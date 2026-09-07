@@ -60,7 +60,7 @@ overrides:
   preact@>=10.26.5 <10.26.10: '>=10.26.10'
   devalue@>=5.1.0 <5.6.2: '>=5.6.2'
   axios@>=1.0.0 <1.12.0: '>=1.12.0'
-  jspdf@<=3.0.4: '>=4.0.0'
+  jspdf@<=3.0.4: '>=4.2.1'
   seroval@<=1.4.0: '>=1.4.1'
   seroval@<1.4.1: '>=1.4.1'
   undici@>=7.0.0 <7.18.2: '>=7.18.2'
@@ -219,3 +219,5 @@ minimumReleaseAgeExclude:
   - "@faker-js/faker@10.5.0"
   # Renovate security update: next@15.5.25
   - next@15.5.25
+  # Renovate security update: jspdf@4.2.1
+  - jspdf@4.2.1
