@@ -31,6 +31,7 @@ auditConfig:
 overrides:
   semver@>=7.0.0 <7.5.2: '>=7.5.2'
   better-call@<1.0.12: '>=1.0.12'
+  browserslist@<=4.28.6: '>=4.28.7'
   '@eslint/plugin-kit@<0.3.4': '>=0.3.4'
   mermaid@>=11.1.0 <11.10.0: '>=11.10.0'
   devalue@<5.3.2: '>=5.3.2'
