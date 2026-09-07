@@ -78,7 +78,7 @@ overrides:
   qs@>=6.7.0 <=6.14.1: '>=6.14.2'
   '@modelcontextprotocol/sdk@<1.24.0': '>=1.24.0'
   tar@<=7.5.2: '>=7.5.3'
-  jspdf@<4.2.0: '>=4.2.0'
+  jspdf@<4.2.0: '>=4.2.1'
   devalue@<=5.6.2: '>=5.6.3'
   langchain@<0.3.37: '>=0.3.37'
   '@langchain/core@<0.3.80': '>=0.3.80'
@@ -219,3 +219,5 @@ minimumReleaseAgeExclude:
   - "@faker-js/faker@10.5.0"
   # Renovate security update: next@15.5.25
   - next@15.5.25
+  # Renovate security update: jspdf@4.2.1
+  - jspdf@4.2.1
