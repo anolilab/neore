@@ -221,3 +221,5 @@ minimumReleaseAgeExclude:
   - next@15.5.25
   # Renovate security update: jspdf@4.2.1
   - jspdf@4.2.1
+  # Renovate security update: ai@4.3.19
+  - ai@4.3.19
