@@ -70,7 +70,7 @@ overrides:
   diff@>=6.0.0 <8.0.3: '>=8.0.3'
   js-yaml@<3.14.2: '>=3.14.2'
   js-yaml@>=4.0.0 <4.1.1: '>=4.1.1'
-  jspdf@<=4.0.0: '>=4.1.0'
+  jspdf@<=4.0.0: '>=4.2.1'
   '@isaacs/brace-expansion@<=5.0.0': '>=5.0.1'
   mdast-util-to-hast@>=13.0.0 <13.2.1: '>=13.2.1'
   '@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3': '>=1.26.0'
@@ -219,3 +219,5 @@ minimumReleaseAgeExclude:
   - "@faker-js/faker@10.5.0"
   # Renovate security update: next@15.5.25
   - next@15.5.25
+  # Renovate security update: jspdf@4.2.1
+  - jspdf@4.2.1
