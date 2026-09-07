@@ -214,7 +214,7 @@ importers:
         specifier: 21.2.4
         version: 21.2.4
       '@secretlint/secretlint-rule-preset-recommend':
-        specifier: ^10.1.1
+        specifier: ^10.2.2
         version: 10.2.2
       audit-ci:
         specifier: ^7.1.0
