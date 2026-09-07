@@ -50,7 +50,7 @@ overrides:
   mdast-util-to-hast@>=13.0.0 <13.2.1: '>=13.2.1'
   '@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3': '>=1.26.0'
   '@langchain/community@<=1.1.13': '>=1.1.14'
-  qs@>=6.7.0 <=6.14.1: '>=6.14.2'
+  qs@>=6.7.0 <=6.14.1: '>=6.16.0'
   '@modelcontextprotocol/sdk@<1.24.0': '>=1.24.0'
   tar@<=7.5.2: '>=7.5.3'
   jspdf@<4.2.0: '>=4.2.0'
