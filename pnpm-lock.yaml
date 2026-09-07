@@ -586,8 +586,8 @@ importers:
         specifier: 6.0.1
         version: 6.0.1(prettier@3.6.2)
       '@faker-js/faker':
-        specifier: ^9.8.0
-        version: 9.8.0
+        specifier: ^10.0.0
+        version: 10.6.0
       '@lingui/babel-plugin-lingui-macro':
         specifier: ^5.9.5
         version: 5.9.5(babel-plugin-macros@3.1.0)(typescript@5.8.3)
@@ -2115,9 +2115,9 @@ packages:
     resolution: {integrity: sha512-+CNAzxglkrpNf/kKywqQfk74QjtceuOE7Qm+AF8miRvPF/wmmK5+OJOgVh3AVTT3RP2mH3+FOaxlE5v72owk0A==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@faker-js/faker@9.8.0':
-    resolution: {integrity: sha512-U9wpuSrJC93jZBxx/Qq2wPjCuYISBueyVUGK7qqdmj7r/nxaxwW8AQDCLeRO7wZnjj94sh3p246cAYjUKuqgfg==}
-    engines: {node: '>=18.0.0', npm: '>=9.0.0'}
+  '@faker-js/faker@10.6.0':
+    resolution: {integrity: sha512-3RQHgEtvL1Frl/d1cSreo7qhJ3Gk1OdNUai/CtZ8G+wYeRQnJih3s9xJ9/kgYekPQRdwgh0HXRPqMlzWGwivIQ==}
+    engines: {node: ^20.19.0 || ^22.13.0 || ^23.5.0 || >=24.0.0, npm: '>=10'}
 
   '@fastify/busboy@3.2.0':
     resolution: {integrity: sha512-m9FVDXU3GT2ITSe0UaMA5rU3QkfC/UXtCU8y0gSN/GugTqtVldOBWIB5V6V3sbmenVZUIpU6f+mPEO2+m5iTaA==}
@@ -5265,7 +5265,7 @@ packages:
   '@tailwindcss/vite@4.3.3':
     resolution: {integrity: sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==}
     peerDependencies:
-      vite: '>=7.3.2'
+      vite: '>=7.3.6'
 
   '@tanstack/directive-functions-plugin@1.121.31':
     resolution: {integrity: sha512-SC+oUtp7R0TM3wKY1xyGDb5aq0QrshEUxcpVJhJ/fUTKI9DClOW5uuQuwbaY5SW0pM0PbwzwMwau8JtXVKJNiQ==}
@@ -14377,7 +14377,7 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@faker-js/faker@9.8.0': {}
+  '@faker-js/faker@10.6.0': {}
 
   '@fastify/busboy@3.2.0':
     optional: true
@@ -21399,7 +21399,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.19.0)
+      retry-axios: 2.6.0(axios@1.19.0(debug@4.4.3))
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -24416,7 +24416,7 @@ snapshots:
       onetime: 7.0.0
       signal-exit: 4.1.0
 
-  retry-axios@2.6.0(axios@1.19.0):
+  retry-axios@2.6.0(axios@1.19.0(debug@4.4.3)):
     dependencies:
       axios: 1.19.0(debug@4.4.3)
 

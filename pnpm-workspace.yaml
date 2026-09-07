@@ -213,3 +213,6 @@ overrides:
   tar@<=7.5.20: '>=7.5.21'
   ts-deepmerge@<8.0.0: '>=8.0.0'
   undici: '>=8.9.0'
+minimumReleaseAgeExclude:
+  # Renovate security update: @faker-js/faker@10.5.0
+  - "@faker-js/faker@10.5.0"

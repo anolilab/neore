@@ -146,7 +146,7 @@
     },
     "devDependencies": {
         "@anolilab/prettier-config": "6.0.1",
-        "@faker-js/faker": "^9.8.0",
+        "@faker-js/faker": "^10.0.0",
         "@lingui/babel-plugin-lingui-macro": "^5.9.5",
         "@lingui/cli": "^5.9.5",
         "@lingui/vite-plugin": "^5.9.5",
