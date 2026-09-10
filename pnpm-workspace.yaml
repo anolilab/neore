@@ -74,7 +74,7 @@ overrides:
   '@isaacs/brace-expansion@<=5.0.0': '>=5.0.1'
   mdast-util-to-hast@>=13.0.0 <13.2.1: '>=13.2.1'
   '@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3': '>=1.26.0'
-  '@langchain/community@<=1.1.13': '>=1.1.14'
+  '@langchain/community@<=1.1.13': '>=1.1.18'
   qs@>=6.7.0 <=6.14.1: '>=6.14.2'
   '@modelcontextprotocol/sdk@<1.24.0': '>=1.24.0'
   tar@<=7.5.2: '>=7.5.3'
@@ -223,3 +223,5 @@ minimumReleaseAgeExclude:
   - jspdf@4.2.1
   # Renovate security update: ai@4.3.19
   - ai@4.3.19
+  # Renovate security update: @langchain/community@1.1.18
+  - "@langchain/community@1.1.18"
