@@ -160,7 +160,7 @@
         "eslint-plugin-react-compiler": "19.1.0-rc.2",
         "jsdom": "^26.1.0",
         "npm-run-all2": "8.0.4",
-        "prettier": "^3.6.2",
+        "prettier": "^3.9.6",
         "prettier-plugin-tailwindcss": "0.6.13",
         "react-scan": "^0.3.4",
         "sort-package-json": "^3.3.0",
