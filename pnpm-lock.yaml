@@ -156,7 +156,7 @@ overrides:
   tmp@<0.2.6: '>=0.2.6'
   axios@>=1.0.0 <1.16.0: '>=1.16.0'
   axios@>=1.7.0 <1.16.0: '>=1.16.0'
-  vitest@<3.2.6: '>=3.2.6'
+  vitest@<3.2.6: '>=4.1.11'
   mermaid@>=11.0.0-alpha.1 <=11.14.0: '>=11.15.0'
   langsmith@<0.6.0: '>=0.6.0'
   kysely@>=0.26.0 <0.28.17: '>=0.28.17'
@@ -650,7 +650,7 @@ importers:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.9.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
       vitest:
-        specifier: '>=3.2.6'
+        specifier: '>=4.1.11'
         version: 5.0.0(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(jsdom@26.1.0)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
       web-vitals:
         specifier: ^5.0.3
@@ -729,7 +729,7 @@ importers:
         specifier: ^8.69.0
         version: 8.69.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
       vitest:
-        specifier: '>=3.2.6'
+        specifier: '>=4.1.11'
         version: 5.0.0(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(jsdom@26.1.0)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
       zod:
         specifier: ^3.25.67
@@ -918,7 +918,7 @@ packages:
       prettier: ^3.7.4
       secretlint: ^7.x || ^8.x || ^10.0.0 || ^11.0.0
       stylelint: ^15.x || ^16.x
-      vitest: '>=3.2.6'
+      vitest: '>=4.1.11'
     peerDependenciesMeta:
       eslint:
         optional: true
@@ -6547,7 +6547,7 @@ packages:
       '@typescript-eslint/eslint-plugin': '*'
       eslint: '>=8.57.0'
       typescript: '>=5.0.0'
-      vitest: '>=3.2.6'
+      vitest: '>=4.1.11'
     peerDependenciesMeta:
       '@typescript-eslint/eslint-plugin':
         optional: true
@@ -6932,7 +6932,7 @@ packages:
       react-dom: ^18.0.0 || ^19.0.0
       solid-js: ^1.0.0
       svelte: ^4.0.0 || ^5.0.0
-      vitest: '>=3.2.6'
+      vitest: '>=4.1.11'
       vue: ^3.0.0
     peerDependenciesMeta:
       '@lynx-js/react':
@@ -13676,7 +13676,7 @@ snapshots:
   '@antfu/install-pkg@1.1.0':
     dependencies:
       package-manager-detector: 1.8.0
-      tinyexec: 1.0.1
+      tinyexec: 1.3.1
 
   '@antfu/install-pkg@2.0.1':
     dependencies:
@@ -17222,7 +17222,7 @@ snapshots:
       estree-walker: 2.0.2
       fdir: 6.5.0(picomatch@4.0.7)
       is-reference: 1.2.1
-      magic-string: 0.30.17
+      magic-string: 0.30.21
       picomatch: 4.0.7
     optionalDependencies:
       rollup: 4.63.1
@@ -17245,7 +17245,7 @@ snapshots:
       astring: 1.9.0
       estree-walker: 2.0.2
       fast-glob: 3.3.3
-      magic-string: 0.30.17
+      magic-string: 0.30.21
     optionalDependencies:
       rollup: 4.63.1
 
@@ -17253,7 +17253,7 @@ snapshots:
     dependencies:
       '@rollup/pluginutils': 5.2.0(rollup@4.63.1)
       estree-walker: 2.0.2
-      magic-string: 0.30.17
+      magic-string: 0.30.21
     optionalDependencies:
       rollup: 4.63.1
 
@@ -17286,7 +17286,7 @@ snapshots:
   '@rollup/plugin-replace@6.0.2(rollup@4.63.1)':
     dependencies:
       '@rollup/pluginutils': 5.2.0(rollup@4.63.1)
-      magic-string: 0.30.17
+      magic-string: 0.30.21
     optionalDependencies:
       rollup: 4.63.1
 
@@ -22087,7 +22087,7 @@ snapshots:
       jsonwebtoken: 9.0.3
       load-esm: 1.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.18.0(debug@4.3.4))
+      retry-axios: 2.6.0(axios@1.18.0)
       tough-cookie: 4.1.3
     transitivePeerDependencies:
       - supports-color
@@ -25113,7 +25113,7 @@ snapshots:
       onetime: 7.0.0
       signal-exit: 4.1.0
 
-  retry-axios@2.6.0(axios@1.18.0(debug@4.3.4)):
+  retry-axios@2.6.0(axios@1.18.0):
     dependencies:
       axios: 1.18.0(debug@4.3.4)
 
@@ -25149,7 +25149,7 @@ snapshots:
 
   rollup-plugin-dts@6.2.3(rollup@4.63.1)(typescript@5.9.3):
     dependencies:
-      magic-string: 0.30.17
+      magic-string: 0.30.21
       rollup: 4.63.1
       typescript: 5.9.3
     optionalDependencies:
@@ -25160,7 +25160,7 @@ snapshots:
       commenting: 1.1.0
       fdir: 6.5.0(picomatch@4.0.7)
       lodash: 4.18.1
-      magic-string: 0.30.17
+      magic-string: 0.30.21
       moment: 2.30.1
       package-name-regex: 2.0.6
       rollup: 4.63.1
@@ -25177,7 +25177,7 @@ snapshots:
   rollup-plugin-pure@0.4.0(rollup@4.63.1):
     dependencies:
       estree-walker: 3.0.3
-      magic-string: 0.30.17
+      magic-string: 0.30.21
       rollup: 4.63.1
       unplugin-utils: 0.2.5
 
