@@ -180,7 +180,7 @@ overrides:
   tmp@<0.2.6: '>=0.2.6'
   axios@>=1.0.0 <1.16.0: '>=1.16.0'
   axios@>=1.7.0 <1.16.0: '>=1.16.0'
-  vitest@<3.2.6: '>=3.2.6'
+  vitest@<3.2.6: '>=3.2.7'
   mermaid@>=11.0.0-alpha.1 <=11.14.0: '>=11.15.0'
   langsmith@<0.6.0: '>=0.6.0'
   kysely@>=0.26.0 <0.28.17: '>=0.28.17'
@@ -225,3 +225,5 @@ minimumReleaseAgeExclude:
   - ai@4.3.19 || 5.0.52
   # Renovate security update: @langchain/community@1.1.18
   - "@langchain/community@1.1.18"
+  # Renovate security update: vitest@3.2.7
+  - vitest@3.2.7
