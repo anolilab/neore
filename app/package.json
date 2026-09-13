@@ -155,7 +155,7 @@
         "@testing-library/react": "^16.3.0",
         "@types/react": "^19.2.18",
         "@types/react-dom": "^19.2.5",
-        "@vitejs/plugin-react": "^4.6.0",
+        "@vitejs/plugin-react": "^5.2.0",
         "babel-plugin-react-compiler": "19.1.0-rc.3",
         "eslint-plugin-react-compiler": "19.1.0-rc.2",
         "jsdom": "^26.1.0",
