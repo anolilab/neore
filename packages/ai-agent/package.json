@@ -96,7 +96,7 @@
         "@edge-runtime/vm": "^5.0.0",
         "@total-typescript/ts-reset": "^0.6.1",
 "@types/node": "^24.13.3",
-        "@types/react": "^19.2.18",
+        "@types/react": "^19.3.0",
         "@visulima/packem": "^1.28.3",
         "convex": "^1.24.8",
         "convex-helpers": "^0.1.95",
