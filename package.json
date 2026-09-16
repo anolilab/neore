@@ -40,25 +40,25 @@
         "sort-package-json": "sort-package-json packages/**/package.json app/package.json ./package.json"
     },
     "dependencies": {
-        "@anolilab/commitlint-config": "^6.0.1",
-        "@anolilab/lint-staged-config": "^3.0.17",
-        "@anolilab/prettier-config": "6.0.1",
+        "@anolilab/commitlint-config": "^6.0.7",
+        "@anolilab/lint-staged-config": "^3.0.41",
+        "@anolilab/prettier-config": "6.0.8",
         "@commitlint/cli": "^19.8.1",
         "@commitlint/config-conventional": "^19.8.1",
         "@nx/workspace": "21.2.4",
         "@secretlint/secretlint-rule-preset-recommend": "^10.2.2",
         "audit-ci": "^7.1.0",
-        "commitizen": "^4.3.1",
+        "commitizen": "^4.3.2",
         "dotenv": "16.5.0",
         "husky": "^9.1.7",
         "is-ci": "^4.1.0",
-        "lint-staged": "^16.1.2",
+        "lint-staged": "^16.1.6",
 "nx": "23.1.3",
         "prettier": "^3.6.2",
-        "prettier-plugin-tailwindcss": "0.6.13",
+        "prettier-plugin-tailwindcss": "0.6.14",
         "secretlint": "10.1.1",
-        "sort-package-json": "^3.3.0",
+        "sort-package-json": "^3.3.1",
         "typescript": "^5.8.3"
     },
-    "packageManager": "pnpm@10.12.3"
+    "packageManager": "pnpm@10.12.4"
 }
