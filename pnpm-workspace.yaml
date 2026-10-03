@@ -58,8 +58,8 @@ overrides:
   better-auth@<1.4.5: '>=1.4.22'
   '@modelcontextprotocol/sdk@<1.25.2': '>=1.25.3'
   preact@>=10.26.5 <10.26.10: '>=10.26.10'
-  devalue@>=5.1.0 <5.6.2: '>=5.6.4'
-  axios@>=1.0.0 <1.12.0: '>=1.12.0'
+  devalue@>=5.1.0 <5.6.2: '>=5.6.2'
+  axios@>=1.0.0 <1.12.0: '>=1.12.2'
   jspdf@<=3.0.4: '>=4.2.1'
   seroval@<=1.4.0: '>=1.4.2'
   seroval@<1.4.1: '>=1.4.2'
@@ -233,5 +233,5 @@ minimumReleaseAgeExclude:
   - fast-uri@4.1.5
   # Renovate security update: dompurify@3.4.16
   - dompurify@3.4.16
-  # Renovate security update: axios@1.20.0
-  - axios@1.20.0
+  # Renovate security update: axios@1.20.0 || 1.12.2
+  - axios@1.20.0 || 1.12.2
