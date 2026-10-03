@@ -39,7 +39,7 @@ overrides:
   mermaid@>=11.0.0-alpha.1 <11.10.0: '>=11.10.0'
   vite@>=7.0.0 <=7.0.6: '>=7.0.8'
   jspdf@<=3.0.1: '>=4.2.1'
-  next@>=15.0.0-canary.0 <15.4.7: '>=15.4.11'
+  next@>=15.0.0-canary.0 <15.4.7: '>=15.5.27'
   jsondiffpatch@<0.7.2: '>=0.7.2'
   vite@>=7.0.0 <=7.0.7: '>=7.0.8'
   playwright@<1.55.1: '>=1.55.1'
@@ -217,8 +217,8 @@ overrides:
 minimumReleaseAgeExclude:
   # Renovate security update: @faker-js/faker@10.5.0
   - "@faker-js/faker@10.5.0"
-  # Renovate security update: next@15.5.25
-  - next@15.5.25
+  # Renovate security update: next@15.5.25 || 15.5.27
+  - next@15.5.25 || 15.5.27
   # Renovate security update: jspdf@4.2.1
   - jspdf@4.2.1
   # Renovate security update: ai@4.3.19 || 5.0.52
