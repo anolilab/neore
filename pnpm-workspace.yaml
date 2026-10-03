@@ -174,7 +174,7 @@ overrides:
   ws@>=8.0.0 <8.20.1: '>=8.20.1'
   protobufjs@<=7.5.7: '>=7.5.8'
   seroval@>=0.2.0 <=1.4.0: '>=1.4.1'
-  serialize-javascript@>=5.0.0 <7.0.5: '>=7.0.5'
+  serialize-javascript@>=5.0.0 <7.0.5: '>=7.0.7'
   uuid@<11.1.1: '>=11.1.1'
   qs@>=6.11.1 <=6.15.1: '>=6.15.2'
   tmp@<0.2.6: '>=0.2.6'
@@ -235,3 +235,5 @@ minimumReleaseAgeExclude:
   - dompurify@3.4.16
   # Renovate security update: axios@1.20.0
   - axios@1.20.0
+  # Renovate security update: serialize-javascript@7.0.7
+  - serialize-javascript@7.0.7
