@@ -166,7 +166,7 @@ overrides:
   next@>=15.0.0 <15.5.16: '>=15.5.27'
   next@>=10.0.0 <15.5.16: '>=15.5.25'
   next@>=13.4.13 <15.5.16: '>=15.5.25'
-  next@>=14.2.0 <15.5.16: '>=15.5.25'
+  next@>=14.2.0 <15.5.16: '>=15.5.27'
   next@>=15.2.0 <15.5.16: '>=15.5.27'
   nitropack@<2.13.4: '>=2.13.4'
   devalue@>=4.0.0 <5.6.4: '>=5.6.4'
@@ -217,8 +217,8 @@ overrides:
 minimumReleaseAgeExclude:
   # Renovate security update: @faker-js/faker@10.5.0
   - "@faker-js/faker@10.5.0"
-  # Renovate security update: next@15.5.25 || 16.3.8
-  - next@15.5.25 || 16.3.8
+  # Renovate security update: next@15.5.25 || 16.3.8 || 15.5.27
+  - next@15.5.25 || 16.3.8 || 15.5.27
   # Renovate security update: jspdf@4.2.1
   - jspdf@4.2.1
   # Renovate security update: ai@4.3.19 || 5.0.52
