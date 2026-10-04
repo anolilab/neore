@@ -415,8 +415,8 @@ importers:
         specifier: ^0.11.2
         version: 0.11.2(@modelcontextprotocol/sdk@1.30.0(zod@3.25.76))(next@16.3.4(@babel/core@7.29.7)(@opentelemetry/api@1.9.0)(@playwright/test@1.63.0)(@types/node@24.19.1)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.1.9(react@19.1.9))(react@19.1.9))
       '@visulima/pail':
-        specifier: ^2.1.31
-        version: 2.1.31(ai@7.0.127(zod@3.25.76))
+        specifier: ^3.2.2
+        version: 3.2.2(@opentelemetry/api@1.9.0)
       ai:
         specifier: ^7.0.122
         version: 7.0.127(zod@3.25.76)
@@ -6414,25 +6414,15 @@ packages:
     engines: {node: '>=18.0.0 <=23.x'}
     os: [darwin, linux, win32]
 
-  '@visulima/colorize@1.4.24':
-    resolution: {integrity: sha512-RtU3RoSRX4ih2Z5CWYUH3skAMv30Qn/SEm0AibgvcfEv6TDj2KjsCruSTuAWFmWAzx1u4jr8bXCn3YlN0ngwUA==}
-    engines: {node: '>=18.0.0 <=24.x'}
+  '@visulima/colorize@1.4.29':
+    resolution: {integrity: sha512-oCoKVh4mUkiOcmPpoHn7kTxOeT0AAERYrGaqDyoqFZS1pc5yTsUctSIIlf1BC6Ydm/yr/JY5jCl40B+vHiZvlw==}
+    engines: {node: '>=18.0.0 <=25.x'}
     os: [darwin, linux, win32]
 
   '@visulima/error@4.4.18':
     resolution: {integrity: sha512-JSfYrRRb3LLRTaql1Fi4T7067ilTSWwxLjcLQv61zhCKOoQoUJux88C9/m4+ebXspqZV98KbAP9W9uPpIpp6Ig==}
     engines: {node: '>=18.0.0 <=23.x'}
     os: [darwin, linux, win32]
-
-  '@visulima/error@5.0.0':
-    resolution: {integrity: sha512-p+HwJNtDUVxOOjOD4ijCDl/LT7kzw5KZZ6/pyuGg0Hyj/r8spyA+jswUEdTrKA77s6DS9A8AA5+Gjxb7w3LrvA==}
-    engines: {node: '>=20.19 <=24.x'}
-    os: [darwin, linux, win32]
-    peerDependencies:
-      ai: '>=5.0.269'
-    peerDependenciesMeta:
-      ai:
-        optional: true
 
   '@visulima/find-cache-dir@1.0.31':
     resolution: {integrity: sha512-EWD8XxufhhX0AbSP98t977E/6XvZw4wtsD3UMAr7xw83PhRfTS3uQsnk4Trcppf03bjx7y/R044qfyQZiuetGg==}
@@ -6441,11 +6431,6 @@ packages:
   '@visulima/fmt@1.1.15':
     resolution: {integrity: sha512-r0+HmEwvbgz2ey+I7NyNfaDF6qHmsUYxmZ2nUl9nWUunyLQO2f1IYy/ZJFLBnsaYpbhqWXG32lFlUtmar4c3rQ==}
     engines: {node: '>=18.0.0 <=23.x'}
-    os: [darwin, linux, win32]
-
-  '@visulima/fmt@1.1.16':
-    resolution: {integrity: sha512-0kDEt1VI9CGTu6hpQhBsOjl9p9s4c3uPa3oQGJEvxtm4qqc/7WzFzLkutvwyWuaYv+3SQNaPOTthkrsBAwadcA==}
-    engines: {node: '>=18.0.0 <=24.x'}
     os: [darwin, linux, win32]
 
   '@visulima/fs@3.1.5':
@@ -6486,18 +6471,14 @@ packages:
     resolution: {integrity: sha512-qV8+tm35NY1XBKbfMoygvgx1Nz05zBeyoyjV6Fi/JMouUHOhpFkX79tHRtg1IWj8c42OR8FLCmP5WFDLcrUGKg==}
     engines: {node: '>=18.0.0 <=23.x'}
 
-  '@visulima/inspector@1.0.25':
-    resolution: {integrity: sha512-y2qmH42ByWTNt3pc38NZF2TC5HB+S7iBhr8qEDwV2IuBZGqZ5G6HqjQtdESSZBDL1QcMdKiCN2Y2TUrBXQLT+g==}
-    engines: {node: '>=18.0.0 <=24.x'}
-
   '@visulima/is-ansi-color-supported@2.2.14':
     resolution: {integrity: sha512-5Z3V97wvXl+0b4uykb0jKG7nPhLfXG0pl5mdyAhIuUzCNRqwk6Tn7Upb16WyWafeKd7kTHY9nr78uTiPtOYuXg==}
     engines: {node: '>=18.0.0 <=23.x'}
     os: [darwin, linux, win32]
 
-  '@visulima/is-ansi-color-supported@2.3.0':
-    resolution: {integrity: sha512-kM0t6vAhAjUQiKGoEIxD56VTLPz5nbh/WDGdFLLpQOrNK/TjrsxoDLlPRGLFpDyP+PucMR/XibXTXY96QX+t/A==}
-    engines: {node: '>=18.0.0 <=24.x'}
+  '@visulima/is-ansi-color-supported@2.3.5':
+    resolution: {integrity: sha512-lN42DAqpzI7ubcr/lUz9XSW+T3s/TNI31iwUMfb1nKU5c/zhYe04Nx+Jkw1x0yJOCyRSAO1tX1m6477mGHogng==}
+    engines: {node: '>=18.0.0 <=25.x'}
     os: [darwin, linux, win32]
 
   '@visulima/package@3.5.8':
@@ -6602,14 +6583,17 @@ packages:
       rotating-file-stream:
         optional: true
 
-  '@visulima/pail@2.1.31':
-    resolution: {integrity: sha512-qQSDV61XSuEaALtZH1yipibogIzQ1qU4pv0e9YmUpCX+DUPte7ycICVDpVmv7SHuTk9qYK7OAqHqLfMCk8V/hw==}
-    engines: {node: '>=18.0.0 <=24.x'}
+  '@visulima/pail@3.2.2':
+    resolution: {integrity: sha512-DiHq3fmNackFinBYnWM4z8y73rJAHnZwuhpOdTy+CTIeMoqao+14m1kaY1xMPk+SR5x69pin8FEdAFIWey3+Xg==}
+    engines: {node: '>=20.19 <=25.x'}
     os: [darwin, linux, win32]
     peerDependencies:
-      '@visulima/redact': 2.0.0
-      rotating-file-stream: ^3.1.1
+      '@opentelemetry/api': ^1.9
+      '@visulima/redact': 2.0.5
+      rotating-file-stream: ^3.2.7
     peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
       '@visulima/redact':
         optional: true
       rotating-file-stream:
@@ -19079,15 +19063,11 @@ snapshots:
     dependencies:
       '@visulima/is-ansi-color-supported': 2.2.14
 
-  '@visulima/colorize@1.4.24':
+  '@visulima/colorize@1.4.29':
     dependencies:
-      '@visulima/is-ansi-color-supported': 2.3.0
+      '@visulima/is-ansi-color-supported': 2.3.5
 
   '@visulima/error@4.4.18': {}
-
-  '@visulima/error@5.0.0(ai@7.0.127(zod@3.25.76))':
-    optionalDependencies:
-      ai: 7.0.127(zod@3.25.76)
 
   '@visulima/find-cache-dir@1.0.31(yaml@2.9.0)':
     dependencies:
@@ -19097,8 +19077,6 @@ snapshots:
       - yaml
 
   '@visulima/fmt@1.1.15': {}
-
-  '@visulima/fmt@1.1.16': {}
 
   '@visulima/fs@3.1.5(yaml@2.9.0)':
     dependencies:
@@ -19123,13 +19101,9 @@ snapshots:
 
   '@visulima/inspector@1.0.24': {}
 
-  '@visulima/inspector@1.0.25':
-    dependencies:
-      type-fest: 5.9.0
-
   '@visulima/is-ansi-color-supported@2.2.14': {}
 
-  '@visulima/is-ansi-color-supported@2.3.0': {}
+  '@visulima/is-ansi-color-supported@2.3.5': {}
 
   '@visulima/package@3.5.8(@types/node@24.19.1)(yaml@2.9.0)':
     dependencies:
@@ -19225,16 +19199,11 @@ snapshots:
       '@visulima/inspector': 1.0.24
       safe-stable-stringify: 2.5.0
 
-  '@visulima/pail@2.1.31(ai@7.0.127(zod@3.25.76))':
+  '@visulima/pail@3.2.2(@opentelemetry/api@1.9.0)':
     dependencies:
-      '@visulima/colorize': 1.4.24
-      '@visulima/error': 5.0.0(ai@7.0.127(zod@3.25.76))
-      '@visulima/fmt': 1.1.16
-      '@visulima/inspector': 1.0.25
-      safe-stable-stringify: 2.5.0
-      type-fest: 5.9.0
-    transitivePeerDependencies:
-      - ai
+      '@visulima/colorize': 1.4.29
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.0
 
   '@visulima/path@1.4.0': {}
 
