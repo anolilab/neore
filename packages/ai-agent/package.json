@@ -97,7 +97,7 @@
         "@total-typescript/ts-reset": "^0.6.1",
 "@types/node": "^24.19.0",
         "@types/react": "^19.3.0",
-        "@visulima/packem": "^1.28.3",
+        "@visulima/packem": "^2.1.0",
         "convex": "^1.24.8",
         "convex-helpers": "^0.1.124",
         "convex-test": "^0.0.60",
