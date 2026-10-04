@@ -13,11 +13,11 @@ overrides:
   devalue@<5.3.2: '>=5.3.2'
   next@>=15.0.0 <=15.4.4: '>=15.5.27'
   mermaid@>=11.0.0-alpha.1 <11.10.0: '>=11.10.0'
-  vite@>=7.0.0 <=7.0.6: '>=7.3.6'
+  vite@>=7.0.0 <=7.0.6: '>=8.3.1'
   jspdf@<=3.0.1: '>=4.2.1'
   next@>=15.0.0-canary.0 <15.4.7: '>=15.5.27'
   jsondiffpatch@<0.7.2: '>=0.7.2'
-  vite@>=7.0.0 <=7.0.7: '>=7.3.6'
+  vite@>=7.0.0 <=7.0.7: '>=8.3.1'
   playwright@<1.55.1: '>=1.55.1'
   tmp@<=0.2.3: '>=0.2.7'
   form-data@>=4.0.0 <4.0.4: '>=4.0.6'
@@ -112,7 +112,7 @@ overrides:
   dompurify@<=3.3.1: '>=3.3.3'
   better-auth@<1.4.9: '>=1.4.22'
   defu@<=6.1.4: '>=6.1.7'
-  vite@>=7.0.0 <=7.3.1: '>=7.3.6'
+  vite@>=7.0.0 <=7.3.1: '>=8.3.1'
   next@>=13.0.0 <15.5.15: '>=15.5.27'
   langsmith@<=0.5.17: '>=0.5.18'
   h3@<=1.15.4: '>=1.15.5'
@@ -2993,7 +2993,7 @@ packages:
     resolution: {integrity: sha512-oFlEkr4/56yWZYVJ5xfYfJUTgegSKkbQUo/t/MJVFcyxiMvtGsyzrZdm7grwbY9v8JbVyW5BdcIGN6/Z8wvEtw==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
 
   '@loaderkit/resolve@1.0.6':
     resolution: {integrity: sha512-G8FdIoF5CypfwmD9rl8BXod5HDn8JqB0CCNBXDTaRZ+yRYhARrrSToX1zg1zy9jX3zLqigsELwhT4gNtkdQAUg==}
@@ -5648,7 +5648,7 @@ packages:
   '@tailwindcss/vite@4.3.3':
     resolution: {integrity: sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==}
     peerDependencies:
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
 
   '@tanstack/devtools-event-client@0.4.4':
     resolution: {integrity: sha512-6T5Yop/793YI+H+5J8Hsyj4kCih9sl4t3ElLgKioW5hk3ocn+ZdSJ94tT7vL7uabxSugWYBZlOTMPzEw2puvQw==}
@@ -5659,7 +5659,7 @@ packages:
     resolution: {integrity: sha512-SC+oUtp7R0TM3wKY1xyGDb5aq0QrshEUxcpVJhJ/fUTKI9DClOW5uuQuwbaY5SW0pM0PbwzwMwau8JtXVKJNiQ==}
     engines: {node: '>=12'}
     peerDependencies:
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
 
   '@tanstack/form-core@1.33.5':
     resolution: {integrity: sha512-3dfx9MBP0aq5sXKteikG629X9oviptrQj0IFRk9YGcb+lB7Kv5x8S17oOSk1wUWgjQZ4xVJEMbKwOAODymocgA==}
@@ -5743,7 +5743,7 @@ packages:
     engines: {node: '>=12'}
     peerDependencies:
       '@vitejs/plugin-react': '>=4.3.4'
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
 
   '@tanstack/react-start-server@1.121.41':
     resolution: {integrity: sha512-hTNw8HJvfCoRceuiCb09IXWDZCbbf3YQb2IHosZxXt4OniclhRz0L82lwCllzXP6oCIzbHjkkTpM7SwomVu5EQ==}
@@ -5759,7 +5759,7 @@ packages:
       '@vitejs/plugin-react': '>=4.3.4'
       react: '>=18.0.0 || >=19.0.0'
       react-dom: '>=18.0.0 || >=19.0.0'
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
 
   '@tanstack/react-store@0.11.1':
     resolution: {integrity: sha512-HaIGKI3YLmjBYIvy5DFDY23oNaYZIsTZfngey07Uh5iLVJgM3bIGCnZeOFOqzjFld9JHWcaHJnasD/bKoGKwJQ==}
@@ -5818,7 +5818,7 @@ packages:
     peerDependencies:
       '@rsbuild/core': '>=1.0.2'
       '@tanstack/react-router': ^1.121.41
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
       vite-plugin-solid: ^2.11.2
       webpack: '>=5.92.0'
     peerDependenciesMeta:
@@ -5839,7 +5839,7 @@ packages:
     peerDependencies:
       '@rsbuild/core': '>=1.0.2 || ^2.0.0'
       '@tanstack/react-router': ^1.170.33
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
       vite-plugin-solid: ^2.11.10 || ^3.0.0-0
       webpack: '>=5.92.0'
     peerDependenciesMeta:
@@ -5882,7 +5882,7 @@ packages:
     resolution: {integrity: sha512-ziv8HCyyLJTwHJpC8XR8Xt2m9W69a9naEGDqyN79jjQ/WXibXB+jJOCz4yWSlZKk0ROOsxHk9dM4i1X50nDxLQ==}
     engines: {node: '>=12'}
     peerDependencies:
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
 
   '@tanstack/start-server-core@1.169.32':
     resolution: {integrity: sha512-/r10WTBAncF1llVqxc7r+a5Y3Lkd685gMbFCl4udV+9022bW40or3K4mmNI5q+LceZgI/HFdHF4+j54wikFrNw==}
@@ -6646,7 +6646,7 @@ packages:
     resolution: {integrity: sha512-YmKkfhOAi3wsB1PhJq5Scj3GXMn3WvtQ/JC0xoopuHoXSdmtdStOpFrYaT1kie2YgFBcIe64ROzMYRjCrYOdYw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
 
   '@vitest/eslint-plugin@1.6.27':
     resolution: {integrity: sha512-X1RCAfwbatG4GFbJ/1PIHP9MSZMt0JJThqbYID+vS4L783k6QGlLPe421wQE8dHXuGCcenVLsydiM4qzsYWxhg==}
@@ -6668,7 +6668,7 @@ packages:
     resolution: {integrity: sha512-66PGTMIiVJP3t4a5yxU9qPtf7MdTBs8jmToMvy+HVflB3Yy13WJZTtPePdvU+wjRV02SKK5doLbSA6o9pwOmiA==}
     peerDependencies:
       msw: ^2.4.9
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
     peerDependenciesMeta:
       msw:
         optional: true
@@ -12976,7 +12976,7 @@ packages:
       rolldown: '*'
       rollup: '>=4.63.5'
       unloader: '*'
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
       webpack: '*'
     peerDependenciesMeta:
       '@farmfe/core':
@@ -13191,7 +13191,7 @@ packages:
   vite-tsconfig-paths@5.1.4:
     resolution: {integrity: sha512-cYj0LRuLV2c2sMqhqhGpaO3LretdtMn/BVX4cPLanIZuwwrkVl+lK84E/miEXkCHWXuq65rhNN4rXsBcOB3S4w==}
     peerDependencies:
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
     peerDependenciesMeta:
       vite:
         optional: true
@@ -13255,7 +13255,7 @@ packages:
       '@vitest/ui': 5.0.0
       happy-dom: '*'
       jsdom: '*'
-      vite: '>=7.3.6'
+      vite: '>=8.3.1'
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
