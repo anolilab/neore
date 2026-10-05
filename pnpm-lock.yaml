@@ -173,7 +173,7 @@ overrides:
   moment@>=2.29.2 <2.31.0: '>=2.31.0 <3'
   smol-toml@<=1.6.2: '>=1.7.1'
   '@ai-sdk/provider-utils@<3.0.28': '>=3.0.28'
-  better-auth@<1.6.22: '>=1.6.31'
+  better-auth@<1.6.22: '>=1.6.33'
   body-parser@>=2.0.0 <2.3.0: '>=2.3.0'
   brace-expansion@>=3.0.0 <5.0.9: '>=5.0.12'
   brace-expansion@>=5.0.0 <5.0.12: '>=5.0.12'
@@ -1531,7 +1531,7 @@ packages:
   '@convex-dev/better-auth@0.6.2':
     resolution: {integrity: sha512-16ehxLCcDc8rtc/Tfyq0TOz2erCQYE5JQhvxMLkpdUmqQU62HHGRY7Tm3TMyfhJFiwa0fP7xk28DSQjTwfowLQ==}
     peerDependencies:
-      better-auth: '>=1.6.31'
+      better-auth: '>=1.6.33'
       convex: ~1.16.5 || >=1.17.0 <1.35.0
       react: ^18.3.1 || ^19.0.0
       react-dom: ^18.3.1 || ^19.0.0
@@ -3696,7 +3696,7 @@ packages:
     engines: {node: '>=16'}
     peerDependencies:
       '@polar-sh/sdk': ^0.47.0
-      better-auth: '>=1.6.31'
+      better-auth: '>=1.6.33'
       zod: ^3.25.0 || ^4.0.0
 
   '@polar-sh/checkout@0.2.1':

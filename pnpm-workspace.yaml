@@ -213,7 +213,7 @@ overrides:
   smol-toml@<=1.6.2: '>=1.7.1'
   # GHSA-866g-f22w-33x8, vulnerable <3.0.28.
   '@ai-sdk/provider-utils@<3.0.28': '>=3.0.28'
-  better-auth@<1.6.22: '>=1.6.31'
+  better-auth@<1.6.22: '>=1.6.33'
   body-parser@>=2.0.0 <2.3.0: '>=2.3.0'
   brace-expansion@>=3.0.0 <5.0.9: '>=5.0.12'
   # GHSA-6j4f-fj2g-mc7p, GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7.
