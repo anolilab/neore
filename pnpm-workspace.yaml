@@ -27,6 +27,14 @@ auditConfig:
     - GHSA-955p-x3mx-jcvp
     - GHSA-52cp-r559-cp3m
     - GHSA-5p4m-2wfm-xmqj
+    # GHSA-vfj7-8cjw-p6xm (braces stack exhaustion) has no fix: the advisory covers <=3.0.3
+    # and 3.0.3 is the latest published version. Only reached through commitizen's
+    # find-node-modules chain, whose patterns come from our own config.
+    - GHSA-vfj7-8cjw-p6xm
+    # GHSA-86w9-cpqp-85rv (node-forge) has no fix available yet: the advisory needs 1.4.1
+    # and 1.4.0 is the latest published version. Reached only through listhen, a
+    # build-time dev-server helper, never in the built app output.
+    - GHSA-86w9-cpqp-85rv
 
 overrides:
   semver@>=7.0.0 <7.5.2: '>=7.5.4'
@@ -95,6 +103,8 @@ overrides:
   minimatch@>=10.0.0 <10.2.3: '>=10.2.3'
   minimatch@<3.1.4: '>=3.1.4'
   serialize-javascript@<=7.0.2: '>=7.0.7'
+  # GHSA-gfhx-hw2g-v5hg, vulnerable >=7.1.1 <7.1.2.
+  serialize-javascript@>=7.1.1 <7.1.2: '>=7.1.2'
   ajv@<6.14.0: '>=6.14.0'
   ajv@>=7.0.0-alpha.0 <8.18.0: '>=8.18.0'
   qs@<6.14.1: '>=6.14.2'
@@ -192,10 +202,25 @@ overrides:
   '@auth/core@<0.41.3': '>=0.41.3'
   '@hono/node-server@<2.0.5': '>=2.0.5'
   axios@>=1.0.0 <1.18.0: '>=1.18.1'
+  # GHSA-3pq3-5fj3-cg6v, GHSA-542g-h47m-68v8, GHSA-c29m-xwm3-cm6r, GHSA-m8m8-qj5v-23w3,
+  # GHSA-mghh-pgcx-3jjj, GHSA-r4gj-5m52-g5wh, GHSA-x97p-jq2g-jp4f (high),
+  # GHSA-44g4-m2mj-wpvx, GHSA-4hqw-qxg8-jxx2, GHSA-9fr6-4gfg-395g, GHSA-j8rh-479h-cp32,
+  # GHSA-vh66-26gq-q6x8 (moderate): all vulnerable <1.20.0.
+  axios@>=1.0.0 <1.20.0: '>=1.20.0'
+  # GHSA-4p3w-j4w9-5jqw, vulnerable >=2.29.2 <2.31.0.
+  moment@>=2.29.2 <2.31.0: '>=2.31.0 <3'
+  # GHSA-7w5x-hrqm-74c2, vulnerable <=1.6.2.
+  smol-toml@<=1.6.2: '>=1.7.1'
+  # GHSA-866g-f22w-33x8, vulnerable <3.0.28.
+  '@ai-sdk/provider-utils@<3.0.28': '>=3.0.28'
   better-auth@<1.6.22: '>=1.6.31'
   body-parser@>=2.0.0 <2.3.0: '>=2.3.0'
   brace-expansion@>=3.0.0 <5.0.9: '>=5.0.12'
+  # GHSA-6j4f-fj2g-mc7p, GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7.
+  brace-expansion@>=5.0.0 <5.0.12: '>=5.0.12'
   dompurify@<=3.4.12: '>=3.4.16'
+  # GHSA-p98j-92pf-mc4p, vulnerable <=3.4.15.
+  dompurify@<=3.4.15: '>=3.4.16'
   engine.io@<6.6.7: '>=6.6.11'
   fast-uri@>=4.0.0 <4.1.2: '>=4.1.5'
   form-data@>=4.0.0 <4.0.6: '>=4.0.6'
@@ -206,6 +231,9 @@ overrides:
   nanoid@>=4.0.0 <5.1.16: '>=5.1.16'
   nanoid@<3.3.17: '>=3.3.17'
   next@>=16.0.0 <16.2.11: '>=16.3.8'
+  # GHSA-vcvr-r3jv-pc5j (critical), vulnerable >=16.2.0 <16.3.6.
+  next@>=16.2.0 <16.3.6: '>=16.3.8'
+  next@<16.3.6: '>=16.3.8'
   nx@>=17.0.4 <22.7.7: '>=22.7.9'
   postcss@<=8.5.22: '>=8.5.28'
   sharp@<0.35.0: '>=0.35.5'
