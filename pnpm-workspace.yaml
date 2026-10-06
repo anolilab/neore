@@ -35,6 +35,8 @@ auditConfig:
     # and 1.4.0 is the latest published version. Reached only through listhen, a
     # build-time dev-server helper, never in the built app output.
     - GHSA-86w9-cpqp-85rv
+    # katex fix is 0.18.2 but micromark-extension-math (dev-only eslint markdown) needs ^0.16.0.
+    - GHSA-238p-pmpm-9mq7
 
 overrides:
   semver@>=7.0.0 <7.5.2: '>=7.5.4'
@@ -242,6 +244,10 @@ overrides:
   tar@<=7.5.20: '>=7.5.22'
   ts-deepmerge@<8.0.0: '>=8.0.0'
   undici: '>=8.9.0'
+  nx@>=23.0.0 <23.2.1: '>=23.2.1'
+  postcss-selector-parser@<7.1.6: '>=7.1.6'
+  proxy-addr@>=1.1.0 <2.0.8: '>=2.0.8'
+  source-map-js@<1.2.2: '>=1.2.2'
 minimumReleaseAgeExclude:
   # Renovate security update: @faker-js/faker@10.5.0
   - "@faker-js/faker@10.5.0"
