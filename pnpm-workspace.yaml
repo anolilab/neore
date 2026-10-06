@@ -277,3 +277,5 @@ minimumReleaseAgeExclude:
   - nx@22.7.12
   # Renovate security update: katex@0.18.2
   - katex@0.18.2
+  # Renovate security update: @modelcontextprotocol/sdk@1.31.0
+  - "@modelcontextprotocol/sdk@1.31.0"
