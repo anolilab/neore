@@ -32,7 +32,7 @@ overrides:
   next@>=15.3.0-canary.0 <15.3.6: '>=15.5.27'
   next@>=15.3.0-canary.0 <15.3.7: '>=15.5.27'
   better-auth@<1.4.5: '>=1.7.7'
-  '@modelcontextprotocol/sdk@<1.25.2': '>=1.25.3'
+  '@modelcontextprotocol/sdk@<1.25.2': '>=1.32.1'
   preact@>=10.26.5 <10.26.10: '>=10.26.10'
   devalue@>=5.1.0 <5.6.2: '>=5.6.4'
   axios@>=1.0.0 <1.12.0: '>=1.12.2'
@@ -18179,7 +18179,7 @@ snapshots:
 
   '@types/node-fetch@2.6.13':
     dependencies:
-      '@types/node': 18.19.130
+      '@types/node': 24.19.1
       form-data: 4.0.6
 
   '@types/node@18.19.130':
@@ -21664,7 +21664,7 @@ snapshots:
       jsonwebtoken: 9.0.3
       load-esm: 1.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.20.0(debug@4.3.4))
+      retry-axios: 2.6.0(axios@1.20.0)
       tough-cookie: 4.1.3
     transitivePeerDependencies:
       - supports-color
@@ -24694,7 +24694,7 @@ snapshots:
       onetime: 7.0.0
       signal-exit: 4.1.0
 
-  retry-axios@2.6.0(axios@1.20.0(debug@4.3.4)):
+  retry-axios@2.6.0(axios@1.20.0):
     dependencies:
       axios: 1.20.0(debug@4.3.4)
 
