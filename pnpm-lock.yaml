@@ -226,8 +226,8 @@ importers:
         specifier: ^19.8.1
         version: 19.8.1
       '@nx/workspace':
-        specifier: 21.2.4
-        version: 21.2.4
+        specifier: 21.6.11
+        version: 21.6.11
       '@secretlint/secretlint-rule-preset-recommend':
         specifier: ^10.2.2
         version: 10.2.2
@@ -3303,8 +3303,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@nx/devkit@21.2.4':
-    resolution: {integrity: sha512-NiltvpeLG5OHTMQVsu2tfpEYepTd2o6F156qYny/lZPLmKhwU+VL2q6ZSAzuvSLr8PJIXvJaslvwbBo6cW7UBQ==}
+  '@nx/devkit@21.6.11':
+    resolution: {integrity: sha512-tjx0GMuJQSXBhmz4XZD3D5jVtXO9/bIc7fLe0tXJ5w6ohQMKhBdkpyyjFm+1nRdAnWRQARqM2HqV+WZLYr3axQ==}
     peerDependencies:
       nx: '>=23.2.1'
 
@@ -3358,8 +3358,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@nx/workspace@21.2.4':
-    resolution: {integrity: sha512-NX/dADO0JqcS0FAIJT9E9xpvAmP1vriyP4lBaYQxxiAeN4Tg0CMg4KxYIkiq7cAyvj/2Wjchrt8kbHyMmEJcUA==}
+  '@nx/workspace@21.6.11':
+    resolution: {integrity: sha512-EMY3erQiP/VNqzsPyfxLhCrBzbTb1ug9+LWr7McDd30f4qM8VSgc2f/L00HcmNhRInkwBeEO+PqL11rIqz/lFw==}
 
   '@octokit/auth-token@6.0.0':
     resolution: {integrity: sha512-P4YJBPdPSpWTQ1NU4XYdvHvXJJDxM6YwpS0FZHRgP7YFkdVxsWcpWGy/NVqlAA7PcPCnMacXlRm1y2PFZRWL/w==}
@@ -15456,7 +15456,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.3
 
-  '@nx/devkit@21.2.4(nx@23.2.1)':
+  '@nx/devkit@21.6.11(nx@23.2.1)':
     dependencies:
       ejs: 3.1.10
       enquirer: 2.3.6
@@ -15464,7 +15464,6 @@ snapshots:
       minimatch: 10.2.6
       nx: 23.2.1
       semver: 7.8.5
-      tmp: 0.2.7
       tslib: 2.8.1
       yargs-parser: 21.1.1
 
@@ -15498,14 +15497,15 @@ snapshots:
   '@nx/nx-win32-x64-msvc@23.2.1':
     optional: true
 
-  '@nx/workspace@21.2.4':
+  '@nx/workspace@21.6.11':
     dependencies:
-      '@nx/devkit': 21.2.4(nx@23.2.1)
+      '@nx/devkit': 21.6.11(nx@23.2.1)
       '@zkochan/js-yaml': 0.0.7
       chalk: 4.1.2
       enquirer: 2.3.6
       nx: 23.2.1
       picomatch: 4.0.7
+      semver: 7.8.5
       tslib: 2.8.1
       yargs-parser: 21.1.1
     transitivePeerDependencies:
