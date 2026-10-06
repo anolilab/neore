@@ -62,7 +62,7 @@
         "@lingui/detect-locale": "^5.9.5",
         "@lingui/macro": "^5.9.5",
         "@lingui/react": "^5.9.5",
-        "@modelcontextprotocol/sdk": "^1.13.1",
+        "@modelcontextprotocol/sdk": "^1.31.0",
         "@openrouter/ai-sdk-provider": "^0.7.5",
         "@polar-sh/better-auth": "^1.8.4",
         "@polar-sh/sdk": "^0.34.17",
