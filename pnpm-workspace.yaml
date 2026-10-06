@@ -236,7 +236,7 @@ overrides:
   # GHSA-vcvr-r3jv-pc5j (critical), vulnerable >=16.2.0 <16.3.6.
   next@>=16.2.0 <16.3.6: '>=16.3.8'
   next@<16.3.6: '>=16.3.8'
-  nx@>=17.0.4 <22.7.7: '>=22.7.12'
+  nx@>=17.0.4 <22.7.7: '>=23.2.1'
   postcss@<=8.5.22: '>=8.5.28'
   sharp@<0.35.0: '>=0.35.5'
   shell-quote@<=1.8.4: '>=1.9.0'
@@ -273,8 +273,8 @@ minimumReleaseAgeExclude:
   - axios@1.20.0
   # Renovate security update: ip-address@10.7.3
   - ip-address@10.7.3
-  # Renovate security update: nx@22.7.12
-  - nx@22.7.12
+  # Renovate security update: nx@22.7.12 || 23.2.1
+  - nx@22.7.12 || 23.2.1
   # Renovate security update: katex@0.18.2
   - katex@0.18.2
   # Renovate security update: @modelcontextprotocol/sdk@1.31.0
