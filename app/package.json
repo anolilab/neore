@@ -94,7 +94,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
-        "convex": "^1.24.8",
+        "convex": "^1.46.0",
         "convex-helpers": "^0.1.124",
         "cookie-es": "^2.0.1",
         "date-fns": "^4.4.0",
