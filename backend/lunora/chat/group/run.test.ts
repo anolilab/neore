@@ -207,7 +207,9 @@ beforeAll(async () => {
     }
 
     fakeProcedures();
-});
+}, 60_000);
+// (The hook imports eight module graphs cold. On a slow Windows runner that took
+// longer than the 10 s default, with no change to what the tests check.)
 
 const insertSkill = async (slug: string) => {
     const id = `skill_${slug}`;

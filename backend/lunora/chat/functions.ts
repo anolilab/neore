@@ -2986,18 +2986,16 @@ export const revokeExtension = authMutation
     .input({
         extensionId: v.string().max(MAX_LENGTH.id),
     })
-    .mutation(
-        async ({ args: { extensionId }, ctx: context }) => {
-            const result = await context.runMutation(internal.browser.functions.revokeExtension, {
-                extensionDocId: extensionId as Id<"browserExtensions">,
-                userId: context.user.userId,
-            });
+    .mutation(async ({ args: { extensionId }, ctx: context }) => {
+        const result = await context.runMutation(internal.browser.functions.revokeExtension, {
+            extensionDocId: extensionId as Id<"browserExtensions">,
+            userId: context.user.userId,
+        });
 
-            context.log.event("chat.revoke_extension", { revoked: true });
+        context.log.event("chat.revoke_extension", { revoked: true });
 
-            return result;
-        },
-    );
+        return result;
+    });
 
 export const updateThreadDictationLanguage = authMutation
     .use(rateLimit("chat/update"))

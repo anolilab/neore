@@ -113,11 +113,29 @@ describe(parseHtmlMeta, () => {
     });
 
     it("stays linear on hostile markup", () => {
-        const hostile = `<meta ${"a".repeat(200_000)}${"<meta x".repeat(20_000)}`;
-        const started = performance.now();
+        // An absolute wall-clock budget failed on slow CI runners without any change
+        // to the parser. Compare growth instead: a quadratic scan costs about 16x when
+        // the input grows 4x, a linear one about 4x. The fastest of three runs at each
+        // size keeps GC pauses and runner noise out of the ratio.
+        const hostileOf = (scale: number) => `<meta ${"a".repeat(50_000 * scale)}${"<meta x".repeat(5_000 * scale)}`;
+        const fastestRun = (scale: number) => {
+            const hostile = hostileOf(scale);
+            let fastest = Infinity;
 
-        expect(parseHtmlMeta(hostile, "https://example.com/").title).toBeUndefined();
-        expect(performance.now() - started).toBeLessThan(1000);
+            for (let run = 0; run < 3; run++) {
+                const started = performance.now();
+
+                expect(parseHtmlMeta(hostile, "https://example.com/").title).toBeUndefined();
+                fastest = Math.min(fastest, performance.now() - started);
+            }
+
+            return fastest;
+        };
+
+        // Warm up the JIT so the first measured size does not pay for compilation.
+        fastestRun(1);
+
+        expect(fastestRun(4) / fastestRun(1)).toBeLessThan(8);
     });
 
     it("truncates long titles", () => {

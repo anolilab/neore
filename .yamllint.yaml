@@ -1,0 +1,21 @@
+---
+# Repository YAML lint config (read by the shared lint workflow's yamllint step).
+#
+# Vendored skill content under .agents/ and .claude/ is third-party and not
+# ours to reformat: its templates contain placeholders that are not valid YAML.
+ignore: |
+    .agents/
+    .claude/
+    node_modules/
+
+extends: default
+
+rules:
+    # GitHub workflow files start with the `on:` key, which the truthy rule flags.
+    truthy:
+        check-keys: false
+    # The repo puts one space before inline comments, the prettier style.
+    comments:
+        min-spaces-from-content: 1
+    document-start: disable
+    line-length: disable

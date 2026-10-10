@@ -202,4 +202,3 @@ describe("deleteUserSkills and other users' ratings", () => {
         expect(fake.ratingsOf(`${B}-skill-0`)).toBe(1);
     });
 });
-

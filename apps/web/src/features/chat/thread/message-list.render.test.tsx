@@ -202,6 +202,10 @@ const pushLastMessageEdit = (share: boolean, freshActions: boolean): number => {
     return renders;
 };
 
+// Each case mounts the whole thread from cold. On a slow Windows runner the first
+// mount alone went past the 10 s default, with no change to what is measured.
+const RENDER_TEST_TIMEOUT_MS = 60_000;
+
 describe("message list render cost", () => {
     beforeEach(() => {
         harness.messages = Array.from({ length: THREAD_LENGTH }, (_, index) => makeMessage(index));
@@ -209,24 +213,36 @@ describe("message list render cost", () => {
         harness.contentRenders.clear();
     });
 
-    it("re-renders every row when a push decodes fresh objects and the actions context changes (the old behaviour)", () => {
-        mount();
+    it(
+        "re-renders every row when a push decodes fresh objects and the actions context changes (the old behaviour)",
+        () => {
+            mount();
 
-        expect(pushLastMessageEdit(false, true)).toBeGreaterThanOrEqual(THREAD_LENGTH);
-    });
+            expect(pushLastMessageEdit(false, true)).toBeGreaterThanOrEqual(THREAD_LENGTH);
+        },
+        RENDER_TEST_TIMEOUT_MS,
+    );
 
-    it("re-renders only the changed row once unchanged messages keep their identity and the actions context is stable", () => {
-        mount();
+    it(
+        "re-renders only the changed row once unchanged messages keep their identity and the actions context is stable",
+        () => {
+            mount();
 
-        expect(pushLastMessageEdit(true, false)).toBe(1);
-        expect(harness.contentRenders.get(`m${THREAD_LENGTH - 1}`)).toBe(1);
-    });
+            expect(pushLastMessageEdit(true, false)).toBe(1);
+            expect(harness.contentRenders.get(`m${THREAD_LENGTH - 1}`)).toBe(1);
+        },
+        RENDER_TEST_TIMEOUT_MS,
+    );
 
-    it("still re-renders every row when only the actions context changes", () => {
-        mount();
+    it(
+        "still re-renders every row when only the actions context changes",
+        () => {
+            mount();
 
-        // Why chat-context reads `messages` through a ref in its action callbacks:
-        // a new actions object alone re-renders all rows.
-        expect(pushLastMessageEdit(true, true)).toBeGreaterThanOrEqual(THREAD_LENGTH);
-    });
+            // Why chat-context reads `messages` through a ref in its action callbacks:
+            // a new actions object alone re-renders all rows.
+            expect(pushLastMessageEdit(true, true)).toBeGreaterThanOrEqual(THREAD_LENGTH);
+        },
+        RENDER_TEST_TIMEOUT_MS,
+    );
 });
