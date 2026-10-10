@@ -90,20 +90,20 @@ interface ModelDefinition {
 
 ## WHERE TO LOOK
 
-| Task                 | Location               | Notes                                                                   |
-| -------------------- | ---------------------- | ----------------------------------------------------------------------- |
-| Add/modify a model   | models/registry.ts     | `MODEL_REGISTRY` array — one and only place                             |
-| Agent builders       | models/registry.ts     | `buildAgents()`, `buildDynamicAgent()`                                  |
-| Backend model lookup | models/registry.ts     | `MODEL_LOOKUP` map (O(1) by model ID)                                   |
-| Frontend model list  | Gateway `/v1/models`   | `GatewayModel` type from `gateway-types.ts`                             |
-| Capability lookups   | models/capabilities.ts | `isToolCallUnsupportedModel()` etc.                                     |
-| Provider import      | providers/index.ts     | Thin re-export for the backend's `@neore/ai/providers`                  |
-| Local model hosts    | models/local-endpoint.ts | `LOCAL_ENDPOINT_HOSTS` — must agree with the web CSP and the save validator |
-| Free tier / paid gate | models/free-tier.ts   | `FREE_TIER_TEXT_MODELS`, `requiresPaidPlan`                             |
-| Design presets       | design/                | Presets, styles, templates, canvas prompt enhancer                      |
-| Prompts              | prompts/               | Template management                                                     |
-| Prompt optimizer     | prompts/optimizer/     | Ported linshenkx templates + Mustache renderer with JSON-evidence guard |
-| Tools                | tools/                 | AI tool definitions                                                     |
+| Task                  | Location                 | Notes                                                                       |
+| --------------------- | ------------------------ | --------------------------------------------------------------------------- |
+| Add/modify a model    | models/registry.ts       | `MODEL_REGISTRY` array — one and only place                                 |
+| Agent builders        | models/registry.ts       | `buildAgents()`, `buildDynamicAgent()`                                      |
+| Backend model lookup  | models/registry.ts       | `MODEL_LOOKUP` map (O(1) by model ID)                                       |
+| Frontend model list   | Gateway `/v1/models`     | `GatewayModel` type from `gateway-types.ts`                                 |
+| Capability lookups    | models/capabilities.ts   | `isToolCallUnsupportedModel()` etc.                                         |
+| Provider import       | providers/index.ts       | Thin re-export for the backend's `@neore/ai/providers`                      |
+| Local model hosts     | models/local-endpoint.ts | `LOCAL_ENDPOINT_HOSTS` — must agree with the web CSP and the save validator |
+| Free tier / paid gate | models/free-tier.ts      | `FREE_TIER_TEXT_MODELS`, `requiresPaidPlan`                                 |
+| Design presets        | design/                  | Presets, styles, templates, canvas prompt enhancer                          |
+| Prompts               | prompts/                 | Template management                                                         |
+| Prompt optimizer      | prompts/optimizer/       | Ported linshenkx templates + Mustache renderer with JSON-evidence guard     |
+| Tools                 | tools/                   | AI tool definitions                                                         |
 
 ## ANTI-PATTERNS
 

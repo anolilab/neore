@@ -49,6 +49,8 @@
         "generate": "jiti plopfile.ts",
         "generate:labeler": "node scripts/generate-labeler-config.js",
         "graph": "vis graph",
+        "preinstall": "node -e \"if(process.env.CI == 'true') {console.info('Skipping preinstall...')} else {process.exit(1)}\" || (node verify-node-version.js && npm -y exec only-allow pnpm)",
+        "postinstall": "vis hook install --force && node scripts/generate-labeler-config.js",
         "lint": "pnpm run lint:prettier && pnpm run lint:eslint && pnpm run lint:dedupe",
         "lint:affected:attw": "vis affected lint:attw",
         "lint:affected:eslint": "vis affected lint:eslint",
@@ -68,12 +70,9 @@
         "lint:types:deploy": "tsc -p tsconfig.deploy.json",
         "native:build": "pnpm --filter @neore/native run tauri:build",
         "native:dev": "pnpm --filter @neore/native run tauri:dev",
-        "postinstall": "vis hook install --force && node scripts/generate-labeler-config.js",
-        "preinstall": "node -e \"if(process.env.CI == 'true') {console.info('Skipping preinstall...')} else {process.exit(1)}\" || (node verify-node-version.js && npm -y exec only-allow pnpm)",
         "sort-package-json": "sort-package-json packages/**/package.json apps/*/package.json backend/package.json services/*/package.json tools/*/package.json ./package.json",
         "test:e2e": "pnpm --filter=app test:e2e"
     },
-    "packageManager": "pnpm@12.8.1",
     "devDependencies": {
         "@anolilab/commitlint-config": "catalog:lint",
         "@anolilab/multi-semantic-release": "catalog:release",
@@ -113,5 +112,6 @@
         "typescript-eslint": "catalog:lint",
         "vite": "catalog:build",
         "vitest": "catalog:test"
-    }
+    },
+    "packageManager": "pnpm@12.8.1"
 }

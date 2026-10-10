@@ -379,21 +379,21 @@ GDPR Article 12 requires requests to be fulfilled within 30 days. The cron job:
 
 The following tables contain user personal data and are included in exports/deletions:
 
-| Table               | Location               | Data Type                    |
-| ------------------- | ---------------------- | ---------------------------- |
-| `user`              | Better Auth            | Profile (name, email, image) |
-| `account`           | Better Auth            | Auth providers, tokens       |
-| `session`           | Better Auth            | Active sessions              |
-| `userSettings`      | `schema.ts`            | Preferences, shortcuts       |
-| `aiUserPreferences` | `schema.ts`            | AI settings, encrypted keys  |
-| `threads`           | `schema.ts`            | Chat conversations           |
-| `messages`          | `schema.ts`            | Chat messages                |
-| `files`             | `schema.ts`            | Uploaded files               |
-| `folders`           | `schema.ts`            | Folder structure             |
-| `prompts`           | `schema.ts`            | Saved prompts                |
-| `promptHistory`     | `schema.ts`            | Prompt versions              |
-| `threadAccess`      | `schema.ts`            | Shared thread permissions    |
-| `threadInvites`     | `schema.ts`            | Thread sharing invites       |
+| Table               | Location    | Data Type                    |
+| ------------------- | ----------- | ---------------------------- |
+| `user`              | Better Auth | Profile (name, email, image) |
+| `account`           | Better Auth | Auth providers, tokens       |
+| `session`           | Better Auth | Active sessions              |
+| `userSettings`      | `schema.ts` | Preferences, shortcuts       |
+| `aiUserPreferences` | `schema.ts` | AI settings, encrypted keys  |
+| `threads`           | `schema.ts` | Chat conversations           |
+| `messages`          | `schema.ts` | Chat messages                |
+| `files`             | `schema.ts` | Uploaded files               |
+| `folders`           | `schema.ts` | Folder structure             |
+| `prompts`           | `schema.ts` | Saved prompts                |
+| `promptHistory`     | `schema.ts` | Prompt versions              |
+| `threadAccess`      | `schema.ts` | Shared thread permissions    |
+| `threadInvites`     | `schema.ts` | Thread sharing invites       |
 
 **Not in exports or deletions, by design: `wsTicket`** (raw D1, `lib/ws-ticket.ts`).
 Each row is a live-query socket ticket: a SHA-256 hash, a user id, a session id
@@ -617,21 +617,21 @@ This plan implements full EU GDPR compliance for your multi-region chat applicat
 
 Based on codebase analysis, the following tables contain user personal data:
 
-| Table               | Location                                                                | Data Type                    |
-| ------------------- | ----------------------------------------------------------------------- | ---------------------------- |
-| `user`              | Better Auth                                                             | Profile (name, email, image) |
-| `account`           | Better Auth                                                             | Auth providers, tokens       |
-| `session`           | Better Auth                                                             | Active sessions              |
-| `userSettings`      | [schema.ts](../schema.ts)                                               | Preferences, shortcuts       |
-| `aiUserPreferences` | [schema.ts](../schema.ts)                                               | AI settings, encrypted keys  |
-| `threads`           | [schema.ts](../schema.ts)                                               | Chat conversations           |
-| `messages`          | [schema.ts](../schema.ts)                                               | Chat messages                |
-| `files`             | [schema.ts](../schema.ts)                                               | Uploaded files               |
-| `folders`           | [schema.ts](../schema.ts)                                               | Folder structure             |
-| `prompts`           | [schema.ts](../schema.ts)                                               | Saved prompts                |
-| `promptHistory`     | [schema.ts](../schema.ts)                                               | Prompt versions              |
-| `threadAccess`      | [schema.ts](../schema.ts)                                               | Shared thread permissions    |
-| `threadInvites`     | [schema.ts](../schema.ts)                                               | Thread sharing invites       |
+| Table               | Location                  | Data Type                    |
+| ------------------- | ------------------------- | ---------------------------- |
+| `user`              | Better Auth               | Profile (name, email, image) |
+| `account`           | Better Auth               | Auth providers, tokens       |
+| `session`           | Better Auth               | Active sessions              |
+| `userSettings`      | [schema.ts](../schema.ts) | Preferences, shortcuts       |
+| `aiUserPreferences` | [schema.ts](../schema.ts) | AI settings, encrypted keys  |
+| `threads`           | [schema.ts](../schema.ts) | Chat conversations           |
+| `messages`          | [schema.ts](../schema.ts) | Chat messages                |
+| `files`             | [schema.ts](../schema.ts) | Uploaded files               |
+| `folders`           | [schema.ts](../schema.ts) | Folder structure             |
+| `prompts`           | [schema.ts](../schema.ts) | Saved prompts                |
+| `promptHistory`     | [schema.ts](../schema.ts) | Prompt versions              |
+| `threadAccess`      | [schema.ts](../schema.ts) | Shared thread permissions    |
+| `threadInvites`     | [schema.ts](../schema.ts) | Thread sharing invites       |
 
 ## Architecture
 

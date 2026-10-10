@@ -922,8 +922,7 @@ describe("stored media survives the owner's legitimate copies", () => {
                 }),
         );
         const fork = async () =>
-            ((await as(STRANGER).action(procedureAt("workflow_fork", "forkWorkflow"), { sourceProjectId } as never)) as { projectId: string })
-                .projectId;
+            ((await as(STRANGER).action(procedureAt("workflow_fork", "forkWorkflow"), { sourceProjectId } as never)) as { projectId: string }).projectId;
         const countOf = async () => (await run(async (context) => await context.db.get(sourceProjectId))).galleryForkCount;
 
         const first = await fork();
