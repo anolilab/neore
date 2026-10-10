@@ -687,6 +687,9 @@ overrides:
   immutable: ">=5.1.8"
   immutable@>=4.0.0-rc.1 <4.3.8: ">=4.3.8"
   immutable@>=5.0.0-beta.1 <5.1.8: ">=5.1.8"
+  # GHSA-238p-pmpm-9mq7 (prototype pollution bypassing trust). Mermaid and the math
+  # plugins pin katex 0.16.x; the catalog only covers the direct dependency.
+  katex@<0.18.2: ">=0.18.2"
   ip-address@<=10.1.0: ">=10.1.1"
   ip-address@<=10.3.0: ">=10.3.1"
   ip-address@<=10.7.0: ">=10.7.1"
