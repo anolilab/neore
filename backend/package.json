@@ -36,8 +36,8 @@
         "./skills/markdown": "./lunora/skills/markdown.ts"
     },
     "scripts": {
-        "build": "node scripts/run-then-codegen.mjs lunora build --emit-bindings lunora-bindings.json",
         "advise": "lunora advisor",
+        "build": "node scripts/run-then-codegen.mjs lunora build --emit-bindings lunora-bindings.json",
         "clean": "rimraf node_modules dist .eslintcache lunora/_generated",
         "codegen": "lunora codegen && node scripts/check-generated.mjs",
         "deploy": "lunora deploy",
