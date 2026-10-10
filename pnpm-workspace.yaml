@@ -12,9 +12,6 @@ auditConfig:
   # eight of those did not even apply to the installed 16.x — they were written
   # against `< 15.5.21`. The ninth was live and suppressed.
   ignoreGhsas:
-    # image-size <=2.0.2, via `pptxgenjs`. No patched release exists.
-    - GHSA-w3rx-r6r6-pgpr
-    - GHSA-5p2g-fcmc-qvqq
     # @ai-sdk/provider-utils <=3.0.97. No patched release exists; the 5.x copies
     # in the tree are unaffected, the older ones come in transitively.
     - GHSA-866g-f22w-33x8
@@ -34,6 +31,7 @@ catalog:
   "@lunora/client": 1.0.0-alpha.193
   "@lunora/react": 1.0.0-alpha.206
   "@lunora/workflow": 1.0.0-alpha.72
+  '@visulima/vis': 4.2.0
   "@visulima/yaml": 1.0.0
 catalogMode: prefer
 
@@ -44,43 +42,43 @@ catalogs:
   # `npm view <pkg> dist-tags.alpha`.
 
   ai:
-    "@ai-sdk/amazon-bedrock": 5.0.104
-    "@ai-sdk/anthropic": 4.0.71
+    "@ai-sdk/amazon-bedrock": 5.0.113
+    "@ai-sdk/anthropic": 4.0.78
     # Pinned to the release that depends on exactly @ai-sdk/openai 4.0.83 and
     # provider 4.0.21 / provider-utils 5.0.53 — move with those, or pnpm splits them.
     # (`@lunora/agent` pins `ai` 7.0.93 exactly, so codegen/testing carry that older
     # copy of the ai/provider set; nothing of ours imports it.)
-    "@ai-sdk/azure": 4.0.89
-    "@ai-sdk/black-forest-labs": 2.0.54
-    "@ai-sdk/fal": 3.0.54
-    "@ai-sdk/fireworks": 3.0.65
-    "@ai-sdk/google": 4.0.87
-    "@ai-sdk/groq": 4.0.54
-    "@ai-sdk/klingai": 4.0.55
-    "@ai-sdk/luma": 3.0.54
-    "@ai-sdk/mcp": 2.0.65
-    "@ai-sdk/mistral": 4.0.56
-    "@ai-sdk/openai": 4.0.83
-    "@ai-sdk/provider": 4.0.21
-    "@ai-sdk/provider-utils": 5.0.53
-    "@ai-sdk/react": 4.0.129
-    "@ai-sdk/replicate": 3.0.54
+    "@ai-sdk/azure": 4.0.99
+    "@ai-sdk/black-forest-labs": 2.0.59
+    "@ai-sdk/fal": 3.0.59
+    "@ai-sdk/fireworks": 3.0.70
+    "@ai-sdk/google": 4.0.93
+    "@ai-sdk/groq": 4.0.59
+    "@ai-sdk/klingai": 4.0.60
+    "@ai-sdk/luma": 3.0.59
+    "@ai-sdk/mcp": 2.0.73
+    "@ai-sdk/mistral": 4.0.62
+    "@ai-sdk/openai": 4.0.91
+    "@ai-sdk/provider": 4.0.26
+    "@ai-sdk/provider-utils": 5.0.58
+    "@ai-sdk/react": 4.0.140
+    "@ai-sdk/replicate": 3.0.59
     "@ai-sdk/ui-utils": ^1.2.11
-    "@ai-sdk/xai": 5.0.14
-    "@e2b/code-interpreter": 2.8.0
+    "@ai-sdk/xai": 5.0.20
+    "@e2b/code-interpreter": 2.8.3
     "@openrouter/ai-sdk-provider": 3.1.0
     "@requesty/ai-sdk": 3.6.2
-    ai: 7.0.126
-    e2b: 2.52.0
+    ai: 7.0.137
+    e2b: 2.55.0
     ollama-ai-provider-v2: 4.0.1
     workers-ai-provider: 4.0.0
   analytics:
     "@posthog/react": 1.11.3
-    posthog-js: 1.435.6
-    posthog-node: 5.55.0
+    posthog-js: 1.438.5
+    posthog-node: 5.55.1
   animation:
     "@rive-app/react-webgl2": 4.36.0
-    motion: 13.5.0
+    motion: 14.0.0
   auth:
     # `@lunora/auth` (alpha.197) depends on
     # `@better-auth/{api-key,passkey,mcp,scim,oauth-provider}` at EXACTLY 1.7.7,
@@ -98,10 +96,10 @@ catalogs:
     # "Network connection lost.") as one failed request instead of exiting the
     # dev server — the crash the old 4.124.0 pin lived with. The bump ships a new
     # workerd binary; a per-app firewall (OpenSnitch) must allow it once.
-    "@cloudflare/vite-plugin": 1.62.3
+    "@cloudflare/vite-plugin": 1.63.1
     # wrangler peer-requires ^5.<its workerd date> — 4.145.0 wants ^5.20260930.2.
     # Bump with wrangler.
-    "@cloudflare/workers-types": 5.20261001.1
+    "@cloudflare/workers-types": 5.20261009.1
     "@crxjs/vite-plugin": 3.0.0
     "@prosopo/vite-plugin-watch-workspace": 2.6.33
     "@rolldown/plugin-babel": 0.2.4
@@ -110,24 +108,24 @@ catalogs:
     # CommonJS loader cannot run in their ESM node build (`Dynamic require of
     # "fs"`, then `__dirname`, then ENOENT hb.wasm) — `scripts/generate-og.mjs`,
     # and so `apps/web`'s `pnpm run build`, fails. 1.0.1 has no harfbuzz.
-    "@vercel/og": 1.0.1
-    "@visulima/dev-toolbar": 1.1.11
-    "@visulima/vite-overlay": 2.0.34
+    "@vercel/og": 1.0.3
+    "@visulima/dev-toolbar": 1.1.18
+    "@visulima/vite-overlay": 2.0.41
     "@vite-pwa/assets-generator": ^2.0.0
-    "@vitejs/plugin-react": 6.1.1
+    "@vitejs/plugin-react": 6.1.2
     esbuild: 0.28.2
     sharp: 0.35.5
     svgo: 4.1.0
     unplugin-fonts: 2.0.0
     unplugin-purge-polyfills: 0.1.0
-    vite: 8.3.2
+    vite: 8.3.4
     vite-plugin-image-optimizer: 2.0.3
     vite-plugin-svgr: 5.2.0
     vite-plugin-wasm: 3.6.0
     vite-plugin-zip-pack: ^1.2.4
     workbox-build: 7.4.1
     workbox-window: 7.4.1
-    wrangler: 4.145.0
+    wrangler: 4.149.0
   bundler:
     "@swc-node/register": ~1.12.1
     "@swc/cli": 0.8.1
@@ -143,7 +141,7 @@ catalogs:
     # happened to sit in the tree and `pnpm dedupe` flipped between "with" and
     # "without" on every run, so `pnpm dedupe --check` (part of `pnpm lint`)
     # could never pass.
-    rollup: 4.63.6
+    rollup: 4.64.3
     tslib: ^2.8.1
   canvas-spreadsheet:
     "@univerjs/preset-sheets-core": 1.0.3
@@ -152,7 +150,7 @@ catalogs:
     "@univerjs/preset-sheets-sort": 1.0.3
     "@univerjs/presets": 1.0.3
     papaparse: ^5.7.0
-    read-excel-file: 9.3.10
+    read-excel-file: 9.3.12
     rxjs: ^7.8.2
   charts:
     "@xyflow/react": 12.12.0
@@ -189,9 +187,9 @@ catalogs:
     "@dnd-kit/utilities": ^3.2.2
   editor:
     "@fellow/prosemirror-recreate-transform": 1.2.3
-    slate: 0.126.2
-    slate-dom: 0.126.0
-    slate-react: 0.127.1
+    slate: 0.132.0
+    slate-dom: 0.132.0
+    slate-react: 0.132.0
   file-renderers:
     hls.js: 1.7.3
     mammoth: 1.13.0
@@ -199,25 +197,25 @@ catalogs:
     # imports the worker from it as a `?url` asset, and a second pdfjs-dist copy
     # makes the API and the worker disagree ("API version does not match Worker
     # version"). Move with react-pdf.
-    pdfjs-dist: 6.3.289
+    pdfjs-dist: 6.4.299
     react-pdf: 11.0.0
-    wavesurfer.js: 8.0.1
+    wavesurfer.js: 8.0.2
   forms:
     emblor: ^1.4.8
     react-day-picker: 10.0.2
     react-dropzone: 20.1.2
     react-number-format: 5.4.5
   fumadocs:
-    fumadocs-core: 16.15.17
-    fumadocs-mdx: 15.4.5
-    fumadocs-ui: 16.15.17
+    fumadocs-core: 16.17.1
+    fumadocs-mdx: 15.4.7
+    fumadocs-ui: 16.17.1
   i18n:
-    "@lingui/babel-plugin-lingui-macro": 6.8.0
-    "@lingui/cli": 6.8.0
-    "@lingui/core": 6.8.0
-    "@lingui/detect-locale": 6.8.0
-    "@lingui/react": 6.8.0
-    "@lingui/vite-plugin": 6.8.0
+    "@lingui/babel-plugin-lingui-macro": 6.9.1
+    "@lingui/cli": 6.9.1
+    "@lingui/core": 6.9.1
+    "@lingui/detect-locale": 6.9.1
+    "@lingui/react": 6.9.1
+    "@lingui/vite-plugin": 6.9.1
     "@visulima/iso-locale": ^1.0.1
   iac:
     # HELD AT 0.x — npm's `latest` tag is 2.0.0-beta.80 (still the 2.0 beta;
@@ -235,25 +233,25 @@ catalogs:
     alchemy: 0.94.0
     tsx: 4.23.15
   icons:
-    "@lobehub/icons": 5.22.0
-    lucide-react: 1.49.0
+    "@lobehub/icons": 5.23.0
+    lucide-react: 1.54.0
     react-icons: 5.7.0
   lint:
-    "@anolilab/commitlint-config": 10.1.3
-    "@anolilab/eslint-config": 30.0.2
+    "@anolilab/commitlint-config": 10.1.5
+    "@anolilab/eslint-config": 30.0.4
     "@anolilab/prettier-config": 10.0.3
     "@commitlint/cli": 21.2.3
     "@commitlint/config-conventional": 21.2.3
     # `@anolilab/eslint-config` 30.0.2 peer-pins this, `@eslint/css`, the query
     # plugin, react-refresh, zod and tailwind-csstree to exact older versions; the
     # unmet-peer warnings are expected and `pnpm lint` passes on the newer ones.
-    "@eslint-react/eslint-plugin": 5.23.3
+    "@eslint-react/eslint-plugin": 5.24.10
     "@eslint/css": 2.0.0
     "@eslint/js": 10.0.1
-    eslint: 10.11.0
+    eslint: 10.12.0
     eslint-config-prettier: ^10.1.8
     eslint-plugin-jsx-a11y: 6.10.2
-    eslint-plugin-playwright: 2.12.0
+    eslint-plugin-playwright: 2.12.1
     eslint-plugin-react: 7.37.5
     eslint-plugin-react-compiler: 19.1.0-rc.2
     eslint-plugin-react-hooks: 7.1.1
@@ -267,7 +265,7 @@ catalogs:
     prettier: 3.9.9
     prettier-plugin-tailwindcss: 0.8.1
     tailwind-csstree: 0.4.1
-    typescript-eslint: 8.71.0
+    typescript-eslint: 8.71.1
   lunora:
     "@lunora/auth": 1.0.0-alpha.201
     "@lunora/bindings": 1.0.0-alpha.103
@@ -302,14 +300,14 @@ catalogs:
     unified: 11.0.5
   mcp:
     "@mcp-ui/client": 7.1.1
-    "@modelcontextprotocol/sdk": 1.31.0
+    "@modelcontextprotocol/sdk": 1.32.1
   node:
     "@t3-oss/env-core": 0.13.11
-    dotenv: 18.0.5
+    dotenv: 18.0.7
     rimraf: 6.1.3
   onboarding:
     "@onboardjs/core": 1.0.0-rc.4
-    "@onboardjs/posthog-plugin": 1.0.5
+    "@onboardjs/posthog-plugin": 1.0.6
     "@onboardjs/react": 1.0.0-rc.5
   react:
     babel-plugin-react-compiler: ^1.0.0
@@ -317,16 +315,16 @@ catalogs:
     react-compiler-runtime: ^1.0.0
     react-dom: 19.3.0
   release:
-    "@anolilab/multi-semantic-release": 4.4.21
+    "@anolilab/multi-semantic-release": 4.4.23
     semantic-release: ^25.0.9
   security:
     "@hcaptcha/react-hcaptcha": 2.2.0
     "@marsidev/react-turnstile": 1.6.1
     "@visulima/content-safety": 1.0.1
     dompurify: 3.4.16
-    tldts: 7.4.16
+    tldts: 7.4.18
   server:
-    "@aws-sdk/client-s3": 3.1144.0
+    "@aws-sdk/client-s3": 3.1148.0
     "@hono/swagger-ui": 0.6.1
     "@hono/zod-openapi": 1.6.3
     "@visulima/health-check": 6.0.0
@@ -343,22 +341,22 @@ catalogs:
     tailwindcss: 4.3.3
     tw-animate-css: 1.4.0
   syntax:
-    katex: 0.18.10
+    katex: 0.19.0
     # HELD AT 11 — 12.1.0 is out. `@streamdown/mermaid` (1.0.3) depends on `mermaid ^11`,
     # and `apps/web/vite.config.ts` aliases every `mermaid` import to this copy's
     # `dist/mermaid.esm.min.mjs` — which 12 makes unparseable for Vite's
     # es-module-lexer. 12 also re-lays-out and recolours existing diagrams.
-    mermaid: 11.17.2
+    mermaid: 12.1.0
     shiki: 4.5.0
   tanstack:
-    "@tanstack/eslint-plugin-query": 5.104.0
+    "@tanstack/eslint-plugin-query": 5.104.1
     "@tanstack/eslint-plugin-router": 1.162.0
     "@tanstack/form-core": 1.33.5
     # Travels with @tanstack/react-table below.
-    "@tanstack/match-sorter-utils": 9.1.2
-    "@tanstack/query-core": 5.104.0
+    "@tanstack/match-sorter-utils": 9.2.6
+    "@tanstack/query-core": 5.104.1
     "@tanstack/react-form": 1.33.5
-    "@tanstack/react-query": 5.104.0
+    "@tanstack/react-query": 5.104.1
     # MOVE AS A SET. react-router 1.170.27 / react-start 1.168.44 /
     # router-plugin 1.168.30 once broke hydration: SSR emitted a
     # `<script type="module">` inside the __root__ match that the client render
@@ -372,20 +370,20 @@ catalogs:
     "@tanstack/react-router": 1.170.41
     "@tanstack/react-router-ssr-query": 1.167.3
     "@tanstack/react-start": 1.168.60
-    "@tanstack/react-table": 9.2.4
-    "@tanstack/react-virtual": 3.14.13
+    "@tanstack/react-table": 9.2.8
+    "@tanstack/react-virtual": 3.14.14
     "@tanstack/store": 0.11.2
   test:
-    "@playwright/test": 1.63.0
+    "@playwright/test": 1.64.0
     "@testing-library/dom": ^10.4.2
     "@testing-library/react": ^16.3.3
     "@vitest/browser": 5.0.3
     "@vitest/browser-playwright": 5.0.3
     "@vitest/coverage-v8": 5.0.3
     "@vitest/ui": 5.0.3
-    axe-core: 4.13.0
-    jsdom: 30.1.1
-    playwright: 1.63.0
+    axe-core: 4.14.0
+    jsdom: 30.1.2
+    playwright: 1.64.0
     vitest: 5.0.3
     vitest-browser-react: 2.3.0
   tiptap:
@@ -431,12 +429,12 @@ catalogs:
   types:
     "@types/chrome": 0.3.4
     "@types/json-schema": ^7.0.15
-    "@types/node": 26.6.3
+    "@types/node": 26.6.4
     "@types/papaparse": 5.5.2
     "@types/react": 19.3.0
     "@types/react-dom": 19.3.0
   ui:
-    "@base-ui/react": 1.8.0
+    "@base-ui/react": 1.9.0
     "@radix-ui/react-use-controllable-state": 1.2.6
     "@silvia-odwyer/photon": 0.3.3
     class-variance-authority: 0.7.1
@@ -446,17 +444,17 @@ catalogs:
     facehash: 0.1.0
     input-otp: 1.5.0
     next-themes: 0.4.6
-    react-resizable-panels: 4.14.1
-    shadcn: 4.21.1
+    react-resizable-panels: 4.14.3
+    shadcn: 4.21.4
     sonner: 2.0.8
     tailwind-merge: 3.7.0
     vaul: 1.1.2
   utils:
-    "@c15t/react": 2.2.1
+    "@c15t/react": 2.3.0
     # Imported at runtime by `apps/web/src/lib/consent/show-banner.ts`; moves
     # with `@c15t/react`, which depends on exactly this version through `c15t`.
-    "@c15t/translations": 2.2.1
-    "@toon-format/toon": 4.1.1
+    "@c15t/translations": 2.3.0
+    "@toon-format/toon": 4.4.0
     "@ungap/structured-clone": 1.4.0
     "@visulima/pail": 5.0.0
     ansi-to-react: ^6.2.6
@@ -470,7 +468,7 @@ catalogs:
     jszip: ^3.10.2
     media-chrome: 4.19.3
     my-ua-parser: ^2.0.4
-    nanoid: 6.0.1
+    nanoid: 6.0.2
     pptxgenjs: 4.0.1
     react-hotkeys-hook: 5.3.3
     react-qr-code: 2.2.0
@@ -687,6 +685,12 @@ overrides:
   immutable: ">=5.1.8"
   immutable@>=4.0.0-rc.1 <4.3.8: ">=4.3.8"
   immutable@>=5.0.0-beta.1 <5.1.8: ">=5.1.8"
+  # GHSA-238p-pmpm-9mq7 (prototype pollution bypassing trust). Mermaid and the math
+  # plugins pin katex 0.16.x; the catalog only covers the direct dependency.
+  katex@<0.18.2: ">=0.18.2"
+  # GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq. pptxgenjs pins image-size ^1.2.1,
+  # which the advisory covers; 2.0.4 is the first patched release.
+  image-size@<=2.0.2: ">=2.0.4"
   ip-address@<=10.1.0: ">=10.1.1"
   ip-address@<=10.3.0: ">=10.3.1"
   ip-address@<=10.7.0: ">=10.7.1"

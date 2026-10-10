@@ -148,7 +148,8 @@
   ],
   "name": "neore-backend",
   "unknown": [
-    "dev"
+    "dev",
+    "env"
   ],
   "vars": [],
   "version": 1

@@ -85,7 +85,7 @@
         "@swc/core": "catalog:bundler",
         "@swc/helpers": "catalog:bundler",
         "@types/node": "catalog:types",
-        "@visulima/vis": "4.1.12",
+        "@visulima/vis": "catalog:",
         "@visulima/yaml": "catalog:",
         "@vitest/coverage-v8": "catalog:test",
         "@vitest/ui": "catalog:test",
