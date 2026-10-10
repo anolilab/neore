@@ -27,7 +27,7 @@
         "lint:types": "tsc --noEmit",
         "preview": "npm run build && vite preview",
         "cf:typegen": "wrangler types",
-        "postinstall": "pnpm run cf:typegen",
+        "postinstall": "pnpm run cf:typegen && fumadocs-mdx",
         "start": "node dist/server/index.mjs",
         "test": "vitest run",
         "test:e2e": "playwright test",
