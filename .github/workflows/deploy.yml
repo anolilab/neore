@@ -6,8 +6,6 @@ on: # yamllint disable-line rule:truthy
     push:
         tags:
             - "v*" # e.g. v1.0.0, v2.3.1-rc.1
-    pull_request:
-        types: ["opened", "synchronize", "reopened"]
     workflow_dispatch:
         inputs:
             environment:
@@ -40,7 +38,7 @@ jobs:
         outputs:
             # Resolve target environment:
             #   'production' → v* tag push OR manual dispatch with production selected
-            #   'preview'    → pull_request or manual dispatch with preview selected
+            #   'preview'    → manual dispatch with preview selected
             deploy-env: "${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && 'production' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment) || 'preview' }}"
         steps:
             - name: "Harden Runner"
