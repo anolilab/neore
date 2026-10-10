@@ -1,0 +1,19 @@
+{
+    "name": "@neore/native",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Tauri v2 desktop and mobile shell around the deployed Neore web app",
+    "type": "module",
+    "scripts": {
+        "android:dev": "tauri android dev",
+        "icons": "tauri icon ../web/public/pwa-icon.svg",
+        "ios:dev": "tauri ios dev",
+        "tauri": "tauri",
+        "tauri:build": "tauri build",
+        "tauri:dev": "NEORE_SITE_URL=${NEORE_SITE_URL:-http://localhost:5173} tauri dev",
+        "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --lib"
+    },
+    "devDependencies": {
+        "@tauri-apps/cli": "catalog:cli"
+    }
+}

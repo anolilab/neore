@@ -1,0 +1,35 @@
+import { createMiddleware } from "hono/factory";
+
+import type { AppEnv } from "../index.js";
+
+export const securityMiddleware = createMiddleware<{ Bindings: AppEnv }>(async (c, next) => {
+    const requestId = crypto.randomUUID();
+    c.set("requestId" as never, requestId);
+
+    await next();
+
+    c.res.headers.set("X-Request-Id", requestId);
+    c.res.headers.set("X-Content-Type-Options", "nosniff");
+    c.res.headers.set("X-Frame-Options", "DENY");
+    c.res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    c.res.headers.set("Content-Security-Policy", "default-src 'none'");
+    c.res.headers.set("Cache-Control", "no-store");
+});
+
+export const corsMiddleware = createMiddleware<{ Bindings: AppEnv }>(async (c, next) => {
+    const origin = c.req.header("Origin");
+    const allowedOrigins = c.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()) ?? [];
+
+    if (origin && allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+        c.res.headers.set("Access-Control-Allow-Origin", origin);
+        c.res.headers.set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+        c.res.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+        c.res.headers.set("Vary", "Origin");
+    }
+
+    if (c.req.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: c.res.headers });
+    }
+
+    await next();
+});

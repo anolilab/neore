@@ -1,0 +1,117 @@
+name: "Translate Catalogs"
+
+# Extracts lingui messages, fills missing translations with an LLM
+# (`apps/web/scripts/translate-catalogs.mjs`), checks the catalogs still
+# compile, and opens — or updates — a pull request. It never pushes to main:
+# machine translations land only through review.
+
+on: # yamllint disable-line rule:truthy
+    schedule:
+        - cron: "0 4 * * 1" # Mondays 04:00 UTC
+    workflow_dispatch:
+        inputs:
+            locale:
+                description: "Comma-separated locales (empty = every non-source locale)"
+                required: false
+                default: ""
+                type: "string"
+            limit:
+                description: "Max messages per locale (empty = no limit)"
+                required: false
+                default: ""
+                type: "string"
+            model:
+                description: "Model id (empty = script default / TRANSLATE_MODEL variable)"
+                required: false
+                default: ""
+                type: "string"
+
+concurrency:
+    group: "${{ github.workflow }}"
+    cancel-in-progress: false
+
+permissions: {}
+
+env:
+    BRANCH: "i18n/auto-translate"
+
+jobs:
+    translate:
+        name: "Extract, translate, compile"
+        runs-on: "ubuntu-24.04"
+        # The first run over empty catalogs is ~12k messages; weekly runs after
+        # that only see what changed.
+        timeout-minutes: 180
+        permissions:
+            contents: "write" # push the translation branch
+            pull-requests: "write" # open the PR
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@main"
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            - name: "Extract messages"
+              run: "pnpm --filter @neore/web run translate:extract"
+
+            - name: "Translate missing messages"
+              working-directory: "apps/web"
+              env:
+                  TRANSLATE_API_KEY: "${{ secrets.OPENROUTER_API_KEY }}"
+                  TRANSLATE_MODEL: "${{ inputs.model || vars.TRANSLATE_MODEL }}"
+                  INPUT_LOCALE: "${{ inputs.locale }}"
+                  INPUT_LIMIT: "${{ inputs.limit }}"
+              run: |
+                  args=()
+                  if [ -n "$INPUT_LOCALE" ]; then args+=(--locale "$INPUT_LOCALE"); fi
+                  if [ -n "$INPUT_LIMIT" ]; then args+=(--limit "$INPUT_LIMIT"); fi
+                  if [ -z "$TRANSLATE_MODEL" ]; then unset TRANSLATE_MODEL; fi
+                  node scripts/translate-catalogs.mjs "${args[@]}"
+
+            # The app loads `.po` through the lingui vite plugin, so this is a
+            # gate, not an artifact: it fails the run on a catalog lingui cannot
+            # compile rather than letting it reach a PR.
+            - name: "Compile catalogs"
+              run: "pnpm --filter @neore/web run translate:compile"
+
+            - name: "Open or update pull request"
+              env:
+                  GH_TOKEN: "${{ secrets.I18N_PR_TOKEN || github.token }}"
+                  REPOSITORY: "${{ github.repository }}"
+                  BASE: "${{ github.event.repository.default_branch }}"
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  # Only the catalogs: `.po` files, plus any compiled output that
+                  # is already tracked. Nothing untracked is swept in.
+                  git add -- 'apps/web/src/locales/*/messages.po'
+                  git add -u -- apps/web/src/locales
+
+                  if git diff --cached --quiet; then
+                      echo "Catalogs unchanged; nothing to propose."
+                      exit 0
+                  fi
+
+                  git switch -c "$BRANCH"
+                  git commit -m "chore(i18n): update machine translations"
+                  git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
+
+                  if [ -z "$(gh pr list --repo "$REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
+                      gh pr create --repo "$REPOSITORY" --base "$BASE" --head "$BRANCH" \
+                          --title "chore(i18n): update machine translations" \
+                          --body "Automated run of \`apps/web/scripts/translate-catalogs.mjs\` (lingui extract → LLM translate → compile).
+
+                  Every translation passed ICU, placeholder and tag validation; entries that failed twice were left empty — see the workflow log. Please have a speaker of each language skim the diff before merging."
+                  fi

@@ -1,0 +1,73 @@
+---
+title: API & CLI
+description: Use Neore from scripts and the terminal with API keys, the v1 REST API and the neore CLI
+---
+
+# API & CLI
+
+Everything the API exposes (chat, threads, skills, tasks, the knowledge base and memories) is available over a REST API at `/api/v1` on the backend origin, and through the `neore` command-line client. The machine-readable contract is served at **`/api/v1/openapi.json`** (OpenAPI 3.1), and a rendered reference is at **`/api/v1/docs`**.
+
+## API keys
+
+Create keys in **Settings → API keys**. Each key has:
+
+- **Permissions**: a read and a write scope per resource (`chat`, `threads`, `skills`, `tasks`, `knowledge`, `memories`, `models`). Write does not imply read. A key that only posts messages can't list your threads.
+- **An expiry** (7 to 365 days, or none).
+- **Last used**: when the key last authenticated a request.
+
+The full key is shown **once**, when you create it. Only its first characters are stored in a readable form, so a lost key has to be replaced, not recovered. Revoking a key takes effect on its next request. Guest (anonymous) accounts can't create keys, and you can have at most 25.
+
+Send the key as `Authorization: Bearer <key>` (or `X-API-Key: <key>`). API keys work **only** on `/api/v1`. They can't be used to call the app's internal RPC endpoints.
+
+## Conventions
+
+| Topic       | Behaviour                                                                                                                                                                                                                                 |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Errors      | Always `{ "error": { "code", "message", "requestId", "details"? } }`. Branch on `code` (for example `invalid_api_key`, `insufficient_scope`, `not_found`, `rate_limited`, `daily_limit_reached`); `message` is for humans and may change. |
+| Pagination  | Lists take `?limit=` (1–100, default 20) and `?cursor=` and answer `{ "data": [...], "nextCursor": "…" \| null }`. Cursors are opaque; pass them back unchanged.                                                                          |
+| Idempotency | Send `Idempotency-Key: <unique string>` on any POST. A retry with the same key and body replays the first response for 24 hours; the same key with a different body answers `idempotency_conflict`.                                       |
+| Rate limits | Per key: 120 reads and 30 writes per minute (with a short burst allowance). Your account's own limits apply on top, including the **daily message limit**, which API chats share with the app. A `429` carries `Retry-After`.             |
+
+## Chatting
+
+```bash
+# Start (or continue, with "threadId") a chat. Answers 202 with a stream token.
+curl -X POST "$NEORE_API_URL/api/v1/chat" \
+  -H "Authorization: Bearer $NEORE_API_KEY" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"prompt":"Summarise the Rust 2024 edition changes"}'
+
+# Stream the reply as NDJSON.
+curl -N -X POST "$NEORE_API_URL/api/v1/chat/stream" \
+  -H "Authorization: Bearer $NEORE_API_KEY" -H "Content-Type: application/json" \
+  -d '{"streamToken":"<streamToken from above>"}'
+```
+
+The stream emits one JSON object per line: `{"type":"text","text":"…"}`, `{"type":"reasoning",…}`, `{"type":"speaker",…}` (group chats), and finally exactly one `{"type":"done","status":"done"}` or `{"type":"error","error":{…}}`. Pass `"stream": false` to `/chat` instead to block until the reply is complete (up to 5 minutes) and get `{ threadId, messageId, text, status }` back.
+
+`POST /api/v1/skills/{slug}/run` runs a skill the same way. It's equivalent to typing `/<slug> <input>` in the app.
+
+## The `neore` CLI
+
+The CLI lives in `apps/cli` (`pnpm --filter @neore/cli build`, then `node apps/cli/dist/bin.js`, or link it to get the `neore` binary).
+
+```bash
+neore login --api-url https://api.example.com   # paste the key when prompted
+neore doctor                                     # config, connectivity, key validity
+neore chat "What changed in my tasks today?"     # streams to stdout
+neore chat                                       # interactive session (/new, /exit)
+neore threads ls --limit 10
+neore threads show <thread-id>
+neore threads rm <thread-id> --yes
+neore skills ls
+neore skills run summarize "https://example.com/post"
+neore tasks create --title "Weekly digest" --instructions "…" --cron "0 8 * * 1"
+neore tasks run <task-id> && neore tasks status <task-id>
+neore kb upload ./handbook.pdf
+neore kb search "vacation policy"
+neore models
+```
+
+Every command takes `--json` for machine-readable output (NDJSON for streams). The key is stored in the OS config directory (`$XDG_CONFIG_HOME/neore/config.json`, `~/Library/Application Support/neore/`, or `%APPDATA%\neore\`) with `0600` permissions; `neore doctor` flags a looser file. `NEORE_API_KEY` and `NEORE_API_URL` override it, for CI. Prefer the prompt or stdin over `--key`, which ends up in shell history.
+
+Exit codes: `0` ok, `1` error, `2` usage, `3` auth or missing scope, `4` not found, `5` rate or daily limit, `6` network.

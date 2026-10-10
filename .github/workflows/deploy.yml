@@ -1,0 +1,417 @@
+# https://alchemy.run/getting-started/
+
+name: "Deploy"
+
+on: # yamllint disable-line rule:truthy
+    push:
+        tags:
+            - "v*" # e.g. v1.0.0, v2.3.1-rc.1
+    pull_request:
+        types: ["opened", "synchronize", "reopened"]
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: "Target environment (production or preview)"
+                required: true
+                default: "production"
+                type: "choice"
+                options:
+                    - "production"
+                    - "preview"
+
+concurrency:
+    group: "${{ github.workflow }}-${{ github.ref }}"
+    # Don't cancel in-progress deployments to avoid partial deploys
+    cancel-in-progress: false
+
+permissions:
+    contents: "read"
+    deployments: "write"
+    pull-requests: "write" # Required for posting preview URL comments on PRs
+
+jobs:
+    # -----------------------------------------------------------------
+    # Step 1: Gate the deploy — audit, build the shared packages, and resolve
+    # the target environment for the job below.
+    # -----------------------------------------------------------------
+    build-packages:
+        name: "Build Packages"
+        runs-on: "ubuntu-24.04"
+        outputs:
+            # Resolve target environment:
+            #   'production' → v* tag push OR manual dispatch with production selected
+            #   'preview'    → pull_request or manual dispatch with preview selected
+            deploy-env: "${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && 'production' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment) || 'preview' }}"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              env:
+                  GIT_COMMITTER_NAME: "GitHub Actions Shell"
+                  GIT_AUTHOR_NAME: "GitHub Actions Shell"
+                  EMAIL: "github-actions[bot]@users.noreply.github.com"
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@main"
+              with:
+                  node-version: "22"
+
+            - name: "Build shared packages"
+              run: "pnpm run build:packages"
+
+    # -----------------------------------------------------------------
+    # Step 2a: Build app & deploy all Cloudflare Workers via Alchemy
+    #
+    # Alchemy (alchemy.run) replaces per-worker `wrangler deploy` calls
+    # with a single TypeScript IaC script that manages both the main
+    # TanStack Start app and the document-parser service.
+    # -----------------------------------------------------------------
+    deploy-cloudflare:
+        name: "Deploy Cloudflare Workers via Alchemy (${{ needs.build-packages.outputs.deploy-env }})"
+        needs: "build-packages"
+        runs-on: "ubuntu-24.04"
+        environment:
+            name: "${{ needs.build-packages.outputs.deploy-env }}"
+            url: "${{ steps.alchemy.outputs.website-url }}"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              env:
+                  GIT_COMMITTER_NAME: "GitHub Actions Shell"
+                  GIT_AUTHOR_NAME: "GitHub Actions Shell"
+                  EMAIL: "github-actions[bot]@users.noreply.github.com"
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@main"
+              with:
+                  node-version: "22"
+
+            # Built here rather than carried from `build-packages` as an artifact.
+            # `upload-artifact` strips the least common ancestor of the matched
+            # files, so `packages/*/dist/` with two emitting packages (ai and
+            # service-sdk) uploaded as `ai/dist/...` and `service-sdk/dist/...`.
+            # Extracting that to `.` produced `./ai/dist`, never
+            # `packages/ai/dist` — so the app build failed to resolve
+            # `@neore/ai/models`. The LCA also shifts with the number of
+            # emitting packages, which makes the artifact path silently wrong
+            # again on the next package that gains or loses a `dist`. The build
+            # is ~20s and nx-cached; that is cheaper than the trap.
+            - name: "Build shared packages"
+              run: "pnpm run build:packages"
+
+            - name: "Build app"
+              working-directory: "apps/web"
+              env:
+                  # Node sizes the default old-space from available RAM: this is
+                  # a private repo, so the runner is 2-core/7GB and Node picked
+                  # ~2080MB — the build died there with "Ineffective mark-compacts
+                  # near heap limit". It succeeds on a workstation whose default
+                  # is 4144MB, so match that rather than guess upward; the peak
+                  # is driven by the sourcemaps for the large code-split chunks
+                  # (univer-sheet-editor ~5.5MB, vendor-diagrams ~2.8MB).
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+                  VITE_DEBUG: "false"
+                  # These three are REQUIRED by apps/web/src/lib/env.ts as
+                  # `string().url()`. `emptyStringAsUndefined` is on, so an unset
+                  # secret fails the build rather than degrading — which is what
+                  # happened: the repo has no secrets set at all.
+                  #
+                  # `VITE_LUNORA_URL` names the BACKEND Worker — one Worker
+                  # serves both `/_lunora/rpc` and `/api/auth/*` — and must agree
+                  # with its `PUBLIC_ORIGIN`, or the browser signs tokens against
+                  # one origin and the backend verifies them against another.
+                  #
+                  # There is deliberately no fallback. A `workers.dev` URL is
+                  # `<worker>.<account-subdomain>.workers.dev`, and this
+                  # workflow cannot know the account subdomain — the previous
+                  # single-label guesses (`neore-backend.workers.dev`) resolve to
+                  # nothing, which does not fail the build. It ships an app whose
+                  # JWKS fetch cannot succeed, so every RPC comes back
+                  # FORBIDDEN_SHARD. An unset secret failing the deploy is the
+                  # cheaper outcome.
+                  VITE_LUNORA_URL: "${{ secrets.VITE_LUNORA_URL }}"
+                  VITE_LLM_GATEWAY_URL: "${{ secrets.VITE_LLM_GATEWAY_URL }}"
+                  VITE_SITE_URL: "${{ secrets.VITE_SITE_URL }}"
+                  VITE_DPO_EMAIL: "${{ secrets.VITE_DPO_EMAIL }}"
+                  VITE_DPO_NAME: "${{ secrets.VITE_DPO_NAME }}"
+                  VITE_PRIVACY_POLICY_URL: "${{ secrets.VITE_PRIVACY_POLICY_URL }}"
+                  VITE_C15T_MODE: "${{ secrets.VITE_C15T_MODE }}"
+                  VITE_C15T_BACKEND_URL: "${{ secrets.VITE_C15T_BACKEND_URL }}"
+                  VITE_POSTHOG_API_KEY: "${{ secrets.VITE_POSTHOG_API_KEY }}"
+                  VITE_POSTHOG_HOST: "${{ secrets.VITE_POSTHOG_HOST }}"
+                  POSTHOG_PERSONAL_API_KEY: "${{ secrets.POSTHOG_PERSONAL_API_KEY }}"
+                  # Half of a pair. This is what makes the sign-up / sign-in
+                  # forms render a Turnstile widget at all; the matching
+                  # TURNSTILE_SECRET_KEY below is what verifies the token it
+                  # produces. alchemy.run.ts refuses to deploy with one set and
+                  # not the other, because each half alone fails silently — the
+                  # secret alone kills every credential flow, the site key alone
+                  # shows a challenge nothing checks.
+                  VITE_TURNSTILE_SITE_KEY: "${{ secrets.VITE_TURNSTILE_SITE_KEY }}"
+              run: "pnpm build"
+
+            # Alchemy uploads services/document-parser AS BUILT (Rust,
+            # worker-build) and refuses to start without `build/`.
+            - name: "Setup Rust Worker toolchain"
+              uses: "./.github/actions/setup-rust-worker"
+
+            - name: "Build the document-parser Worker"
+              run: "pnpm --filter document-parser run build:worker"
+
+            - name: "Deploy all Cloudflare Workers via Alchemy"
+              id: "alchemy"
+              env:
+                  CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+                  CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+                  DEPLOY_ENV: "${{ needs.build-packages.outputs.deploy-env }}"
+                  CI: "true"
+                  # alchemy.run.ts refuses to deploy without every one of these
+                  # (REQUIRED_DEPLOY_ENV) — there are deliberately no defaults,
+                  # because a blank auth secret deploys a working-looking app
+                  # with forgeable sessions.
+                  #
+                  # BACKEND_PUBLIC_ORIGIN is fed from VITE_LUNORA_URL on
+                  # purpose. That is the origin the app proxies /api/auth/* to,
+                  # and the backend mints its JWTs with whatever host it is
+                  # reached on, then verifies iss/aud against PUBLIC_ORIGIN. Two
+                  # separate secrets would let those drift, and the failure is
+                  # silent: every bearer token verifies as anonymous.
+                  BACKEND_PUBLIC_ORIGIN: "${{ secrets.VITE_LUNORA_URL }}"
+                  BETTER_AUTH_SECRET: "${{ secrets.BETTER_AUTH_SECRET }}"
+                  ENCRYPTION_KEY: "${{ secrets.ENCRYPTION_KEY }}"
+                  # Gateway -> backend only (chunk polling, usage reports, key
+                  # validation, stream tokens). The backend reaches the gateway,
+                  # the document parser, the NSFW checker and the browser renderer
+                  # over service bindings — no URL and no secret for those.
+                  LLM_GATEWAY_SIGNING_SECRET: "${{ secrets.LLM_GATEWAY_SIGNING_SECRET }}"
+                  # The gateway's PUBLIC origin (custom domain, PUBLIC_GATEWAY_URL).
+                  LLM_GATEWAY_URL: "${{ secrets.VITE_LLM_GATEWAY_URL }}"
+                  # Authenticates the backend's own job dispatch (the jobs queue
+                  # consumer and the SchedulerDO). A long random string; nothing
+                  # outside the backend Worker ever sends it.
+                  LUNORA_ADMIN_TOKEN: "${{ secrets.LUNORA_ADMIN_TOKEN }}"
+                  R2_ENDPOINT: "${{ secrets.R2_ENDPOINT }}"
+                  STORAGE_SIGNING_SECRET: "${{ secrets.STORAGE_SIGNING_SECRET }}"
+                  # Outbound mail (`email/mailer.ts`). MAIL_FROM is the sender and is
+                  # required in production. With RESEND_API_KEY unset, alchemy.run.ts
+                  # binds Cloudflare Email Service (MAIL_FROM must be on its verified
+                  # sending domain); set the key to send through Resend instead.
+                  MAIL_FROM: "${{ secrets.MAIL_FROM }}"
+                  RESEND_API_KEY: "${{ secrets.RESEND_API_KEY }}"
+                  SITE_URL: "${{ secrets.VITE_SITE_URL }}"
+                  # Optional, but paired with VITE_TURNSTILE_SITE_KEY in the
+                  # build step above — set both or neither. Unset on both sides
+                  # means no captcha anywhere, which is what ships today.
+                  TURNSTILE_SECRET_KEY: "${{ secrets.TURNSTILE_SECRET_KEY }}"
+                  VITE_TURNSTILE_SITE_KEY: "${{ secrets.VITE_TURNSTILE_SITE_KEY }}"
+                  # Encrypts every `alchemy.secret()` into the R2 state file.
+                  # No default anywhere — unset, the deploy dies partway through
+                  # the graph with "Cannot serialize secret without password".
+                  # It must stay STABLE: rotating it makes the existing state
+                  # file undecryptable.
+                  ALCHEMY_PASSWORD: "${{ secrets.ALCHEMY_PASSWORD }}"
+                  #
+                  # ---------------------------------------------------------
+                  # Everything below is passed through to the backend Worker by
+                  # `requiredEnvPassthrough` in alchemy.run.ts.
+                  #
+                  # These are NOT optional extras. `http.ts` runs `assertEnv()`
+                  # on every request against the strict schema (the strict one
+                  # applies to both stages), and most fields there are a bare
+                  # `z.string()` — so an ABSENT key fails while an EMPTY one
+                  # passes. An unset GitHub secret expands to "", which is
+                  # exactly the "present but not configured" state the schema
+                  # wants; a key omitted from this list instead 500s every
+                  # request on a Worker that deployed green.
+                  #
+                  # Generated from `REQUIRED_ENV_KEYS` in
+                  # backend/lunora/lib/env-validation.ts. Adding a field there
+                  # means adding it here — `backend/deploy-env-bindings.test.ts`
+                  # fails if the two drift.
+                  # ---------------------------------------------------------
+                  #
+                  # Core. ADMIN is the one that decides whether anyone can ever
+                  # sign up: registration is invite-only unless
+                  # SIGNUP_INVITE_ONLY is "false"/"0", and the bootstrap
+                  # (`lunora run auth_invitations:seedAdminInvitations`) throws
+                  # "ADMIN is empty" without it. Comma-separated addresses.
+                  ADMIN: "${{ secrets.ADMIN }}"
+                  # Repository VARIABLE, not a secret: "false" opens registration.
+                  SIGNUP_INVITE_ONLY: "${{ vars.SIGNUP_INVITE_ONLY }}"
+                  JWKS: "${{ secrets.JWKS }}"
+                  # Services
+                  GOOGLE_CLIENT_ID: "${{ secrets.GOOGLE_CLIENT_ID }}"
+                  GOOGLE_CLIENT_SECRET: "${{ secrets.GOOGLE_CLIENT_SECRET }}"
+                  R2_ACCESS_KEY_ID: "${{ secrets.R2_ACCESS_KEY_ID }}"
+                  R2_BUCKET: "${{ secrets.R2_BUCKET }}"
+                  R2_SECRET_ACCESS_KEY: "${{ secrets.R2_SECRET_ACCESS_KEY }}"
+                  R2_TOKEN: "${{ secrets.R2_TOKEN }}"
+                  RESEND_WEBHOOK_SECRET: "${{ secrets.RESEND_WEBHOOK_SECRET }}"
+                  # AI providers — the backend's own copies. The gateway is what
+                  # actually calls the providers and takes its keys from the
+                  # block further down; these satisfy the backend's schema and
+                  # cover the paths that still read them directly.
+                  FAL_API_KEY: "${{ secrets.FAL_API_KEY }}"
+                  GROQ_API_KEY: "${{ secrets.GROQ_API_KEY }}"
+                  OPENROUTER_API_KEY: "${{ secrets.OPENROUTER_API_KEY }}"
+                  REPLICATE_API_TOKEN: "${{ secrets.REPLICATE_API_TOKEN }}"
+                  REQUESTY_API_KEY: "${{ secrets.REQUESTY_API_KEY }}"
+                  XAI_API_KEY: "${{ secrets.XAI_API_KEY }}"
+                  # Tool APIs — each one an agent tool that degrades to
+                  # unavailable when empty.
+                  AMADEUS_CLIENT_ID: "${{ secrets.AMADEUS_CLIENT_ID }}"
+                  AMADEUS_CLIENT_SECRET: "${{ secrets.AMADEUS_CLIENT_SECRET }}"
+                  COINGECKO_API_KEY: "${{ secrets.COINGECKO_API_KEY }}"
+                  E2B_API_KEY: "${{ secrets.E2B_API_KEY }}"
+                  EXA_API_KEY: "${{ secrets.EXA_API_KEY }}"
+                  FIRECRAWL_API_KEY: "${{ secrets.FIRECRAWL_API_KEY }}"
+                  # NOT `secrets.GITHUB_TOKEN`. That name is reserved — GitHub
+                  # refuses to create a secret under it and substitutes the
+                  # workflow's own ephemeral Actions token, which would be
+                  # baked into the Worker as a long-lived credential that
+                  # expires minutes after the deploy. Use a PAT stored under a
+                  # name of our own.
+                  GITHUB_TOKEN: "${{ secrets.TOOLS_GITHUB_TOKEN }}"
+                  GOOGLE_MAPS_API_KEY: "${{ secrets.GOOGLE_MAPS_API_KEY }}"
+                  OPENWEATHER_API_KEY: "${{ secrets.OPENWEATHER_API_KEY }}"
+                  PARALLEL_API_KEY: "${{ secrets.PARALLEL_API_KEY }}"
+                  SPOTIFY_CLIENT_ID: "${{ secrets.SPOTIFY_CLIENT_ID }}"
+                  SPOTIFY_CLIENT_SECRET: "${{ secrets.SPOTIFY_CLIENT_SECRET }}"
+                  SUPADATA_API_KEY: "${{ secrets.SUPADATA_API_KEY }}"
+                  TAVILY_API_KEY: "${{ secrets.TAVILY_API_KEY }}"
+                  TMDB_API_KEY: "${{ secrets.TMDB_API_KEY }}"
+                  VALYU_API_KEY: "${{ secrets.VALYU_API_KEY }}"
+                  # Optional backend extras — bound only when non-empty.
+                  CONNECTOR_ENCRYPTION_KEY: "${{ secrets.CONNECTOR_ENCRYPTION_KEY }}"
+                  # GitHub reserves secret names starting with GITHUB_, hence the swap.
+                  GITHUB_CONNECTOR_CLIENT_ID: "${{ secrets.CONNECTOR_GITHUB_CLIENT_ID }}"
+                  GITHUB_CONNECTOR_CLIENT_SECRET: "${{ secrets.CONNECTOR_GITHUB_CLIENT_SECRET }}"
+                  GOOGLE_CONNECTOR_CLIENT_ID: "${{ secrets.GOOGLE_CONNECTOR_CLIENT_ID }}"
+                  GOOGLE_CONNECTOR_CLIENT_SECRET: "${{ secrets.GOOGLE_CONNECTOR_CLIENT_SECRET }}"
+                  SLACK_CONNECTOR_CLIENT_ID: "${{ secrets.SLACK_CONNECTOR_CLIENT_ID }}"
+                  SLACK_CONNECTOR_CLIENT_SECRET: "${{ secrets.SLACK_CONNECTOR_CLIENT_SECRET }}"
+                  FEATUREBASE_API_KEY: "${{ secrets.FEATUREBASE_API_KEY }}"
+                  # Creem subscriptions — checkout is off until CREEM_API_KEY is set.
+                  CREEM_API_KEY: "${{ secrets.CREEM_API_KEY }}"
+                  CREEM_PRODUCT_PRO: "${{ secrets.CREEM_PRODUCT_PRO }}"
+                  CREEM_PRODUCT_TEAM: "${{ secrets.CREEM_PRODUCT_TEAM }}"
+                  CREEM_TEST_MODE: "${{ secrets.CREEM_TEST_MODE }}"
+                  CREEM_WEBHOOK_SECRET: "${{ secrets.CREEM_WEBHOOK_SECRET }}"
+                  GOOGLE_GENERATIVE_AI_API_KEY: "${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}"
+                  # Optional sign-in providers — each is enabled only when its
+                  # id AND secret are set. Register the redirect URI
+                  # `${SITE_URL}/api/auth/callback/<github|microsoft|oidc>`.
+                  AUTH_GITHUB_CLIENT_ID: "${{ secrets.AUTH_GITHUB_CLIENT_ID }}"
+                  AUTH_GITHUB_CLIENT_SECRET: "${{ secrets.AUTH_GITHUB_CLIENT_SECRET }}"
+                  MICROSOFT_CLIENT_ID: "${{ secrets.MICROSOFT_CLIENT_ID }}"
+                  MICROSOFT_CLIENT_SECRET: "${{ secrets.MICROSOFT_CLIENT_SECRET }}"
+                  MICROSOFT_TENANT_ID: "${{ secrets.MICROSOFT_TENANT_ID }}"
+                  OIDC_ISSUER: "${{ secrets.OIDC_ISSUER }}"
+                  OIDC_CLIENT_ID: "${{ secrets.OIDC_CLIENT_ID }}"
+                  OIDC_CLIENT_SECRET: "${{ secrets.OIDC_CLIENT_SECRET }}"
+                  OIDC_BUTTON_LABEL: "${{ secrets.OIDC_BUTTON_LABEL }}"
+                  # Web Push — optional; push is off unless BOTH keys are set.
+                  # Generate a P-256 pair once (e.g. `npx web-push
+                  # generate-vapid-keys`); SUBJECT is a mailto: or https: URL.
+                  VAPID_PUBLIC_KEY: "${{ secrets.VAPID_PUBLIC_KEY }}"
+                  VAPID_PRIVATE_KEY: "${{ secrets.VAPID_PRIVATE_KEY }}"
+                  VAPID_SUBJECT: "${{ secrets.VAPID_SUBJECT }}"
+                  # Display name sent in connector OAuth client registration;
+                  # unset = "Neore".
+                  APP_NAME: "${{ secrets.APP_NAME }}"
+                  POSTHOG_API_KEY: "${{ secrets.VITE_POSTHOG_API_KEY }}"
+                  POSTHOG_HOST: "${{ secrets.VITE_POSTHOG_HOST }}"
+                  POSTHOG_PERSONAL_API_KEY: "${{ secrets.POSTHOG_PERSONAL_API_KEY }}"
+                  # Realtime dictation token for the web Worker; unset = Web Speech fallback.
+                  ELEVENLABS_API_KEY: "${{ secrets.ELEVENLABS_API_KEY }}"
+                  POSTHOG_PROJECT_ID: "${{ secrets.POSTHOG_PROJECT_ID }}"
+                  # The address the account-deletion email names; the web build
+                  # shows the same one (VITE_DPO_EMAIL).
+                  DPO_EMAIL: "${{ secrets.VITE_DPO_EMAIL }}"
+                  # Published browser-extension origin(s), comma-separated:
+                  # chrome-extension://<store id>. Unset = the extension cannot
+                  # sign in; a wildcard is ignored, never honoured.
+                  TRUSTED_EXTENSION_ORIGINS: "${{ secrets.TRUSTED_EXTENSION_ORIGINS }}"
+                  # Firefox extension sign-in redirect URI(s). Leave the secret
+                  # unset: the backend defaults to the shipped add-on id's URI.
+                  # Set it only for another gecko id, or to "none" to turn the
+                  # Firefox sign-in off. A value replaces the default.
+                  TRUSTED_EXTENSION_REDIRECT_URIS: "${{ secrets.TRUSTED_EXTENSION_REDIRECT_URIS }}"
+                  WOLFRAM_APP_ID: "${{ secrets.WOLFRAM_APP_ID }}"
+                  #
+                  # ---------------------------------------------------------
+                  # LLM Gateway provider keys. The gateway is what actually
+                  # calls the model providers, and `AppEnv` marks all of these
+                  # optional — so without them it boots fine and every model
+                  # call fails unless the user brought their own key. Bound only
+                  # when non-empty.
+                  # ---------------------------------------------------------
+                  BFL_API_KEY: "${{ secrets.BFL_API_KEY }}"
+                  CLOUDFLARE_API_KEY: "${{ secrets.CLOUDFLARE_API_KEY }}"
+                  GATEWAY_ADMIN_USER_IDS: "${{ secrets.GATEWAY_ADMIN_USER_IDS }}"
+                  GOOGLE_API_KEY: "${{ secrets.GOOGLE_API_KEY }}"
+                  OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+                  OTEL_EXPORTER_OTLP_ENDPOINT: "${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}"
+                  OTEL_EXPORTER_OTLP_HEADERS: "${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}"
+              run: |
+                  # `pnpm run deploy`, spelled out. On pnpm 10 bare `deploy` was the
+                  # built-in (deploy a workspace package to a directory) and failed
+                  # with ERR_PNPM_NOTHING_TO_DEPLOY; since pnpm 11 a `deploy` script
+                  # shadows the built-in, so both spellings now run alchemy — keep
+                  # the explicit one so the intent survives another change.
+                  output=$(pnpm run deploy 2>&1) || { echo "$output"; exit 1; }
+                  echo "$output"
+
+                  # Extract website URL from Alchemy output for GitHub environment
+                  url=$(echo "$output" | grep -oP "website: '?\Khttps?://[^'}\s]+" || true)
+                  echo "website-url=${url}" >> "$GITHUB_OUTPUT"
+
+            - name: "Comment preview URL on PR"
+              if: "github.event_name == 'pull_request' && steps.alchemy.outputs.website-url != ''"
+              uses: "marocchino/sticky-pull-request-comment@0ea0beb66eb9baf113663a64ec522f60e49231c0" # v3.0.4
+              with:
+                  header: "cloudflare-app-preview"
+                  message: |
+                      ### Cloudflare Workers Preview — Alchemy
+
+                      | | |
+                      |-|-|
+                      | **App URL** | ${{ steps.alchemy.outputs.website-url }} |
+                      | **Stage** | `${{ needs.build-packages.outputs.deploy-env }}` |
+                      | **Commit** | `${{ github.sha }}` |
+
+    # -----------------------------------------------------------------
+    # There is no separate backend deploy job.
+    #
+    # The backend is the `neore-backend` Worker in `alchemy.run.ts`, so it
+    # goes out with everything else in the Alchemy step above and needs no
+    # job of its own.
+    # -----------------------------------------------------------------
+
+    # -----------------------------------------------------------------
+    # Required check gate (mirrors pattern from test.yml / lint.yml)
+    # -----------------------------------------------------------------
+    deploy-required-check:
+        needs: ["build-packages", "deploy-cloudflare"]
+        name: "Check Deploy Run"
+        if: "always() && (needs.deploy-cloudflare.result == 'success' || needs.deploy-cloudflare.result == 'skipped')"
+        runs-on: "ubuntu-24.04"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Check for failures"
+              if: "contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')"
+              run: |
+                  echo "One of the deploy jobs failed. Check the logs above." && exit 1

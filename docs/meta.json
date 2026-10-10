@@ -1,0 +1,32 @@
+{
+    "title": "Documentation",
+    "pages": [
+        "index",
+        "chat",
+        "voice",
+        "projects",
+        "tools",
+        "browser",
+        "workflows",
+        "design-canvas",
+        "spreadsheets",
+        "triggers",
+        "knowledge-base",
+        "memory",
+        "authentication",
+        "settings",
+        "organizations",
+        "prompts",
+        "skills",
+        "mcp",
+        "pins",
+        "vault",
+        "messenger",
+        "devices",
+        "keyboard-shortcuts",
+        "privacy",
+        "chat-import",
+        "api",
+        "services"
+    ]
+}

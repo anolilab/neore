@@ -1,0 +1,82 @@
+---
+title: Memory
+description: The AI remembers facts about you across conversations for more personalized responses
+---
+
+# Memory
+
+Neore Chat can automatically learn and remember facts about you from your conversations. This makes the AI's responses more personalized over time — it remembers your preferences, projects, and context without you having to repeat yourself.
+
+## How It Works
+
+1. After each AI response, the system automatically extracts relevant facts from the conversation
+2. Facts are categorized (preferences, projects, expertise, etc.) with confidence and importance scores
+3. Before generating each response, relevant memories are retrieved and included in the AI's context
+4. The AI uses these memories to provide more personalized, context-aware answers
+
+### Fact Extraction
+
+The memory system extracts facts like:
+- Your name, role, and background
+- Technical preferences (languages, frameworks, tools)
+- Current projects and goals
+- Communication preferences
+- Domain expertise
+
+### Smart Deduplication
+
+When new facts are extracted, the system checks for conflicts with existing memories:
+- **Duplicate facts** are ignored (similarity threshold: 85%)
+- **Updated information** supersedes old memories (e.g., "I moved to Berlin" replaces "I live in London")
+- **Conflicting facts** are resolved using belief revision (UPDATE, SUPERSEDE, IGNORE, ADD)
+
+### Retrieval Scoring
+
+When the AI prepares a response, it retrieves the most relevant memories using a multi-signal scoring system:
+
+| Signal | Weight | Description |
+|--------|--------|-------------|
+| Semantic similarity | 40% | How relevant the memory is to the current conversation |
+| Confidence | 20% | How certain the system is about the fact |
+| Importance | 15% | How significant the fact is |
+| Recency | 25% | How recently the fact was learned (30-day half-life) |
+
+## Managing Memory
+
+### Enable/Disable
+
+Memory is **enabled by default**. To toggle it:
+
+1. Navigate to **Settings → Personalization**
+2. Find the **Memory** toggle
+3. Turn it on or off
+
+When disabled, no new facts are extracted and existing memories are not used in responses.
+
+### Viewing Memories
+
+You can view all memories the AI has learned about you:
+
+1. Go to **Settings → Personalization**
+2. See the list of extracted facts with their categories and confidence levels
+
+### Deleting Memories
+
+You can delete individual memories or clear all memories:
+
+1. Go to **Settings → Personalization**
+2. Click the delete button next to any memory to remove it
+3. Deleted memories are permanently removed (GDPR Article 17)
+
+## Privacy
+
+- Memories are stored per-user and are never shared with other users
+- Memory extraction uses a lightweight model (Gemini 2.0 Flash) — your conversation data is not used for training
+- Full GDPR deletion is supported — deleting your account removes all memories
+- You can disable memory at any time without losing existing memories
+
+## Related Features
+
+- [Settings](/docs/settings) — Manage personalization preferences
+- [Privacy & GDPR](/docs/privacy) — Data rights and deletion
+- [Chat](/docs/chat) — Core conversation features

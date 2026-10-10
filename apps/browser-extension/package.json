@@ -1,0 +1,51 @@
+{
+    "name": "@neore/browser-extension",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "tsc -b && vite build",
+        "build:firefox": "tsc -b && TARGET_BROWSER=firefox vite build",
+        "dev": "vite",
+        "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
+        "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
+        "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
+        "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
+        "lint:types": "tsc -b",
+        "preview": "vite preview",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@lingui/core": "catalog:i18n",
+        "@lingui/react": "catalog:i18n",
+        "@lunora/client": "catalog:",
+        "@lunora/react": "catalog:",
+        "@neore/ai": "workspace:*",
+        "@neore/backend": "workspace:*",
+        "@neore/chat-ui": "workspace:*",
+        "@neore/ui": "workspace:*",
+        "better-auth": "catalog:auth",
+        "lucide-react": "catalog:icons",
+        "react": "catalog:react",
+        "react-dom": "catalog:react"
+    },
+    "devDependencies": {
+        "@anolilab/eslint-config": "catalog:lint",
+        "@crxjs/vite-plugin": "catalog:build",
+        "@lingui/babel-plugin-lingui-macro": "catalog:i18n",
+        "@rolldown/plugin-babel": "catalog:build",
+        "@tailwindcss/vite": "catalog:build",
+        "@types/chrome": "catalog:types",
+        "@types/node": "catalog:types",
+        "@types/react": "catalog:types",
+        "@types/react-dom": "catalog:types",
+        "@vitejs/plugin-react": "catalog:build",
+        "eslint": "catalog:lint",
+        "jsdom": "catalog:test",
+        "tailwindcss": "catalog:style",
+        "typescript": "catalog:tsc",
+        "vite": "catalog:build",
+        "vite-plugin-zip-pack": "catalog:build",
+        "vitest": "catalog:test"
+    }
+}

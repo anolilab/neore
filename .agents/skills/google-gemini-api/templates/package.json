@@ -1,0 +1,22 @@
+{
+  "name": "gemini-api-example",
+  "version": "1.0.0",
+  "description": "Google Gemini API examples using @google/genai SDK",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@google/genai": "^1.48.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

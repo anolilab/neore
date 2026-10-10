@@ -1,0 +1,625 @@
+---
+title: Settings
+description: Customize your account, chat preferences, and app settings
+---
+
+# Settings
+
+Customize your Neore Chat experience with comprehensive settings for account management, chat preferences, and app customization.
+
+## Quick Start
+
+Access settings from the dashboard navigation or use `Ctrl+,` (Mac: `Cmd+,`) if available.
+
+Settings open in a modal with four groups in the sidebar:
+
+| Group | Pages |
+|---|---|
+| **App** | Customization, Keyboard Shortcuts |
+| **Chat** | Personalization, System Prompts, Knowledge Base, Default Models, Models, Agent, MCP Servers, API Keys |
+| **Account** | Account, Security, API Keys, Organizations, Organization, Billing, Members |
+| **Privacy** | Privacy & Data |
+
+A few settings pages are not yet listed in that sidebar and are reached by URL:
+
+| Page | URL |
+|---|---|
+| Triggers | `/dashboard/settings/chat/triggers` |
+| Usage | `/dashboard/settings/chat/usage` |
+| Model filters | `/dashboard/settings/chat/model-filters` |
+| Connectors (messenger) | `/dashboard/settings/connectors` |
+| Teams | `/dashboard/settings/auth/teams` |
+
+## Account Settings
+
+### Profile Management
+
+**Profile Information:**
+- View and update your profile
+- Display name and avatar
+- Account email (read-only)
+- Account creation date
+
+**Profile Updates:**
+- Change display name
+- Update avatar (if supported)
+- Manage profile visibility
+
+### Email and Password
+
+**Email:**
+- View current email address
+- Email change is currently not enabled
+- Contact support for email changes
+
+**Password:**
+- Change password for email/password accounts
+- Password requirements displayed
+- Secure password update process
+
+**Password Change Process:**
+1. Navigate to Settings → Account
+2. Click "Change Password"
+3. Enter current password
+4. Enter new password
+5. Confirm new password
+6. Save changes
+
+### Security Settings
+
+**Two-Factor Authentication (2FA):**
+- TOTP-based two-factor authentication, available at **Settings → Account → Security**
+- Scan a QR code with an authenticator app, then confirm with a code
+- Backup codes are issued when you enable it — save them
+- Offered on accounts that have a password set
+
+See [Authentication](/docs/authentication#two-factor-authentication-2fa).
+
+**Session Management:**
+- View active sessions
+- See devices and locations
+- Sign out from specific devices
+- Manage session security
+
+**Active Sessions:**
+- List of all active sessions
+- Device information
+- Location and IP address
+- Last activity timestamp
+
+**Sign Out:**
+- Sign out from current device
+- Sign out from all devices
+- Sign out from specific device
+- Remote session management
+
+## Chat Settings
+
+### Model Preferences
+
+**Favorite Models:**
+- Mark models as favorites
+- Favorite models appear first
+- Quick model selection
+- Personal preferences
+
+**Model Configuration:**
+- Default model selection
+- Model-specific settings
+- Reasoning effort preferences
+- Feature toggles
+
+**Model Settings:**
+- Configure per-model preferences
+- Enable/disable features
+- Set default reasoning effort
+- Customize model behavior
+
+### System Prompts
+
+A library of named system prompts you can reuse. Access at
+**Settings → Chat → System Prompts**.
+
+**Features:**
+- Create, edit and delete named presets
+- Optionally scope a preset to a specific model, so it surfaces first when that model is selected
+- Optimize any preset in place with the prompt optimizer
+- Apply a preset to a thread from the thread sidebar
+
+See [Prompts](/docs/prompts#system-prompt-presets) for details.
+
+### Default Models
+
+Pick which model is used by default for each kind of generation. Access at
+**Settings → Chat → Default Models**.
+
+Separate defaults are configurable for **text**, **image** and **video**. Leaving
+one unset falls back to the system default.
+
+### Model Filters
+
+Restrict which models and providers may be used. Reached at
+`/dashboard/settings/chat/model-filters` — this page is not yet linked from the
+settings sidebar.
+
+**Features:**
+- Region restrictions — limit which regions models may be hosted in, for GDPR and data-residency requirements
+- Block specific models or providers outright
+- Clear all rules at once
+
+### Usage
+
+Token usage and cost reporting. Reached at `/dashboard/settings/chat/usage` —
+this page is not yet linked from the settings sidebar.
+
+**Features:**
+- Token usage and cost breakdown per model for a selected period
+- Daily spend and request volume
+- **Activity** — a calendar heatmap of your replies and spend per day
+  over the last 53 weeks. Switch between **Replies** and **Spend** to
+  colour the days, and hover a day (or focus the chart and use the
+  arrow keys) to see its numbers. A table below lists the same
+  activity per month
+- **Usage by skill** — replies, tokens and spend per skill or agent
+  for the selected period. Replies that used no skill are listed as
+  **Assistant (no skill)**
+- Budget alerts that notify or block when a usage metric crosses a threshold
+
+**What counts as a reply:** the activity heatmap and the skill
+breakdown include every reply the AI wrote for you, not only the ones
+in chats you had open. Background runs count too: tasks, triggers,
+evals, sub-agents, messenger replies and the Daily Brief (which has its
+own row, **Daily Brief**, in the skill breakdown).
+
+**Earlier replies:** replies from before the heatmap existed are added
+in the background, once per account — at the latest when you first
+open the page. While that runs, the heatmap shows **Adding your
+earlier replies…** and fills in as it goes; every reply is counted
+once.
+
+### Connectors
+
+Connect messenger platforms so you can chat with the AI from Telegram, Slack or
+Discord. Reached at `/dashboard/settings/connectors` — this page is not yet
+linked from the settings sidebar.
+
+See [Messenger Integration](/docs/messenger).
+
+### Chat Preferences
+
+**Default Settings:**
+- Default thread type
+- Default model selection
+- Auto-save preferences
+- Conversation defaults
+
+### Devices
+
+Let the AI use shared folders, a shell and local MCP servers on your own
+computer through the Neore desktop app. Access at **Settings → Chat → Devices**.
+
+**Features:**
+- Pair the computer the desktop app runs on (**Use this computer for agent tools**)
+- See each paired device, whether it is online, and the tools it offers
+- Rename or remove a device
+- **Device activity** — what the AI asked your devices to do in the last 30 days
+
+Every action is approved on the computer itself. See [Devices](/docs/devices).
+
+### MCP servers
+
+Connect external Model Context Protocol (MCP) servers to give the AI access to
+additional tools and interactive UIs. Access at **Settings → Chat → MCP Servers**.
+
+See [MCP Servers](/docs/mcp) for full setup and configuration instructions.
+
+### Agent Capabilities
+
+Configure advanced AI agent modules that enhance response quality for complex tasks. Access at **Settings → Chat → Agent Capabilities**.
+
+:::info
+The agent loop is always active for all conversations — it provides systematic task execution (analyze → plan → execute → validate). The settings below control optional specialized modules layered on top.
+:::
+
+**Task Planning Module**
+
+Breaks complex tasks into numbered steps with progress tracking. The AI will create an explicit plan before executing multi-step work.
+
+- Best for: multi-step development tasks, feature implementation, refactoring, system design
+- Enable when: your request has 3+ distinct steps or dependencies between steps
+
+**Knowledge Module**
+
+Applies domain-specific best practices, patterns, and proven approaches to responses.
+
+- Best for: technical work requiring expertise (coding, architecture, data modeling)
+- Enable when: you want the AI to follow established patterns and apply professional standards
+
+**Data Source Module**
+
+Prioritizes authoritative sources and validates data quality. The AI cross-references information and is more rigorous about factual accuracy.
+
+- Best for: research tasks, fact-checking, competitive analysis, data gathering
+- Enable when: accuracy and source quality matter
+
+**Auto-Detect Task Complexity**
+
+When enabled, the system automatically analyzes your message and enables the appropriate modules — you don't need to configure them manually. Manual module toggles act as a minimum baseline that auto-detection can only add to, never remove.
+
+| Your message | Auto-detected | Result |
+|---|---|---|
+| "What is 2+2?" | Simple | No extra modules |
+| "Build an auth system" | Coding, complex | Planner + Knowledge |
+| "Research AI trends" | Research | Knowledge + Data Source |
+
+**Token Cost**
+
+Modules add tokens to each conversation's system prompt (applied once, not per message):
+
+| Configuration | System tokens |
+|---|---|
+| Base (agent loop only) | ~2,300 |
+| + Task Planning | ~2,500 |
+| + Knowledge | ~2,600 |
+| + Data Source | ~2,700 |
+| All modules | ~2,900 |
+
+Enable only what you need — Auto-Detect Task Complexity is the most efficient approach for most users.
+
+### Triggers
+
+Automate agent execution on a schedule, via webhooks, or from external
+events. Access at `/dashboard/settings/chat/triggers` — this page is not yet
+linked from the settings sidebar.
+
+Each trigger creates a new thread when it fires and runs your configured
+agent autonomously with Deep Work mode (up to 25 iterations). Results
+appear in your thread list.
+
+**Trigger types:**
+
+- **Schedule** — Run on a cron schedule (for example, daily at 8 AM).
+  Uses standard 5-field cron expressions with timezone support.
+- **Webhook** — Receive HTTP POST requests from external services
+  (Stripe, GitHub, Zapier). Includes HMAC-SHA256 signature
+  verification. A unique URL and secret are generated when you create
+  the trigger.
+- **Event** — React to external events via MCP or Composio (coming in
+  a future release).
+
+**Creating a trigger:**
+
+1. Open `/dashboard/settings/chat/triggers`.
+2. Click **New Trigger**.
+3. Enter a name and optional description.
+4. Select the trigger type (Schedule, Webhook, or Event).
+5. Configure type-specific settings (cron expression, timezone, etc.).
+6. Optionally set a system prompt and input template.
+7. Click **Create Trigger**.
+8. Enable the trigger with the toggle switch.
+
+**Managing triggers:**
+
+- Toggle triggers on or off at any time.
+- View execution count and last triggered timestamp.
+- Delete triggers and their execution history.
+- Monitor errors — the last error message is shown inline.
+
+> **Note:** Triggers start disabled. You must explicitly enable them
+> after creation.
+
+See [Triggers](/docs/triggers) for full documentation including webhook setup and troubleshooting.
+
+### Knowledge Base
+
+Upload documents to give the AI persistent context for your conversations.
+Access at **Settings → Chat → Knowledge Base**.
+
+**Features:**
+- Upload PDFs, DOCX, TXT, Markdown, and other text files
+- Documents are chunked and semantically indexed (RAG)
+- Attach knowledge bases to individual threads
+- Upload progress shown in real time
+
+See [Knowledge Base](/docs/knowledge-base) for full documentation.
+
+### Personalization (Memory)
+
+The AI can learn and remember facts about you across conversations.
+Access at **Settings → Chat → Personalization**.
+
+**Features:**
+- **Memory toggle** — enable or disable automatic fact extraction
+- **View memories** — see all facts the AI has learned about you
+- **Delete memories** — remove individual facts or clear all memories
+
+When enabled, the AI automatically extracts relevant facts from your
+conversations and uses them to personalize future responses.
+
+See [Memory](/docs/memory) for details on how extraction and retrieval work.
+
+## App Customization
+
+### Voice
+
+At **Settings → App → Customization**, in the **Chat** section:
+
+- **Hands-free voice** — the hosted voice hands-free voice mode reads replies in
+  (not shown to guest accounts)
+- **Auto-read replies** — read every reply aloud with your browser's voice when it finishes
+
+See [Voice](/docs/voice).
+
+### UI Customization
+
+**Theme Preferences:**
+- Light theme
+- Dark theme
+- System theme (auto)
+- Theme persistence
+
+**Interface Options:**
+- Layout preferences
+- Sidebar visibility
+- Compact or spacious views
+- Customize appearance
+
+### Keyboard Shortcuts
+
+**Customizable Shortcuts:**
+- Configure keyboard shortcuts
+- Personal preferences
+- Power user features
+- Quick actions
+
+**Default Shortcuts:**
+- Navigation shortcuts
+- Action shortcuts
+- Thread management
+- Search and commands
+
+**Customization:**
+1. Navigate to Settings → Keyboard Shortcuts
+2. Click on shortcut to edit
+3. Press new key combination
+4. Save changes
+
+**Reset Shortcuts:**
+- Reset to defaults
+- Restore original shortcuts
+- Undo customizations
+
+See [Keyboard Shortcuts](/docs/keyboard-shortcuts) for detailed information.
+
+## API Keys
+
+### Bring Your Own Key (BYOK)
+
+Use your own API keys for AI providers, search tools, and messenger bots.
+Access at **Settings → API Keys**.
+
+**Supported provider keys:**
+- **AI providers** — OpenAI, Anthropic, Google, OpenRouter, Groq, and more
+- **Search tools** — Tavily (used by web search, people search, company search, deep research)
+- **Messenger bots** — Telegram, Slack, and Discord bot tokens
+
+Provider keys are encrypted at rest and decrypted only when needed. This
+lets you use your own quotas and billing instead of the platform's.
+
+### API Key Management
+
+**API Keys:**
+- Create API keys for programmatic access
+- Manage existing keys
+- Set expiration dates
+- Control access permissions
+
+**Creating API Keys:**
+1. Navigate to Settings → API Keys
+2. Click "Create API Key"
+3. Set name and permissions
+4. Copy key immediately (shown once)
+5. Store securely
+
+**API Key Features:**
+- Prefix: `app_` for application keys
+- Metadata: Environment and version info
+- Expiration: Optional expiration dates
+- Permissions: Scoped access control
+
+**Managing API Keys:**
+- View all active keys
+- See creation dates
+- Revoke keys
+- Delete unused keys
+
+**Security:**
+- Keys are shown only once at creation
+- Store keys securely
+- Rotate keys regularly
+- Revoke compromised keys immediately
+
+## Organization Settings
+
+### Organization Management
+
+**Current Organization:**
+- View current organization
+- Organization details
+- Member count
+- Settings access
+
+**Organization Switching:**
+- Switch between organizations
+- Quick switcher available
+- Organization-specific settings
+- Multi-organization support
+
+### Member Management
+
+**Members:**
+- View organization members
+- Member roles and permissions
+- Invite new members
+- Remove members
+
+**Roles:**
+- Owner: Full control
+- Admin: Management access
+- Member: Standard access
+- Custom roles (if available)
+
+See [Organizations](/docs/organizations) for detailed information.
+
+## Preferences
+
+### General Preferences
+
+**Language:**
+- Select interface language
+- Supported languages
+- Locale preferences
+
+**Notifications:**
+- Email notifications
+- In-app notifications
+- Notification preferences
+
+**Privacy:**
+- Data sharing preferences
+- Analytics opt-out
+- Privacy controls
+
+## Data Management
+
+### Import Conversations
+
+Import conversation history from other AI chat platforms:
+
+- **Supported:** ChatGPT, Google Gemini, Claude
+- **Auto-detects** the provider from the file structure
+- **Server-side processing** — runs reliably even if you close the browser
+- **Real-time progress** tracking
+
+See [Chat Import](/docs/chat-import) for detailed instructions.
+
+### Export Data
+
+**Data Export:**
+- Export conversation data
+- Export file data
+- Download account data
+- Data portability
+
+### Account Deletion
+
+**Delete Account:**
+1. Navigate to Settings → Account
+2. Scroll to "Delete Account"
+3. Confirm deletion
+4. Account permanently removed
+
+**Warning:**
+- Account deletion is permanent
+- All data will be removed
+- Cannot be undone
+- Export data before deleting
+
+## Common Use Cases
+
+### Setting Up Your Profile
+
+1. Navigate to Settings → Account
+2. Update display name
+3. Set avatar (if available)
+4. Review account information
+
+### Configuring Model Preferences
+
+1. Go to Settings → Chat → Models
+2. Mark frequently used models as favorites
+3. Set default model for new threads
+4. Configure model-specific settings
+
+### Configuring Agent Capabilities
+
+1. Go to Settings → Chat → Agent Capabilities
+2. Enable **Auto-Detect Task Complexity** for hands-free module management
+3. Or manually enable specific modules (Planner, Knowledge, Data Source) as your baseline
+4. Both can be active — manual toggles set the minimum, auto-detection adds on top
+
+### Customizing Keyboard Shortcuts
+
+1. Navigate to Settings → Keyboard Shortcuts
+2. Click on any shortcut to edit
+3. Press your preferred key combination
+4. Save changes
+
+### Managing API Keys
+
+1. Go to Settings → API Keys
+2. Click "Create API Key"
+3. Name your key and set permissions
+4. Copy key immediately (shown once)
+5. Store securely
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue**: Can't change email
+- **Solution**: Email change is currently disabled - contact support
+
+**Issue**: Password reset email not received
+- **Solution**: Check spam folder
+- **Solution**: Verify email address is correct
+- **Solution**: Request new reset link
+
+**Issue**: API key not working
+- **Solution**: Verify key was copied correctly
+- **Solution**: Check key hasn't expired
+- **Solution**: Ensure correct permissions are set
+- **Solution**: Regenerate key if compromised
+
+**Issue**: Settings not saving
+- **Solution**: Refresh page and try again
+- **Solution**: Check internet connection
+- **Solution**: Clear browser cache
+
+## Privacy & Data Settings
+
+### GDPR Features
+
+Access comprehensive privacy and data management tools:
+
+**Available Features:**
+- Privacy Policy review
+- Consent preferences management
+- Data access summary
+- Data export (Article 20)
+- Account deletion (Article 17)
+- DPO contact information
+
+**Access:**
+1. Navigate to Settings → Privacy & Data
+2. Manage all privacy settings in one place
+3. Exercise your GDPR rights
+
+See [Privacy & GDPR](/docs/privacy) for detailed information about all privacy features.
+
+## Related Features
+
+- [AI Tools](/docs/tools) - Built-in tools the AI can use (search, images, code, etc.)
+- [Triggers](/docs/triggers) - Full trigger documentation (schedules, webhooks, events)
+- [Browser Automation](/docs/browser) - Cloud browser automation
+- [Knowledge Base](/docs/knowledge-base) - Upload documents for persistent AI context
+- [Memory](/docs/memory) - AI remembers facts about you across conversations
+- [MCP Servers](/docs/mcp) - Connect external tools via Model Context Protocol
+- [Skills](/docs/skills) - Custom AI behaviors with slash commands
+- [Privacy & GDPR](/docs/privacy) - Comprehensive privacy and GDPR documentation
+- [Authentication](/docs/authentication) - Account security
+- [Organizations](/docs/organizations) - Team settings
+- [Keyboard Shortcuts](/docs/keyboard-shortcuts) - Shortcut customization
+- [Messenger Integration](/docs/messenger) - Connect Telegram, Slack, or Discord
+- [Devices](/docs/devices) - Let the AI use your own computer through the desktop app
+- [Voice](/docs/voice) - Hands-free voice mode and spoken replies

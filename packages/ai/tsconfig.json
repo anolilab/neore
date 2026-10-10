@@ -1,0 +1,14 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "composite": true,
+    "compilerOptions": {
+        "composite": true,
+        "moduleResolution": "bundler",
+        "paths": {
+            "@neore/ai": ["./src/index.ts"],
+            "@neore/ai/*": ["./src/*"]
+        }
+    },
+    "include": ["**/*.ts", "**/*.d.ts", "eslint.config.js", "prettier.config.js"],
+    "exclude": ["dist", "**/*.md", "**/*.json"]
+}

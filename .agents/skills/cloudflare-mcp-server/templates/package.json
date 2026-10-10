@@ -1,0 +1,24 @@
+{
+  "name": "my-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "npx @modelcontextprotocol/inspector"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260818.1",
+    "wrangler": "^4.124.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "agents": "^0.10.0",
+    "zod": "^4.3.0"
+  },
+  "optionalDependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.4.0",
+    "@octokit/rest": "^21.0.2"
+  }
+}

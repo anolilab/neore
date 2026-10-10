@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Quick Composer</title>
+        <link rel="stylesheet" href="quick-composer.css" />
+        <script type="module" src="quick-composer.js"></script>
+    </head>
+    <body>
+        <form id="composer" novalidate>
+            <label class="sr-only" for="prompt">Ask Neore</label>
+            <textarea id="prompt" name="prompt" rows="3" placeholder="Ask Neore anything…" autofocus></textarea>
+            <div class="bar">
+                <span id="status" role="status" aria-live="polite"></span>
+                <span class="hint" aria-hidden="true">Enter to send · Shift+Enter for a new line · Esc to close</span>
+                <button type="submit">Send</button>
+            </div>
+        </form>
+    </body>
+</html>

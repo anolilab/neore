@@ -1,0 +1,36 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "browser-renderer",
+    "main": "src/index.ts",
+    // Private: no workers.dev URL and no route. The backend reaches this Worker
+    // only through its service binding (`backend/lunora.config.ts`).
+    "workers_dev": false,
+    "compatibility_date": "2025-09-15",
+    "compatibility_flags": ["nodejs_compat"],
+    "placement": {
+        "mode": "smart"
+    },
+    "observability": {
+        "enabled": true
+    },
+    "browser": {
+        "binding": "BROWSER"
+    },
+    "vars": {
+        "NODE_ENV": "development"
+    },
+    "env": {
+        "production": {
+            "name": "browser-renderer",
+            "vars": {
+                "NODE_ENV": "production"
+            }
+        },
+        "preview": {
+            "name": "browser-renderer-preview",
+            "vars": {
+                "NODE_ENV": "development"
+            }
+        }
+    }
+}

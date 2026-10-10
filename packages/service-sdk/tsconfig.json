@@ -1,0 +1,14 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "composite": true,
+    "compilerOptions": {
+        "composite": true,
+        "moduleResolution": "bundler",
+        "paths": {
+            "@neore/service-sdk": ["./src/index.ts"],
+            "@neore/service-sdk/*": ["./src/*"]
+        }
+    },
+    "include": ["**/*.ts", "**/*.d.ts"],
+    "exclude": ["dist", "**/*.md", "**/*.json", "scripts/**"]
+}

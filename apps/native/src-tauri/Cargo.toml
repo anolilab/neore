@@ -1,0 +1,59 @@
+[package]
+name = "neore-native"
+version = "0.1.0"
+description = "Neore desktop and mobile shell (Tauri v2) around the deployed web app"
+authors = ["Daniel Bannert"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+# `staticlib`/`cdylib` are what the iOS and Android builds link against;
+# `rlib` is what `main.rs` links against on desktop.
+name = "neore_native_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-deep-link = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# PKCE for the system-browser sign-in (`sign_in.rs`); all three are already in
+# the dependency tree through tauri, so they add no new crates.
+base64 = "0.22"
+getrandom = "0.3"
+sha2 = "0.10"
+url = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+# `deep-link` makes a second launch forward its URL to the running instance.
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-updater = "2"
+# Folder picker for the device's allowed roots (`device/`), driven from Rust
+# and reachable only from the LOCAL device window — never the remote page.
+tauri-plugin-dialog = "2"
+
+# The `shell_run` sandbox (`device/sandbox.rs`). `libc` is already in the tree;
+# `landlock` adds itself only (its deps — enumflags2, libc, thiserror — are
+# already here). windows-sys 0.61 is already in the tree through tauri; this
+# only enables the Job Object features.
+[target.'cfg(target_os = "linux")'.dependencies]
+landlock = "0.4.7"
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

@@ -1,0 +1,178 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Embeddings API",
+        "description": "Cloudflare Worker for generating text embeddings via Workers AI. Default model: @cf/baai/bge-base-en-v1.5 (768 dimensions).",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/embed": {
+            "post": {
+                "operationId": "generateEmbeddings",
+                "summary": "Generate text embeddings",
+                "tags": ["Embeddings"],
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EmbedRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Generated embeddings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EmbedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/models": {
+            "get": {
+                "operationId": "listEmbeddingModels",
+                "summary": "List available embedding models",
+                "tags": ["Models"],
+                "responses": {
+                    "200": {
+                        "description": "Available embedding models",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ModelsResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "operationId": "getHealth",
+                "summary": "Health check",
+                "tags": ["Health"],
+                "responses": {
+                    "200": {
+                        "description": "Service health status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HealthResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "EmbedRequest": {
+                "type": "object",
+                "required": ["texts"],
+                "properties": {
+                    "texts": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "description": "Array of text strings to embed"
+                    },
+                    "model": {
+                        "type": "string",
+                        "description": "Model ID override (must be in allowed list)",
+                        "default": "@cf/baai/bge-base-en-v1.5"
+                    }
+                }
+            },
+            "EmbedResponse": {
+                "type": "object",
+                "properties": {
+                    "success": { "type": "boolean" },
+                    "model": { "type": "string" },
+                    "dimensions": { "type": "integer" },
+                    "embeddings": {
+                        "type": "array",
+                        "items": {
+                            "type": "array",
+                            "items": { "type": "number" }
+                        }
+                    }
+                }
+            },
+            "ModelsResponse": {
+                "type": "object",
+                "properties": {
+                    "default": { "type": "string" },
+                    "available": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "string" },
+                                "dimensions": { "type": "integer" },
+                                "description": { "type": "string" }
+                            }
+                        }
+                    }
+                }
+            },
+            "HealthResponse": {
+                "type": "object",
+                "properties": {
+                    "status": { "type": "string" },
+                    "service": { "type": "string" }
+                }
+            },
+            "ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "success": { "type": "boolean" },
+                    "error": { "type": "string" }
+                }
+            }
+        }
+    }
+}

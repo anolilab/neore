@@ -1,0 +1,58 @@
+{
+    "name": "llm-gateway",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "wrangler deploy --dry-run --outdir=dist",
+        "clean": "rimraf node_modules dist .eslintcache",
+        "deploy": "wrangler deploy",
+        "dev": "wrangler dev --local --port 8787 --inspector-port 9230",
+        "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
+        "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
+        "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore",
+        "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore",
+        "lint:types": "tsc --noEmit",
+        "test": "vitest run",
+        "test:integration": "vitest run --reporter=verbose src/__tests__/integration",
+        "test:watch": "vitest"
+    },
+    "dependencies": {
+        "@ai-sdk/amazon-bedrock": "catalog:ai",
+        "@ai-sdk/anthropic": "catalog:ai",
+        "@ai-sdk/azure": "catalog:ai",
+        "@ai-sdk/black-forest-labs": "catalog:ai",
+        "@ai-sdk/fal": "catalog:ai",
+        "@ai-sdk/google": "catalog:ai",
+        "@ai-sdk/groq": "catalog:ai",
+        "@ai-sdk/mistral": "catalog:ai",
+        "@ai-sdk/openai": "catalog:ai",
+        "@ai-sdk/provider": "catalog:ai",
+        "@ai-sdk/provider-utils": "catalog:ai",
+        "@ai-sdk/xai": "catalog:ai",
+        "@hono/swagger-ui": "catalog:server",
+        "@hono/zod-openapi": "catalog:server",
+        "@neore/ai": "workspace:*",
+        "@openrouter/ai-sdk-provider": "catalog:ai",
+        "@requesty/ai-sdk": "catalog:ai",
+        "@visulima/content-safety": "catalog:security",
+        "@visulima/health-check": "catalog:server",
+        "@visulima/pail": "catalog:utils",
+        "ai": "catalog:ai",
+        "hono": "catalog:server",
+        "workers-ai-provider": "catalog:ai",
+        "zod": "catalog:utils"
+    },
+    "devDependencies": {
+        "@anolilab/eslint-config": "catalog:lint",
+        "@anolilab/prettier-config": "catalog:lint",
+        "@cloudflare/workers-types": "catalog:build",
+        "eslint": "catalog:lint",
+        "prettier": "catalog:lint",
+        "typescript": "catalog:tsc",
+        "vitest": "catalog:test",
+        "wrangler": "catalog:build"
+    },
+    "engines": {
+        "node": ">=22.x"
+    }
+}

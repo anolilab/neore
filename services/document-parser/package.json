@@ -1,0 +1,33 @@
+{
+    "name": "document-parser",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "pnpm run build:worker",
+        "build:worker": "node scripts/build.mjs",
+        "clean": "rimraf node_modules dist build target .eslintcache",
+        "dev": "wrangler dev --port 8792 --inspector-port 9231",
+        "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
+        "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
+        "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
+        "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
+        "lint:types": "tsc --noEmit",
+        "test": "pnpm run test:rust && pnpm run test:worker",
+        "test:rust": "cargo test --locked",
+        "test:worker": "vitest run"
+    },
+    "devDependencies": {
+        "@anolilab/eslint-config": "catalog:lint",
+        "@anolilab/prettier-config": "catalog:lint",
+        "@types/node": "catalog:types",
+        "esbuild": "catalog:build",
+        "eslint": "catalog:lint",
+        "prettier": "catalog:lint",
+        "typescript": "catalog:tsc",
+        "vitest": "catalog:test",
+        "wrangler": "catalog:build"
+    },
+    "engines": {
+        "node": ">=22.x"
+    }
+}

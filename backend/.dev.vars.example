@@ -1,0 +1,185 @@
+# Local secrets for `lunora dev` / `wrangler dev`.
+#
+# Copy to `.dev.vars` and fill in. `.dev.vars` is gitignored; this file is not,
+# so never put a real value here.
+#
+# `.dev.vars` is the wrangler/Lunora convention — `lunora doctor` and `lunora-quickstart` both
+# point at it.
+#
+# Generated from the groups in `lunora/lib/envValidation.ts`; the optional block
+# is genuinely optional (features degrade rather than fail).
+
+
+# --- Core ---
+ADMIN=
+BETTER_AUTH_SECRET=
+ENCRYPTION_KEY=
+# Signs storage upload/download URLs (openssl rand -hex 32). Required outside
+# development; in development every upload fails without it.
+STORAGE_SIGNING_SECRET=
+# Unlocks POST /e2e/invitations for the e2e suite (development + loopback only).
+E2E_SEED_TOKEN=
+# Web Push (optional; unset = push off). A P-256 pair, base64url: the public key
+# as an uncompressed point, the private key as the raw scalar. scripts/dev-setup.js
+# generates one; `npx web-push generate-vapid-keys` prints the same format.
+# VAPID_SUBJECT is a mailto: or https: contact for the push services.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=
+ENVIRONMENT=development
+# Dev-only loopback origins. Kept out of wrangler.jsonc because `lunora build`
+# blocks on loopback addresses there; scripts/dev-setup.js writes both.
+LUNORA_ORIGIN_URL=http://localhost:8788
+PUBLIC_ORIGIN=http://localhost:8788
+JWKS=
+SITE_URL=
+
+# --- Services (R2, gateway, auth) ---
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+# Optional sign-in providers — each is on only when its id AND secret are set.
+# Redirect URI to register: ${SITE_URL}/api/auth/callback/<github|microsoft|oidc>
+AUTH_GITHUB_CLIENT_ID=
+AUTH_GITHUB_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+# common (default) | organizations | consumers | <tenant id> — one tenant id for a company-only login
+MICROSOFT_TENANT_ID=
+# Enterprise SSO: any OpenID Connect issuer (discovered from {issuer}/.well-known/openid-configuration)
+OIDC_ISSUER=
+OIDC_CLIENT_ID=
+OIDC_CLIENT_SECRET=
+OIDC_BUTTON_LABEL=
+LLM_GATEWAY_SIGNING_SECRET=
+LLM_GATEWAY_URL=
+R2_ACCESS_KEY_ID=
+R2_BUCKET=
+R2_ENDPOINT=
+R2_SECRET_ACCESS_KEY=
+R2_TOKEN=
+# Sender for all mail. `lunora dev` never delivers: every send shows up in the
+# studio's Mail tab. LUNORA_MAIL_CAPTURE=0 delivers for real through Resend
+# (RESEND_API_KEY).
+MAIL_FROM="Neore <noreply@neore.localhost>"
+RESEND_API_KEY=
+RESEND_WEBHOOK_SECRET=
+
+# --- AI providers ---
+FAL_API_KEY=
+GROQ_API_KEY=
+OPENROUTER_API_KEY=
+REPLICATE_API_TOKEN=
+REQUESTY_API_KEY=
+XAI_API_KEY=
+
+# --- Tool APIs ---
+AMADEUS_CLIENT_ID=
+AMADEUS_CLIENT_SECRET=
+COINGECKO_API_KEY=
+E2B_API_KEY=
+EXA_API_KEY=
+FIRECRAWL_API_KEY=
+GITHUB_TOKEN=
+GOOGLE_MAPS_API_KEY=
+OPENWEATHER_API_KEY=
+PARALLEL_API_KEY=
+SPOTIFY_CLIENT_ID=
+SPOTIFY_CLIENT_SECRET=
+SUPADATA_API_KEY=
+TAVILY_API_KEY=
+TMDB_API_KEY=
+VALYU_API_KEY=
+
+# --- Optional ---
+APP_NAME=
+BROWSERBASE_API_KEY=
+BROWSERBASE_PROJECT_ID=
+BROWSER_RENDERER_SIGNING_SECRET=
+BROWSER_RENDERER_URL=
+# Optional dedicated key for connector OAuth tokens (openssl rand -base64 32); falls back to ENCRYPTION_KEY.
+CONNECTOR_ENCRYPTION_KEY=
+# Connector OAuth apps (no dynamic client registration on these providers).
+# Register the redirect URI ${SITE_URL}/dashboard/settings/connectors/callback with each.
+GITHUB_CONNECTOR_CLIENT_ID=
+GITHUB_CONNECTOR_CLIENT_SECRET=
+GOOGLE_CONNECTOR_CLIENT_ID=
+GOOGLE_CONNECTOR_CLIENT_SECRET=
+SLACK_CONNECTOR_CLIENT_ID=
+SLACK_CONNECTOR_CLIENT_SECRET=
+# Creem subscriptions (creem.io). Product ids are the Pro and Team products;
+# the webhook endpoint is ${PUBLIC_ORIGIN}/billing/creem/webhook. CREEM_TEST_MODE=true
+# uses the test API.
+CREEM_API_KEY=
+CREEM_PRODUCT_PRO=
+CREEM_PRODUCT_TEAM=
+CREEM_TEST_MODE=true
+CREEM_WEBHOOK_SECRET=
+DOCUMENT_PARSER_SIGNING_SECRET=
+DOCUMENT_PARSER_URL=
+DPO_EMAIL=
+EMBEDDINGS_WORKER_SIGNING_SECRET=
+EMBEDDINGS_WORKER_URL=
+FEATUREBASE_API_KEY=
+GOOGLE_GENERATIVE_AI_API_KEY=
+NSFW_CHECKER_SIGNING_SECRET=
+NSFW_CHECKER_URL=
+POSTHOG_API_KEY=
+POSTHOG_HOST=
+POSTHOG_PERSONAL_API_KEY=
+POSTHOG_PROJECT_ID=
+TURNSTILE_SECRET_KEY=
+# Browser extension origins allowed to sign in and call the backend, comma-separated.
+# Unset = the extension cannot sign in. Never a wildcard.
+# Unpacked extension id: build apps/browser-extension, load dist/ at chrome://extensions
+# (Developer mode -> Load unpacked); the ID is on its card. Value: chrome-extension://<that id>
+TRUSTED_EXTENSION_ORIGINS=
+# Firefox extension sign-in (identity.launchWebAuthFlow) redirect URIs, comma-separated.
+# Unset = the shipped add-on (anole-chat@neore.ai), which is what you want unless you
+# build with another gecko id; "none" = Firefox sign-in off. A value REPLACES the default.
+# For another id: node -e "console.log('https://'+require('crypto').createHash('sha1').update('<id>').digest('hex')+'.extensions.allizom.org/')"
+TRUSTED_EXTENSION_REDIRECT_URIS=
+WOLFRAM_APP_ID=
+
+# --- Lunora tooling (not in the schema) ---
+# Enables admin RPCs + the studio; `lunora doctor` reports it as INFO when unset.
+LUNORA_ADMIN_TOKEN=
+
+# 32-byte random secret used to sign sessions and tokens. Generate with: openssl rand -hex 32
+# Docs: https://lunora.sh/docs/packages/auth#secrets
+AUTH_SECRET="replace-with-openssl-rand-hex-32"
+
+# Public base URL of your worker (used by better-auth for redirects and cookie domain). For local dev this is typically http://localhost:8787
+# Docs: https://lunora.sh/docs/packages/auth#secrets
+AUTH_URL="http://localhost:8787"
+
+# Stripe secret key (sk_test_…). Required when using the Stripe adapter. Obtain at https://dashboard.stripe.com/apikeys
+# Docs: https://lunora.sh/docs/packages/payment#stripe
+STRIPE_SECRET_KEY="<your-stripe-secret-key>"
+
+# Stripe webhook signing secret (whsec_…) for verifying event payloads. Obtain at https://dashboard.stripe.com/webhooks
+# Docs: https://lunora.sh/docs/packages/payment#stripe
+STRIPE_WEBHOOK_SECRET="<your-stripe-webhook-secret>"
+
+# Polar access token for the Polar payment adapter. Obtain at https://polar.sh/settings/tokens
+# Docs: https://lunora.sh/docs/packages/payment#polar
+POLAR_ACCESS_TOKEN="<your-polar-access-token>"
+
+# Polar webhook secret for verifying event payloads from Polar. Obtain at https://polar.sh/settings/webhooks
+# Docs: https://lunora.sh/docs/packages/payment#polar
+POLAR_WEBHOOK_SECRET="<your-polar-webhook-secret>"
+
+# Autumn secret key (am_sk_…) for the Autumn payment adapter. Obtain at https://app.useautumn.com/dev
+# Docs: https://lunora.sh/docs/packages/payment#autumn
+AUTUMN_SECRET_KEY="<your-autumn-secret-key>"
+
+# Autumn webhook signing secret for verifying Standard Webhooks event payloads. Obtain from your Autumn dashboard webhook settings.
+# Docs: https://lunora.sh/docs/packages/payment#autumn
+AUTUMN_WEBHOOK_SECRET="<your-autumn-webhook-secret>"
+
+# Dodo Payments API key (bearer token) for the Dodo Payments adapter. Obtain at https://app.dodopayments.com/developer/api-keys
+# Docs: https://lunora.sh/docs/packages/payment#dodo-payments
+DODO_PAYMENTS_API_KEY="<your-dodo-payments-api-key>"
+
+# Dodo Payments webhook signing secret (whsec_…) for verifying event payloads. Obtain at https://app.dodopayments.com/developer/webhooks
+# Docs: https://lunora.sh/docs/packages/payment#dodo-payments
+DODO_PAYMENTS_WEBHOOK_KEY="<your-dodo-payments-webhook-secret>"

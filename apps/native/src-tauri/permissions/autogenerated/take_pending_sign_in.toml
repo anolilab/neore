@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-take-pending-sign-in"
+description = "Enables the take_pending_sign_in command without any pre-configured scope."
+commands.allow = ["take_pending_sign_in"]
+
+[[permission]]
+identifier = "deny-take-pending-sign-in"
+description = "Denies the take_pending_sign_in command without any pre-configured scope."
+commands.deny = ["take_pending_sign_in"]

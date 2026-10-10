@@ -1,0 +1,8 @@
+{
+    "name": "@neore/cli",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "apps/cli/src",
+    "projectType": "application",
+    "tags": ["cli"],
+    "implicitDependencies": []
+}

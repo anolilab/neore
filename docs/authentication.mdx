@@ -1,0 +1,270 @@
+---
+title: Authentication
+description: Sign in methods, invitations, and account management features
+---
+
+# Authentication
+
+Neore Chat supports several authentication methods to suit different use cases.
+
+## Quick Start
+
+Choose your preferred sign-in method:
+
+- **Email/Password**: Traditional account with email and password
+- **Google Sign-In**: One-click authentication with your Google account
+- **Anonymous Guest**: Start immediately without creating an account
+
+:::warning Registration is invite-only
+Creating an account requires an invitation link. Browsing as an anonymous guest
+does not. See [Invitations](#invitations) below.
+:::
+
+## Invitations
+
+Sign-up is gated. This applies to:
+
+- **Email/password sign-up**
+- **The first sign-in with a social provider** (it creates an account)
+- **Converting an anonymous guest into a real account** — under the hood this
+  creates a new account and links the guest one to it, so it counts as
+  registration
+
+It does **not** apply to anonymous guest sign-in. You can start using the app
+immediately without an invitation; you just can't keep an account without one.
+
+### Using an invitation
+
+An invitation arrives as a link with an `?invite=` parameter, for example:
+
+```
+https://app.example.com/auth/sign-up?invite=<token>
+```
+
+Open that link and complete sign-up in the same browser tab. The token is read
+at the moment you submit, so it also works if you land on the link and then
+switch to "Continue with Google" or convert an existing guest session.
+
+### If you don't have one
+
+You'll see one of two messages:
+
+| Message | Meaning |
+|---|---|
+| Invitation required | You reached sign-up without an invitation link |
+| Invitation invalid | The token is unknown, already used, or expired |
+
+Ask an administrator for a new link. Invitation tokens are stored hashed, so a
+lost link cannot be recovered — a fresh one has to be issued.
+
+:::note
+Administrators create invitations from the admin surface. Nothing is emailed
+automatically — the invitation URL is returned to the administrator, who sends
+it however they like.
+:::
+
+## Sign In Methods
+
+### Email/Password
+
+**Features:**
+- Sign up with email and password (requires an invitation)
+- Email verification is optional (not required for account creation)
+- Password reset via email
+- Secure password storage
+
+**Usage:**
+1. Open your invitation link
+2. Enter your email and create a password
+3. Sign in with your credentials
+
+**Password Reset:**
+- Click "Forgot Password" on the sign-in page
+- Enter your email address
+- Check your email for reset instructions
+- Follow the link to create a new password
+
+### Google Sign-In
+
+One-click authentication using your Google account. Google is the only social
+provider currently enabled, and it is available only when the deployment has
+Google OAuth credentials configured.
+
+**Features:**
+- OAuth-based authentication via Google
+- One-click sign-in without password
+- Account linking supported (link Google to existing email account)
+- Automatic profile information sync
+
+**Usage:**
+1. Click the "Sign in with Google" button
+2. Authorize Neore Chat to access your Google account
+3. You're automatically signed in
+
+**Account Linking:**
+- If you have an existing email/password account, you can link your Google account
+- This allows you to sign in with either method
+- Account information is merged seamlessly
+
+:::note
+Your **first** Google sign-in creates an account, so it requires an invitation
+like any other registration. Subsequent sign-ins do not.
+:::
+
+### Anonymous Guest Access
+
+Quick access without creating an account, and without an invitation.
+
+**Features:**
+- Instant access without registration
+- Limited features (message limits apply)
+- Can convert to a full account later (requires an invitation)
+- No personal information required
+
+**Usage:**
+1. Click "Continue as Guest" or "Anonymous Access"
+2. Start using the application immediately
+3. Some features may be limited
+
+**Converting to Full Account:**
+- Open an invitation link while signed in as a guest
+- Complete the conversion dialog
+- Your guest session data is carried over to the new account
+
+## Security Features
+
+### Two-Factor Authentication (2FA)
+
+Time-based one-time passwords (TOTP) are supported for accounts that have a
+password set.
+
+**Enabling:**
+1. Navigate to **Settings → Account → Security**
+2. Find the **Two-Factor Authentication** card
+3. Scan the QR code with an authenticator app (1Password, Authy, Google Authenticator, …)
+4. Enter a code from the app to confirm
+
+**Signing in with 2FA:**
+After entering your password you'll be asked for a six-digit code from your
+authenticator app.
+
+**Recovery:**
+Backup codes are issued when you enable 2FA. Keep them somewhere safe — if you
+lose your authenticator you'll need one to get back in via the account recovery
+page.
+
+:::note
+2FA is offered on accounts with a password. An account that only signs in with
+Google is protected by Google's own 2FA instead.
+:::
+
+### Bot protection
+
+When the deployment is configured with Cloudflare Turnstile, sign-in, sign-up
+and password-reset forms include an invisible bot check. No action is needed
+from you. If Turnstile is only half-configured the forms fall back to running
+without it rather than locking anyone out.
+
+### Session Management
+
+- Active sessions are tracked per device
+- View and manage sessions in **Settings → Account → Security**
+- Sign out from specific devices remotely
+- Session timeout for security
+
+### API keys
+
+Programmatic access uses API keys issued from **Settings → Account → API Keys**.
+Keys are prefixed `app_`. See [Settings](/docs/settings#api-keys).
+
+### Account Security
+
+- Secure password storage (hashed and encrypted)
+- OAuth tokens managed securely
+- No plain-text password storage
+- Regular security updates
+
+## Account Management
+
+### Password Reset
+
+If you've forgotten your password:
+
+1. Go to the sign-in page
+2. Click "Forgot Password"
+3. Enter your email address
+4. Check your email for reset instructions
+5. Click the reset link and create a new password
+
+### Account Deletion
+
+You can delete your account at any time:
+
+1. Navigate to Settings → Account
+2. Scroll to the account deletion section
+3. Follow the prompts to confirm deletion
+4. Your account and data will be permanently removed
+
+**Note:** Account deletion is permanent and cannot be undone. Make sure to export any important data before deleting your account.
+
+### Email Change
+
+Email change functionality is currently not enabled. If you need to change your email address, please contact support.
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue**: "Invitation required" when signing up
+- **Solution**: Registration is invite-only. Use the `?invite=` link you were sent
+- **Solution**: If you were signed in as a guest, open the invitation link in the same browser
+
+**Issue**: "Invitation invalid"
+- **Solution**: The token has already been used or has expired. Request a new link — old links can't be revived
+
+**Issue**: Can't sign in with Google
+- **Solution**: Ensure pop-ups are enabled in your browser
+- **Solution**: Check that you're allowing Neore Chat to access your Google account
+- **Solution**: If this is your first Google sign-in, you need an invitation — it creates an account
+- **Solution**: Try clearing browser cache and cookies
+
+**Issue**: Forgot password
+- **Solution**: Use the "Forgot Password" link on the sign-in page
+- **Solution**: Check your email (including spam folder) for reset instructions
+- **Solution**: Reset link expires after a set time - request a new one if needed
+
+**Issue**: Lost my 2FA device
+- **Solution**: Use one of the backup codes issued when you enabled 2FA, on the account recovery page
+- **Solution**: Without a backup code, an administrator has to reset 2FA for you
+
+**Issue**: Email verification not received
+- **Solution**: Check spam/junk folder
+- **Solution**: Email verification is optional - you can use the app without verifying
+- **Solution**: Resend verification email from settings
+
+**Issue**: Anonymous guest limitations
+- **Solution**: Convert to a full account (with an invitation) to unlock all features
+
+## Privacy and Data Rights
+
+### GDPR Rights
+
+As part of your account, you have full GDPR rights:
+
+- **Right to Access:** View your data summary or export all data
+- **Right to Erasure:** Delete your account and all data
+- **Right to Data Portability:** Export your data in JSON format
+- **Consent Management:** Control cookie and data processing consent
+
+**Access Privacy Settings:**
+1. Go to Settings → Privacy & Data
+2. Exercise your GDPR rights
+3. Manage consent preferences
+
+See [Privacy & GDPR](/docs/privacy) for comprehensive information about all privacy features.
+
+## Related Features
+
+- [Privacy & GDPR](/docs/privacy) - Full privacy and GDPR documentation
+- [Settings](/docs/settings) - Manage account preferences
+- [Organizations](/docs/organizations) - Join or create teams

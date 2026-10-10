@@ -1,0 +1,152 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+@source "../../../packages/ui";
+@source "../node_modules/fumadocs-ui/dist/**/*.js";
+/* Add Streamdown to Tailwind's source scanning for v4
+   See: https://streamdown.ai/docs/faq#how-do-i-configure-tailwind-css-to-work-with-streamdown */
+@source "../node_modules/streamdown/dist/*.js";
+
+@import "@neore/ui/global.css";
+/* Accent colour presets (`data-accent` on <html>), generated from features/appearance/lib/accent-presets.ts */
+@import "./features/appearance/accent-presets.css";
+@import "@c15t/react/styles.css";
+/* Import KaTeX styles for math rendering */
+@import "katex/dist/katex.min.css";
+
+:root {
+    --thread-max-width: 65ch;
+}
+
+.thread-viewport > [data-radix-scroll-area-content] {
+    @apply flex flex-col items-center self-stretch bg-inherit;
+}
+
+/* Cycling placeholder fade transition */
+.tiptap.is-editor-empty .is-empty::before {
+    transition: opacity 180ms ease-in-out;
+}
+.placeholder-changing .tiptap.is-editor-empty .is-empty::before {
+    opacity: 0;
+}
+
+/* Composer morph transition for landing page */
+[data-view-transition="landing-composer"] {
+    view-transition-name: landing-composer;
+}
+
+::view-transition-old(landing-composer),
+::view-transition-new(landing-composer) {
+    animation-duration: 300ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(landing-composer),
+    ::view-transition-new(landing-composer) {
+        animation-duration: 0.01ms !important;
+    }
+}
+
+/* codemirror */
+.ͼ1.cm-focused {
+    outline: none !important;
+}
+
+/* ── Fumadocs brand theme ─────────────────────────────────────────────
+   The main app's ThemeProvider (html.dark) controls the theme.
+   We use ID-scoped blocks to map --color-fd-* to brand tokens.
+   Light: #nd-docs-layout (specificity 1,0,0)
+   Dark:  .dark #nd-docs-layout (specificity 1,1,0 — always wins)
+   Explicit hex values are used (not var() references) for stability.
+   ──────────────────────────────────────────────────────────────────── */
+
+/* Light mode docs layout */
+#nd-docs-layout {
+    --color-fd-background: #ffffff; /* brand-white */
+    --color-fd-foreground: #191919; /* brand-obsidian */
+    --color-fd-muted: #f2f2f2; /* brand-frost */
+    --color-fd-muted-foreground: #636363; /* brand-graphite */
+    --color-fd-popover: #ffffff;
+    --color-fd-popover-foreground: #191919;
+    --color-fd-card: #f2f2f2;
+    --color-fd-card-foreground: #191919;
+    --color-fd-border: #d8d8d8; /* brand-silver */
+    --color-fd-ring: #636363;
+    --color-fd-overlay: rgba(0, 0, 0, 0.2);
+    --color-fd-primary: #191919; /* brand-obsidian */
+    --color-fd-primary-foreground: #ffffff;
+    --color-fd-secondary: #f2f2f2;
+    --color-fd-secondary-foreground: #191919;
+    --color-fd-accent: color-mix(in srgb, #caff00 10%, transparent);
+    --color-fd-accent-foreground: #191919;
+    background-color: #ffffff;
+    border-left: 1px solid #d8d8d8;
+    border-right: 1px solid #d8d8d8;
+}
+
+/* Dark mode docs layout */
+.dark #nd-docs-layout {
+    --color-fd-background: #191919; /* brand-obsidian */
+    --color-fd-foreground: #f2f2f2; /* brand-frost */
+    --color-fd-muted: #262626;
+    --color-fd-muted-foreground: #9a9a9a;
+    --color-fd-popover: #1f1f1f;
+    --color-fd-popover-foreground: #f2f2f2;
+    --color-fd-card: #222222;
+    --color-fd-card-foreground: #f2f2f2;
+    --color-fd-border: #2d2d2d;
+    --color-fd-ring: #636363;
+    --color-fd-overlay: rgba(0, 0, 0, 0.5);
+    --color-fd-primary: #f2f2f2; /* brand-frost */
+    --color-fd-primary-foreground: #191919;
+    --color-fd-secondary: #262626;
+    --color-fd-secondary-foreground: #f2f2f2;
+    --color-fd-accent: color-mix(in srgb, #caff00 15%, transparent);
+    --color-fd-accent-foreground: #191919;
+    background-color: #191919;
+    border-left: 1px solid #2d2d2d;
+    border-right: 1px solid #2d2d2d;
+}
+
+/* Light sidebar */
+#nd-sidebar {
+    background-color: #ffffff !important;
+    color: #191919 !important;
+    border-color: #d8d8d8 !important;
+    --color-fd-accent: color-mix(in srgb, #caff00 10%, transparent);
+    --color-fd-accent-foreground: #191919;
+    --color-fd-muted: #f2f2f2;
+    --color-fd-muted-foreground: #636363;
+}
+
+/* Dark sidebar — explicit values to avoid shadcn.css sidebar token conflicts */
+.dark #nd-sidebar {
+    background-color: #191919 !important;
+    color: #f2f2f2 !important;
+    border-color: #2d2d2d !important;
+    --color-fd-accent: color-mix(in srgb, #caff00 15%, transparent);
+    --color-fd-accent-foreground: #191919;
+    --color-fd-muted: #262626;
+    --color-fd-muted-foreground: #9a9a9a;
+}
+
+/* Lime left-border indicator on active sidebar items */
+#nd-sidebar a[data-active="true"]::before,
+#nd-sidebar button[data-active="true"]::before {
+    background-color: #caff00 !important; /* brand-lime */
+}
+
+/* Docs prose links: app global .prose a uses text-primary (lime) which fails
+   contrast on light/dark backgrounds. Use fd-foreground for text; lime only
+   as underline decoration for the brand touch. */
+#nd-page .prose a:not(.not-prose a) {
+    color: #191919;
+    text-decoration-color: #caff00;
+}
+
+.dark #nd-page .prose a:not(.not-prose a) {
+    color: #f2f2f2;
+    text-decoration-color: #caff00;
+}

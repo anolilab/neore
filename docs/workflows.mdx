@@ -1,0 +1,232 @@
+---
+title: Workflows
+description: Build multi-step AI pipelines visually — chain image, video, and text models on a node canvas
+---
+
+# Workflows
+
+A workflow is a visual pipeline. You drop nodes on a canvas, wire them together,
+and run the whole graph — so the output of one model feeds straight into the
+next. It is the right tool when a result takes several coordinated steps that you
+want to re-run, tweak, and share, rather than describe again in prose each time.
+
+Workflows live at `/workflow`.
+
+## Quick Start
+
+1. Go to `/workflow` and click **New Workflow**
+2. Start from a template, or add nodes yourself
+3. Wire an output handle to the next node's input handle
+4. Press `Ctrl+Enter` (Mac: `Cmd+Enter`) to run it
+5. Results appear on the output nodes
+
+## Ways to start
+
+### From a template
+
+Nine built-in templates cover the common shapes:
+
+| Template | What it does |
+|---|---|
+| Text to Image | Prompt → image model → output |
+| Upscale & Enhance | Image → upscale → output |
+| Style Transfer | Image + style reference → styled image |
+| Model Comparison | One prompt fanned out to several models, side by side |
+| Character Consistency | Character reference → consistent generations |
+| Image Transform | Image-to-image transformation |
+| Inpaint Edit | Image + mask → edited region |
+| Text to Video | Prompt → video model → output |
+| AI Chat Pipeline | Text in → AI node → text out |
+
+### From a prompt
+
+Describe what you want in plain language and the AI builds the graph for you —
+nodes, connections and model choices. You then edit it like any other workflow.
+
+### From the community gallery
+
+The **Community Gallery** (`/workflow/gallery`) lists workflows other people have
+published. Browse by category — All, Image, Text, Video, Audio, Automation — sort
+by Most Recent, Most Popular or Most Forked, and search by name.
+
+**Fork** copies a published workflow into your own account so you can change it.
+The original's fork count goes up; your copy is independent.
+
+### From scratch
+
+Start empty and add nodes yourself.
+
+## Node types
+
+### Inputs
+
+| Node | Purpose |
+|---|---|
+| **Text** | A prompt or any text value |
+| **Image** | An uploaded or generated image |
+| **Video** | A video input |
+| **Audio** | An audio input |
+| **File** | An arbitrary file |
+
+### Generation and editing
+
+| Node | Purpose |
+|---|---|
+| **AI** | Run a text model |
+| **Image to Video** | Animate a still image |
+| **Img2Img** | Transform an image with a prompt |
+| **Inpaint** | Edit a masked region of an image |
+| **Outpaint** | Extend an image beyond its original bounds |
+| **Upscale** | Increase resolution |
+| **Background Removal** | Isolate the subject |
+| **Object Editor** | Manipulate objects within an image |
+| **Transcription** | Speech to text |
+
+### Conditioning
+
+| Node | Purpose |
+|---|---|
+| **Style Reference** | Steer generations toward a reference style |
+| **Character Reference** | Keep a character consistent across generations |
+| **ControlNet** | Structural conditioning (pose, depth, edges) |
+| **Advanced Controls** | Expose lower-level model parameters |
+
+### Control flow and organisation
+
+| Node | Purpose |
+|---|---|
+| **Branch** | Take one path or another based on a condition |
+| **Parallel Compare** | Run several variants and compare results side by side |
+| **Group** | Collapse a set of nodes into one block |
+| **Comment** | A note on the canvas; does not execute |
+| **Code** | A small code step between nodes |
+| **Output** | Marks a terminal result |
+
+## Running a workflow
+
+Press `Ctrl+Enter`, or use the run button. Each run creates an **execution**
+record with:
+
+- A status: pending, running, completed, failed, or cancelled
+- Start and completion timestamps
+- Total token usage across the whole graph
+- A snapshot of the graph as it was when you ran it, so a later edit doesn't
+  rewrite history
+- Per-node status, so you can see exactly which step failed
+
+## Collaboration
+
+Workflows support live multi-user editing. When more than one person has the same
+workflow open you'll see:
+
+- Each person's cursor, in their own colour
+- Which node someone else is editing — nodes are locked while held, so two people
+  can't fight over the same one
+- Everyone's viewport position
+
+Presence times out automatically if a session goes away without disconnecting
+cleanly.
+
+## Version history
+
+Save a named version at any point, then browse and restore earlier ones. Restoring
+replaces the current graph with the saved one; it does not delete the versions in
+between.
+
+This is separate from execution snapshots: versions are graphs you chose to keep,
+execution snapshots are automatic records of what actually ran.
+
+## Sharing and publishing
+
+Sharing and publishing are the same action. **Publish** a workflow with a
+category (Image, Text, Video, Audio, Automation) and optional tags, and two
+things happen:
+
+1. It appears in the community gallery, where anyone can view and fork it, and it
+   starts accumulating view and fork counts.
+2. It gets a share link — `/workflow/shared/<token>` — that opens the workflow
+   read-only for anyone who has it.
+
+**Unpublish** at any time. That removes it from the gallery *and* stops the share
+link working, because the link checks that the workflow is still public.
+
+:::note
+A workflow must have at least one node to be published, and you can only publish
+your own.
+:::
+
+## Canvas Keyboard Shortcuts
+
+These apply while the workflow canvas is focused.
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+Enter` / `Cmd+Enter` | Run the workflow |
+| `Ctrl+S` / `Cmd+S` | Save |
+| `Ctrl+Z` / `Cmd+Z` | Undo |
+| `Ctrl+Shift+Z` or `Ctrl+Y` | Redo |
+| `Ctrl+D` / `Cmd+D` | Duplicate the selected node |
+| `Ctrl+C` / `Cmd+C` | Copy the selected node |
+| `Ctrl+V` / `Cmd+V` | Paste |
+| `Ctrl+A` / `Cmd+A` | Select all nodes |
+| `Ctrl+G` / `Cmd+G` | Group the selected nodes |
+| `H` | Align selected nodes horizontally |
+| `V` | Align selected nodes vertically |
+| `D` | Distribute selected nodes evenly |
+| `Escape` | Deselect all |
+
+:::note
+`H`, `V` and `D` are single-key shortcuts, so they only fire when no text input
+is focused.
+:::
+
+## Workflows vs. Chat vs. Triggers
+
+| Use | When |
+|---|---|
+| [Chat](/docs/chat) | One-off or exploratory work, where you describe what you want in prose |
+| **Workflows** | A repeatable multi-step pipeline you want to tune and re-run |
+| [Triggers](/docs/triggers) | Running an agent automatically on a schedule or a webhook |
+
+Workflows and chat projects share the same underlying storage, so a workflow
+shows up alongside your [projects](/docs/projects).
+
+## Common Use Cases
+
+**Consistent brand imagery**
+A character or style reference node feeding several generation nodes, so every
+asset comes out on-brand.
+
+**Model bake-off**
+One text node fanned out to several image models through a Parallel Compare node
+— the fastest way to decide which model suits a job.
+
+**Asset pipeline**
+Generate → upscale → remove background → output, as one repeatable run.
+
+**Video from stills**
+Generate an image, then feed it to an Image-to-Video node.
+
+## Troubleshooting
+
+**Issue:** A node shows no output after a run
+- **Solution:** Check the node's status in the execution record — a failed upstream node leaves downstream nodes unrun
+- **Solution:** Confirm every required input handle is actually wired
+
+**Issue:** Someone else's changes overwrote mine
+- **Solution:** Nodes lock while another person edits them. If you saw a lock indicator, wait for it to clear
+- **Solution:** Restore an earlier version from version history
+
+**Issue:** A single-key shortcut (`H`, `V`, `D`) does nothing
+- **Solution:** Click on empty canvas first — they're suppressed while a text input has focus
+
+**Issue:** A forked workflow behaves differently from the original
+- **Solution:** Forks copy the graph, not the author's API keys or model access. Check that the models it uses are available to you
+
+## Related Features
+
+- [Projects](/docs/projects) — workflows and chat projects share storage
+- [AI Tools](/docs/tools) — the same image and video models are available in chat
+- [Chat](/docs/chat) — conversational generation
+- [Triggers](/docs/triggers) — scheduled and webhook-driven automation
+- [Design Canvas](/docs/design-canvas) — hand-editable visual designs

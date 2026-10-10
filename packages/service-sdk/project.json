@@ -1,0 +1,8 @@
+{
+    "name": "@neore/service-sdk",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "packages/service-sdk/src",
+    "projectType": "library",
+    "tags": ["type:package"],
+    "implicitDependencies": []
+}

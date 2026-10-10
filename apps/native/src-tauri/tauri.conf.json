@@ -1,0 +1,37 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "Neore",
+    "version": "0.1.0",
+    "identifier": "de.anolilab.neore",
+    "build": {
+        "frontendDist": "../src"
+    },
+    "app": {
+        "withGlobalTauri": true,
+        "windows": [],
+        "security": {
+            "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost",
+            "capabilities": ["quick-composer", "device"]
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "category": "Productivity",
+        "shortDescription": "Neore AI chat",
+        "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"]
+    },
+    "plugins": {
+        "deep-link": {
+            "desktop": {
+                "schemes": ["neore"]
+            },
+            "mobile": [
+                {
+                    "scheme": ["neore"],
+                    "appLink": false
+                }
+            ]
+        }
+    }
+}

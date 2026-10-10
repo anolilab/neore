@@ -1,0 +1,17 @@
+/* The shared design tokens, base layer and reduced-motion rule. */
+@import "@neore/ui/global.css";
+
+/* Tailwind only scans this project by default; the chat UI lives in packages. */
+@source "../../../packages/ui/src";
+@source "../../../packages/chat-ui/src";
+@source "../../../packages/chat-ui/node_modules/streamdown/dist/*.js";
+
+html,
+body,
+#root {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+}

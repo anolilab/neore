@@ -1,0 +1,10 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "lib": ["ESNext"],
+        "moduleResolution": "bundler",
+        "types": ["node"]
+    },
+    "include": ["src/**/*.ts", "*.ts"],
+    "exclude": ["dist"]
+}

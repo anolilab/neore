@@ -1,0 +1,38 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "neore-chat",
+    "compatibility_date": "2026-09-01",
+    "compatibility_flags": ["nodejs_compat_v2"],
+    "main": "@tanstack/react-start/server-entry",
+    "assets": {
+        "binding": "ASSETS",
+        "directory": "dist/client",
+        // Prevent the Assets layer from trying to handle HTML or 404 pages —
+        // the SSR Worker handles all of that.
+        "html_handling": "none",
+        "not_found_handling": "none",
+        // Only these paths go to the Worker first (server routes that override
+        // static files in dist/client). All other assets are served directly
+        // from Cloudflare's edge without Worker overhead.
+        "run_worker_first": ["/robots.txt", "/sitemap.xml"],
+    },
+    // Smart Placement: runs the Worker in the Cloudflare region nearest to your
+    // backend. When the backend is in the EU this keeps all
+    // subrequests within EU datacenters. For strict EU-only data processing,
+    // enable Regional Services in the Cloudflare dashboard as well.
+    "placement": {
+        "mode": "smart",
+    },
+    "observability": {
+        "enabled": true,
+    },
+    "vars": {},
+    "env": {
+        "production": {
+            "name": "neore-chat",
+        },
+        "preview": {
+            "name": "neore-chat-preview",
+        },
+    },
+}

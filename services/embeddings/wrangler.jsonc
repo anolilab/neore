@@ -1,0 +1,38 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "embeddings",
+    "main": "src/index.ts",
+    // Private: no workers.dev URL and no route, as in alchemy.run.ts. Nothing
+    // calls this Worker; see the note there.
+    "workers_dev": false,
+    "compatibility_date": "2026-09-01",
+    "compatibility_flags": ["nodejs_compat_v2"],
+    "placement": {
+        "mode": "smart"
+    },
+    "observability": {
+        "enabled": true
+    },
+    "ai": {
+        "binding": "AI"
+    },
+    // SIGNING_SECRET is a secret (`.dev.vars` locally), never a var. The deploy
+    // binds none, so the deployed `/embed` fails closed.
+    "vars": {
+        "NODE_ENV": "development"
+    },
+    "env": {
+        "production": {
+            "name": "embeddings",
+            "vars": {
+                "NODE_ENV": "production"
+            }
+        },
+        "preview": {
+            "name": "embeddings-preview",
+            "vars": {
+                "NODE_ENV": "development"
+            }
+        }
+    }
+}

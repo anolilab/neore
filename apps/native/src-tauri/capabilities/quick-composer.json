@@ -1,0 +1,9 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "quick-composer",
+    "description": "The local Quick Composer window: hand text to the main window, or close. Nothing else.",
+    "local": true,
+    "windows": ["quick-composer"],
+    "platforms": ["macOS", "windows", "linux"],
+    "permissions": ["allow-quick-compose", "allow-close-quick-composer"]
+}

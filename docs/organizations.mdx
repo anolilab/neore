@@ -1,0 +1,317 @@
+---
+title: Organizations
+description: Team collaboration and multi-organization features
+---
+
+# Organizations
+
+Organizations allow you to collaborate with team members, share resources, and manage team settings collectively.
+
+## Quick Start
+
+1. **Create Organization**: Go to Settings → Organizations → Create
+2. **Invite Members**: Add team members via email
+3. **Set Permissions**: Assign roles (Owner, Admin, Member)
+4. **Start Collaborating**: Switch to organization and begin working together
+
+## Organization Management
+
+### Creating Organizations
+
+**Create New Organization:**
+1. Navigate to Settings → Organizations
+2. Click "Create Organization"
+3. Enter organization name
+4. Set initial settings
+5. Organization is created
+
+**Organization Details:**
+- Organization name
+- Slug/identifier
+- Owner information
+- Creation date
+- Member count
+
+**Organization Limits:**
+
+| Limit | Value |
+|---|---|
+| Organizations you can create | 3 |
+| Members per organization | 100 |
+| Teams per organization | 10 |
+| Invitation validity | 7 days |
+
+### Managing Organizations
+
+**Organization Settings:**
+- Update organization name
+- Configure organization settings
+- Manage members
+- Set permissions
+
+**Organization Features:**
+- Monthly credits allocation
+- Resource management
+- Team collaboration
+- Shared resources
+
+### Organization Switching
+
+**Switch Between Organizations:**
+1. Click organization switcher (top navigation)
+2. Select organization from list
+3. Switch instantly
+4. Settings and data are organization-specific
+
+**Multi-Organization Support:**
+- Be a member of multiple organizations
+- Switch seamlessly between them
+- Organization-specific data isolation
+- Independent settings per organization
+
+## Member Management
+
+### Inviting Members
+
+**Send Invitations:**
+1. Navigate to Settings → Members (within organization)
+2. Click "Invite Member"
+3. Enter email address
+4. Select role/permissions
+5. Send invitation
+
+**Invitation Features:**
+- Email invitations sent automatically
+- Invitation expiration (configurable)
+- Role assignment at invitation
+- Resend invitations if needed
+
+**Invitation Expiration:**
+- Invitations expire **7 days** after they are sent
+- An expired invitation can be reissued by inviting the address again
+- Pending invitations are listed alongside members so you can see what is outstanding
+
+### Member Roles and Permissions
+
+Three roles are available. The differences between **Owner** and **Admin** are
+narrower than they look — the two that matter are billing changes and deleting
+teams, both of which only an Owner can do.
+
+| Capability | Owner | Admin | Member |
+|---|:---:|:---:|:---:|
+| Invite and remove members | ✅ | ✅ | — |
+| Change member roles | ✅ | ✅ | — |
+| Create projects | ✅ | ✅ | ✅ |
+| Update projects | ✅ | ✅ | ✅ |
+| Delete projects | ✅ | ✅ | — |
+| Read billing | ✅ | ✅ | ✅ |
+| **Update billing** | ✅ | — | — |
+| Create teams | ✅ | ✅ | — |
+| Update teams | ✅ | ✅ | — |
+| **Delete teams** | ✅ | — | — |
+| Manage team members | ✅ | ✅ | — |
+| Read / update team settings | ✅ | ✅ | — |
+| Delete the organization | ✅ | — | — |
+
+The person who creates an organization becomes its Owner.
+
+### Teams
+
+An organization can be subdivided into **teams** — up to 10 per organization.
+Teams are managed at `/dashboard/settings/auth/teams`.
+
+Owners and Admins can create and update teams and manage their members; only an
+Owner can delete a team.
+
+### Managing Members
+
+**View Members:**
+- List all organization members
+- See roles and permissions
+- View member activity
+- Member details
+
+**Member Actions:**
+- Change member roles
+- Remove members
+- Resend invitations
+- View member activity
+
+**Removing Members:**
+1. Navigate to member list
+2. Click on member
+3. Select "Remove Member"
+4. Confirm removal
+5. Member is removed
+
+## Accepting Invitations
+
+### Receiving Invitations
+
+**Invitation Email:**
+- Receive email invitation
+- Click invitation link
+- Sign in or create account
+- Accept invitation
+
+**Invitation Link:**
+- Unique invitation token
+- Expires after set time
+- One-time use
+- Secure access
+
+### Accepting Invitations
+
+**Accept Process:**
+1. Click invitation link in email
+2. Sign in to your account (or create one)
+3. Review organization details
+4. Accept invitation
+5. Join organization
+
+**After Acceptance:**
+- Organization appears in switcher
+- Access organization resources
+- Collaborate with team
+- Use organization features
+
+**Invitation Routes:**
+- Direct link: `/auth/accept-invitation/{invitationId}`
+- Automatic redirect after sign-in
+- Seamless onboarding
+
+## Multi-Tenant Support
+
+### Multiple Organization Membership
+
+**Features:**
+- Join multiple organizations
+- Switch between organizations easily
+- Independent data per organization
+- Organization-specific settings
+
+**Use Cases:**
+- Personal and work organizations
+- Multiple client organizations
+- Different project teams
+- Flexible collaboration
+
+### Organization-Specific Data Isolation
+
+**Data Isolation:**
+- Threads are organization-specific
+- Files are organization-specific
+- Settings are organization-specific
+- Complete data separation
+
+**Benefits:**
+- Privacy between organizations
+- Independent resource management
+- Team-specific configurations
+- Secure collaboration
+
+## Organization Features
+
+### Shared Resources
+
+**Organization Resources:**
+- Shared file storage
+- Shared provider API keys (BYOK at the organization level)
+- Monthly credit allocation
+- Collaborative features
+
+Every member can read the organization's billing information; only the Owner can
+change it.
+
+### Organization Settings
+
+**Settings Available:**
+- Organization name and details
+- Member management
+- Resource allocation
+- Permission configuration
+
+**Monthly Credits:**
+- Credits allocated per organization
+- Track usage per organization
+- Manage team resources
+- Budget management
+
+## Best Practices
+
+**Organization Management:**
+- Use descriptive organization names
+- Assign appropriate roles
+- Regular member review
+- Clear permission structure
+
+**Collaboration:**
+- Use organization-specific threads
+- Share resources appropriately
+- Communicate team guidelines
+- Regular team updates
+
+## Common Use Cases
+
+### Team Collaboration
+
+**Use Case**: Work with a team on shared projects.
+
+**Workflow:**
+1. Create organization for your team
+2. Invite team members with appropriate roles
+3. Create organization-specific threads
+4. Share files and resources
+5. Collaborate in real-time
+
+### Multiple Projects
+
+**Use Case**: Manage different projects or clients separately.
+
+**Workflow:**
+1. Create separate organization for each project/client
+2. Invite relevant team members to each
+3. Keep project data isolated
+4. Switch between organizations as needed
+
+### Client Management
+
+**Use Case**: Work with multiple clients while keeping data separate.
+
+**Workflow:**
+1. Create organization per client
+2. Invite client team members (Member role)
+3. Maintain your team as Admin/Owner
+4. Share only relevant threads and files
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue**: Can't create organization
+- **Solution**: Check organization limit for your plan
+- **Solution**: Verify you have permission to create organizations
+- **Solution**: Try refreshing the page
+
+**Issue**: Invitation not received
+- **Solution**: Check spam folder
+- **Solution**: Verify email address is correct
+- **Solution**: Check invitation hasn't expired
+- **Solution**: Resend invitation
+
+**Issue**: Can't switch organizations
+- **Solution**: Ensure you're a member of the organization
+- **Solution**: Check organization is active
+- **Solution**: Try refreshing the page
+
+**Issue**: Missing permissions
+- **Solution**: Contact organization owner for role upgrade
+- **Solution**: Verify your role has required permissions
+- **Solution**: Check organization settings
+
+## Related Features
+
+- [Projects](/docs/projects) - Group chats within an organization
+- [Settings](/docs/settings) - Organization settings
+- [Authentication](/docs/authentication) - Account management
+- [Chat](/docs/chat) - Organization-specific threads

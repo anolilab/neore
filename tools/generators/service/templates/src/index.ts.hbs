@@ -1,0 +1,62 @@
+import { swaggerUI } from "@hono/swagger-ui";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { logger } from "./lib/logger.js";
+
+import { loggerMiddleware } from "./middleware/logger.js";
+import { corsMiddleware, securityMiddleware } from "./middleware/security.js";
+import { healthRouter } from "./routes/health.js";
+
+export interface AppEnv {
+    ALLOWED_ORIGINS?: string;
+    APP_NAME: string;
+    APP_VERSION: string;
+    NODE_ENV: string;
+    PARSER_SIGNING_SECRET?: string;
+}
+
+const app = new OpenAPIHono<{ Bindings: AppEnv }>();
+
+// Global middleware
+app.use("*", securityMiddleware);
+app.use("*", corsMiddleware);
+app.use("*", loggerMiddleware);
+
+// Error handler
+app.onError(async (err, c) => {
+    const isDev = c.env.NODE_ENV !== "production";
+
+    logger.error(err.message, isDev ? err : undefined);
+
+    return c.json(
+        {
+            details: isDev ? err.stack : undefined,
+            error: err.message ?? "Internal Server Error",
+        },
+        500,
+    );
+});
+
+// Routes
+app.route("/", healthRouter);
+
+// OpenAPI docs (dev only)
+app.get("/openapi.json", (c) => {
+    if (c.env.NODE_ENV === "production") {
+        return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json(
+        app.getOpenAPIDocument({
+            info: {
+                description: "{{description}}",
+                title: "{{titleCase name}} API",
+                version: "1.0.0",
+            },
+            openapi: "3.1.0",
+        }),
+    );
+});
+
+app.get("/doc", swaggerUI({ url: "/openapi.json" }));
+
+export default app;

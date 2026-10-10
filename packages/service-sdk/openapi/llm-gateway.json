@@ -1,0 +1,1200 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "LLM Gateway API",
+        "description": "LLM Gateway Service — proxies all LLM API calls with token counting, cost tracking, smart routing, and usage analytics.",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/health": {
+            "get": {
+                "operationId": "getHealth",
+                "summary": "Full health report",
+                "tags": ["Health"],
+                "responses": {
+                    "200": {
+                        "description": "Service health report",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/HealthReport" }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service unhealthy",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/HealthReport" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health/live": {
+            "get": {
+                "operationId": "getLiveness",
+                "summary": "Liveness check",
+                "tags": ["Health"],
+                "responses": {
+                    "200": {
+                        "description": "Service is live",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": { "type": "string" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/generate": {
+            "post": {
+                "operationId": "internalGenerate",
+                "summary": "Non-streaming LLM generation",
+                "tags": ["Internal"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/InternalGenerateRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Generation result",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/InternalGenerateResponse" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Provider error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/stream": {
+            "post": {
+                "operationId": "internalStream",
+                "summary": "Streaming LLM generation",
+                "tags": ["Internal"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/InternalStreamRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "SSE stream of generation chunks",
+                        "content": {
+                            "text/event-stream": {
+                                "schema": { "type": "string" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Provider error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/route": {
+            "post": {
+                "operationId": "internalRoute",
+                "summary": "Smart model selection",
+                "tags": ["Internal"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/InternalRouteRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Routing decision",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/InternalRouteResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/model/proxy": {
+            "post": {
+                "operationId": "internalModelProxy",
+                "summary": "Low-level LanguageModelV3 proxy (doGenerate / doStream)",
+                "tags": ["Internal"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/ModelProxyRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Model result (JSON for generate, SSE for stream)",
+                        "content": {
+                            "application/json": {
+                                "schema": { "type": "object", "additionalProperties": true }
+                            },
+                            "text/event-stream": {
+                                "schema": { "type": "string" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Provider error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/embeddings": {
+            "post": {
+                "operationId": "internalEmbeddings",
+                "summary": "Generate embeddings (HMAC auth, for the backend)",
+                "tags": ["Internal"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/InternalEmbeddingsRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Embedding result",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/InternalEmbeddingsResponse" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Provider error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/webhooks": {
+            "post": {
+                "operationId": "registerWebhook",
+                "summary": "Register a webhook endpoint",
+                "tags": ["Webhooks"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/RegisterWebhookRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Webhook registered",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": { "type": "string" },
+                                        "secret": { "type": "string" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "operationId": "listWebhooks",
+                "summary": "List webhooks for a user",
+                "tags": ["Webhooks"],
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "in": "query",
+                        "required": true,
+                        "schema": { "type": "string" }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of webhooks",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "webhooks": {
+                                            "type": "array",
+                                            "items": { "$ref": "#/components/schemas/Webhook" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/webhooks/{id}": {
+            "delete": {
+                "operationId": "deleteWebhook",
+                "summary": "Remove a webhook",
+                "tags": ["Webhooks"],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "string" }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Webhook deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "deleted": { "type": "boolean" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/webhooks/{id}/test": {
+            "post": {
+                "operationId": "testWebhook",
+                "summary": "Send a test event to a webhook",
+                "tags": ["Webhooks"],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "string" }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Test event sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "delivered": { "type": "boolean" },
+                                        "deliveryId": { "type": "string" }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Webhook not found",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/chat/completions": {
+            "post": {
+                "operationId": "chatCompletions",
+                "summary": "OpenAI-compatible chat completions",
+                "description": "Supports both streaming (stream: true) and non-streaming modes. Uses Bearer token auth (gk_* keys). Model 'auto' triggers smart routing.",
+                "tags": ["SaaS API"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/ChatCompletionsRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Chat completion (JSON or SSE stream depending on stream parameter)",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ChatCompletionResponse" }
+                            },
+                            "text/event-stream": {
+                                "schema": { "type": "string" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Provider error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/chat": {
+            "post": {
+                "operationId": "startChat",
+                "summary": "Start a chat (create thread + schedule agent)",
+                "tags": ["Chat"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "type": "object", "additionalProperties": true }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Chat started",
+                        "content": {
+                            "application/json": {
+                                "schema": { "type": "object", "additionalProperties": true }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing Authorization header",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/chat/media": {
+            "post": {
+                "operationId": "chatMedia",
+                "summary": "Media generation (image/video)",
+                "tags": ["Chat"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "type": "object", "additionalProperties": true }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Media generation result",
+                        "content": {
+                            "application/json": {
+                                "schema": { "type": "object", "additionalProperties": true }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/chat/edit": {
+            "post": {
+                "operationId": "chatEdit",
+                "summary": "Edit and regenerate a message",
+                "tags": ["Chat"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "type": "object", "additionalProperties": true }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Edit result",
+                        "content": {
+                            "application/json": {
+                                "schema": { "type": "object", "additionalProperties": true }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/chat/improve-prompt": {
+            "post": {
+                "operationId": "improvePrompt",
+                "summary": "Improve a user prompt",
+                "tags": ["Chat"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "type": "object", "additionalProperties": true }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Improved prompt",
+                        "content": {
+                            "application/json": {
+                                "schema": { "type": "object", "additionalProperties": true }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/prompts/optimize": {
+            "post": {
+                "operationId": "optimizePrompt",
+                "summary": "Optimize a prompt template",
+                "tags": ["Chat"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "type": "object", "additionalProperties": true }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Optimized prompt",
+                        "content": {
+                            "application/json": {
+                                "schema": { "type": "object", "additionalProperties": true }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/stream": {
+            "post": {
+                "operationId": "clientStream",
+                "summary": "Client-facing SSE relay for streaming responses",
+                "description": "Validates stream token, polls the backend for chunks, relays NDJSON to client.",
+                "tags": ["Streaming"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/ClientStreamRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "NDJSON stream of chunks",
+                        "content": {
+                            "text/plain": {
+                                "schema": { "type": "string" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid stream token",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/models": {
+            "get": {
+                "operationId": "listModels",
+                "summary": "List available models with pricing and metadata",
+                "tags": ["SaaS API"],
+                "parameters": [
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "schema": { "type": "string" },
+                        "description": "Filter by mode (comma-separated): text, image, video, speech-to-text, text-to-speech"
+                    },
+                    { "name": "provider", "in": "query", "schema": { "type": "string" }, "description": "Filter by provider (comma-separated)" },
+                    { "name": "region", "in": "query", "schema": { "type": "string" }, "description": "Filter by region (comma-separated)" },
+                    { "name": "tier", "in": "query", "schema": { "type": "string" }, "description": "Filter by quality tier (comma-separated)" },
+                    { "name": "capability", "in": "query", "schema": { "type": "string" }, "description": "Filter by capabilities (comma-separated)" },
+                    { "name": "enabled", "in": "query", "schema": { "type": "string", "enum": ["true", "false"] } },
+                    { "name": "premium", "in": "query", "schema": { "type": "string", "enum": ["true", "false"] } },
+                    { "name": "new", "in": "query", "schema": { "type": "string", "enum": ["true", "false"] } },
+                    { "name": "tools", "in": "query", "schema": { "type": "string", "enum": ["true", "false"] } },
+                    { "name": "multimodal", "in": "query", "schema": { "type": "string", "enum": ["true", "false"] } },
+                    { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Free-text search" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Model list",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ModelsListResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/embeddings": {
+            "post": {
+                "operationId": "createEmbeddings",
+                "summary": "OpenAI-compatible embeddings",
+                "tags": ["SaaS API"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/SaasEmbeddingsRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Embedding result",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/SaasEmbeddingsResponse" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/embeddings/models": {
+            "get": {
+                "operationId": "listEmbeddingModels",
+                "summary": "List available embedding models",
+                "tags": ["SaaS API"],
+                "responses": {
+                    "200": {
+                        "description": "Embedding model list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "object": { "type": "string" },
+                                        "data": {
+                                            "type": "array",
+                                            "items": { "$ref": "#/components/schemas/EmbeddingModelInfo" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/usage": {
+            "get": {
+                "operationId": "getUsage",
+                "summary": "Get usage summary",
+                "tags": ["Usage"],
+                "parameters": [
+                    { "name": "userId", "in": "query", "required": true, "schema": { "type": "string" } },
+                    { "name": "period", "in": "query", "schema": { "type": "string", "default": "30" }, "description": "Period in days" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Usage summary",
+                        "content": {
+                            "application/json": {
+                                "schema": { "type": "object", "additionalProperties": true }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/events": {
+            "get": {
+                "operationId": "getEvents",
+                "summary": "Live dashboard event stream (SSE)",
+                "tags": ["Usage"],
+                "parameters": [
+                    { "name": "userId", "in": "query", "required": true, "schema": { "type": "string" } },
+                    { "name": "types", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated event types to subscribe" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE event stream",
+                        "content": {
+                            "text/event-stream": {
+                                "schema": { "type": "string" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/cache/stats": {
+            "get": {
+                "operationId": "getCacheStats",
+                "summary": "Get prompt cache hit/miss statistics",
+                "tags": ["Cache"],
+                "parameters": [{ "name": "period", "in": "query", "schema": { "type": "string", "enum": ["24h", "7d"], "default": "24h" } }],
+                "responses": {
+                    "200": {
+                        "description": "Cache statistics",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/CacheStatsResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/cache": {
+            "delete": {
+                "operationId": "flushCache",
+                "summary": "Flush all prompt cache entries (admin only)",
+                "tags": ["Cache"],
+                "responses": {
+                    "200": {
+                        "description": "Cache flush result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "flushed": { "type": "boolean" },
+                                        "deleted": { "type": "number" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "HealthReport": {
+                "type": "object",
+                "additionalProperties": true
+            },
+            "ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "oneOf": [
+                            { "type": "string" },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "code": { "type": "string" },
+                                    "message": { "type": "string" },
+                                    "type": { "type": "string" }
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "ModelFilterRules": {
+                "type": "object",
+                "properties": {
+                    "allowedRegions": { "type": "array", "items": { "type": "string" } },
+                    "blockedRegions": { "type": "array", "items": { "type": "string" } },
+                    "allowedModels": { "type": "array", "items": { "type": "string" } },
+                    "blockedModels": { "type": "array", "items": { "type": "string" } },
+                    "allowedProviders": { "type": "array", "items": { "type": "string" } },
+                    "blockedProviders": { "type": "array", "items": { "type": "string" } },
+                    "requireZDR": { "type": "boolean" },
+                    "denyDataCollection": { "type": "boolean" }
+                }
+            },
+            "InternalGenerateRequest": {
+                "type": "object",
+                "required": ["modelId", "provider", "modelApiId", "messages", "requestId", "userId"],
+                "properties": {
+                    "modelId": { "type": "string" },
+                    "provider": { "type": "string" },
+                    "modelApiId": { "type": "string" },
+                    "messages": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                    "system": { "type": "string" },
+                    "temperature": { "type": "number" },
+                    "maxTokens": { "type": "number" },
+                    "providerApiKey": { "type": "string" },
+                    "providerOptions": { "type": "object", "additionalProperties": true },
+                    "requestId": { "type": "string" },
+                    "userId": { "type": "string" },
+                    "orgId": { "type": "string" },
+                    "threadId": { "type": "string" },
+                    "contextWindow": { "type": "number" },
+                    "transforms": { "type": "array", "items": { "type": "string" } },
+                    "modelFilterRules": { "$ref": "#/components/schemas/ModelFilterRules" }
+                }
+            },
+            "InternalGenerateResponse": {
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string" },
+                    "usage": {
+                        "type": "object",
+                        "properties": {
+                            "promptTokens": { "type": "number" },
+                            "completionTokens": { "type": "number" },
+                            "cachedTokens": { "type": "number" },
+                            "reasoningTokens": { "type": "number" }
+                        }
+                    },
+                    "finishReason": { "type": "string" },
+                    "cost": {
+                        "type": "object",
+                        "properties": {
+                            "microdollars": { "type": "number" },
+                            "pricingAvailable": { "type": "boolean" }
+                        }
+                    },
+                    "latencyMs": { "type": "number" }
+                }
+            },
+            "InternalStreamRequest": {
+                "type": "object",
+                "required": ["modelId", "provider", "modelApiId", "messages", "requestId", "userId"],
+                "properties": {
+                    "modelId": { "type": "string" },
+                    "provider": { "type": "string" },
+                    "modelApiId": { "type": "string" },
+                    "messages": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                    "system": { "type": "string" },
+                    "toolSchemas": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object",
+                            "properties": { "description": { "type": "string" }, "parameters": { "type": "object", "additionalProperties": true } }
+                        }
+                    },
+                    "temperature": { "type": "number" },
+                    "maxTokens": { "type": "number" },
+                    "providerApiKey": { "type": "string" },
+                    "providerOptions": { "type": "object", "additionalProperties": true },
+                    "requestId": { "type": "string" },
+                    "userId": { "type": "string" },
+                    "orgId": { "type": "string" },
+                    "threadId": { "type": "string" },
+                    "contextWindow": { "type": "number" },
+                    "transforms": { "type": "array", "items": { "type": "string" } },
+                    "guardrails": {
+                        "oneOf": [{ "type": "boolean" }, { "type": "object", "properties": { "pii": { "type": "string" }, "injection": { "type": "string" } } }]
+                    },
+                    "modelFilterRules": { "$ref": "#/components/schemas/ModelFilterRules" }
+                }
+            },
+            "InternalRouteRequest": {
+                "type": "object",
+                "required": ["messages"],
+                "properties": {
+                    "messages": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                    "toolSchemas": { "type": "object", "additionalProperties": true },
+                    "userTier": { "type": "string", "default": "free" },
+                    "preferredModel": { "type": "string" },
+                    "preferredQuality": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "routingProfile": { "type": "string", "enum": ["fast", "balanced", "reasoning", "premium"] },
+                    "modelFilterRules": { "$ref": "#/components/schemas/ModelFilterRules" }
+                }
+            },
+            "InternalRouteResponse": {
+                "type": "object",
+                "properties": {
+                    "modelId": { "type": "string" },
+                    "provider": { "type": "string" },
+                    "modelApiId": { "type": "string" },
+                    "tier": { "type": "string" },
+                    "fromCache": { "type": "boolean" },
+                    "score": {
+                        "type": "object",
+                        "properties": {
+                            "combined": { "type": "number" },
+                            "complexity": { "type": "number" },
+                            "codeGeneration": { "type": "number" },
+                            "reasoning": { "type": "number" },
+                            "contextLength": { "type": "number" },
+                            "toolUse": { "type": "number" }
+                        }
+                    },
+                    "classification": { "type": "object", "additionalProperties": true }
+                }
+            },
+            "ModelProxyRequest": {
+                "type": "object",
+                "required": ["action", "provider", "modelId", "modelApiId", "callOptions", "requestId", "userId"],
+                "properties": {
+                    "action": { "type": "string", "enum": ["generate", "stream"] },
+                    "provider": { "type": "string" },
+                    "modelId": { "type": "string" },
+                    "modelApiId": { "type": "string" },
+                    "providerApiKey": { "type": "string" },
+                    "callOptions": { "type": "object", "additionalProperties": true },
+                    "requestId": { "type": "string" },
+                    "userId": { "type": "string" },
+                    "orgId": { "type": "string" },
+                    "threadId": { "type": "string" }
+                }
+            },
+            "InternalEmbeddingsRequest": {
+                "type": "object",
+                "required": ["model", "input", "requestId", "userId"],
+                "properties": {
+                    "model": { "type": "string" },
+                    "input": {
+                        "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
+                    },
+                    "dimensions": { "type": "integer" },
+                    "requestId": { "type": "string" },
+                    "userId": { "type": "string" },
+                    "orgId": { "type": "string" },
+                    "threadId": { "type": "string" }
+                }
+            },
+            "InternalEmbeddingsResponse": {
+                "type": "object",
+                "properties": {
+                    "embeddings": {
+                        "type": "array",
+                        "items": { "type": "array", "items": { "type": "number" } }
+                    },
+                    "model": { "type": "string" },
+                    "dimensions": { "type": "integer" },
+                    "usage": {
+                        "type": "object",
+                        "properties": {
+                            "totalTokens": { "type": "number" }
+                        }
+                    }
+                }
+            },
+            "RegisterWebhookRequest": {
+                "type": "object",
+                "required": ["userId", "url", "events"],
+                "properties": {
+                    "userId": { "type": "string" },
+                    "orgId": { "type": "string" },
+                    "url": { "type": "string", "format": "uri" },
+                    "secret": { "type": "string" },
+                    "events": {
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["completion", "budget_exceeded", "guardrail_triggered", "provider_error"] },
+                        "minItems": 1
+                    }
+                }
+            },
+            "Webhook": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" },
+                    "userId": { "type": "string" },
+                    "orgId": { "type": "string", "nullable": true },
+                    "url": { "type": "string" },
+                    "events": { "type": "array", "items": { "type": "string" } },
+                    "isActive": { "type": "boolean" },
+                    "createdAt": { "type": "number" },
+                    "lastDeliveryAt": { "type": "number", "nullable": true },
+                    "lastDeliveryStatus": { "type": "number", "nullable": true }
+                }
+            },
+            "ChatCompletionsRequest": {
+                "type": "object",
+                "required": ["model", "messages"],
+                "properties": {
+                    "model": { "type": "string", "description": "Model ID or 'auto' for smart routing" },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["role", "content"],
+                            "properties": {
+                                "role": { "type": "string", "enum": ["system", "user", "assistant", "tool"] },
+                                "content": {
+                                    "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "object", "additionalProperties": true } }]
+                                },
+                                "name": { "type": "string" },
+                                "tool_call_id": { "type": "string" },
+                                "tool_calls": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+                            }
+                        }
+                    },
+                    "stream": { "type": "boolean", "default": false },
+                    "temperature": { "type": "number" },
+                    "max_tokens": { "type": "number" },
+                    "tools": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": { "type": "string", "const": "function" },
+                                "function": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": { "type": "string" },
+                                        "description": { "type": "string" },
+                                        "parameters": { "type": "object", "additionalProperties": true }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "top_p": { "type": "number" },
+                    "frequency_penalty": { "type": "number" },
+                    "presence_penalty": { "type": "number" },
+                    "stop": {
+                        "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
+                    },
+                    "transforms": { "type": "array", "items": { "type": "string" } },
+                    "response_format": {
+                        "oneOf": [
+                            { "type": "object", "properties": { "type": { "type": "string", "const": "json_object" } } },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "type": { "type": "string", "const": "json_schema" },
+                                    "json_schema": { "type": "object", "additionalProperties": true }
+                                }
+                            },
+                            { "type": "object", "properties": { "type": { "type": "string", "const": "text" } } }
+                        ]
+                    }
+                }
+            },
+            "ChatCompletionResponse": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" },
+                    "object": { "type": "string" },
+                    "created": { "type": "number" },
+                    "model": { "type": "string" },
+                    "choices": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "index": { "type": "number" },
+                                "message": {
+                                    "type": "object",
+                                    "properties": {
+                                        "role": { "type": "string" },
+                                        "content": { "type": "string" }
+                                    }
+                                },
+                                "finish_reason": { "type": "string" }
+                            }
+                        }
+                    },
+                    "usage": {
+                        "type": "object",
+                        "properties": {
+                            "prompt_tokens": { "type": "number" },
+                            "completion_tokens": { "type": "number" },
+                            "total_tokens": { "type": "number" }
+                        }
+                    }
+                }
+            },
+            "ClientStreamRequest": {
+                "type": "object",
+                "required": ["streamToken"],
+                "properties": {
+                    "streamToken": { "type": "string" },
+                    "lastChunkIndex": { "type": "number" }
+                }
+            },
+            "ModelsListResponse": {
+                "type": "object",
+                "properties": {
+                    "object": { "type": "string" },
+                    "data": {
+                        "type": "array",
+                        "items": { "type": "object", "additionalProperties": true }
+                    },
+                    "version": { "type": "string" }
+                }
+            },
+            "SaasEmbeddingsRequest": {
+                "type": "object",
+                "required": ["model", "input"],
+                "properties": {
+                    "model": { "type": "string" },
+                    "input": {
+                        "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }]
+                    },
+                    "encoding_format": { "type": "string", "enum": ["float", "base64"], "default": "float" },
+                    "dimensions": { "type": "integer" },
+                    "user": { "type": "string" }
+                }
+            },
+            "SaasEmbeddingsResponse": {
+                "type": "object",
+                "properties": {
+                    "object": { "type": "string" },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "object": { "type": "string" },
+                                "index": { "type": "number" },
+                                "embedding": {
+                                    "oneOf": [{ "type": "array", "items": { "type": "number" } }, { "type": "string" }]
+                                }
+                            }
+                        }
+                    },
+                    "model": { "type": "string" },
+                    "usage": {
+                        "type": "object",
+                        "properties": {
+                            "prompt_tokens": { "type": "number" },
+                            "total_tokens": { "type": "number" }
+                        }
+                    }
+                }
+            },
+            "EmbeddingModelInfo": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string" },
+                    "object": { "type": "string" },
+                    "created": { "type": "number" },
+                    "owned_by": { "type": "string" },
+                    "dimensions": { "type": "integer" },
+                    "provider": { "type": "string" }
+                }
+            },
+            "CacheStatsResponse": {
+                "type": "object",
+                "properties": {
+                    "period": { "type": "string" },
+                    "hits": { "type": "number" },
+                    "misses": { "type": "number" },
+                    "hitRate": { "type": "number" },
+                    "savedTokens": { "type": "number" },
+                    "savedCostMicrodollars": { "type": "number" }
+                }
+            }
+        }
+    }
+}

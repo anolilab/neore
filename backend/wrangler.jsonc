@@ -1,0 +1,209 @@
+{
+    "$schema": "../node_modules/wrangler/config-schema.json",
+    "name": "neore-backend",
+    "main": "src/server.ts",
+    "compatibility_date": "2026-06-10",
+
+    // The port lives here so every entry point agrees on it. `project.json`'s dev
+    // target passes `--worker-port 8788`, but `package.json`'s `dev` script does
+    // not — so `pnpm dev:backend` (which goes through vis, and so
+    // through project.json) landed on 8788 while `pnpm --filter @neore/backend run
+    // dev` took wrangler's default 8787. `PUBLIC_ORIGIN` below and VITE_LUNORA_URL
+    // both say 8788, so the second route left nothing answering where the app
+    // calls. wrangler reads this for both.
+    //
+    // The inspector port is pinned for the same reason, one level down, but on
+    // the CLI: `--inspector-port 9235` in project.json's dev target, package.json's
+    // `dev` script and scripts/dev-backend-watchdog.sh (the flag exists since
+    // anolilab/lunora#689). A new entry point that starts `lunora dev` must pass
+    // it too, or the backend takes wrangler's default 9229 and, when that is
+    // busy, walks UPWARD into 9230-9234 — which the five services declare in
+    // their `package.json` dev scripts (llm-gateway 9230, document-parser 9231,
+    // browser-renderer 9232, embeddings 9233, nsfw-checker 9234). Observed: with
+    // the web dev server on 9229 and the gateway/parser on 9230/9231, the backend
+    // silently claimed 9232, so `pnpm dev:stack` — which DOES include
+    // browser-renderer — would have raced for it. Which one lost depended purely
+    // on boot order, and the loser died with `Address already in use` naming a
+    // port that appears nowhere near a service port map. 9235 is the next free
+    // slot above the five; keep it above them when adding a service.
+    "dev": {
+        "port": 8788
+    },
+
+    // No `vars` here on purpose. `PUBLIC_ORIGIN` and `LUNORA_ORIGIN_URL` are
+    // dev-only loopback values, and `lunora build` blocks on a loopback address
+    // in wrangler.jsonc:
+    //   build blocked: PUBLIC_ORIGIN in wrangler.jsonc point at localhost.
+    // The gate is right in general and cannot know this file is dev-only, so both
+    // dev values are written to `.dev.vars` by `scripts/dev-setup.js`, and the
+    // deployed values come from `alchemy.run.ts`. The backend refuses to start
+    // without PUBLIC_ORIGIN (`requirePublicOrigin` in `src/server.ts`): it is the
+    // base for the JWKS URL bearer tokens verify against, for signed storage URLs,
+    // and for scheduler dispatch.
+    // `durable_object_io_tasks_prevent_eviction`: before compat date 2026-10-01,
+    // pending I/O (waitUntil, cross-DO RPC, service calls) does not keep a Durable
+    // Object alive once its last client disconnects, so a live-query refresh or a
+    // durable stream (a chat reply) could be cut off mid-flight. Kept in step with
+    // alchemy.run.ts.
+    "compatibility_flags": ["nodejs_compat", "durable_object_io_tasks_prevent_eviction"],
+
+    // Placeholders for local dev only — Alchemy (`alchemy.run.ts`) owns the real
+    // resources in preview/production, mirroring how the existing Workers are
+    // provisioned. Keep the binding NAMES in sync with alchemy.run.ts; the ids
+    // below are overwritten at deploy time.
+    "durable_objects": {
+        "bindings": [
+            { "name": "SHARD", "class_name": "ShardDO" },
+            // Backs `ctx.scheduler.runAfter/runAt` and the 8 ported crons.
+            { "name": "SCHEDULER", "class_name": "SchedulerDO" },
+            // Which user shards exist, for cross-shard fan-out (`.shardRegistry` in src/server.ts).
+            { "name": "SHARD_REGISTRY", "class_name": "ShardRegistryDO" }
+        ]
+    },
+    "migrations": [
+        { "tag": "v1", "new_sqlite_classes": ["ShardDO", "SchedulerDO"] },
+        { "tag": "v2", "new_sqlite_classes": ["ShardRegistryDO"] }
+    ],
+
+    // D1 backs `.global()` tables and the better-auth user/session store.
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "neore-backend",
+            "database_id": "00000000-0000-0000-0000-000000000000"
+        }
+    ],
+
+    // R2 backs ctx.storage.
+    "r2_buckets": [{ "binding": "FILES", "bucket_name": "neore-files" }],
+
+    // One Vectorize index per supported embedding width. The schema declares one
+    // `embeddings_<dim>` table per width (a vector index needs a fixed
+    // `dimensions`), so each maps to its own Vectorize
+    // index. `index_name` MUST equal the schema's index name or the build fails.
+    "vectorize": [
+        { "binding": "EMBEDDINGS_128", "index_name": "embeddings-128" },
+        { "binding": "EMBEDDINGS_256", "index_name": "embeddings-256" },
+        { "binding": "EMBEDDINGS_512", "index_name": "embeddings-512" },
+        { "binding": "EMBEDDINGS_768", "index_name": "embeddings-768" },
+        { "binding": "EMBEDDINGS_1024", "index_name": "embeddings-1024" },
+        { "binding": "EMBEDDINGS_1408", "index_name": "embeddings-1408" },
+        { "binding": "EMBEDDINGS_1536", "index_name": "embeddings-1536" },
+        { "binding": "EMBEDDINGS_2048", "index_name": "embeddings-2048" },
+        { "binding": "EMBEDDINGS_3072", "index_name": "embeddings-3072" },
+        { "binding": "EMBEDDINGS_4096", "index_name": "embeddings-4096" }
+    ],
+
+    // The jobs queue and its DLQ (`lunora/queues.ts`). Long and latency-critical
+    // jobs go here instead of the SchedulerDO, which keeps at most six in flight.
+    // `lunora dev` rewrites what `defineQueue` declares (names, max_retries,
+    // retry_delay, dead_letter_queue); the batch size, batch timeout and
+    // concurrency are hand-set from `lunora/lib/job-queue-config.ts` with its dev
+    // overrides — `deploy-bindings.test.ts` fails when either half drifts, and
+    // alchemy.run.ts reads the same sources for the deploy. Miniflare runs the
+    // queues locally.
+    "queues": {
+        "producers": [
+            { "binding": "QUEUE_JOBS", "queue": "neore-backend-jobs" },
+            { "binding": "QUEUE_JOBS_DEAD_LETTERS", "queue": "neore-backend-jobs-dlq" }
+        ],
+        "consumers": [
+            {
+                "queue": "neore-backend-jobs",
+                "max_batch_size": 10,
+                "max_batch_timeout": 1,
+                "max_retries": 2,
+                "max_concurrency": 20,
+                "retry_delay": 5,
+                "dead_letter_queue": "neore-backend-jobs-dlq"
+            },
+            { "queue": "neore-backend-jobs-dlq", "max_batch_size": 10, "max_retries": 0 }
+        ]
+    },
+
+    // Read by codegen only — nothing runs `wrangler --env preview`. A preview
+    // deploy's queues carry alchemy.run.ts's `-preview` suffix, and the generated
+    // consumer routes a batch by its queue's name: a producer here mapping a
+    // queue's binding to a renamed queue makes codegen route that name to the
+    // same handler. `deploy-bindings.test.ts` pins these to the declared names.
+    "env": {
+        "preview": {
+            "queues": {
+                "producers": [
+                    { "binding": "QUEUE_JOBS", "queue": "neore-backend-jobs-preview" },
+                    { "binding": "QUEUE_JOBS_DEAD_LETTERS", "queue": "neore-backend-jobs-dlq-preview" }
+                ]
+            },
+            "services": [
+                {
+                    "binding": "SERVICE_BROWSER_RENDERER",
+                    "service": "browser-renderer-preview"
+                },
+                {
+                    "binding": "SERVICE_DOCUMENT_PARSER",
+                    "service": "document-parser-preview"
+                },
+                {
+                    "binding": "SERVICE_LLM_GATEWAY",
+                    "entrypoint": "InternalApi",
+                    "service": "llm-gateway-preview"
+                },
+                {
+                    "binding": "SERVICE_NSFW_CHECKER",
+                    "service": "nsfw-checker-preview"
+                }
+            ]
+        }
+    },
+
+    "minify": true,
+
+    "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+    },
+    // ONE trigger: Cloudflare allows at most 3 per Worker, so `lunora/crons.ts`
+    // registers a single one-minute tick that runs every periodic job when due
+    // (`lib/cron-schedule.ts`). Must equal the build manifest's `crons`
+    // (`deploy-bindings.test.ts`), which is what alchemy.run.ts deploys.
+    "triggers": {
+        "crons": ["*/1 * * * *"]
+    },
+    "exports": {
+        "AccountDeletionWorkflowWorkflow": {
+            "type": "workflow",
+            "name": "account-deletion-workflow"
+        },
+        "ChatImportWorkflowWorkflow": {
+            "type": "workflow",
+            "name": "chat-import-workflow"
+        },
+        "DataExportWorkflowWorkflow": {
+            "type": "workflow",
+            "name": "data-export-workflow"
+        }
+    },
+    "services": [
+        {
+            "binding": "SERVICE_BROWSER_RENDERER",
+            "service": "browser-renderer"
+        },
+        {
+            "binding": "SERVICE_DOCUMENT_PARSER",
+            "service": "document-parser"
+        },
+        // HAND-WRITTEN, so Lunora leaves it alone (it warns on every reconcile):
+        // the gateway is public, and only its `InternalApi` NAMED entrypoint is
+        // unreachable from the internet. See `lunora.config.ts` for why the
+        // entrypoint is not declared there.
+        {
+            "binding": "SERVICE_LLM_GATEWAY",
+            "entrypoint": "InternalApi",
+            "service": "llm-gateway"
+        },
+        {
+            "binding": "SERVICE_NSFW_CHECKER",
+            "service": "nsfw-checker"
+        }
+    ]
+}

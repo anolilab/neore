@@ -1,0 +1,15 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "composite": true,
+    "compilerOptions": {
+        "composite": true,
+        "jsx": "react-jsx",
+        "moduleResolution": "bundler",
+        "paths": {
+            "@ui/*": ["./src/*"]
+        },
+        "types": ["vite/client"]
+    },
+    "include": ["**/*.ts", "**/*.tsx", "eslint.config.js", "prettier.config.js"],
+    "exclude": ["dist", "**/*.md", "**/*.json"]
+}

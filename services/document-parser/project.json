@@ -1,0 +1,42 @@
+{
+    "name": "document-parser",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "services/document-parser/src",
+    "projectType": "service",
+    "tags": ["chat", "document-parser", "type:service"],
+    "implicitDependencies": [],
+    "targets": {
+        "build:worker": {
+            "//": "The Rust Worker (worker-build --release + a name-section strip). Needs the Rust toolchain: see docs/plans/document-parser.md. Cached on the Rust sources, so `test` only rebuilds after a change.",
+            "command": "node scripts/build.mjs",
+            "inputs": [
+                "{projectRoot}/src/**/*.rs",
+                "{projectRoot}/Cargo.toml",
+                "{projectRoot}/Cargo.lock",
+                "{projectRoot}/.cargo/config.toml",
+                "{projectRoot}/scripts/build.mjs"
+            ],
+            "outputs": ["{projectRoot}/build/**"],
+            "cache": true
+        },
+        "test": {
+            "//": "`cargo test` on the host, then the workerd suite against the BUILT module — hence `build:worker` first.",
+            "dependsOn": ["build:worker"]
+        },
+        "dev": {
+            "//": "Standalone only. In the stack this Worker runs INSIDE the backend's `lunora dev` session as a service binding (`backend/lunora.config.ts`) and has no port of its own — `pnpm dev` does not start this target. 8792, not 8788: 8788 belongs to the Lunora backend (`PUBLIC_ORIGIN`). Keep this in sync with `package.json`'s `--port`.",
+            "command": "pnpm dev",
+            "preset": "server",
+            "options": {
+                "service": {
+                    "port": 8792,
+                    "readiness": {
+                        "tcp": {
+                            "port": 8792
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

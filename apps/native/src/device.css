@@ -1,0 +1,194 @@
+:root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #191919;
+    --muted: #6b6b6b;
+    --border: #e2e2e2;
+    --accent: #191919;
+    --accent-fg: #ffffff;
+    --warn-bg: #fff4e5;
+    --warn-fg: #7a4100;
+    --error: #b42318;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #191919;
+        --fg: #f2f2f2;
+        --muted: #a0a0a0;
+        --border: #333333;
+        --accent: #f2f2f2;
+        --accent-fg: #191919;
+        --warn-bg: #3a2600;
+        --warn-fg: #ffd08a;
+        --error: #ff8a80;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+main {
+    padding: 16px 20px 24px;
+}
+
+h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+}
+
+h2 {
+    font-size: 14px;
+    margin: 20px 0 4px;
+}
+
+.muted {
+    color: var(--muted);
+    margin: 0 0 8px;
+}
+
+pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 260px;
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12.5px;
+}
+
+.warning {
+    background: var(--warn-bg);
+    color: var(--warn-fg);
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin: 8px 0;
+}
+
+.check {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.error {
+    color: var(--error);
+    min-height: 1em;
+}
+
+.actions,
+.row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.actions {
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+button,
+input,
+textarea {
+    font: inherit;
+    color: inherit;
+}
+
+button {
+    border: 1px solid var(--border);
+    background: transparent;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+}
+
+button.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+pre:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+input,
+textarea {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+#typed-root {
+    flex: 1;
+    min-width: 160px;
+}
+
+form {
+    display: grid;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+form button {
+    justify-self: start;
+    margin-top: 4px;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 8px;
+}
+
+li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+    word-break: break-all;
+}
+
+.audit li {
+    display: block;
+    font-size: 12px;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}

@@ -1,0 +1,33 @@
+# This is used by the action https://github.com/dorny/paths-filter (which we have forked to https://github.com/getsentry/paths-filter)
+
+frontend_lintable:
+    - "**/*.[tj]{s,sx}"
+    - "**/tsconfig*.json"
+    - "**/package.json"
+    - "pnpm-lock.yaml"
+
+package_json_lintable:
+    - "**/package.json"
+    - "package.json"
+
+markdown_lintable:
+    - "**/*.md"
+    - "**/*.mdx"
+    - "**/package.json"
+    - "pnpm-lock.yaml"
+
+yaml_lintable:
+    - "**/*.yml"
+    - "**/*.yaml"
+    - "pnpm-lock.yaml"
+
+packages: &packages
+    - "**/tsconfig*.json"
+    - "pnpm-lock.yaml"
+    - "package.json"
+    - "backend/**"
+    - "packages/**"
+    - "tools/**"
+
+codecov:
+    - "codecov.yml"

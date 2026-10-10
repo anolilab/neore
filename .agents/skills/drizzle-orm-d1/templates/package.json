@@ -1,0 +1,40 @@
+{
+  "name": "drizzle-d1-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker with Drizzle ORM and D1",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate:local": "wrangler d1 migrations apply my-database --local",
+    "db:migrate:remote": "wrangler d1 migrations apply my-database --remote",
+    "db:create": "wrangler d1 create my-database",
+    "db:list": "wrangler d1 list",
+    "db:info": "wrangler d1 info my-database",
+    "db:delete": "wrangler d1 delete my-database"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.13.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260818.1",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.124.0"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "drizzle",
+    "d1",
+    "orm",
+    "database",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT"
+}

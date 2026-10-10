@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-start-browser-sign-in-command"
+description = "Enables the start_browser_sign_in_command command without any pre-configured scope."
+commands.allow = ["start_browser_sign_in_command"]
+
+[[permission]]
+identifier = "deny-start-browser-sign-in-command"
+description = "Denies the start_browser_sign_in_command command without any pre-configured scope."
+commands.deny = ["start_browser_sign_in_command"]

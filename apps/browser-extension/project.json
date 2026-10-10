@@ -1,0 +1,24 @@
+{
+    "name": "@neore/browser-extension",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "apps/browser-extension/src",
+    "projectType": "application",
+    "tags": ["chat", "browser-extension"],
+    "implicitDependencies": [],
+    "targets": {
+        "dev": {
+            "command": "pnpm dev",
+            "preset": "server",
+            "options": {
+                "service": {
+                    "port": 5174,
+                    "readiness": {
+                        "tcp": {
+                            "port": 5174
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

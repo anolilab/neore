@@ -1,0 +1,134 @@
+---
+title: Spreadsheets
+description: Create, edit, import, and export spreadsheet documents within your AI conversations
+---
+
+# Spreadsheets
+
+Neore Chat can create and edit spreadsheet documents as part of your AI conversations. Ask the AI to generate tables, datasets, or calculations and it will produce an interactive spreadsheet you can view, edit, and download.
+
+:::note
+Spreadsheet documents are created by the AI using the "create document" tool. You can also import your own data from XLSX or XLS files.
+:::
+
+## Quick Start
+
+1. **Ask the AI** to create a spreadsheet (e.g. "Create a spreadsheet comparing the top 10 programming languages")
+2. **Click the card** that appears in the chat to open it in the canvas side panel
+3. **Edit** the data directly in the interactive spreadsheet editor
+4. **Download** as CSV or XLSX when you're done
+
+## Spreadsheet Cards in Chat
+
+When the AI creates or updates a spreadsheet, a card appears inline in the conversation. The card shows:
+
+- A **table icon** and the document title
+- The document kind ("Spreadsheet") and version number
+- A **thumbnail preview** of the first few rows and columns so you can recognise the data at a glance
+
+Click the card to open the full spreadsheet in the canvas side panel. The card highlights when the document is already open.
+
+## Canvas Side Panel
+
+The canvas panel opens on the right side of the screen when you click a spreadsheet card. It has two modes:
+
+### Edit Mode
+
+An interactive spreadsheet editor powered by Univer.js. You can:
+
+- Click any cell to edit its value
+- Add or remove rows and columns
+- Sort and filter data
+- Use find-and-replace to update values in bulk
+- Changes auto-save after a short delay
+
+### Preview Mode
+
+A read-only table view of the spreadsheet data. Useful for reviewing content without accidentally changing anything. Toggle between edit and preview using the **pencil/eye icon** in the panel header.
+
+## Importing XLSX Files
+
+You can replace the contents of a spreadsheet document with data from an Excel file.
+
+1. Open a spreadsheet document in the canvas panel
+2. Click the **upload icon** in the panel header toolbar
+3. Select an `.xlsx` or `.xls` file from your computer
+4. The first sheet of the workbook is imported as CSV data
+
+:::tip
+If the workbook contains multiple sheets, only the first sheet is imported. A notification will let you know how many sheets were skipped.
+:::
+
+**What's preserved:**
+- Cell values (text, numbers, dates)
+- Row and column structure
+
+**What's not preserved:**
+- Formulas (converted to their computed values)
+- Cell formatting, colors, and styles
+- Charts and images
+- Multiple sheets (only sheet 1)
+
+## Downloading Spreadsheets
+
+Click the **download icon** in the canvas panel header to save your spreadsheet. For spreadsheet documents, a dropdown menu offers two formats:
+
+### Download as CSV
+
+Saves the data as a plain-text `.csv` file. Compatible with any spreadsheet application, text editor, or data tool.
+
+### Download as XLSX
+
+Saves the data as an Excel `.xlsx` file. Opens directly in Microsoft Excel, Google Sheets, LibreOffice Calc, and other spreadsheet applications.
+
+:::note
+Both export formats contain the raw cell values only. Cell formatting, formulas, and styles from the editor are not included in the download.
+:::
+
+## Version History
+
+When a spreadsheet has been updated more than once (either by you or by the AI), you can view its version history:
+
+1. Click the **clock icon** in the panel header
+2. Compare previous versions of the spreadsheet
+3. Restore an older version if needed
+
+When the AI updates a spreadsheet you're viewing, a banner appears offering to show you what changed or undo the update.
+
+## Common Use Cases
+
+**Data analysis and comparison**
+Ask the AI to compile data into a structured table, then edit and refine it in the spreadsheet editor. Download the result as XLSX to continue working in Excel.
+
+**Budget and planning templates**
+Have the AI generate a budget template or project timeline, then fill in your own numbers in the editor.
+
+**Importing existing data**
+Import an XLSX file from your computer, then ask the AI to analyze, transform, or extend the data in follow-up messages.
+
+**Quick data formatting**
+Paste raw data into the chat and ask the AI to organize it into a clean spreadsheet. Download the result in your preferred format.
+
+## Troubleshooting
+
+**Issue**: Spreadsheet card doesn't show a thumbnail preview
+- **Solution**: The preview appears once the document content has loaded. If the spreadsheet is empty or still streaming, the preview won't display
+
+**Issue**: Import button is not visible
+- **Solution**: The import button (upload icon) only appears for spreadsheet documents, and only when the document is not currently streaming. Make sure you have a sheet document open in the canvas panel
+
+**Issue**: Formulas from my XLSX file are missing after import
+- **Solution**: Formulas are converted to their computed values during import. The spreadsheet editor stores plain values, not Excel formulas
+
+**Issue**: Only the first sheet was imported from my workbook
+- **Solution**: Multi-sheet import is not currently supported. Export individual sheets from Excel as separate files if you need to import them
+
+**Issue**: Downloaded XLSX doesn't have my formatting
+- **Solution**: Downloads contain raw cell values only. Apply formatting in your desktop spreadsheet application after downloading
+
+## Related Features
+
+- [Chat](/docs/chat) — Where AI creates spreadsheet documents during conversations
+- [Vault](/docs/vault) — Upload and store files separately from conversations
+- [Pins](/docs/pins) — Save important messages and text selections from conversations
+- [Keyboard Shortcuts](/docs/keyboard-shortcuts) — Navigate the app efficiently

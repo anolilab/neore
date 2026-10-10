@@ -1,0 +1,3438 @@
+{
+  "version": 1,
+  "skills": {
+    "access-control-rbac": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/access-control-rbac/skills/access-control-rbac/SKILL.md",
+      "computedHash": "d46a02b1980fd8a2333d8532d51099ed2450e6d287973a87766ebf3c1674267e"
+    },
+    "accessibility": {
+      "source": "addyosmani/web-quality-skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "bffe3d08cfe92ebad63699f74ce29e35c19850ebfbf474c1463183cfe34d6a09"
+    },
+    "accessibility-compliance": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/accessibility-compliance/SKILL.md",
+      "computedHash": "36d3b046163c42251732b3127c042f6b8eb7d91fcbf7ef9ae79fde79e9c99369"
+    },
+    "accessibility-compliance-accessibility-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/accessibility-compliance-accessibility-audit/SKILL.md",
+      "computedHash": "653f1972133a68520cff37d8d52cd516d66a1cfcf48cc7b0bebbf3d83d9bb5bf"
+    },
+    "aceternity-ui": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/aceternity-ui/skills/aceternity-ui/SKILL.md",
+      "computedHash": "ec58b85f3668dbfda1b279c7399f85d2c05f0db4474e4ce4de629a4823f651bf"
+    },
+    "address-github-comments": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/address-github-comments/SKILL.md",
+      "computedHash": "9dd43d6029ed1bea5a36e8d1a133ff3a57f163357b1383c99b1e345ca224524a"
+    },
+    "adr-drafting": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-core/skills/adr-drafting/SKILL.md",
+      "computedHash": "c570fcd257bed65516adf0b658373092ec088b15c2d5513e2200b6b8a4225be5"
+    },
+    "advanced-evaluation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/advanced-evaluation/SKILL.md",
+      "computedHash": "90e62d9695167e3b1109573451fa63b3ac2c46977123ff49cca437c236606ee2"
+    },
+    "agent-evaluation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/agent-evaluation/SKILL.md",
+      "computedHash": "b00885b17fde2bdf6b6a271f86223f9cc0d786ac747152e84754c76fc029c5ef"
+    },
+    "agent-tool-builder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/agent-tool-builder/SKILL.md",
+      "computedHash": "238e9ac45a90d984de5a2a74d2fa01184a7369aa43751add6ccccc4dc5062e40"
+    },
+    "agents-md": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/agents-md/SKILL.md",
+      "computedHash": "92a914bfd0054b2e917710df0ef2e9db62e7f984da1f84f01d78e54dfdce8003"
+    },
+    "agents-sdk": {
+      "source": "cloudflare/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "e610caa247da5e71560ced76fe7a1af2c6752cab2fa23977ada2e9b9c810e868"
+    },
+    "ai-agent-development": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ai-agent-development/SKILL.md",
+      "computedHash": "b1b19e3f430a701d95b1dc604c608c5e290dd12d3d10fbf6500c5fdbd8039c0f"
+    },
+    "ai-agents-architect": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ai-agents-architect/SKILL.md",
+      "computedHash": "9f8cc6d0a2a84aae57b0b406d43a320dccd69a0ec56698df87691d78d8a83cc1"
+    },
+    "ai-elements-chatbot": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/ai-elements-chatbot/skills/ai-elements-chatbot/SKILL.md",
+      "computedHash": "d8c9d3a5efa1375d39437bcf19011c941e916bcb8f50229d1785973123744e8e"
+    },
+    "ai-engineer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ai-engineer/SKILL.md",
+      "computedHash": "4d2fd22bee2b694ebff50e2d5a1944ba57022bf94e3ab1ed85256f59d561d474"
+    },
+    "ai-engineering-toolkit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ai-engineering-toolkit/SKILL.md",
+      "computedHash": "844819a9d83d3001a871e6348c113c2683ba74b4db5f0fbf049b86c2456b7698"
+    },
+    "ai-native-cli": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ai-native-cli/SKILL.md",
+      "computedHash": "c22b1f2d746bc2ee9411a2b95186ebd9f6d11adfb2cd8d7d31423665f397090d"
+    },
+    "ai-sdk": {
+      "source": "vercel/ai",
+      "sourceType": "github",
+      "skillPath": "skills/use-ai-sdk/SKILL.md",
+      "computedHash": "2249889eb47ef0f61c4dba4cf2afe01c1c8dd793bb4c24230347c1ab909bb7dd"
+    },
+    "ai-sdk-core": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/ai-sdk-core/skills/ai-sdk-core/SKILL.md",
+      "computedHash": "2bb1174fccb377a797cc30bcd5844790242f1c5fa20ac6117c79919e5caedeed"
+    },
+    "ai-sdk-ui": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/ai-sdk-ui/skills/ai-sdk-ui/SKILL.md",
+      "computedHash": "2041dc46d1b46707bf44765d6990f2f3648ea23fb79a14f350d745846731d86d"
+    },
+    "analytics-tracking": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/analytics-tracking/SKILL.md",
+      "computedHash": "e5578c4950e06fdd03b602b81f162cc04408b3a15a421884c091eb888a36ad62"
+    },
+    "analyze-project": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/analyze-project/SKILL.md",
+      "computedHash": "4d55e038088b06c76393b42c1d9e3f262a1ef1e5e5d69268bb2e27edd632f65f"
+    },
+    "antfu": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/antfu/SKILL.md",
+      "computedHash": "e6629200b1f033c78150985fb1b1ec2aa848a378c0637f9a850cb33f650bce19"
+    },
+    "api-authentication": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-authentication/skills/api-authentication/SKILL.md",
+      "computedHash": "f133636372c42d3e419bd48b28d3aa252233898767002551b222a35ed3d265e0"
+    },
+    "api-changelog-versioning": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-changelog-versioning/skills/api-changelog-versioning/SKILL.md",
+      "computedHash": "c4ac69b9f9e5475f60b0b47eae3433e3d4f8673b786f848e02afc275e8a9db6b"
+    },
+    "api-contract-testing": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-contract-testing/skills/api-contract-testing/SKILL.md",
+      "computedHash": "a3c99eb074e2424ca64cebfe92084643b240a067e99891363aec88531b060248"
+    },
+    "api-design-principles": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-design-principles/SKILL.md",
+      "computedHash": "853df00266999c9cddf8b6bbd563cf0fe822c1cf8463ef0c584c4af457d87b95"
+    },
+    "api-documentation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-documentation/SKILL.md",
+      "computedHash": "148c3b73f6dd9218c7d835064a4ae7a7443e878f21503d7bd98f2c6eb51b6647"
+    },
+    "api-documentation-generator": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-documentation-generator/SKILL.md",
+      "computedHash": "aedba614a1b82f897a54b77322c26c8707a1c25ed374386b8a57cf3731a68c65"
+    },
+    "api-documenter": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-documenter/SKILL.md",
+      "computedHash": "d9ffc20b01eb2b82da90d3e2e730ec162f0836fef6e33c8a05379e104e48c336"
+    },
+    "api-endpoint-builder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-endpoint-builder/SKILL.md",
+      "computedHash": "55cc8e681118856c748a4e3e9366d72648d7ee66c916128cbc50cac4c6155684"
+    },
+    "api-error-handling": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-error-handling/skills/api-error-handling/SKILL.md",
+      "computedHash": "b5f023f0790510f02a1f89d2ea75fd8ef794f6b2234c63e6265b7c89187fe93e"
+    },
+    "api-filtering-sorting": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-filtering-sorting/skills/api-filtering-sorting/SKILL.md",
+      "computedHash": "19207fcd7c2e26ec7567ffd6aa0b04e953517fb071fc2d3b693efcfa4c68d716"
+    },
+    "api-fuzzing-bug-bounty": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-fuzzing-bug-bounty/SKILL.md",
+      "computedHash": "2a031bbf9e96a0e9519716229e8968111f40d65ad12361e114b4a317ba41b53b"
+    },
+    "api-gateway-configuration": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-gateway-configuration/skills/api-gateway-configuration/SKILL.md",
+      "computedHash": "e78b2d6e38fcea9e4649009acd09819dd0c1ec486c1ce10b614363f214729721"
+    },
+    "api-pagination": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-pagination/skills/api-pagination/SKILL.md",
+      "computedHash": "df5f45aa75db2fc22748d38d9fc0c12a7260329260ce23d130e17cac7aebe4c3"
+    },
+    "api-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-patterns/SKILL.md",
+      "computedHash": "12fc7cef305ded0a373cf34dcf3808dfa5ea5c31d30e638ef6d86be31dc76411"
+    },
+    "api-rate-limiting": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-rate-limiting/skills/api-rate-limiting/SKILL.md",
+      "computedHash": "5614b3778e70c9147ffc173b0f552afe411c9970903f7db907f04f7ffdd8989e"
+    },
+    "api-reference-documentation": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-reference-documentation/skills/api-reference-documentation/SKILL.md",
+      "computedHash": "10599a9702ff6b1ef3e1e056901b0a1bd92be499ce114c2ed338c0277081030f"
+    },
+    "api-response-optimization": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-response-optimization/skills/api-response-optimization/SKILL.md",
+      "computedHash": "ecb57ceaec943401d3b1e1040df5e5e09e8bfd0f92f979e3b3e7206e26a17d67"
+    },
+    "api-security-best-practices": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-security-best-practices/SKILL.md",
+      "computedHash": "5a088c5b84b75ed44955e7a153b4af20b5a70b6430e86d0f0398b824cc9efb20"
+    },
+    "api-security-hardening": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-security-hardening/skills/api-security-hardening/SKILL.md",
+      "computedHash": "ab907fdb7994207d944c5995acf4a647eb7e4280d5724d4f41415421df7e8b9d"
+    },
+    "api-security-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-security-testing/SKILL.md",
+      "computedHash": "f8edc93f930c9bda315e1c7a8802cdcfc8bfa4bbbf099e5f0b30728b08fab25c"
+    },
+    "api-testing": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-testing/skills/api-testing/SKILL.md",
+      "computedHash": "8a3fb3bbdbe93fcd0fd88042e95f9f7837de955c85331113a23631f7d916abed"
+    },
+    "api-testing-observability-api-mock": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/api-testing-observability-api-mock/SKILL.md",
+      "computedHash": "0ccb665b8a3cb2bd8234dce02c63d91a1a011ade09b71b4d73d408f53c74aa88"
+    },
+    "api-versioning-strategy": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/api-versioning-strategy/skills/api-versioning-strategy/SKILL.md",
+      "computedHash": "05091f4f42f0422ee6eafe0f8e3e20cfff1e510a85a117ca431cecb3f5991634"
+    },
+    "application-performance-performance-optimization": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/application-performance-performance-optimization/SKILL.md",
+      "computedHash": "eb3b1c4e2c10045f823284e968fe5d7204dcccd4a272eed46eb63b02d6d3d0d1"
+    },
+    "architect-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/architect-review/SKILL.md",
+      "computedHash": "aadde115bc2d58ce62a31bec8973fefbd90b5d52b3da10a096cffb7f881c74df"
+    },
+    "architecture": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/architecture/SKILL.md",
+      "computedHash": "98b5d7fa700e2cb98cb7a2e55fb3c8dab460b87cc802f23a09c86031668f72d4"
+    },
+    "architecture-decision-records": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/architecture-decision-records/SKILL.md",
+      "computedHash": "8b02a3fbfc6e87bbc9f58fdb9998364d25615f410f86df6154a253aac5fe1901"
+    },
+    "architecture-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/architecture-patterns/SKILL.md",
+      "computedHash": "df4b1173a32fe59a5da5a9cadd9bd23c21a9e944e3d26827d0d98f6b9afd5d11"
+    },
+    "ask-questions-if-underspecified": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ask-questions-if-underspecified/SKILL.md",
+      "computedHash": "e8aa02e916922eea00f45cba7e95d441ed8c8fd1cbda9504d4df193b6629a9d1"
+    },
+    "ast-grep": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/ast-grep/SKILL.md",
+      "computedHash": "d21b4ab166d9d1d31e6c95dbeea697aaf3843d8d8f71a67ab5d32813a3177707"
+    },
+    "attack-tree-construction": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/attack-tree-construction/SKILL.md",
+      "computedHash": "a591b7cce39c02a5aa8dd3ca8be1541197997be385cd44c718240c9560eed9c7"
+    },
+    "audio-transcriber": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/audio-transcriber/SKILL.md",
+      "computedHash": "a573e3e4d4ec63bbccb48c4392891c6235d7aef7d4d5c1f1675828379c3d4dfa"
+    },
+    "audit-context-building": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/audit-context-building/SKILL.md",
+      "computedHash": "8aec35fdec95ba577761a2bc197e810707fa665f63268a524f0166b1ba6d6026"
+    },
+    "audit-skills": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/audit-skills/SKILL.md",
+      "computedHash": "c43fbfa9c240c1499b748319d99f76da3d43d58b5b61f40a01692c45a5d7ab2b"
+    },
+    "auth-implementation-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/auth-implementation-patterns/SKILL.md",
+      "computedHash": "6e6cc8e11f8c77185d448e967b60897fe99ddd162671d0fece4664cedc6582f2"
+    },
+    "auto-animate": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/auto-animate/skills/auto-animate/SKILL.md",
+      "computedHash": "77c9bab282089f66dc0dead3f31fdf2ef85cf529d6402ce7a3ebefbef8f0f27b"
+    },
+    "awt-e2e-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/awt-e2e-testing/SKILL.md",
+      "computedHash": "33e594cf022aae8624f243165fdeeb693dcf1df483b0596cf837f063266488f2"
+    },
+    "backend-architect": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/backend-architect/SKILL.md",
+      "computedHash": "991cd650814b2e4e434720ebe20ae8d00e1b2c8a3ac3193c1a5d477e729b595c"
+    },
+    "backend-dev-guidelines": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/backend-dev-guidelines/SKILL.md",
+      "computedHash": "65fe3c053c8c1e790268293098a505ae02ae6997df82f6e9f74b0736dab0fc76"
+    },
+    "backend-security-coder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/backend-security-coder/SKILL.md",
+      "computedHash": "b62655410aaea528433b7adda9f8fb971a5a7d7a6db3a365474c52061a703ca5"
+    },
+    "base-ui-react": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/base-ui-react/skills/base-ui-react/SKILL.md",
+      "computedHash": "8dab01d9318482306c36e2ae086bd55cec657a736d4eeb5d51697ba2ac18abca"
+    },
+    "baseline-ui": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/baseline-ui/SKILL.md",
+      "computedHash": "421a34b6a9aadfcd26a5dd743da7d04336e975d59d53989fe236f4de54ea1efa"
+    },
+    "bash-defensive-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/bash-defensive-patterns/SKILL.md",
+      "computedHash": "4817e92dcdb7f2e2e988198668c293ebb8aee71db69470c560cadc7291196e20"
+    },
+    "bash-linux": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/bash-linux/SKILL.md",
+      "computedHash": "e078b9da423a49126b6684dc210ae77e4d851b521de390a21b7c8b9f6c926851"
+    },
+    "bash-pro": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/bash-pro/SKILL.md",
+      "computedHash": "a16136d229d501a974f81abc10449053e882c303190ccedb667e791d0b5ddec5"
+    },
+    "bash-scripting": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/bash-scripting/SKILL.md",
+      "computedHash": "1c2080bc5de9996ee17a8f550aa8744ed9207873d4243073e99961b2c1f1685e"
+    },
+    "best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "0d59bc23f61ba03b850aa3b81392044c5c7fa3662a5f61b98490b20b0f14a56a"
+    },
+    "better-auth": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/better-auth/skills/better-auth/SKILL.md",
+      "computedHash": "0a8abea8d7c9296aca0b135226bf4b6d9478741840f623e385e6d2bad6906df5"
+    },
+    "better-auth-best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/best-practices/SKILL.md",
+      "computedHash": "a4c830509e85557b59339d8d93a4e243e9e59c686e7678854d39230e12c2a6dc"
+    },
+    "better-chatbot": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/better-chatbot/skills/better-chatbot/SKILL.md",
+      "computedHash": "4533ac80094774632090c829054955f99f12b21f4685c1291280dae588271160"
+    },
+    "better-chatbot-patterns": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/better-chatbot-patterns/skills/better-chatbot-patterns/SKILL.md",
+      "computedHash": "c541625190bd53217f53dc140dba694ccda0d5e266f136ebedd6fa868b05d2e9"
+    },
+    "brainstorming": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/brainstorming/SKILL.md",
+      "computedHash": "b27a55b85de6ca13c32212a41fe2e566705fdb59f2a74e0848146bfd481cc668"
+    },
+    "broken-authentication": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/broken-authentication/SKILL.md",
+      "computedHash": "de050c61a6c4a9f163b7d028982ddeed72225b2f9ce2cde4566178cbb121197a"
+    },
+    "browser-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/browser-automation/SKILL.md",
+      "computedHash": "8357cb73c83a77f473af7bda0052395d9c429320765198e9db89816c418491a7"
+    },
+    "browser-extension-builder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/browser-extension-builder/SKILL.md",
+      "computedHash": "32722e8533b335a9a262593d060e5dbd716fa0799f8d543928e6e7e27496e024"
+    },
+    "bug-fix-brief": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-core/skills/bug-fix-brief/SKILL.md",
+      "computedHash": "7d4fb51facdc100caef01759188f087acb8ef8d768a39c70ce047441fb33cf14"
+    },
+    "bug-hunter": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/bug-hunter/SKILL.md",
+      "computedHash": "8a426c68b92d44bdfd5483c175f39fe61c7441fbe6abe5d83e7b9b087c584a91"
+    },
+    "bug-review": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/bug-review/SKILL.md",
+      "computedHash": "3aa4833500bc3b503ff82bd005685ce57e707149b2d06d51c9e555fe2d9082ec"
+    },
+    "build": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/build/SKILL.md",
+      "computedHash": "78f35482456ba0cd57b2d77976447969245269b5a6188116d20759a668163856"
+    },
+    "build-mcp-server": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/build-mcp-server/SKILL.md",
+      "computedHash": "f8dc0cee7e49f68081b2b4bf4cb42769d5d3241cdd631f88b4f8f0df90aad27b"
+    },
+    "cc-skill-backend-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/cc-skill-backend-patterns/SKILL.md",
+      "computedHash": "88dacdcb6d42bb993bc0f02a95a6c9aaee9bf211b02d96c0425b708277e01c44"
+    },
+    "cc-skill-coding-standards": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/cc-skill-coding-standards/SKILL.md",
+      "computedHash": "f18e789f1b259ceb0f5c98ac6a8d3fb431c4a3da02c1ffb8224e363a18d31876"
+    },
+    "cc-skill-frontend-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/cc-skill-frontend-patterns/SKILL.md",
+      "computedHash": "0f08b9a2104498a920bd9509bf0072b3a480af350dc7227c1dd8ba6fd2fb2774"
+    },
+    "cc-skill-security-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/cc-skill-security-review/SKILL.md",
+      "computedHash": "2a5e1c4f0ad10bb041feb5102c6e1629c8a045e741162d1544d64152126f6e06"
+    },
+    "chrome-devtools": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/chrome-devtools/skills/chrome-devtools/SKILL.md",
+      "computedHash": "37dc31495eadaea74b2709fba6eecc05e4e451cc95953ef0df9cd3f342fe42d6"
+    },
+    "chrome-extension": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/chrome-extension/SKILL.md",
+      "computedHash": "3c8d7d52eb777bd0e27c914cc09bf309fc6e3d1e344efbdd202d2af9a82eb6fa"
+    },
+    "chrome-extension-developer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/chrome-extension-developer/SKILL.md",
+      "computedHash": "4684c0c40654ae9a3316a3efb6996ded443ffad7444194456296703443cbd75d"
+    },
+    "chrome-extension-ui": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/chrome-extension-ui/SKILL.md",
+      "computedHash": "e35060b5076efa31d3a0f6004343a6ce9f23be6f702fbd5645382dae0dbec840"
+    },
+    "chunking-strategy": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-ai/skills/chunking-strategy/SKILL.md",
+      "computedHash": "39558dedfa82b30eec7409f2eb816dbf2c02941e1e90a73ed95859cc6cbe95d5"
+    },
+    "claude-agent-sdk": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/claude-agent-sdk/skills/claude-agent-sdk/SKILL.md",
+      "computedHash": "45fa604197cebcbe7de397ecaceb566c107e1b102a8cf34e7eced830c7a1987e"
+    },
+    "claude-api": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/claude-api/SKILL.md",
+      "computedHash": "963f85e801b47801019d9e0b9df2dae845d314c287db286fb9b9b58230893094"
+    },
+    "claude-code-bash-patterns": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/claude-code-bash-patterns/skills/claude-code-bash-patterns/SKILL.md",
+      "computedHash": "582bb832e0516ce0fc1c77cfe378a11a6c33ed67b59672a705ad09def494659c"
+    },
+    "claude-code-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/claude-code-expert/SKILL.md",
+      "computedHash": "8344aa318a25f548d4e0cc268efe6ab244de6868775097e8326c57fa541b90df"
+    },
+    "claude-code-guide": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/claude-code-guide/SKILL.md",
+      "computedHash": "076396dc3f1ad1e8735bb8c583b80be1ebdb5a101eb1134abb5ab6611c49de8f"
+    },
+    "claude-hook-writer": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/claude-hook-writer/skills/claude-hook-writer/SKILL.md",
+      "computedHash": "8b75c75fb80377f6ce16338595b42154c0ef82e9e415301620f02f56cc8af961"
+    },
+    "claude-settings-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/claude-settings-audit/SKILL.md",
+      "computedHash": "663809004d98eb5b708770d951d74c50fccb4d42b91f6ac29eca78c5635a39ff"
+    },
+    "clean-code": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/clean-code/SKILL.md",
+      "computedHash": "74bf6ded4f61ddcb593e7a29beb96c284f888cbe0639ad6e23710447c36ff19a"
+    },
+    "cli-for-agents": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/cli-for-agents/SKILL.md",
+      "computedHash": "691a41874bedd4d6a91f97d23d001e8a31f2eb66a01457849aa1aa5ffb1beb3e"
+    },
+    "cli-review-runner": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/cli-review-runner/SKILL.md",
+      "computedHash": "e512a39ba9a7d84d7b44a028af30c3cab6fed49ef04ea70a3a8b2fdca378b1d3"
+    },
+    "cloudflare": {
+      "source": "cloudflare/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "ed01e97370f2c5060338ebef9189ac5f7652addf325e1ec4b9b30ed9653122c2"
+    },
+    "cloudflare-agents": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-agents/skills/cloudflare-agents/SKILL.md",
+      "computedHash": "689d13edaaf4bfa9e49e429f7663b35130f55c6fa86d2850ef5540d7639330ca"
+    },
+    "cloudflare-browser-rendering": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-browser-rendering/skills/cloudflare-browser-rendering/SKILL.md",
+      "computedHash": "cc8ebc6cff5ae4e30a7e6d441dd5b5c17d6198619092763c545ac5c64a735aa6"
+    },
+    "cloudflare-cron-triggers": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-cron-triggers/skills/cloudflare-cron-triggers/SKILL.md",
+      "computedHash": "b09e3d15b4fd07433d256134fc0ba69435e011344c5593bd0a2a323afef6204f"
+    },
+    "cloudflare-d1": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-d1/skills/cloudflare-d1/SKILL.md",
+      "computedHash": "416a309270887fa71d16fd36efafae3c896cf0b19a18275b4ec6297755719834"
+    },
+    "cloudflare-deploy": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/cloudflare-deploy/SKILL.md",
+      "computedHash": "72e2f6fec78aecc84994c1c23e74fcd7f09328c8ab61ff12d957a956e1784179"
+    },
+    "cloudflare-durable-objects": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-durable-objects/skills/cloudflare-durable-objects/SKILL.md",
+      "computedHash": "79b74f834e13d13a80eccc80c43f826e78a776b6a5034e3c750a4e63fb88a0bd"
+    },
+    "cloudflare-email-routing": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-email-routing/skills/cloudflare-email-routing/SKILL.md",
+      "computedHash": "41f310e0bf115a53f0ef56042a4edc0e5d56dd6987aabfa596fab4447afe64ad"
+    },
+    "cloudflare-hyperdrive": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-hyperdrive/skills/cloudflare-hyperdrive/SKILL.md",
+      "computedHash": "dcd93b06eb72515582d946e05a1f6f706c296a1967725d57994fac9512153d74"
+    },
+    "cloudflare-images": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-images/skills/cloudflare-images/SKILL.md",
+      "computedHash": "07b8f44f66c07bee1fcefbc4bc7a033d5283f4ffdb1b83f12a4d90ea2ff01f3a"
+    },
+    "cloudflare-kv": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-kv/skills/cloudflare-kv/SKILL.md",
+      "computedHash": "12315ba5ce852724866d8d4a3f71bc2b3fc5c7e87c066e4af07d2fcefe121f0f"
+    },
+    "cloudflare-manager": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-manager/skills/cloudflare-manager/SKILL.md",
+      "computedHash": "b8f09b973d13fc77e0cde71f88700b2f078d9375d388029631f9ea941cdba4a4"
+    },
+    "cloudflare-mcp-server": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-mcp-server/skills/cloudflare-mcp-server/SKILL.md",
+      "computedHash": "33d6fdff0a747194ceb9e65be5a4f0ad5272f862d6925b83380289632e15479a"
+    },
+    "cloudflare-queues": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-queues/skills/cloudflare-queues/SKILL.md",
+      "computedHash": "5b5f34d9efbd1ac319c289f875e9680cbabfc1db4f15ae49678fb84ae83877ba"
+    },
+    "cloudflare-r2": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-r2/skills/cloudflare-r2/SKILL.md",
+      "computedHash": "67e17a3ca36e4771b8ea7ac9f42a6e63f8b54c3344747e92604aee4785be5a41"
+    },
+    "cloudflare-sandbox": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-sandbox/skills/cloudflare-sandbox/SKILL.md",
+      "computedHash": "36e619c4c9e13736c30e564ac311653a45a21ea2558bcb1642686ec503adcb27"
+    },
+    "cloudflare-turnstile": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-turnstile/skills/cloudflare-turnstile/SKILL.md",
+      "computedHash": "ae90f009ba7e37f3b51fa49d8eb6d1e84e289e8b84a91e6c996e132ef32838c0"
+    },
+    "cloudflare-vectorize": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-vectorize/skills/cloudflare-vectorize/SKILL.md",
+      "computedHash": "567c4a11d42ba9ff3d1c0e09ee781be63bd8f7db60a009e73cf31ae76ac94388"
+    },
+    "cloudflare-workers-ai": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers-ai/skills/cloudflare-workers-ai/SKILL.md",
+      "computedHash": "04aa84fef135208ec05e31954c5099f108417baf68ecb23644472063bd9bc467"
+    },
+    "cloudflare-workers-ci-cd": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-ci-cd/SKILL.md",
+      "computedHash": "aeed85a17cf68720482198b7b7e7ed80fa487b94db5b550e53c80f9296643e42"
+    },
+    "cloudflare-workers-dev-experience": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-dev-experience/SKILL.md",
+      "computedHash": "b756bf400016f791cdea806c97ac2790e1bfc8166f733f9236dfe228958ef413"
+    },
+    "cloudflare-workers-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/cloudflare-workers-expert/SKILL.md",
+      "computedHash": "a5e8e3d8571debb953789eb4f40c71e3cef16a9f5d5e9f3749e42db189d15f4a"
+    },
+    "cloudflare-workers-frameworks": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-frameworks/SKILL.md",
+      "computedHash": "171d4eb581d7a32c8bfdec3a3419e694b2fd23a119d91c3fdca00ca49f538637"
+    },
+    "cloudflare-workers-migration": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-migration/SKILL.md",
+      "computedHash": "02f870cf3ccce70c7230d57567ae6ddcc3777386678f984dcadbaeb4ea385f07"
+    },
+    "cloudflare-workers-multi-lang": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-multi-lang/SKILL.md",
+      "computedHash": "d77a02034d23eef3bd9950e8a652443ead7700264c6496857ece3dbbb7d3f390"
+    },
+    "cloudflare-workers-observability": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-observability/SKILL.md",
+      "computedHash": "dbd6e372c089d51bb144512c7342e5fc242201a98235ec6df406ca8200dd3648"
+    },
+    "cloudflare-workers-performance": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-performance/SKILL.md",
+      "computedHash": "0f198ba17db37163a8214b16ebf3d4dc62f2e9104e2bc7b66afeda4e1808f434"
+    },
+    "cloudflare-workers-runtime-apis": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-runtime-apis/SKILL.md",
+      "computedHash": "a4db0d2c4a461b03c9d66741ad2bb1bea745958a32cc4a6e977a90f61dc67827"
+    },
+    "cloudflare-workers-security": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-security/SKILL.md",
+      "computedHash": "80b37347948d3c4268ddf77eba62d841dfa5afbf3ce4cc2ef66310e9064da02a"
+    },
+    "cloudflare-workers-testing": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workers/skills/cloudflare-workers-testing/SKILL.md",
+      "computedHash": "a0d76d970d04e96fc8a5520c4a87a2f491b534ab780b5263688a11728684b1d2"
+    },
+    "cloudflare-workflows": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-workflows/skills/cloudflare-workflows/SKILL.md",
+      "computedHash": "806ab3ed8c2df9140ecc431503a801556ab737b0a2fd70a23b53a8943f9180d6"
+    },
+    "cloudflare-zero-trust-access": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-zero-trust-access/skills/cloudflare-zero-trust-access/SKILL.md",
+      "computedHash": "0c4f2b75449ccfb57c05fc99fa0dac45b6c5a8b11af63cd5c8e3d2e29f8dd3c5"
+    },
+    "code-documentation-code-explain": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-documentation-code-explain/SKILL.md",
+      "computedHash": "e0b73f19105624c791bd57c7285a22d12748e28d63bfa708e92c198cde1080ed"
+    },
+    "code-documentation-doc-generate": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-documentation-doc-generate/SKILL.md",
+      "computedHash": "628131d7c18bde97e7fc3c049a9e98432ed33b166354fd76764c6a761793b50e"
+    },
+    "code-refactoring-refactor-clean": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-refactoring-refactor-clean/SKILL.md",
+      "computedHash": "b5fcfe8cf5c9f2aa155c23e38db89dcc34cfd5bc78f2e2fde821b43c2f8326cc"
+    },
+    "code-refactoring-tech-debt": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-refactoring-tech-debt/SKILL.md",
+      "computedHash": "710983402c8d1380cf6fbd522aa9dacd6f2ee900c487d5c3e40b5b4d2fb50e68"
+    },
+    "code-review": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/code-review/skills/code-review/SKILL.md",
+      "computedHash": "4bfb42c56a24792101f3e8271e657bbb59651d9fd23178c914925245aef736e1"
+    },
+    "code-review-ai-ai-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review-ai-ai-review/SKILL.md",
+      "computedHash": "3f26be5ee75c688e47ce867523f61918befd821a6f651212d5bc49782bbc0fa3"
+    },
+    "code-review-checklist": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review-checklist/SKILL.md",
+      "computedHash": "9bd8c2a4865d5bf86196192b73fe9658cdf38c90c4590545f2c7636b65a34b22"
+    },
+    "code-review-excellence": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review-excellence/SKILL.md",
+      "computedHash": "c4d662900a8d2f85e8aae735baf5e9ee15ff127b1568d9567e59d5fd8bc7899f"
+    },
+    "code-reviewer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-reviewer/SKILL.md",
+      "computedHash": "b33d78bb544b6c163c32b9c02c80b143b753f3a91b9d8fdcfe8e4f9ec93ab34b"
+    },
+    "code-simplifier": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-simplifier/SKILL.md",
+      "computedHash": "a9c801c78849f11e0a2c3651a481b02128b915265bc0d5e380fc197520d85868"
+    },
+    "codebase-cleanup-deps-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/codebase-cleanup-deps-audit/SKILL.md",
+      "computedHash": "6e99b232b1ac337d5f5ba8c545c32600d33b1e290af0089c2d96a8690031a48c"
+    },
+    "codebase-cleanup-refactor-clean": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/codebase-cleanup-refactor-clean/SKILL.md",
+      "computedHash": "b474e6e47f76ca5fe6537bba30e9a062e6317caf41c239030d766c0e48d33763"
+    },
+    "codebase-cleanup-tech-debt": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/codebase-cleanup-tech-debt/SKILL.md",
+      "computedHash": "35afd556a583b5d1307bf332e200a3f5d05698b2c081f72f5ca026769244dcea"
+    },
+    "codemod": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/codemod/SKILL.md",
+      "computedHash": "82b37bc02800038016e288d1fc4d1220ab410722149723a5ad6847b77e2e9fdf"
+    },
+    "commit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/commit/SKILL.md",
+      "computedHash": "3bcf0ec3de92c660eaa10d6882ab0a2bcd25f565492556dcbf92946c09f20f5a"
+    },
+    "composition-patterns": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "c124390cc3441844903ada94cb5820b23d922f2d0ad34e01e029e410197c8a32"
+    },
+    "comprehensive-review-full-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/comprehensive-review-full-review/SKILL.md",
+      "computedHash": "9e843243635d761c8e8a5b55ea63d96dedc8b28304a837d81f15a54738aff286"
+    },
+    "comprehensive-review-pr-enhance": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/comprehensive-review-pr-enhance/SKILL.md",
+      "computedHash": "4fb55ce6290339dc37eb1bccf0badbc93379e6a9df9195051797b4b893949394"
+    },
+    "constitution": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-specs/skills/constitution/SKILL.md",
+      "computedHash": "6e357fd1a3e1282692ef210f3318ef9449a7276ba6f458dd1cd0490924b57acb"
+    },
+    "create-auth-skill": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/create-auth/SKILL.md",
+      "computedHash": "31c027d02dbf1faa37f58191f574b9443143042fb2b684fe32df53ab0270487c"
+    },
+    "create-branch": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/create-branch/SKILL.md",
+      "computedHash": "bdfc831a74a747e05ec784df541ae60ae99b71e3b014a607d7b7c5954571376a"
+    },
+    "create-issue-gate": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/create-issue-gate/SKILL.md",
+      "computedHash": "61cc32262af9336ecdb230a860cb87b77df8de0b09f8577594c2b051cc584b76"
+    },
+    "create-pr": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/create-pr/SKILL.md",
+      "computedHash": "97158fc03d4c8859703ed3fa9827b0692af3790f35cbfef6a0832b027c2baa57"
+    },
+    "create-pr-from-spec": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-specs/skills/create-pr-from-spec/SKILL.md",
+      "computedHash": "7c71c165038c7e8f1ef3b66937bdb68e560e30f25faf8173451d64b23bc888d3"
+    },
+    "cred-omega": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/cred-omega/SKILL.md",
+      "computedHash": "cdac35365fac0ce402a61fd186671893b5509caf5f76607113db7987875f9e4c"
+    },
+    "csrf-protection": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/csrf-protection/skills/csrf-protection/SKILL.md",
+      "computedHash": "ebbf4556748a890319f344c05cb1696ba2c6c37a96e9c44621c12e47134e4f26"
+    },
+    "database": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/database/SKILL.md",
+      "computedHash": "c426e20f40448ddaccf86fcade3bf0ef4a08baf23837a21f055468006174881d"
+    },
+    "database-design": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/database-design/SKILL.md",
+      "computedHash": "9a4a5f3bd05183eb75e860261763fc75c0fc38d9b5ac0fa1a64e2cf6cceed2fc"
+    },
+    "database-migration": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/database-migration/SKILL.md",
+      "computedHash": "14d01c56d60a6a04376435453d8e5c785c80bcdfd13c09b9e4e36a48d0b9c327"
+    },
+    "database-schema-design": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/database-schema-design/skills/database-schema-design/SKILL.md",
+      "computedHash": "cde4095c738da42838d044773203e5dc9a5cfec7d4dffe7a8f8b4740e250d13c"
+    },
+    "debug": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/debug/SKILL.md",
+      "computedHash": "f59c8403a6fc2f547e2cdd57b2cf9c58d5e37f1d5dd7cdf7bf67e1784a8215db"
+    },
+    "debug-buttercup": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/debug-buttercup/SKILL.md",
+      "computedHash": "84838e07510382016dedc0a6a96be731c0e307e4244be16c9c785a03a33a73c6"
+    },
+    "debugger": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/debugger/SKILL.md",
+      "computedHash": "f5cf98c81f9b4a7c461a2349b80b38226a3a2d47754b57a6260a7695f57173a2"
+    },
+    "debugging-strategies": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/debugging-strategies/SKILL.md",
+      "computedHash": "29e4434ca4430b1f79fa1517eefb6d7cbd624fb8192bc3550a559848df5bc1b7"
+    },
+    "debugging-toolkit-smart-debug": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/debugging-toolkit-smart-debug/SKILL.md",
+      "computedHash": "81d0328b6c7440a1a5cff9765d9225a3956c8e63bd286fe387623b4f2e815433"
+    },
+    "deep-research": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/deep-research/SKILL.md",
+      "computedHash": "0ff6fa9901a11aca566911bbe261e2583a179131199e35041e18d0beec128517"
+    },
+    "defense-in-depth-validation": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/defense-in-depth-validation/skills/defense-in-depth-validation/SKILL.md",
+      "computedHash": "b914aba4c07d3a4d65f93e233db45057ea3d4eb581f1232e3233e9f91611a2d1"
+    },
+    "defuddle": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/defuddle/SKILL.md",
+      "computedHash": "5c0f160bc1d56d48f070ab5996a878447511dd11949178085dfb4e33dd325af0"
+    },
+    "dependency-management-deps-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/dependency-management-deps-audit/SKILL.md",
+      "computedHash": "170a2c46690024ec389ab18e4228c962ab502496fe97865d88bac26164f59dff"
+    },
+    "dependency-upgrade": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/dependency-upgrade/SKILL.md",
+      "computedHash": "a624a22d38169e07cb2926753f724c106cffadfa409b5e756dec4bd6e6b0e76e"
+    },
+    "deployment-validation-config-validate": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/deployment-validation-config-validate/SKILL.md",
+      "computedHash": "b1d09c35d53ffa40834aa87fb2d48becac685c902a42417995943995cf669bb1"
+    },
+    "design-md": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/design-md/SKILL.md",
+      "computedHash": "ec2f1a0fe94d3c921dd9fd7e8f45d881cb37ebc6ac2783583bdfa4a6479ef2c9"
+    },
+    "design-orchestration": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/design-orchestration/SKILL.md",
+      "computedHash": "cdeba19c9f6d0d2f096dce61a4e3d9e2918fbe153131f330f00a72b7705bdda7"
+    },
+    "design-review": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/design-review/skills/design-review/SKILL.md",
+      "computedHash": "dfc0aaf9cd4572902d40825854eb66d01c91f94936953afd56277d208b650fd0"
+    },
+    "design-system-creation": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/design-system-creation/skills/design-system-creation/SKILL.md",
+      "computedHash": "5c58dbfa53a93d30a3888703e929bc463cc679aea9304da66c099a89d644a0d3"
+    },
+    "design-system-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/design-system-patterns/SKILL.md",
+      "computedHash": "5f8c9b187e77fcb31db78da2f7b55f905dcd2357454624cac93f00c766ace346"
+    },
+    "design-taste-frontend": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/design-taste-frontend/SKILL.md",
+      "computedHash": "e4ef0064c0986135fc0f5a6452db8cf262c67d0da80f1e489378fad3752f0785"
+    },
+    "dev-rfc": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/dev-rfc/SKILL.md",
+      "computedHash": "2b65b7a6a26eab919d36f0cb06b156a0a06d4836fbeb38f8d66ee26a64a59541"
+    },
+    "development": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/development/SKILL.md",
+      "computedHash": "260bb59bdded04bdbef316a75dcd82dbc740e4e976af796c9eb67989bd3260ef"
+    },
+    "diagram-quality": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/diagram-quality/SKILL.md",
+      "computedHash": "643ae112635ef7635fbaa0298edc5f04efa5a15130e8a69cb657ee71e628dc32"
+    },
+    "differential-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/differential-review/SKILL.md",
+      "computedHash": "15aa5f2a38195a07ebeb3e496f4fb288754b6e57292ae210fe019803650782cf"
+    },
+    "discord-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/discord-automation/SKILL.md",
+      "computedHash": "aa89ea099b395ac0708ca591a89b9ae8616d4d09264f57224b5bbeee39075755"
+    },
+    "discord-bot-architect": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/discord-bot-architect/SKILL.md",
+      "computedHash": "11e722b57ad28bc1919069ef3e82e627033373631e5647100356bc9181a51f68"
+    },
+    "dispatching-parallel-agents": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/dispatching-parallel-agents/SKILL.md",
+      "computedHash": "636761c544a1493452ea354c6188fe100b1bc700fe5e834ccbf3ea980554c4c6"
+    },
+    "doc-coauthoring": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/doc-coauthoring/SKILL.md",
+      "computedHash": "b74119d4de2f5c9182d55d52a0e3e3ae01967dce2750e8659d86d4d5f7e2ce91"
+    },
+    "docs-architect": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/docs-architect/SKILL.md",
+      "computedHash": "2fa52d3d1ad5740fae8d98f4ebc15bcf8d52c311837390692cc75f23e91264e2"
+    },
+    "docs-updater": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-core/skills/docs-updater/SKILL.md",
+      "computedHash": "980123e630f0376f297059f754c8f079c972593384aba4870b37133a7d3fdaf5"
+    },
+    "documentation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/documentation/SKILL.md",
+      "computedHash": "1aecbc6119310005ec0781d5c7b842898d448edf3e9817eba39561fcae91adf0"
+    },
+    "documentation-generation-doc-generate": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/documentation-generation-doc-generate/SKILL.md",
+      "computedHash": "906b5f19dbddedb33b25cbbef080032d987da8f7b19c94be1a56b5a4e40db297"
+    },
+    "documentation-templates": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/documentation-templates/SKILL.md",
+      "computedHash": "d587f306cdf65365e78ce9e4a6170c7c80a58ee5266d994b5c7f3558235ff1d5"
+    },
+    "docx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/docx/SKILL.md",
+      "computedHash": "6962db07127ee540a56e4677f65576d0727668a1d67f7da8bc978f10791c2bfe"
+    },
+    "docx-official": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/docx-official/SKILL.md",
+      "computedHash": "5ecbda8b60d439a7362f66e3b4845c24646925b8092515c17cb8fd54129202d5"
+    },
+    "drizzle-orm-d1": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/drizzle-orm-d1/skills/drizzle-orm-d1/SKILL.md",
+      "computedHash": "b7f1a29667539e40085a349a502fb80ab55706e8be6aa0d1b23bdddcf2fff466"
+    },
+    "dx-optimizer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/dx-optimizer/SKILL.md",
+      "computedHash": "52a9fa72f69d27c800b0ba6226d1a1d2ec8e5aa421dde63fcaee9f2b2444fc99"
+    },
+    "e2e-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/e2e-testing/SKILL.md",
+      "computedHash": "8d3ba489e1e6e74b5b05b19c5fa2e28e0e2998a206b6eb2256866fc2fd4a6b1c"
+    },
+    "e2e-testing-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/e2e-testing-patterns/SKILL.md",
+      "computedHash": "f63849dd5d6d901e541a2d4fbbcb0d367877a86802b21c20b345272fd2c727d9"
+    },
+    "earllm-build": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/earllm-build/SKILL.md",
+      "computedHash": "7ec423a2c0491d024b1af70225427554dcb2d6fda5d71cc88c4082f5158fb278"
+    },
+    "email-and-password-best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/emailAndPassword/SKILL.md",
+      "computedHash": "747d7f73bd9e2ec5317b8ef88dc70f97df716d00e3d02de4051feebaa48b062d"
+    },
+    "email-systems": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/email-systems/SKILL.md",
+      "computedHash": "56c3b0e7472238be0e1d7f5d81fdf89b2b23d4abd355f9fa2d8d4d6c32ad3731"
+    },
+    "emailAndPassword": {
+      "source": "better-auth/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "1cbc9527756aa933c0f2f5ad7f18fe493f78ef0f4b6f073b624fbf6ccbd463c9"
+    },
+    "embedding-strategies": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/embedding-strategies/SKILL.md",
+      "computedHash": "5c70806ab1093b13f690bbd2f15ce123344048cd0d36b393c8d7e173b8ac4e6d"
+    },
+    "environment-setup-guide": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/environment-setup-guide/SKILL.md",
+      "computedHash": "0a4999114be73335244fabf4b36c447d1a83146d77ee0fdeb888ffa9f4f0a566"
+    },
+    "error-debugging-error-analysis": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/error-debugging-error-analysis/SKILL.md",
+      "computedHash": "a93db2a4607329067d0dff98a7f1274795a0d3034c07561350c4bda7cd0bb706"
+    },
+    "error-debugging-error-trace": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/error-debugging-error-trace/SKILL.md",
+      "computedHash": "24d9ccbf0ddbbc1e2a78684253a70f6ac2c0f0ff3feb55dae905528b39315b49"
+    },
+    "error-debugging-multi-agent-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/error-debugging-multi-agent-review/SKILL.md",
+      "computedHash": "c02871443f9be706fe74296d5f86edaeca0ab28d4b3009a36a7f96d58ddd3b39"
+    },
+    "error-detective": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/error-detective/SKILL.md",
+      "computedHash": "a3f6c3c7b5fe7835c44c6338f4391b834d58a21af2445be8390f6683fb4be6d7"
+    },
+    "error-diagnostics-error-analysis": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/error-diagnostics-error-analysis/SKILL.md",
+      "computedHash": "b0637fc11461573de2e6731729f0b310e5a70606bcd7eba4683171a05e92fd87"
+    },
+    "error-diagnostics-error-trace": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/error-diagnostics-error-trace/SKILL.md",
+      "computedHash": "34bdd771edf10ceb7e675e5270b3171edea93e0d8b0ee984c4c0c8cc9549a17d"
+    },
+    "error-diagnostics-smart-debug": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/error-diagnostics-smart-debug/SKILL.md",
+      "computedHash": "d1b9aa63cbeee3baae09cd3a34ad6646e0c6080b56dd59dc783332dd7013b370"
+    },
+    "error-handling-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/error-handling-patterns/SKILL.md",
+      "computedHash": "be627aa8dd0f547d03ed908b09acc51eb44d851144e62bbf0596c570f8b14c61"
+    },
+    "evaluation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/evaluation/SKILL.md",
+      "computedHash": "ed7b39af8f6346799775ed3e2d05ad1419fad2da21d4eb6050bd9b657054fc66"
+    },
+    "evaluation-methodology": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/plugin-eval/skills/evaluation-methodology/SKILL.md",
+      "computedHash": "7dcf134d3f3c3228bf736aee0bae4260cf180a0cc883a0c16f003d939dc043aa"
+    },
+    "executing-plans": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/executing-plans/SKILL.md",
+      "computedHash": "4c72cee7d3754e6fa8aedf406bdfd62f948549d7c43a81667234f3635f0c86d5"
+    },
+    "fal-audio": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fal-audio/SKILL.md",
+      "computedHash": "01afa87ed6713223c951bd02ddad4d99ac47234bc8f4e60a0d6b745ebe309362"
+    },
+    "fal-generate": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fal-generate/SKILL.md",
+      "computedHash": "8d5392a26544a90b8499ac270d7c80ca488159ba22236bd49360f37bd0c3b4d4"
+    },
+    "fal-image-edit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fal-image-edit/SKILL.md",
+      "computedHash": "635c26fa3554db7d735c7990e62b4ee8b8c5560ad39684535183302982d7ca02"
+    },
+    "fal-platform": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fal-platform/SKILL.md",
+      "computedHash": "9a7190dcd448664203fa51b17ad25c930dd92b01c7644a457b5dd5077f58dc4c"
+    },
+    "fal-upscale": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fal-upscale/SKILL.md",
+      "computedHash": "b67327b1f8b6940acbb4694e513ae29524c10a95ff43484e40460d98496fcaee"
+    },
+    "fal-workflow": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fal-workflow/SKILL.md",
+      "computedHash": "7ba1b06e45d451e980ca65a70696893c698dab7ab00536a27e42eb6a101263f0"
+    },
+    "favicon": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/favicon/SKILL.md",
+      "computedHash": "faffbaa6f6e8b2b7c0fbfce482553ce60f1da9ea9ae503a6a6118fc19e065740"
+    },
+    "figma": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/figma/SKILL.md",
+      "computedHash": "be357ea39dc912911c0da826a1638513e3544d7315dc5a206a0d7aec1bae9ed7"
+    },
+    "figma-generate-design": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/figma-generate-design/SKILL.md",
+      "computedHash": "049787f3bc0d4c0b1fac5852f1f14145556b8b12251af0f72e571db469e0bd9b"
+    },
+    "figma-implement-design": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/figma-implement-design/SKILL.md",
+      "computedHash": "78b017706f6e3732a1f9e87968cdc8ce7f31b0a59741f7d0f7cf9a531fe47e7a"
+    },
+    "file-path-traversal": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/file-path-traversal/SKILL.md",
+      "computedHash": "a88983afee84696ec18821f0dab6fc379eeccba5edbfbe8e593c967f63998b58"
+    },
+    "file-uploads": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/file-uploads/SKILL.md",
+      "computedHash": "a11c5eb9db772c532bdea215b9eb8f2583e1fda0f5506e52a139717f9446ab3a"
+    },
+    "find-bugs": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-bugs/SKILL.md",
+      "computedHash": "5c5ce3d0961af2121af2f4575dcde9da3b9a0ff07d2cc87d744c35fba6bc5914"
+    },
+    "finishing-a-development-branch": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/finishing-a-development-branch/SKILL.md",
+      "computedHash": "24928223df3e6564168a78cc9aea49f8f2bb8db2bf5faf39d621a6e3cb1b83f5"
+    },
+    "fix-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fix-review/SKILL.md",
+      "computedHash": "5bc42c2a03e4c8e5c236a12a28ef190d0f109c5c189886903cd5420c2a0ebd5f"
+    },
+    "fixing-accessibility": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fixing-accessibility/SKILL.md",
+      "computedHash": "23635e26ff3ef6a0cb2c0792b8c2bbaefcaa735c40f02914d465caf6cdbbcd2f"
+    },
+    "fixing-metadata": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fixing-metadata/SKILL.md",
+      "computedHash": "f9bd44775359fb60e6525bffb832b3aac4ddd9065c931685bc3aeaf5f75afe0e"
+    },
+    "fixing-motion-performance": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fixing-motion-performance/SKILL.md",
+      "computedHash": "9e46bdd3a4ad4844d2144c1c748dcd22c5e9d476a974b95e373db8b4e30c8ad2"
+    },
+    "framer-motion": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/framer-motion/SKILL.md",
+      "computedHash": "9c621d2245bfd3797004c765096253ed16f5de382d800090ce83bef7ceb9fc61"
+    },
+    "frontend-api-integration-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-api-integration-patterns/SKILL.md",
+      "computedHash": "3f72bdf6d2bbe2ed4bdf42ad825253c0943281700459ececd74814746eedbec0"
+    },
+    "frontend-design": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "bb3f72187c172a39c64e74bee56d08df99029e5d45c16828b433eb0a2b28b663"
+    },
+    "frontend-dev-guidelines": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-dev-guidelines/SKILL.md",
+      "computedHash": "b1f1183bb089490302eca16b1495988b19bb2d6418b6dabc585f64976c61704f"
+    },
+    "frontend-developer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-developer/SKILL.md",
+      "computedHash": "11b1be7121aa1a5395a9838b34532d88025acb2853c306fd18de25065547699a"
+    },
+    "frontend-security-coder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-security-coder/SKILL.md",
+      "computedHash": "6f7d6a582812d55da9a12d5fff7523501d1ec500c8fde77f6f7b04ce86d1c569"
+    },
+    "frontend-ui-dark-ts": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-ui-dark-ts/SKILL.md",
+      "computedHash": "9a89e24dfbd8669df0d3867aecf3b77c7de95f0e60b4d5e2cc0b00694832df1a"
+    },
+    "full-output-enforcement": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/full-output-enforcement/SKILL.md",
+      "computedHash": "302635481cfc1588bca36a09b95c43593df5f05c98aaa411ca88114a06c60788"
+    },
+    "full-stack-orchestration-full-stack-feature": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/full-stack-orchestration-full-stack-feature/SKILL.md",
+      "computedHash": "c4800484b0e8a8bfa855361dfd02587d08ef897bdadcbbb7fe27376b4f68b4fe"
+    },
+    "gdpr-data-handling": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/gdpr-data-handling/SKILL.md",
+      "computedHash": "1bb0f7c432411709596053985a29bc76593384ecf98012e7144e3831d5940bee"
+    },
+    "gemini": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-tools/skills/gemini/SKILL.md",
+      "computedHash": "805f864c284b6e92e961e8c507e5645b94e8cfc280d0e5b3f9b07bd673eeff50"
+    },
+    "gemini-api-dev": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/gemini-api-dev/SKILL.md",
+      "computedHash": "94a81096e56441190876debc84cd3516ea064b1acb2c7c2994c0fd3c674bfcab"
+    },
+    "gh-address-comments": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/gh-address-comments/SKILL.md",
+      "computedHash": "0a480d4fe8deb31852cd47ec8708e66b66b94875a23ba7679b17cf11ae9255a0"
+    },
+    "gh-fix-ci": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/gh-fix-ci/SKILL.md",
+      "computedHash": "1b1ce4eeeae2bfc175d05f1b69e07b17dfa1fddf99a96c22b6dcae7e5fb4e550"
+    },
+    "gh-review-requests": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/gh-review-requests/SKILL.md",
+      "computedHash": "3a0f4c4ebd5d6db7517cd525f741c3822190bc8502f1d4add5e02f37d0de375a"
+    },
+    "gha-security-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/gha-security-review/SKILL.md",
+      "computedHash": "00e9e85fb4f759ed067227320077a2ea1f4767f3594786841d13e77eb7d66b28"
+    },
+    "git-advanced-workflows": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-advanced-workflows/SKILL.md",
+      "computedHash": "68d2284bc4f510e3a5eaff0ceb111228d984243b065ca33127e2cd50a86788c4"
+    },
+    "git-hooks-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-hooks-automation/SKILL.md",
+      "computedHash": "8562a2835b2ba7c656421fed6af29d00df386ad4ae59f8e30a9ab177f31ac496"
+    },
+    "git-pr-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-pr-review/SKILL.md",
+      "computedHash": "c8397d4d84f016115a3538dd9cf899315d904836709941d70d9763c8b6a58fc5"
+    },
+    "git-pr-workflows-git-workflow": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-pr-workflows-git-workflow/SKILL.md",
+      "computedHash": "49cb2882b091544bf3353830181e6a000019fdb22b77b3cf7222efba06a5c88f"
+    },
+    "git-pr-workflows-onboard": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-pr-workflows-onboard/SKILL.md",
+      "computedHash": "b51595a925ebf2439723fbab3f4798cd34c2e727174e721e8d3d06706b86c3b3"
+    },
+    "git-pr-workflows-pr-enhance": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-pr-workflows-pr-enhance/SKILL.md",
+      "computedHash": "d50a095b8bfe285f5b5de28f612d9e78dafb49eb8246a628290c99c3e5ead300"
+    },
+    "git-pushing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-pushing/SKILL.md",
+      "computedHash": "e0b7fa5d0c66897df893e08493b37ce6c7e2c77d93a87f6c3151743446701ba2"
+    },
+    "github": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/github/SKILL.md",
+      "computedHash": "8bb3210e072304636d4503370ef1e35ef57b27655737fb98986bea8370531baf"
+    },
+    "github-actions-templates": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/github-actions-templates/SKILL.md",
+      "computedHash": "0e9ef6482d18da53dfc766dcb483222cd4a61c79702d1fb9f42e34fb6d1f81b6"
+    },
+    "github-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/github-automation/SKILL.md",
+      "computedHash": "2d24527af0b4cd020ba158500db8a5ae1e2914a55ddd9df214152eec3eb5cd77"
+    },
+    "github-issue-creator": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/github-issue-creator/SKILL.md",
+      "computedHash": "7cb23e15606c557f69ff68e653abd7e3f521b24bed3cc042b9ea27b775f4ff70"
+    },
+    "github-issue-workflow": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-core/skills/github-issue-workflow/SKILL.md",
+      "computedHash": "504d8edeccba7fcbb5a60a6dcad8593e542fac3f8d58b97696df90cf36a708bd"
+    },
+    "github-project-automation": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/github-project-automation/skills/github-project-automation/SKILL.md",
+      "computedHash": "88e5aedacc0f71408b7ee543486ac24f7f5bb67a34b35ee22becd3d11f62f8a1"
+    },
+    "github-workflow-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/github-workflow-automation/SKILL.md",
+      "computedHash": "678d1da4bde7dc6cbadef22607dd9052e913716093f5a9eb3414f0827758906f"
+    },
+    "google-gemini-api": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/google-gemini-api/skills/google-gemini-api/SKILL.md",
+      "computedHash": "e9cefdd2374716b082f9134e51753231119bd27fdc39fe732e4a8828a43751ae"
+    },
+    "harness-engineering": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/harness-engineering/SKILL.md",
+      "computedHash": "2f1c367b69716a8c08beea159dde9c1627db61c8c5c1fba275c7978b6fe54383"
+    },
+    "health-check-endpoints": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/health-check-endpoints/skills/health-check-endpoints/SKILL.md",
+      "computedHash": "668b3e78e8f7533c1b9e9df51082e02f17d0a4bd39365df267ff13c374dc234b"
+    },
+    "high-end-visual-design": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/high-end-visual-design/SKILL.md",
+      "computedHash": "d8c2d396b640494b6bfc8093b1cfe306e553c4677a28187f3eb4476f8e46b6dc"
+    },
+    "hono": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/hono/SKILL.md",
+      "computedHash": "2760ff22fe62c2861941c4ced8fed8c720e6ca150a134ff4f6708f21a7ceff09"
+    },
+    "hono-routing": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/hono-routing/skills/hono-routing/SKILL.md",
+      "computedHash": "ce615e0614027f7bf98531c805dd25a6389723e2a4cb59ba51d75bdefe80cef9"
+    },
+    "html-injection-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/html-injection-testing/SKILL.md",
+      "computedHash": "c356be1883926bbc18df0bce61072a940e9cad6e9bb6739f62de9fe1e6974f78"
+    },
+    "hybrid-search-implementation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/hybrid-search-implementation/SKILL.md",
+      "computedHash": "9e9a7d62c23fad643345d90d52c31721410ed1cfb6143dc96950ab39b3e9f549"
+    },
+    "i18n-localization": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/i18n-localization/SKILL.md",
+      "computedHash": "ea5d6d0faa9fabd6a8a3165dca69dac9ab7c622dc130bdce3f1dfa88e02ba948"
+    },
+    "idempotency-handling": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/idempotency-handling/skills/idempotency-handling/SKILL.md",
+      "computedHash": "2679d12b6c50c5e8b4b4fd58a5aa28dcdf7260e2dd275ff80d66a844545a600e"
+    },
+    "idor-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/idor-testing/SKILL.md",
+      "computedHash": "6f100962f5a7f5ffe94ee2c63ca66bbd0618cbe3d56439033f5b70613c15be04"
+    },
+    "image-optimization": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/image-optimization/skills/image-optimization/SKILL.md",
+      "computedHash": "9d87722ea2451ca31d580526f9d3beb63515c7a5f946d6f2d96be48b7d49fbdf"
+    },
+    "imagen": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/imagen/SKILL.md",
+      "computedHash": "8da307c4c03c6f2a3ac3fb0bab968c659af599f13a3a09c1ae3e562c463eb11d"
+    },
+    "incident-responder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/incident-responder/SKILL.md",
+      "computedHash": "b3567a675318c16eeec390de9a4d74fab31d74ec68d4df0cfc572eca474813be"
+    },
+    "industrial-brutalist-ui": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/industrial-brutalist-ui/SKILL.md",
+      "computedHash": "a0ed0a750b082b7de7a40f76bc0cca59c151ec047ae8cd20bcdb73a6846ccdf9"
+    },
+    "inspira-ui": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/inspira-ui/skills/inspira-ui/SKILL.md",
+      "computedHash": "c686c38df48969fafd997073213939607ad88236366ce09f85061993b04a9f52"
+    },
+    "interaction-design": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/interaction-design/skills/interaction-design/SKILL.md",
+      "computedHash": "4da7b76d1291a5d0e1dbc33795335f52fb5683853c56c82c82fb6ad1da91b1bc"
+    },
+    "internationalization-i18n": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/internationalization-i18n/skills/internationalization-i18n/SKILL.md",
+      "computedHash": "ecd4f825aa2d87f50e6f65bac39ca12ab058b705dca2f5ae68adc5b4fa761632"
+    },
+    "iterate-pr": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/iterate-pr/SKILL.md",
+      "computedHash": "6b3a56c30a10eb2d504df6236805d47d4d7f642291b8a20dd98b63faa00b51c6"
+    },
+    "javascript-mastery": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javascript-mastery/SKILL.md",
+      "computedHash": "ac6d598ca4e8e2b988bd3e8d7dfb45845a0d8d4876e519e97c0116cefd323b8e"
+    },
+    "javascript-pro": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javascript-pro/SKILL.md",
+      "computedHash": "455b01f015d389f056b78d975af55d5b297a97319cc0331a0c6f4f40f2920baa"
+    },
+    "javascript-testing-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javascript-testing-patterns/SKILL.md",
+      "computedHash": "6413ffd7e6949747c300eb0d739862574e724ece491630feb8c03780e85f7dc0"
+    },
+    "javascript-typescript-typescript-scaffold": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/javascript-typescript-typescript-scaffold/SKILL.md",
+      "computedHash": "670e217b2258e9fe0c210fc4c2e187e9dfd9a4bcdb48b2111607dd963ff7b9c1"
+    },
+    "jq": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/jq/SKILL.md",
+      "computedHash": "f4fc98e8e85b572332b63a15d84f34a0c7fd6e47b0c6576cfa4c689b9270e46c"
+    },
+    "jscodeshift": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/jscodeshift/SKILL.md",
+      "computedHash": "9b9a43f791dd3039e98db9288e25fde72bd66c6c9a93ad30cc642e1f8e983a90"
+    },
+    "k6-load-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/k6-load-testing/SKILL.md",
+      "computedHash": "b79cf26834c9bf77c193b5e07c00d70a904f51ffbf665e6ffbe43782876a4253"
+    },
+    "knip-deadcode": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/knip-deadcode/SKILL.md",
+      "computedHash": "e58764b88123c65e617368a65d90ea82db6935da26a54d652e82a8c820346b67"
+    },
+    "lint-and-validate": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/lint-and-validate/SKILL.md",
+      "computedHash": "37854110489e24a286c4ef95629e9eac158f4f63464ab02c02983c3d51ef9561"
+    },
+    "linux-shell-scripting": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/linux-shell-scripting/SKILL.md",
+      "computedHash": "7837dc1464d5ab0709bd55c0cd6849b1985c8525d1305bb8d1175e96a13b1f6b"
+    },
+    "llm-app-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/llm-app-patterns/SKILL.md",
+      "computedHash": "5276020a23e4c13f8c3c2f37ec7245449b1518467cb7144391ebd965a1c2c81a"
+    },
+    "llm-application-dev-ai-assistant": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/llm-application-dev-ai-assistant/SKILL.md",
+      "computedHash": "c03fa1fb154f951d9afd7d51ef0d68648f72c3d389fda78653449c6ce7011c35"
+    },
+    "llm-application-dev-prompt-optimize": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/llm-application-dev-prompt-optimize/SKILL.md",
+      "computedHash": "a8414217bf8888700247bd2c1b525b774bfc3f17e3d2ff214ea0629212a2d6c9"
+    },
+    "llm-evaluation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/llm-evaluation/SKILL.md",
+      "computedHash": "d1c55a7640031a4683c5e9b1333eae0ccb4812c8271ee07a9cf2340cd76dc318"
+    },
+    "llm-ops": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/llm-ops/SKILL.md",
+      "computedHash": "72e50f28e3528235081b9a6267c437507aa619b0da85a088e939ef8a0917639e"
+    },
+    "llm-prompt-optimizer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/llm-prompt-optimizer/SKILL.md",
+      "computedHash": "eef460bc1c02545bc7754e0b8f113e662a3294fad1ea2bfd92f0385efb2c42d4"
+    },
+    "llm-structured-output": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/llm-structured-output/SKILL.md",
+      "computedHash": "280b9f14e0bcaa283a26e0b769ddaea19c5b044ec4f412bcd2dc91f10de578db"
+    },
+    "local-llm-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/local-llm-expert/SKILL.md",
+      "computedHash": "bd9d33c912759416b417adc9dbdd95f592b69cded3f01602c9ed142caf63e975"
+    },
+    "logging-best-practices": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/logging-best-practices/skills/logging-best-practices/SKILL.md",
+      "computedHash": "2af4f441adc1e36346a9b6c4864392327f122e477604842c217d161bf33415b9"
+    },
+    "manage-skills": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/manage-skills/SKILL.md",
+      "computedHash": "688f3c676810bd0afb5d7774f0cdc54c2df9fc873abb703e4109d6a2e2ad44f6"
+    },
+    "mcp-builder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/mcp-builder/SKILL.md",
+      "computedHash": "7d85b2761016512557dabf450afabc34bee8ead8abfbd852a4ad6d8d50a3b456"
+    },
+    "mcp-builder-ms": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/mcp-builder-ms/SKILL.md",
+      "computedHash": "9d030aa94f09c5354168b8bcca61e95399f2a696daed1d1f37a3b47bf8bcda70"
+    },
+    "mcp-management": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/mcp-management/skills/mcp-management/SKILL.md",
+      "computedHash": "ae3f7135f5bea588ec6b1ab3dab255c3e284976426f4f1ad4a375763040323ba"
+    },
+    "memory-safety-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/memory-safety-patterns/SKILL.md",
+      "computedHash": "3bae85adc31602213f71faa68b013bd85ade9172e643314992a70332d7e1eac3"
+    },
+    "memory-systems": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/memory-systems/SKILL.md",
+      "computedHash": "fb07053bb23cd7bff85dcdbca0fb775d4105e03a22ff478180003a67ef335310"
+    },
+    "mermaid-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/mermaid-expert/SKILL.md",
+      "computedHash": "6dae987d8d84e071e106d7f181a07dd85ae1b62292891cf524addea7048f179d"
+    },
+    "microsoft-teams-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/microsoft-teams-automation/SKILL.md",
+      "computedHash": "4e1bb3ac896720cfd33d2c258be2f151579446ce96d80470e3e3efefa42c0850"
+    },
+    "minimalist-ui": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/minimalist-ui/SKILL.md",
+      "computedHash": "9402dce3f1220cb91168bbe2bb0dc6a3a87af38d28525fba0de5783381028f4b"
+    },
+    "modern-javascript-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/modern-javascript-patterns/SKILL.md",
+      "computedHash": "ee7414361412eeee5be6afc43d294e779eead04cdcc5b5799d335431c332f10d"
+    },
+    "monorepo-architect": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/monorepo-architect/SKILL.md",
+      "computedHash": "af072fb671eab947e4d374dcc19e270e696201edc2a97433b4ace7d0d5eb3128"
+    },
+    "monorepo-management": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/monorepo-management/SKILL.md",
+      "computedHash": "6812a72aa5936fc21b09b11e818868b56ec2f6082cb2eff2af3088c7833ea62a"
+    },
+    "motion": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/motion/skills/motion/SKILL.md",
+      "computedHash": "417c59918c5950c936bffddd060f79425f999f25b18ba94aa70b6742cba3b3d1"
+    },
+    "msw": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/msw/SKILL.md",
+      "computedHash": "c432eaa96c11e729a6d305988c79bf944d6a741bc55e6a51ba5fae8d6031f976"
+    },
+    "mutation-testing": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/mutation-testing/skills/mutation-testing/SKILL.md",
+      "computedHash": "f0a476424a9815651b6d967a6229d6483cd186e16c97c1d26f21260060ec9efb"
+    },
+    "network-engineer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/network-engineer/SKILL.md",
+      "computedHash": "9148831046ee08eb6e86f85ded2a72bee7b33d5a51715c6f5f13a92aa2408aa2"
+    },
+    "nodejs-backend-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nodejs-backend-patterns/SKILL.md",
+      "computedHash": "912fa183d031f99b16bfdf29bbedb3dd11e5a59aa48d880777e1497db1e16b5c"
+    },
+    "nodejs-best-practices": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nodejs-best-practices/SKILL.md",
+      "computedHash": "3e025f24a1948fcbfe666eabc757f5b426271b08a420a86dba1ea7518cc7b369"
+    },
+    "oauth-implementation": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/oauth-implementation/skills/oauth-implementation/SKILL.md",
+      "computedHash": "379b587613ab7c11ee06f3ff1a61a0f0584e02df517e9818dd336137c61f7be3"
+    },
+    "observability-engineer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/observability-engineer/SKILL.md",
+      "computedHash": "5fd8f9591f0dea4c1e393e83d7dfcabf07147556423396e61f65bc7987b54c1f"
+    },
+    "observability-monitoring-monitor-setup": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/observability-monitoring-monitor-setup/SKILL.md",
+      "computedHash": "c435bd4aca30ce03e3d366c369e087e479da7bbd946b55337c3b309fe6d8dd7b"
+    },
+    "observability-monitoring-slo-implement": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/observability-monitoring-slo-implement/SKILL.md",
+      "computedHash": "b7cbd73a9c4fdd1654e7081d027a7a667a7aea998024fef0f6ed0ef1bedecd14"
+    },
+    "openai-api": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/openai-api/skills/openai-api/SKILL.md",
+      "computedHash": "65061a35a5832cd94332d28af9c756f657f1586d2aa22424325f0c6628268e2f"
+    },
+    "openai-docs": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/openai-docs/SKILL.md",
+      "computedHash": "2fbde863c4a84ea971136f3138baa0a81648038747724cc60f4e8d46718f8d7d"
+    },
+    "openai-responses": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/openai-responses/skills/openai-responses/SKILL.md",
+      "computedHash": "fdb3765def8f21fd2f03c983c302892b22c22c697bee5b2ba6aa761e2e7e1f04"
+    },
+    "openapi-spec-generation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/openapi-spec-generation/SKILL.md",
+      "computedHash": "55081a25bff6693cca28b2f3e0b712b9939f46ce7302fea20f0b52263f74624f"
+    },
+    "payment-integration": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/payment-integration/SKILL.md",
+      "computedHash": "62fa66ebd98c0212afa3b764a502b0fcbb89740979f870d379e77efd15e39c05"
+    },
+    "pdf": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/pdf/SKILL.md",
+      "computedHash": "ae0a8fde8447e83a08edd0baf5373cd52febce32494e47e17d5d695a441a1884"
+    },
+    "pdf-official": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/pdf-official/SKILL.md",
+      "computedHash": "fe6639530fc0c5433931a7a3e9f65079fa35f6a8ed0e04cb23bf7a6dbc794b3a"
+    },
+    "performance-engineer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/performance-engineer/SKILL.md",
+      "computedHash": "d3c7de245a6295001be2b3e86f24ebcc90ecc1d5865ba1540d4594fba73586a8"
+    },
+    "performance-optimizer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/performance-optimizer/SKILL.md",
+      "computedHash": "3f9cc4b078de918e25ed258ca17eb526dfd4f0392f00553ed0c85fdb187b1682"
+    },
+    "performance-profiling": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/performance-profiling/SKILL.md",
+      "computedHash": "fd00f71134c3e909fba80ff5abe24ea9ca9b30ba4443b1b8a5e3c795dfc4c373"
+    },
+    "performance-testing-review-ai-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/performance-testing-review-ai-review/SKILL.md",
+      "computedHash": "a56d9ff601d8cf0481dd9dcbc4b078714c20b4996645b8c925107101d0524bd0"
+    },
+    "performance-testing-review-multi-agent-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/performance-testing-review-multi-agent-review/SKILL.md",
+      "computedHash": "ba281ca5a0dc9a56e6b5feb8cf806acb83908d98b7efbdd6504162b484b49869"
+    },
+    "plan-writing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/plan-writing/SKILL.md",
+      "computedHash": "7b71feab40a6f633057cdb96dba8db05e16d2f6b6d99a492b4b48abf131e474a"
+    },
+    "playwright": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/playwright/SKILL.md",
+      "computedHash": "595a334de3bd5335f442a33d1bdefb01207c88c99fe43e3bd99b0d5435f230de"
+    },
+    "playwright-best-practices": {
+      "source": "currents-dev/playwright-best-practices-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "320eaf861e3a0a923bfaad0726cb311a3fe30093378f8d26c89b9c5ae5c42b35"
+    },
+    "playwright-interactive": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/playwright-interactive/SKILL.md",
+      "computedHash": "6a8871c4fba50a9a1f4c90a7955d94cef920d866c2ba7640fa009a26c73e0c83"
+    },
+    "playwright-skill": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/playwright-skill/SKILL.md",
+      "computedHash": "465b1d346b9fabd4c8abe4fa1cecf285109f587cf8f159babc054d96dfb30a36"
+    },
+    "plugin-creator": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.system/plugin-creator/SKILL.md",
+      "computedHash": "f6cd2ab74e30276067cb68aa2f41d56a762b41fe9dfb9dd914f2dbc27d0010f9"
+    },
+    "pnpm": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pnpm/SKILL.md",
+      "computedHash": "318f9fca2441a3e06fedc336e195dd18be5dbe901064e4fa71b76b40b096ab3a"
+    },
+    "posix-shell-pro": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/posix-shell-pro/SKILL.md",
+      "computedHash": "4073cbf2d2695f0119902c076ab0a412215bb198e11148f8a98c5a7bfad984c1"
+    },
+    "posthog-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/posthog-automation/SKILL.md",
+      "computedHash": "a38f4390eea409b28870b79c78ecf3eed6164c6ffc3a5c1266f217378b9b82b1"
+    },
+    "pptx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pptx/SKILL.md",
+      "computedHash": "6b8b859d26f93aa059c9870d1ab76b44ab69e3d6757ce4a03cc94cb760888073"
+    },
+    "pptx-official": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/pptx-official/SKILL.md",
+      "computedHash": "c56832b79c0a996735069c88a600008ab2552079f1ba484a5e354b305c73784e"
+    },
+    "pr-writer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/pr-writer/SKILL.md",
+      "computedHash": "38a1a6049ec1261aa1b0bbc9dd770c1c187c61888cfadff0c84b4e5ffaca9b62"
+    },
+    "privacy-by-design": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/privacy-by-design/SKILL.md",
+      "computedHash": "22a2b3a3d716f80e901ad93395db516fc36390387db3945a3aa894b85b93c6aa"
+    },
+    "production-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/production-audit/SKILL.md",
+      "computedHash": "5b2f9e3ab3938cd37cac172dcf33563f978fe428ee7e13b1fed59d41f5236479"
+    },
+    "production-code-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/production-code-audit/SKILL.md",
+      "computedHash": "f70b69006effebca27869cfa74329c1a3c873202c5ba8826521023841969c967"
+    },
+    "progressive-web-app": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/progressive-web-app/SKILL.md",
+      "computedHash": "f77fd5f734f0073df2293c71163a0118c12866cec3c61120fa31b5bdbfa750af"
+    },
+    "project-skill-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/project-skill-audit/SKILL.md",
+      "computedHash": "dae5b1e330fb52be9c06f39f792c3570edbaa7faa0c349234730ec6c33692c0c"
+    },
+    "prompt-caching": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/prompt-caching/SKILL.md",
+      "computedHash": "293df2008ab78dee1b921412315a7a3b184934b479a4213255bc62f55994ce9f"
+    },
+    "prompt-engineer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/prompt-engineer/SKILL.md",
+      "computedHash": "3cec4622cbb6e6794be3eb25186e4a4d8f6c19816f79abbd5f5eed1830d9e559"
+    },
+    "prompt-engineering": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/prompt-engineering/SKILL.md",
+      "computedHash": "171883a7c3b5e5799a4cb89598f5454fd34bd5b405195d51842f89024ae2b89c"
+    },
+    "prompt-engineering-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/prompt-engineering-patterns/SKILL.md",
+      "computedHash": "1f0e307d11b21fabaa03a5e4b0af24caec8e4c0a51534cf3507a170260999116"
+    },
+    "push-notification-setup": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/push-notification-setup/skills/push-notification-setup/SKILL.md",
+      "computedHash": "ec2e9d40f0a50f47778506e33b3ec042f0910e0ef2ada62de25a4366e0e78774"
+    },
+    "radix-ui-design-system": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/radix-ui-design-system/SKILL.md",
+      "computedHash": "e80a260a82334d85f4ca41d9417f44df759db55db88c881447c8d8d2eb434825"
+    },
+    "rag": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-ai/skills/rag/SKILL.md",
+      "computedHash": "0659f2058a523bf6daa5e58296dc12cac32d7176fb35e03c31f90fa7bc48d798"
+    },
+    "rag-engineer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rag-engineer/SKILL.md",
+      "computedHash": "09a5e174bca621f134235ec59e942499c6298101cc72effda9b7b9046baf6806"
+    },
+    "rag-implementation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rag-implementation/SKILL.md",
+      "computedHash": "0c86261f73ff427f4594b9419b1bd8e94a184002d57c8af31fc4ac2e7dbe8fe2"
+    },
+    "react": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/react/SKILL.md",
+      "computedHash": "b838edcf3c3a56e2e2b2eef0876bc7d3c36bb79ff1026017ed14a0ea34b7ac98"
+    },
+    "react-best-practices": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "6a2573cea01069776bcd23a4c3834e47c2ac5f15a6071df85edd2702ca576b57"
+    },
+    "react-code-review": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/react-code-review/SKILL.md",
+      "computedHash": "3a6ca3a1755850a7d1de17314ecd431be724fe85ad33ef2ac2bbfe658244414a"
+    },
+    "react-component-performance": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-component-performance/SKILL.md",
+      "computedHash": "e34279fe3d30ad747eaeb5676ed75ec3a42df727fb033121d11de8feee59cc41"
+    },
+    "react-composition-patterns": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/react-composition-patterns/skills/react-composition-patterns/SKILL.md",
+      "computedHash": "81fcf95a63235527f54afbe21b48764fae0ccf3a784980e7d2e4f49bf4740619"
+    },
+    "react-flow-architect": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-flow-architect/SKILL.md",
+      "computedHash": "bde9db472ec38b8b750fce1b350433d2513d5ad714103de890c49af04adb8c55"
+    },
+    "react-flow-node-ts": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-flow-node-ts/SKILL.md",
+      "computedHash": "0ff6bd453985b0bc0c104ed371af88a00a4a9456100e1360b56a84a8dca9f01a"
+    },
+    "react-hook-form": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/react-hook-form/SKILL.md",
+      "computedHash": "b7f82b6311d61233c17062792f6be4137cbd6284b56f8d7e60ef63c7b5836329"
+    },
+    "react-hook-form-zod": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/react-hook-form-zod/skills/react-hook-form-zod/SKILL.md",
+      "computedHash": "46ee3a7d14017a14c978f7e3cf0aab6b79ac02036f72d86dac1e9cffdb72ca6b"
+    },
+    "react-modernization": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-modernization/SKILL.md",
+      "computedHash": "82d879e1ebe27df98ee3de75985047df9cbe9827c99d8862c782628eef9930a6"
+    },
+    "react-optimise": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/react-optimise/SKILL.md",
+      "computedHash": "1f275d9ba9058a343a78769d74a9b3319c06ebb6fb896342b1242f20eb755d70"
+    },
+    "react-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-patterns/SKILL.md",
+      "computedHash": "af8463c224dc911e56233db2c67bceb944099f764d77e34600cd951e85558081"
+    },
+    "react-refactor": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/react-refactor/SKILL.md",
+      "computedHash": "e8311b720ebd9143b16c119fad4817e683914e9499bb127d397c712a320ec6d4"
+    },
+    "react-state-management": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-state-management/SKILL.md",
+      "computedHash": "2c45808afe0def0497626cdb4fdd37feeb8c3de49ce3d1a0e89c069df681f492"
+    },
+    "react-testing-library": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/react-testing-library/SKILL.md",
+      "computedHash": "a4f9b64d36073864bcf07010702d37c035fe5d9f798c2bfbe4456f96f3de624c"
+    },
+    "react-ui-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-ui-patterns/SKILL.md",
+      "computedHash": "6cf16ff01d66cf827c99ea0fdd215e6f2a62b1999737baabc4a85fb8e28adf94"
+    },
+    "readme": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/readme/SKILL.md",
+      "computedHash": "0ff1f12f888fe06872574a39b4716a916f7b3e554423655bf2308b8e123861c6"
+    },
+    "receiving-code-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/receiving-code-review/SKILL.md",
+      "computedHash": "d2894259919d0a42cda8adf88250b0610e1fddbe07502973772036202e060dee"
+    },
+    "redesign-existing-projects": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/redesign-existing-projects/SKILL.md",
+      "computedHash": "b96db9a87ede33d0de850b8b23f3a46817ed0d4b3d9c787a06fb5bdf147c2c8c"
+    },
+    "refactor": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/refactor/SKILL.md",
+      "computedHash": "70694c431e9179707c4bc55ddf19efddd38472f8d5629194eb5fc17ee5b80b94"
+    },
+    "requesting-code-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/requesting-code-review/SKILL.md",
+      "computedHash": "e6367f02fe8c5d8a529d799568d57f0be31f3bb3c23093f2ae7c5049c8d15256"
+    },
+    "responsive-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/responsive-design/SKILL.md",
+      "computedHash": "0977c17696ab66ea613ce5b83c856bc7cd01332d98ae237dac7539840fe96187"
+    },
+    "responsive-web-design": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/responsive-web-design/skills/responsive-web-design/SKILL.md",
+      "computedHash": "e7b09a592129115d711803a7213b16c0626903eeba18dca10127dd126e062081"
+    },
+    "rest-api-design": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/rest-api-design/skills/rest-api-design/SKILL.md",
+      "computedHash": "60248d72662c4bc3c9ba68f8703b614507181197c52f529e7d5aeb8db3e6523a"
+    },
+    "root-cause-tracing": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/root-cause-tracing/skills/root-cause-tracing/SKILL.md",
+      "computedHash": "7905b7ec56aa9a31be7491a4ed8565d760e58c838ce4602336282c7302d7a535"
+    },
+    "rust-async-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-async-patterns/SKILL.md",
+      "computedHash": "25ac8c037fb98d5a7838457f0acab729b88184ae99f2c3ff0f1f6e94476dedf6"
+    },
+    "rust-implement": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/rust-implement/SKILL.md",
+      "computedHash": "00593f7780cb9313d67f612cb66461c23b4a1417af744138ba6ee53094945d32"
+    },
+    "rust-pro": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-pro/SKILL.md",
+      "computedHash": "d6c417eaf1d57ffc2a6760ed5f2486b206ed3c5a547fa7857555c1643ad2095e"
+    },
+    "rust-refactor": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/rust-refactor/SKILL.md",
+      "computedHash": "a4242e8032e3b2c5c869053b5c29a7030b57c79e2285cfc0814adb0f296a665c"
+    },
+    "rust-write-tests": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/rust-write-tests/SKILL.md",
+      "computedHash": "fbde06362b5a3fdcec63ba764fc65935644da93f59c78edfdb7d16a0bec43dc8"
+    },
+    "sast-configuration": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/sast-configuration/SKILL.md",
+      "computedHash": "d0e0d25ad6d09a1c876069396eb50e30d4839923ebe8d1ec915673e3cee762e2"
+    },
+    "satori": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/satori/SKILL.md",
+      "computedHash": "9a6946796494a1e0d9e66eb890231a6b7fcc140c5c764c0d043b5e08ceea9c13"
+    },
+    "scanning-tools": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/scanning-tools/SKILL.md",
+      "computedHash": "56463333916eafe0eb8ab5dc561c58b822cc0d118d9d1fc80742d4aa2dbdab34"
+    },
+    "screen-reader-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/screen-reader-testing/SKILL.md",
+      "computedHash": "0583e45b3efba366883d7aba8cd2cd6f28175bf35352d24fd4a10885eac29c74"
+    },
+    "secrets-management": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/secrets-management/SKILL.md",
+      "computedHash": "bdf148b586f59d8bf02f403bad303ebcbd2eba2ab6d24722e561a1b5a728bfdb"
+    },
+    "security-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-audit/SKILL.md",
+      "computedHash": "d2939884d0b0631675555fc02cf86283d749b56d02d1378e7a7bf99312bad262"
+    },
+    "security-auditor": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-auditor/SKILL.md",
+      "computedHash": "771d0b237eb7557818e4350488f266faf35c883b643c9ab375d14e19141882f8"
+    },
+    "security-best-practices": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/security-best-practices/SKILL.md",
+      "computedHash": "c27616fb4e27999605b90b261dc729784420c8d77bd1a98748384ffaa5b35704"
+    },
+    "security-bluebook-builder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-bluebook-builder/SKILL.md",
+      "computedHash": "0ec20be918845c1c48876969aec8ef52276e751ee90007c1368e7c4949199f58"
+    },
+    "security-compliance-compliance-check": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-compliance-compliance-check/SKILL.md",
+      "computedHash": "2d33196014d57075f8b442bdfff8383797157617baa4f7701fda4478b7caa03b"
+    },
+    "security-headers-configuration": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/security-headers-configuration/skills/security-headers-configuration/SKILL.md",
+      "computedHash": "155cdb201550a391409f9adb57bc630dff14ec517d3ff8ef10958e7109ffc248"
+    },
+    "security-ownership-map": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/security-ownership-map/SKILL.md",
+      "computedHash": "0eefbaabdbe0ccfc39555195b9a7f7c8369abe1b4dc969aabb2e5aec8c3705ab"
+    },
+    "security-requirement-extraction": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-requirement-extraction/SKILL.md",
+      "computedHash": "b8d197ff11d2b2c1c186f81e6def66dbb90efd938b949555c7e90b857c41303e"
+    },
+    "security-scanning-security-dependencies": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-scanning-security-dependencies/SKILL.md",
+      "computedHash": "28be70858a96903444f461debdd101cd25af82c1fa92f92c3c2513bd247961c3"
+    },
+    "security-scanning-security-hardening": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-scanning-security-hardening/SKILL.md",
+      "computedHash": "f829788584fdd90797d829c8f6c095aaa8423a3c3671dc3761fd35dab68c8c4c"
+    },
+    "security-scanning-security-sast": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-scanning-security-sast/SKILL.md",
+      "computedHash": "432a3eea84fceea5785cdfb0cda6ecf9258f8aab27d54a660313f063669253fd"
+    },
+    "security-threat-model": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/security-threat-model/SKILL.md",
+      "computedHash": "b3ad2dc0b2eee1f189680fdb8cf3b17853f12ab3403d389393f4237ebc6f9821"
+    },
+    "semgrep-rule-creator": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/semgrep-rule-creator/SKILL.md",
+      "computedHash": "8d03a48d434de74c49b765c7396f6100dba33ce40cec3a8071bd51dee3da026f"
+    },
+    "semgrep-rule-variant-creator": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/semgrep-rule-variant-creator/SKILL.md",
+      "computedHash": "1b0c1f12d865709b43c9b5e08f9f4b5b482b9ec0d17ed16b9b6dd76f027e46ae"
+    },
+    "seo-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/seo-audit/SKILL.md",
+      "computedHash": "50abed9d8282dc3512802f3295e3adfad1aaf8f5a00b66a8e054d446f0c4c2ca"
+    },
+    "seo-technical": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/seo-technical/SKILL.md",
+      "computedHash": "83c3307161ce9b424a51a5bbe8fafcee326f349a3b4566cf3fba278963370690"
+    },
+    "session-management": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/session-management/skills/session-management/SKILL.md",
+      "computedHash": "5fc64dbd3e6492ebc00968bf841c1f57246a070c4de52e53576c78e5a853990d"
+    },
+    "shadcn": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "1d9eca48714f0298a91c2743d05b7f45bacd2ff1d44ece55c3ff32f4a93cf3b8"
+    },
+    "shadcn-ui": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/shadcn-ui/SKILL.md",
+      "computedHash": "a2c4e57faab8e31f3df91156edf2df1a5a7f6c242249b2d86ca11336c9183157"
+    },
+    "sharp-edges": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/sharp-edges/SKILL.md",
+      "computedHash": "31f0d1c782c13255dc9796340369accea6b7433ff7eae1ec61ad97fd64f249a7"
+    },
+    "shell": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/shell/SKILL.md",
+      "computedHash": "17c30eea0d066cc7c9ca565fa49a9550c4e40c0415b9f44cd1181b0d69198e07"
+    },
+    "shellcheck-configuration": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/shellcheck-configuration/SKILL.md",
+      "computedHash": "123c45e3c14046cd14ced825483c642e6ba27be1f8d7cc7827b9f60381886a60"
+    },
+    "signed-audit-trails-recipe": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/signed-audit-trails/skills/signed-audit-trails-recipe/SKILL.md",
+      "computedHash": "40fdf79c54daa2897cc54ae4a8335fd83f77292d50155c152bbff620e6943513"
+    },
+    "similarity-search-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/similarity-search-patterns/SKILL.md",
+      "computedHash": "557a5bf9bf0ac2b0127d286cb01564c9022efab45a993e4ac242c1cf04126f5a"
+    },
+    "simplify-code": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/simplify-code/SKILL.md",
+      "computedHash": "6ed13a18c5aa533063a87895a4532938c23bb5e489ae1198cac3e36c708e2a22"
+    },
+    "skill-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-audit/SKILL.md",
+      "computedHash": "aa7ab898de9b95937431f697e12a73049eb855b22c7961d2818c1615724b7e2e"
+    },
+    "skill-authoring": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/skill-authoring/SKILL.md",
+      "computedHash": "3e54834dd9d5dde3a382985cda6e8b271419a04e3c8e63dbed95fd0edc9366bf"
+    },
+    "skill-check": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-check/SKILL.md",
+      "computedHash": "a708ec15862dcf212011b804b46c6f62d4cdfc4ed4c1075cb7365311523f8972"
+    },
+    "skill-creator": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator/SKILL.md",
+      "computedHash": "7dd56bb412e0b17ef0fc3e910286a552479210713dcb2107fc35c482f5355156"
+    },
+    "skill-creator-ms": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator-ms/SKILL.md",
+      "computedHash": "07cab2862038516e2f3dafb6120f24e072d69182971c0bfb4650267e7032f045"
+    },
+    "skill-developer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-developer/SKILL.md",
+      "computedHash": "cccfa376c7f538ec619179ac6a0ec4646c56181fbd916b1063adb9d649a20973"
+    },
+    "skill-improver": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-improver/SKILL.md",
+      "computedHash": "1d478c318543af34285e2395ff392157fe43bf44e3cd4833398bd5675db69e0b"
+    },
+    "skill-installer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-installer/SKILL.md",
+      "computedHash": "eef32de1591c93030021b3bf9f87a566df1db4954da0b5c2659105983a3e83b0"
+    },
+    "skill-optimizer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-optimizer/SKILL.md",
+      "computedHash": "5c52ef94e9c7da46d7208b0202f10e3ee3bec604c2f371182f989ea3a4d5222e"
+    },
+    "skill-router": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-router/SKILL.md",
+      "computedHash": "64565e26b20d5025d54da5e3f8ec10de2dbcd29af9fd61e742ded4c5c3025571"
+    },
+    "skill-scanner": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-scanner/SKILL.md",
+      "computedHash": "4892b2a9a013a83ed0ff6fabb5a69f44dc7244aac77687c0c0690eeee8fdf97f"
+    },
+    "skill-sentinel": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-sentinel/SKILL.md",
+      "computedHash": "7cdde851a54d48ebfc1b26d6257997bd800d71a14b0fa9b0b50726b4f110fba7"
+    },
+    "skill-writer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-writer/SKILL.md",
+      "computedHash": "12f5763c1610c23f270ed8fa4521fe18b4bad8e5ec1d8b7bd072106548f10c68"
+    },
+    "slack-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/slack-automation/SKILL.md",
+      "computedHash": "1c98f052412d0315b67847c4c7ea251193b94c0ba6674b11b718e23fead56d69"
+    },
+    "slack-bot-builder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/slack-bot-builder/SKILL.md",
+      "computedHash": "d52ac2f407c909ba12eedabd7a4fc4fa6710c697130ea87a2d87fd11e24cafe0"
+    },
+    "software-architecture": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/software-architecture/SKILL.md",
+      "computedHash": "19ee028010077ff687e3fcf9613b4f9b9d6c839a15396007d9ba263f6930ec6a"
+    },
+    "sonarqube-mcp": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-tools/skills/sonarqube-mcp/SKILL.md",
+      "computedHash": "9f1a35541258f286218e04d2ab8a2df7aa8ed45e4db8d3b932eef3fb09943492"
+    },
+    "speech": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/speech/SKILL.md",
+      "computedHash": "767adf188f0beb4b45f4b60cfe1945f1f104884ff3d1597e09825dadcea5f7fa"
+    },
+    "sql-injection-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/sql-injection-testing/SKILL.md",
+      "computedHash": "a5d4187784cbbffb0ea5b6a3f3b2e8806280a2e563aed271ac98fc1adc44516e"
+    },
+    "stride-analysis-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/stride-analysis-patterns/SKILL.md",
+      "computedHash": "4b7224b7c8287a82844cc4f5e2d53ee523182659f7a7bc7904b5e9eac3c50665"
+    },
+    "subagent-driven-development": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/subagent-driven-development/SKILL.md",
+      "computedHash": "21dc38e2291b4229224aab9066445578037a87f7cd4216eea85bb12ca187b65e"
+    },
+    "supply-chain-risk-auditor": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supply-chain-risk-auditor/SKILL.md",
+      "computedHash": "fa26ac559262aec1e9a31f36df8940a4194cd37daf7a5fb7a8f61a8d9ef07661"
+    },
+    "systematic-debugging": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/systematic-debugging/SKILL.md",
+      "computedHash": "7ac937f9ad4e74f5d441340f314ec2dbc70ed678d90889f6789091e5863d9aa4"
+    },
+    "systems-programming-rust-project": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/systems-programming-rust-project/SKILL.md",
+      "computedHash": "60e65397f1992b2081cdb8447a0159c52f1862091f624934de64a4ed18c37700"
+    },
+    "tailwind": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/tailwind/SKILL.md",
+      "computedHash": "cbeebfbf77537127a4a309fe3439cc00027d6e6e56f0aeea74ed5537a971ac8b"
+    },
+    "tailwind-css-patterns": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/tailwind-css-patterns/SKILL.md",
+      "computedHash": "6092620c3af955a46ea2b94ca8a40197ac8392e6bbdc8c7515659328b186c770"
+    },
+    "tailwind-design-system": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tailwind-design-system/SKILL.md",
+      "computedHash": "8bf7b1946042609fb682e41d822f875208ac4d6383037c170675a8bbe52f9ba5"
+    },
+    "tailwind-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tailwind-patterns/SKILL.md",
+      "computedHash": "54ea413749acbfadc152864d73e16e6cf5d13f8c88c7fbf8f84693988789c30a"
+    },
+    "tailwind-refactor": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/tailwind-refactor/SKILL.md",
+      "computedHash": "f041281452a90fed2c2a5f455571bd660c94827c08e0c40b8beee3834c3d9fbc"
+    },
+    "tailwind-responsive-ui": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/tailwind-responsive-ui/SKILL.md",
+      "computedHash": "dcb45134574840921c1f34ce1fa4b3d6aa7cbf11c5d13ae8adefe7d37265add5"
+    },
+    "tailwind-ui-refactor": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/tailwind-ui-refactor/SKILL.md",
+      "computedHash": "bb7fbdb319e83bd48fd13c7dc8ee0a2e071f51cf21f5cb498d0a472148b4365f"
+    },
+    "tailwind-v4-shadcn": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tailwind-v4-shadcn/skills/tailwind-v4-shadcn/SKILL.md",
+      "computedHash": "ab5ef62db14cbd7abd213ed669e52303d2cf250e3545c798787a2b9ba58f000c"
+    },
+    "tanstack-ai": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-ai/skills/tanstack-ai/SKILL.md",
+      "computedHash": "8d4336e58b07f809da139ae12261d2c76e775aef4c4a155535f37b724a1a2ad0"
+    },
+    "tanstack-cli": {
+      "source": "tanstack-skills/tanstack-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-cli/skills/tanstack-cli/SKILL.md",
+      "computedHash": "2f075c675dd814a87f8dfd7b94a03bd83d0aac98cac326d8b237ef967a18e2e8"
+    },
+    "tanstack-config": {
+      "source": "tanstack-skills/tanstack-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-config/skills/tanstack-config/SKILL.md",
+      "computedHash": "f1d53bd18002a098bf55153fbbf78ab504b89ec0cf03d2fbb79d3e31b3fbe91c"
+    },
+    "tanstack-db": {
+      "source": "tanstack-skills/tanstack-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-db/skills/tanstack-db/SKILL.md",
+      "computedHash": "9d21b2c472a9e642273ff70b52b1107839e414860462cad6ce6df3ae15debbda"
+    },
+    "tanstack-devtools": {
+      "source": "tanstack-skills/tanstack-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-devtools/skills/tanstack-devtools/SKILL.md",
+      "computedHash": "ecb51f9902ae6de9f512b299e6c16bd4befc3ff2c62f8cd1ece07e31b1c73dfe"
+    },
+    "tanstack-form": {
+      "source": "tanstack-skills/tanstack-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-form/skills/tanstack-form/SKILL.md",
+      "computedHash": "1eb9f9fc43ab2777f586f916b2234c5340ed98f296a98b22c75cbbafcbd29b86"
+    },
+    "tanstack-pacer": {
+      "source": "tanstack-skills/tanstack-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-pacer/skills/tanstack-pacer/SKILL.md",
+      "computedHash": "abc0e5bcf7b80a48b39d3e3aa1d6e67220c34a8a3240c1d6a28eba3fc2b5cfd0"
+    },
+    "tanstack-query": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/tanstack-query/SKILL.md",
+      "computedHash": "e7d35b4fa0a3f167de1f465a31e25d7087ee553ab894083716894d61ca1091f9"
+    },
+    "tanstack-query-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tanstack-query-expert/SKILL.md",
+      "computedHash": "24ca57d13931ad57ce26e8e28abbffdec424a2e1ce159b3f4a20a6aa6c01003a"
+    },
+    "tanstack-ranger": {
+      "source": "tanstack-skills/tanstack-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-ranger/skills/tanstack-ranger/SKILL.md",
+      "computedHash": "0d0a101ae1bcfbaa060ab5673d46ed9a369db02b3b719e9718405031d3655033"
+    },
+    "tanstack-router": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-router/skills/tanstack-router/SKILL.md",
+      "computedHash": "84ec1d796cbaccb729a38a8ed91a552c37c2927a471f659553d1730b24dfd5e5"
+    },
+    "tanstack-start": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-start/skills/tanstack-start/SKILL.md",
+      "computedHash": "3430273eb1214e110adb67493141bd57d5b340f4f0463ee6d399409dc18b49eb"
+    },
+    "tanstack-store": {
+      "source": "tanstack-skills/tanstack-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-store/skills/tanstack-store/SKILL.md",
+      "computedHash": "acfc5f1217685253fa9484f8f89dc92aae96a9ae30e42001b07b2ca672c758b2"
+    },
+    "tanstack-table": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-table/skills/tanstack-table/SKILL.md",
+      "computedHash": "41e1152dc812afde4af6431b60753b86b636a57b6e53d0939abc1263b6a3b619"
+    },
+    "tanstack-virtual": {
+      "source": "tanstack-skills/tanstack-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-virtual/skills/tanstack-virtual/SKILL.md",
+      "computedHash": "987d0fcffeac700cea1303a13a9cecd8a4583985dd675f97ebbca27bfa592b47"
+    },
+    "tdd": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/tdd/SKILL.md",
+      "computedHash": "09b4598d374af2e1872c4b59ac316859a58b5e8cf0aef6c5f41c1b31a818eb89"
+    },
+    "tdd-orchestrator": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tdd-orchestrator/SKILL.md",
+      "computedHash": "d9d32fa1b5c2d6d0a66ef4bf689157ce4a9a475ddd137b0beceafff11d62e62e"
+    },
+    "tdd-workflow": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tdd-workflow/SKILL.md",
+      "computedHash": "9224d1024d1164ef2243358c40397a70f65800b6c431b92f6fbac42afcf4902e"
+    },
+    "tdd-workflows-tdd-cycle": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tdd-workflows-tdd-cycle/SKILL.md",
+      "computedHash": "f4a0c4d39a1bc794a2fa79aa2752cf542aaa93b731e3b78c20fdbdecae56a60d"
+    },
+    "tdd-workflows-tdd-green": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tdd-workflows-tdd-green/SKILL.md",
+      "computedHash": "0d10c8fc2b690ee668ee5f1f57449631a9a5e21f3757759bee87c24f360f6fde"
+    },
+    "tdd-workflows-tdd-red": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tdd-workflows-tdd-red/SKILL.md",
+      "computedHash": "71bc840d72bcfcaf46fd2c90916aae1f5674cf4754e3532ccf0b93cc0662f203"
+    },
+    "tdd-workflows-tdd-refactor": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tdd-workflows-tdd-refactor/SKILL.md",
+      "computedHash": "fc0ea20c8fe8cdb31d1df2d173225cd906828918a801c0040ef855dc14d8d39e"
+    },
+    "technical-change-tracker": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/technical-change-tracker/SKILL.md",
+      "computedHash": "4d0f013966237f97123cd63d9e9ddb1d35d371cd35216e355abfa08a45b9183a"
+    },
+    "technical-specification": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/technical-specification/skills/technical-specification/SKILL.md",
+      "computedHash": "65caf4c219b720549a924929c448e949ef0cd2cac1b05c2b86c55916fc22c594"
+    },
+    "telegram": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/telegram/SKILL.md",
+      "computedHash": "ac02436b1c8941eb7a103f3db47077b0161cf026b85c72c355c8050d98e33848"
+    },
+    "telegram-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/telegram-automation/SKILL.md",
+      "computedHash": "1b7cbdaab50a8cc85a724685fc2272e9626eda92c21a624d58ebaa9b391650ad"
+    },
+    "telegram-bot-builder": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/telegram-bot-builder/SKILL.md",
+      "computedHash": "a57b1413132d277829e3e357270e993a5ae67a41fa757c9b201d46c30c6289fc"
+    },
+    "telegram-mini-app": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/telegram-mini-app/SKILL.md",
+      "computedHash": "e19acb241d3d9d8dd2f275be5588dd129fd36f97f93d0dd18fa7b93b67d2e205"
+    },
+    "test-automator": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/test-automator/SKILL.md",
+      "computedHash": "b8dcb786287f7fdf0aa4768e9cc0e3e5d4e96cb992da036788bca404dde4386e"
+    },
+    "test-driven-development": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/test-driven-development/SKILL.md",
+      "computedHash": "eded5969b12613d1cc0a454b9a5eb4839fcfdfaea2bc52c423e18b4b13da2312"
+    },
+    "test-fixing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/test-fixing/SKILL.md",
+      "computedHash": "d478821a82e73a39e2d5150e42fea982af1bfd53716614f8c5622581780edaa8"
+    },
+    "test-quality-analysis": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/test-quality-analysis/skills/test-quality-analysis/SKILL.md",
+      "computedHash": "e313559f4eb047974de77b4e66d615b5ec55303e2e2c8a7af552c2b8a3b8f9b0"
+    },
+    "testing-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/testing-patterns/SKILL.md",
+      "computedHash": "028a768cc83e90ef6dcd96bc067dcc5d271eaca44d4f86ecf28bf39e5e32b8a6"
+    },
+    "testing-qa": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/testing-qa/SKILL.md",
+      "computedHash": "600265f8f7e46637bcd103626256cf05079365ae0a120a7bfee4c9150ae3f539"
+    },
+    "think": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/think/SKILL.md",
+      "computedHash": "ba382da8b4f00ae769903136bef9644a45295d590e1701fca07cf23c24093003"
+    },
+    "threat-mitigation-mapping": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threat-mitigation-mapping/SKILL.md",
+      "computedHash": "4b35c000d8fb5d7d6a8c5129f4df1ed01195d9fcd1b4160ac232055daab39fd3"
+    },
+    "threat-model": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/threat-model/SKILL.md",
+      "computedHash": "579bfb9d9a1afc642b653bc64931d0f038a60c425bd6412fd5fb135b0253d1c9"
+    },
+    "threat-modeling-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threat-modeling-expert/SKILL.md",
+      "computedHash": "276c2c50ce42ee4be6882ac2fe57d7ee9a142c5ab456b949dd10ea88b1aecfe4"
+    },
+    "threat-patch": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/threat-patch/SKILL.md",
+      "computedHash": "8dd73f6d39513b1a04e1979d3dcbdac99c072398e46bae99a8ac38628445c8ba"
+    },
+    "top-web-vulnerabilities": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/top-web-vulnerabilities/SKILL.md",
+      "computedHash": "6e87994dbb192001cad571d4011156030c37d7d8794e8bdd981294fd8cbf5ed1"
+    },
+    "transcribe": {
+      "source": "openai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/transcribe/SKILL.md",
+      "computedHash": "0391b3fba28374df131946e0b515e62f5e2a9b51013d05a35791944ca6853dff"
+    },
+    "turborepo": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/turborepo/skills/turborepo/SKILL.md",
+      "computedHash": "1a3eb5e61f11c2a56b8da4ad2ad4a505301e1dcd09663fa9e02f4fa4147c6ba8"
+    },
+    "turborepo-caching": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/turborepo-caching/SKILL.md",
+      "computedHash": "da2293bdc7e11f8b4ec5bf1194aa0008b7270142f094b94c4a3907290eef700b"
+    },
+    "turborepo-monorepo": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/turborepo-monorepo/SKILL.md",
+      "computedHash": "dd24a9f0e1ba7586ca6ce85732b6f3388d2c2760307d4316596ab0cb155f8173"
+    },
+    "two-factor-authentication-best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/twoFactor/SKILL.md",
+      "computedHash": "7e297aaf887e11fdc03e52bdbf44974e161e8f7c393170ced7dc66cace4f6d46"
+    },
+    "twoFactor": {
+      "source": "better-auth/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "85230144b20eed676d0cbe8d28997cb9ccc0b293517204215adad0d74fae9a9d"
+    },
+    "typescript": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/typescript/SKILL.md",
+      "computedHash": "3475c8e2a2e556833213dc2d4dff19e09ef166375a203b256b0d7f04f7d5d424"
+    },
+    "typescript-advanced-types": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/typescript-advanced-types/SKILL.md",
+      "computedHash": "73556f974c748e2294304a9471ea60727f1c7d2ed35ee59a3a5a5e61423e6701"
+    },
+    "typescript-docs": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/typescript-docs/SKILL.md",
+      "computedHash": "9e2c39b8a9ea569feb0c90080b10a71371e2d2d8ffb35de4fc5f7afe2a442f67"
+    },
+    "typescript-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/typescript-expert/SKILL.md",
+      "computedHash": "525e74a7220ed67832001ca89b46deae8f2bab1abc9d25c56c8716d6550c795f"
+    },
+    "typescript-mcp": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/typescript-mcp/skills/typescript-mcp/SKILL.md",
+      "computedHash": "cfdfe8b814594e95484b2f230600c9196b388c892054ced70db53e47b49743be"
+    },
+    "typescript-pro": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/typescript-pro/SKILL.md",
+      "computedHash": "166981fe3092b01ea6f8d0ec2d7aa00454d0efc8d178f0f35ac17d54b92c9cd8"
+    },
+    "typescript-refactor": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/typescript-refactor/SKILL.md",
+      "computedHash": "33469346ec90531e8877b9148fb075148bbe9610d78526be0871e06af16eeeb4"
+    },
+    "typescript-security-review": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/typescript-security-review/SKILL.md",
+      "computedHash": "964df9f841a2afb2114639662fcf6a85e2ad5ee705fe46b99f462aa331defaee"
+    },
+    "ui-a11y": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-a11y/SKILL.md",
+      "computedHash": "1ec02fc98f134603a279bd37efb000cb8f22d3889e1b5dfae14a0eb6990ebd25"
+    },
+    "ui-component": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-component/SKILL.md",
+      "computedHash": "dd8959b41425232210fa7aff9e99fa61c17f124b6b58f0c1ae3ba3c659d110c1"
+    },
+    "ui-design": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/ui-design/SKILL.md",
+      "computedHash": "69c14fd298c6420b7e65e908183d9b8e938164703e0989a944accbfb12abb1b6"
+    },
+    "ui-page": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-page/SKILL.md",
+      "computedHash": "7ced97158cbf3e35d32713abe15a513d554af8a3523596cd637f1d518ac4df15"
+    },
+    "ui-pattern": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-pattern/SKILL.md",
+      "computedHash": "7881f82731aadb696f6aa59f60551a8fc6bcffab962775c16f457e23cfa29b8b"
+    },
+    "ui-review": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-review/SKILL.md",
+      "computedHash": "d3771b6916c25bac66cfb0abf17692af8763ace1c1a858c6e960b78d2f9a5f74"
+    },
+    "ui-setup": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-setup/SKILL.md",
+      "computedHash": "e3722f9e0d9e7980fdc655464223667c4c354f69e6c71543f00839cd765d57db"
+    },
+    "ui-skills": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-skills/SKILL.md",
+      "computedHash": "884bb7abf09022a46d647775f81abba174df51a585dfc0b894b052b6d0fa4d44"
+    },
+    "ui-tokens": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-tokens/SKILL.md",
+      "computedHash": "a45198752c4640282f4072219f9c20e04820ac9a9c88b06eb15ac01ce1d207df"
+    },
+    "ui-ux-designer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-ux-designer/SKILL.md",
+      "computedHash": "2f0bcb6b7a81fbd31575b78a3d777d4b43fc8a2f602db46ad027dbbb6adc9a0f"
+    },
+    "ui-ux-pro-max": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "703dda85be57e33ee32212488e017be0863bc796dfbe41bfad273e457648d42a"
+    },
+    "ui-visual-validator": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-visual-validator/SKILL.md",
+      "computedHash": "2b0bee7f6a42011ff76e70737b33bcd4aa87849a669cf9a52349b0591da767b3"
+    },
+    "unit-test-boundary-conditions": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-java/skills/unit-test-boundary-conditions/SKILL.md",
+      "computedHash": "a19b65853df56b1de36fc3a008691e92b1a654d0e2c8dfcd2a823492fbcf6f65"
+    },
+    "unit-test-caching": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-java/skills/unit-test-caching/SKILL.md",
+      "computedHash": "6eda196627507fd387c3e5b2c4ba461393c525e53c48447725b10b31345fb149"
+    },
+    "unit-test-parameterized": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-java/skills/unit-test-parameterized/SKILL.md",
+      "computedHash": "3b43747a83bb47ca8dde9f2b9e555fd0cbae0e575ae6b796bc4abdca8674ef71"
+    },
+    "unit-test-service-layer": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-java/skills/unit-test-service-layer/SKILL.md",
+      "computedHash": "e24d6b55c360cf55b8564a6ccc7bb743d83306db22ae6ec48d00a0ccc31cc898"
+    },
+    "unit-test-utility-methods": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-java/skills/unit-test-utility-methods/SKILL.md",
+      "computedHash": "a73711c9bdbd4b301a91d3c3edd654676e7166348010e139dbf434ce063aba9e"
+    },
+    "unit-testing-test-generate": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/unit-testing-test-generate/SKILL.md",
+      "computedHash": "60b0c33801210bd79b53f05c6466cc32e77fbbfd9538b1d1ba2958ed78c723e3"
+    },
+    "unix-cli": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/unix-cli/SKILL.md",
+      "computedHash": "0558a8e230e66a792eaf2e0543d9ad949027116811c68c750811eae4c89ff125"
+    },
+    "use-ai-sdk": {
+      "source": "vercel/ai",
+      "sourceType": "autoskills-registry",
+      "computedHash": "78ef7cd5ffec2f2781724bd8f14042e27194536964453e51d9c583c151943698"
+    },
+    "using-git-worktrees": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/using-git-worktrees/SKILL.md",
+      "computedHash": "8529505ce1756a5bc6c56921af4c3ced575d7530553a2ddbff30cebefd95f036"
+    },
+    "using-superpowers": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/using-superpowers/SKILL.md",
+      "computedHash": "e530636aebd22c2dcd683fe6926701c917bcb236e31cfd5f97cff6488e1747d5"
+    },
+    "ux-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ux-audit/SKILL.md",
+      "computedHash": "2da145bda5d98b8d8cf2c11b8547ce0d72bf4792dcf2b2d442270602a92ad676"
+    },
+    "ux-feedback": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ux-feedback/SKILL.md",
+      "computedHash": "570cc3e6e8277af4c56b92cd31f54ea88b416eed096776881a2917b41d37134c"
+    },
+    "uxui-principles": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/uxui-principles/SKILL.md",
+      "computedHash": "bff6634ee66bdd1e20bf9e4c181ac84ecd163e25287112dc7aea56d83ed1d3df"
+    },
+    "varlock": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/varlock/SKILL.md",
+      "computedHash": "5545f072c3eb53a73630bad936c1ef43a9bc0d0bde1da3ef1df6dcbba9692763"
+    },
+    "varlock-claude-skill": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/varlock-claude-skill/SKILL.md",
+      "computedHash": "e83b887ec51000a7c9c541750c999167ea2995bb5e44a648b95434d18ddb120a"
+    },
+    "vector-index-tuning": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/vector-index-tuning/SKILL.md",
+      "computedHash": "2e57ed2ad792b220d6a97de679b329549d13d1c24439fe52d6d12157771e258c"
+    },
+    "vercel-ai-sdk-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/vercel-ai-sdk-expert/SKILL.md",
+      "computedHash": "80e610470cb230fed8668a7bbd9d1a5acb9d01a445449625f73fb082c4296cd1"
+    },
+    "vercel-composition-patterns": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/composition-patterns/SKILL.md",
+      "computedHash": "575757e3e25761c8c562d6e395d29f0b76c98b1273c0bd72d88e6ab1bc9c7d42"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "ca7b0c0c6e5f2750043f7f0cd72d16ac4e2abc48f9b5500d047a4b77a2506212"
+    },
+    "vercel-react-view-transitions": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-view-transitions/SKILL.md",
+      "computedHash": "c8952fc9127fa0564d0cb71dccb4215a5608ac933b5831104f09173a97a46f85"
+    },
+    "verification-before-completion": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/verification-before-completion/SKILL.md",
+      "computedHash": "a1f33fe6482d116a6e7d9db3883370dfe827eca5fcf1b2ad0048d6d8945ee9b5"
+    },
+    "video": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "skillPath": "skills/video/SKILL.md",
+      "computedHash": "361c89ae835cfbbbbc9d1abd919f4e297280a4dff36eeedb94080791992fcdfd"
+    },
+    "visual-design-foundations": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/visual-design-foundations/SKILL.md",
+      "computedHash": "9f0f44bd206036f17f69cf78f3f3b5f9c0e0118672574ffd35c4c34c3d574d16"
+    },
+    "vite": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/vite/SKILL.md",
+      "computedHash": "c00132fefad9dc5a89935ced95abf61d136ba036341307e526b0f062e870d0eb"
+    },
+    "vitest": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/vitest/SKILL.md",
+      "computedHash": "84d2d291054736df0cdee47d1a9a8d3ceb5b9e5a06afb879edff51f55ef30816"
+    },
+    "vitest-testing": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/vitest-testing/skills/vitest-testing/SKILL.md",
+      "computedHash": "1c24e993c451a720db0c66b444b2623aee3597699c6054858fb8251b38a5eb3b"
+    },
+    "vulnerability-scanner": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/vulnerability-scanner/SKILL.md",
+      "computedHash": "d457720ffbf8f1245e387b38f006a041e6c130e3434bb5b6a92b0be072409c3b"
+    },
+    "vulnerability-scanning": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/vulnerability-scanning/skills/vulnerability-scanning/SKILL.md",
+      "computedHash": "4c526a9b8243f325f1c98e6bc0813bba406b3cb786cec16f7d2c42ae3db7c6b3"
+    },
+    "wcag-audit-patterns": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/wcag-audit-patterns/SKILL.md",
+      "computedHash": "5d1d9c36047f3b072b6dca7a12c93fc33c4828c9fabf5d93d195fc32d7605a96"
+    },
+    "web-design-guidelines": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "de44ccda534f5eaf1595f0d2c6403bcaaf96d6f060fa0bb1cdf0037fe1867c6c"
+    },
+    "web-perf": {
+      "source": "cloudflare/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "02a46c6d1c10070034f6030f2e208bb306b14b04e535d3990ca4310b907e91a5"
+    },
+    "web-performance-audit": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/web-performance-audit/skills/web-performance-audit/SKILL.md",
+      "computedHash": "2034f63d9a0cbfe437fd40ab636d271031690ab69d26ecb0e4599781271b8247"
+    },
+    "web-performance-optimization": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-performance-optimization/SKILL.md",
+      "computedHash": "b1f46c736054422a4854c7d5fbbe3397e8ac48dddb81da05ade5d83cef2cfb73"
+    },
+    "web-security-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-security-testing/SKILL.md",
+      "computedHash": "b9ab37bfdc67232e22456fc993892e3e9059180260004a3c6bb816b70a05fae9"
+    },
+    "webapp-testing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/webapp-testing/SKILL.md",
+      "computedHash": "d82a5132fcca4b2896fc9fd54a70f733b57898d1cf1c5dfff5269f92e3bd235a"
+    },
+    "websocket-implementation": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/websocket-implementation/skills/websocket-implementation/SKILL.md",
+      "computedHash": "3e0060bc0e5ba6f5f2beb7ebfe869c00f3b837345727d78108c13dff6f1f260e"
+    },
+    "whatsapp-automation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/whatsapp-automation/SKILL.md",
+      "computedHash": "23b759792c99a492630c2f1a9e78bbf23a812852b04721a6dc3dcc6928ff5b00"
+    },
+    "whatsapp-cloud-api": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/whatsapp-cloud-api/SKILL.md",
+      "computedHash": "a43bb5c737b3ba151576167e5f5e7cae6d970b04b252834e3cbd02508da6c5f2"
+    },
+    "workers-best-practices": {
+      "source": "cloudflare/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "9661260d852b07de738dd870fc92606b2a44c091b0e5c0df785ae097c26dc382"
+    },
+    "wrangler": {
+      "source": "cloudflare/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "d9a05896e7ef591d4c499436ce0a53c510800832de30de866b2c2999efe3f622"
+    },
+    "writing-plans": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/writing-plans/SKILL.md",
+      "computedHash": "a87a54f16f5a95a920efd739db9d12991f0eb724d6def53bc1fb3852136cbe91"
+    },
+    "xlsx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/xlsx/SKILL.md",
+      "computedHash": "efd0c8011cf0677d8075cf93867ecec804f9a8754a777e1d2fdb46197e9c247f"
+    },
+    "xlsx-official": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/xlsx-official/SKILL.md",
+      "computedHash": "41427ff53766a1cf049f5013c260d3988bec7c489302efc352c1163b613bbcbb"
+    },
+    "xss-html-injection": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/xss-html-injection/SKILL.md",
+      "computedHash": "a8a3228b1e60175247b3ab3dba7cd9a71299fd92a90511991d4387e03c98b97a"
+    },
+    "xss-prevention": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/xss-prevention/skills/xss-prevention/SKILL.md",
+      "computedHash": "06afb00e6b054c905a3bdb6caf7eba39517e94d3c93e10bd886cd8ddd55b48f2"
+    },
+    "zeroize-audit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/zeroize-audit/SKILL.md",
+      "computedHash": "05df3758752a505c0589188ee62737a85bfad5b594b17d9155c0aec0c359eda9"
+    },
+    "zod": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/zod/SKILL.md",
+      "computedHash": "e5d8e35002d0d6b03db0b0daad54e1b82c9c10804f8a745025c07db5ea685655"
+    },
+    "zod-validation-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/zod-validation-expert/SKILL.md",
+      "computedHash": "d973af5f5bb353b6793ba2516bc11f17d6df6e505e787e774611a05e182db16a"
+    },
+    "zod-validation-utilities": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/zod-validation-utilities/SKILL.md",
+      "computedHash": "9785b925118b719c6f2c34b3d1fb2052a272d2efee4853ced86b8d6be5a7b061"
+    },
+    "zustand": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/zustand/SKILL.md",
+      "computedHash": "e9a0f8275e0a62ad9e3cf1a6553a6f51b6caa46d0ecb0ccb3e6e1d346f98475d"
+    },
+    "zustand-state-management": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/zustand-state-management/skills/zustand-state-management/SKILL.md",
+      "computedHash": "9de078e8b4a26d254a1e426c3d77b8d3edf5abfdd0e8e91143893003c2dc8536"
+    },
+    "zustand-store-ts": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/zustand-store-ts/SKILL.md",
+      "computedHash": "b66ed7ed7978bae5de8d2a5552fbf11c317de347e39bc1cea9f9a817d2a8179d"
+    }
+  }
+}

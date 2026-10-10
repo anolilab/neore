@@ -1,0 +1,161 @@
+---
+title: Triggers
+description: Automate agent execution on schedules, via webhooks, or from external events
+---
+
+# Triggers
+
+Triggers let you automate AI agent execution without manually starting a conversation. When a trigger fires, it creates a new thread and runs the AI autonomously with Deep Work mode (up to 25 iterations). Results appear in your thread list like any other conversation.
+
+## Quick Start
+
+1. Open `/dashboard/settings/chat/triggers`
+2. Click **New Trigger**
+3. Choose a trigger type (Schedule, Webhook, or Event)
+4. Configure the trigger settings and optionally set a system prompt
+5. Click **Create Trigger**, then enable it with the toggle
+
+## Trigger Types
+
+### Schedule
+
+Run the AI on a recurring cron schedule — for example, daily at 8 AM or every Monday morning.
+
+**Configuration:**
+- **Cron expression** — standard 5-field cron format (minute, hour, day-of-month, month, day-of-week)
+- **Timezone** — the timezone the schedule runs in (e.g. `America/New_York`)
+
+**Examples:**
+
+| Cron expression | Schedule |
+|---|---|
+| `0 8 * * *` | Every day at 8:00 AM |
+| `0 9 * * 1` | Every Monday at 9:00 AM |
+| `*/30 * * * *` | Every 30 minutes |
+| `0 0 1 * *` | First day of every month at midnight |
+
+**How it works:** A background job polls every minute and checks if any enabled schedule triggers are due to fire. When one matches, a new thread is created and the agent runs your configured prompt.
+
+### Webhook
+
+Receive HTTP POST requests from external services (Stripe, GitHub, Zapier, etc.) and run the AI with the payload as context.
+
+**Configuration:**
+- When you create a webhook trigger, a unique **webhook URL** and **signing secret** are generated automatically
+- Copy the URL and register it with the external service
+- The signing secret is used to verify that incoming requests are authentic
+
+**Webhook URL format:**
+```
+{LUNORA_URL}/triggers/webhook/{triggerId}
+```
+
+**Security:**
+- All webhook requests are verified using HMAC-SHA256 signature validation
+- Supports both GitHub-style signatures (`sha256=hex`) and raw hex format
+- Requests without a valid signature are rejected
+
+**Payload handling:**
+- The webhook body is passed to the AI as context
+- You can define a **payload template** to transform or filter the incoming data before it reaches the AI
+
+### Event (Coming Soon)
+
+React to external events from MCP servers or Composio integrations. This trigger type is planned for a future release.
+
+## Creating a Trigger
+
+1. Open `/dashboard/settings/chat/triggers`
+2. Click **New Trigger**
+3. Fill in the details:
+   - **Name** — a descriptive name for the trigger
+   - **Description** (optional) — what the trigger does
+   - **Type** — Schedule, Webhook, or Event
+4. Configure type-specific settings:
+   - For Schedule: cron expression and timezone
+   - For Webhook: the URL and secret are generated automatically
+5. Optionally configure the agent:
+   - **System prompt** — custom instructions for the AI when this trigger fires
+   - **Input template** — the initial message sent to the AI (for schedules)
+   - **Model** — override the default model
+   - **Search mode** — set the search mode for tool calls
+6. Click **Create Trigger**
+7. Enable the trigger with the toggle switch
+
+:::note
+Triggers start disabled. You must explicitly enable them after creation.
+:::
+
+## How Execution Works
+
+When a trigger fires:
+
+1. A new thread is created, tagged with the trigger's metadata
+2. The AI runs autonomously using Deep Work mode (up to 25 iterations)
+3. The agent can use all available tools — web search, code execution, document creation, etc.
+4. Memory extraction runs automatically after the AI finishes
+5. The completed thread appears in your thread list
+
+Each execution is logged with:
+- Start and end timestamps
+- Success or failure status
+- Error messages (if any)
+
+## Managing Triggers
+
+The **Triggers** settings page (`/dashboard/settings/chat/triggers`) shows all
+your triggers with their current state.
+
+:::note
+This page is not yet linked from the settings sidebar — navigate to the URL
+directly.
+:::
+
+**For each trigger you can:**
+- Toggle it on or off at any time
+- View execution count and last triggered timestamp
+- See the next scheduled run time (for schedule triggers)
+- View the last error message if an execution failed
+- Delete the trigger and its execution history
+
+## Common Use Cases
+
+**Daily briefing**
+Create a schedule trigger that runs every morning and asks the AI to research and summarize the latest news in your industry.
+
+**Webhook-driven reports**
+Connect a Stripe webhook to generate a financial summary whenever a payment is processed.
+
+**Automated monitoring**
+Set up a schedule trigger to check a website or API endpoint at regular intervals and alert you to changes.
+
+**Content generation**
+Schedule the AI to draft a weekly newsletter or social media posts on a recurring basis.
+
+## Troubleshooting
+
+**Issue:** Trigger doesn't fire on schedule
+- **Solution:** Verify the trigger is enabled (toggle is on)
+- **Solution:** Double-check the cron expression — use a cron validator to confirm it matches your intended schedule
+- **Solution:** Verify the timezone is correct
+
+**Issue:** Webhook returns 401 or signature validation fails
+- **Solution:** Ensure the signing secret in the external service matches the one shown in Neore
+- **Solution:** For GitHub webhooks, set the secret in the webhook settings — GitHub uses `sha256=hex` format which is supported automatically
+- **Solution:** Verify the external service is sending the signature in the `X-Hub-Signature-256` or similar header
+
+**Issue:** Trigger fires but the AI response is empty or unhelpful
+- **Solution:** Add a detailed system prompt to guide the AI's behavior
+- **Solution:** Include an input template that provides context for the task
+- **Solution:** Enable Deep Work mode settings if the task requires multiple steps
+
+**Issue:** Too many threads being created
+- **Solution:** Adjust the cron schedule to run less frequently
+- **Solution:** Disable the trigger temporarily while you refine the configuration
+
+## Related Features
+
+- [Chat](/docs/chat) — Threads created by triggers appear in your thread list
+- [Deep Work Mode](/docs/chat#deep-work-mode-auto-continue) — All triggers use Deep Work mode automatically
+- [Settings](/docs/settings) — Access trigger management from chat settings
+- [Memory](/docs/memory) — Trigger executions contribute to your memory

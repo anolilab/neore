@@ -1,0 +1,76 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+dev-dist
+*.local
+.env
+.output
+.vinxi
+.tanstack
+.tanstack-start
+.nitro
+.history
+.eslint.cache.json
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
+.idea
+.tsbuildinfo
+
+.claude/settings.local.json
+
+# Generated build artifacts. `apps/web` was `app/` before the migration; these
+# paths did not move with it, so the artifacts below were tracked by accident.
+apps/web/public/og.png
+
+# Alchemy IaC local state (CI uses R2RestStateStore instead)
+.alchemy/
+
+# Fumadocs MDX generated types
+apps/web/.source/
+apps/web/source.generated.ts
+
+.playwright-mcp
+.wrangler/
+
+# Lunora build output + local Miniflare state (`lunora build` / `lunora dev`).
+# 52M after one `lunora build`; nothing here is a source artifact.
+.lunora/
+
+# Wrangler/Lunora local secrets. `.dev.vars` is where `lunora doctor` and the
+# quickstart tell you to put real keys, and it was not ignored — the example
+# file is tracked, the real one must never be.
+.dev.vars
+!.dev.vars.example
+tmp/
+.concave/
+docs/analyze/
+.claude/scheduled_tasks.lock
+# Agent worktrees — each is a full checkout (327MB at the time of writing), so
+# leaving them untracked meant every `git status` listed them and any
+# `git add -A` would have swept them in.
+.claude/worktrees/
+# vis task cache / run metadata. `.vis/*` rather than `.vis/`, because git will
+# not look inside an excluded DIRECTORY, so a negation under it never matches.
+.vis/*
+# The hook scripts are the reviewable part and belong in the repo; `_/` holds
+# generated dispatchers that `vis hook install` rebuilds from postinstall.
+!.vis/hooks/
+.vis/hooks/_/
+
+# `lunora advisor` health map. Generated; not committed by default.
+# Commit it deliberately to enable `lunora advisor --baseline`, which fails on a
+# regression against the recorded score instead of just reporting one.
+backend/lunora.advisor.map.json
+.pnpm-store/v11/
+
+# Playwright / browser-test artefacts.
+**/__screenshots__/
+**/.vitest-attachments/
+**/e2e/.report/
+**/e2e/.results/
+# The shared test user's signed-in browser state (`e2e/auth.setup.ts`): a live session cookie.
+**/e2e/.auth/
+
+# Agent git worktrees (Claude Code isolation)
+/.worktrees/

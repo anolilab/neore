@@ -1,0 +1,556 @@
+---
+title: Prompts
+description: Create, manage, and reuse prompt templates with dynamic variables
+---
+
+# Prompts
+
+The Prompts feature allows you to create, save, and reuse prompt templates with dynamic variables, making it easy to maintain consistent and efficient AI interactions.
+
+## Quick Start
+
+1. **Access Prompts**: Open the Prompts sidebar tab or navigate to the prompts page
+2. **Create Prompt**: Click "New Prompt" and fill in the form
+3. **Add Variables**: Use `{{variableName}}` syntax for dynamic content (or type `{{` for autocomplete)
+4. **Use Prompt**: Click "Use" to insert the prompt into your chat composer
+
+## Overview
+
+Prompts are reusable templates that can include:
+- **Static Content**: Fixed text that stays the same
+- **Dynamic Variables**: Placeholders that get replaced with actual values
+- **Model Settings**: Associated AI model, reasoning effort, and features
+- **Metadata**: Name, description, tags, and favorites
+
+## Creating Prompts
+
+### Basic Prompt Creation
+
+1. Click "New Prompt" or the "+" button
+2. Enter a **name** for your prompt
+3. Write the **content** in the text area
+4. Optionally add a **description**
+5. Click "Save"
+
+### Adding Variables
+
+Variables use the `{{variableName}}` syntax:
+
+**Example:**
+```
+Hello {{user.name}}, welcome to {{configs.BRAND}}!
+
+Today is {{context.currentDate}} and the time is {{context.currentTime}}.
+```
+
+**Variable Syntax:**
+- Simple: `{{BRAND}}`
+- Categorized: `{{configs.BRAND}}` or `{{user.name}}`
+- Case-sensitive: Variable names are case-sensitive
+
+### Variable Autocomplete
+
+When typing in the composer, you can use autocomplete to insert variables:
+
+**How to Use:**
+1. Type `{{` in the composer
+2. An autocomplete menu appears with available variables
+3. Type to filter variables (e.g., `{{user` shows user variables)
+4. Use arrow keys to navigate
+5. Press Enter or click to insert
+
+**Features:**
+- **Real-time Filtering**: Type after `{{` to filter variables
+- **Categorized Display**: Variables grouped by category (configs, context, user, conversation, custom)
+- **Keyboard Navigation**: Arrow keys to navigate, Enter to select
+- **Descriptions**: See what each variable does
+- **Custom Variables**: Your prompt's custom variables appear first
+
+**Example:**
+- Type `{{` → See all variables
+- Type `{{user` → See only user variables (`user.name`, `user.email`, etc.)
+- Type `{{context.` → See context variables (`context.currentDate`, `context.currentTime`, etc.)
+
+**Keyboard Shortcuts:**
+- `Arrow Up/Down`: Navigate through variables
+- `Enter`: Insert selected variable
+- `Escape`: Close autocomplete menu
+- `Tab`: Insert selected variable (alternative to Enter)
+
+### Variable Definitions
+
+When creating a prompt, define variables with:
+- **Name**: The variable name (must match usage in content)
+- **Description**: Help text explaining what the variable is for
+- **Default Value**: Optional default value
+- **Required**: Mark if the variable must be filled before use
+
+**Example Variable Definition:**
+- Name: `BRAND`
+- Description: "Your company brand name"
+- Default Value: "Neore Chat"
+- Required: Yes
+
+### Model Settings
+
+Associate prompts with specific model configurations:
+
+**Available Settings:**
+- **Model**: Specific AI model to use (optional)
+- **Reasoning Effort**: Reasoning level (None, Low, Medium, High)
+- **Enabled Features**: Features to enable (if model supports)
+
+**When Using Prompt:**
+- If model is set, it switches to that model automatically
+- Reasoning effort and features are applied
+- Settings are validated before use
+
+## Using Prompts
+
+### From Sidebar
+
+1. Open the Prompts sidebar tab
+2. Browse or search for a prompt
+3. Click "Use" on a prompt
+4. If variables need values, a dialog appears
+5. Fill in required variables
+6. Prompt is inserted into composer
+
+### From Prompt Library
+
+1. Navigate to the prompts page
+2. Find your prompt
+3. Click "Use" button
+4. Fill variables if needed
+5. Prompt is ready to send
+
+### Using Slash Commands
+
+You can also insert prompts using slash commands in the composer:
+
+1. Type `/prompt` in the composer
+2. An autocomplete menu shows available prompts
+3. Type to filter prompts by name, content, or tags
+4. Select a prompt to insert it
+5. Fill variables if needed
+
+**Example:**
+- Type `/prompt` → See all prompts
+- Type `/prompt email` → See prompts matching "email"
+- Select a prompt → It's inserted into composer
+
+### Variable Filling
+
+When a prompt has variables:
+
+1. **Auto-populated Variables**: Some variables are filled automatically:
+   - `{{context.currentDate}}` - Current date
+   - `{{context.currentTime}}` - Current time
+   - `{{user.name}}` - Your name
+   - `{{user.email}}` - Your email
+   - `{{user.organization}}` - Your organization
+
+2. **User Defaults**: Variables you've set defaults for are pre-filled
+
+3. **Thread Variables**: Variables set for the current thread override defaults
+
+4. **Required Variables**: Must be filled before using the prompt
+
+5. **Optional Variables**: Can be left empty (uses default or empty string)
+
+## Managing Prompts
+
+### Organizing Prompts
+
+**Tags:**
+- Add tags to categorize prompts
+- Filter prompts by tags
+- Multiple tags per prompt
+- Quick organization
+
+**Favorites:**
+- Mark frequently used prompts as favorites
+- Favorites appear at the top
+- Quick access to important prompts
+- Toggle with star icon
+
+**Search:**
+- Search prompts by name or content
+- Real-time search results
+- Filter by tags
+- Quick access to prompts
+
+### View Modes
+
+**Board View:**
+- Card-based layout
+- Visual browsing
+- See more prompts at once
+- Default view
+
+**List View:**
+- Compact list format
+- More information visible
+- Sortable columns
+- Efficient for many prompts
+
+### Sorting Options
+
+- **Recent**: Most recently used first
+- **Alphabetical**: A-Z by name
+- **Usage**: Most used first
+- **Created**: Newest first
+
+## Advanced Features
+
+### Prompt Optimization
+
+The prompt optimizer rewrites a prompt for you. It runs in three places: on a
+saved prompt, on whatever you have typed in the composer, and on a system
+prompt.
+
+#### Optimizing a saved prompt
+
+1. Select a prompt
+2. Click "Optimize" from the menu
+3. Optionally add improvement instructions
+4. The AI analyzes and suggests improvements
+5. Review the optimized version
+6. Apply changes or keep the original
+
+#### Optimizing what you're about to send
+
+Click the sparkles icon in the composer. The dropdown next to it picks the
+style; your choice is remembered between messages.
+
+| Style | What it does |
+|---|---|
+| **Basic optimization** | Quick expression improvement: clarity, structure, missing context |
+| **Professional precision** | Converts a vague request into a specific, actionable one with quantified standards |
+| **Step-by-step planning** | Converts a goal into a structured, executable task plan with role, steps, and output spec |
+
+#### Optimizing a system prompt
+
+System prompts get their own styles, because they are describing a role rather
+than a task:
+
+| Style | What it does |
+|---|---|
+| **General role scaffold** | Produces a Role / Profile / Skills / Rules / Workflows system prompt |
+| **Analytical structured** | Deeper: Role / Background / Attention / Profile / Skills / Goals / Constraints / Workflow |
+| **Output-format heavy** | Like General, but also specifies output format, validation rules, and examples |
+
+The system-prompt optimizer is available from personalization settings, from the
+thread sidebar next to a thread's custom system prompt, and from each row of the
+system prompt preset library.
+
+#### Refine with feedback
+
+Every optimizer panel has a **Refine with feedback** box. Describe what you want
+changed — "make it shorter", "ask for a table", "drop the persona" — and the AI
+revises its own previous output with your feedback as an added constraint,
+rather than starting from scratch.
+
+**Use Cases:**
+- Improve clarity and effectiveness
+- Enhance prompt structure
+- Add missing context
+- Refine for better results
+
+:::note
+The optimizer treats your prompt text as evidence to be rewritten, never as
+instructions to follow. A prompt containing "ignore previous instructions" gets
+rewritten, not obeyed.
+:::
+
+### System Prompt Presets
+
+A system prompt sets the AI's role and behaviour for a whole thread. Presets let
+you save the ones you use repeatedly instead of retyping them.
+
+**Managing presets:** **Settings → Chat → System Prompts**
+
+- **Create** — give the preset a name and the prompt text
+- **Scope to a model** (optional) — presets matching the currently selected model are listed first
+- **Optimize** — run the system-prompt optimizer on any preset from its row
+- **Edit / Delete** — presets are yours alone; they are not shared
+
+**Using a preset in a thread:**
+
+1. Open the thread sidebar
+2. Find the **Custom system prompt** field
+3. Click **Load preset**
+4. Presets scoped to the thread's current model appear at the top
+
+**Saving from the optimizer:** when you optimize a system prompt, the result
+panel offers **Save as preset**, so a good result can go straight into the
+library without leaving the flow.
+
+### Prompt History
+
+Track changes to your prompts:
+
+**History Features:**
+- View all versions of a prompt
+- See what changed and when
+- Restore previous versions
+- Track optimization changes
+
+**Change Types:**
+- **Created**: Initial creation
+- **Manual Edit**: User edits
+- **AI Optimized**: Optimization changes
+- **Restored**: Version restoration
+
+**Restoring Versions:**
+1. Open prompt history
+2. Select a previous version
+3. Click "Restore"
+4. Prompt reverts to that version
+
+### Thread Variables
+
+Set variable values specific to a thread:
+
+**Thread Variables:**
+- Override user defaults for specific threads
+- Useful for context-specific values
+- Set once, used for all prompts in thread
+- Accessible in thread settings
+
+**Example:**
+- Set `{{customer.name}}` = "Acme Corp" for a thread
+- All prompts in that thread use "Acme Corp"
+- Other threads use default or different value
+
+### User Variable Defaults
+
+Set default values for variables globally:
+
+**Global Defaults:**
+- Apply to all prompts
+- Overridden by thread variables
+- Useful for common values
+- Set once, use everywhere
+
+**Example:**
+- Set `{{BRAND}}` default = "Neore Chat"
+- All prompts use "Neore Chat" unless overridden
+- Can override per-thread if needed
+
+## Variable System
+
+### Variable Categories
+
+**Config Variables** (`configs.*`):
+- `configs.BRAND` - Brand name
+- `configs.COMPANY` - Company name
+- `configs.PRODUCT` - Product name
+- `configs.SUPPORT_EMAIL` - Support email
+- `configs.TONE` - Tone of voice
+
+**Context Variables** (`context.*`):
+- `context.currentDate` - Current date (auto-populated)
+- `context.currentTime` - Current time (auto-populated)
+- `context.timezone` - User timezone (auto-populated)
+- `context.language` - Browser language (auto-populated)
+- `context.year` - Current year (auto-populated)
+- `context.month` - Current month name (auto-populated)
+- `context.dayOfWeek` - Day of week (auto-populated)
+
+**User Variables** (`user.*`):
+- `user.name` - User's display name (auto-populated)
+- `user.email` - User's email (auto-populated)
+- `user.role` - User's role
+- `user.organization` - User's organization (auto-populated)
+
+**Conversation Variables** (`conversation.*`):
+- `conversation.lastCustomerMessage` - Last customer message
+- `conversation.summary` - Conversation summary
+- `conversation.history` - Full conversation history
+- `conversation.messageCount` - Number of messages
+
+### Auto-Populated Variables
+
+These variables are automatically filled and cannot be overridden:
+
+- Date and time variables
+- User information (when logged in)
+- Browser context (timezone, language)
+
+### Custom Variables
+
+Create your own variables:
+
+1. Use `{{YourVariableName}}` in prompt content
+2. Define the variable in the form
+3. Set description and default
+4. Mark as required if needed
+
+## Prompt Limits
+
+**Free Accounts:**
+- Limited to 3 prompts
+- Upgrade to Pro for unlimited prompts
+
+**Pro Accounts:**
+- Unlimited prompts
+- All features available
+- No restrictions
+
+## Best Practices
+
+### Writing Effective Prompts
+
+1. **Be Specific**: Clear, detailed prompts get better results
+2. **Use Variables**: Make prompts reusable with variables
+3. **Use Autocomplete**: Type `{{` to quickly insert variables
+4. **Add Descriptions**: Help others understand your prompts
+5. **Tag Appropriately**: Use tags for easy organization
+6. **Test Before Saving**: Try prompts before saving
+
+### Variable Management
+
+1. **Use Descriptive Names**: Clear variable names help understanding
+2. **Use Autocomplete**: Leverage `{{` autocomplete for faster variable insertion
+3. **Set Defaults**: Provide defaults when possible
+4. **Mark Required**: Only mark truly required variables
+5. **Use Categories**: Organize variables with categories (configs.*, user.*, etc.)
+6. **Document Variables**: Add descriptions for clarity
+7. **Filter While Typing**: Type after `{{` to quickly find variables
+
+### Organization Tips
+
+1. **Use Tags**: Tag prompts by project, use case, or category
+2. **Favorite Important**: Mark frequently used prompts
+3. **Name Clearly**: Use descriptive names
+4. **Add Descriptions**: Help others understand purpose
+5. **Regular Cleanup**: Remove unused prompts
+
+## Common Use Cases
+
+### Customer Support Templates
+
+**Use Case**: Standardized responses for support team.
+
+**Example:**
+```
+Hello {{user.name}},
+
+Thank you for contacting {{configs.BRAND}} support.
+
+Regarding your inquiry about {{topic}}, here's what we can help with:
+{{response}}
+
+Best regards,
+{{configs.SUPPORT_EMAIL}}
+```
+
+**Variables:**
+- `{{user.name}}` - Customer name
+- `{{configs.BRAND}}` - Your brand
+- `{{topic}}` - Inquiry topic
+- `{{response}}` - Support response
+- `{{configs.SUPPORT_EMAIL}}` - Support email
+
+### Email Templates
+
+**Use Case**: Reusable email templates with dynamic content.
+
+**Example:**
+```
+Subject: Welcome to {{configs.PRODUCT}}, {{user.name}}!
+
+Hi {{user.name}},
+
+Welcome to {{configs.PRODUCT}}! Today is {{context.currentDate}}.
+
+We're excited to have you on board. Your account is ready to use.
+
+Best,
+{{configs.BRAND}} Team
+```
+
+### Code Generation Prompts
+
+**Use Case**: Consistent code generation with project-specific variables.
+
+**Example:**
+```
+Generate {{language}} code following {{configs.CODING_STANDARDS}}.
+
+Requirements:
+- Use {{framework}} framework
+- Follow {{configs.TONE}} style
+- Include error handling
+- Add comments
+
+Context: {{context}}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue**: Prompt not using correct model
+- **Solution**: Check prompt's model setting
+- **Solution**: Verify model is available
+- **Solution**: Check model validation errors
+
+**Issue**: Variables not replacing
+- **Solution**: Verify variable names match exactly (case-sensitive)
+- **Solution**: Check variable values are set
+- **Solution**: Ensure variable syntax is correct (`{{variableName}}`)
+
+**Issue**: Variable autocomplete not appearing
+- **Solution**: Type `{{` (double curly braces) to trigger autocomplete
+- **Solution**: Ensure cursor is in the composer input field
+- **Solution**: Check that variables are available (may need to define custom variables)
+- **Solution**: Try typing after `{{` to filter variables
+
+**Issue**: Can't create more prompts
+- **Solution**: Check your prompt limit (Free: 3 prompts)
+- **Solution**: Delete unused prompts
+- **Solution**: Upgrade to Pro for unlimited prompts
+
+**Issue**: Prompt optimization not working
+- **Solution**: Check internet connection
+- **Solution**: Verify prompt content is valid
+- **Solution**: Try again - may be temporary issue
+
+**Issue**: Variables missing values
+- **Solution**: Set user defaults for variables
+- **Solution**: Fill variables when using prompt
+- **Solution**: Check auto-populated variables are available
+
+## Tips and Tricks
+
+### Quick Variable Insertion
+
+**Using Autocomplete:**
+- Type `{{` anywhere in composer to see variables
+- Type `{{user` to quickly find user variables
+- Type `{{context.` to see all context variables
+- Use arrow keys and Enter for fast insertion
+
+**Common Patterns:**
+- `{{user.name}}` - User's name (auto-filled)
+- `{{context.currentDate}}` - Current date (auto-filled)
+- `{{configs.BRAND}}` - Your brand name (set default)
+- `{{conversation.summary}}` - Conversation summary
+
+### Efficient Prompt Creation
+
+1. **Start with Template**: Use an existing prompt as a template
+2. **Use Autocomplete**: Leverage `{{` autocomplete for variables
+3. **Test Variables**: Fill variables and test before saving
+4. **Optimize**: Use AI optimization to improve prompts
+5. **Version Control**: Use history to track changes
+
+## Related Features
+
+- [Chat](/docs/chat) - Use prompts in conversations
+- [Chat → Prompt Improvement](/docs/chat#prompt-improvement) - Optimize what you're about to send
+- [Skills](/docs/skills) - Reusable AI behaviours invoked with `/skill-name`
+- [Settings](/docs/settings#system-prompts) - Manage the system prompt preset library
+- [Keyboard Shortcuts](/docs/keyboard-shortcuts) - Quick access shortcuts

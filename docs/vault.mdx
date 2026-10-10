@@ -1,0 +1,134 @@
+---
+title: Vault
+description: File management and storage system
+---
+
+# Vault
+
+The Vault is your personal file store. Everything you upload to a conversation,
+and every image the AI generates for you, lands here — and you can upload files
+directly for later use.
+
+## Quick Start
+
+1. **Navigate to Vault**: Go to `/vault`, or click Vault in the sidebar
+2. **Upload files**: Click the upload button, or drag files onto the page
+3. **Use in chat**: Attach files to your messages from the composer
+
+## File Upload
+
+**Upload button** — click the upload icon in the Vault header and pick files from
+your device.
+
+**Drag and drop** — drag files from your file system anywhere onto the Vault page
+and drop them.
+
+### Limits
+
+| Limit | Value |
+|---|---|
+| Maximum file size | 5 MB per file |
+| Maximum files per drop | 25 |
+
+Uploading a file larger than 5 MB, or of an unsupported type, is rejected with an
+error message rather than silently failing.
+
+### Supported file types
+
+| Category | Extensions |
+|---|---|
+| Images | `.jpg` `.jpeg` `.png` `.webp` `.gif` `.svg` |
+| Documents | `.pdf` `.doc` `.docx` `.txt` `.md` |
+| Spreadsheets | `.xls` `.xlsx` |
+| Presentations | `.ppt` `.pptx` |
+| Archives | `.zip` |
+
+Anything not on this list is refused at the drop zone.
+
+## Browsing your files
+
+The Vault shows all your files in a responsive grid — one to six columns
+depending on window width.
+
+Each card shows:
+
+- A thumbnail for images, or a coloured icon indicating the file type (image,
+  video, audio, PDF, archive, or generic)
+- The filename
+- The file size
+
+Hovering a card reveals its actions.
+
+:::note
+The Vault is a single grid view. There is no list view, no search box, no tag
+system, and no sort or filter controls — files appear newest-first as returned by
+the server. If you need to find a file by name, use your browser's find (`Ctrl+F`
+/ `Cmd+F`) on the page.
+:::
+
+## File Actions
+
+Hover any file card to reveal two actions:
+
+| Action | What it does |
+|---|---|
+| **Download** | Saves the file to your device |
+| **Delete** | Removes the file from your vault |
+
+Deletion is permanent and is confirmed with a dialog first.
+
+## Where files come from
+
+Files reach the Vault three ways:
+
+1. **Direct upload** — the upload button or drag-and-drop described above
+2. **Chat attachments** — anything you attach to a message
+3. **AI-generated images** — images the AI creates are saved to your vault
+   automatically and are marked as generated
+
+## Content safety
+
+Uploaded images carry a safety status — pending, checking, safe, blocked, or
+failed — from an automated classification pass. Images classified as unsafe are
+blocked.
+
+:::note
+The classification service is deployed but not currently connected in hosted
+environments, so this check is inactive today. See
+[NSFW checker service](/docs/services/nsfw-checker).
+:::
+
+## Common Use Cases
+
+**Reference documents**
+Upload a PDF or spec once, then attach it to whichever conversations need it
+instead of re-uploading each time.
+
+**Generated image library**
+Every image the AI generates is kept here, so you can come back and download one
+later, or pick it as a reference for a new generation.
+
+**Reference images for generation**
+Images in your vault can be selected as references when generating new ones. See
+[AI Tools](/docs/tools#reference-images).
+
+## Troubleshooting
+
+**Issue**: "File size too large. Maximum 5MB allowed."
+- **Solution**: The per-file limit is 5 MB. Compress the file, or for a large document use the [Knowledge Base](/docs/knowledge-base) instead
+
+**Issue**: "File type not supported."
+- **Solution**: Check the supported types table above. The drop zone refuses anything else
+
+**Issue**: I can't find a file
+- **Solution**: There is no search in the Vault. Use your browser's find-on-page, or narrow down from the chat the file was used in
+
+**Issue**: I deleted a file by mistake
+- **Solution**: Deletion is permanent — there is no trash or undo
+
+## Related Features
+
+- [Chat](/docs/chat#file-attachments) — attaching files to messages
+- [Knowledge Base](/docs/knowledge-base) — documents indexed for AI retrieval, for content too large or too numerous for the vault
+- [AI Tools](/docs/tools#reference-images) — using vault images as generation references
+- [Privacy & GDPR](/docs/privacy) — data export and deletion

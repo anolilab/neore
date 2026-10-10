@@ -1,0 +1,110 @@
+---
+title: Voice
+description: Talk to the AI hands-free and hear replies in a natural hosted voice, with your browser's voice as the fallback
+---
+
+# Voice
+
+Neore Chat can listen and speak. In **hands-free voice mode** you talk,
+your words are sent as a message, and the reply is read aloud — then
+it listens again, so you can hold a spoken conversation without
+touching the keyboard.
+
+## Hands-free voice mode
+
+**Starting and stopping:**
+
+1. Click the hands-free voice button in the composer
+   (tooltip: **Hands-free voice mode — talk, and replies are read
+   aloud**)
+2. Allow microphone access if your browser asks
+3. Speak. What you say appears in the composer as you talk, and is
+   sent when you pause
+4. The reply is read aloud, then the mode listens for your next
+   message
+5. Press **Esc** or click the button again to stop
+
+The button shows what the mode is doing: **Listening…**,
+**Thinking…** while the reply is written, and **Speaking…** while it
+is read aloud. If nothing is said for a while, the mode stops by
+itself with **No speech detected. Hands-free mode stopped.**
+
+### Which voice reads the reply
+
+For signed-in users, replies are spoken with a hosted voice
+(MiniMax Speech). The audio is made for playback only — it is not
+saved to the chat, and no audio message is added to the thread.
+
+You fall back to your **browser's built-in voice** when:
+
+- you are using a guest account — create an account to use the
+  hosted voice
+- you have used up today's spoken-reply allowance (see below)
+- the hosted voice fails for any reason — the rest of the reply
+  continues in the browser voice, so it is never cut off or spoken
+  twice
+
+### Choosing a voice
+
+Pick the hosted voice at **Settings → App → Customization**, in the
+**Chat** section, under **Hands-free voice**. The setting is not
+shown to guest accounts.
+
+A [skill](/docs/skills) can set its own voice. When a reply comes
+from that skill — you invoked it with `/skill-name`, or it answered
+in a group chat — the skill's voice is used instead of yours. A skill
+voice can be one of the hosted voices or a voice installed in your
+browser.
+
+## Daily allowance and cost
+
+Spoken replies count against a **daily character allowance**:
+
+| Plan    | Characters per day |
+| ------- | ------------------ |
+| Free    | 10,000             |
+| Premium | 200,000            |
+
+Once it is used up, replies are read with your browser's voice until
+the next day.
+
+The hosted voice is also charged to your credits by the number of
+characters spoken, like any other model call. If you add your own
+**fal.ai** key under **Settings → API Keys**, speech runs on your key
+instead and is billed by fal.ai.
+
+## Other ways to hear replies
+
+These always use your **browser's voice**, never the hosted one, and
+cost nothing:
+
+- **Read aloud** — the speaker button in a reply's action bar reads
+  that one reply. Click **Stop reading** to stop.
+- **Auto-read replies** — at **Settings → App → Customization**, in
+  the **Chat** section, reads every reply aloud when it finishes.
+
+To create an audio file of a reply that is saved in the chat, use
+**Generate voice** in the reply's action bar instead.
+
+## Troubleshooting
+
+**Issue:** "Microphone access denied"
+- **Solution:** Allow microphone access for Neore in your browser's
+  site settings, then start hands-free mode again.
+
+**Issue:** "Speech recognition is not supported in your browser"
+- **Solution:** Your browser has no built-in speech recognition, and
+  Neore's hosted transcription was not available. Sign in with a full
+  account, or try a browser with speech recognition, such as a
+  current Chrome or Edge.
+
+**Issue:** The reply is read in a robotic voice
+- **Solution:** You are hearing the browser voice. Check whether you
+  are signed in with a full account and whether you used up today's
+  allowance.
+
+## Related features
+
+- [Chat](/docs/chat) — Audio recording and transcription in the composer
+- [Skills](/docs/skills) — Give a skill its own voice
+- [Settings](/docs/settings) — Account and app configuration

@@ -1,0 +1,35 @@
+import { defineModule } from "lunorash/server";
+
+export default defineModule({
+    description:
+        "The agent runtime's storage: threads, messages, streams, in-thread branches, files, documents, projects and vectors. Other modules write these only through agent/table-writes.ts.",
+    tables: [
+        "chatFileAccess",
+        "chatFiles",
+        "documentVersions",
+        "documents",
+        "embeddings_1024",
+        "embeddings_128",
+        "embeddings_1408",
+        "embeddings_1536",
+        "embeddings_2048",
+        "embeddings_256",
+        "embeddings_3072",
+        "embeddings_4096",
+        "embeddings_512",
+        "embeddings_768",
+        "followupSuggestions",
+        "messages",
+        "nodeExecutions",
+        "playgroundApiKeys",
+        "projects",
+        "streamDeltas",
+        "streamingMessages",
+        "temporaryThreads",
+        "threadAccess",
+        "threadInvites",
+        "threadRelationships",
+        "threads",
+        "workflowExecutions",
+    ],
+});

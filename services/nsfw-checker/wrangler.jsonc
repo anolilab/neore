@@ -1,0 +1,48 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "nsfw-checker",
+    "main": "src/index.ts",
+    // Private: no workers.dev URL and no route. The backend reaches this Worker
+    // only through its service binding (`backend/lunora.config.ts`).
+    "workers_dev": false,
+    "compatibility_date": "2026-09-01",
+    "compatibility_flags": ["nodejs_compat_v2"],
+    "placement": {
+        "mode": "smart"
+    },
+    "observability": {
+        "enabled": true
+    },
+    // Workers AI is declared per DEPLOY environment (`env.production` /
+    // `env.preview` below; `ai` is not inherited from the top level), NOT here.
+    // This Worker runs inside the backend's `lunora dev` session (a service
+    // binding, `backend/lunora.config.ts`), and wrangler treats an `ai` binding
+    // as always-remote: one in the shared session starts a remote-proxy session,
+    // which dies in any non-interactive shell without CLOUDFLARE_API_TOKEN and
+    // takes the backend down with it (`remote: false` is rejected for `ai`, and
+    // `lunora dev` passes no `--local`). Dev runs without AI, as `wrangler dev
+    // --local` did; the deploy is Alchemy's, which binds `AI` itself.
+    "vars": {
+        "NODE_ENV": "development"
+    },
+    "env": {
+        "production": {
+            "name": "nsfw-checker",
+            "ai": {
+                "binding": "AI"
+            },
+            "vars": {
+                "NODE_ENV": "production"
+            }
+        },
+        "preview": {
+            "name": "nsfw-checker-preview",
+            "ai": {
+                "binding": "AI"
+            },
+            "vars": {
+                "NODE_ENV": "development"
+            }
+        }
+    }
+}

@@ -1,0 +1,191 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "NSFW Checker API",
+        "description": "Cloudflare Worker service for classifying images for NSFW content using Workers AI vision model.",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/classify": {
+            "post": {
+                "operationId": "classifyImage",
+                "summary": "Classify image for NSFW content",
+                "description": "Classify an image for NSFW content. The request body must be the raw image bytes. Supported: image/jpeg, image/png, image/gif, image/webp, image/bmp.",
+                "tags": ["Classification"],
+                "parameters": [
+                    {
+                        "name": "content-type",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": ["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"]
+                        },
+                        "description": "MIME type of the image"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/octet-stream": {
+                            "schema": {
+                                "type": "string",
+                                "format": "binary"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "NSFW classification scores",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NsfwResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request (empty body or unsupported MIME type)",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "Payload too large (max 10 MB)",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Classification failed",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "operationId": "getHealth",
+                "summary": "Full health report",
+                "tags": ["Health"],
+                "responses": {
+                    "200": {
+                        "description": "Service health report",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/HealthReport" }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service unhealthy",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/HealthReport" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health/live": {
+            "get": {
+                "operationId": "getLiveness",
+                "summary": "Liveness check",
+                "tags": ["Health"],
+                "responses": {
+                    "200": {
+                        "description": "Service is live",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/LivenessResponse" }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service is not live",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/LivenessResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "NsfwResponse": {
+                "type": "object",
+                "required": ["drawing", "hentai", "isNsfw", "neutral", "porn", "sexy", "topCategory"],
+                "properties": {
+                    "drawing": {
+                        "type": "number",
+                        "description": "Probability of cartoon/anime/illustration content (0.0-1.0)"
+                    },
+                    "hentai": {
+                        "type": "number",
+                        "description": "Probability of explicit animated/drawn sexual content (0.0-1.0)"
+                    },
+                    "isNsfw": {
+                        "type": "boolean",
+                        "description": "Whether the image exceeds NSFW thresholds"
+                    },
+                    "neutral": {
+                        "type": "number",
+                        "description": "Probability of safe-for-work content (0.0-1.0)"
+                    },
+                    "porn": {
+                        "type": "number",
+                        "description": "Probability of explicit photographic sexual content (0.0-1.0)"
+                    },
+                    "sexy": {
+                        "type": "number",
+                        "description": "Probability of suggestive or mildly explicit content (0.0-1.0)"
+                    },
+                    "topCategory": {
+                        "type": "string",
+                        "enum": ["drawing", "hentai", "neutral", "porn", "sexy"],
+                        "description": "Category with the highest score"
+                    }
+                }
+            },
+            "HealthReport": {
+                "type": "object",
+                "additionalProperties": true
+            },
+            "LivenessResponse": {
+                "type": "object",
+                "properties": {
+                    "status": { "type": "string" }
+                }
+            },
+            "ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "error": { "type": "string" },
+                    "details": { "type": "string" }
+                }
+            }
+        }
+    }
+}

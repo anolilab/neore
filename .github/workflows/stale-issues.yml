@@ -1,0 +1,11 @@
+name: "Label Idle Issues"
+
+on: # yamllint disable-line rule:truthy
+    schedule:
+        - cron: "0 0 * * *"
+
+jobs:
+    stale-issues:
+        uses: "anolilab/workflows/.github/workflows/stale-issues.yml@main"
+        with:
+            target-repo: "anolilab/neore"

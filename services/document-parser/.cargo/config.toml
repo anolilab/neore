@@ -1,0 +1,8 @@
+[target.wasm32-unknown-unknown]
+# Same flags upstream's xberg-wasm builds with (xberg-io/xberg .cargo/config.toml).
+rustflags = [
+  "-C",
+  "target-feature=+bulk-memory",
+  "--cfg",
+  "getrandom_backend=\"wasm_js\"",
+]

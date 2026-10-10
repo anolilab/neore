@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Merged into the macOS bundle by Tauri. The web app's voice input asks for
+         the microphone; without this key WKWebView denies it silently. -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Neore uses the microphone for voice input when you start dictation.</string>
+</dict>
+</plist>

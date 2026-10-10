@@ -1,0 +1,119 @@
+---
+title: Document parser service
+description: The Rust document-parser Worker — how the backend reaches it, what it extracts, its 25 MB limit, and how to build and run it.
+---
+
+# Document parser service
+
+The document-parser is a Cloudflare Worker, written in Rust on
+[workers-rs](https://github.com/cloudflare/workers-rs) and the
+[xberg](https://crates.io/crates/xberg) extraction crate, that turns uploaded
+files into text, tables and metadata. The Lunora backend calls it whenever a
+user attaches a document to a chat message, and when it ingests a document into
+the knowledge base.
+
+It reads PDF (a pure-Rust parser), Word, Excel, PowerPoint and OpenDocument
+files, HTML, XML, e-books and archives. Any `text/*` type it has no parser for
+(source code, for example) is read as plain text. There is no OCR: a scanned
+PDF has no text to extract.
+
+## How the backend reaches it
+
+The Worker is **private**: it has no `workers.dev` URL and no route. The
+backend calls it through a Cloudflare service binding, `SERVICE_DOCUMENT_PARSER`
+(`ctx.services.documentParser`), declared in `backend/lunora.config.ts`. The
+binding is the only way in, so the Worker carries no authentication of its own
+and needs no secrets.
+
+## Size limit
+
+Documents can be at most **25 MB**. The same limit is enforced at every step:
+
+| Where | What happens over the limit |
+| --- | --- |
+| Chat composer | The file is refused before upload, with a message |
+| `file.uploadFile` | The upload is rejected (`PAYLOAD_TOO_LARGE`) |
+| Extraction and knowledge ingestion | The file is marked as failed without reading it |
+| The Worker | `413`, checked from `Content-Length` and by counting the body |
+
+The limit comes from the Workers memory limit: an isolate has 128 MB, and
+parsing a PDF needs roughly three times the file's size. Larger documents need a
+different runtime — see `docs/plans/document-parser.md`.
+
+## API reference
+
+### `POST /extract`
+
+**Request:** the raw file bytes as the body, with the file's MIME type as
+`Content-Type` (for example, `application/pdf`).
+
+**Response (200):**
+
+```json
+{
+    "content": "Extracted plain text...",
+    "mimeType": "application/pdf",
+    "tables": [{ "markdown": "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |\n", "pageNumber": 3 }],
+    "metadata": { "format": { "format_type": "pdf" } }
+}
+```
+
+**Error responses** carry `{ "error": string, "details"?: string }`:
+
+| Status | Meaning |
+| --- | --- |
+| `400` | Empty request body |
+| `413` | File exceeds 25 MB (`maxBytes` carries the limit) |
+| `500` | Extraction failed (unsupported or corrupt file) |
+
+### `GET /health` and `GET /health/live`
+
+Liveness. `/health` also reports the Worker's WebAssembly memory size.
+
+The OpenAPI description the backend's typed client is generated from is
+`packages/service-sdk/openapi/document-parser.json`, maintained by hand.
+
+## Building
+
+Building needs a Rust toolchain:
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo install worker-build --version 0.8.7 --locked
+pnpm --filter document-parser run build:worker
+```
+
+The build writes `services/document-parser/build/` (about 14 MB of
+WebAssembly). It is skipped when that output is newer than the sources; pass
+`--force` to rebuild anyway.
+
+## Local development
+
+You do not start it yourself: the backend's `lunora dev` session runs it as a
+service binding and builds it on start. To run it alone:
+
+```bash
+pnpm dev:document-parser
+curl -X POST http://localhost:8792/extract \
+  -H "Content-Type: application/pdf" \
+  --data-binary @path/to/file.pdf
+```
+
+Port **8788 is reserved for the Lunora backend** — never bind a service to it.
+
+## Tests
+
+```bash
+pnpm --filter document-parser test
+```
+
+runs the Rust unit tests on the host (`cargo test`), then sends PDF, Word,
+Excel and PowerPoint fixtures through the built Worker in workerd.
+
+## Related
+
+- [LLM Gateway service](/docs/services/llm-gateway)
+- [Browser renderer service](/docs/services/browser-renderer)
+- [Embeddings service](/docs/services/embeddings)
+- [NSFW checker service](/docs/services/nsfw-checker)
+- [Knowledge Base](/docs/knowledge-base) — the main consumer of extracted text

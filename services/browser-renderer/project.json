@@ -1,0 +1,25 @@
+{
+    "name": "browser-renderer",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "services/browser-renderer/src",
+    "projectType": "service",
+    "tags": ["chat", "browser-renderer", "type:service"],
+    "implicitDependencies": [],
+    "targets": {
+        "dev": {
+            "//": "Standalone only. In the stack this Worker runs INSIDE the backend's `lunora dev` session as a service binding (`backend/lunora.config.ts`) and has no port of its own — `pnpm dev` does not start this target. It is for running the service alone (e.g. `pnpm --filter @neore/service-sdk generate:extract`).",
+            "command": "pnpm dev",
+            "preset": "server",
+            "options": {
+                "service": {
+                    "port": 8789,
+                    "readiness": {
+                        "tcp": {
+                            "port": 8789
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

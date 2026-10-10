@@ -1,0 +1,767 @@
+---
+title: Chat Features
+description: AI chat capabilities, thread management, and messaging features
+---
+
+# Chat Features
+
+Neore Chat provides powerful AI conversation capabilities with advanced thread management and rich messaging features.
+
+## Quick Start
+
+Get started with Neore Chat in three simple steps:
+
+1. **Create a Thread**: Click "New Chat" or press `Ctrl+N` (Mac: `Cmd+N`) to start a conversation
+2. **Choose a Model**: Select an AI model from the dropdown (default: Kimi K2)
+3. **Start Chatting**: Type your message and press Enter to send
+
+That's it! Your conversation is saved automatically and you can continue it anytime.
+
+## Core Chat
+
+### Thread-Based Conversations
+
+All conversations are organized into threads, making it easy to manage multiple topics and contexts.
+
+**Features:**
+- Create unlimited threads
+- Each thread maintains its own conversation history
+- Thread titles are auto-generated or can be customized
+- Threads can be organized with tags and folders
+
+### Real-Time Message Streaming
+
+Messages stream in real-time as the AI generates responses, providing immediate feedback.
+
+**Features:**
+- See responses as they're generated
+- Cancel generation at any time
+- Smooth streaming experience
+- Fast response times
+
+### Message History and Context
+
+Full conversation history is maintained for context-aware responses.
+
+**Features:**
+- Complete message history per thread
+- Context-aware AI responses
+- Message editing capabilities
+- Conversation continuity
+
+## Thread Types
+
+Neore Chat supports three distinct thread types, each designed for different use cases. Understanding when to use each type will help you work more efficiently.
+
+:::tip Choosing the Right Thread Type
+- **Normal Threads**: For ongoing conversations and projects
+- **Temporary Threads**: For quick queries you don't need to keep
+- **Stateless Threads**: When you want each message to be independent
+:::
+
+### Normal Threads
+
+Standard persistent conversations with full chat history.
+
+**Characteristics:**
+- Full chat history maintained across all messages
+- Messages have context from previous interactions
+- AI can reference earlier messages in the conversation
+- Stored permanently until manually deleted
+
+**Best For:**
+- Ongoing conversations
+- Complex multi-turn discussions
+- Projects requiring context
+- Important conversations you want to keep
+
+**Features:**
+- Can be organized with tags
+- Can be pinned to the top
+- Can be shared with others
+- Can be archived
+- Supports thread hierarchy (parent/child relationships)
+
+### Temporary Threads
+
+Auto-expiring conversations with configurable retention periods.
+
+**Characteristics:**
+- Default retention: 24 hours (configurable)
+- Automatically deleted after expiration
+- Can be converted to permanent threads before expiration
+- Shown in separate "Temporary" group in thread list
+
+**Best For:**
+- Quick, disposable conversations
+- Testing or experimentation
+- One-time queries
+- Temporary research
+
+**Features:**
+- Created via "Temporary Chat" button or `Ctrl+Shift+N` (Mac: `Cmd+Shift+N`)
+- Display expiration countdown timer
+- Convert to permanent before expiration
+- Automatically cleaned up after retention period
+- Useful for privacy-sensitive conversations
+
+**How to Create:**
+1. Click the "Temporary Chat" button in the thread list
+2. Or use keyboard shortcut `Ctrl+Shift+N` (Mac: `Cmd+Shift+N`)
+3. Start chatting - the thread will auto-expire after the retention period
+
+**Converting to Permanent:**
+- Click the "Convert to Permanent" option in the thread menu
+- The thread becomes a normal thread and won't expire
+- All message history is preserved
+
+### Stateless Threads
+
+Process each message independently without chat history context.
+
+**Characteristics:**
+- Each message processed independently
+- No chat history context used
+- Only system prompt and current input are considered
+- Can have custom system prompt for consistent behavior
+
+**Best For:**
+- One-off queries where context shouldn't influence responses
+- Consistent behavior across messages
+- When you want fresh responses each time
+- Testing prompts without conversation history
+
+**Features:**
+- Shown in separate "Stateless" group in thread list
+- Each message gets fresh context
+- Can be combined with temporary threads (stateless + temporary)
+
+**How to Enable:**
+1. Open thread settings (click model selector)
+2. Enable "Stateless Mode" toggle
+3. All subsequent messages will be stateless
+
+**Custom System Prompt:**
+- Define a system prompt that applies to every message
+- Load one from your saved [system prompt presets](/docs/prompts#system-prompt-presets), or optimize the one you have in place
+- Works with or without stateless mode
+- When used with stateless mode: ensures consistent behavior across messages without chat history
+- When used without stateless mode: applies custom instructions alongside conversation history
+- Useful for specific use cases or personas
+
+**Combining Thread Types:**
+- You can create a temporary stateless thread
+- Combines auto-expiration with stateless behavior
+- Useful for quick, context-free queries that auto-delete
+
+## AI Models
+
+### Multiple Model Providers
+
+Neore Chat supports multiple AI providers and models, giving you flexibility to choose the best model for your task.
+
+**Providers (320+ models across text, image, video, audio and music):**
+- **OpenAI**: GPT-4o, GPT-4o Mini, GPT-4.5, o1, o1-mini, o3, o3-mini, o4-mini
+- **Anthropic**: Claude Opus 4/4.5/4.6, Claude Sonnet 4/4.5/4.6, Claude Haiku 4.5
+- **Google**: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 2.5 Pro
+- **Moonshot**: Kimi K2 (the default chat model)
+- **DeepSeek**: DeepSeek V3.2, DeepSeek R1
+- **xAI**: Grok models
+- **Meta**: Llama 3.3, Llama 3.1 variants
+- **Qwen / Alibaba**: Qwen 2.5, QwQ reasoning models
+- **Mistral**: Mistral Large, Mistral Small, Codestral
+- **Z.AI, MiniMax, Cohere, ByteDance, Amazon, StepFun, Arcee, Inception** and more
+- **Image models**: FLUX, Nano Banana, Recraft, Ideogram, Imagen, SDXL, Krea, Stability
+- **Video models**: Seedance, Veo, Kling, Hailuo, Luma, Pika, Runway, Wan, LTX, Vidu
+- **Music models**: Stable Audio, Lyria 2, MusicGen, CassetteAI
+- And many more via OpenRouter and custom providers
+
+**Model States:**
+- **Free:** Available to all users
+- **Premium:** Requires premium subscription
+
+### Model Comparison
+
+| Model | Best For | Capabilities |
+|-------|----------|--------------|
+| GPT-4o | General purpose, fast responses | Text, Vision, Reasoning, Tools |
+| GPT-4o Mini | Quick tasks, cost-effective | Text, Vision, Reasoning, Tools |
+| o3-mini | Complex reasoning, math | Text, Reasoning, Tools |
+| Claude Opus 4.6 | Long-form content, deep analysis | Text, Reasoning, Tools, Extended Thinking |
+| Claude Sonnet 4.6 | Balanced performance | Text, Reasoning, Tools, Extended Thinking |
+| Claude Haiku 4.5 | Fast responses, simple tasks | Text, Reasoning, Tools |
+| Gemini 2.5 Flash | Multimodal tasks, fast | Text, Vision, Reasoning, Tools |
+| Gemini 2.5 Pro | Complex multimodal tasks | Text, Vision, Reasoning, Tools |
+| DeepSeek R1 | Open-source reasoning | Text, Reasoning, Extended Thinking |
+
+### Model Capabilities
+
+Different models support different capabilities:
+
+- **Text:** Standard text generation
+- **Vision:** Process and understand images
+- **Reasoning:** Advanced reasoning capabilities
+- **Function Calling:** Tool/function calling support
+- **Document Processing:** PDF and document comprehension
+
+### Model Switching
+
+Switch between models during conversations using multiple methods:
+
+**Method 1: Model Selector**
+1. Click the model selector in the composer
+2. Choose from available models
+3. Continue conversation with new model
+4. Previous messages remain in thread
+
+**Method 2: Slash Command**
+1. Type `/model` in the composer
+2. An autocomplete menu shows available models
+3. Type to filter models (e.g., `/model gpt` shows GPT models)
+4. Select a model to switch
+5. Model changes immediately
+
+**Slash Command Features:**
+- Type `/model` to see all models
+- Type `/model gpt` to filter GPT models
+- Type `/model claude` to filter Claude models
+- Favorite models appear first
+- Premium models shown only for Pro users
+- Keyboard navigation (arrow keys, Enter)
+
+### Favorite Models
+
+Mark frequently used models as favorites:
+
+1. Click the star icon next to a model
+2. Favorite models appear at the top of the list
+3. Quick access to your preferred models
+
+### Enhanced Model Features
+
+**Reasoning Effort:**
+- Configure reasoning effort levels (None, Low, Medium, High)
+- Available for models that support reasoning
+- Affects response quality and speed
+
+**Extended Thinking:**
+- Some models (Claude Opus, Claude Sonnet, DeepSeek R1) support extended thinking mode
+- The model shows its reasoning process before the final answer
+- Enable via model variants with the `:thinking` suffix
+
+**Bring Your Own Key (BYOK):**
+- Use your own API keys for any supported provider
+- Keys are encrypted at rest and never exposed to the client
+- Manage keys in **Settings → API Keys**
+- Supported providers: OpenAI, Anthropic, Google, OpenRouter, Groq, and more
+
+**Stateless Mode:**
+- Enable stateless mode per thread
+- Process messages without history
+- Custom system prompt support
+
+## Deep Work Mode (Auto-Continue)
+
+Deep Work mode lets the AI run up to 25 tool-use iterations in a single
+request — chaining searches, reads, and document creation without
+requiring you to send follow-up messages. It's designed for complex
+multi-step tasks that would otherwise need back-and-forth.
+
+### Enabling Deep Work mode
+
+Click the **Deep Work** button (lightning bolt icon) in the composer
+toolbar before sending your message. When active, the button turns
+amber and a label confirms "Up to 25 iterations."
+
+### How it works
+
+When Deep Work mode is on:
+
+1. The AI receives a higher iteration limit (25 instead of the
+   default 5).
+2. After each step, the system checks whether the context window is
+   getting full and compresses older messages if needed.
+3. A status bar appears above the composer showing the current
+   iteration, tool calls in progress, and a progress bar.
+4. You can cancel at any time — partial results are preserved.
+
+### When to use it
+
+| Task type | Deep Work? | Why |
+|---|---|---|
+| Simple question | No | One step is enough |
+| Search + answer | No | Default iterations handle it |
+| Multi-step research and report | Yes | Needs many tool calls |
+| Trigger-initiated execution | Automatic | All triggers use Deep Work |
+
+### Status bar
+
+While Deep Work is active, a status bar shows:
+
+- Current iteration count (for example, "3/25")
+- Number of completed tool calls
+- Names of the last three tools executed
+- A cancel button to stop early
+
+> **Note:** Deep Work mode uses more tokens per request. For simple
+> questions, leave it off.
+
+## Message Features
+
+### Rich Text Formatting
+
+**Markdown Support:**
+- Full Markdown formatting
+- Headers, lists, links, emphasis
+- Code blocks and inline code
+- Tables and more
+
+**Code Syntax Highlighting:**
+- Powered by Shiki syntax highlighter
+- Supports 100+ programming languages
+- Beautiful code rendering
+- Copy code with one click
+
+**Mermaid Diagrams:**
+- Render Mermaid diagrams inline
+- Flowcharts, sequence diagrams, and more
+- Perfect for technical documentation
+- Visual representation of concepts
+
+### File Attachments
+
+**Supported Types:**
+- Images (JPG, PNG, GIF, WebP)
+- Documents (PDF, DOCX, TXT)
+- And more...
+
+**Features:**
+- Drag and drop files into composer
+- Paste images from clipboard
+- Multiple files per message
+- File preview in messages
+
+### Audio Recording and Transcription
+
+**Features:**
+- Record audio messages directly
+- Automatic transcription to text
+- Send as text message
+- Useful for voice input
+
+**Usage:**
+1. Click the microphone icon in composer
+2. Record your message
+3. Review transcription
+4. Send or edit before sending
+
+For a spoken back-and-forth, use hands-free voice mode — you talk and
+replies are read aloud. See [Voice](/docs/voice).
+
+### Message Editing
+
+Edit your messages after sending:
+
+1. Click the edit icon on your message
+2. Modify the text
+3. Save changes
+4. AI can respond to edited message
+
+### Prompt Improvement
+
+Get AI-powered rewrites of your prompt before you send it:
+
+1. Type your prompt, then click the sparkles icon in the composer
+2. Pick an optimization style from the dropdown next to it
+3. The AI returns a rewritten prompt in a panel
+4. Accept it, keep your original, or refine it further with feedback
+
+**Styles:**
+
+| Style | What it does |
+|---|---|
+| Basic optimization | Quick expression improvement: clarity, structure, missing context |
+| Professional precision | Turns a vague request into a specific, actionable one with quantified standards |
+| Step-by-step planning | Turns a goal into a structured task plan with role, steps, and output spec |
+
+Your chosen style is remembered between messages.
+
+**Refine with feedback:** the panel has a feedback box. Describe what you want
+changed ("make it shorter", "ask for a table instead") and the AI revises its own
+previous rewrite rather than starting over.
+
+See [Prompts](/docs/prompts#prompt-optimization) for the full optimizer,
+including system-prompt optimization and saved presets.
+
+### Follow-Up Suggestions
+
+After each AI response, Neore Chat automatically generates relevant follow-up questions to help you continue the conversation.
+
+**Features:**
+- Automatically generated based on conversation context
+- Appears after AI completes a response
+- 3-5 contextual suggestions per response
+- Click any suggestion to use it as your next message
+- Collapsible panel with smooth animations
+- Auto-opens on first load, can be toggled closed
+
+**How It Works:**
+1. After the AI finishes responding, suggestions appear above the composer
+2. Suggestions are contextually relevant to the current conversation
+3. Click the chevron icon to expand or collapse the suggestions panel
+4. Click any suggestion to insert it into the composer
+5. Edit the suggestion or send it as-is
+
+**When Suggestions Appear:**
+- Only after AI assistant messages (not after your messages)
+- Only when the AI has finished responding (not during streaming)
+- Only in threads with at least one user message
+- Automatically cached to reduce API costs
+
+**Best Practices:**
+- Use suggestions to explore related topics
+- Modify suggestions before sending to customize your query
+- Suggestions adapt to your conversation's language and context
+- Suggestions consider your timezone and location for relevance
+
+### Slash Commands
+
+Use slash commands in the composer for quick actions:
+
+**Available Commands:**
+- `/model` - Switch AI model
+- `/prompt` - Insert a saved prompt
+- `/skill-name` - Invoke a custom skill (see [Skills](/docs/skills))
+
+**How to Use:**
+1. Type `/` in the composer
+2. See available commands
+3. Type command name (e.g., `/model` or `/prompt`)
+4. Type to filter options
+5. Use arrow keys to navigate
+6. Press Enter to select
+
+**Model Switching (`/model`):**
+- Type `/model` to see all models
+- Type `/model gpt` to filter GPT models
+- Type `/model claude` to filter Claude models
+- Favorite models appear first
+- Premium models shown only for Pro users
+
+**Prompt Insertion (`/prompt`):**
+- Type `/prompt` to see all prompts
+- Type `/prompt email` to filter prompts matching "email"
+- Select a prompt to insert it
+- Fill variables if needed
+
+**Features:**
+- Real-time filtering as you type
+- Keyboard navigation (arrow keys, Enter)
+- Quick access to common actions
+- No need to leave composer
+
+### Variable Autocomplete
+
+Insert variables directly in the composer using autocomplete:
+
+**How to Use:**
+1. Type `{{` in the composer
+2. Autocomplete menu appears with available variables
+3. Type to filter (e.g., `{{user` shows user variables)
+4. Use arrow keys to navigate
+5. Press Enter to insert
+
+**Available Variables:**
+- **User Variables**: `{{user.name}}`, `{{user.email}}`, `{{user.organization}}`
+- **Context Variables**: `{{context.currentDate}}`, `{{context.currentTime}}`, `{{context.timezone}}`
+- **Config Variables**: `{{configs.BRAND}}`, `{{configs.COMPANY}}`, `{{configs.TONE}}`
+- **Conversation Variables**: `{{conversation.summary}}`, `{{conversation.history}}`
+
+**Features:**
+- Real-time filtering as you type
+- Categorized display with icons
+- Keyboard navigation (arrow keys, Enter)
+- Descriptions for each variable
+- Custom variables from prompts appear first
+
+See [Prompts](/docs/prompts) for more information about variables.
+
+## Thread Management
+
+### Thread Organization
+
+**Projects:**
+- Group related threads into a project
+- Give a project its own default model, system context, and enabled tools
+- Pin projects for quick access
+- See [Projects](/docs/projects)
+
+**Tags:**
+- Add custom tags to threads
+- Filter threads by tags
+- Organize by topic or project
+- Multiple tags per thread
+
+**Pinning:**
+- Pin important threads to top
+- Quick access to frequently used threads
+- Pin/unpin from the thread menu or the command palette (`Ctrl+K`)
+
+**Hierarchy:**
+- Create parent/child thread relationships
+- Organize related conversations
+- Branch conversations
+- Create a branch from the thread menu or the command palette (`Ctrl+K`)
+
+### Thread Sharing
+
+**Share via Email Invitation:**
+- Invite specific users by email to collaborate on a thread
+- Choose permission levels: Read-only, Write, or Admin
+- Set optional expiration dates on shared access
+- Shared users see the thread in their thread list
+
+**Public Sharing:**
+- Generate a public link for read-only access
+- Anyone with the link can view the thread
+- Revoke public access at any time
+
+**Private Threads:**
+- Threads are private by default
+- Only you and explicitly invited users can access them
+
+### Thread Categories
+
+Threads are automatically categorized by the AI to help with organization:
+
+| Category | Description |
+|---|---|
+| Coding | Programming, debugging, code review |
+| Writing | Content creation, editing, drafting |
+| Research | Information gathering, analysis |
+| Analysis | Data analysis, comparison, evaluation |
+| Brainstorming | Ideation, creative thinking |
+| General | Everything else |
+
+Categories are assigned automatically and shown in the thread list for quick visual identification.
+
+### Thread Search and Filtering
+
+**Search:**
+- Search across all threads
+- Search within messages
+- Filter by tags
+- Focus the search box with `Ctrl+F` (Mac: `Cmd+F`), or open the command palette with `Ctrl+K` (Mac: `Cmd+K`)
+
+**Filtering:**
+- Filter by thread type (normal, temporary, stateless)
+- Filter by tags
+- Filter by date
+- Filter by status (active, archived)
+
+### Thread Welcome Suggestions
+
+New threads show helpful suggestions:
+
+- Example prompts to get started
+- Common use cases
+- Tips for better results
+- Quick actions
+
+**Note:** Welcome suggestions appear when a thread is empty. Once you start chatting, you'll see [Follow-Up Suggestions](#follow-up-suggestions) after each AI response instead.
+
+### Empty State Handling
+
+When you have no threads:
+
+- Helpful onboarding messages
+- Quick start guides
+- Example prompts
+- Getting started tips
+
+## Common Use Cases
+
+### Writing and Editing
+
+**Use Case**: Draft documents, emails, or content with AI assistance.
+
+**Best Practices:**
+- Use Normal Threads for ongoing writing projects
+- Switch models to get different writing styles
+- Use message editing to refine drafts
+- Attach reference documents for context
+
+**Example Workflow:**
+1. Create a new thread titled "Blog Post Draft"
+2. Ask AI to outline the post structure
+3. Request specific sections
+4. Edit and refine responses
+5. Use prompt improvement for better results
+
+### Code Development
+
+**Use Case**: Get help with programming, debugging, or code review.
+
+**Best Practices:**
+- Use code blocks in messages for better formatting
+- Attach code files for complex projects
+- Use stateless mode for independent code reviews
+- Switch to reasoning models (o1, Claude) for complex problems
+
+**Example Workflow:**
+1. Paste code snippet in message
+2. Ask specific questions about the code
+3. Request improvements or explanations
+4. Use code syntax highlighting for readability
+
+### Research and Analysis
+
+**Use Case**: Research topics, analyze documents, or gather information.
+
+**Best Practices:**
+- Use Normal Threads to maintain research context
+- Attach PDFs or documents for analysis
+- Create branches for different research angles
+- Use tags to organize research threads
+
+**Example Workflow:**
+1. Create thread with research topic
+2. Upload relevant documents
+3. Ask questions about the documents
+4. Create branches for different aspects
+5. Tag threads by research area
+
+### Quick Queries
+
+**Use Case**: One-off questions or quick information lookup.
+
+**Best Practices:**
+- Use Temporary Threads for disposable queries
+- Use Stateless Threads for independent questions
+- Combine both for privacy-sensitive quick queries
+
+**Example Workflow:**
+1. Create temporary thread
+2. Ask your question
+3. Get answer and let thread expire
+4. No need to clean up manually
+
+### Creative Projects
+
+**Use Case**: Brainstorming, creative writing, or ideation.
+
+**Best Practices:**
+- Use Normal Threads to build on ideas
+- Switch between creative models (GPT-4o, Claude)
+- Use thread hierarchy for related ideas
+- Tag threads by project or theme
+
+**Example Workflow:**
+1. Create main thread for project
+2. Generate ideas and variations
+3. Create branches for different directions
+4. Use tags to organize by theme
+
+## Tips and Best Practices
+
+### Getting Better Responses
+
+1. **Be Specific**: Clear, detailed prompts get better results
+2. **Provide Context**: Include relevant background information
+3. **Use Examples**: Show what you want with examples
+4. **Iterate**: Refine prompts based on responses
+5. **Use Prompt Improvement**: Let AI suggest better prompts
+
+### Organizing Your Work
+
+1. **Use Tags**: Tag threads by project, topic, or status
+2. **Pin Important Threads**: Keep frequently used threads at top
+3. **Create Hierarchy**: Use branches for related conversations
+4. **Archive Old Threads**: Keep workspace clean
+5. **Search Regularly**: Use search to find past conversations
+
+### Performance Tips
+
+1. **Choose Right Model**: Use faster models (GPT-4o Mini) for simple tasks
+2. **Use Stateless Mode**: When context isn't needed, disable history
+3. **Temporary Threads**: Use for quick queries to save resources
+4. **Favorite Models**: Mark frequently used models for quick access
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue**: Responses are slow
+- **Solution**: Try a faster model like GPT-4o Mini or Gemini Flash
+- **Solution**: Use stateless mode if context isn't needed
+
+**Issue**: Responses lack context
+- **Solution**: Ensure you're using Normal Threads (not Stateless)
+- **Solution**: Check that message history is being maintained
+
+**Issue**: Can't find old conversations
+- **Solution**: Use the command palette (`Ctrl+K`) or the thread search box (`Ctrl+F`) to find threads
+- **Solution**: Check archived threads
+- **Solution**: Filter by tags if you used them
+
+**Issue**: Thread expired unexpectedly
+- **Solution**: Check if it was a Temporary Thread
+- **Solution**: Convert to permanent before expiration
+
+## Quick Actions
+
+### Command Palette
+
+Access quick actions and navigation with the Command Palette:
+
+- Press `Ctrl+K` (Mac: `Cmd+K`) to open
+- Search threads, navigate pages, or perform actions
+- Keyboard-only navigation
+- Quick thread switching
+
+See [Keyboard Shortcuts](/docs/keyboard-shortcuts) for detailed Command Palette documentation.
+
+## Canvas (Document Artifacts)
+
+When the AI creates documents, code, spreadsheets, or other artifacts, they
+appear in the **Canvas** — a side panel that opens next to the conversation.
+
+**Artifact types:**
+- **Text documents** — Rich text editing with ProseKit editor
+- **Spreadsheets** — Interactive editing with Univer.js (XLSX import/export)
+- **Code** — Syntax-highlighted code with language detection
+- **Images** — Generated images from image generation tools
+- **Designs** — Editable visual designs (social posts, banners, flyers) on a drag-and-drop canvas
+- **Presentations** — AI-generated slide decks with styled templates
+
+**Features:**
+- Version history with rollback capability
+- Edit content directly in the panel
+- Download or share artifacts
+- Switch between edit and preview modes
+
+**How it works:**
+1. Ask the AI to create a document, spreadsheet, or code file
+2. The Canvas panel opens with the generated artifact
+3. Edit the content directly in the panel
+4. Download or share the result
+
+See also [Spreadsheets](/docs/spreadsheets) and [Design Canvas](/docs/design-canvas)
+for artifact-specific features.
+
+## Related Features
+
+- [AI Tools](/docs/tools) - Built-in tools for search, image generation, code execution, and more
+- [Knowledge Base](/docs/knowledge-base) - Upload documents for persistent AI context
+- [Memory](/docs/memory) - AI remembers facts about you across conversations
+- [Prompts](/docs/prompts) - Use prompt templates in conversations
+- [MCP Servers](/docs/mcp) - Extend the AI with external tools and interactive UIs
+- [Keyboard Shortcuts](/docs/keyboard-shortcuts) - Navigate threads efficiently and use Command Palette
+- [Settings](/docs/settings) - Configure chat preferences
+- [Vault](/docs/vault) - Manage file attachments
+- [Messenger Integration](/docs/messenger) - Chat from Telegram, Slack, or Discord
+- [Triggers](/docs/triggers) - Automate agent execution on schedules or webhooks
+- [Browser Automation](/docs/browser) - Automate web browsing tasks
+- [Projects](/docs/projects) - Group threads and share defaults across them
+- [Workflows](/docs/workflows) - Chain image and video models on a visual canvas
+- [Design Canvas](/docs/design-canvas) - Editable visual designs as artifacts

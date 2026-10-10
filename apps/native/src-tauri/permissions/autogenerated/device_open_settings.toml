@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-device-open-settings"
+description = "Enables the device_open_settings command without any pre-configured scope."
+commands.allow = ["device_open_settings"]
+
+[[permission]]
+identifier = "deny-device-open-settings"
+description = "Denies the device_open_settings command without any pre-configured scope."
+commands.deny = ["device_open_settings"]

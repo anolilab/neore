@@ -1,0 +1,24 @@
+/**
+ * Worker-safe logger.
+ *
+ * `@visulima/pail` cannot load in workerd: both its default and `/browser`
+ * entries call Node's `createRequire`, so importing it kills the Worker at
+ * startup with `TypeError: The argument 'path' must be a file URL object`.
+ * A generated service that used it did exactly that.
+ *
+ * Console output is captured by wrangler locally and by Cloudflare's logging in
+ * production, so a shim is enough.
+ */
+export interface Logger {
+    error: (...args: unknown[]) => void;
+    info: (...args: unknown[]) => void;
+    warn: (...args: unknown[]) => void;
+}
+
+const TAG = "[{{name}}]";
+
+export const logger: Logger = {
+    error: (...args: unknown[]) => console.error(TAG, ...args),
+    info: (...args: unknown[]) => console.log(TAG, ...args),
+    warn: (...args: unknown[]) => console.warn(TAG, ...args),
+};

@@ -1,0 +1,362 @@
+---
+title: Messenger integration
+description: Chat with the AI from Telegram, Slack, or Discord and see every conversation in your thread list
+---
+
+# Messenger integration
+
+Messenger integration lets you chat with the AI directly from
+Telegram, Slack, or Discord. Every message you send from a connected
+platform creates a thread inside Neore Chat, tagged with the
+platform name. The AI auto-responds on the same platform, so you
+can carry on a conversation without opening the web app.
+
+## Quick start
+
+1. Navigate to **Settings > API Keys** and add your bot tokens
+   under the **Messenger Bot Keys** section
+2. Navigate to **Settings > Chat > Messenger**
+3. Click **Connect** on the platform you want to use
+4. Copy the webhook URL shown on the connected card
+5. Register the webhook URL with your platform (BotFather,
+   Slack App settings, or Discord Developer Portal)
+6. Send a message to the bot on that platform
+7. Your conversation appears in the thread list with a platform
+   badge
+
+## Bring Your Own Bot (BYOK)
+
+Neore uses a **Bring Your Own Key** approach for messenger
+integrations — the same pattern used for AI provider keys and tool
+keys. Each user provides their own bot token, which is encrypted at
+rest using AES-256-GCM and never exposed to the client after being
+saved.
+
+Your bot tokens are managed from a single page:
+**Settings > API Keys > Messenger Bot Keys**
+
+| Key                      | Platform | Where to get it                    |
+| ------------------------ | -------- | ---------------------------------- |
+| Telegram Bot Token       | Telegram | @BotFather on Telegram             |
+| Telegram Webhook Secret  | Telegram | Any random string you choose       |
+| Slack Bot Token          | Slack    | Slack App > OAuth & Permissions    |
+| Slack Signing Secret     | Slack    | Slack App > Basic Information      |
+| Discord Bot Token        | Discord  | Discord Developer Portal > Bot     |
+| Discord Public Key       | Discord  | Discord Developer Portal > General |
+
+## How it works
+
+When you send a message on a connected platform, the following
+happens automatically:
+
+1. The platform delivers your message to Neore via a webhook
+2. Neore looks up your connection and decrypts your bot tokens
+3. The webhook signature is validated using your tokens
+4. A new thread is created (or an existing one is continued)
+5. The AI generates a response using your preferences and the
+   default chat model
+6. The response is sent back to the platform using your bot token
+
+All messages — both yours and the AI's — are visible in the web
+app, just like any other thread.
+
+### Per-connection webhook URLs
+
+Each connection gets a unique webhook URL:
+
+```
+{LUNORA_URL}/messenger/{platform}/{connectionId}
+```
+
+This URL is shown on the platform card after you activate a
+connection. Copy it and register it with your platform's webhook
+settings.
+
+## Supported platforms
+
+### Telegram
+
+Telegram uses a bot created through
+[@BotFather](https://t.me/BotFather).
+
+**How to set up:**
+
+1. Message @BotFather and send `/newbot` to create a bot
+2. Copy the bot token
+3. In Neore, go to **Settings > API Keys** and add the
+   **Telegram Bot Token** and a **Telegram Webhook Secret**
+   (any random string)
+4. Go to **Settings > Chat > Messenger** and click **Connect**
+   on Telegram
+5. Copy the webhook URL from the card
+6. Register the webhook with Telegram:
+   ```bash
+   curl -X POST \
+     "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
+     -d "url=<WEBHOOK_URL>" \
+     -d "secret_token=<WEBHOOK_SECRET>"
+   ```
+7. Send `/start` to your bot on Telegram
+
+**Characteristics:**
+
+- One thread per Telegram chat (direct message with the bot)
+- Messages up to 4,096 characters are supported
+- Long AI responses are automatically split into multiple messages
+- The thread is tagged `telegram` in the thread list
+
+### Slack
+
+Slack uses a Slack App with the Events API.
+
+**How to set up:**
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) and
+   create a new app
+2. Under **OAuth & Permissions**, add the `chat:write` scope — and
+   `files:read` and `files:write` if the bot should read files people
+   send it and send files back
+3. Install the app to your workspace
+4. Copy the **Bot User OAuth Token** and the **Signing Secret**
+   (from Basic Information)
+5. In Neore, go to **Settings > API Keys** and add both keys
+6. Go to **Settings > Chat > Messenger** and click **Connect**
+   on Slack
+7. Copy the webhook URL from the card
+8. Under **Event Subscriptions** in your Slack App, enable
+   events and set the Request URL to your webhook URL
+9. Subscribe to the `message.im` and `app_mention` bot events
+
+**Characteristics:**
+
+- Slack thread replies are preserved — replies in the same Slack
+  thread map to the same Neore thread
+- New top-level messages create new threads
+- @mentions and direct messages are both supported
+- The thread is tagged `slack` in the thread list
+
+### Discord
+
+Discord uses a Bot Application.
+
+**How to set up:**
+
+1. Go to the
+   [Discord Developer Portal](https://discord.com/developers/applications)
+   and create a new application
+2. Under **Bot**, create a bot and copy the token
+3. Under **General Information**, copy the public key
+4. In Neore, go to **Settings > API Keys** and add both keys
+5. Go to **Settings > Chat > Messenger** and click **Connect**
+   on Discord
+6. Copy the webhook URL from the card
+7. Set the **Interactions Endpoint URL** in your Discord app
+   settings to your webhook URL
+8. Under **OAuth2 > URL Generator**, select the `bot` scope with
+   `Send Messages` and `Read Message History` permissions
+9. Use the generated URL to add the bot to your server
+
+**Characteristics:**
+
+- Each Discord channel maps to a separate Neore thread
+- Messages up to 2,000 characters are supported
+- Long AI responses are automatically split
+- The thread is tagged `discord` in the thread list
+
+## Managing connections
+
+The **Messenger** settings page shows a card for each platform
+with the current connection status.
+
+### Connection states
+
+Each connection can be in one of three states:
+
+| State            | Description                                |
+| ---------------- | ------------------------------------------ |
+| **Connected**    | Messages are being received and processed  |
+| **Paused**       | The connection exists but messages are ignored until you resume |
+| **Disconnected** | No connection — click **Connect** to set one up |
+
+### Pausing a connection
+
+Click **Pause** on a connected platform to temporarily stop
+receiving messages. The bot still receives the messages on the
+platform side, but Neore ignores them until you click **Resume**.
+This is useful when you want to take a break without losing your
+connection setup.
+
+### Disconnecting
+
+Click the **trash icon** on a connected platform to remove the
+connection entirely. This does not delete any existing threads —
+it only stops future messages from being processed. You can
+reconnect at any time.
+
+## Thread list badges
+
+Threads created from messenger platforms display a colored badge
+next to the thread title in the sidebar:
+
+| Platform | Badge color |
+| -------- | ----------- |
+| Telegram | Blue        |
+| Slack    | Purple      |
+| Discord  | Indigo      |
+
+The badge text matches the platform name (for example, `telegram`).
+You can also filter threads by tag to show only conversations from
+a specific platform.
+
+## AI response behavior
+
+The AI responds to messenger messages using the default chat model
+and your personalization settings (language, timezone, custom
+instructions). A few things to note:
+
+- **Non-streaming** — Messenger platforms don't support streamed
+  responses, so the AI generates the full reply before sending it
+- **Text only by default** — replies use no tools unless you turn
+  on reply tools for the connection (see below)
+- **No memory** — your stored memories are never used in messenger
+  replies, because the people messaging your bot are not you
+- **Error recovery** — If the AI fails to generate a response, an
+  error message is sent to the platform so you know to try again
+
+## Reply tools
+
+By default the bot answers with text only. You can let its replies
+use tools — search the web, open links, generate images and more —
+separately for each connection.
+
+**Turning them on:**
+
+1. Go to **Settings > Chat > Messenger**
+2. On a connected platform card, switch on **Let replies use tools**
+3. Tick the tool groups the bot may use
+
+All groups are ticked when you first switch tools on. Untick the ones
+you do not want:
+
+| Group                                          | What replies can do                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------ |
+| **Web search**                                 | Search the web                                                           |
+| **Open links**                                 | Read the content of a web page                                           |
+| **Image generation**                           | Create images, which are sent to the sender after the reply              |
+| **Code execution and sandbox files**           | Run code and work with files in a sandbox                                |
+| **Knowledge search**                           | Search your knowledge base                                               |
+| **Date and time**                              | Look up the current date and time                                        |
+| **Your connectors and MCP tools set to "Auto"** | Use your connected services and MCP servers                             |
+
+Keep in mind that anyone who can message your bot can make it use
+these tools — as you, with your keys, your knowledge base and your
+connected accounts. Only enable what you are comfortable letting them
+use.
+
+**What reply tools never do:**
+
+- **Tools set to "Ask" are skipped.** Nobody can approve a tool from a
+  messenger, so any tool you set to ask for approval is left out, even
+  inside an enabled group
+- The browser, deep research, documents, sub-agents, coding agents
+  and memory search are never available in messenger replies
+- Tools on your own computer ([Devices](/docs/devices)) are never
+  available in messenger replies
+- Nothing in a message can switch tools on or add a group — only your
+  connection settings decide
+
+**Limits and cost:**
+
+- A reply with tools can take up to **five steps**, so the bot can
+  call tools a few times before it answers
+- Each reply with tools counts as one run against your daily chat
+  allowance and your limit for background runs, and the model and any
+  tools it uses (such as image generation) are charged to your
+  account as in the web app
+- If you have reached that limit, the bot still answers, but with
+  text only
+- Replies with tools use a model that handles tools and images well,
+  rather than the default chat model
+- On WhatsApp and WeChat, the reply window is checked again after the
+  tools have run, so a slow reply is not sent outside the platform's
+  window
+
+Images and files a tool creates are sent back on the platform as
+described in the next section.
+
+## Images, files and voice messages
+
+The bot reads images, documents and voice messages on every
+platform, not only text:
+
+- **Images and PDFs** are shown to the AI directly. A thread that
+  contains them is answered by a model that can see images.
+- **Voice messages and audio** are transcribed, and the AI answers
+  the transcript. The recording stays attached to the message in
+  the thread. On WeChat, the platform's own speech recognition is
+  used when your account has it switched on.
+- **Text documents** (TXT, CSV, Markdown, JSON) are read as text.
+  Word, Excel and PowerPoint files are stored with the message, but
+  the AI is only told that they were sent.
+
+Files are downloaded with your own bot token and stored in your
+account, like files you upload in the web app. Each file may be up
+to 20 MB, and up to five are read per message. Videos, stickers and
+locations are not read — the bot tells the sender so.
+
+When a reply produces a file, the bot sends it through the
+platform's own upload API. Where a platform can't take that kind of
+file (LINE and Microsoft Teams only take images; WeChat takes
+images and voice), the bot sends a download link instead, valid for
+24 hours. On WhatsApp and WeChat, replies — files included — are
+only possible within the platform's reply window (24 and 48 hours
+after the sender's last message).
+
+## Troubleshooting
+
+**Issue:** Messages sent on the platform don't appear in Neore
+- **Solution:** Verify that the connection status is **Connected**
+  (not paused or disconnected) on the Messenger settings page
+- **Solution:** Verify your bot tokens are configured in
+  **Settings > API Keys > Messenger Bot Keys**
+- **Solution:** Verify the webhook URL is correctly registered with
+  the platform
+
+**Issue:** The AI doesn't respond on the platform
+- **Solution:** The AI response runs as a background task — wait a
+  few seconds for it to complete
+- **Solution:** If the message was very long or complex, the AI
+  may take longer. Check the web app to see if the thread was
+  created
+
+**Issue:** "Telegram/Slack/Discord not configured" error
+- **Solution:** Add your bot tokens in **Settings > API Keys**
+  under the Messenger Bot Keys section
+- **Solution:** Make sure the connection is active (not paused)
+
+**Issue:** Webhook signature validation fails
+- **Solution:** Verify that the webhook secret or signing key
+  in **Settings > API Keys** matches what you configured on the
+  platform
+- **Solution:** For Slack, verify the request timestamp is within
+  five minutes (clock skew can cause failures)
+
+**Issue:** Duplicate threads are created for the same conversation
+- **Solution:** Each platform conversation maps to a unique
+  external thread ID. If you see duplicates, verify you're
+  messaging the same bot user or channel
+
+**Issue:** Connection shows "Connected" but the platform user info
+is missing
+- **Solution:** Platform user info (username, display name) is
+  linked on the first message. Send a message to the bot to
+  trigger the link
+
+## Related features
+
+- [Chat](/docs/chat) — Thread management and AI conversations
+- [Settings](/docs/settings) — Account and app configuration
+- [Chat Import](/docs/chat-import) — Import conversations from
+  other AI platforms
+- [Privacy & GDPR](/docs/privacy) — Data export and account
+  deletion

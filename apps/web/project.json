@@ -1,0 +1,25 @@
+{
+    "name": "@neore/web",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "apps/web",
+    "projectType": "application",
+    "tags": ["chat"],
+    "implicitDependencies": [],
+    "targets": {
+        "dev": {
+            "command": "pnpm dev",
+            "preset": "server",
+            "options": {
+                "service": {
+                    "port": 5173,
+                    "readiness": {
+                        "http": {
+                            "path": "/",
+                            "port": 5173
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

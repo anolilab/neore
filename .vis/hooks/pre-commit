@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# vis:secrets-hook
+pnpm exec vis secrets --staged --quiet || exit 1

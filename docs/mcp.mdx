@@ -1,0 +1,131 @@
+---
+title: MCP Servers
+description: Connect Model Context Protocol servers to extend the AI with external tools and interactive UIs
+---
+
+# MCP servers
+
+Model Context Protocol (MCP) is an open standard that lets AI models
+communicate with external services in a structured way. When you connect an
+MCP server to Neore, the AI gains access to new tools — for example, a web
+search service, a database query interface, or a code execution sandbox. Some
+MCP servers also provide interactive UIs that render directly inside the chat.
+
+## Connecting a server
+
+You manage MCP servers at **Settings → Chat → MCP Servers**.
+
+To add a server:
+
+1. On the **MCP Servers** page, click **Add Server**.
+2. Fill in the server details:
+   - **Name** — a label you choose; shown in chat next to tool calls from this
+     server.
+   - **Protocol** — choose **Streamable HTTP** (recommended for new servers)
+     or **Server-Sent Events (SSE)** (for older servers that require it).
+   - **URL** — the full endpoint URL provided by the server, for example
+     `https://my-mcp-server.example.com/mcp`.
+   - **Icon URL** (optional) — a URL to a square image used as the server's
+     avatar in the UI.
+   - **Headers** (optional) — additional HTTP headers sent with every request
+     to this server. Use these for authentication tokens or API keys.
+3. Toggle **Enabled** to control whether the server is active.
+4. Click **Test Connection** to verify that Neore can reach the server. A
+   success message shows the number of tools discovered and the round-trip
+   latency.
+5. Click **Add Server** to save.
+
+> **Note:** Authentication headers you add (for example,
+> `Authorization: Bearer <token>`) are stored encrypted and are never sent to
+> the browser. All requests to your MCP servers are proxied through Neore's
+> backend, so your credentials stay server-side at all times.
+
+### Editing and removing servers
+
+- Click any server row to open the edit form. Change any field and click
+  **Update Server** to save.
+- Click the trash icon on a server row to remove it permanently.
+- Use the toggle switch on each server row to enable or disable it without
+  deleting it.
+
+## How tools work in chat
+
+When you start a conversation, Neore connects to all of your enabled MCP
+servers and merges their tools with the built-in tool set. The AI decides
+automatically which tools to use based on your messages.
+
+When the AI calls an MCP tool, a **tool call card** appears in the conversation
+thread. The card shows:
+
+- The tool name and a purple badge with the server name.
+- A **Running…** indicator while the tool is executing.
+- An expand button to see the full input and output JSON after the call
+  completes.
+
+Tool names in Neore follow the format `mcp_<ServerName>__<toolName>`, where
+non-alphanumeric characters in the server name are replaced with underscores.
+You don't need to use this format directly — it's handled internally.
+
+## MCP Apps (interactive UIs)
+
+Some MCP servers provide not just tools but also interactive UIs called
+**MCP Apps**. When a tool advertises a UI resource (`_meta.ui.resourceUri`),
+Neore renders a live interactive panel inside the tool call card instead of
+(or in addition to) the raw JSON output.
+
+MCP Apps load in a sandboxed iframe on a separate, neutral origin so that the
+embedded UI can't access your session data or the rest of the page. Interactions
+inside the app — such as clicking a button that triggers another tool call —
+are proxied through Neore's backend using the same credential-protection model
+as regular tool calls.
+
+No configuration is required. If an MCP server supports MCP Apps, the UI
+appears automatically when the AI calls a compatible tool.
+
+## Protocol reference
+
+| Protocol | When to use |
+|---|---|
+| Streamable HTTP | Modern servers; lower overhead; recommended for new integrations |
+| SSE | Legacy servers that use the older Server-Sent Events transport |
+
+## Troubleshooting
+
+**The AI isn't using my MCP tools**
+
+- Check that the server is enabled (the toggle on the server row is on).
+- Click **Test Connection** to confirm the server is reachable. If the test
+  fails, verify the URL and any required headers.
+- Some models have limited tool-calling support. Try switching to a model that
+  supports function calling (most GPT-4, Claude, and Gemini models do).
+
+**Test connection fails with "Connection timed out"**
+
+- Neore allows up to 10 seconds for a server to respond during connection.
+  If your server takes longer to start, the test will time out.
+- Check that the server URL is correct and that the server is running.
+- If the server requires a VPN or is behind a firewall, it must be accessible
+  from Neore's backend.
+
+**My auth header value isn't saving correctly**
+
+- Header values are masked in the UI after saving (you see bullets instead of
+  the full value). The actual value is stored correctly — the masking is only
+  cosmetic.
+- If you suspect the value was saved incorrectly, click the server row to edit
+  it and re-enter the header value.
+
+**The MCP App UI isn't appearing**
+
+- MCP Apps only appear for tools that the server explicitly marks with a UI
+  resource. Not all tools on an MCP server have an app UI.
+- The UI appears only after the tool call completes successfully, not during
+  execution.
+- If the tool call returned an error, the tool card shows the error instead
+  of the app UI.
+
+## Related features
+
+- [Chat](/docs/chat) — How tool call cards appear in conversations
+- [Settings](/docs/settings) — Full settings reference
+- [Vault](/docs/vault) — Manage files attached to conversations

@@ -1,0 +1,423 @@
+---
+title: Privacy & GDPR
+description: Manage your privacy settings, data rights, and GDPR compliance features
+---
+
+# Privacy & GDPR
+
+Neore Chat is committed to protecting your privacy and providing full compliance with GDPR (General Data Protection Regulation) and other data protection laws. This page explains your privacy rights and how to exercise them.
+
+## Quick Start
+
+Access Privacy & Data settings:
+
+1. Navigate to Settings → Privacy & Data
+2. Review your privacy options
+3. Manage consent preferences
+4. Request data export or account deletion if needed
+
+## Overview
+
+The Privacy & Data section provides comprehensive tools for managing your personal data:
+
+- **Privacy Policy** - Review how we handle your data
+- **Consent Preferences** - Control cookie and data processing consent
+- **Data Access Summary** - View summary of your personal data
+- **Data Export** - Download all your personal data
+- **Chat Import** - Import conversations from other AI platforms
+- **Account Deletion** - Permanently delete your account and data
+- **DPO Contact** - Contact our Data Protection Officer
+
+## Privacy Policy
+
+Review our privacy policy to understand how we collect, use, and protect your personal data.
+
+**Access:**
+- Click "View Privacy Policy" in Privacy & Data settings
+- Opens in a new tab
+- Comprehensive information about data practices
+
+**What's Covered:**
+- Data collection practices
+- How data is used
+- Data sharing policies
+- Security measures
+- Your rights under GDPR and other laws
+
+## Consent Preferences
+
+Manage your consent preferences for cookies and data processing.
+
+### Consent Categories
+
+**Necessary:**
+- Required for basic functionality
+- Cannot be disabled
+- Includes authentication, security, and core features
+
+**Analytics:**
+- Usage analytics and performance monitoring
+- Helps improve the service
+- Can be enabled or disabled
+
+**Marketing:**
+- Marketing communications and tracking
+- Optional consent
+- Can be enabled or disabled
+
+**AI Features:**
+- AI training and improvement features
+- Optional consent
+- Can be enabled or disabled
+
+### Managing Consent
+
+**How to Change Consent:**
+1. Go to Settings → Privacy & Data
+2. Click "Manage Consent Preferences"
+3. Toggle categories on or off
+4. Save your preferences
+
+**Consent Banner:**
+- Appears on first visit (if required by your location)
+- Automatically detects your jurisdiction
+- Respects GDPR, PIPEDA, LGPD, and other regulations
+- Can be reopened anytime from settings
+
+**Features:**
+- Granular control over consent categories
+- Easy to change preferences anytime
+- Consent is logged for compliance
+- Analytics respects your consent choices
+
+## Data Access Summary (Article 15)
+
+View a summary of your personal data without generating a full export.
+
+**What's Included:**
+- **Profile Information:**
+  - Email address
+  - Display name
+  - Account creation date
+  - Email verification status
+
+- **Data Summary:**
+  - Number of files
+  - Number of prompts
+  - Settings configuration status
+  - Number of GDPR requests
+
+**Access:**
+1. Go to Settings → Privacy & Data
+2. View "Data Access Summary" section
+3. See your data overview instantly
+
+**Note:** For detailed information including conversations and messages, use the Data Export feature.
+
+## Data Export (Article 20 - Right to Data Portability)
+
+Download a complete copy of all your personal data in JSON format.
+
+### What's Included in Export
+
+The export is a single JSON file containing:
+
+| Section | Contents |
+|---|---|
+| `dataSubject` | Your user id and email |
+| `profile` | Account information, email, name |
+| `settings` | User preferences and AI settings |
+| `conversations` | All threads, with their messages |
+| `files` | File metadata (file contents are stored separately) |
+| `prompts` | Saved prompts and their edit history |
+
+It also carries an `exportDate` and an `exportVersion`.
+
+:::note
+Some data is **erased** on account deletion but is not currently included in the
+export file — memories, pins, projects, skills, triggers, and knowledge base
+files. If you need a copy of those before deleting your account, retrieve them
+from their own pages first. This is a gap in data portability coverage, not in
+erasure coverage: deletion removes them.
+:::
+
+### Requesting an Export
+
+**How to Request:**
+1. Go to Settings → Privacy & Data
+2. Click "Request Data Export"
+3. Export request is submitted
+4. You'll receive an email when ready
+
+**Export Process:**
+1. Request submitted
+2. Data collection begins (may take a few minutes)
+3. Progress shown in real-time
+4. Export file generated
+5. Email notification sent
+6. Download link available for 7 days
+
+**Export Status:**
+- **Pending:** Request submitted, waiting to start
+- **Processing:** Data collection in progress
+- **Completed:** Export ready for download
+- **Failed:** Export encountered an error
+- **Cancelled:** Export was cancelled
+
+**Downloading Export:**
+1. When export is ready, click "Download Export"
+2. File downloads as JSON
+3. Open with any text editor or JSON viewer
+4. Download link expires after 7 days
+
+**Export Format:**
+```json
+{
+  "exportVersion": "1.0",
+  "exportDate": "2026-01-02T10:30:00.000Z",
+  "dataSubject": {
+    "id": "user_123",
+    "email": "user@example.com"
+  },
+  "profile": { ... },
+  "settings": { ... },
+  "conversations": [ ... ],
+  "files": { ... },
+  "prompts": [ ... ],
+  "usageHistory": [ ... ]
+}
+```
+
+**Features:**
+- Complete data portability
+- JSON format for easy processing
+- Secure download links (7-day expiry)
+- Email notifications
+- Progress tracking
+- Can cancel stuck exports
+
+## Chat Import
+
+Import your conversation history from ChatGPT, Google Gemini, or Claude into Neore Chat.
+
+**Supported Providers:**
+- ChatGPT (export ZIP or `conversations.json`)
+- Google Gemini (Google Takeout ZIP)
+- Claude (exported JSON)
+
+**How to Import:**
+1. Export your data from the source provider
+2. Go to Settings → Privacy & Data
+3. Click **Select File** under Import Conversations
+4. Review the preview and click **Import All**
+
+The import runs entirely server-side — you can close the browser and it will continue processing. Progress is shown in real time when you return to the page.
+
+See [Chat Import](/docs/chat-import) for detailed format-specific instructions and troubleshooting.
+
+## Account Deletion (Article 17 - Right to Erasure)
+
+Permanently delete your account and all associated personal data.
+
+### What Gets Deleted
+
+When you delete your account, the following is permanently removed:
+
+- **Account Information:** Profile, email, authentication data
+- **Conversations:** All threads and messages, including temporary threads, thread relationships, invites, shared access, and per-thread variables
+- **Files:** All uploaded files, folders, and metadata
+- **Documents:** Canvas artifacts and their version history, presentations and their slides
+- **Prompts:** All saved prompts and their history
+- **Skills:** Your skills, their history, and invocation records
+- **Projects and workflows:** All projects, including workflows
+- **Pins:** All pinned messages and selections
+- **Memories:** Every fact the AI learned about you
+- **Settings:** User preferences, AI preferences, and variable defaults
+- **Connectors:** Messenger and OAuth connections, browser extension links, and browser automation sessions and logs
+- **In-flight state:** Streaming buffers, follow-up suggestions, and chat import jobs
+- **Sessions:** All active sessions revoked
+
+### Requesting Deletion
+
+**How to Delete:**
+1. Go to Settings → Privacy & Data
+2. Click "Delete My Account"
+3. Type "DELETE" to confirm
+4. Review warning about permanent deletion
+5. Confirm deletion
+
+**Deletion Process:**
+1. Request submitted with confirmation
+2. Deletion workflow begins immediately
+3. All data is permanently removed
+4. Confirmation email sent
+5. Account cannot be recovered
+
+**Important Warnings:**
+- ⚠️ **Permanent:** Deletion cannot be undone
+- ⚠️ **Immediate:** Data is deleted right away
+- ⚠️ **Complete:** All data is removed
+- ⚠️ **No Recovery:** Account cannot be restored
+
+**Recovery Period:**
+- If you change your mind, contact support within 30 days
+- After 30 days, deletion is final
+- No data recovery possible after retention period
+
+**Deletion Status:**
+- **Pending:** Request submitted
+- **Processing:** Deletion in progress
+- **Completed:** Account deleted
+
+## Data Protection Officer (DPO)
+
+Contact our Data Protection Officer for questions about your data rights.
+
+**When to Contact DPO:**
+- Questions about your personal data
+- GDPR rights inquiries
+- Privacy concerns
+- Data processing questions
+- Consent-related issues
+
+**Contact Information:**
+- Available in Settings → Privacy & Data
+- Email address provided
+- Direct contact link
+
+**Response Time:**
+- DPO responds to inquiries promptly
+- GDPR requires response within 30 days
+- We aim to respond faster when possible
+
+## GDPR Rights
+
+Neore Chat implements all core GDPR rights:
+
+### Article 12: Transparent Information
+- Clear information about data processing
+- Easy-to-understand privacy policy
+- Accessible privacy settings
+
+### Article 15: Right of Access
+- Data Access Summary for quick overview
+- Data Export for complete access
+- View all personal data we process
+
+### Article 17: Right to Erasure
+- Account deletion feature
+- Permanent removal of all data
+- "Right to be forgotten" implemented
+
+### Article 20: Right to Data Portability
+- Complete data export in JSON format
+- Machine-readable format
+- Easy to transfer to other services
+
+### Article 30: Records of Processing
+- Audit logging of all GDPR actions
+- Compliance records maintained
+- Transparent data processing
+
+## Consent Management
+
+### Automatic Detection
+
+The system automatically detects your location and applies appropriate consent requirements:
+
+**Supported Jurisdictions:**
+- **GDPR:** EU countries, EEA, UK
+- **PIPEDA:** Canada
+- **LGPD:** Brazil
+- **Swiss Data Protection:** Switzerland
+- **Privacy Act:** Australia
+- **APPI:** Japan
+- **PIPA:** South Korea
+
+**How It Works:**
+- Server-side location detection
+- Automatic jurisdiction mapping
+- Appropriate consent banner shown
+- Language detection for consent UI
+
+### Consent Storage
+
+- Consent preferences are stored securely
+- Changes are logged for compliance
+- Consent history maintained
+- Can be revoked anytime
+
+## Best Practices
+
+### Data Management
+
+1. **Regular Reviews:** Periodically review your data access summary
+2. **Export Backups:** Export your data regularly for backups
+3. **Consent Management:** Review and update consent preferences
+4. **Privacy Settings:** Keep privacy settings up to date
+
+### Security
+
+1. **Strong Passwords:** Use strong, unique passwords
+2. **Session Management:** Review active sessions regularly
+3. **Two-Factor Auth:** Enable 2FA when available
+4. **Account Security:** Keep account secure
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue:** Export stuck in "Processing"
+- **Solution:** Wait a few minutes - exports can take time
+- **Solution:** Check email for completion notification
+- **Solution:** Use "Cancel Export" and request new one if stuck
+
+**Issue:** Can't download export
+- **Solution:** Check if download link expired (7-day limit)
+- **Solution:** Request a new export
+- **Solution:** Check email for download link
+
+**Issue:** Deletion not completing
+- **Solution:** Check deletion status in settings
+- **Solution:** Contact support if stuck
+- **Solution:** Verify deletion was confirmed
+
+**Issue:** Consent preferences not saving
+- **Solution:** Refresh page and try again
+- **Solution:** Check browser settings (cookies enabled)
+- **Solution:** Clear browser cache if needed
+
+**Issue:** Can't access privacy settings
+- **Solution:** Ensure you're logged in
+- **Solution:** Check account permissions
+- **Solution:** Try refreshing the page
+
+## Request Timelines
+
+**GDPR Requirements:**
+- All requests must be fulfilled within 30 days
+- We aim to complete requests faster when possible
+
+**Typical Timelines:**
+- **Data Export:** Usually ready within minutes to hours
+- **Account Deletion:** Usually completed within hours
+- **Data Access Summary:** Instant
+- **Consent Changes:** Immediate
+
+**Email Notifications:**
+- Export ready notifications
+- Deletion confirmation emails
+- Request status updates
+
+## Related Features
+
+- [Chat Import](/docs/chat-import) - Import conversations from other AI platforms
+- [Settings](/docs/settings) - General account settings
+- [Authentication](/docs/authentication) - Account security
+- [Account Deletion](/docs/authentication#account-deletion) - Account management
+
+## Additional Resources
+
+- [GDPR Official Text](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016R0679)
+- [GDPR.eu Guide](https://gdpr.eu/what-is-gdpr/)
+- [ICO GDPR Guide](https://ico.org.uk/for-organisations/guide-to-data-protection/guide-to-the-general-data-protection-regulation-gdpr/)

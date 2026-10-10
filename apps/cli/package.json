@@ -1,0 +1,46 @@
+{
+    "name": "@neore/cli",
+    "version": "0.1.0",
+    "private": true,
+    "description": "The `neore` command-line client for the Neore public API",
+    "sideEffects": true,
+    "type": "module",
+    "exports": {
+        "./package.json": "./package.json"
+    },
+    "bin": {
+        "neore": "./dist/bin.js"
+    },
+    "files": [
+        "./dist"
+    ],
+    "scripts": {
+        "build": "packem build --development",
+        "build:prod": "packem build --production",
+        "clean": "rimraf node_modules dist .eslintcache",
+        "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
+        "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
+        "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore",
+        "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore",
+        "lint:types": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "devDependencies": {
+        "@anolilab/eslint-config": "catalog:lint",
+        "@anolilab/prettier-config": "catalog:lint",
+        "@types/node": "catalog:types",
+        "@visulima/packem": "catalog:bundler",
+        "@visulima/packem-rollup": "catalog:bundler",
+        "esbuild": "catalog:build",
+        "eslint": "catalog:lint",
+        "prettier": "catalog:lint",
+        "rimraf": "catalog:node",
+        "rollup": "catalog:bundler",
+        "typescript": "catalog:tsc",
+        "vitest": "catalog:test"
+    },
+    "engines": {
+        "node": ">=22.15"
+    }
+}

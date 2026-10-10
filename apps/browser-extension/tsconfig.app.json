@@ -1,0 +1,29 @@
+{
+    // Extends the workspace base like every other project here. This used to be
+    // a standalone config pinned to `target`/`lib` ES2020, which mattered because
+    // `@neore/ui` and `@neore/chat-ui` export their SOURCE (`./src/**/*.tsx`,
+    // no dist) — so this app typechecks their files under ITS options, and the
+    // shared code uses `Array.prototype.at` and `toSorted`.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "incremental": false,
+        "composite": false,
+        "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+        "jsx": "react-jsx",
+        "moduleResolution": "bundler",
+        "paths": {
+            "@/*": ["./src/*"],
+            // `@neore/ui` refers to itself by this alias inside its own source,
+            // which we compile. Same declaration as apps/web/tsconfig.json.
+            "@ui/*": ["../../packages/ui/src/*"]
+        },
+        "types": ["vite/client", "chrome", "node"],
+        "allowImportingTsExtensions": true,
+        "declaration": false,
+        "declarationMap": false,
+        "emitDeclarationOnly": false,
+        "noEmit": true,
+        "noUncheckedSideEffectImports": true
+    },
+    "include": ["src"]
+}

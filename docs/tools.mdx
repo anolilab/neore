@@ -1,0 +1,327 @@
+---
+title: AI Tools
+description: Built-in tools that extend the AI's capabilities — web search, image generation, deep research, code execution, and more
+---
+
+# AI Tools
+
+Neore Chat includes a powerful suite of built-in tools that the AI can use to perform real-world tasks beyond text generation. Tools run automatically when the AI determines they're needed — you don't have to configure anything.
+
+## Web Search
+
+The AI can search the web in real time to answer questions with up-to-date information.
+
+**Capabilities:**
+- Search the web using Tavily or Exa search providers
+- Returns titles, URLs, and content snippets
+- Deduplicates results by domain
+- Supports BYOK (Bring Your Own Key) for Tavily
+
+**When to use:** Ask the AI any question that requires current information — news, documentation, product details, etc.
+
+## Deep Research
+
+A multi-step research pipeline that produces comprehensive reports with cited sources.
+
+**How it works:**
+1. Generates targeted search queries from your topic
+2. Executes parallel web searches
+3. Retrieves full content from top sources
+4. Synthesizes findings into a structured research report
+5. Saves the report as a canvas document
+
+**Features:**
+- Standard depth: 3–5 queries, ~10 sources
+- Comprehensive depth: 5–8 queries, ~20 sources
+- Scales automatically with research depth setting (speed / balanced / thorough)
+- Produces a Markdown report with citations
+
+**When to use:** For topics that need thorough investigation, multiple perspectives, or synthesis of many sources. Not for simple factual lookups — use regular chat or web search for those.
+
+## Image Generation
+
+Generate images from text descriptions using AI models. Over 60 image models are
+available; the picker groups them by provider and marks which are free.
+
+**Commonly used models:**
+- **fal.ai — FLUX family**: FLUX 2 Pro (default), FLUX Pro, FLUX Pro Ultra, FLUX Dev (fast, free)
+- **fal.ai — Nano Banana**: Nano Banana, Nano Banana Pro, Nano Banana 2 — strong at image-to-image edits
+- **fal.ai — Recraft**: Recraft v3 and v4 Pro, good for vector-style and typographic work
+- **fal.ai — SDXL Lightning**: fastest, lowest cost
+- **Google**: Gemini 2.5 Flash Image (via OpenRouter)
+
+**Features:**
+- Multiple aspect ratios (1:1, 16:9, 9:16, 4:3, and more)
+- Generate up to 4 images at once (premium)
+- Negative prompts to exclude unwanted elements
+- Seed for reproducible results
+- Reference images — attach existing images to steer the result (see below)
+
+### Reference Images
+
+You can attach up to four images you have already generated or uploaded as
+references for a new generation. Click the references button in the composer,
+choose whether to browse **all** your images or just those in the **current
+thread**, and pick the ones to use. Selected references appear as a numbered
+strip above the composer so you can tell the AI which is which ("use the pose
+from reference 2").
+
+How many references a model accepts varies — one, two, or four depending on the
+model — and the picker enforces that model's limit for you.
+
+## Image Editing
+
+Edit and transform existing images using AI-powered operations.
+
+**Operations:**
+- **Remove background** — Isolate the subject from any background
+- **Upscale** — Increase image resolution (2x)
+- **Style transfer** — Apply artistic styles with a text prompt
+- **Inpaint** — Edit specific parts of an image (with optional mask)
+- **Face enhance** — Restore and enhance faces
+
+**When to use:** Ask the AI to edit an image by describing what you want done (e.g., "Remove the background from this image" or "Upscale this photo").
+
+## Vision Analysis
+
+Analyze images using the AI's vision capabilities.
+
+**Analysis types:**
+- **Describe** — Detailed description (colors, composition, subjects, mood)
+- **OCR** — Extract all text with formatting preserved
+- **Objects** — Detect and list objects with positions and sizes
+- **Scene** — Understand setting, lighting, mood, activities
+- **Detailed** — Comprehensive analysis covering all aspects
+- **Custom** — Provide your own analysis prompt
+
+**When to use:** Share an image and ask the AI to describe, analyze, or extract text from it.
+
+## Deepfake Detection
+
+Analyze images for signs of AI generation or manipulation.
+
+**Examines:**
+- Facial feature consistency (skin, eyes, hair, teeth)
+- Artifact detection (edges, patterns, distortions)
+- Lighting and physics consistency
+- Compression and noise patterns
+
+**Returns:**
+- Detailed forensic analysis report
+- Confidence score (0–100)
+- Classification: likely authentic, uncertain, likely AI-generated, or likely manipulated
+
+:::warning
+This is a probabilistic analysis tool. Results should not be used as definitive proof of image authenticity or manipulation.
+:::
+
+## People Search
+
+Search for information about individuals — biographical data, professional profiles, and social media links.
+
+**Data sources:** LinkedIn, Twitter/X, GitHub, Wikipedia, Crunchbase
+
+**When to use:** Ask the AI to find information about a specific person (e.g., "Find information about Jane Doe, CTO of Acme Corp").
+
+## Company Search
+
+Search for information about companies and organizations — founding details, products, leadership, funding, and more.
+
+**Data sources:** Crunchbase, LinkedIn, Wikipedia, Bloomberg, Glassdoor, G2
+
+**When to use:** Ask the AI about a company (e.g., "Tell me about Stripe's funding history and products").
+
+## Code Execution
+
+Run code snippets in a sandboxed environment and see the results.
+
+**Supported languages:** JavaScript, TypeScript, Python, and more
+
+**Features:**
+- Sandboxed execution for safety
+- Output capture (stdout, stderr)
+- File operations within the sandbox
+- Automatic timeout for long-running code
+
+## Browser Automation
+
+Automate web browsing tasks using a cloud browser running on Cloudflare's Browser
+Rendering platform.
+
+**Actions:**
+- Navigate to URLs
+- Take screenshots (optionally full-page)
+- Click elements by CSS selector
+- Type text into inputs
+- Extract page content
+- Scroll pages
+
+**Features:**
+- Browser sessions persist per thread, so actions can be chained
+- Screenshots are returned as images in the chat
+- Action log tracked in the database
+- Private and internal addresses are blocked; error messages are sanitised
+- Rate-limited for safety
+
+**When to use:** Ask the AI to visit a website, fill out a form, take a screenshot, or extract data from a page.
+
+See [Browser Automation](/docs/browser) for full documentation.
+
+## Video Generation
+
+Generate videos from text descriptions, or animate a still image. Around 80 video
+models are available.
+
+**Supported providers include:**
+- **ByteDance Seedance** (default for text-to-video and image-to-video) — v1.5 Pro/Lite and Seedance 2.0
+- **Google Veo** — including first-and-last-frame interpolation
+- **Kling**, **Hailuo**, **Luma Dream Machine**, **Pika**, **Runway**, **Wan**, **LTX**, **Vidu**
+
+**Modes:**
+- **Text-to-video** — describe the shot and get a clip
+- **Image-to-video** — supply a start frame and animate it
+- **First-and-last-frame** — supply both ends and let the model interpolate
+
+**Features:**
+- Multiple aspect ratios and durations
+- Renders are queued and processed in the background, so a long render does not block the conversation
+- Progress tracking, with the finished clip delivered back into the thread
+
+**When to use:** Ask the AI to create a short video from a description (e.g., "Generate a video of a sunset over the ocean"), or attach an image and ask it to animate it.
+
+## Music Generation
+
+Generate short music clips from a text description.
+
+**Supported models:**
+- **Stable Audio 2.5** — general-purpose music and sound design
+- **Lyria 2** — fixed 30-second clips, supports negative prompts
+- **MusicGen** — melodic generation
+- **CassetteAI Music Generator** — fast generation
+
+**Features:**
+- Describe genre, mood, instruments, and tempo in plain language
+- Clip length is configurable on models that support it
+- Negative prompts ("no vocals, no distortion") on models that honour them
+- Renders are queued in the background like video
+
+**When to use:** Ask the AI for a piece of music (e.g., "Make me a 20-second lo-fi hip hop loop with a soft rhodes piano"). There is no composer button for this — it is driven entirely by asking.
+
+## Presentations
+
+The AI can create slide deck presentations as canvas artifacts.
+
+**Features:**
+- AI-generated slideshows with styled templates
+- Progress tracking with resume-on-failure
+- HTML-based slide rendering
+- Edit individual slides after creation
+
+**When to use:** Ask the AI to create a presentation (e.g., "Create a 10-slide presentation about our Q4 results").
+
+## Design Canvas
+
+The AI can create editable visual designs — social posts, banners, flyers, cards
+— as canvas artifacts.
+
+**Features:**
+- 37 platform presets with correct dimensions (Instagram post/story, LinkedIn cover, YouTube thumbnail, A4 flyer, business card, favicon, and more)
+- 16 visual styles (minimal, bold, elegant, playful, corporate, retro, neon, brutalist, glassmorphism, and others)
+- The AI composes the initial layout; you refine it by hand in the canvas editor
+- A second tool lets the AI revise an existing design in place
+- AI operations on the canvas itself: remove background, upscale, apply a style, or generate a new image element to drop in
+
+**When to use:** Ask for a visual (e.g., "Design an Instagram story announcing our launch, bold style").
+
+See [Design Canvas](/docs/design-canvas) for full documentation.
+
+## Interactive Widgets
+
+The AI can render structured interactive widgets inline in the conversation
+instead of plain text — cards, tables, tabs, accordions, progress bars, badges,
+alerts, and similar components.
+
+**When to use:** This happens automatically when a structured layout communicates
+better than prose (comparisons, status summaries, stepped results). You don't
+invoke it directly.
+
+## Task List
+
+The AI can create and manage structured task lists within conversations to track multi-step work.
+
+**Actions:**
+- Create tasks with priorities and subtasks
+- Update task status (pending, in progress, completed, cancelled)
+- List and filter tasks
+- Clear completed tasks
+
+## Additional Tools
+
+### Search & Discovery
+
+- **Academic Search** — Search scholarly articles and papers
+- **Code Search** — Search code repositories and snippets
+- **GitHub Search** — Search GitHub repos, issues, and PRs
+- **Reddit Search** — Search Reddit posts and comments
+- **Image Search** — Find images across the web
+- **Video Search** — Search for videos
+- **YouTube Search** — Search YouTube specifically
+- **Spotify Search** — Search music and podcasts
+- **Movie/TV Search** — Search movies and TV shows
+- **Trending Media** — Discover trending movies and TV shows
+- **X/Twitter Search** — Search posts on X
+
+### Knowledge & Data
+
+- **Knowledge Base Search** — Search your uploaded documents (RAG)
+- **Memory Search** — Search the AI's memories about you
+- **Wolfram Alpha** — Computational knowledge queries
+
+### Finance
+
+- **Stock Charts** — Financial market data and charts
+- **Currency Converter** — Real-time exchange rates between currencies
+- **Crypto Data** — Cryptocurrency prices, OHLC data, and contract lookups
+
+### Location & Travel
+
+- **Weather** — Current weather conditions and forecasts
+- **Flight Tracker** — Track flights in real time
+- **Find Place** — Search for locations and places
+- **Nearby Places** — Find places near a location
+
+### Utilities
+
+- **Text Translation** — Translate text between 100+ languages
+- **Date & Time** — Date and time calculations and conversions
+- **File Operations** — Read, write, and manage files in a sandbox
+- **Shell Execution** — Run shell commands in a sandboxed environment
+- **URL Retrieval** — Fetch and read the contents of a specific web page
+
+## Research Depth
+
+Some tools (particularly Deep Research and web search) respect the **Research Depth** setting, which you can adjust in the composer toolbar:
+
+| Depth | Behavior |
+|-------|----------|
+| Speed | Fewer queries, faster results |
+| Balanced | Default — good mix of speed and thoroughness |
+| Thorough | More queries, more sources, comprehensive results |
+
+## Tool Output Encoding
+
+Neore Chat uses an optimized encoding format (TOON) for structured tool outputs, reducing token usage by 40–60% for large result sets. This is handled automatically — you don't need to configure anything.
+
+## Related Features
+
+- [Chat](/docs/chat) — Core conversation features
+- [Browser Automation](/docs/browser) — Full browser automation documentation
+- [Design Canvas](/docs/design-canvas) — Editable visual designs created by the design tools
+- [Spreadsheets](/docs/spreadsheets) — Spreadsheet artifacts
+- [Workflows](/docs/workflows) — Chain image and video models on a visual canvas
+- [Deep Work Mode](/docs/chat#deep-work-mode-auto-continue) — Extended tool-use iterations
+- [Canvas](/docs/chat#canvas-document-artifacts) — Documents and artifacts created by tools
+- [Knowledge Base](/docs/knowledge-base) — Upload documents for the Knowledge Base Search tool
+- [Memory](/docs/memory) — Facts used by the Memory Search tool
+- [Settings](/docs/settings) — Configure tool API keys
+- [MCP Servers](/docs/mcp) — Add more tools via external MCP servers

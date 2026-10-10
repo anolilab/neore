@@ -1,0 +1,113 @@
+# Builds the Tauri desktop shell (`apps/native`) for macOS, Windows and Linux
+# when a `native-v*` tag is pushed, and attaches the bundles to a DRAFT release.
+#
+# SKELETON: nothing is signed yet. Unsigned macOS builds are blocked by
+# Gatekeeper and unsigned Windows installers trip SmartScreen, so treat the
+# output as internal test builds until the secrets below exist. The full list,
+# and what each one is for, is in `apps/native/README.md` ("Release signing").
+#
+# Mobile (iOS/Android) is not built here — it needs `tauri ios init` /
+# `tauri android init` committed first, plus an Apple team and a keystore.
+
+name: "Native desktop build"
+
+on: # yamllint disable-line rule:truthy
+    push:
+        tags:
+            - "native-v*"
+
+concurrency:
+    group: "${{ github.workflow }}-${{ github.ref }}"
+    cancel-in-progress: false
+
+permissions:
+    contents: "read"
+
+jobs:
+    build:
+        name: "Build (${{ matrix.platform }})"
+        # The release upload needs to write; nothing else in the job does.
+        permissions:
+            contents: "write"
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: "macos-latest"
+                      args: "--target universal-apple-darwin"
+                      rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+                    - platform: "ubuntu-22.04"
+                      args: ""
+                      rust-targets: ""
+                    - platform: "windows-latest"
+                      args: ""
+                      rust-targets: ""
+        runs-on: "${{ matrix.platform }}"
+        timeout-minutes: 60
+        env:
+            # The deployment the shell wraps. A repository VARIABLE, not a secret:
+            # it is public (it is the site's URL) and `build.rs` refuses a release
+            # build without it.
+            NEORE_SITE_URL: "${{ vars.NATIVE_SITE_URL }}"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@main"
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            - name: "Install Linux system dependencies"
+              if: "matrix.platform == 'ubuntu-22.04'"
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+            - name: "Install Rust"
+              uses: "dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87" # stable
+              with:
+                  targets: "${{ matrix.rust-targets }}"
+
+            - name: "Cache Rust build"
+              uses: "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6" # v2.9.2
+              with:
+                  workspaces: "apps/native/src-tauri -> target"
+
+            # Only PNG/ICO icons are committed; this also produces `icon.icns`
+            # and the mobile sets from the same source as the web app's PWA icon.
+            - name: "Generate icons"
+              run: "pnpm --filter @neore/native run icons"
+
+            - name: "Build and upload to a draft release"
+              uses: "tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f" # action-v1.0.0
+              env:
+                  GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+                  # Enable once the secrets exist (see apps/native/README.md):
+                  # TAURI_SIGNING_PRIVATE_KEY: "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"
+                  # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}"
+                  # APPLE_CERTIFICATE: "${{ secrets.APPLE_CERTIFICATE }}"
+                  # APPLE_CERTIFICATE_PASSWORD: "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+                  # APPLE_SIGNING_IDENTITY: "${{ secrets.APPLE_SIGNING_IDENTITY }}"
+                  # APPLE_ID: "${{ secrets.APPLE_ID }}"
+                  # APPLE_PASSWORD: "${{ secrets.APPLE_PASSWORD }}"
+                  # APPLE_TEAM_ID: "${{ secrets.APPLE_TEAM_ID }}"
+              with:
+                  projectPath: "apps/native"
+                  tauriScript: "pnpm tauri"
+                  # Add `--config src-tauri/tauri.updater.conf.json` once its
+                  # endpoint and pubkey are real and TAURI_SIGNING_PRIVATE_KEY is set.
+                  args: "${{ matrix.args }}"
+                  tagName: "${{ github.ref_name }}"
+                  releaseName: "Neore desktop ${{ github.ref_name }}"
+                  releaseBody: "Unsigned test build. See apps/native/README.md."
+                  releaseDraft: true
+                  prerelease: true

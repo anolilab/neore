@@ -1,0 +1,303 @@
+---
+title: LLM Gateway service
+description: How the LLM Gateway Cloudflare Worker proxies AI provider calls, routes models, tracks usage, and exposes a SaaS API.
+---
+
+# LLM Gateway service
+
+The LLM Gateway is a Cloudflare Worker (Hono) that sits between the Lunora backend and every upstream AI provider. All LLM calls — streaming, non-streaming, embeddings, images, audio, video, music, and realtime — flow through it.
+
+The gateway adds token counting, cost tracking, smart model routing, guardrails, structured-output healing, and an OpenAI-compatible SaaS API, all without touching the tool execution or message persistence logic in the backend.
+
+It is the **only** one of the five Workers services that is fully wired in
+deployed environments.
+
+## Why it exists
+
+Without the gateway, LLM calls happen directly inside backend actions. That works but has two limitations:
+
+1. Token counts and costs come from provider metadata, which is inconsistent and often delayed.
+2. There is no central place to enforce rate limits, guardrails, or routing policy.
+
+The gateway solves both. Backend actions talk to the gateway over an internal HMAC-authenticated API. The gateway forwards calls to providers, measures actual tokens, records costs in D1, and reports usage back to the backend via a webhook.
+
+## How backend integration works
+
+Four files in `backend/lunora/chat/lib/` wire everything together:
+
+| File | Purpose |
+|------|---------|
+| `gateway-client.ts` | HTTP client that signs requests with HMAC (chat and embeddings) |
+| `gateway-language-model.ts` | Implements `LanguageModelV3` so every agent call goes through the gateway |
+| `gateway-embedding-model.ts` | Implements `EmbeddingModelV2` so every embedding call goes through the gateway |
+| `gateway-usage.ts` | Webhook handler that deducts credits when a usage report arrives |
+
+When `LLM_GATEWAY_URL` and `LLM_GATEWAY_SIGNING_SECRET` are set (both are
+required by `backend/lunora/lib/env-validation.ts`), all LLM calls automatically route through the gateway. The agent loop, tool execution, and message persistence are unaffected.
+
+The web app also needs `VITE_LLM_GATEWAY_URL`, because the browser posts
+directly to `/v1/chat` to start a conversation and to `/v1/stream` to receive it.
+
+## Authentication
+
+The gateway uses different auth schemes depending on who is calling:
+
+| Caller | Scheme | Credentials |
+|--------|--------|-------------|
+| Lunora backend | HMAC-SHA256 | `Authorization: HMAC <timestamp>.<nonce>.<sig>` using `SIGNING_SECRET` |
+| SaaS API clients | Bearer token | `Authorization: Bearer gk_<key>` (virtual keys issued by the gateway) |
+| Browser / extension | Stream token | Short-lived token in request body: `{streamId}:{userId}:{threadId}:{expiresAt}:{hmac}` (30-min TTL) |
+
+### HMAC request signing
+
+The backend signs each request by hashing `method + path + timestamp + body-hash` with the shared `SIGNING_SECRET`. The gateway verifies the signature and enforces a 5-minute timestamp window to reject replayed requests.
+
+```
+Lunora backend                         LLM Gateway Worker
+──────────────                         ──────────────────
+1. Build payload JSON
+2. SHA-256 hash the body
+3. Construct message:
+   POST\n/internal/stream\n<ts>\n<hash>
+4. HMAC-SHA256 sign with SIGNING_SECRET
+5. Attach header:
+   Authorization: HMAC <ts>.<nonce>.<sig>
+──────────────────────────────────────►
+                                       6. Verify timestamp (±5 min)
+                                       7. Recompute HMAC
+                                       8. Compare — reject on mismatch
+                                       9. Process request
+```
+
+## Smart routing
+
+Before each streaming request, the backend can call `POST /internal/route` to let the gateway pick the best model. The scoring engine runs in under 2ms with no LLM calls.
+
+### Scoring dimensions
+
+| Dimension | Weight | What it measures |
+|-----------|--------|-----------------|
+| complexity | 0.25 | Message length and structure |
+| reasoning | 0.20 | Math, step-by-step patterns |
+| code generation | 0.15 | Code blocks, language keywords |
+| tool use | 0.10 | Number of tools provided |
+| context length | 0.10 | Total tokens vs 32k baseline |
+| technical domain | 0.10 | API/infra terminology density |
+| creativity | 0.05 | Creative writing signals |
+| multimodal | 0.05 | Image or file attachments |
+
+### Tiers
+
+The combined score maps to one of four tiers, each with a ranked model pool:
+
+| Tier | Score | Preferred models |
+|------|-------|-----------------|
+| Simple | ≤ 0.25 | gemini-2.5-flash, gpt-4o-mini, llama-4-scout |
+| Standard | ≤ 0.55 | gpt-4o, gemini-2.5-pro, claude-sonnet-4 |
+| Complex | ≤ 0.80 | claude-sonnet-4, gpt-4.1, gemini-2.5-pro |
+| Reasoning | ≤ 1.0 | claude-opus-4, o3, gemini-2.5-pro |
+
+The selector picks the healthiest, cheapest model in the tier's pool, falling back to the next tier if the top candidate's circuit breaker is open.
+
+### Routing profiles
+
+Callers can override the scoring engine with a `routingProfile` field:
+
+- `"fast"` — always Simple tier (lowest latency)
+- `"balanced"` — default heuristic (same as omitting)
+- `"premium"` — forces Complex or Reasoning
+- `"reasoning"` — always Reasoning tier
+
+Routing decisions are cached in KV for 5 minutes.
+
+## Guardrails
+
+Every request passes through the guardrail pipeline before reaching a provider. This runs in under 2ms using regex only — no ML models, no external calls.
+
+| Violation type | Default | Description |
+|---------------|---------|-------------|
+| `pii` | `mask` | Replaces API keys, emails, SSNs, credit cards, phone numbers, IP addresses |
+| `injection` | `block` | Blocks prompt injection patterns |
+
+HMAC callers (the backend) can override the defaults per-request or disable guardrails entirely with `"guardrails": false`.
+
+Violations are stored in `usage_log.guardrail_violations` and fire a `guardrail_triggered` webhook event.
+
+## Structured output
+
+For `/v1/chat/completions` requests with `response_format: { type: "json_schema", ... }`, the gateway validates and optionally repairs the response:
+
+1. **Validate** — check model output against the provided JSON schema.
+2. **Heal** — if invalid, attempt local repair (bracket/quote fixing, no extra call).
+3. **Re-generate** — if local repair fails, call the model again with explicit instructions.
+
+Healed responses carry `X-Gateway-Healed: true` and `healed: true` in `usage_log`.
+
+## Edge streaming
+
+Agent execution is decoupled from SSE delivery so the backend action can return quickly:
+
+```
+Backend agent loop
+  └─ writes chunks to persistentChunks table
+
+Client (browser/extension)
+  └─ POST /v1/stream  { streamToken }
+        └─ Gateway polls POST /chat/chunks  (backend, HMAC auth)
+              └─ relays NDJSON to client
+```
+
+The stream token is signed with `SIGNING_SECRET` and encodes the stream ID, user ID, thread ID, and a 30-minute expiry. The gateway verifies the token before relaying any chunks.
+
+## Usage tracking
+
+After each request, the gateway writes a row to `usage_log` (D1) and fires a usage-report webhook to `LUNORA_URL/gateway/usage-report`. The backend deducts credits at the rate of 1 credit = 1,000 microdollars.
+
+A scheduled cron at 00:05 UTC materializes `usage_daily` aggregates and cleans up logs older than 90 days. Pricing data is refreshed from models.dev at 02:00 UTC daily.
+
+## Provider health
+
+The gateway tracks provider reliability in the `provider_health` D1 table. When a provider returns errors above a threshold, its circuit breaker opens. The gateway automatically falls back to the next model in the tier pool and retries the open provider after the cooldown period. A cron every 5 minutes resets expired circuit breakers.
+
+## BYOK (Bring Your Own Key)
+
+Users and organizations can supply their own provider API keys through the Anole Chat settings. Keys are stored encrypted in the backend database and passed to the gateway per-request as `providerApiKey` in the request body. The gateway uses the provided key instead of the platform default for that call.
+
+## Virtual API keys
+
+For SaaS API access, the gateway issues `gk_*` keys via `POST /internal/keys`. The raw key is returned once; subsequent lookups use a SHA-256 hash stored in D1. Keys can have per-user monthly budget limits and per-minute token limits.
+
+## API surface (summary)
+
+### SaaS endpoints (`/v1/*`)
+
+All require `Authorization: Bearer gk_*`.
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /v1/chat/completions` | OpenAI-compatible chat, streaming + tools |
+| `GET /v1/models` | List supported models with pricing |
+| `POST /v1/embeddings` | Vector generation |
+| `POST /v1/images/generations` | Image generation (DALL-E / FLUX / …) |
+| `POST /v1/audio/speech` | Text-to-speech |
+| `POST /v1/audio/transcriptions` | Speech-to-text |
+| `GET /v1/realtime` (WebSocket) | OpenAI Realtime API proxy |
+| `POST /v1/classify` | Query complexity classification |
+| `GET /v1/usage` | Daily usage summary |
+| `GET /v1/logs` | Paginated request history |
+| `GET /v1/rate-limits` | Current rate limit status |
+| `GET /v1/cache` | Prompt cache statistics |
+| `GET /v1/events` | Webhook event history |
+
+### App endpoints (`/v1/chat/*`, `/v1/stream`, media)
+
+These are called by the Anole Chat web app and browser extension rather than by
+SaaS clients, and are authenticated with a session or a short-lived stream token.
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /v1/chat` | Start a chat turn (calls the backend's `/chat/start`) |
+| `POST /v1/stream` | Client SSE/NDJSON relay for an in-flight turn |
+| `POST /v1/chat/edit` | Edit-and-resend a message |
+| `POST /v1/chat/media` | Media generation from the composer |
+| `POST /v1/chat/improve-prompt` | User-prompt optimizer (takes a `style`) |
+| `POST /v1/chat/optimize-system-prompt` | System-prompt optimizer |
+| `POST /v1/chat/iterate-prompt` | Refine a previous optimization with feedback |
+| `POST /v1/prompts/optimize` | Optimize a saved prompt |
+
+### Long-running renders (`/v1/videos`, `/v1/music`)
+
+Video and music renders are too slow to hold a request open, so they are queued
+and polled:
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /v1/videos` | Enqueue a video render; returns `202` with a job id |
+| `GET /v1/videos/:jobId` | Poll render status |
+| `GET /v1/videos/:jobId/content` | Fetch the finished video |
+| `GET /v1/videos/models` | List available video models |
+| `POST /v1/music` | Enqueue a music render; returns `202` with a job id |
+| `GET /v1/music/:jobId` | Poll render status |
+| `GET /v1/music/:jobId/content` | Fetch the finished audio |
+| `GET /v1/music/models` | List available music models |
+
+The Worker's `queue()` handler consumes those messages, runs the render, and
+writes the result to R2. Provider API keys are never placed in the queue payload
+— they are stashed in `CACHE_KV` under a short-lived per-job key so exposure is
+bounded by a 2-hour TTL rather than by queue retention.
+
+:::warning
+`VIDEO_RENDER_MAX_ATTEMPTS` in the consumer must stay equal to `maxRetries: 2`
+(plus the initial delivery) on the Worker's `eventSources` in `alchemy.run.ts`.
+A mismatch silently drops messages on the final attempt, before the dead-letter
+queue sees them.
+:::
+
+### Internal endpoints (`/internal/*`)
+
+All require HMAC auth.
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /internal/stream` | Streaming LLM generation |
+| `POST /internal/generate` | Non-streaming LLM generation |
+| `POST /internal/route` | Smart model selection |
+| `POST /internal/model/proxy` | LanguageModelV3 proxy |
+| `POST /internal/webhooks` | Register webhook |
+| `POST /internal/keys` | Create virtual API key |
+| `POST /internal/canary/weights` | Set A/B routing weights |
+| `POST /internal/notification-rules` | Manage budget / usage alert rules |
+| `POST /internal/admin/tier-pools` | Inspect and adjust routing tier pools |
+| `GET /internal/admin/analytics` | Cross-tenant usage analytics |
+
+### System
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Liveness check |
+| `GET /metrics` | Prometheus metrics |
+| `GET /openapi.json` | OpenAPI 3.1 spec (dev only) |
+| `GET /doc` | Swagger UI (dev only) |
+
+## Cloudflare resources
+
+The gateway uses Cloudflare Workers Smart Placement so the Worker runs close to upstream AI provider endpoints. All infrastructure is managed by Alchemy IaC (`alchemy.run.ts`).
+
+| Resource | Type | Purpose |
+|----------|------|---------|
+| `USAGE_DB` | D1 | Usage logs, aggregates, provider health, webhooks, API keys |
+| `RATE_LIMIT_KV` | KV | Per-user rate limit counters |
+| `PRICING_KV` | KV | Pricing cache from models.dev, routing decisions |
+| `CACHE_KV` | KV | Prompt cache stats, idempotency keys, per-job render secrets |
+| `AI` | Workers AI | On-platform inference |
+| `VIDEO_BUCKET` | R2 | Rendered video output |
+| `MUSIC_BUCKET` | R2 | Rendered audio output |
+| `VIDEO_RENDER_QUEUE` | Queue | Video render jobs (with a dead-letter queue) |
+| `MUSIC_RENDER_QUEUE` | Queue | Music render jobs (with a dead-letter queue) |
+
+## Local development
+
+```bash
+# Apply D1 migrations locally
+pnpm wrangler d1 migrations apply llm-gateway-usage-dev --local
+
+# Start the Worker (port 8787, inspector 9230)
+pnpm --filter llm-gateway dev
+
+# Run unit + integration tests
+pnpm --filter llm-gateway test
+```
+
+The dev script passes `--local`. That flag is not optional: from wrangler 4.122
+the Workers **AI** binding is proxied to the real Cloudflare network by default,
+so plain `wrangler dev` opens a remote proxy session and fails with *"it's
+necessary to set a CLOUDFLARE_API_TOKEN"* in any non-interactive shell.
+
+The `wrangler.jsonc` file at `services/llm-gateway/wrangler.jsonc` configures local bindings. D1, KV, R2 and queue IDs are intentionally placeholders there — Alchemy manages the real resources for preview and production deployments.
+
+## Related
+
+- [Document parser service](/docs/services/document-parser)
+- [Browser renderer service](/docs/services/browser-renderer)
+- [Embeddings service](/docs/services/embeddings)
+- [NSFW checker service](/docs/services/nsfw-checker)

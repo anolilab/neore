@@ -1,0 +1,8 @@
+{
+    "name": "@neore/native",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "apps/native/src-tauri/src",
+    "projectType": "application",
+    "tags": ["native"],
+    "implicitDependencies": []
+}

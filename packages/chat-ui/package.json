@@ -1,0 +1,62 @@
+{
+    "name": "@neore/chat-ui",
+    "version": "1.0.0",
+    "private": true,
+    "sideEffects": [
+        "**/*.css"
+    ],
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./auth/*": "./src/auth/*.tsx",
+        "./threads/*": "./src/threads/*.tsx",
+        "./chat/*": "./src/chat/*.tsx",
+        "./model-picker/utils": "./src/model-picker/utils.ts",
+        "./model-picker/*": "./src/model-picker/*.tsx",
+        "./org-switcher/*": "./src/org-switcher/*.tsx",
+        "./types": "./src/types/index.ts",
+        "./utils/*": "./src/utils/*.ts"
+    },
+    "scripts": {
+        "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
+        "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
+        "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore",
+        "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore",
+        "lint:types": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@lingui/core": "catalog:i18n",
+        "@lingui/react": "catalog:i18n",
+        "@mcp-ui/client": "catalog:mcp",
+        "@neore/ai": "workspace:*",
+        "@neore/ui": "workspace:*",
+        "@streamdown/cjk": "catalog:markdown",
+        "@streamdown/code": "catalog:markdown",
+        "@streamdown/math": "catalog:markdown",
+        "@streamdown/mermaid": "catalog:markdown",
+        "clsx": "catalog:ui",
+        "date-fns": "catalog:utils",
+        "lucide-react": "catalog:icons",
+        "streamdown": "catalog:markdown",
+        "tailwind-merge": "catalog:ui"
+    },
+    "devDependencies": {
+        "@anolilab/eslint-config": "catalog:lint",
+        "@lingui/babel-plugin-lingui-macro": "catalog:i18n",
+        "@types/react": "catalog:types",
+        "@types/react-dom": "catalog:types",
+        "eslint": "catalog:lint",
+        "react": "catalog:react",
+        "react-dom": "catalog:react",
+        "typescript": "catalog:tsc",
+        "vitest": "catalog:test"
+    },
+    "peerDependencies": {
+        "react": "*",
+        "react-dom": "*"
+    },
+    "engines": {
+        "node": ">=22.x"
+    }
+}

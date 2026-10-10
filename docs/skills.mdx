@@ -1,0 +1,286 @@
+---
+title: Skills
+description: Create and use custom AI behaviors triggered by slash commands
+---
+
+# Skills
+
+Skills are custom AI behaviors you define once and invoke repeatedly with a slash command. Each skill packages a set of instructions, optional variables, and tool configuration — so the AI behaves exactly the way you intend for a specific task without you having to repeat yourself.
+
+## Quick Start
+
+1. **Open Skills**: Navigate to the Skills page from the sidebar (⚡ icon)
+2. **Enable a skill**: Toggle the switch on any skill card to make it available in chat
+3. **Invoke in chat**: Type `/skill-name` in the composer and press Enter
+
+## How Skills Work
+
+When you invoke a skill, three things happen automatically:
+
+1. **Instructions load** — the skill's full instructions are injected into the AI's context, overriding defaults for that conversation
+2. **Variables resolve** — any `{{placeholder}}` in the instructions is replaced with the values you pass
+3. **Tools configure** — the skill can force a specific search mode and add or remove tools
+
+Enabled-but-not-invoked skills contribute a short description to the AI's awareness so it can suggest using them at the right moment.
+
+## Invoking Skills with Slash Commands
+
+Type `/` followed by the skill's slug in the chat composer:
+
+```
+/stock-analysis ticker=AAPL
+/summarize format=bullet length=short
+/code-review language=typescript
+```
+
+**Argument formats:**
+
+| Format | Example | When to use |
+|---|---|---|
+| Key-value | `name=John company=Acme` | Multiple variables, any order |
+| Positional | `John Acme` | Skills with one or two variables |
+| Mixed | `AAPL detailed` | First positional, rest by name |
+
+The composer autocomplete shows all your enabled skills as you type `/`. Select one to insert the slug with a trailing space, then add your arguments.
+
+## Variables
+
+Skills can define variables using `{{variableName}}` in their instructions. When you invoke a skill, those placeholders are replaced with the values you provide.
+
+**Example skill instruction:**
+```
+Analyze the {{ticker}} stock. Focus on {{aspect}}.
+Provide a {{format}} report with key metrics.
+```
+
+**Invocation:**
+```
+/stock-analysis ticker=AAPL aspect=technical format=brief
+```
+
+**Result sent to AI:**
+```
+Analyze the AAPL stock. Focus on technical.
+Provide a brief report with key metrics.
+```
+
+**Required vs optional variables:**
+- Required variables must be provided — the skill will fail with an error if missing
+- Optional variables use their default value when not provided
+
+## Skills Library
+
+Navigate to **Skills** (⚡ in the sidebar) to manage your skills.
+
+### Enable and Disable
+
+Toggle the switch on any skill card to enable or disable it. Only enabled skills:
+- Appear in the slash command autocomplete
+- Have their name and description injected into the AI's awareness
+
+Disabled skills remain saved but have no effect on conversations.
+
+### Search and Filter
+
+- **Search**: Find skills by name, description, or content
+- **Sort**: Recent, alphabetical, most used, or by creation date
+- **Categories**: Filter by category (research, coding, writing, etc.)
+
+## Skill Limits
+
+| Plan | Skills |
+|---|---|
+| Free | Up to 5 skills |
+| Pro | Unlimited |
+
+## SKILL.md Format
+
+Skills use the open **Agent Skills** standard. A skill is defined as a Markdown file with YAML frontmatter:
+
+```markdown
+---
+name: Stock Analysis
+slug: stock-analysis
+description: Analyze stock prices and trends with financial data
+category: research
+variables:
+  - name: ticker
+    description: Stock ticker symbol (e.g. AAPL, TSLA)
+    required: true
+  - name: aspect
+    description: Analysis focus (technical, fundamental, news)
+    defaultValue: technical
+    required: false
+config:
+  searchMode: finance
+  additionalTools:
+    - stockPrice
+    - stockNews
+  disabledTools:
+    - webSearch
+---
+
+You are a financial analyst specializing in {{aspect}} analysis.
+
+Analyze the {{ticker}} stock using the available financial tools.
+Provide:
+1. Current price and recent price action
+2. Key {{aspect}} indicators
+3. Risk assessment
+4. Summary recommendation
+
+Be concise and data-driven.
+```
+
+### Frontmatter Fields
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | Yes | Display name shown in the library |
+| `slug` | Yes | Unique identifier used in slash commands (lowercase, hyphens only) |
+| `description` | Yes | Short description shown in autocomplete and AI awareness |
+| `category` | No | Groups skills in the library |
+| `variables` | No | List of variable definitions |
+| `config.searchMode` | No | Override the search/tool mode for this skill |
+| `config.additionalTools` | No | Tools to add when this skill is active |
+| `config.disabledTools` | No | Tools to remove when this skill is active |
+
+### Variable Definition Fields
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | Yes | Variable name (used in `{{name}}` placeholders) |
+| `description` | No | Shown to help users understand what to provide |
+| `defaultValue` | No | Value used when not provided at invocation |
+| `required` | No | If `true`, invocation fails when this variable is missing |
+
+### Slug Rules
+
+- Lowercase letters, numbers, and hyphens only
+- Maximum 64 characters
+- Must be unique within your account
+- Reserved slugs (e.g. `system`, `admin`, `claude`) are not allowed
+
+## Common Use Cases
+
+### Research Skill
+
+```markdown
+---
+name: Competitive Research
+slug: competitive-research
+description: Research a company or product competitively
+variables:
+  - name: target
+    description: Company or product name
+    required: true
+  - name: focus
+    description: Research focus area
+    defaultValue: market position
+---
+
+Research {{target}} with emphasis on {{focus}}.
+
+Include:
+- Market position and share
+- Key strengths and weaknesses
+- Recent news and developments
+- Competitive advantages
+- Pricing and packaging
+
+Cross-reference multiple sources and flag any conflicting information.
+```
+
+**Invoke:** `/competitive-research target=OpenAI focus=enterprise`
+
+### Coding Review Skill
+
+```markdown
+---
+name: Code Review
+slug: code-review
+description: Review code for issues, style, and best practices
+variables:
+  - name: language
+    description: Programming language
+    defaultValue: typescript
+  - name: focus
+    description: Review focus (security, performance, style, all)
+    defaultValue: all
+---
+
+Review the provided code as a senior {{language}} engineer.
+
+Focus: {{focus}}
+
+Check for:
+- Logic errors and edge cases
+- Security vulnerabilities (if focus is security or all)
+- Performance issues (if focus is performance or all)
+- Code style and readability
+- Missing error handling
+- Test coverage gaps
+
+Provide specific, actionable feedback with line references.
+```
+
+**Invoke:** `/code-review language=python focus=security`
+
+### Writing Skill
+
+```markdown
+---
+name: Email Drafter
+slug: email-draft
+description: Draft professional emails with the right tone
+variables:
+  - name: recipient
+    description: Who the email is for
+    required: true
+  - name: tone
+    description: Email tone (formal, friendly, assertive)
+    defaultValue: professional
+  - name: goal
+    description: What you want to achieve
+    required: true
+---
+
+Draft a {{tone}} email to {{recipient}}.
+
+Goal: {{goal}}
+
+Structure:
+- Clear subject line
+- Brief, direct opener
+- Supporting details
+- Clear call to action
+- Appropriate closing
+
+Keep it concise. Avoid jargon.
+```
+
+**Invoke:** `/email-draft recipient="VP of Engineering" goal="request headcount approval" tone=formal`
+
+## Troubleshooting
+
+**Issue**: Skill not appearing in slash command autocomplete
+- **Solution**: Check the skill is enabled (toggle is on) in the Skills library
+
+**Issue**: `[MISSING:variableName]` appears in the AI response
+- **Solution**: The skill used `{{variableName}}` but you didn't provide that variable — re-invoke with `variableName=value`
+
+**Issue**: Skill fails with "required variable missing" error
+- **Solution**: The skill has a required variable — check the skill's variable definitions and include all required arguments
+
+**Issue**: Can't create more than 5 skills
+- **Solution**: Free accounts are limited to 5 skills. Delete unused skills or upgrade to Pro for unlimited
+
+**Issue**: Slug validation error when creating a skill
+- **Solution**: Slugs must be lowercase letters, numbers, and hyphens only, max 64 characters, and cannot use reserved words
+
+## Related Features
+
+- [Prompts](/docs/prompts) — Reusable message templates with variables (different from skills: prompts are inserted into the composer, skills invoke AI behaviors)
+- [Chat](/docs/chat) — Where you invoke skills via slash commands
+- [Settings](/docs/settings) — Configure agent capabilities that work alongside skills
+- [Keyboard Shortcuts](/docs/keyboard-shortcuts) — Slash command shortcuts

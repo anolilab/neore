@@ -1,0 +1,114 @@
+---
+title: Browser renderer service
+description: The Cloudflare Worker that drives a real browser for the AI's browser-automation tool.
+---
+
+# Browser renderer service
+
+The browser-renderer is a Cloudflare Worker that drives a real Chromium instance
+on Cloudflare's Browser Rendering platform via `@cloudflare/playwright`. It is
+what backs the AI's [browser automation tool](/docs/browser).
+
+It replaced an earlier Browserbase + `playwright-core` integration. There is no
+Browserbase code path any more, and a `BROWSERBASE_API_KEY` does nothing.
+
+:::warning Not wired in deployed environments
+`alchemy.run.ts` deploys this Worker but binds neither its `SIGNING_SECRET` nor
+the backend's matching `BROWSER_RENDERER_URL` /
+`BROWSER_RENDERER_SIGNING_SECRET`. As shipped, nothing calls it. Turning it on is
+a both-ends change — one end alone produces a 401 on every call.
+
+Because the backend gates tool availability on `BROWSER_RENDERER_URL`, the effect
+today is simply that the browser tool is not offered to the model, rather than
+being offered and failing.
+:::
+
+## Authentication
+
+Requests are signed with HMAC-SHA256 exactly as for the
+[document parser](/docs/services/document-parser#how-authentication-works): the
+signature covers method, path, timestamp, and a SHA-256 hash of the body, and is
+sent as `X-Signature` with `X-Timestamp`.
+
+The signing logic lives in `backend/lunora/lib/sign-request.ts`; the Worker reads
+its half of the secret from `SIGNING_SECRET`.
+
+## Session model
+
+Each `/action` request either launches a new browser or reconnects to an existing
+one:
+
+- A new launch passes `keepAlive`, so the browser survives **60 seconds** of
+  idleness between requests.
+- The response carries a `sessionId`. Passing it on the next request reconnects
+  to the same browser, which is what makes `navigate → click → extract` work as
+  three separate AI tool calls.
+- If the session has expired or is otherwise invalid, the Worker falls back to a
+  fresh launch rather than erroring.
+- The Worker does **not** close the browser after an action — `keepAlive` handles
+  cleanup, and closing would invalidate the `sessionId` the caller is about to
+  reuse.
+
+Timeouts: 30 s for page operations, 60 s for navigation (`domcontentloaded`).
+
+## API reference
+
+### `POST /action`
+
+**Request headers:**
+
+| Header | Required | Description |
+| --- | --- | --- |
+| `Content-Type` | Yes | `application/json` |
+| `X-Signature` | Yes | HMAC-SHA256 hex signature |
+| `X-Timestamp` | Yes | Unix timestamp in milliseconds |
+
+**Request body:**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `action` | `"navigate" \| "screenshot" \| "click" \| "type" \| "extract" \| "scroll"` | Required |
+| `url` | string | Required for `navigate` |
+| `selector` | string | Required for `click` and `type`; optional for `extract` |
+| `text` | string | Required for `type` |
+| `direction` | `"up" \| "down"` | Optional for `scroll` |
+| `fullPage` | boolean | Optional for `screenshot` |
+| `sessionId` | string | Optional — reconnect to an existing browser |
+
+**Response (200):** the per-action result, plus `sessionId` so the caller can
+reconnect for follow-up actions.
+
+There is deliberately no `evaluate` action. Pages run their own JavaScript while
+rendering, but the caller cannot inject arbitrary scripts.
+
+### `GET /health`
+
+Liveness check.
+
+## Error handling
+
+Errors are sanitised before they leave the backend and reach a conversation:
+WebSocket/CDP URLs, any URL carrying a query string, and hex tokens of 24
+characters or more are replaced with redaction markers. That sanitising happens
+in `backend/lunora/chat/tools/browser-node.ts`, not in this Worker.
+
+URL validation (rejecting private, loopback, link-local, CGNAT and reserved
+ranges, including decimal-encoded IPv4 literals) happens in the backend too, in
+`backend/lunora/chat/tools/utilities.ts`.
+
+## Local development
+
+```bash
+pnpm --filter browser-renderer dev
+```
+
+The Worker listens on `http://localhost:8789` with its inspector on 9232. Port
+**8788 is reserved for the Lunora backend** — never bind a service to it.
+
+## Related
+
+- [Browser Automation](/docs/browser) — the user-facing feature
+- [LLM Gateway service](/docs/services/llm-gateway)
+- [Document parser service](/docs/services/document-parser)
+- [Embeddings service](/docs/services/embeddings)
+- [NSFW checker service](/docs/services/nsfw-checker)

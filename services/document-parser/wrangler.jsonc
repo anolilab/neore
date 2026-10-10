@@ -1,0 +1,36 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "document-parser",
+    // A Rust Worker (workers-rs + xberg): `scripts/build.mjs` runs worker-build,
+    // which emits this ES module + `build/index_bg.wasm`.
+    "main": "build/index.js",
+    // Private: no workers.dev URL and no route. The backend reaches this Worker
+    // only through its service binding (`backend/lunora.config.ts`).
+    "workers_dev": false,
+    "compatibility_date": "2026-09-01",
+    "build": {
+        // Through pnpm, NOT `node scripts/build.mjs`: plain wrangler runs the
+        // command in the CALLER's cwd (`build.cwd` is not resolved against this
+        // file; only `watch_dir` is). `lunora dev` runs it from here since
+        // anolilab/lunora#934 was fixed, but CI and the deploy build from the repo
+        // root — `pnpm --filter` runs the script in this package from anywhere.
+        "command": "pnpm --filter document-parser run build:worker",
+        "watch_dir": "src"
+    },
+    // Smart Placement: keeps execution in EU datacenters when backend is EU-based.
+    // For strict EU-only processing, also enable Regional Services in the dashboard.
+    "placement": {
+        "mode": "smart"
+    },
+    "observability": {
+        "enabled": true
+    },
+    "env": {
+        "production": {
+            "name": "document-parser"
+        },
+        "preview": {
+            "name": "document-parser-preview"
+        }
+    }
+}

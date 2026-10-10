@@ -1,0 +1,217 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Document Parser API",
+        "description": "Cloudflare Worker (Rust, xberg) that extracts text, tables, and metadata from documents. Private: reached only through the backend's service binding. Maintained by hand \u2014 the Rust Worker serves no /openapi.json.",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/extract": {
+            "post": {
+                "operationId": "extractDocument",
+                "summary": "Extract document content",
+                "description": "Extract text, tables, and metadata from a document. The request body must be the raw file bytes, at most 25 MB.",
+                "tags": ["Extraction"],
+                "parameters": [
+                    {
+                        "name": "content-type",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "MIME type of the document"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/octet-stream": {
+                            "schema": {
+                                "type": "string",
+                                "format": "binary"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Extracted document content",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ExtractResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request (empty body)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "Payload too large (max 25 MB), by Content-Length or by the streamed byte count",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Extraction failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "operationId": "getHealth",
+                "summary": "Full health report",
+                "tags": ["Health"],
+                "responses": {
+                    "200": {
+                        "description": "Service health report",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HealthReport"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service unhealthy",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HealthReport"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health/live": {
+            "get": {
+                "operationId": "getLiveness",
+                "summary": "Liveness check",
+                "tags": ["Health"],
+                "responses": {
+                    "200": {
+                        "description": "Service is live",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LivenessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service is not live",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LivenessResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ExtractResponse": {
+                "type": "object",
+                "required": ["content", "mimeType", "tables", "metadata"],
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "Extracted text content"
+                    },
+                    "mimeType": {
+                        "type": "string",
+                        "description": "Detected MIME type"
+                    },
+                    "tables": {
+                        "type": "array",
+                        "description": "Extracted tables",
+                        "items": {
+                            "type": "object",
+                            "required": ["markdown", "pageNumber"],
+                            "properties": {
+                                "markdown": {
+                                    "type": "string"
+                                },
+                                "pageNumber": {
+                                    "type": "number"
+                                }
+                            }
+                        }
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "xberg document metadata (null members dropped)"
+                    }
+                }
+            },
+            "HealthReport": {
+                "type": "object",
+                "additionalProperties": true
+            },
+            "LivenessResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            },
+            "ErrorResponse": {
+                "type": "object",
+                "required": ["error"],
+                "properties": {
+                    "error": {
+                        "type": "string"
+                    },
+                    "details": {
+                        "type": "string"
+                    },
+                    "maxBytes": {
+                        "type": "number",
+                        "description": "The size cap, on a 413"
+                    }
+                }
+            }
+        }
+    }
+}

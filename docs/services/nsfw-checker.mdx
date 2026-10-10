@@ -1,0 +1,92 @@
+---
+title: NSFW checker service
+description: A Workers AI vision Worker that classifies uploaded images for unsafe content.
+---
+
+# NSFW checker service
+
+The nsfw-checker is a Cloudflare Worker that classifies an image for unsafe
+content using Workers AI vision inference (`@cf/llava-hf/llava-1.5-7b-hf`).
+
+Uploaded files carry an `nsfwStatus` — `pending`, `checking`, `safe`, `blocked`
+or `failed` — and an `nsfwScores` breakdown, both stored on the file record in
+the backend.
+
+:::warning Not wired in deployed environments
+`alchemy.run.ts` deploys this Worker but binds neither its `NSFW_SIGNING_SECRET`
+nor the backend's matching `NSFW_CHECKER_URL` / signing secret. As shipped,
+nothing calls it, and a call that did arrive would be rejected with
+`503 Service not configured`. Turning it on is a both-ends change.
+:::
+
+## Authentication
+
+Requests are signed with HMAC-SHA256, the same scheme as the
+[document parser](/docs/services/document-parser#how-authentication-works):
+`X-Signature` and `X-Timestamp` headers, with the signature covering method,
+path, timestamp, and a hash of the body.
+
+Authentication is **always** required. There is no `NODE_ENV`-based fail-open
+path — preview environments are publicly reachable, and a missing-secret bypass
+would expose the Worker as free unauthenticated inference.
+
+## API reference
+
+### `POST /classify`
+
+**Request headers:**
+
+| Header | Required | Description |
+| --- | --- | --- |
+| `Content-Type` | Yes | MIME type of the image |
+| `X-Signature` | Yes | HMAC-SHA256 hex signature |
+| `X-Timestamp` | Yes | Unix timestamp in milliseconds |
+
+**Request body:** raw image bytes (max 10 MB).
+
+**Response (200):**
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `neutral` | number | Probability of safe-for-work content |
+| `drawing` | number | Probability of cartoon / anime / illustration content |
+| `sexy` | number | Probability of suggestive or mildly explicit content |
+| `porn` | number | Probability of explicit photographic sexual content |
+| `hentai` | number | Probability of explicit animated or drawn sexual content |
+| `topCategory` | enum | The category with the highest score |
+| `isNsfw` | boolean | Whether the image exceeds the NSFW thresholds |
+
+**Error responses:**
+
+| Status | Meaning |
+| --- | --- |
+| `400` | Empty or unreadable body |
+| `401` | Missing or invalid signature |
+| `413` | Image exceeds 10 MB |
+| `503` | No signing secret configured |
+
+### `GET /health`
+
+Liveness check.
+
+### `GET /doc` and `GET /openapi.json` (development only)
+
+Swagger UI and the OpenAPI spec. Not available when `NODE_ENV` is
+`"production"`.
+
+## Local development
+
+```bash
+pnpm --filter nsfw-checker dev
+```
+
+The Worker listens on `http://localhost:8791` with its inspector on 9234. Port
+**8788 is reserved for the Lunora backend** — never bind a service to it.
+
+## Related
+
+- [Vault](/docs/vault) — where uploaded files live
+- [LLM Gateway service](/docs/services/llm-gateway) — content-safety middleware for text
+- [Document parser service](/docs/services/document-parser)
+- [Browser renderer service](/docs/services/browser-renderer)
+- [Embeddings service](/docs/services/embeddings)

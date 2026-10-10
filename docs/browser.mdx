@@ -1,0 +1,142 @@
+---
+title: Browser Automation
+description: Automate web browsing tasks with a cloud-powered browser inside your conversations
+---
+
+# Browser Automation
+
+Browser automation gives the AI the ability to interact with real web pages — navigating sites, clicking buttons, filling forms, taking screenshots, and extracting data. It runs on Cloudflare's Browser Rendering platform, so you don't need to install anything locally.
+
+## Quick Start
+
+Simply ask the AI to perform a web task:
+
+- "Go to example.com and take a screenshot"
+- "Fill out the contact form on this page"
+- "Extract the pricing table from this website"
+
+The AI will automatically use the browser tool when your request requires interacting with a live web page.
+
+## Available Actions
+
+The browser tool supports six actions:
+
+| Action | Description | Example |
+|---|---|---|
+| **Navigate** | Load a URL in the browser | "Go to https://example.com" |
+| **Screenshot** | Capture the current page as an image (optionally full-page) | "Take a screenshot of the page" |
+| **Click** | Click an element by CSS selector | "Click the Sign In button" |
+| **Type** | Enter text into an input field | "Type 'hello' into the search box" |
+| **Extract** | Extract text content from the page or one element | "Get all the text from this page" |
+| **Scroll** | Scroll the page up or down | "Scroll down to see more content" |
+
+:::note
+There is no "evaluate" or "run JavaScript" action. The browser executes page
+JavaScript normally while rendering, but the AI cannot inject arbitrary scripts
+into a page.
+:::
+
+## How It Works
+
+1. When the AI needs to interact with a web page, the request is signed and sent to the internal **browser-renderer** service.
+2. That service drives a Cloudflare Browser Rendering instance via `@cloudflare/playwright`.
+3. The AI performs actions on the page and receives results (screenshots, text content, etc.).
+4. Screenshots are returned as images directly in the chat; text results are returned in a compact encoding.
+5. The session persists across tool calls, so the AI can chain `navigate → click → extract` as separate steps.
+
+### Session Persistence
+
+Browser sessions are linked to your chat thread. This means:
+
+- The AI can navigate to a page, then perform follow-up actions without re-navigating
+- Cookies and login state are maintained within a session
+- Each thread gets its own isolated browser session
+- The remote browser is kept alive between actions and reaped automatically after roughly a minute of inactivity; if a session has expired, the next action transparently starts a fresh one
+
+### Session States
+
+| State | Meaning |
+|---|---|
+| **Starting** | Browser is being launched |
+| **Active** | Browser is ready and accepting actions |
+| **Completed** | Session ended normally |
+| **Failed** | Session encountered an error |
+| **Terminated** | Session was manually stopped |
+
+### URL Safety
+
+Every URL the browser is asked to open is validated before the request leaves
+the backend. Requests to private, loopback, link-local, CGNAT and other reserved
+address ranges are rejected, including obfuscated forms such as decimal-encoded
+IPv4 literals. Administrators can additionally configure a domain allowlist or
+blocklist.
+
+## Common Use Cases
+
+**Website monitoring**
+Ask the AI to visit a website, take a screenshot, and describe what it sees. Combine with [Triggers](/docs/triggers) to automate this on a schedule.
+
+**Data extraction**
+Navigate to a page and extract structured data — prices, product details, contact information, or any other content visible on the page.
+
+**Form filling and testing**
+Have the AI fill out web forms, test user flows, or verify that a page works as expected.
+
+**Visual verification**
+Take screenshots of web pages and ask the AI to analyze the visual layout, check for broken elements, or compare with a reference design.
+
+**Research automation**
+Navigate through multiple pages to gather information, following links and extracting relevant content along the way. Works well with [Deep Work Mode](/docs/chat#deep-work-mode-auto-continue) for multi-step browsing tasks.
+
+## Availability
+
+Browser automation is available in **chat** and **web search** modes. The tool is
+offered to the AI only when the deployment has a browser-renderer service
+configured (the `BROWSER_RENDERER_URL` environment variable). If it is not set,
+the tool is hidden rather than failing at call time.
+
+:::note
+Browser automation runs in the cloud — the AI does not access your local browser or computer. Each session is a fresh, isolated browser instance.
+:::
+
+## Action Log
+
+Every browser action is logged in the database, including:
+- The action type and parameters
+- Whether it succeeded or failed
+- Error messages (if any)
+- Duration and timestamps
+
+This log helps with debugging and understanding what the AI did during a browsing session.
+
+Error messages are sanitised before they reach the conversation: connection
+URLs, query strings and long hex tokens are redacted, so a failure never leaks
+session credentials into the chat.
+
+## Troubleshooting
+
+**Issue:** The AI says browser automation is not available or not configured
+- **Solution:** The deployment has no browser-renderer service URL configured. Contact your administrator — see [Browser renderer service](/docs/services/browser-renderer)
+
+**Issue:** Screenshot shows an unexpected page
+- **Solution:** The browser may have been redirected. Ask the AI to check the current URL and navigate again if needed
+
+**Issue:** Click or type action fails
+- **Solution:** The target element may not be visible or may have a different selector. Ask the AI to take a screenshot first to see the current page state, then try again
+
+**Issue:** Page content is not loading
+- **Solution:** Some pages require JavaScript to render. The cloud browser supports JavaScript, but heavily dynamic pages may need a short wait. Ask the AI to wait and retry
+
+**Issue:** The browser seems to have forgotten where it was
+- **Solution:** Sessions are reaped after about a minute of inactivity. If you come back to a thread later, ask the AI to navigate again — it will start a fresh session automatically
+
+**Issue:** A URL is refused
+- **Solution:** Internal and private-network addresses are blocked by design. Public URLs only
+
+## Related Features
+
+- [AI Tools](/docs/tools) — Browser automation is one of 50+ built-in AI tools
+- [Chat](/docs/chat) — Use browser automation in conversations
+- [Deep Work Mode](/docs/chat#deep-work-mode-auto-continue) — Chain multiple browser actions in one request
+- [Triggers](/docs/triggers) — Automate browser tasks on a schedule
+- [Browser renderer service](/docs/services/browser-renderer) — How the underlying service works

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Neore — this computer</title>
+        <link rel="stylesheet" href="device.css" />
+        <script type="module" src="device.js"></script>
+    </head>
+    <body>
+        <main>
+            <!-- A request waiting for this person's decision. Rendered with textContent only: everything in it came from a model. -->
+            <section id="prompt" aria-labelledby="prompt-heading" hidden>
+                <h1 id="prompt-heading"></h1>
+                <p id="prompt-context" class="muted"></p>
+                <div id="prompt-warning" class="warning" role="alert" hidden></div>
+                <p id="prompt-sandbox" hidden></p>
+                <pre id="prompt-detail" tabindex="0" aria-label="What will happen"></pre>
+                <details id="prompt-input-box">
+                    <summary>Exact input</summary>
+                    <pre id="prompt-input" tabindex="0"></pre>
+                </details>
+                <p id="prompt-expiry" class="muted" role="status" aria-live="polite"></p>
+                <div class="actions">
+                    <button type="button" id="deny">Deny</button>
+                    <button type="button" id="always" hidden>Always allow this tool</button>
+                    <button type="button" id="once" class="primary"></button>
+                </div>
+                <p id="prompt-error" class="error" role="alert"></p>
+            </section>
+
+            <section id="settings" aria-labelledby="settings-heading">
+                <h1 id="settings-heading">This computer</h1>
+                <p id="pairing" class="muted"></p>
+                <button type="button" id="unpair" hidden>Unpair this computer</button>
+
+                <h2 id="roots-heading">Shared folders</h2>
+                <p class="muted">The agent's file and shell tools reach only these folders. Every action still asks you first.</p>
+                <ul id="roots" aria-labelledby="roots-heading"></ul>
+                <div class="row">
+                    <button type="button" id="pick-root">Choose folder…</button>
+                    <label class="sr-only" for="typed-root">Folder path</label>
+                    <input id="typed-root" type="text" placeholder="/path/to/folder" autocomplete="off" spellcheck="false" />
+                    <button type="button" id="add-root">Add</button>
+                </div>
+
+                <h2 id="sandbox-heading">Shell sandbox</h2>
+                <label class="check">
+                    <input type="checkbox" id="require-sandbox" aria-describedby="sandbox-status" />
+                    Require sandbox for shell commands
+                </label>
+                <p id="sandbox-status" class="muted"></p>
+
+                <h2 id="servers-heading">Local MCP servers</h2>
+                <p class="muted">Started on this computer when the agent first uses them. Only add commands you trust.</p>
+                <ul id="servers" aria-labelledby="servers-heading"></ul>
+                <form id="server-form" novalidate>
+                    <label for="server-name">Name</label>
+                    <input id="server-name" type="text" maxlength="40" required autocomplete="off" />
+                    <label for="server-command">Command</label>
+                    <input id="server-command" type="text" required autocomplete="off" spellcheck="false" placeholder="npx" />
+                    <label for="server-args">Arguments, one per line</label>
+                    <textarea id="server-args" rows="3" spellcheck="false"></textarea>
+                    <label for="server-env">Environment, one KEY=value per line</label>
+                    <textarea id="server-env" rows="2" spellcheck="false"></textarea>
+                    <button type="submit">Add server</button>
+                </form>
+
+                <h2 id="rules-heading">Always allowed</h2>
+                <ul id="rules" aria-labelledby="rules-heading"></ul>
+
+                <h2 id="audit-heading">Recent activity</h2>
+                <p id="audit-path" class="muted"></p>
+                <ul id="audit" aria-labelledby="audit-heading" class="audit"></ul>
+
+                <p id="settings-status" role="status" aria-live="polite"></p>
+            </section>
+        </main>
+    </body>
+</html>

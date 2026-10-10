@@ -1,0 +1,34 @@
+# Validated in CI before every upload: `anolilab/workflows/step/codecov` runs
+# `curl --fail-with-body --data-binary @codecov.yml https://codecov.io/validate`
+# as its first step, unconditionally. The file was missing, so that curl exited
+# 26 ("Failed to open codecov.yml") and failed the node-22 ubuntu leg AFTER every
+# test in it had already passed.
+codecov:
+    require_ci_to_pass: true
+
+coverage:
+    status:
+        project:
+            default:
+                target: "auto"
+                # The monorepo's coverage moves around as `vis affected` picks a
+                # different project set per PR; a hard target would fail on churn
+                # rather than on a real regression.
+                threshold: "1%"
+        patch:
+            default:
+                target: "auto"
+                threshold: "1%"
+
+comment:
+    layout: "reach, diff, flags, files"
+    behavior: "default"
+    require_changes: true
+
+ignore:
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/__tests__/**"
+    - "**/_generated/**"
+    - "**/dist/**"
+    - "apps/web/e2e/**"

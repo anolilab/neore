@@ -1,0 +1,4 @@
+# cargo + worker-build output (generated, minified JS and wasm)
+build/
+target/
+Cargo.lock

@@ -1,0 +1,142 @@
+{
+    "name": "@neore/backend",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Lunora backend for the AI Chat application.",
+    "license": "FSL-1.1-ALv2",
+    "author": {
+        "name": "Daniel Bannert",
+        "url": "https://github.com/anolilab/neore"
+    },
+    "type": "module",
+    "imports": {
+        "#lunora/*": "./lunora/*"
+    },
+    "exports": {
+        "./agent": "./lunora/agent/client/index.ts",
+        "./agent/deltas": "./lunora/agent/deltas.ts",
+        "./agent/shared": "./lunora/agent/shared.ts",
+        "./agent/types": "./lunora/agent/client/types.ts",
+        "./agent/ui-messages": "./lunora/agent/ui-messages.ts",
+        "./agent/validators": "./lunora/agent/validators.ts",
+        "./api": "./lunora/_generated/api.ts",
+        "./auth": "./lunora/auth.ts",
+        "./auth/fields": "./lunora/auth/fields.ts",
+        "./chat-upload-codes": "./lunora/lib/chat-upload-codes.ts",
+        "./chat/fields": "./lunora/chat/fields.ts",
+        "./chat/tags": "./lunora/chat/tags/logic.ts",
+        "./dataModel": "./lunora/_generated/dataModel.ts",
+        "./document-limits": "./lunora/lib/document-limits.ts",
+        "./knowledge/citations": "./lunora/knowledge/citations.ts",
+        "./messenger/reply-tools": "./lunora/messenger/lib/reply-tools.ts",
+        "./package.json": "./package.json",
+        "./public-api/scopes": "./lunora/public-api/scopes.ts",
+        "./schema": "./lunora/schema.ts",
+        "./server": "./lunora/_generated/server.ts",
+        "./skills/markdown": "./lunora/skills/markdown.ts"
+    },
+    "scripts": {
+        "build": "node scripts/run-then-codegen.mjs lunora build --emit-bindings lunora-bindings.json",
+        "advise": "lunora advisor",
+        "clean": "rimraf node_modules dist .eslintcache lunora/_generated",
+        "codegen": "lunora codegen && node scripts/check-generated.mjs",
+        "deploy": "lunora deploy",
+        "dev": "lunora dev --inspector-port 9235",
+        "lint:eslint": "eslint .",
+        "lint:eslint:fix": "eslint . --fix",
+        "lint:prettier": "prettier --check . --ignore-path ../.prettierignore --ignore-path .prettierignore",
+        "lint:prettier:fix": "prettier --write . --ignore-path ../.prettierignore --ignore-path .prettierignore",
+        "lint:types": "tsc --noEmit",
+        "prepare:deploy": "node scripts/run-then-codegen.mjs lunora prepare",
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "dependencies": {
+        "@ai-sdk/mcp": "catalog:ai",
+        "@ai-sdk/provider": "catalog:ai",
+        "@ai-sdk/provider-utils": "catalog:ai",
+        "@aws-sdk/client-s3": "catalog:server",
+        "@better-auth/api-key": "catalog:auth",
+        "@better-auth/passkey": "catalog:auth",
+        "@e2b/code-interpreter": "catalog:ai",
+        "@lunora/auth": "catalog:lunora",
+        "@lunora/bindings": "catalog:lunora",
+        "@lunora/d1": "catalog:lunora",
+        "@lunora/mail": "catalog:lunora",
+        "@lunora/notify": "catalog:lunora",
+        "@lunora/payment": "catalog:lunora",
+        "@lunora/queue": "catalog:lunora",
+        "@lunora/ratelimit": "catalog:lunora",
+        "@lunora/scheduler": "catalog:lunora",
+        "@lunora/server": "catalog:lunora",
+        "@lunora/storage": "catalog:lunora",
+        "@lunora/workflow": "catalog:",
+        "@modelcontextprotocol/sdk": "catalog:mcp",
+        "@neore/ai": "workspace:*",
+        "@neore/service-sdk": "workspace:*",
+        "@toon-format/toon": "catalog:utils",
+        "ai": "catalog:ai",
+        "better-auth": "catalog:auth",
+        "creem": "catalog:server",
+        "e2b": "catalog:ai",
+        "hono": "catalog:server",
+        "jose": "6.2.12",
+        "jsonrepair": "catalog:utils",
+        "lunorash": "catalog:lunora",
+        "react": "catalog:react",
+        "react-dom": "catalog:react",
+        "tldts": "catalog:security",
+        "zod": "catalog:utils"
+    },
+    "devDependencies": {
+        "@anolilab/eslint-config": "catalog:lint",
+        "@anolilab/prettier-config": "catalog:lint",
+        "@cloudflare/workers-types": "catalog:build",
+        "@lunora/cli": "catalog:lunora",
+        "@lunora/seed": "catalog:lunora",
+        "@lunora/studio": "catalog:lunora",
+        "@lunora/testing": "catalog:lunora",
+        "@types/node": "catalog:types",
+        "@types/react": "catalog:types",
+        "@types/react-dom": "catalog:types",
+        "eslint": "catalog:lint",
+        "prettier": "catalog:lint",
+        "rimraf": "catalog:node",
+        "typescript": "catalog:tsc",
+        "vitest": "catalog:test",
+        "wrangler": "catalog:build"
+    },
+    "engines": {
+        "node": ">=22.x"
+    },
+    "lunora": {
+        "crons": [
+            "*/1 * * * *"
+        ],
+        "services": {
+            "services": [
+                "SERVICE_BROWSER_RENDERER",
+                "SERVICE_DOCUMENT_PARSER",
+                "SERVICE_NSFW_CHECKER"
+            ],
+            "env.preview.services": [
+                "SERVICE_BROWSER_RENDERER",
+                "SERVICE_DOCUMENT_PARSER",
+                "SERVICE_LLM_GATEWAY",
+                "SERVICE_NSFW_CHECKER"
+            ]
+        },
+        "queueTuning": {
+            "queues": {
+                "neore-backend-jobs": {
+                    "max_retries": 2,
+                    "dead_letter_queue": "neore-backend-jobs-dlq",
+                    "retry_delay": 5
+                },
+                "neore-backend-jobs-dlq": {
+                    "max_retries": 0
+                }
+            }
+        }
+    }
+}

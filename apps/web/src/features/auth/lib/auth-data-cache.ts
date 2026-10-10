@@ -1,0 +1,102 @@
+type CacheEntry<T> = {
+    data: T | null;
+    isRefetching: boolean;
+    timestamp: number;
+};
+
+class AuthDataCache {
+    private cache = new Map<string, CacheEntry<unknown>>();
+
+    private listeners = new Map<string, Set<() => void>>();
+
+    private inFlightRequests = new Map<string, Promise<unknown>>();
+
+    get<T>(key: string): CacheEntry<T> | undefined {
+        return this.cache.get(key) as CacheEntry<T> | undefined;
+    }
+
+    set<T>(key: string, data: T | null) {
+        const entry: CacheEntry<T> = {
+            data,
+            isRefetching: false,
+            timestamp: Date.now(),
+        };
+
+        this.cache.set(key, entry);
+        this.notify(key);
+    }
+
+    setRefetching(key: string, isRefetching: boolean) {
+        const entry = this.cache.get(key);
+
+        if (entry) {
+            entry.isRefetching = isRefetching;
+            this.notify(key);
+        }
+    }
+
+    clear(key?: string) {
+        if (key) {
+            this.cache.delete(key);
+            this.inFlightRequests.delete(key);
+            this.notify(key);
+        } else {
+            this.cache.clear();
+            this.inFlightRequests.clear();
+            const keys = [...this.listeners.keys()];
+
+            for (const cacheKey of keys) {
+                this.notify(cacheKey);
+            }
+        }
+    }
+
+    getInFlightRequest<T>(key: string): Promise<T> | undefined {
+        return this.inFlightRequests.get(key) as Promise<T> | undefined;
+    }
+
+    setInFlightRequest<T>(key: string, promise: Promise<T>) {
+        this.inFlightRequests.set(key, promise);
+    }
+
+    removeInFlightRequest(key: string) {
+        this.inFlightRequests.delete(key);
+    }
+
+    subscribe(key: string, callback: () => void) {
+        if (!this.listeners.has(key)) {
+            this.listeners.set(key, new Set());
+        }
+
+        this.listeners.get(key)!.add(callback);
+
+        return () => {
+            const callbacks = this.listeners.get(key);
+
+            if (callbacks) {
+                callbacks.delete(callback);
+
+                if (callbacks.size === 0) {
+                    this.listeners.delete(key);
+                }
+            }
+        };
+    }
+
+    private notify(key: string) {
+        const callbacks = this.listeners.get(key);
+
+        if (callbacks) {
+            const callbackArray = [...callbacks];
+
+            for (const callback of callbackArray) {
+                callback();
+            }
+        }
+    }
+}
+
+// Global singleton instance
+const authDataCache = new AuthDataCache();
+
+export default authDataCache;

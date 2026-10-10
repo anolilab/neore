@@ -1,0 +1,68 @@
+name: "Lint"
+on:
+    pull_request:
+        branches: ["main"]
+permissions: {}
+jobs:
+    lint:
+        permissions:
+            contents: "read"
+            pull-requests: "read"
+        uses: "anolilab/workflows/.github/workflows/lint.yml@94b27723e80256ce9bcace59884a051aca8fef22" # v18.0.1
+        with:
+            lint_eslint: true
+            lint_types: true
+            lint_attw: true
+            lint_package_json: true
+            lint_markdown: false
+            lint_yaml: true
+            lint_actionlint: true
+            lint_rust: false
+            node_version: "22"
+
+    # The shared workflow above accepts exactly eight `lint_*` inputs and none of
+    # them is prettier or secret scanning — checked against its own definition,
+    # not assumed. Both are enforced locally (`pnpm lint:prettier`, `pnpm vis
+    # secrets`, and the pre-commit hook), so before this job a PR could go green
+    # having never had either run in CI.
+    format-and-secrets:
+        name: "Prettier and secret scan"
+        runs-on: "ubuntu-latest"
+        permissions:
+            contents: "read"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  # `vis secrets` diffs against a baseline that pins findings to
+                  # line numbers; a shallow clone is enough for the scan itself,
+                  # but full history keeps the diff output meaningful.
+                  fetch-depth: 0
+
+            - name: "Setup resources and environment"
+              id: "setup"
+              uses: "anolilab/workflows/step/setup@main"
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            - name: "Check formatting"
+              shell: "bash"
+              run: "pnpm lint:prettier"
+
+            - name: "Scan for secrets"
+              shell: "bash"
+              run: "pnpm vis secrets"
+
+            # `alchemy.run.ts` runs under `tsx`, which strips types unchecked, and
+            # belongs to no workspace project, so neither `vis run lint:types` nor
+            # any project's eslint reaches it. Needs no build: everything it
+            # imports is committed source or a published package.
+            - name: "Check the deploy script"
+              shell: "bash"
+              run: "pnpm run lint:types:deploy && pnpm run lint:eslint:deploy"

@@ -1,0 +1,155 @@
+{
+  "bindings": [
+    {
+      "binding": "DB",
+      "resource": "neore-backend",
+      "resourceId": "00000000-0000-0000-0000-000000000000",
+      "type": "d1"
+    },
+    {
+      "binding": "SCHEDULER",
+      "className": "SchedulerDO",
+      "sqlite": true,
+      "type": "durable_object"
+    },
+    {
+      "binding": "SHARD",
+      "className": "ShardDO",
+      "sqlite": true,
+      "type": "durable_object"
+    },
+    {
+      "binding": "SHARD_REGISTRY",
+      "className": "ShardRegistryDO",
+      "sqlite": true,
+      "type": "durable_object"
+    },
+    {
+      "binding": "neore-backend-jobs",
+      "resource": "neore-backend-jobs",
+      "type": "queue_consumer"
+    },
+    {
+      "binding": "neore-backend-jobs-dlq",
+      "resource": "neore-backend-jobs-dlq",
+      "type": "queue_consumer"
+    },
+    {
+      "binding": "QUEUE_JOBS",
+      "resource": "neore-backend-jobs",
+      "type": "queue_producer"
+    },
+    {
+      "binding": "QUEUE_JOBS_DEAD_LETTERS",
+      "resource": "neore-backend-jobs-dlq",
+      "type": "queue_producer"
+    },
+    {
+      "binding": "FILES",
+      "resource": "neore-files",
+      "type": "r2"
+    },
+    {
+      "binding": "SERVICE_BROWSER_RENDERER",
+      "resource": "browser-renderer",
+      "type": "service"
+    },
+    {
+      "binding": "SERVICE_DOCUMENT_PARSER",
+      "resource": "document-parser",
+      "type": "service"
+    },
+    {
+      "binding": "SERVICE_LLM_GATEWAY",
+      "resource": "llm-gateway",
+      "type": "service"
+    },
+    {
+      "binding": "SERVICE_NSFW_CHECKER",
+      "resource": "nsfw-checker",
+      "type": "service"
+    },
+    {
+      "binding": "EMBEDDINGS_1024",
+      "resource": "embeddings-1024",
+      "type": "vectorize"
+    },
+    {
+      "binding": "EMBEDDINGS_128",
+      "resource": "embeddings-128",
+      "type": "vectorize"
+    },
+    {
+      "binding": "EMBEDDINGS_1408",
+      "resource": "embeddings-1408",
+      "type": "vectorize"
+    },
+    {
+      "binding": "EMBEDDINGS_1536",
+      "resource": "embeddings-1536",
+      "type": "vectorize"
+    },
+    {
+      "binding": "EMBEDDINGS_2048",
+      "resource": "embeddings-2048",
+      "type": "vectorize"
+    },
+    {
+      "binding": "EMBEDDINGS_256",
+      "resource": "embeddings-256",
+      "type": "vectorize"
+    },
+    {
+      "binding": "EMBEDDINGS_3072",
+      "resource": "embeddings-3072",
+      "type": "vectorize"
+    },
+    {
+      "binding": "EMBEDDINGS_4096",
+      "resource": "embeddings-4096",
+      "type": "vectorize"
+    },
+    {
+      "binding": "EMBEDDINGS_512",
+      "resource": "embeddings-512",
+      "type": "vectorize"
+    },
+    {
+      "binding": "EMBEDDINGS_768",
+      "resource": "embeddings-768",
+      "type": "vectorize"
+    },
+    {
+      "binding": "AccountDeletionWorkflowWorkflow",
+      "className": "AccountDeletionWorkflowWorkflow",
+      "resource": "account-deletion-workflow",
+      "type": "workflow"
+    },
+    {
+      "binding": "ChatImportWorkflowWorkflow",
+      "className": "ChatImportWorkflowWorkflow",
+      "resource": "chat-import-workflow",
+      "type": "workflow"
+    },
+    {
+      "binding": "DataExportWorkflowWorkflow",
+      "className": "DataExportWorkflowWorkflow",
+      "resource": "data-export-workflow",
+      "type": "workflow"
+    }
+  ],
+  "compatibilityDate": "2026-06-10",
+  "compatibilityFlags": [
+    "nodejs_compat",
+    "durable_object_io_tasks_prevent_eviction"
+  ],
+  "crons": [
+    "*/1 * * * *"
+  ],
+  "name": "neore-backend",
+  "unknown": [
+    "dev"
+  ],
+  "vars": [],
+  "version": 1
+}

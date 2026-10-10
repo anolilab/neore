@@ -1,0 +1,24 @@
+{
+    "name": "embeddings",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "services/embeddings/src",
+    "projectType": "service",
+    "tags": ["chat", "embeddings", "type:service"],
+    "implicitDependencies": [],
+    "targets": {
+        "dev": {
+            "command": "pnpm dev",
+            "preset": "server",
+            "options": {
+                "service": {
+                    "port": 8790,
+                    "readiness": {
+                        "tcp": {
+                            "port": 8790
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

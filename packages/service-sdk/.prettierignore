@@ -1,0 +1,4 @@
+# Written by `pnpm generate` (scripts/generate.ts -> orval), which does not
+# format its output. Formatting it here is churn: the next generate overwrites
+# the result. Same reasoning as backend/lunora/_generated.
+src/generated/

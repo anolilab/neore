@@ -1,0 +1,36 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "{{kebabCase name}}",
+    "main": "src/index.ts",
+    "compatibility_date": "2025-01-01",
+    "compatibility_flags": ["nodejs_compat_v2"],
+    "placement": {
+        "mode": "smart"
+    },
+    "observability": {
+        "enabled": true
+    },
+    "vars": {
+        "APP_NAME": "{{kebabCase name}}",
+        "APP_VERSION": "1.0.0",
+        "NODE_ENV": "development"
+    },
+    "env": {
+        "production": {
+            "name": "{{kebabCase name}}",
+            "vars": {
+                "APP_NAME": "{{kebabCase name}}",
+                "APP_VERSION": "1.0.0",
+                "NODE_ENV": "production"
+            }
+        },
+        "preview": {
+            "name": "{{kebabCase name}}-preview",
+            "vars": {
+                "APP_NAME": "{{kebabCase name}}",
+                "APP_VERSION": "1.0.0",
+                "NODE_ENV": "development"
+            }
+        }
+    }
+}

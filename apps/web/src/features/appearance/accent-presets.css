@@ -1,0 +1,89 @@
+/*
+ * GENERATED from src/features/appearance/lib/accent-presets.ts by renderAccentCss().
+ * Do not edit by hand — change the TS module; accent-presets.test.ts prints the new output.
+ */
+/* eslint-disable css/use-layers */
+
+:root[data-accent="blue"] {
+    --primary: #1d4ed8;
+    --primary-foreground: #ffffff;
+    --ring: #1d4ed8;
+    --sidebar-ring: #1d4ed8;
+}
+
+:root.dark[data-accent="blue"] {
+    --primary: #60a5fa;
+    --primary-foreground: #191919;
+    --ring: #60a5fa;
+    --sidebar-ring: #60a5fa;
+}
+
+:root[data-accent="violet"] {
+    --primary: #6d28d9;
+    --primary-foreground: #ffffff;
+    --ring: #6d28d9;
+    --sidebar-ring: #6d28d9;
+}
+
+:root.dark[data-accent="violet"] {
+    --primary: #a78bfa;
+    --primary-foreground: #191919;
+    --ring: #a78bfa;
+    --sidebar-ring: #a78bfa;
+}
+
+:root[data-accent="green"] {
+    --primary: #15803d;
+    --primary-foreground: #ffffff;
+    --ring: #15803d;
+    --sidebar-ring: #15803d;
+}
+
+:root.dark[data-accent="green"] {
+    --primary: #4ade80;
+    --primary-foreground: #191919;
+    --ring: #4ade80;
+    --sidebar-ring: #4ade80;
+}
+
+:root[data-accent="orange"] {
+    --primary: #c2410c;
+    --primary-foreground: #ffffff;
+    --ring: #c2410c;
+    --sidebar-ring: #c2410c;
+}
+
+:root.dark[data-accent="orange"] {
+    --primary: #fb923c;
+    --primary-foreground: #191919;
+    --ring: #fb923c;
+    --sidebar-ring: #fb923c;
+}
+
+:root[data-accent="rose"] {
+    --primary: #be123c;
+    --primary-foreground: #ffffff;
+    --ring: #be123c;
+    --sidebar-ring: #be123c;
+}
+
+:root.dark[data-accent="rose"] {
+    --primary: #fb7185;
+    --primary-foreground: #191919;
+    --ring: #fb7185;
+    --sidebar-ring: #fb7185;
+}
+
+:root[data-accent="teal"] {
+    --primary: #0f766e;
+    --primary-foreground: #ffffff;
+    --ring: #0f766e;
+    --sidebar-ring: #0f766e;
+}
+
+:root.dark[data-accent="teal"] {
+    --primary: #2dd4bf;
+    --primary-foreground: #191919;
+    --ring: #2dd4bf;
+    --sidebar-ring: #2dd4bf;
+}

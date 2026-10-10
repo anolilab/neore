@@ -1,0 +1,174 @@
+---
+title: Chat Import
+description: Import conversations from ChatGPT, Google Gemini, or Claude into Neore Chat
+---
+
+# Chat Import
+
+Bring your conversations from other AI chat platforms into Neore Chat. The import tool supports ChatGPT, Google Gemini, and Claude exports — it auto-detects the provider and preserves your message history.
+
+## Quick Start
+
+1. Export your conversations from ChatGPT, Gemini, or Claude (see [Supported Formats](#supported-formats) below)
+2. Navigate to **Settings → Privacy & Data**
+3. Under **Import Conversations**, click **Select File**
+4. Choose your exported `.json` or `.zip` file
+5. Review the preview, then click **Import All**
+
+## Overview
+
+The import tool handles the entire process:
+
+- **Auto-detection** — Identifies the provider from the file structure
+- **Preview before import** — Shows conversation count and titles before committing
+- **Server-side processing** — Conversations are processed on the server so you can close the browser
+- **Real-time progress** — Track import progress with a live progress bar
+- **Batch processing** — Conversations are imported in batches for reliability
+
+## Supported Formats
+
+### ChatGPT
+
+**Export method:**
+1. Go to [chat.openai.com](https://chat.openai.com)
+2. Navigate to **Settings → Data controls → Export data**
+3. Click **Export** and wait for the email
+4. Download the `.zip` file from the email link
+
+**Accepted files:**
+- `conversations.json` (extracted from the ZIP)
+- The full export `.zip` file (the importer extracts it automatically)
+
+**How it works:** ChatGPT exports use a tree-based `mapping` structure. The importer walks the conversation tree to reconstruct the correct message order.
+
+### Google Gemini
+
+**Export method:**
+1. Go to [takeout.google.com](https://takeout.google.com)
+2. Select **Gemini Apps** (deselect everything else for a faster export)
+3. Click **Next step** → **Create export**
+4. Download the `.zip` file when ready
+
+**Accepted files:**
+- Individual `.json` conversation files
+- The full Google Takeout `.zip` file
+
+**How it works:** Gemini exports use `USER` and `MODEL` roles in a flat message array. Timestamps are in ISO 8601 format.
+
+### Claude
+
+**Export method:**
+1. Go to [claude.ai](https://claude.ai)
+2. Navigate to **Settings → Account → Export Data**
+3. Download the exported `.json` file
+
+**Accepted files:**
+- The exported `.json` file from Claude
+
+**How it works:** Claude exports use `human` and `assistant` sender fields with `chat_messages` arrays. The importer normalizes these to the standard user/assistant roles.
+
+## Import Process
+
+### Step 1: Select File
+
+Click **Select File** and choose your exported `.json` or `.zip` file. The importer parses the file locally in your browser — nothing is uploaded until you confirm.
+
+### Step 2: Review Preview
+
+After parsing, you'll see:
+- The detected provider (ChatGPT, Gemini, or Claude)
+- Total number of conversations found
+- A preview of the first 10 conversation titles with message counts
+
+:::tip
+If the wrong provider is detected or no conversations are found, double-check that you uploaded the correct export file.
+:::
+
+### Step 3: Import
+
+Click **Import All** to start. The import happens in three phases:
+
+1. **Upload** — The normalized conversation data is uploaded to secure temporary storage
+2. **Processing** — The server processes conversations in batches, creating threads and messages
+3. **Cleanup** — Temporary files are automatically removed
+
+### Step 4: Track Progress
+
+The progress bar updates in real time as conversations are imported. You'll see:
+- Percentage complete
+- Number of conversations imported out of total
+- Number of failed imports (if any)
+
+:::note
+The import runs entirely on the server. You can safely navigate away or close the browser — the import will continue. When you return to the settings page, you'll see the current progress or completion status.
+:::
+
+### Step 5: Done
+
+When the import completes, you'll see a summary of imported and failed conversations. Your imported conversations appear in the main chat thread list.
+
+## What Gets Imported
+
+For each conversation, the following is preserved:
+
+- **Thread title** — The original conversation title
+- **Messages** — All user and assistant messages in order
+- **Message content** — Full text content of each message
+- **Timestamps** — Original creation times (when available)
+- **Provider tag** — Each thread is tagged with its source (e.g., `import:chatgpt`)
+
+**What is not imported:**
+- File attachments or images from the original conversation
+- System messages or tool calls
+- Conversation metadata (e.g., model used, temperature settings)
+- Shared conversation links
+
+## Common Use Cases
+
+**Migrating from ChatGPT:**
+Export your ChatGPT history and import it into Neore Chat to continue your conversations with any AI model.
+
+**Consolidating conversations:**
+Import conversations from multiple providers (ChatGPT, Gemini, Claude) to have all your AI chat history in one place.
+
+**Backing up before switching platforms:**
+Import your history first, then use Neore Chat's [data export](/docs/privacy#data-export-article-20---right-to-data-portability) feature for ongoing backups.
+
+## Troubleshooting
+
+**Issue:** "No conversations found in the file"
+- **Solution:** Ensure you uploaded the correct export file, not a metadata-only file
+- **Solution:** For ChatGPT, make sure the file is `conversations.json` or the full ZIP
+- **Solution:** For Gemini, use the Google Takeout ZIP, not individual settings files
+
+**Issue:** "Could not detect the chat provider"
+- **Solution:** The file structure doesn't match any known provider format
+- **Solution:** Ensure the file hasn't been modified or corrupted after export
+- **Solution:** Try exporting again from the original provider
+
+**Issue:** Import stuck or not progressing
+- **Solution:** The import runs server-side — refresh the page to see updated progress
+- **Solution:** Large imports (1000+ conversations) may take several minutes
+- **Solution:** If stuck for more than 10 minutes, try starting a new import
+
+**Issue:** Some conversations failed to import
+- **Solution:** Conversations with no messages are skipped automatically
+- **Solution:** Very large individual conversations may exceed processing limits
+- **Solution:** Failed conversations are counted in the summary — successfully imported ones are unaffected
+
+**Issue:** "An import is already in progress"
+- **Solution:** Wait for the current import to complete before starting another
+- **Solution:** Check the import status on the Privacy & Data settings page
+
+## Limitations
+
+- **One import at a time** — You can only run one import per account at a time
+- **Text content only** — Images, files, and attachments are not imported
+- **Rate limited** — Import requests are rate limited to prevent abuse
+- **Message roles** — Only `user` and `assistant` messages are imported; system messages and tool calls are skipped
+
+## Related Features
+
+- [Privacy & GDPR](/docs/privacy) — Data export, account deletion, and privacy rights
+- [Settings](/docs/settings) — Account and app configuration
+- [Chat](/docs/chat) — Chat features and thread management

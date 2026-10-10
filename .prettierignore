@@ -1,0 +1,58 @@
+# Add files here to ignore them from prettier formatting
+**/dist/
+**/coverage/
+/.vis/cache
+
+# Build and tool artifacts, anywhere in the tree. Gitignored, but prettier
+# reads .prettierignore, not .gitignore — and it resolves that file from the
+# CWD, so a run started at the root never sees backend/.prettierignore.
+# backend/.lunora/build/bundle-meta.json is 3.6 MB and blows the output buffer.
+**/.lunora/
+# Emitted by `lunora build --emit-bindings`; the generator rewrites it unformatted.
+backend/lunora-bindings.json
+# Codegen output. `backend/.prettierignore` covers it for `vis run lint:prettier`,
+# which runs prettier from `backend/` — but this file is what a root-level
+# `prettier --write .` reads, and that would REFORMAT generated sources. Anything
+# written there is discarded by the next `pnpm codegen`, and `lunora dev`
+# regenerates on any source change, so the reformat is both pointless and a
+# source of phantom diffs.
+**/_generated/
+**/.lunora-schema.json
+**/lunora.advisor.map.json
+**/.wrangler/
+# Playwright run artifacts. Already in .gitignore, but prettier and eslint read
+# the working tree, so a local `pnpm test:e2e` would otherwise fail the lint.
+**/e2e/.results/
+**/.alchemy/
+**/.source/
+**/.eslint.cache.json
+
+# Lingui-compiled message catalogues. Minified single-line output carrying an
+# `/*eslint-disable*/` banner — `lingui compile` rewrites them, so formatting
+# is churn. The .po sources next to them are the editable artefact.
+**/src/locales/*/messages.js
+
+# Tool-owned serialisations, rewritten by their generator on every run, so
+# formatting them only starts a fight prettier cannot win. pnpm's YAML writer
+# owns the two pnpm files; the skills sync writes skills-lock.json at indent=2.
+#
+# pnpm-workspace.yaml is here despite being hand-edited: an install that CHANGES
+# the dependency set reflows the whole file to 2-space and hoists auditConfig to
+# the top. An install that changes nothing leaves it alone, which is what made it
+# look safe.
+/pnpm-lock.yaml
+/pnpm-workspace.yaml
+/skills-lock.json
+
+# `wrangler types` rewrites this with tabs on every postinstall, so prettier
+# reformatting it to 4-space guarantees a dirty tree after any install. It is
+# also machine-specific: wrangler reads apps/web/.env, so whatever a developer
+# has locally lands in a TRACKED file (a stale VITE_LUNORA_SITE_URL is how this
+# was found).
+apps/web/worker-configuration.d.ts
+
+# `email-render.test.ts` asserts `expect(html).toBe(expected)` against these
+# fixtures — byte-identical, not parsed. Prettier reformatting them breaks all
+# seven cases, and `lint:prettier:fix` would do it silently. They are generated
+# by `render()`, so their formatting is react-email's to choose, not ours.
+backend/lunora/email/templates/__fixtures__/

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-device-execute"
+description = "Enables the device_execute command without any pre-configured scope."
+commands.allow = ["device_execute"]
+
+[[permission]]
+identifier = "deny-device-execute"
+description = "Denies the device_execute command without any pre-configured scope."
+commands.deny = ["device_execute"]

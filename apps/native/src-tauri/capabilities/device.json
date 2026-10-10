@@ -1,0 +1,18 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "device",
+    "description": "The local device window: answer approval prompts and manage this computer's shared folders, local MCP servers and allow rules. The remote app never gets these.",
+    "local": true,
+    "windows": ["device"],
+    "platforms": ["macOS", "windows", "linux"],
+    "permissions": [
+        "core:event:allow-listen",
+        "core:event:allow-unlisten",
+        "allow-device-prompt-current",
+        "allow-device-prompt-answer",
+        "allow-device-settings-get",
+        "allow-device-settings-update",
+        "allow-device-pick-folder",
+        "allow-device-audit-tail"
+    ]
+}

@@ -1,0 +1,65 @@
+---
+title: Knowledge Base
+description: Upload documents and files to give the AI persistent context for better answers
+---
+
+# Knowledge Base
+
+The Knowledge Base lets you upload documents that the AI can reference during conversations. This gives the AI persistent context about your projects, company, or any topic — improving response quality without having to paste information into every message.
+
+## Overview
+
+- Upload files (PDF, DOCX, TXT, MD, and more) to your knowledge base
+- Attach knowledge bases to specific threads for targeted context
+- The AI automatically searches your knowledge base when answering questions
+- Documents are chunked and indexed for efficient retrieval (RAG)
+
+## Getting Started
+
+### Uploading Documents
+
+1. Navigate to **Settings → Chat → Knowledge Base**
+2. Click **Upload** or drag and drop files
+3. Documents are automatically processed and indexed
+4. Upload progress is shown in real time
+
+### Attaching to Threads
+
+Once you have documents in your knowledge base, you can attach them to individual threads:
+
+1. Open a thread
+2. Click the **Knowledge Base** button in the composer toolbar (book icon)
+3. Select which knowledge base files to attach
+4. The AI will use those documents as context for the conversation
+
+## How It Works
+
+When a knowledge base is attached to a thread:
+
+1. Your message is analyzed to identify relevant topics
+2. The knowledge base is searched using semantic similarity
+3. Relevant document chunks are included in the AI's context
+4. The AI references this information when generating responses
+
+This is a Retrieval-Augmented Generation (RAG) pipeline that ensures the AI has access to your specific information without needing to include entire documents in every message.
+
+## Supported File Types
+
+- PDF documents
+- Word documents (DOCX)
+- Plain text (TXT)
+- Markdown (MD)
+- And other text-based formats
+
+## Best Practices
+
+- **Keep documents focused** — smaller, topic-specific documents work better than large monolithic files
+- **Use descriptive filenames** — helps you organize and identify documents later
+- **Attach selectively** — only attach relevant knowledge bases to each thread for better results
+- **Update regularly** — replace outdated documents with current versions
+
+## Related Features
+
+- [Chat](/docs/chat) — Use knowledge base context in conversations
+- [Vault](/docs/vault) — General file storage and management
+- [Settings](/docs/settings) — Manage knowledge base uploads

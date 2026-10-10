@@ -1,0 +1,14 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "moduleResolution": "bundler",
+        "paths": {
+            "@chat-ui/*": ["./src/*"],
+            "@ui/*": ["../ui/src/*"]
+        },
+        "types": ["vite/client"],
+        "noEmit": true
+    },
+    "include": ["src"]
+}

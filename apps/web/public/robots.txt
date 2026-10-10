@@ -1,0 +1,14 @@
+# https://www.robotstxt.org/robotstxt.html
+# This file is served as a static asset.
+# The sitemap URL is also available via the /robots.txt server route (includes VITE_SITE_URL).
+
+User-agent: *
+Allow: /
+Allow: /auth/sign-in
+Allow: /auth/sign-up
+Allow: /auth/forgot-password
+Disallow: /dashboard/
+Disallow: /chat/
+Disallow: /workflow/
+Disallow: /api/
+Disallow: /_shortcut/

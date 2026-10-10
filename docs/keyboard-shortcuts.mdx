@@ -1,0 +1,190 @@
+---
+title: Keyboard Shortcuts
+description: Efficient navigation and actions with keyboard shortcuts
+---
+
+# Keyboard Shortcuts
+
+Neore Chat provides keyboard shortcuts for efficient navigation and quick actions.
+
+## Quick Reference
+
+Most commonly used shortcuts:
+
+| Action | Windows/Linux | macOS |
+|--------|---------------|-------|
+| Command Palette / Search | `Ctrl+K` | `Cmd+K` |
+| New Chat | `Ctrl+N` | `Cmd+N` |
+| New Temporary Chat | `Ctrl+Shift+N` | `Cmd+Shift+N` |
+| Focus Search | `Ctrl+F` | `Cmd+F` |
+| Toggle Left Sidebar | `Ctrl+B` | `Cmd+B` |
+| Toggle Right Sidebar | `Ctrl+Shift+B` | `Cmd+Shift+B` |
+| Help | `Ctrl+/` | `Cmd+/` |
+
+## All Global Shortcuts
+
+These fire anywhere in the app (except while you are typing in a text field).
+
+### Navigation
+
+| Shortcut | Action |
+|---|---|
+| `Arrow Up` | Previous item in the thread list |
+| `Arrow Down` | Next item in the thread list |
+| `Home` | Jump to the first thread |
+| `End` | Jump to the last thread |
+| `Enter` | Open the selected thread |
+
+### Sidebars
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+B` / `Cmd+B` | Toggle the left sidebar |
+| `Ctrl+Shift+B` / `Cmd+Shift+B` | Toggle the right sidebar |
+
+:::note
+`Ctrl+B` toggles the sidebar. It does **not** create a thread branch — see
+[Thread actions](#thread-actions) below.
+:::
+
+### Chat
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+N` / `Cmd+N` | Create a new thread |
+| `Ctrl+Shift+N` / `Cmd+Shift+N` | Create a new temporary thread |
+| `Ctrl+Shift+R` / `Cmd+Shift+R` | Start / stop audio recording |
+
+### Search and help
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+K` / `Cmd+K` | Open the command palette / global search |
+| `Ctrl+F` / `Cmd+F` | Focus the thread search input |
+| `Ctrl+/` / `Cmd+/` | Show the keyboard help overlay |
+| `Escape` | Close dialogs and menus, cancel the current action |
+
+## Thread Actions
+
+Branching, pinning, archiving and deleting a thread are available from the
+**command palette** (`Ctrl+K`) and from the thread's context menu:
+
+| Action | Where |
+|---|---|
+| Create branch | Command palette, thread menu |
+| Pin / unpin thread | Command palette, thread menu |
+| Archive / unarchive thread | Command palette, thread menu |
+| Delete thread | Command palette, thread menu |
+
+:::warning
+The command palette displays a key hint next to each of these four actions
+(`Ctrl+Shift+C`, `Ctrl+P`, `Ctrl+A`, `Ctrl+D`). Those hints are not yet wired up
+as global keystrokes — pressing the key on its own does nothing. Use the palette
+or the thread menu to run the action.
+:::
+
+## Command Palette
+
+The Command Palette (`Ctrl+K` or `Cmd+K`) is a global search and action interface that lets you quickly navigate, search threads, and perform actions without using the mouse.
+
+### Accessing Command Palette
+
+- `Ctrl+K` (Mac: `Cmd+K`) — open the command palette
+- `Ctrl+K` again — close it
+
+### Navigation Commands
+
+- **Go to Chat** — Navigate to chat interface
+- **Go to Prompts** — Navigate to prompts page
+- **Go to Vault** — Navigate to file vault
+- **Go to Settings** — Navigate to settings
+
+### Using Command Palette
+
+1. Press `Ctrl+K` (Mac: `Cmd+K`)
+2. Start typing to search
+3. Filter by thread name, action, or navigation
+4. Use arrow keys to navigate results
+5. Press Enter to execute
+
+**Navigation inside the palette:**
+- **Arrow Up/Down**: Navigate through results
+- **Enter**: Execute selected command
+- **Escape**: Close palette
+- **Tab**: Navigate between groups
+
+**Features:**
+- Real-time search filtering
+- Grouped results (Navigation, Thread Actions, Active Threads, Archived Threads)
+- Current thread indicator
+- Quick thread actions (branch, pin, archive, delete)
+
+### Power User Tips
+
+**Common patterns:**
+- `Ctrl+K` → Type thread name → Enter (switch thread)
+- `Ctrl+K` → Type "new" → Enter (create thread)
+- `Ctrl+K` → Type "settings" → Enter (go to settings)
+- `Ctrl+K` → Type thread name → Archive/Delete actions
+
+## Customization
+
+Some shortcuts can be rebound at **Settings → App → Keyboard Shortcuts**:
+
+| Customizable | Fixed |
+|---|---|
+| New Chat | Arrow Up / Down, Home, End |
+| New Temporary Chat | Audio recording |
+| Search | Thread actions (palette-driven) |
+| Left sidebar | |
+| Right sidebar | |
+| Help | |
+| Escape | |
+
+To change one:
+
+1. Navigate to **Settings → App → Keyboard Shortcuts**
+2. Click the shortcut you want to change
+3. Press the new key combination
+4. Save
+
+You can reset an individual shortcut, or reset all of them back to their
+defaults.
+
+## Slash Commands
+
+Slash commands are typed in the composer rather than being key combinations:
+
+- `/model` — switch the AI model
+- `/prompt` — insert a saved prompt
+- `/skill-name` — invoke a custom skill
+
+See [Chat](/docs/chat#slash-commands) and [Skills](/docs/skills).
+
+## Platform Differences
+
+### Windows/Linux
+
+- Use the `Ctrl` key for shortcuts
+
+### macOS
+
+- Use the `Cmd` key for shortcuts
+
+## Troubleshooting
+
+**Issue**: Shortcut not working
+- **Solution**: Check whether you're in a text input field — shortcuts are disabled while typing
+- **Solution**: Check whether it is one of the four palette-only thread actions above
+- **Solution**: Ensure no browser extension is intercepting the combination
+
+**Issue**: Shortcut conflicts with the browser
+- **Solution**: Rebind it in Settings → App → Keyboard Shortcuts, if it is one of the customizable ones
+
+**Issue**: Can't remember shortcuts
+- **Solution**: Press `Ctrl+/` (Mac: `Cmd+/`) to see the help overlay
+
+## Related Features
+
+- [Settings](/docs/settings) - Customize shortcuts
+- [Chat](/docs/chat) - Thread management

@@ -1,0 +1,23 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "incremental": false,
+        "composite": false,
+        "jsx": "react-jsx",
+        "moduleResolution": "bundler",
+        "paths": {
+            "@/*": ["./src/*"],
+            "@ui/*": ["../../packages/ui/src/*"],
+            "fumadocs-mdx:collections/server": ["./.source/server.ts"],
+            "fumadocs-mdx:collections/browser": ["./.source/browser.ts"]
+        },
+        "types": ["vite/client", "@vitest/browser/matchers", "vitest/globals"],
+        "allowImportingTsExtensions": true,
+        "declaration": false,
+        "declarationMap": false,
+        "emitDeclarationOnly": false,
+        "noEmit": true
+    },
+    "include": ["**/*.ts", "**/*.tsx", "eslint.config.js", "prettier.config.js", "vite.config.js", "@vitest/browser/providers/webdriverio", ".source/**/*.ts"],
+    "exclude": ["**/*.md", "**/*.json"]
+}

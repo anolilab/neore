@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "noEmit": true,
+        "incremental": false,
+        "lib": ["ES2023"],
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "resolveJsonModule": true,
+        "types": ["node"]
+    },
+    "files": ["alchemy.run.ts", "scripts/worker-bundle.ts"]
+}

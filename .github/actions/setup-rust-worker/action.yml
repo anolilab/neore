@@ -1,0 +1,27 @@
+name: "Setup Rust Worker toolchain"
+description: >-
+    Rust stable with the wasm32-unknown-unknown target and worker-build, for
+    services/document-parser (a workers-rs Worker). worker-build downloads
+    wasm-bindgen, wasm-opt and esbuild itself on first use. The cargo registry,
+    the service's target/ and ~/.cargo/bin (worker-build) are cached.
+
+runs:
+    using: "composite"
+    steps:
+        - name: "Install Rust (stable + wasm32)"
+          uses: "dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87" # stable
+          with:
+              targets: "wasm32-unknown-unknown"
+
+        - name: "Cache Rust build"
+          uses: "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6" # v2.9.2
+          with:
+              workspaces: "services/document-parser -> target"
+              # ~/.cargo/bin, so worker-build below is restored rather than compiled.
+              cache-bin: "true"
+
+        # Pinned: `scripts/build.mjs`, Cargo.toml's `worker` crate and the
+        # docs name 0.8.7. A no-op when the cache restored this exact version.
+        - name: "Install worker-build"
+          shell: "bash"
+          run: "cargo install worker-build --version 0.8.7 --locked"

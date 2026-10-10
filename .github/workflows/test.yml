@@ -1,0 +1,435 @@
+# https://help.github.com/en/categories/automating-your-workflow-with-github-actions
+
+name: "Tests"
+
+on: # yamllint disable-line rule:truthy
+    # eslint-disable-next-line yml/no-empty-mapping-value
+    pull_request: # yamllint disable-line rule:empty-values
+        types: ["opened", "synchronize", "reopened"]
+    merge_group: # yamllint disable-line rule:empty-values
+
+concurrency:
+    group: "${{ github.workflow }}-${{ github.ref }}"
+    cancel-in-progress: true
+
+permissions:
+    contents: "read" # to fetch code (actions/checkout)
+
+env:
+    HEAD_REF: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}"
+    HEAD_REPOSITORY: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+    VIS_BASE: "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}"
+    VIS_HEAD: "${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}"
+
+jobs:
+    files-changed:
+        name: "Detect what files changed"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 3
+        # `dorny/paths-filter` resolves a PR's file list through the REST API
+        # (`GET /repos/{owner}/{repo}/pulls/{n}/files`), not from the git diff, so
+        # `contents: read` alone is not enough — the call comes back
+        # `Resource not accessible by integration` and the job fails before any
+        # test runs. Granted per-job rather than at workflow level so the other
+        # jobs keep the minimal default above.
+        permissions:
+            contents: "read"
+            pull-requests: "read"
+        outputs:
+            packages: "${{ steps.changes.outputs.packages }}"
+            codecov: "${{ steps.changes.outputs.codecov }}"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              env:
+                  GIT_COMMITTER_NAME: "GitHub Actions Shell"
+                  GIT_AUTHOR_NAME: "GitHub Actions Shell"
+                  EMAIL: "github-actions[bot]@users.noreply.github.com"
+
+            - name: "Check for file changes"
+              uses: "dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d" # v4.0.1
+              id: "changes"
+              with:
+                  token: "${{ github.token }}"
+                  filters: ".github/file-filters.yml"
+
+    test:
+        name: >-
+            Test (node-${{ matrix.node_version }}, ${{ matrix.os }}${{ matrix.deno_version && format(', deno {0}', matrix.deno_version) || '' }}${{ matrix.bun_version && format(', bun {0}', matrix.bun_version) || '' }})
+        if: "needs.files-changed.outputs.packages == 'true'"
+        needs: "files-changed"
+        strategy:
+            max-parallel: 4
+            matrix:
+                include:
+                    - os: "ubuntu-latest"
+                      node_version: "22"
+                    - os: "ubuntu-latest"
+                      node_version: "24"
+                    - os: "ubuntu-latest"
+                      node_version: "25"
+                    - os: "macos-latest"
+                      node_version: "22"
+                    - os: "windows-latest"
+                      node_version: "22"
+                    - os: "ubuntu-latest"
+                      node_version: "22"
+                      bun_version: "latest"
+                    - os: "ubuntu-latest"
+                      node_version: "22"
+                      deno_version: "lts"
+            fail-fast: false
+        runs-on: "${{ matrix.os }}"
+        env:
+            # Surfaced as env because the `secrets` context is not available in a
+            # step-level `if:` — see the codecov step below.
+            CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
+            NODE: "${{ matrix.node_version }}"
+            MATRIX_OS: "${{ matrix.os }}"
+            MATRIX_NODE: "${{ matrix.node_version }}"
+            MATRIX_DENO: "${{ matrix.deno_version }}"
+            MATRIX_BUN: "${{ matrix.bun_version }}"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout ${{ env.HEAD_REPOSITORY }}:${{ env.HEAD_REF }}"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              env:
+                  GIT_COMMITTER_NAME: "GitHub Actions Shell"
+                  GIT_AUTHOR_NAME: "GitHub Actions Shell"
+                  EMAIL: "github-actions[bot]@users.noreply.github.com"
+              with:
+                  fetch-depth: 0
+
+            - name: "Setup resources and environment"
+              id: "setup"
+              uses: "anolilab/workflows/step/setup@main"
+              with:
+                  node-version: "${{ matrix.node_version }}"
+                  # The setup action installs `npm@latest` by default, and npm 12
+                  # declares `node: ^22.22.2 || ^24.15.0 || >=26.0.0` — which
+                  # excludes 25. On that leg the global install aborts with
+                  # EBADENGINE and the job dies before a single test runs. Node 25
+                  # ships npm 11.12.1, which is fine, so just skip the upgrade
+                  # there rather than dropping the newest runtime from the matrix.
+                  upgrade-npm-version: "${{ matrix.node_version != '25' }}"
+                  install-bun: "matrix.os == 'ubuntu-latest'"
+                  skip-playwright: "(matrix.node_version != 22 && matrix.os != 'ubuntu-latest') || (matrix.node_version != 22 && matrix.os != 'macos-latest')"
+
+            - name: "Setup Deno"
+              if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && matrix.deno_version"
+              uses: "denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282" # v2.0.4
+              with:
+                  deno-version: "${{ matrix.deno_version }}"
+                  # `cache: true` makes the action save `DENO_DIR` in a post-job
+                  # step — but nothing in this job ever invokes deno (the test
+                  # command is `vis affected test`, which runs vitest under node),
+                  # so that directory is never created and the save fails the job
+                  # AFTER every test has passed:
+                  #   Error: Path Validation Error: Path(s) specified in the action
+                  #   for caching do(es) not exist, hence no cache is being saved.
+                  # There is nothing to cache until this leg actually runs
+                  # something under deno.
+                  cache: false
+
+            - name: "Setup Bun"
+              if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && matrix.bun_version"
+              uses: "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6" # v2.2.0
+              with:
+                  bun-version: "${{ matrix.bun_version }}"
+
+            # services/document-parser is a Rust Worker: its `build:worker`
+            # (which `test` depends on, and `lunora dev` runs on start) needs
+            # rustc + wasm32 + worker-build.
+            - name: "Setup Rust Worker toolchain"
+              uses: "./.github/actions/setup-rust-worker"
+
+            # Build it ONCE, up front, as the E2E job does. Otherwise several test
+            # suites start wrangler with its `build.command` at the same time, each
+            # triggers a cold ~6 min worker-build, and all but the first time out on
+            # its lock ("Timed out waiting for concurrent worker-build to finish").
+            # Later runs skip the build because `build/` is newer than the sources.
+            - name: "Build the document-parser Worker"
+              shell: "bash"
+              run: "pnpm --filter document-parser run build:worker"
+
+            - name: "Build affected packages"
+              shell: "bash"
+              env:
+                  # Same fix, same reason as `deploy.yml`'s "Build app" step: this
+                  # is a private repo, so the runner is 2-core/7GB and Node sizes
+                  # its default old-space at ~2080MB. `@neore/web:build` dies there
+                  # with "FATAL ERROR: Ineffective mark-compacts near heap limit",
+                  # driven by the sourcemaps for the large code-split chunks
+                  # (univer-sheet-editor ~11MB, vendor-diagrams ~3.7MB).
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm exec vis affected build --base $VIS_BASE --head $VIS_HEAD --fail-fast"
+
+            - name: "Run tests (affected)"
+              shell: "bash"
+              run: |
+                  if [[ "$MATRIX_OS" == "ubuntu-latest" && "$MATRIX_NODE" == "22" && -z "$MATRIX_DENO" && -z "$MATRIX_BUN" ]]; then
+                      pnpm exec vis affected test:coverage --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
+                  else
+                      pnpm exec vis affected test --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
+                  fi
+
+            - name: "Install playwright in the needed packages"
+              shell: "bash"
+              if: "((matrix.os == 'ubuntu-latest' && matrix.node_version == 22) || (matrix.node_version == 22 && matrix.os == 'macos-latest')) && !matrix.deno_version && !matrix.bun_version"
+              run: |
+                  pnpm --filter "inspector" exec playwright install
+
+            - name: "Run chrome browser tests (affected)"
+              shell: "bash"
+              if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
+              run: "pnpm exec vis affected test:browser:chrome --base $VIS_BASE --head $VIS_HEAD --fail-fast"
+
+            - name: "Run firefox browser tests (affected)"
+              shell: "bash"
+              if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
+              run: "pnpm exec vis affected test:browser:firefox --base $VIS_BASE --head $VIS_HEAD --fail-fast"
+
+            - name: "Run webkit browser tests (affected)"
+              shell: "bash"
+              if: "matrix.os == 'macos-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
+              run: "pnpm exec vis affected test:browser:webkit --base $VIS_BASE --head $VIS_HEAD --fail-fast"
+
+            # Skipped when CODECOV_TOKEN is unavailable, which is the normal case
+            # for a pull_request from a fork — secrets are not exposed there, so
+            # the upload would fail for a reason that has nothing to do with the
+            # code under test.
+            #
+            # This is NOT what was failing the node-22 leg. That was the action's
+            # first step, `curl --fail-with-body --data-binary @codecov.yml`,
+            # which exited 26 because the repo had no `codecov.yml` — AFTER every
+            # test had already passed. The file now exists at the repo root and
+            # validates against codecov.io. Worth knowing if it regresses: the
+            # action gates that step on `if: inputs.run-lint`, and a non-empty
+            # string is truthy in an Actions expression — including the string
+            # "false" — so the `run-lint` input cannot turn it off, and gating the
+            # whole step is the only lever a caller has.
+            - name: "Upload code coverage to codecov"
+              if: "env.CODECOV_TOKEN != '' && matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
+              uses: "anolilab/workflows/step/codecov@main"
+              with:
+                  run-lint: "needs.files-changed.outputs.codecov == 'true'"
+                  codecov-token: "${{ secrets.CODECOV_TOKEN }}"
+                  use-affected: "true"
+                  exclude-affected-projects: "pail-bench,redact-bench,colorize-bench,inspector-bench,docs,storybook"
+
+    e2e:
+        name: "E2E (chromium)"
+        if: "needs.files-changed.outputs.packages == 'true'"
+        needs: "files-changed"
+        runs-on: "ubuntu-24.04"
+        env:
+            # `apps/web/src/lib/env.ts` declares these three as bare `z.url()` —
+            # NOT optional — so a missing one is a hard boot failure
+            # ("Invalid environment variables"), not a degraded mode. Locally they
+            # come from `apps/web/.env`, which only `scripts/dev-setup.js` writes;
+            # that script is interactive (readline) and so cannot run here, and
+            # nothing else created the file. The app dev server therefore never
+            # served `/models` and Playwright sat out its full 300s `webServer`
+            # timeout. Values mirror what dev-setup writes, and the ports match
+            # `playwright.config.ts` (APP 5173 / BACKEND 8788).
+            #
+            # VITE_LUNORA_URL must equal the backend's PUBLIC_ORIGIN or every
+            # bearer token verifies as anonymous with no error at all.
+            VITE_LUNORA_URL: "http://localhost:8788"
+            VITE_SITE_URL: "http://localhost:5173"
+            VITE_LLM_GATEWAY_URL: "http://localhost:5173/llm-gateway"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  fetch-depth: 0
+
+            - name: "Setup resources and environment"
+              id: "setup"
+              uses: "anolilab/workflows/step/setup@main"
+              with:
+                  node-version: "22"
+
+            # Playwright's first `webServer` is the backend, and `buildAuth(env)`
+            # refuses to start without a signing secret:
+            #
+            #   Error: AUTH_SECRET (or BETTER_AUTH_SECRET) is not set — refusing to
+            #   start rather than sign sessions with better-auth's public default key.
+            #
+            # `/api/health` then returns 500 forever, Playwright waits for a 2xx,
+            # and the job dies on `Timed out waiting 300000ms from config.webServer`
+            # — which reads like a slow boot rather than a missing binding.
+            # Reproduced locally by moving `backend/.dev.vars` aside.
+            #
+            # That file is gitignored and only `scripts/dev-setup.js` writes it,
+            # which is interactive (readline) and cannot run here. These are
+            # throwaway values generated per run: the e2e suite signs up real
+            # users against a local D1 that is discarded with the runner, so the
+            # secret only has to be a secret for the length of the job.
+            - name: "Write throwaway backend secrets for the e2e run"
+              shell: "bash"
+              run: |
+                  # Shared with the gateway's `.dev.vars` in the next step.
+                  GATEWAY_SECRET="$(openssl rand -hex 32)"
+                  echo "GATEWAY_SECRET=$GATEWAY_SECRET" >> "$GITHUB_ENV"
+                  {
+                      # `ENVIRONMENT` is load-bearing, not decoration: `parseEnv()`
+                      # in `lunora/lib/env-validation.ts` picks
+                      # `developmentEnvSchema` only when it is exactly
+                      # "development", and that variant is what turns the service,
+                      # AI-provider and tool-API groups into optional-with-default.
+                      # Without it the strict schema applies and the worker demands
+                      # all 37 keys (R2, Resend, every provider token) before it
+                      # will answer a request.
+                      echo "ENVIRONMENT=\"development\""
+
+                      # The rest of `coreEnvSchema`, which stays required either
+                      # way. ADMIN and JWKS are plain `z.string().trim()` with no
+                      # `.min()`, so empty is valid — they just have to be PRESENT.
+                      echo "ADMIN=\"\""
+                      echo "JWKS=\"\""
+                      echo "SITE_URL=\"$VITE_SITE_URL\""
+
+                      # AUTH_SECRET is checked separately by `buildAuth()`, before
+                      # assertEnv ever runs. ENCRYPTION_KEY needs >= 32 chars;
+                      # base64 of 32 bytes is 44.
+                      echo "AUTH_SECRET=\"$(openssl rand -hex 32)\""
+                      echo "BETTER_AUTH_SECRET=\"$(openssl rand -hex 32)\""
+                      echo "ENCRYPTION_KEY=\"$(openssl rand -base64 32)\""
+                      echo "CONNECTOR_ENCRYPTION_KEY=\"$(openssl rand -hex 32)\""
+                      # Signs storage download URLs; without it every signed download 500s.
+                      echo "STORAGE_SIGNING_SECRET=\"$(openssl rand -hex 32)\""
+                      # Unlocks `POST /e2e/invitations`, which `apps/web/e2e/seed.ts`
+                      # seeds through; the suite reads it back from this file.
+                      echo "E2E_SEED_TOKEN=\"$(openssl rand -hex 32)\""
+
+                      # Loopback origins. They cannot live in wrangler.jsonc
+                      # (`lunora build` blocks on loopback addresses there), and
+                      # `requirePublicOrigin` in `src/server.ts` fails every request
+                      # without PUBLIC_ORIGIN. LUNORA_ORIGIN_URL is what the
+                      # SchedulerDO calls back on; both must equal the dev port.
+                      echo "PUBLIC_ORIGIN=\"http://localhost:8788\""
+                      echo "LUNORA_ORIGIN_URL=\"http://localhost:8788\""
+
+                      # Every model call goes through the LLM gateway — over the
+                      # `SERVICE_LLM_GATEWAY` binding, to the copy `lunora dev`
+                      # runs inside the backend's session (no URL). The secret is
+                      # the gateway -> backend direction (chunk polling, usage
+                      # reports, stream tokens): both ends equal, or a 401.
+                      echo "LLM_GATEWAY_SIGNING_SECRET=\"$GATEWAY_SECRET\""
+                  } > backend/.dev.vars
+
+            # The gateway runs the deterministic mock model (`MOCK_LLM=1`, see
+            # `services/llm-gateway/src/providers/mock-model.ts`), so the chat
+            # specs need no provider key and assert on exact replies. The flag is
+            # refused when NODE_ENV is production — it fails every request.
+            - name: "Write the LLM gateway's dev vars (mock model)"
+              shell: "bash"
+              run: |
+                  {
+                      echo "NODE_ENV=\"development\""
+                      echo "MOCK_LLM=\"1\""
+                      echo "SIGNING_SECRET=\"$GATEWAY_SECRET\""
+                      echo "LUNORA_URL=\"http://localhost:8788\""
+                      echo "ALLOWED_ORIGINS=\"$VITE_SITE_URL\""
+                  } > services/llm-gateway/.dev.vars
+                  # Usage tracking and provider health write to D1 after every
+                  # call; an unmigrated local database only logs, but migrate so
+                  # the run reads like a real one. Twice: the public gateway on
+                  # :8787 (the browser's `/v1/*`, Playwright's second webServer)
+                  # and the binding target inside the backend's `lunora dev`
+                  # session, which persists to the backend's state directory.
+                  pnpm --filter llm-gateway exec wrangler d1 migrations apply llm-gateway-usage-dev --local
+                  pnpm --filter llm-gateway exec wrangler d1 migrations apply llm-gateway-usage-dev --local --persist-to ../../backend/.wrangler/state
+
+            - name: "Build workspace packages"
+              shell: "bash"
+              run: "pnpm run build:packages"
+
+            # The backend's `lunora dev` session runs services/document-parser,
+            # a Rust Worker, and builds it on start. Built up front so a
+            # toolchain problem fails here, named, not as a backend that never
+            # comes up inside Playwright's webServer timeout.
+            - name: "Setup Rust Worker toolchain"
+              uses: "./.github/actions/setup-rust-worker"
+
+            - name: "Build the document-parser Worker"
+              shell: "bash"
+              run: "pnpm --filter document-parser run build:worker"
+
+            # `apps/web/.source` holds the `fumadocs-mdx:collections/*` virtual
+            # modules and is gitignored, so a fresh checkout has none. `vite build`
+            # is fine — the mdx plugin generates them during the build — but
+            # `vite dev` is not: the dependency SCAN runs before the plugin, so it
+            # reports
+            #
+            #   Failed to run dependency scan. Skipping dependency pre-bundling.
+            #   fumadocs-mdx:collections/browser (imported by src/routes/docs/$.tsx)
+            #
+            # and that "Skipping" is the part that matters — without pre-bundling
+            # React is no longer deduped to one instance, SSR dies on
+            # "Invalid hook call", the dev server goes down, and all 26 e2e tests
+            # fail with ERR_CONNECTION_REFUSED at localhost:5173. Generating up
+            # front costs ~3ms and is deterministic.
+            - name: "Generate fumadocs sources"
+              shell: "bash"
+              run: "pnpm --filter @neore/web exec fumadocs-mdx"
+
+            - name: "Install Chromium"
+              shell: "bash"
+              run: "pnpm --filter @neore/web exec playwright install --with-deps chromium"
+
+            # Playwright's webServer starts the Lunora backend and the app itself.
+            # No TURNSTILE_SECRET_KEY is set here, so better-auth loads without the
+            # captcha plugin and the credential flows are exercised for real; a
+            # runner that does set it would skip them with a reason rather than
+            # time out twelve times over.
+            - name: "Run e2e tests"
+              shell: "bash"
+              run: "pnpm --filter @neore/web run test:e2e"
+
+            - name: "Upload the Playwright report"
+              if: "!cancelled()"
+              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              with:
+                  # `.report` is a DOTTED directory and `upload-artifact` skips
+                  # hidden files unless told otherwise, so every run so far
+                  # uploaded nothing:
+                  #   No files were found with the provided path:
+                  #   apps/web/e2e/.report. No artifacts will be uploaded.
+                  # The step still reported success, so the report was silently
+                  # missing exactly when a failing run needed it.
+                  include-hidden-files: "true"
+                  name: "playwright-report"
+                  path: "apps/web/e2e/.report"
+                  retention-days: 7
+
+    test-required-check:
+        needs: ["files-changed", "test", "e2e"]
+        name: "Check Test Run"
+        if: "always() && (needs.test.result == 'success' || needs.test.result == 'skipped') && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped')"
+        runs-on: "ubuntu-24.04"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Check for failures"
+              if: "contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')"
+              run: |
+                  echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1

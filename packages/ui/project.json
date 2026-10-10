@@ -1,0 +1,8 @@
+{
+    "name": "@neore/ui",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "packages/ui/src",
+    "projectType": "library",
+    "tags": ["type:package"],
+    "implicitDependencies": []
+}

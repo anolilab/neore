@@ -1,0 +1,25 @@
+{
+    "name": "llm-gateway",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "services/llm-gateway/src",
+    "projectType": "service",
+    "tags": ["chat", "llm-gateway", "type:service"],
+    "implicitDependencies": [],
+    "targets": {
+        "dev": {
+            "//": "The PUBLIC gateway on :8787 — what the browser's `/v1/*` reaches (through the web app's `/llm-gateway` proxy). The backend does NOT call this one: its `SERVICE_LLM_GATEWAY` binding resolves to the copy `lunora dev` runs inside the backend's own session (`backend/lunora.config.ts`). So two gateways run in dev, each with its own local KV/D1 state.",
+            "command": "pnpm dev",
+            "preset": "server",
+            "options": {
+                "service": {
+                    "port": 8787,
+                    "readiness": {
+                        "tcp": {
+                            "port": 8787
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,329 @@
+---
+title: Devices
+description: Let the assistant use shared folders, a shell and local MCP servers on your own computer through the Neore desktop app
+---
+
+# Devices
+
+With the Neore desktop app, the assistant can work on your own
+computer: read and write files in folders you share, run shell
+commands, and use MCP servers that run locally. Your computer becomes
+a **device** paired to your account.
+
+Nothing runs silently. Every action is shown to you in a window on
+that computer, and it runs only after you allow it there. The web page
+can pass requests to your computer, but it cannot approve them, and
+neither can Neore's servers.
+
+> **Note:** Devices need the desktop app on macOS, Windows or Linux.
+> A browser tab cannot be paired, and the mobile apps do not support
+> devices.
+
+## Quick start
+
+1. Open Neore in the desktop app and go to **Settings → Chat →
+   Devices**
+2. Click **Use this computer for agent tools**
+3. A window titled **Pair this computer?** opens on your computer.
+   Click **Pair** to confirm
+4. The desktop app's own settings window opens. Under **Shared
+   folders**, click **Choose folder…** and pick the folders the
+   assistant may use
+5. Start a new chat and ask the assistant to do something with those
+   files, for example _"List the Markdown files in my notes folder"_
+6. When the approval window appears, check what will run and click
+   **Allow once**
+
+## What the assistant can do on a device
+
+| Tool                   | What it does                                                          |
+| ---------------------- | --------------------------------------------------------------------- |
+| `fs_list`              | Lists the contents of a shared folder                                 |
+| `fs_read`              | Reads a file in a shared folder                                       |
+| `fs_write`             | Writes a file in a shared folder                                      |
+| `shell_run`            | Runs a shell command, with a shared folder as its working folder      |
+| Local MCP server tools | Any tool offered by an MCP server you added in the desktop app        |
+
+File tools and shell commands only reach the folders you shared.
+Paths are checked after resolving shortcuts and symbolic links, so a
+path with `..` or a link that points outside a shared folder is
+refused. If you have not shared any folder, the file and shell tools
+are not offered at all.
+
+## Following an action in the chat
+
+In the chat, a device action appears as a tool card showing the tool
+name (for example `shell_run`) and a badge with your device's name.
+Click the card's header to see the input and the output. A status
+line under the header shows where the action is:
+
+| Status                                     | Meaning                                                                 |
+| ------------------------------------------ | ----------------------------------------------------------------------- |
+| **Waiting for _device_ to pick this up…**  | The request was sent; the desktop app has not taken it yet             |
+| **Sent to _device_…**                      | The desktop app has taken the request                                   |
+| **Waiting for approval on _device_**       | The approval window is showing the request on your computer            |
+| **Running on _device_…**                   | You allowed it (or an "Always allow" rule did), and it is running      |
+| **Done on _device_**                       | It finished. A shell command that exits with an error still counts as done; the error is in the output |
+| **Denied on _device_**                     | You clicked **Deny**, let the countdown run out, or closed the approval window |
+| **Expired — _device_ didn't answer**       | The desktop app did not pick it up within 20 seconds (for example because it was closed), no result came back within five minutes, you pressed Stop, or the device was removed |
+| **Failed on _device_**                     | The action could not run — for example a path outside your shared folders, a shell command that ran out of time, or the device was busy |
+
+_device_ is the name of your device, or "your computer" while it is
+not known yet.
+
+## Pairing a computer
+
+Pairing happens in two places, on purpose:
+
+1. In the web app, **Settings → Chat → Devices** registers the
+   computer with your account. The button is
+   **Use this computer for agent tools** and only appears inside the
+   desktop app. Guest accounts cannot pair a device.
+2. On the computer itself, the desktop app asks
+   **Pair this computer?** and names the Neore account that wants to
+   use it. Pairing only lets the assistant _ask_; nothing runs yet.
+   Click **Pair** to confirm, or **Cancel** to stop.
+
+If you cancel on the computer, the web app removes the half-finished
+pairing and tells you **Pairing was cancelled on this computer.**
+
+You can pair up to 10 devices. Each one is listed with its name,
+whether it is **Online** or **Offline**, and the tools it offers. A
+device counts as online while the desktop app is open; when it is
+closed, its tools are simply not offered to the assistant. To rename
+a device, edit its name in the list.
+
+## Approving actions
+
+Every action the assistant wants to take on your computer opens the
+approval window on that computer, titled with the tool's name — for example
+**Allow "fs_read"?**. It shows:
+
+- the chat the request came from
+- what will happen — the resolved file path, or the exact command
+  and the folder it runs in
+- the **Exact input** the assistant sent
+- a countdown: **Denied automatically in … s**
+
+You then choose one of:
+
+| Button                     | Effect                                                 |
+| -------------------------- | ------------------------------------------------------ |
+| **Deny**                   | The action does not run; the assistant is told so      |
+| **Allow once**             | This one action runs                                   |
+| **Always allow this tool** | This action runs, and future calls of this tool on this device run without asking |
+
+The buttons stay disabled for a moment after the window appears, so
+a click meant for another window cannot approve anything by accident.
+Closing the window denies every request that is waiting. A request
+you do not answer within five minutes is denied.
+
+### When "Always allow" is not offered
+
+**Always allow this tool** is never offered for:
+
+- **Shell commands and file writes** (`shell_run`, `fs_write`) —
+  these always ask
+- **Requests that follow outside content** — when the assistant has
+  read something earlier in the chat that you did not write yourself:
+  web pages or search results, knowledge-base search results, results
+  from MCP or connector tools, the output of an earlier action on
+  your computer, or files attached to the chat
+
+Text from those sources can try to steer the assistant. So such a
+request shows a warning — _"This request follows content from outside
+(…). Text there can try to steer the agent — check exactly what will
+run before allowing it."_ — and it asks you **even if you already
+always-allowed the tool**.
+
+### Managing always-allowed tools
+
+The desktop app's settings window lists your rules under **Always
+allowed**. Click **Remove** next to a rule to make that tool ask
+again. Rules are stored only on your computer and are cleared
+whenever the computer is paired again.
+
+## Shared folders and local MCP servers
+
+Both are managed only in the desktop app's own settings window — never
+from the web page. Open it from **Settings → Chat → Devices** with
+**Shared folders and local servers…**.
+
+**Shared folders**
+
+- Click **Choose folder…** to pick a folder, or type a path and click
+  **Add**
+- Click **Remove** next to a folder to stop sharing it
+
+**Local MCP servers**
+
+Add an MCP server that runs on your computer over standard input and
+output:
+
+1. Enter a **Name** and the **Command** (for example `npx`)
+2. Enter the **Arguments, one per line** and, if needed, the
+   **Environment, one KEY=value per line**
+3. Click **Add server**
+4. Confirm the exact command line the app shows you
+
+The server starts the first time the assistant uses one of its tools
+and stops after 10 idle minutes or when you quit the app. Only add
+commands you trust — local MCP servers are **not sandboxed** and run
+with your full access to the computer.
+
+## Shell sandbox
+
+On macOS and Linux, shell commands run inside an operating-system
+sandbox. A sandboxed command:
+
+- can change files **only in your shared folders**, plus a private
+  temporary folder for that run, which is deleted afterwards
+- can read your shared folders, the system folders and common
+  toolchain folders in your home folder (for example `~/.cargo/bin`,
+  `~/.nvm`, `~/.pyenv`, `~/.local/bin`, `~/go/bin`), and nothing else
+- **cannot see the rest of your home folder** — not `~/.ssh`,
+  `~/.config`, `~/.gitconfig`, other dotfiles or your documents. On
+  macOS, file names and sizes there stay visible, but not their
+  contents
+- **can still use the network** — network access is not restricted
+
+Because the home folder is hidden, some tools behave differently
+inside the sandbox:
+
+- Git warns that it cannot read `~/.gitconfig`.
+- Package managers (npm, yarn, bun, pip, uv, Go) work, but their
+  caches go to the run's private temporary folder, so they download
+  fresh every run. If your own environment already points a cache
+  into a shared folder, that is kept and the cache carries over.
+- Tools that write anywhere else in your home folder (dotfiles,
+  `~/.config`) fail.
+
+| System  | Sandbox                                                      |
+| ------- | ------------------------------------------------------------ |
+| Linux   | Landlock — needs kernel 5.13 or later with Landlock enabled  |
+| macOS   | The built-in `sandbox-exec`                                  |
+| Windows | None. Commands are stopped together with everything they started when the run ends, and capped at 4 GB of memory |
+
+**Require sandbox for shell commands**
+
+This checkbox, under **Shell sandbox** in the desktop app's settings
+window, is **on by default**. It decides what happens on a computer
+without a sandbox (Windows, or Linux without Landlock):
+
+- **On** — shell commands are refused before you are even asked. The
+  assistant is told to turn the setting off to run them without a
+  sandbox.
+- **Off** — shell commands are offered for approval as usual and run
+  with your full access. Turning it off asks you to confirm first.
+
+The line under the checkbox tells you which case applies on this
+computer — either that commands are confined to the shared folders,
+or **Not available on this computer** with the reason.
+
+The approval window also shows it for every shell command: it starts
+with either **Sandboxed** and what the command can reach, or
+**NOT sandboxed** as a warning that the command would run with your
+full access to the computer. The web app cannot change this setting.
+
+## Limits
+
+| Limit                                          | Value           |
+| ---------------------------------------------- | --------------- |
+| Open requests per device (waiting or running)  | 3               |
+| Device actions per assistant reply             | 20              |
+| Device actions per minute, across your devices | 60              |
+| Time to approve and finish an action           | 5 minutes       |
+| Shell command run time                         | 60 seconds by default, at most 10 minutes |
+| Output returned to the assistant               | 64 KB           |
+| Largest file read                              | 1 MB            |
+| Paired devices per account                     | 10              |
+
+When a device already has three requests waiting, the assistant is
+told the device is busy and to wait for your answer. If the desktop
+app does not pick up a request within 20 seconds, the assistant is
+told the device is offline.
+
+Device actions cost nothing extra: you pay only for the assistant's
+reply, as in any chat.
+
+## Where devices work
+
+Device tools are only offered in **your own private chats**, while
+you are in the chat. They are never offered in:
+
+- chats you share with others, group chats, or public chats — not
+  even your own devices in someone else's chat
+- messenger conversations (Telegram, Slack, Discord and others)
+- triggers, tasks, evals, sub-agents, workflows and other background
+  runs
+
+This keeps other people's text, and runs nobody is watching, away
+from your computer.
+
+## Activity
+
+**Settings → Chat → Devices → Device activity** lists what the
+assistant asked your devices to do in the last 30 days: the tool, the
+device, the status (**Sent**, **Waiting for approval**, **Done**,
+**Denied**, **Expired**, **Failed**), the input and the output.
+Requests that followed outside content are marked
+**After outside content**.
+
+The desktop app keeps its own log of every decision, shown under
+**Recent activity** in its settings window, with the path of the full
+log file.
+
+## Removing a device
+
+You can end a pairing from either side:
+
+- **From the web** — click **Remove** next to the device in
+  **Settings → Chat → Devices**. This works from any browser, so use
+  it if you lose a laptop. Waiting requests are cancelled and nothing
+  new can be sent to it. Its activity log stays until it expires.
+- **From the computer** — click **Unpair this computer** in the
+  desktop app's settings window.
+
+## Troubleshooting
+
+**Issue:** The **Use this computer for agent tools** button is missing
+- **Solution:** Pairing only works in the desktop app. In a browser,
+  the page shows the devices you paired before.
+- **Solution:** Guest accounts cannot pair a device. Sign up first.
+
+**Issue:** The assistant does not use my computer
+- **Solution:** Check that the device shows **Online** — the desktop
+  app must be open.
+- **Solution:** Check that you are in your own private chat, not a
+  shared or group chat.
+- **Solution:** Share at least one folder; without one, the file and
+  shell tools are not offered.
+
+**Issue:** Shell commands are refused with "shell commands must run
+sandboxed"
+- **Solution:** This computer has no sandbox (Windows, or Linux
+  without Landlock) and **Require sandbox for shell commands** is on.
+  Turn it off in the desktop app's settings window only if you are
+  comfortable approving commands that run with your full access.
+
+**Issue:** A command fails inside the sandbox because it cannot read
+or write something in the home folder
+- **Solution:** The sandbox hides the home folder outside your shared
+  folders and toolchain folders. Share the folder the command needs.
+  To keep a package manager's cache between runs, point it at a
+  shared folder in your environment.
+
+**Issue:** The assistant says the device is busy
+- **Solution:** Answer or deny the requests waiting in the approval
+  window. A device holds at most three at a time.
+
+**Issue:** An action was denied although I did not click anything
+- **Solution:** Requests are denied when the countdown runs out or
+  when you close the approval window.
+
+## Related features
+
+- [MCP Servers](/docs/mcp) — Connect remote MCP servers
+- [AI Tools](/docs/tools) — Built-in tools the assistant can use
+- [Settings](/docs/settings) — Account and app configuration
+- [Privacy & GDPR](/docs/privacy) — Data export and account deletion

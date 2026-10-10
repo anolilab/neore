@@ -1,0 +1,501 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    /* Custom viewport height for framer */
+    --framer-viewport-height: 400px;
+
+    --font-sans:
+        "Geist Variable", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+        "Helvetica Neue", sans-serif;
+    --font-mono: "Geist Mono Variable", "Geist Mono", source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+    --font-pixel-square: "Geist Pixel Square", "Geist Mono Variable", monospace;
+    --font-pixel-grid: "Geist Pixel Grid", "Geist Mono Variable", monospace;
+    --font-pixel-circle: "Geist Pixel Circle", "Geist Mono Variable", monospace;
+    --font-pixel-triangle: "Geist Pixel Triangle", "Geist Mono Variable", monospace;
+    --font-pixel-line: "Geist Pixel Line", "Geist Mono Variable", monospace;
+}
+
+:root {
+    /* ── Brand palette ─────────────────────────────────────── */
+    --brand-lime: #caff00; /* Electric Lime Surge */
+    --brand-chartreuse: #baea01; /* Solar Chartreuse */
+    --brand-white: #ffffff; /* Pure Ice White */
+    --brand-frost: #f2f2f2; /* Frosted Mist */
+    --brand-silver: #d8d8d8; /* Silver Veil */
+    --brand-cloud: #cccccc; /* Urban Cloud */
+    --brand-steel: #c2c2c2; /* Steel Mist */
+    --brand-graphite: #636363; /* Graphite Ash – WCAG AA 5.4:1 on #f2f2f2 */
+    --brand-iron: #3c3c3c; /* Iron Smoke */
+    --brand-charcoal: #212121; /* Deep Charcoal */
+    --brand-obsidian: #191919; /* Obsidian Black */
+    --brand-black: #000000; /* Absolute Black */
+
+    /* ── Design tokens ─────────────────────────────────────── */
+    --radius: 0.625rem;
+    --background: var(--brand-frost);
+    --foreground: var(--brand-obsidian);
+    --card: var(--brand-white);
+    --card-foreground: var(--brand-obsidian);
+    --popover: var(--brand-white);
+    --popover-foreground: var(--brand-obsidian);
+    --primary: var(--brand-lime);
+    --primary-foreground: var(--brand-obsidian);
+    --secondary: var(--brand-frost);
+    --secondary-foreground: var(--brand-obsidian);
+    --muted: var(--brand-frost);
+    --muted-foreground: var(--brand-graphite);
+    --accent: var(--brand-frost);
+    --accent-foreground: var(--brand-obsidian);
+    --destructive: oklch(0.55 0.22 25); /* Red - better contrast */
+    --border: var(--brand-silver);
+    --input: var(--brand-silver);
+    --ring: var(--brand-graphite);
+    --chart-1: oklch(0.871 0.15 154.449);
+    --chart-2: oklch(0.723 0.219 149.579);
+    --chart-3: oklch(0.627 0.194 149.214);
+    --chart-4: oklch(0.527 0.154 150.069);
+    --chart-5: oklch(0.448 0.119 151.328);
+    --sidebar: var(--brand-white);
+    --sidebar-foreground: var(--brand-graphite);
+    --sidebar-primary: var(--brand-obsidian);
+    --sidebar-primary-foreground: var(--brand-white);
+    --sidebar-accent: var(--brand-frost);
+    --sidebar-accent-foreground: var(--brand-obsidian);
+    --sidebar-border: var(--brand-silver);
+    --sidebar-ring: var(--brand-graphite);
+
+    --destructive-foreground: var(--color-red-400);
+    --info: var(--color-blue-500);
+    --info-foreground: var(--color-blue-700);
+    --success: var(--color-emerald-500);
+    --success-foreground: var(--color-emerald-700);
+    --warning: oklch(0.7 0.18 65);
+    --warning-foreground: var(--color-amber-700);
+}
+
+.dark {
+    --background: var(--brand-charcoal);
+    --foreground: var(--brand-frost);
+    --card: var(--brand-charcoal);
+    --card-foreground: var(--brand-frost);
+    --popover: var(--brand-charcoal);
+    --popover-foreground: var(--brand-frost);
+    --primary: var(--brand-lime);
+    --primary-foreground: var(--brand-obsidian);
+    --secondary: var(--brand-iron);
+    --secondary-foreground: var(--brand-frost);
+    --muted: var(--brand-iron);
+    --muted-foreground: var(--brand-steel);
+    --accent: var(--brand-iron);
+    --accent-foreground: var(--brand-frost);
+    --destructive: oklch(0.65 0.2 25); /* Red - optimized for dark mode */
+    --border: oklch(1 0 0 / 6%);
+    --input: oklch(1 0 0 / 12%);
+    --ring: #8c8c8c; /* 4.8:1 on --brand-charcoal; graphite was 2.7:1, under WCAG 1.4.11's 3:1. Mirrored in apps/web accent-presets.ts */
+    --chart-1: oklch(0.871 0.15 154.449);
+    --chart-2: oklch(0.723 0.219 149.579);
+    --chart-3: oklch(0.627 0.194 149.214);
+    --chart-4: oklch(0.527 0.154 150.069);
+    --chart-5: oklch(0.448 0.119 151.328);
+    --sidebar: var(--brand-charcoal);
+    --sidebar-foreground: var(--brand-obsidian);
+    --sidebar-primary: var(--brand-frost);
+    --sidebar-primary-foreground: var(--brand-charcoal);
+    --sidebar-accent: var(--brand-iron);
+    --sidebar-accent-foreground: var(--brand-frost);
+    --sidebar-border: oklch(1 0 0 / 5%);
+    --sidebar-ring: oklch(0.5 0 0);
+
+    --destructive-foreground: var(--color-red-400);
+    --info: var(--color-blue-500);
+    --info-foreground: var(--color-blue-400);
+    --success: var(--color-emerald-500);
+    --success-foreground: var(--color-emerald-400);
+    --warning: oklch(0.75 0.16 65);
+    --warning-foreground: var(--color-amber-400);
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-site-header-background: var(--site-header-background);
+    --color-site-header-border: var(--site-header-border);
+
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+
+    /* ── Brand palette (Tailwind utilities) ──────────────── */
+    --color-brand-lime: var(--brand-lime);
+    --color-brand-chartreuse: var(--brand-chartreuse);
+    --color-brand-white: var(--brand-white);
+    --color-brand-frost: var(--brand-frost);
+    --color-brand-silver: var(--brand-silver);
+    --color-brand-cloud: var(--brand-cloud);
+    --color-brand-steel: var(--brand-steel);
+    --color-brand-graphite: var(--brand-graphite);
+    --color-brand-iron: var(--brand-iron);
+    --color-brand-charcoal: var(--brand-charcoal);
+    --color-brand-obsidian: var(--brand-obsidian);
+    --color-brand-black: var(--brand-black);
+
+    --shadow-complex: 0 10px 10px -5px #17171705, 0 6px 6px -3px #1717170a, 0 3px 3px -1.5px #1717170a, 0 1px 1px -0.5px #1717170a, 0 0 0 1px #17171705;
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+
+    body {
+        @apply bg-background text-foreground m-0 font-sans;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    code {
+        @apply font-mono;
+    }
+
+    button {
+        @apply cursor-pointer;
+    }
+
+    /* Custom scrollbar styles */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: oklch(0.7 0 0 / 0.3);
+        border-radius: 4px;
+        transition: background-color 0.2s ease-out;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: oklch(0.6 0 0 / 0.5);
+    }
+
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    /* Dark mode scrollbar */
+    .dark ::-webkit-scrollbar-thumb {
+        background: oklch(0.4 0 0 / 0.4);
+    }
+
+    .dark ::-webkit-scrollbar-thumb:hover {
+        background: oklch(0.5 0 0 / 0.6);
+    }
+
+    /* Firefox scrollbar */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: oklch(0.7 0 0 / 0.3) transparent;
+    }
+
+    .dark * {
+        scrollbar-color: oklch(0.4 0 0 / 0.4) transparent;
+    }
+
+    /* Hide scrollbar utility */
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+
+    /*
+     * Shiki writes the per-token values as inline styles on the generated markup.
+     * Declared here so the rules below reference known variables; each default
+     * reproduces what an undeclared variable already produced — an
+     * invalid-at-computed-value-time declaration resolves to `unset`, which is
+     * `inherit` for the inherited properties and `transparent` for the background.
+     */
+    :root {
+        --shiki-dark: inherit;
+        --shiki-dark-bg: transparent;
+        --shiki-dark-font-style: inherit;
+        --shiki-dark-font-weight: inherit;
+        --shiki-dark-text-decoration: inherit;
+    }
+
+    /* Shiki dual theme support for dark mode */
+    html.dark .shiki,
+    html.dark .shiki span {
+        color: var(--shiki-dark) !important;
+        background-color: var(--shiki-dark-bg) !important;
+        /* Optional font styles */
+        font-style: var(--shiki-dark-font-style) !important;
+        font-weight: var(--shiki-dark-font-weight) !important;
+        text-decoration: var(--shiki-dark-text-decoration) !important;
+    }
+}
+
+.prose {
+    @apply text-foreground max-w-[65ch];
+
+    & h1:not(.not-prose h1) {
+        @apply scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl;
+    }
+
+    & h2:not(.not-prose h2) {
+        @apply border-border mt-12 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0;
+    }
+
+    & h3:not(.not-prose h3) {
+        @apply mt-12 scroll-m-20 text-2xl font-semibold tracking-tight first:mt-0;
+    }
+
+    & h4:not(.not-prose h4) {
+        @apply mt-12 scroll-m-20 text-xl font-semibold tracking-tight first:mt-0;
+    }
+
+    & h5:not(.not-prose h5) {
+        @apply mt-12 scroll-m-20 text-lg font-semibold tracking-tight first:mt-0;
+    }
+
+    & h6:not(.not-prose h6) {
+        @apply mt-12 scroll-m-20 text-base font-semibold tracking-tight first:mt-0;
+    }
+
+    & h1:not(.not-prose h1),
+    & h2:not(.not-prose h2),
+    & h3:not(.not-prose h3),
+    & h4:not(.not-prose h4),
+    & h5:not(.not-prose h5),
+    & h6:not(.not-prose h6) {
+        & + p {
+            @apply mt-0;
+        }
+    }
+
+    & p:not(.not-prose p) {
+        @apply leading-[175%] [&:not(:first-child)]:mt-6;
+    }
+
+    & li:not(.not-prose li) {
+        @apply leading-[175%];
+    }
+
+    & a:not(.not-prose a) {
+        @apply text-primary font-medium underline underline-offset-4;
+    }
+
+    & blockquote:not(.not-prose blockquote) {
+        @apply border-border mt-6 border-l-2 pl-6 italic;
+    }
+
+    & table:not(.not-prose table) {
+        @apply my-6 w-full overflow-y-auto;
+
+        & thead tr {
+            @apply even:bg-muted border-border m-0 border-t p-0;
+        }
+
+        & th {
+            @apply border-border border px-4 py-2 text-left font-bold [&[align=center]]:text-center [&[align=right]]:text-right;
+        }
+
+        & tbody tr {
+            @apply even:bg-muted border-border m-0 border-t p-0;
+        }
+
+        & td {
+            @apply border-border border px-4 py-2 text-left [&[align=center]]:text-center [&[align=right]]:text-right;
+        }
+    }
+
+    & ul:not(.not-prose ul) {
+        @apply my-6 ml-6 list-disc [&>li]:mt-2;
+
+        & p {
+            @apply my-0 inline;
+        }
+    }
+
+    & ol:not(.not-prose ol) {
+        @apply my-6 ml-6 list-decimal [&>li]:mt-2;
+
+        & p {
+            @apply my-0 inline;
+        }
+    }
+
+    & pre:not(.not-prose pre) {
+        @apply bg-muted my-6 overflow-y-auto rounded-md p-4 text-sm;
+    }
+
+    & code:not(pre code):not(.not-prose code) {
+        @apply bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold;
+    }
+
+    & .lead:not(.not-prose .lead) {
+        @apply text-muted-foreground text-xl;
+    }
+
+    & .large:not(.not-prose .large) {
+        @apply text-lg font-semibold;
+    }
+
+    & .small:not(.not-prose .small) {
+        @apply text-sm leading-none font-medium;
+    }
+
+    & .muted:not(.not-prose .muted) {
+        @apply text-muted-foreground text-sm;
+    }
+
+    & img:not(.not-prose img),
+    & picture:not(.not-prose picture),
+    & video:not(.not-prose video) {
+        @apply my-6;
+    }
+
+    & picture > img:not(.not-prose picture > img) {
+        @apply my-0;
+    }
+
+    & kbd:not(.not-prose kbd) {
+        @apply bg-muted rounded-md px-1.5 py-0.5 text-xs font-semibold;
+    }
+
+    & hr {
+        @apply border-border my-10 border-t;
+    }
+
+    & dl:not(.not-prose dl) {
+        @apply my-6;
+
+        & dt {
+            @apply mt-6 font-semibold tracking-tight first:mt-0;
+        }
+    }
+
+    & details:not(.not-prose details) {
+        @apply mt-6;
+
+        & summary {
+            @apply mt-6 cursor-pointer font-semibold tracking-tight;
+        }
+
+        & p {
+            @apply [&:first-of-type]:mt-2;
+        }
+    }
+
+    & mark:not(.not-prose mark) {
+        @apply bg-warning/20 text-warning-foreground;
+    }
+
+    & small:not(.not-prose small) {
+        @apply text-xs leading-none;
+    }
+}
+
+/* ── Marketing button background animation ─────────────── */
+@keyframes move-background {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* ── Reduced motion ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+.prose.assistant-message {
+    & img:not(.not-prose img),
+    & picture:not(.not-prose picture),
+    & video:not(.not-prose video) {
+        @apply my-0;
+    }
+
+    & ul:not(.not-prose ul) {
+        @apply my-6 list-disc [&>li]:mt-2;
+
+        & p {
+            @apply my-0 inline;
+        }
+    }
+
+    & ol:not(.not-prose ol) {
+        @apply my-6 list-decimal [&>li]:mt-2;
+
+        & p {
+            @apply my-0 inline;
+        }
+    }
+
+    & div > p {
+        @apply my-0;
+    }
+}

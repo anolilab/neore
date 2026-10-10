@@ -1,0 +1,15 @@
+"package: ai":
+    - changed-files:
+          - any-glob-to-any-file: "packages/ai/**/*"
+"package: chat-ui":
+    - changed-files:
+          - any-glob-to-any-file: "packages/chat-ui/**/*"
+"package: service-sdk":
+    - changed-files:
+          - any-glob-to-any-file: "packages/service-sdk/**/*"
+"package: ui":
+    - changed-files:
+          - any-glob-to-any-file: "packages/ui/**/*"
+"documentation":
+    - changed-files:
+          - any-glob-to-any-file: "docs/**/*"

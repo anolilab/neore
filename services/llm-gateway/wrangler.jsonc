@@ -1,0 +1,152 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "llm-gateway",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-09-01",
+    "compatibility_flags": ["nodejs_compat_v2"],
+    // Smart Placement: keeps execution close to AI provider endpoints.
+    "placement": {
+        "mode": "smart"
+    },
+    "observability": {
+        "enabled": true
+    },
+    // Workers AI is declared per DEPLOY environment (`env.production` /
+    // `env.preview` below; `ai` is not inherited from the top level), NOT here.
+    // This Worker runs inside the backend's `lunora dev` session (a service
+    // binding, `backend/lunora.config.ts`), and wrangler treats an `ai` binding
+    // as always-remote: one in the shared session starts a remote-proxy session,
+    // which dies in any non-interactive shell without CLOUDFLARE_API_TOKEN and
+    // takes the backend down with it (`remote: false` is rejected for `ai`, and
+    // `lunora dev` passes no `--local`). Dev runs without AI, as `wrangler dev
+    // --local` did; the deploy is Alchemy's, which binds `AI` itself.
+    "vars": {
+        "APP_NAME": "llm-gateway",
+        "APP_VERSION": "1.0.0",
+        "NODE_ENV": "development",
+        "ALLOWED_ORIGINS": "http://localhost:3005,http://localhost:5173,http://localhost:4173"
+    },
+    // D1 database for usage tracking.
+    // NOTE: database_id is a placeholder for local dev — Alchemy manages the actual
+    // binding in alchemy.run.ts for preview/production deployments.
+    "d1_databases": [
+        {
+            "binding": "USAGE_DB",
+            "database_name": "llm-gateway-usage-dev",
+            "database_id": "llm-gateway-usage-local-dev"
+        }
+    ],
+    // KV namespaces: separate namespaces for rate limiting vs pricing/routing cache
+    // to avoid key collisions between `rl:*` and `pricing:*` prefixes.
+    // NOTE: id fields are placeholders for local dev — Alchemy manages the actual
+    // bindings in alchemy.run.ts for preview/production deployments.
+    "kv_namespaces": [
+        {
+            "binding": "RATE_LIMIT_KV",
+            "id": "rate-limit-kv-local-dev"
+        },
+        {
+            "binding": "PRICING_KV",
+            "id": "pricing-kv-local-dev"
+        },
+        // Used by the video producer (POST /v1/videos) to stash the resolved
+        // provider API key under `video_render_secret:{jobId}` so the queue
+        // message body never carries the raw key. Shared with the chat cache.
+        {
+            "binding": "CACHE_KV",
+            "id": "cache-kv-local-dev"
+        }
+    ],
+    // R2 bucket for video blobs (rendered output from /v1/videos jobs).
+    // bucket_name is a placeholder for local dev — Alchemy manages the actual
+    // binding in alchemy.run.ts for preview/production deployments.
+    "r2_buckets": [
+        {
+            "binding": "VIDEO_BUCKET",
+            "bucket_name": "llm-gateway-videos-local-dev"
+        },
+        {
+            "binding": "MUSIC_BUCKET",
+            "bucket_name": "llm-gateway-music-local-dev"
+        }
+    ],
+    // Cloudflare Queues — video render jobs are decoupled from the POST
+    // request lifecycle so renders can run with their own CPU budget and
+    // emit telemetry outside the request span.
+    // Queue names are placeholders for local dev parity — Alchemy manages
+    // the real Queue resources + bindings in alchemy.run.ts.
+    "queues": {
+        "producers": [
+            {
+                "binding": "VIDEO_RENDER_QUEUE",
+                "queue": "llm-gateway-video-renders"
+            },
+            {
+                "binding": "MUSIC_RENDER_QUEUE",
+                "queue": "llm-gateway-music-renders"
+            }
+        ],
+        "consumers": [
+            {
+                "queue": "llm-gateway-video-renders",
+                "max_batch_size": 1,
+                "max_concurrency": 10,
+                "max_retries": 2,
+                "max_batch_timeout": 1,
+                "retry_delay": 60,
+                "dead_letter_queue": "llm-gateway-video-renders-dlq"
+            },
+            {
+                "queue": "llm-gateway-video-renders-dlq",
+                "max_batch_size": 10,
+                "max_concurrency": 1,
+                "max_retries": 0,
+                "max_batch_timeout": 30
+            },
+            {
+                "queue": "llm-gateway-music-renders",
+                "max_batch_size": 1,
+                "max_concurrency": 10,
+                "max_retries": 2,
+                "max_batch_timeout": 1,
+                "retry_delay": 30,
+                "dead_letter_queue": "llm-gateway-music-renders-dlq"
+            },
+            {
+                "queue": "llm-gateway-music-renders-dlq",
+                "max_batch_size": 10,
+                "max_concurrency": 1,
+                "max_retries": 0,
+                "max_batch_timeout": 30
+            }
+        ]
+    },
+    // Scheduled cron triggers for background maintenance tasks
+    "triggers": {
+        "crons": ["5 0 * * *", "0 2 * * *", "0 4 * * 0", "*/5 * * * *"]
+    },
+    "env": {
+        "production": {
+            "name": "llm-gateway",
+            "ai": {
+                "binding": "AI"
+            },
+            "vars": {
+                "APP_NAME": "llm-gateway",
+                "APP_VERSION": "1.0.0",
+                "NODE_ENV": "production"
+            }
+        },
+        "preview": {
+            "name": "llm-gateway-preview",
+            "ai": {
+                "binding": "AI"
+            },
+            "vars": {
+                "APP_NAME": "llm-gateway",
+                "APP_VERSION": "1.0.0",
+                "NODE_ENV": "development"
+            }
+        }
+    }
+}

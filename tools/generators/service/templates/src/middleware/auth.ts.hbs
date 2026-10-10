@@ -1,0 +1,102 @@
+/**
+ * HMAC-SHA256 request signature verification.
+ *
+ * Expects headers set by the caller (e.g. the backend's request signer):
+ *   X-Signature: HMAC-SHA256(PARSER_SIGNING_SECRET, METHOD+"\n"+PATH+"\n"+TIMESTAMP+"\n"+SHA256(BODY))
+ *   X-Timestamp: unix milliseconds
+ *
+ * Security properties:
+ *  - Authenticity:       only the holder of the shared secret can forge a valid signature
+ *  - Body integrity:     body hash is part of the signed message
+ *  - Replay protection:  rejects requests where |now - timestamp| > 30 s
+ *  - Timing-safe:        comparison via HMAC double-signing
+ */
+import { createMiddleware } from "hono/factory";
+
+import type { AppEnv } from "../index.js";
+
+const REPLAY_WINDOW_MS = 30_000;
+
+async function sha256Hex(data: ArrayBuffer): Promise<string> {
+    const hash = await crypto.subtle.digest("SHA-256", data);
+
+    return Array.from(new Uint8Array(hash))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(message));
+
+    return Array.from(new Uint8Array(sig))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+/**
+ * Timing-safe hex string comparison via HMAC double-signing.
+ * Always runs both HMAC operations regardless of input to prevent timing attacks.
+ */
+async function timingSafeEqual(secret: string, a: string, b: string): Promise<boolean> {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const sigA = await crypto.subtle.sign("HMAC", key, encoder.encode(a));
+    const sigB = await crypto.subtle.sign("HMAC", key, encoder.encode(b));
+
+    const viewA = new Uint8Array(sigA);
+    const viewB = new Uint8Array(sigB);
+
+    let diff = 0;
+    for (let i = 0; i < viewA.length; i++) {
+        diff |= viewA[i]! ^ viewB[i]!;
+    }
+
+    return diff === 0;
+}
+
+async function verifyHmac(req: Request, secret: string): Promise<boolean> {
+    const signature = req.headers.get("X-Signature");
+    const timestamp = req.headers.get("X-Timestamp");
+
+    if (!signature || !timestamp) return false;
+
+    // Strict numeric validation — reject strings like "123abc"
+    if (!/^\d+$/.test(timestamp)) return false;
+
+    // Replay protection
+    const ts = Number(timestamp);
+
+    if (Math.abs(Date.now() - ts) > REPLAY_WINDOW_MS) return false;
+
+    const body = await req.clone().arrayBuffer();
+    const bodyHash = await sha256Hex(body);
+    const path = new URL(req.url).pathname;
+    const message = `${req.method}\n${path}\n${timestamp}\n${bodyHash}`;
+    const expected = await hmacSha256Hex(secret, message);
+
+    return timingSafeEqual(secret, signature, expected);
+}
+
+export const hmacAuth = createMiddleware<{ Bindings: AppEnv }>(async (c, next) => {
+    const secret = c.env.PARSER_SIGNING_SECRET;
+
+    if (!secret) {
+        if (c.env.NODE_ENV === "production") {
+            return c.json({ error: "Service not configured" }, 503);
+        }
+
+        // Development open mode — no secret required
+        await next();
+        return;
+    }
+
+    const valid = await verifyHmac(c.req.raw, secret);
+
+    if (!valid) {
+        return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    await next();
+});

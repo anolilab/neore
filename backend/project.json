@@ -1,0 +1,41 @@
+{
+    "name": "@neore/backend",
+    "$schema": "../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "backend",
+    "projectType": "service",
+    "tags": ["chat", "lunora"],
+    "implicitDependencies": [],
+    "targets": {
+        "codegen": {
+            "//": "No `command` on purpose, so this falls through to the package.json script. A bare `lunora codegen` here would skip the post-codegen check that follows it — the regression guard in `scripts/check-generated.mjs` for the `.pnpm` store-path import codegen once emitted. (It also used to be needed because codegen took several passes to converge from a cold `_generated/`; that is fixed, one pass reproduces it byte-for-byte.)",
+            "inputs": [
+                "{projectRoot}/lunora/**/*.ts",
+                "!{projectRoot}/lunora/_generated/**",
+                "{projectRoot}/src/**/*.ts",
+                "{projectRoot}/scripts/check-generated.mjs",
+                "{projectRoot}/lunora.config.ts",
+                "{projectRoot}/package.json",
+                "{projectRoot}/wrangler.jsonc",
+                "{workspaceRoot}/pnpm-lock.yaml"
+            ],
+            "outputs": ["{projectRoot}/lunora/_generated/**"],
+            "cache": true
+        },
+        "dev": {
+            "//": "`dependsOn: codegen` so a checkout with no (or a stale) `_generated/` converges BEFORE the worker boots, rather than serving a half-inferred API and failing somewhere unrelated. It is cached on the sources, so a warm start pays nothing and a cold one pays ~11s.",
+            "dependsOn": ["codegen"],
+            "command": "PATH=\"./node_modules/.bin:$PATH\" lunora dev --no-codegen --worker-port 8788 --inspector-port 9235",
+            "preset": "server",
+            "options": {
+                "service": {
+                    "port": 8788,
+                    "readiness": {
+                        "tcp": {
+                            "port": 8788
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

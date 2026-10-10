@@ -1,0 +1,11 @@
+import { HealthCheck } from "@visulima/health-check";
+
+const health = new HealthCheck();
+
+// Add custom checkers here:
+// health.addChecker("my-checker", async () => ({
+//     displayName: "My Checker",
+//     health: { healthy: true, timestamp: new Date().toISOString() },
+// }));
+
+export { health };

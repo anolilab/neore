@@ -1,0 +1,56 @@
+[package]
+name = "document-parser"
+version = "1.0.0"
+edition = "2024"
+publish = false
+description = "Document text extraction as a Cloudflare Worker, on the xberg crate"
+
+[lib]
+# cdylib ONLY: adding "rlib" grew the wasm from 14.4 to 17.2 MiB (measured).
+# `cargo test` does not need it — the lib's unit tests build their own harness.
+crate-type = [ "cdylib" ]
+
+[features]
+default = [
+  "pdf",
+  "office",
+  "excel",
+  "html",
+  "xml",
+  "archives" 
+]
+# pdf = xberg's pure-Rust `pdf-native` backend (no pdfium on wasm32).
+pdf = [ "xberg/pdf" ]
+office = [ "xberg/office" ]
+excel = [ "xberg/excel-wasm" ]
+html = [ "xberg/html" ]
+xml = [ "xberg/xml" ]
+archives = [ "xberg/archives" ]
+
+[dependencies]
+worker = "=0.8.7"
+futures-util = { version = "0.3", default-features = false }
+serde = { version = "1", features = [ "derive" ] }
+serde_json = "1"
+# Pinned exactly: output shaping (`src/shape.rs`) depends on its renderer.
+# default-features = false drops tokio-runtime and simd-utf8; every format is opted in above.
+xberg = { version = "=1.3.2", default-features = false }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# xberg's graph pulls three getrandom majors; each needs its JS backend on wasm32.
+getrandom = { version = "0.4", features = [ "wasm_js" ] }
+getrandom_02 = { package = "getrandom", version = "0.2", features = [ "js" ] }
+getrandom_03 = { package = "getrandom", version = "0.3", features = [ "wasm_js" ] }
+
+[profile.release]
+# Measured 2026-10-02 (wasm-opt -O, names stripped): "s" = 14.4 MiB, "z" = 12.7 MB
+# — but "z" took 2.2x the CPU on a 40 MB / 330-page PDF (1061 ms vs 488 ms).
+# Size is nowhere near the 64 MiB limit; CPU is billed.
+opt-level = "s"
+lto = true
+codegen-units = 1
+# `strip = true` (symbols) breaks worker-build 0.8.7: wasm-bindgen then fails with
+# "externref table required for catch wrappers". Debuginfo only; scripts/build.mjs
+# drops the name section afterwards.
+strip = "debuginfo"
+panic = "abort"

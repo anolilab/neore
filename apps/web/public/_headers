@@ -1,0 +1,31 @@
+# Cloudflare Workers Static Assets headers (read at deploy; never served).
+# Only applies to responses served from dist/client — the SSR Worker sets its
+# own (see src/middleware/cache-headers.ts).
+#
+# Without this every asset is served `public, max-age=0, must-revalidate`, so a
+# repeat visit revalidates each of the ~40 startup chunks.
+#
+# /assets/ is Vite's build output and holds ONLY content-hashed files: a changed
+# file gets a new name, so it can be cached forever. Non-hashed static files
+# live elsewhere in public/ (images/, audio/) — never put one under
+# public/assets/, or it is pinned in browsers for a year.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Static images/audio, stable names: a day, then revalidate in the background.
+/images/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/audio/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# The service worker and the manifest must never be stale: browsers already
+# bypass the HTTP cache for sw.js update checks (updateViaCache: imports), but
+# a proxy must not hold it either.
+/sw.js
+  Cache-Control: no-cache
+/push-sw.js
+  Cache-Control: no-cache
+/sw-cache-cleanup.js
+  Cache-Control: no-cache
+/manifest.json
+  Cache-Control: no-cache

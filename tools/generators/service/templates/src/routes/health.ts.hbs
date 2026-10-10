@@ -1,0 +1,63 @@
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { z } from "zod";
+
+import { health } from "../lib/health-check.js";
+import type { AppEnv } from "../index.js";
+
+const healthRouter = new OpenAPIHono<{ Bindings: AppEnv }>();
+
+healthRouter.openapi(
+    {
+        method: "get",
+        path: "/health",
+        tags: ["Health"],
+        summary: "Full health report",
+        responses: {
+            200: {
+                content: { "application/json": { schema: z.record(z.string(), z.unknown()) } },
+                description: "Service health report",
+            },
+            503: {
+                content: { "application/json": { schema: z.record(z.string(), z.unknown()) } },
+                description: "Service unhealthy",
+            },
+        },
+    },
+    async (c) => {
+        const report = await health.getReport();
+        const isHealthy = Object.values(report).every((r: any) => r.health?.healthy !== false);
+        const status = isHealthy ? 200 : 503;
+
+        return c.json(report, status);
+    },
+);
+
+healthRouter.openapi(
+    {
+        method: "get",
+        path: "/health/live",
+        tags: ["Health"],
+        summary: "Liveness check",
+        responses: {
+            200: {
+                content: { "application/json": { schema: z.object({ status: z.string() }) } },
+                description: "Service is live",
+            },
+            503: {
+                content: { "application/json": { schema: z.object({ status: z.string() }) } },
+                description: "Service is not live",
+            },
+        },
+    },
+    async (c) => {
+        const live = await health.isLive();
+
+        if (live) {
+            return c.json({ status: "live" }, 200);
+        }
+
+        return c.json({ status: "not live" }, 503);
+    },
+);
+
+export { healthRouter };

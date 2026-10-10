@@ -1,0 +1,98 @@
+---
+title: Embeddings service
+description: A Workers AI text-embedding Worker used for semantic search and memory retrieval.
+---
+
+# Embeddings service
+
+The embeddings service is a Cloudflare Worker that turns text into vectors using
+Workers AI. It exists as a cheap, on-platform alternative to routing embedding
+calls out to a third-party provider.
+
+:::warning Not wired in deployed environments
+`alchemy.run.ts` deploys this Worker privately — no workers.dev URL, no route,
+no service binding to it, and no `SIGNING_SECRET` — so nothing can call it, and
+`/embed` would refuse a call anyway.
+
+Embeddings currently flow through the
+[LLM Gateway](/docs/services/llm-gateway) instead, via
+`backend/lunora/chat/lib/gateway-embedding-model.ts`. Turning this Worker on is a
+both-ends change.
+:::
+
+## Models
+
+| Model | Dimensions | Notes |
+| --- | --- | --- |
+| `@cf/baai/bge-base-en-v1.5` | 768 | **Default.** English, balanced |
+| `@cf/baai/bge-large-en-v1.5` | 1024 | English, high quality |
+| `@cf/baai/bge-small-en-v1.5` | 384 | English, fast |
+
+The default is 768-dimensional deliberately: it matches the dimension of the
+memory vector table, so switching the default would require a new vector index
+rather than just a config change.
+
+Only models on this allow-list are accepted. A request naming anything else is
+rejected.
+
+## Authentication
+
+Requests are signed with HMAC-SHA256, the same scheme as the
+[document parser](/docs/services/document-parser#how-authentication-works):
+`X-Signature` and `X-Timestamp` headers, with the signature covering method,
+path, timestamp, and a hash of the body. The Worker reads its half of the secret
+from `SIGNING_SECRET`.
+
+## Rate limiting
+
+The Worker applies its own in-process limit of **120 requests per minute**,
+independent of any limit the caller applies.
+
+## API reference
+
+### `POST /embed`
+
+**Request body:**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `texts` | string[] | Required. 1–100 items |
+| `model` | string | Optional. Must be one of the allowed models above |
+
+**Response (200):** one vector per input text, in input order, plus the model
+that produced them.
+
+**Error responses:**
+
+| Status | Meaning |
+| --- | --- |
+| `400` | Invalid body — empty array, more than 100 items, or a disallowed model |
+| `401` | Missing or invalid signature |
+| `429` | Rate limit exceeded |
+| `500` | Inference failed |
+
+### `GET /models`
+
+Lists the allowed models with their dimensions and a short description.
+
+### `GET /health`
+
+Liveness check.
+
+## Local development
+
+```bash
+pnpm --filter embeddings dev
+```
+
+The Worker listens on `http://localhost:8790` with its inspector on 9233. Port
+**8788 is reserved for the Lunora backend** — never bind a service to it.
+
+## Related
+
+- [Knowledge Base](/docs/knowledge-base) — semantic search over your documents
+- [Memory](/docs/memory) — retrieval scoring uses embeddings
+- [LLM Gateway service](/docs/services/llm-gateway) — the path embeddings take today
+- [Document parser service](/docs/services/document-parser)
+- [Browser renderer service](/docs/services/browser-renderer)
+- [NSFW checker service](/docs/services/nsfw-checker)

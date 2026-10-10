@@ -1,0 +1,15 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "bundle": {
+        "createUpdaterArtifacts": true
+    },
+    "plugins": {
+        "updater": {
+            "endpoints": ["https://REPLACE-ME.example.com/native/{{target}}/{{arch}}/{{current_version}}"],
+            "pubkey": "REPLACE-ME-with-the-public-key-from-tauri-signer-generate",
+            "windows": {
+                "installMode": "passive"
+            }
+        }
+    }
+}

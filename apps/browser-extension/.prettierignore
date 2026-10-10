@@ -1,0 +1,3 @@
+# Build output this app writes next to `dist/` (the root file covers `dist/`).
+dist-firefox/
+release/

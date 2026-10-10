@@ -1,0 +1,114 @@
+---
+title: Projects
+description: Group related chats under shared context, a default model, and default tools
+---
+
+# Projects
+
+A project groups related chats and gives them a shared starting point: background
+context the AI always sees, a default model, and a default set of enabled tools.
+Instead of re-explaining your situation at the top of every thread, you say it
+once in the project.
+
+## Quick Start
+
+1. In the thread sidebar, create a project
+2. Give it a title and, optionally, a description, colour and icon
+3. Write the **Context / Instructions** the AI should always have
+4. Create chats inside the project, or move existing ones in
+
+## Creating a project
+
+Projects are created from the thread list sidebar.
+
+| Field | What it does |
+|---|---|
+| **Title** | The project name — e.g. "Financial Planning" |
+| **Description** | A short note for your own reference |
+| **Colour** | Tints the project in the sidebar |
+| **Icon** | A small icon for quick visual identification |
+| **Context / Instructions** | Prepended to the system prompt for every chat in the project |
+| **Default Model** | The model new chats in this project start with |
+| **Default reasoning effort** | Starting reasoning effort for new chats |
+| **Default enabled features** | Which tools are on by default for new chats |
+
+Colour and icon are both optional and can be removed later.
+
+## Project context
+
+The **Context / Instructions** field is the point of projects. Whatever you write
+there is prepended to the system prompt of every chat in the project — so it is
+the right home for:
+
+- Background the AI needs but you're tired of repeating ("we're a B2B SaaS, our
+  customers are procurement teams")
+- Standing instructions ("always answer in German", "cite sources")
+- Shared reference material that's short enough to sit in the prompt
+
+For anything long enough that it shouldn't live in every prompt, use the
+[Knowledge Base](/docs/knowledge-base) instead — it retrieves only the relevant
+parts.
+
+## Default AI settings
+
+New chats created inside a project inherit its defaults: model, reasoning effort,
+and enabled tools. These are starting points, not locks — you can change any of
+them within an individual chat without affecting the project.
+
+## Organising chats
+
+**Move an existing chat in:** open a thread's menu and choose **Move to
+Project**. The same dialog removes a chat from its project.
+
+**Pin a project:** pinned projects stay at the top of the sidebar.
+
+**Reorder:** projects can be reordered in the sidebar.
+
+## Projects and Workflows
+
+Projects and [workflows](/docs/workflows) share the same underlying storage —
+each one is a project record, distinguished by its type. In practice that means a
+workflow appears in the same list as your chat projects, and the same publishing
+and sharing machinery backs both.
+
+## Common Use Cases
+
+**Client work**
+One project per client, with their industry, tone of voice and constraints in the
+context field.
+
+**A long-running piece of work**
+A project for a migration or a launch, with the architecture and decisions so far
+as context, and every related thread grouped inside it.
+
+**A persona**
+A project whose context defines a role — "you are a meticulous copy editor" — and
+whose default model is the one that does that job best.
+
+## Projects vs. other organisation
+
+| Feature | Use it for |
+|---|---|
+| **Projects** | Shared context and defaults across many threads |
+| [Tags](/docs/chat#thread-organization) | Cross-cutting labels; a thread can have many |
+| Pinning | Quick access to a handful of threads |
+| Thread hierarchy | Branches of one conversation |
+
+## Troubleshooting
+
+**Issue:** A new chat in a project isn't using the project's model
+- **Solution:** Defaults apply at creation time. A chat created before you set the default keeps its own model
+
+**Issue:** The project context doesn't seem to reach the AI
+- **Solution:** Confirm the chat is actually in the project — check the sidebar grouping
+- **Solution:** Stateless threads ignore history but still receive the system prompt; a per-thread custom system prompt sits alongside project context rather than replacing it
+
+**Issue:** I can't find "Move to Project"
+- **Solution:** Create a project first — the dialog has nothing to offer otherwise
+
+## Related Features
+
+- [Chat](/docs/chat) — thread organization and thread types
+- [Workflows](/docs/workflows) — visual pipelines, stored alongside projects
+- [Knowledge Base](/docs/knowledge-base) — for context too long to sit in every prompt
+- [Prompts](/docs/prompts#system-prompt-presets) — reusable system prompts for individual threads

@@ -1,0 +1,16 @@
+{
+  "name": "cloudflare-images-example",
+  "version": "1.0.0",
+  "description": "Cloudflare Images examples and templates",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260818.1",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.124.0"
+  }
+}
