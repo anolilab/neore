@@ -11,7 +11,10 @@ jobs:
         uses: "anolilab/workflows/.github/workflows/lint.yml@94b27723e80256ce9bcace59884a051aca8fef22" # v18.0.1
         with:
             lint_eslint: true
-            lint_types: true
+            # The type check runs in its own job below: `lint:types` builds the
+            # document-parser Worker, which needs the Rust toolchain this shared
+            # job does not install.
+            lint_types: false
             lint_attw: true
             lint_package_json: true
             lint_markdown: false
@@ -69,6 +72,35 @@ jobs:
             - name: "Check the deploy script"
               shell: "bash"
               run: "pnpm run lint:types:deploy && pnpm run lint:eslint:deploy"
+
+    types:
+        name: "Type check"
+        runs-on: "ubuntu-latest"
+        permissions:
+            contents: "read"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@main"
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            # `lint:types` builds the document-parser Worker (worker-build), so the
+            # same toolchain the test workflow installs is needed here too.
+            - name: "Setup Rust Worker toolchain"
+              uses: "./.github/actions/setup-rust-worker"
+
+            - name: "Type check"
+              shell: "bash"
+              run: "pnpm lint:types"
 
     actionlint:
         name: "Actionlint"
