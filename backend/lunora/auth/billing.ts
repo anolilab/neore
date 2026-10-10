@@ -339,7 +339,7 @@ export const setMemberCreditOverride = adminMutation
             });
         }
 
-        context.log.event("billing.set_member_credit_override",{ cleared: creditOverride === null, organizationId: orgId, userId });
+        context.log.event("billing.set_member_credit_override", { cleared: creditOverride === null, organizationId: orgId, userId });
     });
 
 export const deductCreditsFromGateway = internalMutation

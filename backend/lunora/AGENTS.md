@@ -81,50 +81,50 @@ There is no `shared/`, `generated/` or `pins/` top-level folder.
 
 ## WHERE TO LOOK
 
-| Task                  | Location                              | Notes                                                          |
-| --------------------- | ------------------------------------- | -------------------------------------------------------------- |
-| Table definitions     | `schema.ts`                           | `defineTable` from `lunorash/server`; 131 `defineTable` calls  |
-| Table ownership       | `<module>/module.ts`                  | `tables: [...]`; `lib/` and root files own none                |
-| Procedure builders    | `lib/crpc.ts`                         | `publicQuery`, `authQuery`, `authMutation`, `adminAction`, ... |
-| Rate limits           | `lib/rate-limiter.ts`                 | `RATE_LIMIT_CONFIGS`; `rateLimit("<name>")` middleware         |
-| Auth options          | `auth.ts`                             | `buildAuthOptions(hooks)`, `buildAuth(env)`, `getAuth()`       |
-| Auth helpers          | `auth/session.ts`                     | `getAuthUserId`, `getAuthUserIdentity`, `getSession`           |
-| HTTP routes           | `http.ts`                             | Hono app; `/triggers/webhook/:triggerId`, `/chat/*`, uploads   |
-| Chat features         | `chat/`                               | `execute.ts` (agent run), `functions.ts`, `streaming/`         |
-| Triggers              | `triggers/`                           | schedule / webhook automation; headless runs                   |
-| Shard routing         | `lib/shard-*.ts`, `lib/cross-shard.ts`| see RUNTIME NOTES                                              |
-| Services (bindings)   | `lib/services.ts`                     | `serviceFetch`, `gatewayFetch`, `isServiceBound`               |
-| Jobs and queues       | `lib/job-queue.ts`, `lib/job-once.ts` | `enqueueJob`, `runJobOnce`; config in `lib/job-queue-config.ts`|
-| Cron tick             | `crons.ts`, `lib/cron-schedule.ts`    | add to `PERIODIC_JOBS`, not a new `crons.interval`             |
-| Audit triggers        | `lib/audit-triggers.ts`               | `AUDIT_TABLES`, `auditTriggersFor`                             |
-| Storage               | `lib/storage-*.ts`, `lib/upload-route.ts` | private files, signed URLs, TUS uploads                    |
-| Authorization (RLS)   | `lib/rls/`                            | `policies.ts`, `scope.ts`; `docs/security/authz-matrix.md`     |
-| GDPR                  | `gdpr/`, `<module>/gdpr.ts`           | erasure must reach every table; see `gdpr/module.ts`           |
-| Public API / CLI      | `public-api/`                         | one route table feeds the router and `/api/v1/openapi.json`    |
-| Browser automation    | `browser/`                            | Cloudflare Browser Rendering sessions and actions              |
-| Messenger             | `messenger/`                          | Telegram, Slack, Discord, WhatsApp, LINE, Feishu, Teams, WeChat|
+| Task                | Location                                  | Notes                                                           |
+| ------------------- | ----------------------------------------- | --------------------------------------------------------------- |
+| Table definitions   | `schema.ts`                               | `defineTable` from `lunorash/server`; 131 `defineTable` calls   |
+| Table ownership     | `<module>/module.ts`                      | `tables: [...]`; `lib/` and root files own none                 |
+| Procedure builders  | `lib/crpc.ts`                             | `publicQuery`, `authQuery`, `authMutation`, `adminAction`, ...  |
+| Rate limits         | `lib/rate-limiter.ts`                     | `RATE_LIMIT_CONFIGS`; `rateLimit("<name>")` middleware          |
+| Auth options        | `auth.ts`                                 | `buildAuthOptions(hooks)`, `buildAuth(env)`, `getAuth()`        |
+| Auth helpers        | `auth/session.ts`                         | `getAuthUserId`, `getAuthUserIdentity`, `getSession`            |
+| HTTP routes         | `http.ts`                                 | Hono app; `/triggers/webhook/:triggerId`, `/chat/*`, uploads    |
+| Chat features       | `chat/`                                   | `execute.ts` (agent run), `functions.ts`, `streaming/`          |
+| Triggers            | `triggers/`                               | schedule / webhook automation; headless runs                    |
+| Shard routing       | `lib/shard-*.ts`, `lib/cross-shard.ts`    | see RUNTIME NOTES                                               |
+| Services (bindings) | `lib/services.ts`                         | `serviceFetch`, `gatewayFetch`, `isServiceBound`                |
+| Jobs and queues     | `lib/job-queue.ts`, `lib/job-once.ts`     | `enqueueJob`, `runJobOnce`; config in `lib/job-queue-config.ts` |
+| Cron tick           | `crons.ts`, `lib/cron-schedule.ts`        | add to `PERIODIC_JOBS`, not a new `crons.interval`              |
+| Audit triggers      | `lib/audit-triggers.ts`                   | `AUDIT_TABLES`, `auditTriggersFor`                              |
+| Storage             | `lib/storage-*.ts`, `lib/upload-route.ts` | private files, signed URLs, TUS uploads                         |
+| Authorization (RLS) | `lib/rls/`                                | `policies.ts`, `scope.ts`; `docs/security/authz-matrix.md`      |
+| GDPR                | `gdpr/`, `<module>/gdpr.ts`               | erasure must reach every table; see `gdpr/module.ts`            |
+| Public API / CLI    | `public-api/`                             | one route table feeds the router and `/api/v1/openapi.json`     |
+| Browser automation  | `browser/`                                | Cloudflare Browser Rendering sessions and actions               |
+| Messenger           | `messenger/`                              | Telegram, Slack, Discord, WhatsApp, LINE, Feishu, Teams, WeChat |
 
 ## BUILDERS (`lib/crpc.ts`)
 
 Every client-reachable procedure is built from one of these. Auth is the builder
 choice, not a flag, so `ctx.user` is non-nullable on the authed variants.
 
-| Builder                | `ctx.user`             | Use for                                                       |
-| ---------------------- | ---------------------- | ------------------------------------------------------------- |
-| `query` / `publicQuery`| none (`ctx.auth` only) | Reads that resolve identity themselves                        |
-| `optionalAuthQuery`    | `SessionUser \| null`  | Public reads that personalise when signed in                  |
-| `authQuery`            | `SessionUser`          | Default for authenticated reads (`authPaginatedQuery` aliases it) |
-| `liteAuthQuery`        | `SessionUser`          | JWT-only reads (no session lookup) for hot paths              |
-| `adminQuery`           | `SessionUser`, admin   | Platform-admin reads                                          |
-| `mutation`             | none (`ctx.auth` only) | Bare guarded mutation                                         |
-| `publicMutation`       | `SessionUser \| null`  | Writes that may be anonymous                                  |
-| `optionalAuthMutation` | `SessionUser \| null`  | Anonymous-allowed writes                                      |
-| `authMutation`         | `SessionUser`          | Default for authenticated writes                              |
-| `adminMutation`        | `SessionUser`, admin   | Platform-admin writes                                         |
-| `action` / `publicAction` | none                | External API calls; no database access                        |
-| `authAction`           | `SessionUser`          | Authenticated actions                                         |
-| `adminAction`          | `SessionUser`, admin   | Admin-only actions                                            |
-| `internalQuery` / `internalMutation` / `internalAction` | none (no auth) | Server-only; re-exported from `_generated/server` |
+| Builder                                                 | `ctx.user`             | Use for                                                           |
+| ------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------- |
+| `query` / `publicQuery`                                 | none (`ctx.auth` only) | Reads that resolve identity themselves                            |
+| `optionalAuthQuery`                                     | `SessionUser \| null`  | Public reads that personalise when signed in                      |
+| `authQuery`                                             | `SessionUser`          | Default for authenticated reads (`authPaginatedQuery` aliases it) |
+| `liteAuthQuery`                                         | `SessionUser`          | JWT-only reads (no session lookup) for hot paths                  |
+| `adminQuery`                                            | `SessionUser`, admin   | Platform-admin reads                                              |
+| `mutation`                                              | none (`ctx.auth` only) | Bare guarded mutation                                             |
+| `publicMutation`                                        | `SessionUser \| null`  | Writes that may be anonymous                                      |
+| `optionalAuthMutation`                                  | `SessionUser \| null`  | Anonymous-allowed writes                                          |
+| `authMutation`                                          | `SessionUser`          | Default for authenticated writes                                  |
+| `adminMutation`                                         | `SessionUser`, admin   | Platform-admin writes                                             |
+| `action` / `publicAction`                               | none                   | External API calls; no database access                            |
+| `authAction`                                            | `SessionUser`          | Authenticated actions                                             |
+| `adminAction`                                           | `SessionUser`, admin   | Admin-only actions                                                |
+| `internalQuery` / `internalMutation` / `internalAction` | none (no auth)         | Server-only; re-exported from `_generated/server`                 |
 
 Every client-reachable builder ends in `withRlsScope` + `rowLevelSecurity()`
 (see root `CLAUDE.md`). Rate limiting is opt-in per procedure:
@@ -165,9 +165,9 @@ Procedure rules that matter:
 
 Procedures are referenced through the generated maps:
 
-| Import                          | Use                                                           |
-| ------------------------------- | ------------------------------------------------------------- |
-| `api` from `_generated/api`     | Public procedures, e.g. `ctx.runQuery(api.agent.threads.getChildThreads, {...})` |
+| Import                                | Use                                                                                                |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `api` from `_generated/api`           | Public procedures, e.g. `ctx.runQuery(api.agent.threads.getChildThreads, {...})`                   |
 | `internal` from `_generated/internal` | Internal procedures; the namespace nests by folder (`internal.connectors.store.consumeOAuthState`) |
 
 - A query or mutation that needs another module's data calls a **plain function**
@@ -184,17 +184,17 @@ Procedures are referenced through the generated maps:
 
 ## IMPORTS (Cheat Sheet)
 
-| Need                                          | Import from                                       |
-| --------------------------------------------- | ------------------------------------------------- |
-| `query`, `mutation`, `action`, `internal*`    | `_generated/server` (usually via `lib/crpc`)      |
-| `QueryCtx`, `MutationCtx`, `ActionCtx`        | `_generated/server`                               |
-| Procedure builders and `rateLimit`            | `lib/crpc`                                        |
-| `v`, `defineSchema`, `defineTable`, `defineModule`, `LunoraError` | `lunorash/server`                |
-| `platformAdmin`                               | `@lunora/server`                                  |
-| `api` / `internal` references                 | `_generated/api`, `_generated/internal`           |
-| Better Auth session helpers                   | `auth/session.ts`                                 |
-| Service bindings                              | `lib/services.ts`                                 |
-| Public API types                              | `_generated/api.ts` (generated)                   |
+| Need                                                              | Import from                                  |
+| ----------------------------------------------------------------- | -------------------------------------------- |
+| `query`, `mutation`, `action`, `internal*`                        | `_generated/server` (usually via `lib/crpc`) |
+| `QueryCtx`, `MutationCtx`, `ActionCtx`                            | `_generated/server`                          |
+| Procedure builders and `rateLimit`                                | `lib/crpc`                                   |
+| `v`, `defineSchema`, `defineTable`, `defineModule`, `LunoraError` | `lunorash/server`                            |
+| `platformAdmin`                                                   | `@lunora/server`                             |
+| `api` / `internal` references                                     | `_generated/api`, `_generated/internal`      |
+| Better Auth session helpers                                       | `auth/session.ts`                            |
+| Service bindings                                                  | `lib/services.ts`                            |
+| Public API types                                                  | `_generated/api.ts` (generated)              |
 
 ## AUTH WIRING (`auth.ts`)
 
@@ -260,28 +260,28 @@ own-row count, per the RLS notes in root `CLAUDE.md`).
 
 `triggers/` runs an agent on a schedule, a webhook, or (not yet) an event.
 
-| File           | Holds                                                                     |
-| -------------- | ------------------------------------------------------------------------- |
-| `schema.ts`    | `triggers` (config, incl. cron expression, timezone, webhook secret) and `triggerExecutions` (log) |
+| File           | Holds                                                                                                                                                                                                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `schema.ts`    | `triggers` (config, incl. cron expression, timezone, webhook secret) and `triggerExecutions` (log)                                                                                                                                                                                         |
 | `functions.ts` | Public: `getTriggers`, `createTrigger`, `updateTrigger`, `setTriggerEnabled`, `deleteTrigger`, `getTriggerExecutions`, `testRunTrigger`. Internal: `getTriggerInternal`, `getDueScheduleTriggers`, `updateTriggerStats`, `createExecution`, `updateExecution`, `setTriggerEnabledInternal` |
-| `schedule.ts`  | `checkDueTriggers` (internal mutation, batch of 25) and the 5-field cron parser (`getNextCronTime`, `isValidCronExpression`). Run by the one-minute tick, not its own cron |
-| `execute.ts`   | `executeTrigger` (internal action): runs `runHeadlessAgent` (`chat/lib/headless-run.ts`) in a new thread, then logs the execution |
-| `http.ts`      | `POST /triggers/webhook/:triggerId`; `verifyHmacSignature` (HMAC-SHA256, GitHub-style `sha256=hex` and raw hex) |
+| `schedule.ts`  | `checkDueTriggers` (internal mutation, batch of 25) and the 5-field cron parser (`getNextCronTime`, `isValidCronExpression`). Run by the one-minute tick, not its own cron                                                                                                                 |
+| `execute.ts`   | `executeTrigger` (internal action): runs `runHeadlessAgent` (`chat/lib/headless-run.ts`) in a new thread, then logs the execution                                                                                                                                                          |
+| `http.ts`      | `POST /triggers/webhook/:triggerId`; `verifyHmacSignature` (HMAC-SHA256, GitHub-style `sha256=hex` and raw hex)                                                                                                                                                                            |
 
 ## AUTO-CONTINUE (DEEP WORK MODE)
 
 `chat/lib/auto-continue.ts` extends the AI SDK loop for multi-step work.
 
-| Export                      | Purpose                                           |
-| --------------------------- | ------------------------------------------------- |
-| `getMaxSteps(shouldAutoContinue, modelDefault = 5)` | `DEFAULT_AUTO_CONTINUE_CONFIG.maxIterations` (25) when on, else `modelDefault` |
-| `estimateTokens(messages)`  | Fast ~4 chars/token estimate                      |
-| `getModelContextWindow(id)` | Context window lookup by model ID                 |
-| `compressContextMessages()` | Summarise older messages near the context limit   |
-| `applyLateCompression()`    | Compression applied just before a model call      |
-| `isContextExceededError()`  | Detects the provider's context-overflow error     |
-| `AutoContinueConfig`, `DEFAULT_AUTO_CONTINUE_CONFIG` | Config (maxIterations, threshold) |
-| `AutoContinueStreamEvent`   | SSE event types for frontend progress             |
+| Export                                               | Purpose                                                                        |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `getMaxSteps(shouldAutoContinue, modelDefault = 5)`  | `DEFAULT_AUTO_CONTINUE_CONFIG.maxIterations` (25) when on, else `modelDefault` |
+| `estimateTokens(messages)`                           | Fast ~4 chars/token estimate                                                   |
+| `getModelContextWindow(id)`                          | Context window lookup by model ID                                              |
+| `compressContextMessages()`                          | Summarise older messages near the context limit                                |
+| `applyLateCompression()`                             | Compression applied just before a model call                                   |
+| `isContextExceededError()`                           | Detects the provider's context-overflow error                                  |
+| `AutoContinueConfig`, `DEFAULT_AUTO_CONTINUE_CONFIG` | Config (maxIterations, threshold)                                              |
+| `AutoContinueStreamEvent`                            | SSE event types for frontend progress                                          |
 
 Triggers use `runHeadlessAgent`, which defaults to `getMaxSteps(true)`. Chat
 turns pass `getMaxSteps(isAutoContinue)` from `chat/execute.ts`.
@@ -291,13 +291,13 @@ turns pass `getMaxSteps(isAutoContinue)` from `chat/execute.ts`.
 Message pins live in `chat/pins/functions.ts` (module `chat`). The `threadPins`
 table is in `schema.ts` and is owned by `chat/module.ts`.
 
-| Function            | Type     | Notes                                      |
-| ------------------- | -------- | ------------------------------------------ |
-| `getThreadPins`     | Query    | Pins for a thread                          |
-| `createPin`         | Mutation | Rate-limited (`pins/create`); anchors a message and optional selection |
-| `updatePinNote`     | Mutation |                                            |
-| `updatePinSelectedText` | Mutation |                                        |
-| `deletePin`         | Mutation |                                            |
+| Function                | Type     | Notes                                                                  |
+| ----------------------- | -------- | ---------------------------------------------------------------------- |
+| `getThreadPins`         | Query    | Pins for a thread                                                      |
+| `createPin`             | Mutation | Rate-limited (`pins/create`); anchors a message and optional selection |
+| `updatePinNote`         | Mutation |                                                                        |
+| `updatePinSelectedText` | Mutation |                                                                        |
+| `deletePin`             | Mutation |                                                                        |
 
 All five are `authQuery` / `authMutation`.
 
