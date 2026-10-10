@@ -16,7 +16,10 @@ jobs:
             lint_package_json: true
             lint_markdown: false
             lint_yaml: true
-            lint_actionlint: true
+            # Actionlint runs in its own job below. The shared step installs its
+            # helper with `npm install` in the repo root, which cannot read pnpm's
+            # `catalog:` specifiers and fails before linting (EUNSUPPORTEDPROTOCOL).
+            lint_actionlint: false
             lint_rust: false
             node_version: "22"
 
@@ -66,3 +69,23 @@ jobs:
             - name: "Check the deploy script"
               shell: "bash"
               run: "pnpm run lint:types:deploy && pnpm run lint:eslint:deploy"
+
+    actionlint:
+        name: "Actionlint"
+        runs-on: "ubuntu-latest"
+        permissions:
+            contents: "read"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
+            # Pinned image; the default entrypoint lints every workflow under
+            # .github/workflows of the mounted checkout.
+            - name: "Lint workflows"
+              shell: "bash"
+              run: 'docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12'
