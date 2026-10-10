@@ -108,4 +108,3 @@ describe("procedure builders in production", () => {
         await expect(invoke(procedure)).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 });
-

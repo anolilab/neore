@@ -171,7 +171,7 @@ jobs:
                   # driven by the sourcemaps for the large code-split chunks
                   # (univer-sheet-editor ~11MB, vendor-diagrams ~3.7MB).
                   NODE_OPTIONS: "--max-old-space-size=4096"
-              run: "pnpm exec vis affected build --base $VIS_BASE --head $VIS_HEAD --fail-fast"
+              run: 'pnpm exec vis affected build --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
             - name: "Run tests (affected)"
               shell: "bash"
@@ -191,17 +191,17 @@ jobs:
             - name: "Run chrome browser tests (affected)"
               shell: "bash"
               if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
-              run: "pnpm exec vis affected test:browser:chrome --base $VIS_BASE --head $VIS_HEAD --fail-fast"
+              run: 'pnpm exec vis affected test:browser:chrome --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
             - name: "Run firefox browser tests (affected)"
               shell: "bash"
               if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
-              run: "pnpm exec vis affected test:browser:firefox --base $VIS_BASE --head $VIS_HEAD --fail-fast"
+              run: 'pnpm exec vis affected test:browser:firefox --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
             - name: "Run webkit browser tests (affected)"
               shell: "bash"
               if: "matrix.os == 'macos-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
-              run: "pnpm exec vis affected test:browser:webkit --base $VIS_BASE --head $VIS_HEAD --fail-fast"
+              run: 'pnpm exec vis affected test:browser:webkit --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
             # Skipped when CODECOV_TOKEN is unavailable, which is the normal case
             # for a pull_request from a fork — secrets are not exposed there, so

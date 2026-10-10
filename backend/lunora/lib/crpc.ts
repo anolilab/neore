@@ -109,8 +109,6 @@ export function rateLimit<C>(name: RateLimitName): Middleware<C, C> {
     };
 }
 
-
-
 const unauthorized = () => new LunoraError("UNAUTHORIZED", "Please sign in to continue");
 
 // ---------------------------------------------------------------------------

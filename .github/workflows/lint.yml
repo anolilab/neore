@@ -10,13 +10,23 @@ jobs:
             pull-requests: "read"
         uses: "anolilab/workflows/.github/workflows/lint.yml@94b27723e80256ce9bcace59884a051aca8fef22" # v18.0.1
         with:
-            lint_eslint: true
-            lint_types: true
-            lint_attw: true
+            # ESLint also runs in the type-check job: the shared job builds the whole
+            # workspace first, which needs the Rust toolchain it lacks.
+            lint_eslint: false
+            # The type check runs in its own job below: `lint:types` builds the
+            # document-parser Worker, which needs the Rust toolchain this shared
+            # job does not install.
+            lint_types: false
+            # attw has no task in this repository (`vis run lint:attw` matches no
+            # project), so the shared step has nothing real to check.
+            lint_attw: false
             lint_package_json: true
             lint_markdown: false
             lint_yaml: true
-            lint_actionlint: true
+            # Actionlint runs in its own job below. The shared step installs its
+            # helper with `npm install` in the repo root, which cannot read pnpm's
+            # `catalog:` specifiers and fails before linting (EUNSUPPORTEDPROTOCOL).
+            lint_actionlint: false
             lint_rust: false
             node_version: "22"
 
@@ -66,3 +76,60 @@ jobs:
             - name: "Check the deploy script"
               shell: "bash"
               run: "pnpm run lint:types:deploy && pnpm run lint:eslint:deploy"
+
+    types:
+        name: "Types and eslint"
+        runs-on: "ubuntu-latest"
+        permissions:
+            contents: "read"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@b5d611c5dda8645e93f2407e3d3fee250a9f5376" # main
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            # `lint:types` builds the document-parser Worker (worker-build), so the
+            # same toolchain the test workflow installs is needed here too.
+            - name: "Setup Rust Worker toolchain"
+              uses: "./.github/actions/setup-rust-worker"
+
+            - name: "Type check"
+              shell: "bash"
+              run: "pnpm lint:types"
+
+            - name: "ESLint"
+              shell: "bash"
+              run: "pnpm lint:eslint"
+
+            - name: "Build packages"
+              shell: "bash"
+              run: "pnpm build:packages"
+
+    actionlint:
+        name: "Actionlint"
+        runs-on: "ubuntu-latest"
+        permissions:
+            contents: "read"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
+            # Pinned image; the default entrypoint lints every workflow under
+            # .github/workflows of the mounted checkout.
+            - name: "Lint workflows"
+              shell: "bash"
+              run: 'docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12'
