@@ -20,7 +20,9 @@ jobs:
             # attw has no task in this repository (`vis run lint:attw` matches no
             # project), so the shared step has nothing real to check.
             lint_attw: false
-            lint_package_json: true
+            # The shared package.json step runs after a workspace build, which needs
+            # the Rust toolchain it lacks. The order check runs in the types job.
+            lint_package_json: false
             lint_markdown: false
             lint_yaml: true
             # Actionlint runs in its own job below. The shared step installs its
@@ -105,6 +107,10 @@ jobs:
             - name: "Type check"
               shell: "bash"
               run: "pnpm lint:types"
+
+            - name: "Package.json order"
+              shell: "bash"
+              run: "pnpm exec sort-package-json --check packages/*/package.json apps/*/package.json backend/package.json services/*/package.json package.json"
 
             - name: "ESLint"
               shell: "bash"
