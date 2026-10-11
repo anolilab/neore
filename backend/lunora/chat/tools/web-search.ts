@@ -52,6 +52,13 @@ interface ExaSearchResponse {
 /**
  * Search using Tavily API.
  */
+/**
+ * Retry a paid search only when the provider refused the call or dropped it. A
+ * timeout is not retried: the search may have completed server-side and been
+ * billed already, and a retry bills it again.
+ */
+const isPaidSearchRetryable = (error: unknown): boolean => error instanceof Error && /rate limit|\b429\b|econnreset|socket hang up/i.test(error.message);
+
 const searchWithTavily = async (
     query: string,
     maxResults: number,
@@ -273,6 +280,7 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
                 const results = await withRetry(() => searchFunction(query, maxResults), {
                     initialDelayMs: 1000,
                     maxRetries: 2,
+                    shouldRetry: isPaidSearchRetryable,
                 });
 
                 return { query, results: deduplicateByDomainAndUrl(results) };
