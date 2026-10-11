@@ -57,6 +57,50 @@
             "id": "cache-kv-local-dev"
         }
     ],
+    // Native rate limits, one binding per per-minute limit value (see
+    // src/middleware/native-rate-limit.ts). Alchemy declares the same ids in alchemy.run.ts.
+    "ratelimits": [
+        {
+            "name": "RATE_LIMIT_2",
+            "namespace_id": "9101",
+            "simple": { "limit": 2, "period": 60 }
+        },
+        {
+            "name": "RATE_LIMIT_5",
+            "namespace_id": "9102",
+            "simple": { "limit": 5, "period": 60 }
+        },
+        {
+            "name": "RATE_LIMIT_15",
+            "namespace_id": "9103",
+            "simple": { "limit": 15, "period": 60 }
+        },
+        {
+            "name": "RATE_LIMIT_20",
+            "namespace_id": "9104",
+            "simple": { "limit": 20, "period": 60 }
+        },
+        {
+            "name": "RATE_LIMIT_30",
+            "namespace_id": "9105",
+            "simple": { "limit": 30, "period": 60 }
+        },
+        {
+            "name": "RATE_LIMIT_60",
+            "namespace_id": "9106",
+            "simple": { "limit": 60, "period": 60 }
+        },
+        {
+            "name": "RATE_LIMIT_120",
+            "namespace_id": "9107",
+            "simple": { "limit": 120, "period": 60 }
+        },
+        {
+            "name": "RATE_LIMIT_600",
+            "namespace_id": "9108",
+            "simple": { "limit": 600, "period": 60 }
+        }
+    ],
     // R2 bucket for video blobs (rendered output from /v1/videos jobs).
     // bucket_name is a placeholder for local dev — Alchemy manages the actual
     // binding in alchemy.run.ts for preview/production deployments.
