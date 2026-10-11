@@ -170,9 +170,18 @@ export const deleteExpiredTemporaryChats = internalMutation
 
         for (const threadId of batch) {
             try {
-                // Delete the thread and all its associated data (messages,
-                // streams, and its `temporaryThreads` marker — without which
-                // the next run would find the same ids forever).
+                // The marker goes first. `deleteAllForThreadIdAsync` deletes it only
+                // when the thread's message chain finishes, and that chain runs on
+                // the scheduler: until then every run here found the same ids and
+                // started a duplicate chain for each, every 100 ms.
+                const markers = await context.db
+                    .query("temporaryThreads")
+                    .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+                    .collect();
+
+                await Promise.all(markers.map((marker) => context.db.delete(marker._id)));
+
+                // Delete the thread and all its associated data (messages, streams).
                 await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, {
                     threadId,
                 });
@@ -185,11 +194,12 @@ export const deleteExpiredTemporaryChats = internalMutation
 
         cronsLogger.info(`deleteExpiredTemporaryChats: Deleted ${deletedCount} expired temporary threads`);
 
-        // If there are more expired threads, schedule another run
-        // This recalculates expired threads fresh each time to handle any changes
+        // If there are more expired threads, schedule another run. Markers are
+        // gone by now, so the next run selects new ids; the wait only spaces out
+        // the batches.
         if (expiredThreadIds.length > TEMPORARY_THREAD_BATCH_SIZE) {
             cronsLogger.debug(`deleteExpiredTemporaryChats: More expired threads remain, scheduling follow-up`);
-            await context.scheduler.runAfter(100, internal.crons.deleteExpiredTemporaryChats, {});
+            await context.scheduler.runAfter(10_000, internal.crons.deleteExpiredTemporaryChats, {});
         }
 
         return null;
