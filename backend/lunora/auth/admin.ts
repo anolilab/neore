@@ -121,7 +121,7 @@ export const updateUserRole = adminMutation
             targetUserId: input.userId,
         });
 
-        ctx.log.event("admin.update_user_role", { role: input.role, targetUserId: input.userId, previousRole: previousRole ?? null });
+        ctx.log.event("admin.update_user_role", { previousRole: previousRole ?? null, role: input.role, targetUserId: input.userId });
 
         return true;
     });

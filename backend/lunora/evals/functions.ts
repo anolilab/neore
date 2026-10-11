@@ -431,7 +431,7 @@ export const createDataset = authMutation
             throw new LunoraError("BAD_REQUEST", `You can have at most ${String(MAX_DATASETS_PER_USER)} datasets`);
         }
 
-        const now = ctx.now;
+        const {now} = ctx;
         const datasetId = await ctx.db.insert("evalDatasets", {
             caseCount: 0,
             createdAt: now,
@@ -561,7 +561,7 @@ export const createCase = authMutation
         }
 
         const draft = requireDraft(args);
-        const now = ctx.now;
+        const {now} = ctx;
         const caseId = await ctx.db.insert("evalCases", {
             ...draft,
             createdAt: now,
@@ -648,7 +648,7 @@ export const importCases = authMutation
             return { errors: parsed.errors, imported: 0 };
         }
 
-        const now = ctx.now;
+        const {now} = ctx;
 
         for (const [offset, draft] of parsed.cases.entries()) {
             // Distinct `createdAt`s keep the file's order in the by-creation index.
@@ -748,7 +748,7 @@ export const startRun = authMutation
             throw new LunoraError("BAD_REQUEST", "Add at least one case before running the dataset");
         }
 
-        const now = ctx.now;
+        const {now} = ctx;
         const runId = await ctx.db.insert("evalRuns", {
             caseIds: cases.map((evalCase) => evalCase._id),
             costCapMicrodollars: costCap,

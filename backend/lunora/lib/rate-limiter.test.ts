@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import { getRateLimitKey, getUserTier, RATE_LIMIT_CONFIGS } from "./rate-limiter";
 import { compareStrings } from "./collections";
 
+const SHARE_BUCKET_KEY = /^share:[0-9a-f]{64}$/u;
+
 describe("getUserTier", () => {
     it("should return 'public' for null user", () => {
         expect(getUserTier(null)).toBe("public");
@@ -168,7 +170,7 @@ describe("shareLinkBucket", () => {
 
         const bucket = await shareLinkBucket("secret-share-token-abc");
 
-        expect(bucket).toMatch(/^share:[0-9a-f]{64}$/u);
+        expect(bucket).toMatch(SHARE_BUCKET_KEY);
         expect(bucket).not.toContain("secret-share-token");
     });
 

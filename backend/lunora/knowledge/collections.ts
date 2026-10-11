@@ -161,7 +161,7 @@ export const createCollection = authMutation
             throw new LunoraError("UNPROCESSABLE", `You can have at most ${String(MAX_COLLECTIONS)} collections`);
         }
 
-        const now = ctx.now;
+        const {now} = ctx;
 
         const collectionId = await ctx.db.insert("knowledgeCollections", {
             createdAt: now,
@@ -246,7 +246,7 @@ export const deleteCollection = authMutation
             throw new LunoraError("UNPROCESSABLE", `This collection holds more than ${String(cap)} files; move or remove some first`);
         }
 
-        const now = ctx.now;
+        const {now} = ctx;
 
         for (const file of files) {
             await (args.deleteFiles

@@ -144,7 +144,7 @@ export const claimDailyBrief = internalMutation
     )
     .mutation(async ({ args: { userId }, ctx }) => {
         const [settings, state] = await Promise.all([loadUserSettings(ctx, userId), loadState(ctx, userId)]);
-        const now = ctx.now;
+        const {now} = ctx;
         const eligibility = checkBriefEligibility({
             enabled: settings?.dailyBriefEnabled === true,
             lastActiveAt: state?.lastActiveAt,

@@ -117,12 +117,12 @@ describe(parseHtmlMeta, () => {
         // to the parser. Compare growth instead: a quadratic scan costs about 16x when
         // the input grows 4x, a linear one about 4x. The fastest of three runs at each
         // size keeps GC pauses and runner noise out of the ratio.
-        const hostileOf = (scale: number) => `<meta ${"a".repeat(50_000 * scale)}${"<meta x".repeat(5_000 * scale)}`;
+        const hostileOf = (scale: number) => `<meta ${"a".repeat(50_000 * scale)}${"<meta x".repeat(5000 * scale)}`;
         const fastestRun = (scale: number) => {
             const hostile = hostileOf(scale);
             let fastest = Infinity;
 
-            for (let run = 0; run < 3; run++) {
+            for (let run = 0; run < 3; run += 1) {
                 const started = performance.now();
 
                 expect(parseHtmlMeta(hostile, "https://example.com/").title).toBeUndefined();

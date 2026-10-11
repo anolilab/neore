@@ -41,7 +41,7 @@ export const cancelUserCodingAgentRuns = internalMutation
     .output(v.array(v.string()))
     .mutation(async ({ args: { userId }, ctx }) => {
         const sandboxIds: string[] = [];
-        const now = ctx.now;
+        const {now} = ctx;
 
         for (const status of ["queued", "running"] as const) {
             const runs = await ctx.db

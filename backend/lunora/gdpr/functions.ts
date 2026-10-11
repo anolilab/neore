@@ -356,7 +356,7 @@ export const getExportDownloadUrl = authAction
             throw new LunoraError("BAD_REQUEST", "Export has expired");
         }
 
-        const storageId = request.storageId;
+        const {storageId} = request;
         const url = await withDependency("file storage", () => ctx.storage.getUrl(storageId));
 
         if (!url) {

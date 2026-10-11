@@ -48,7 +48,7 @@ export const createSession = internalMutation
         userId: v.string(),
     })
     .mutation(async ({ args: { connectUrl, providerSessionId, source, threadId, userId }, ctx }) => {
-        const now = ctx.now;
+        const {now} = ctx;
 
         // Encrypt the CDP connect URL before persisting — it contains session credentials
         const encryptedConnectUrl = connectUrl ? await encryptKey(connectUrl, "tool-keys") : undefined;
@@ -134,7 +134,7 @@ export const createExtensionPairing = internalMutation
     })
     .mutation(async ({ args: { userId }, ctx }) => {
         const code = generatePairingCode();
-        const now = ctx.now;
+        const {now} = ctx;
         const insertedId = await ctx.db.insert("browserExtensions", {
             extensionId: `ext_${now}_${crypto.randomUUID().slice(0, 8)}`,
             pairingCode: code,

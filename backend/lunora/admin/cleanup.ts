@@ -186,8 +186,8 @@ export const executeCleanup = adminAction
 
         ctx.log.event("admin.execute_cleanup", {
             deletedCount,
-            durationMs,
             dryRun: input.dryRun === true,
+            durationMs,
             eligibleCount,
         });
 

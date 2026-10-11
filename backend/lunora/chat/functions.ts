@@ -4292,7 +4292,7 @@ export const generateVideo = internalAction
                     threadId,
                 });
 
-                context.log.event("chat.generate_video", { model, mimeType });
+                context.log.event("chat.generate_video", { mimeType, model });
 
                 return {
                     assets: [

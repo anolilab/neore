@@ -72,11 +72,11 @@ import { recomputeSkillRatings } from "../../skills/rating-cascade";
 import { anonymiseGatewayUsage, deleteIdentityRows, deleteUserRecord, readIdentityRows } from "../../auth/gdpr";
 import { eraseUsageForUser } from "../../usage/gdpr";
 import { eraseGatewayNotificationsForUser } from "../../saas/gdpr";
-import { DELETED_USER_MARKER } from "../constants";
 
-export { BATCH };
 
-export { DELETED_USER_MARKER };
+
+
+
 
 const vBatchResult = v.object({ hasMore: v.boolean() });
 
@@ -311,10 +311,11 @@ export const deleteUserWorkflowData = internalMutation
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => {
         const userExecutions = await eraseWorkflowExecutionsForUser(context, userId);
-        let hasMore = userExecutions.hasMore;
+        let {hasMore} = userExecutions;
 
         // Versions and presence the user wrote, anywhere (`workflow/gdpr.ts`).
         const userVersions = await eraseWorkflowVersionsAndPresenceForUser(context, userId);
+
         hasMore ||= userVersions.hasMore;
 
         const { page: projects } = await context.db.projects.findMany({ where: { userId } });
@@ -509,3 +510,6 @@ export const minimiseGdprRecords = internalMutation
 
         return null;
     });
+
+export {BATCH} from "../batch";
+export {DELETED_USER_MARKER} from "../constants";

@@ -80,7 +80,7 @@ export const createPreset = authMutation
     .output(v.object({ presetId: v.string() }))
     .mutation(async ({ args: input, ctx: context }) => {
         const { userId } = context.user;
-        const now = context.now;
+        const {now} = context;
         const inserted = await context.db.insert("systemPromptPresets", {
             createdAt: now,
             description: input.description,

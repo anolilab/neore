@@ -14,7 +14,7 @@ import { eraseSkillsForUser } from "../../skills/gdpr";
 import { eraseBrowserDataForUser } from "../../browser/gdpr";
 import { BATCH, deleteParentsWithChildren } from "../batch";
 
-export { deleteParentsWithChildren };
+
 
 /**
  * Steps that return `{ hasMore }` follow the residual steps' contract
@@ -224,3 +224,5 @@ export const deleteUserBrowserData = internalMutation
 
         return null;
     });
+
+export {deleteParentsWithChildren} from "../batch";

@@ -505,7 +505,7 @@ export const sendExportReadyEmail = internalAction
             throw new LunoraError("NOT_FOUND", "Export request not found or storage ID missing");
         }
 
-        const storageId = request.storageId;
+        const {storageId} = request;
         const downloadUrl = await withDependency("file storage", () => context.storage.getUrl(storageId));
 
         if (!downloadUrl) {

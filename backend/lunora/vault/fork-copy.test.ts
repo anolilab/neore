@@ -28,6 +28,8 @@ const createBucket = (objects: Record<string, { bytes: string; contentType?: str
     };
 };
 
+const FORK_COPY_FAILURE = /1 vault object\(s\) failed to copy/u;
+
 describe(copyStoredObjects, () => {
     it("copies the bytes and content type to the new key and leaves the source in place", async () => {
         const bucket = createBucket({ author: { bytes: "png-bytes", contentType: "image/png" } });
@@ -70,7 +72,7 @@ describe("a copy that fails for a reason other than a missing object", () => {
                 { from: "good-1", to: "copy-1" },
                 { from: "good-2", to: "copy-2" },
             ]),
-        ).rejects.toThrow(/1 vault object\(s\) failed to copy/u);
+        ).rejects.toThrow(FORK_COPY_FAILURE);
         expect(bucket.stored.has("copy-1")).toBe(true);
         expect(bucket.stored.has("copy-2")).toBe(true);
     });

@@ -19,7 +19,7 @@ export const checkDueTriggers = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx }) => {
-        const now = ctx.now;
+        const {now} = ctx;
 
         // Tasks ride this every-minute tick instead of declaring a cron of their
         // own: recurrences that are due, and rounds that stopped reporting.

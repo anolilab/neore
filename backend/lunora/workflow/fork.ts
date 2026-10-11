@@ -143,7 +143,7 @@ export const completeFork = internalMutation
         // number. Each fork recounts after its own insert, so the last recount runs
         // after every insert that finished before it. Capped at MAX_COUNTED_FORKS.
         if (source.isPublic) {
-            const forks = await context.db.projects.findMany({ where: { forkedFromId: sourceProjectId }, limit: MAX_COUNTED_FORKS });
+            const forks = await context.db.projects.findMany({ limit: MAX_COUNTED_FORKS, where: { forkedFromId: sourceProjectId } });
 
             await context.runMutation(internal.agent.projects.updateProject, {
                 patch: {

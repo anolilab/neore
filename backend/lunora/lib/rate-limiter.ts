@@ -60,29 +60,42 @@ export const Ratelimit = {
  * keeps the same checking on the values while preserving the literal keys.
  */
 export const RATE_LIMIT_CONFIGS = {
+    // Admin cleanup: a bulk delete over every eligible account.
+    "admin/cleanup:free": Ratelimit.fixedWindow(5, HOUR),
+
+    "admin/cleanup:premium": Ratelimit.fixedWindow(10, HOUR),
+    // Admin reads: dashboards and lists.
+    "admin/read:free": Ratelimit.fixedWindow(60, MINUTE),
+    "admin/read:premium": Ratelimit.fixedWindow(120, MINUTE),
+
     // `POST /admin/seed-invitations`, per client IP and charged before the token
     // check — this is what throttles guessing `LUNORA_ADMIN_TOKEN`. Untiered: the
     // caller has no identity to derive a tier from.
     "admin/seedInvitations": Ratelimit.fixedWindow(5, 15 * MINUTE),
+    // Admin writes (roles, bans, sessions, impersonation log, invitations, gateway
+    // keys). Admins always resolve to the premium tier; the free entry exists so
+    // the base resolves for every tier like the rest.
+    "admin/write:free": Ratelimit.fixedWindow(10, MINUTE),
 
+    "admin/write:premium": Ratelimit.fixedWindow(30, MINUTE),
     // API usage limits
     "api/usage:free": Ratelimit.tokenBucket(100, MINUTE, 200),
     "api/usage:premium": Ratelimit.tokenBucket(200, MINUTE, 400),
-    "api/usage:public": Ratelimit.tokenBucket(50, MINUTE, 100),
 
+    "api/usage:public": Ratelimit.tokenBucket(50, MINUTE, 100),
     // `auth/api-keys.ts#createScopedApiKey` — minting a public-API key.
     "apiKeys/create:free": Ratelimit.fixedWindow(10, HOUR),
     "apiKeys/create:premium": Ratelimit.fixedWindow(20, HOUR),
-
     // Auth limits
     "auth/failure:free": Ratelimit.fixedWindow(5, 15 * MINUTE),
     "auth/failure:premium": Ratelimit.fixedWindow(10, 15 * MINUTE),
-    "auth/failure:public": Ratelimit.fixedWindow(3, 15 * MINUTE),
 
+    "auth/failure:public": Ratelimit.fixedWindow(3, 15 * MINUTE),
     // Billing limits
     // `billing/checkout.ts` — each call is an outbound Creem request.
     "billing/checkout:free": Ratelimit.fixedWindow(10, HOUR),
     "billing/checkout:premium": Ratelimit.fixedWindow(20, HOUR),
+
     "billing/update:free": Ratelimit.fixedWindow(5, MINUTE),
     "billing/update:premium": Ratelimit.fixedWindow(15, MINUTE),
     // Browser automation limits
@@ -90,44 +103,51 @@ export const RATE_LIMIT_CONFIGS = {
 
     "browser/action:premium": Ratelimit.fixedWindow(200, HOUR),
     "browser/action:public": Ratelimit.fixedWindow(5, HOUR),
-    "byok/decrypt:free": Ratelimit.fixedWindow(100, MINUTE),
 
+    "byok/decrypt:free": Ratelimit.fixedWindow(100, MINUTE),
     "byok/decrypt:premium": Ratelimit.fixedWindow(300, MINUTE),
+
     // BYOK key operation limits
     "byok/save:free": Ratelimit.fixedWindow(10, 15 * MINUTE),
     "byok/save:premium": Ratelimit.fixedWindow(30, 15 * MINUTE),
 
+    "changelog/read:free": Ratelimit.fixedWindow(600, MINUTE),
+    "changelog/read:premium": Ratelimit.fixedWindow(600, MINUTE),
+
+    // `getChangelogs` is an anonymous read of a cached list. Actions carry no client
+    // IP, so this is ONE bucket shared by every anonymous visitor: generous, to bound
+    // abuse without throttling a busy landing page.
+    "changelog/read:public": Ratelimit.fixedWindow(600, MINUTE),
+
     // Chat import limits
     "chat-import/start:free": Ratelimit.fixedWindow(5, HOUR),
     "chat-import/start:premium": Ratelimit.fixedWindow(20, HOUR),
-
     // Chat attachments taken into chat files (`file.ts#finalizeChatUpload`):
     // each is up to 25 MB hashed and re-stored. A burst covers dropping a
     // handful of files at once.
     "chat/attachmentUpload:free": Ratelimit.tokenBucket(20, MINUTE, 30),
-    "chat/attachmentUpload:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
 
+    "chat/attachmentUpload:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
     // Composer ghost text (`chat/autocomplete.ts`): one tiny utility-model call
     // per pause in typing — frequent by design, so generous, but bounded. Its
     // own family so typing never spends the optimizer's or translate's budget.
     "chat/autocomplete:free": Ratelimit.tokenBucket(30, MINUTE, 40),
-    "chat/autocomplete:premium": Ratelimit.tokenBucket(60, MINUTE, 80),
 
+    "chat/autocomplete:premium": Ratelimit.tokenBucket(60, MINUTE, 80),
     // Chat CRUD limits
     "chat/create:free": Ratelimit.fixedWindow(20, MINUTE),
     "chat/create:premium": Ratelimit.fixedWindow(60, MINUTE),
 
     // Daily content limits per user tier - AUDIO
     "chat/dailyAudio:anonymous": Ratelimit.fixedWindow(1, DAY),
-
     "chat/dailyAudio:free": Ratelimit.fixedWindow(5, DAY),
     "chat/dailyAudio:premium": Ratelimit.fixedWindow(100, DAY),
+
     // Daily content limits per user tier - IMAGE
     "chat/dailyImage:anonymous": Ratelimit.fixedWindow(1, DAY),
-
     "chat/dailyImage:free": Ratelimit.fixedWindow(5, DAY),
-    "chat/dailyImage:premium": Ratelimit.fixedWindow(100, DAY),
 
+    "chat/dailyImage:premium": Ratelimit.fixedWindow(100, DAY),
     // Daily content limits per user tier - MUSIC
     // Music renders are cheaper than video (Stable Audio ~$0.20/render vs
     // video's $0.50–$1.50) so the free-tier ceiling is higher.
@@ -144,10 +164,8 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/dailyRetrieve:premium": Ratelimit.fixedWindow(500, DAY),
     // Daily content limits per user tier - TEXT
     "chat/dailyText:anonymous": Ratelimit.fixedWindow(10, DAY),
-
     "chat/dailyText:free": Ratelimit.fixedWindow(20, DAY),
     "chat/dailyText:premium": Ratelimit.fixedWindow(1000, DAY),
-
     // Daily content limits per user tier - VIDEO
     // Note: "chat/dailyVideo:anonymous" is intentionally omitted (limit=0 means always blocked)
     // The calling code already handles capacity===0 by returning early.
@@ -155,29 +173,30 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/dailyVideo:premium": Ratelimit.fixedWindow(100, DAY),
     "chat/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "chat/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
-
     // Follow-up suggestions: an LLM call per invocation. Its own family, so the
     // suggestions a client fetches after every reply cannot eat the budget of
     // real thread edits (`chat/update`), and vice versa.
     "chat/followups:free": Ratelimit.fixedWindow(30, MINUTE),
     "chat/followups:premium": Ratelimit.fixedWindow(100, MINUTE),
     "chat/globalPromptImprovement": Ratelimit.tokenBucket(1000, MINUTE, 1500),
+
     // Link preview cards (`chat/link-preview.ts`): charged only on a cache miss,
     // each one outbound fetch of at most 5s. A thread scrolled into view can ask
     // for several at once, hence the burst.
     "chat/linkPreview:free": Ratelimit.tokenBucket(30, MINUTE, 60),
+
     "chat/linkPreview:premium": Ratelimit.tokenBucket(90, MINUTE, 150),
     // Chat/AI limits (tiered)
     "chat/message:free": Ratelimit.tokenBucket(30, MINUTE, 50),
     "chat/message:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
     "chat/message:public": Ratelimit.fixedWindow(10, HOUR),
+
     "chat/promptImprovement:free": Ratelimit.tokenBucket(10, MINUTE, 15),
     "chat/promptImprovement:premium": Ratelimit.tokenBucket(30, MINUTE, 50),
     "chat/promptImprovement:public": Ratelimit.fixedWindow(3, HOUR),
     "chat/stream:free": Ratelimit.tokenBucket(30, MINUTE, 50),
 
     "chat/stream:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
-
     // "Translate" on a message: one short utility-model call per cache miss
     // (`chat/translate.ts`); its own family so it does not spend the optimizer's.
     // No `:public` tier: the action requires a session.
@@ -185,14 +204,12 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/translate:premium": Ratelimit.tokenBucket(60, MINUTE, 100),
     "chat/update:free": Ratelimit.fixedWindow(30, MINUTE),
     "chat/update:premium": Ratelimit.fixedWindow(100, MINUTE),
-
     // Coding-agent delegation (`coding-agents/`): each run is a sandbox for up to
     // 20 minutes on the user's own provider key, on top of one-at-a-time.
     "codingAgent/pr:free": Ratelimit.fixedWindow(10, HOUR),
     "codingAgent/pr:premium": Ratelimit.fixedWindow(30, HOUR),
     "codingAgent/run:free": Ratelimit.fixedWindow(5, HOUR),
     "codingAgent/run:premium": Ratelimit.fixedWindow(20, HOUR),
-
     // Connector OAuth: start/complete each make outbound discovery, registration
     // and token calls, and disconnect a revocation call.
     "connectors/oauth:free": Ratelimit.fixedWindow(20, MINUTE),
@@ -212,6 +229,9 @@ export const RATE_LIMIT_CONFIGS = {
     "devices/register:premium": Ratelimit.fixedWindow(5, HOUR),
     "devices/relay:free": Ratelimit.fixedWindow(120, MINUTE),
     "devices/relay:premium": Ratelimit.fixedWindow(120, MINUTE),
+    "documents/update:free": Ratelimit.fixedWindow(60, MINUTE),
+
+    "documents/update:premium": Ratelimit.fixedWindow(180, MINUTE),
     // Evals (`evals/functions.ts`). `run` starts a whole dataset of headless agent
     // runs; each case is also charged to the daily chat and task limits
     // (`tasks/account.ts:chargeRound`), so this only paces the starts.
@@ -225,10 +245,11 @@ export const RATE_LIMIT_CONFIGS = {
     "evals/update:premium": Ratelimit.fixedWindow(90, MINUTE),
     // General rate limits
     free: Ratelimit.tokenBucket(40, 10 * SECOND, 40),
+
     // GDPR limits
     "gdpr/request:free": Ratelimit.fixedWindow(3, HOUR),
-
     "gdpr/request:premium": Ratelimit.fixedWindow(5, HOUR),
+
     // Adding a file to the knowledge base schedules its ingestion.
     "knowledge/add:free": Ratelimit.fixedWindow(20, MINUTE),
     "knowledge/add:premium": Ratelimit.fixedWindow(60, MINUTE),
@@ -245,15 +266,17 @@ export const RATE_LIMIT_CONFIGS = {
     // Knowledge-base search over the public API; each call embeds the query.
     "knowledge/search:free": Ratelimit.fixedWindow(30, MINUTE),
     "knowledge/search:premium": Ratelimit.fixedWindow(120, MINUTE),
+    // Reads of the signed-in user's own library and usage (prompts, skills,
+    // usage, notification rules). Panels and pickers re-read these often.
+    "library/read:free": Ratelimit.fixedWindow(120, MINUTE),
+    "library/read:premium": Ratelimit.fixedWindow(300, MINUTE),
     // MCP App proxy (readResource / callTool) — guards user-supplied
     // MCP server URLs from being abused as a connection-pool DoS vector.
     "mcp/proxy:free": Ratelimit.tokenBucket(20, MINUTE, 30),
-
     "mcp/proxy:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
     // MCP Registry browsing (settings page) — each uncached search is an
     // outbound registry call, so free text cannot be an unbounded fan-out.
     "mcp/registry:free": Ratelimit.tokenBucket(30, MINUTE, 40),
-
     "mcp/registry:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
     // Memory management (edit / pin / retype / delete / dismiss a digest)
     "memory/update:free": Ratelimit.fixedWindow(60, MINUTE),
@@ -282,32 +305,36 @@ export const RATE_LIMIT_CONFIGS = {
     // spend the owner's platform quota.
     "messenger/pairAttempt": Ratelimit.fixedWindow(5, 15 * MINUTE),
     "messenger/pairAttemptConnection": Ratelimit.fixedWindow(30, 15 * MINUTE),
+
     "messenger/privateNotice": Ratelimit.fixedWindow(1, HOUR),
+
     // Notifications (`notifications/`): read state and the Daily Brief toggle,
     // and push subscribe/unsubscribe (each a browser permission prompt at most).
     "notifications/push:free": Ratelimit.fixedWindow(10, MINUTE),
     "notifications/push:premium": Ratelimit.fixedWindow(30, MINUTE),
     "notifications/update:free": Ratelimit.fixedWindow(60, MINUTE),
     "notifications/update:premium": Ratelimit.fixedWindow(180, MINUTE),
+    "organization/accept:free": Ratelimit.fixedWindow(10, MINUTE),
+    "organization/accept:premium": Ratelimit.fixedWindow(30, MINUTE),
+
     "organization/cancelInvite:free": Ratelimit.fixedWindow(10, MINUTE),
     "organization/cancelInvite:premium": Ratelimit.fixedWindow(30, MINUTE),
     // Organization limits
     "organization/create:free": Ratelimit.fixedWindow(3, HOUR),
     "organization/create:premium": Ratelimit.fixedWindow(10, HOUR),
+    "organization/delete:free": Ratelimit.fixedWindow(3, HOUR),
+    "organization/delete:premium": Ratelimit.fixedWindow(10, HOUR),
     "organization/invite:free": Ratelimit.fixedWindow(5, MINUTE),
     "organization/invite:premium": Ratelimit.fixedWindow(20, MINUTE),
     "organization/leave:free": Ratelimit.fixedWindow(3, MINUTE),
     "organization/leave:premium": Ratelimit.fixedWindow(10, MINUTE),
-
     "organization/rejectInvite:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "organization/rejectInvite:premium": Ratelimit.fixedWindow(30, MINUTE),
     "organization/removeMember:free": Ratelimit.fixedWindow(5, MINUTE),
     "organization/removeMember:premium": Ratelimit.fixedWindow(15, MINUTE),
     "organization/setActive:free": Ratelimit.fixedWindow(10, MINUTE),
     "organization/setActive:premium": Ratelimit.fixedWindow(30, MINUTE),
     "organization/update:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "organization/update:premium": Ratelimit.fixedWindow(30, MINUTE),
     "organization/updateRole:free": Ratelimit.fixedWindow(5, MINUTE),
     "organization/updateRole:premium": Ratelimit.fixedWindow(15, MINUTE),
@@ -315,6 +342,7 @@ export const RATE_LIMIT_CONFIGS = {
     // debounce), so it is sized for continuous typing; `agent` is an LLM call.
     "pages/agent:free": Ratelimit.tokenBucket(10, MINUTE, 20),
     "pages/agent:premium": Ratelimit.tokenBucket(30, MINUTE, 60),
+
     "pages/comment:free": Ratelimit.fixedWindow(30, MINUTE),
     "pages/comment:premium": Ratelimit.fixedWindow(100, MINUTE),
     "pages/create:free": Ratelimit.fixedWindow(20, MINUTE),
@@ -323,8 +351,10 @@ export const RATE_LIMIT_CONFIGS = {
     "pages/delete:premium": Ratelimit.fixedWindow(60, MINUTE),
     "pages/presence:free": Ratelimit.fixedWindow(30, MINUTE),
     "pages/presence:premium": Ratelimit.fixedWindow(60, MINUTE),
+
     "pages/save:free": Ratelimit.fixedWindow(90, MINUTE),
     "pages/save:premium": Ratelimit.fixedWindow(240, MINUTE),
+
     "pages/share:free": Ratelimit.fixedWindow(10, MINUTE),
     "pages/share:premium": Ratelimit.fixedWindow(30, MINUTE),
     "pages/update:free": Ratelimit.fixedWindow(60, MINUTE),
@@ -332,39 +362,37 @@ export const RATE_LIMIT_CONFIGS = {
     // Pins limits
     "pins/create:free": Ratelimit.fixedWindow(20, MINUTE),
     "pins/create:premium": Ratelimit.fixedWindow(60, MINUTE),
+
     "pins/delete:free": Ratelimit.fixedWindow(20, MINUTE),
 
     "pins/delete:premium": Ratelimit.fixedWindow(60, MINUTE),
+
     "pins/update:free": Ratelimit.fixedWindow(30, MINUTE),
     "pins/update:premium": Ratelimit.fixedWindow(100, MINUTE),
     premium: Ratelimit.tokenBucket(100, 10 * SECOND, 100),
     // Project limits
     "project/create:free": Ratelimit.fixedWindow(5, MINUTE),
+
     "project/create:premium": Ratelimit.fixedWindow(20, MINUTE),
     "project/member:free": Ratelimit.fixedWindow(10, MINUTE),
     "project/member:premium": Ratelimit.fixedWindow(30, MINUTE),
-
     "project/update:free": Ratelimit.fixedWindow(20, MINUTE),
     "project/update:premium": Ratelimit.fixedWindow(60, MINUTE),
-
     // Projects (plural) aliases used by projects/functions.ts
     "projects/create:free": Ratelimit.fixedWindow(5, MINUTE),
     "projects/create:premium": Ratelimit.fixedWindow(20, MINUTE),
     "projects/delete:free": Ratelimit.fixedWindow(5, MINUTE),
     "projects/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
     "projects/update:free": Ratelimit.fixedWindow(20, MINUTE),
-    "projects/update:premium": Ratelimit.fixedWindow(60, MINUTE),
 
+    "projects/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Prompts limits
     "prompts/create:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "prompts/create:premium": Ratelimit.fixedWindow(30, MINUTE),
-
     "prompts/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "prompts/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "prompts/update:free": Ratelimit.fixedWindow(20, MINUTE),
     "prompts/update:premium": Ratelimit.fixedWindow(60, MINUTE),
-
     public: Ratelimit.tokenBucket(20, 10 * SECOND, 20),
     // Public v1 API (`public-api/router.ts`): PER-KEY limits (identifier = the
     // key id), applied before any procedure runs; the procedure's own per-user
@@ -380,6 +408,18 @@ export const RATE_LIMIT_CONFIGS = {
     "sandbox/execute:public": Ratelimit.fixedWindow(5, HOUR),
     // Scraper limits (admin only)
     scraper: Ratelimit.fixedWindow(10, MINUTE),
+    // Settings are written on every toggle and autosave; a loop of them is abuse, not use.
+    "settings/update:free": Ratelimit.fixedWindow(60, MINUTE),
+    "settings/update:premium": Ratelimit.fixedWindow(180, MINUTE),
+    "share/view:free": Ratelimit.fixedWindow(600, MINUTE),
+    "share/view:premium": Ratelimit.fixedWindow(600, MINUTE),
+    // Public share views (`getPublicThread`, `getPublicPage`, `getPublicWorkflow`),
+    // bucketed by the share token (`rateLimit`'s `keyBy`), so one link's traffic
+    // never throttles another link. It is a FLOOD bound on the whole link, shared
+    // by all its readers, not a per-visitor quota: a popular link must stay open.
+    // Guessing tokens gets no help from this; the token's length is the defence.
+    // The free and premium entries are only read by a signed-in viewer's call.
+    "share/view:public": Ratelimit.fixedWindow(600, MINUTE),
     // Sharing limits
     "sharing/create:free": Ratelimit.fixedWindow(5, MINUTE),
 
@@ -403,11 +443,14 @@ export const RATE_LIMIT_CONFIGS = {
     "skills/create:free": Ratelimit.fixedWindow(10, MINUTE),
     "skills/create:premium": Ratelimit.fixedWindow(30, MINUTE),
     "skills/delete:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "skills/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "skills/invoke:free": Ratelimit.tokenBucket(30, MINUTE, 50),
     "skills/invoke:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
     "skills/update:free": Ratelimit.fixedWindow(20, MINUTE),
+
     "skills/update:premium": Ratelimit.fixedWindow(60, MINUTE),
+
     // Sub-agent starts (`sub-agents/functions.ts`), on top of the task quotas
     // each start is charged (`tasks/account.ts:chargeRound`) and the fan-out cap.
     "subAgents/run:free": Ratelimit.fixedWindow(10, HOUR),
@@ -417,12 +460,12 @@ export const RATE_LIMIT_CONFIGS = {
     "tag/create:premium": Ratelimit.fixedWindow(30, MINUTE),
     "tag/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "tag/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
+
     "tag/update:free": Ratelimit.fixedWindow(20, MINUTE),
     "tag/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Tasks and goals (`tasks/functions.ts`). `run` also covers review decisions:
     // each one can start a full headless agent run plus a verifier call.
     "tasks/create:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "tasks/create:premium": Ratelimit.fixedWindow(30, MINUTE),
     // Rounds per day, on top of `chat/dailyText` (`tasks/account.ts:chargeRound`):
     // a recurring task must not spend a user's whole message allowance.
@@ -430,25 +473,25 @@ export const RATE_LIMIT_CONFIGS = {
     "tasks/dailyRuns:premium": Ratelimit.fixedWindow(200, DAY),
     "tasks/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "tasks/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
+
     "tasks/run:free": Ratelimit.fixedWindow(5, MINUTE),
+
     "tasks/run:premium": Ratelimit.fixedWindow(20, MINUTE),
     "tasks/update:free": Ratelimit.fixedWindow(20, MINUTE),
-
     "tasks/update:premium": Ratelimit.fixedWindow(60, MINUTE),
+
     // Team limits
     "team/addMember:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/addMember:premium": Ratelimit.fixedWindow(30, MINUTE),
     "team/create:free": Ratelimit.fixedWindow(5, MINUTE),
-
     "team/create:premium": Ratelimit.fixedWindow(15, MINUTE),
-
     "team/delete:free": Ratelimit.fixedWindow(5, MINUTE),
+
     "team/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/leave:free": Ratelimit.fixedWindow(5, MINUTE),
     "team/leave:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/removeMember:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/removeMember:premium": Ratelimit.fixedWindow(30, MINUTE),
-
     "team/setActive:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/setActive:premium": Ratelimit.fixedWindow(30, MINUTE),
     "team/update:free": Ratelimit.fixedWindow(10, MINUTE),
@@ -457,14 +500,11 @@ export const RATE_LIMIT_CONFIGS = {
     "team/updateRole:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/updateSettings:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/updateSettings:premium": Ratelimit.fixedWindow(30, MINUTE),
-
     // Trigger limits
     "triggers/create:free": Ratelimit.fixedWindow(5, MINUTE),
-
     "triggers/create:premium": Ratelimit.fixedWindow(20, MINUTE),
     "triggers/delete:free": Ratelimit.fixedWindow(5, MINUTE),
     "triggers/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
-
     "triggers/update:free": Ratelimit.fixedWindow(10, MINUTE),
     "triggers/update:premium": Ratelimit.fixedWindow(30, MINUTE),
     // Inbound webhook deliveries per trigger (unauthenticated until the HMAC check).
@@ -474,10 +514,15 @@ export const RATE_LIMIT_CONFIGS = {
     // a caller can push. Untiered — the route knows the caller's id, not their
     // plan; the per-plan limits sit on the finalize procedures.
     "uploads/create": Ratelimit.tokenBucket(60, MINUTE, 90),
+    // A backfill walks the whole history, so it is rare by design.
+    "usage/backfill:free": Ratelimit.fixedWindow(2, HOUR),
+    "usage/backfill:premium": Ratelimit.fixedWindow(5, HOUR),
     // Vault limits
     "vault/delete:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "vault/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
+    "vault/download:free": Ratelimit.fixedWindow(30, MINUTE),
+
+    "vault/download:premium": Ratelimit.fixedWindow(90, MINUTE),
     "vault/upload:free": Ratelimit.fixedWindow(10, MINUTE),
     "vault/upload:premium": Ratelimit.fixedWindow(30, MINUTE),
     vercel: Ratelimit.tokenBucket(3, 10 * SECOND, 3),
@@ -499,56 +544,11 @@ export const RATE_LIMIT_CONFIGS = {
     // out into many model calls, so this is deliberately tighter than CRUD.
     "workflow/execute:free": Ratelimit.fixedWindow(5, MINUTE),
     "workflow/execute:premium": Ratelimit.fixedWindow(20, MINUTE),
-    // Settings are written on every toggle and autosave; a loop of them is abuse, not use.
-    "settings/update:free": Ratelimit.fixedWindow(60, MINUTE),
-    "settings/update:premium": Ratelimit.fixedWindow(180, MINUTE),
-    "organization/accept:free": Ratelimit.fixedWindow(10, MINUTE),
-    "organization/accept:premium": Ratelimit.fixedWindow(30, MINUTE),
-    "organization/delete:free": Ratelimit.fixedWindow(3, HOUR),
-    "organization/delete:premium": Ratelimit.fixedWindow(10, HOUR),
-    // A backfill walks the whole history, so it is rare by design.
-    "usage/backfill:free": Ratelimit.fixedWindow(2, HOUR),
-    "usage/backfill:premium": Ratelimit.fixedWindow(5, HOUR),
-    "vault/download:free": Ratelimit.fixedWindow(30, MINUTE),
-    "vault/download:premium": Ratelimit.fixedWindow(90, MINUTE),
     // Presence heartbeats run every few seconds per open editor.
     "workflow/presence:free": Ratelimit.fixedWindow(60, MINUTE),
     "workflow/presence:premium": Ratelimit.fixedWindow(180, MINUTE),
     "workflow/save:free": Ratelimit.fixedWindow(60, MINUTE),
     "workflow/save:premium": Ratelimit.fixedWindow(180, MINUTE),
-
-    // Admin writes (roles, bans, sessions, impersonation log, invitations, gateway
-    // keys). Admins always resolve to the premium tier; the free entry exists so
-    // the base resolves for every tier like the rest.
-    "admin/write:free": Ratelimit.fixedWindow(10, MINUTE),
-    "admin/write:premium": Ratelimit.fixedWindow(30, MINUTE),
-    // Admin reads: dashboards and lists.
-    "admin/read:free": Ratelimit.fixedWindow(60, MINUTE),
-    "admin/read:premium": Ratelimit.fixedWindow(120, MINUTE),
-    // Admin cleanup: a bulk delete over every eligible account.
-    "admin/cleanup:free": Ratelimit.fixedWindow(5, HOUR),
-    "admin/cleanup:premium": Ratelimit.fixedWindow(10, HOUR),
-    // Reads of the signed-in user's own library and usage (prompts, skills,
-    // usage, notification rules). Panels and pickers re-read these often.
-    "library/read:free": Ratelimit.fixedWindow(120, MINUTE),
-    "library/read:premium": Ratelimit.fixedWindow(300, MINUTE),
-    // Public share views (`getPublicThread`, `getPublicPage`, `getPublicWorkflow`),
-    // bucketed by the share token (`rateLimit`'s `keyBy`), so one link's traffic
-    // never throttles another link. It is a FLOOD bound on the whole link, shared
-    // by all its readers, not a per-visitor quota: a popular link must stay open.
-    // Guessing tokens gets no help from this; the token's length is the defence.
-    // The free and premium entries are only read by a signed-in viewer's call.
-    "share/view:public": Ratelimit.fixedWindow(600, MINUTE),
-    "share/view:free": Ratelimit.fixedWindow(600, MINUTE),
-    "share/view:premium": Ratelimit.fixedWindow(600, MINUTE),
-    // `getChangelogs` is an anonymous read of a cached list. Actions carry no client
-    // IP, so this is ONE bucket shared by every anonymous visitor: generous, to bound
-    // abuse without throttling a busy landing page.
-    "changelog/read:public": Ratelimit.fixedWindow(600, MINUTE),
-    "changelog/read:free": Ratelimit.fixedWindow(600, MINUTE),
-    "changelog/read:premium": Ratelimit.fixedWindow(600, MINUTE),
-    "documents/update:free": Ratelimit.fixedWindow(60, MINUTE),
-    "documents/update:premium": Ratelimit.fixedWindow(180, MINUTE),
 } satisfies Record<string, RateLimitConfig>;
 
 /**
@@ -712,12 +712,12 @@ export const rateLimitGuard = async (
     context: {
         /** Tokens to take at once — one per unit of work the call starts. Default 1. */
         count?: number;
+        /** Bucket to count against, when the caller is not the bucket (see `rateLimit`'s `keyBy`). */
+        identifier?: string;
         // `RateLimitName`, not `string`: this is the BASE name, and typing it
         // loosely is what let `rateLimit("skills/create")` reach production
         // naming a limit that was never in the table.
         rateLimitKey: RateLimitName;
-        /** Bucket to count against, when the caller is not the bucket (see `rateLimit`'s `keyBy`). */
-        identifier?: string;
         user: Pick<SessionUser, "userId" | "plan"> | null;
     } & (ActionContext | MutationContext),
 ): Promise<void> => {

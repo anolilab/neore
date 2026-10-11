@@ -12,6 +12,17 @@
  * `services/embeddings` is deliberately absent: nothing in the backend calls it.
  */
 export default {
+    // Reviewed ERRORs. The team add writes an existing org member; the subject field comes from args by design:
+    advisor: {
+        accept: [
+            {
+                exportName: "addTeamMember",
+                file: "auth/team",
+                reason: "Adds another user by design. Requires canManageTeamMembers for the team, the team must belong to the caller's organization, and the target must already be a member of it.",
+                rule: "owner_field_from_args_not_auth",
+            },
+        ],
+    },
     services: {
         browserRenderer: { dir: "../services/browser-renderer" },
         documentParser: { dir: "../services/document-parser" },
@@ -27,16 +38,5 @@ export default {
         // serves `fetch`, so the fetch typing is the right one anyway.
         llmGateway: { dir: "../services/llm-gateway" },
         nsfwChecker: { dir: "../services/nsfw-checker" },
-    },
-    // Reviewed ERRORs. The team add writes an existing org member; the subject field comes from args by design:
-    advisor: {
-        accept: [
-            {
-                exportName: "addTeamMember",
-                file: "auth/team",
-                reason: "Adds another user by design. Requires canManageTeamMembers for the team, the team must belong to the caller's organization, and the target must already be a member of it.",
-                rule: "owner_field_from_args_not_auth",
-            },
-        ],
     },
 };

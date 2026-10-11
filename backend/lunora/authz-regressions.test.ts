@@ -48,9 +48,9 @@ const MODULES = {
     projects_functions: async () => await import("./projects/functions"),
     prompts_functions: async () => await import("./prompts/functions"),
     vault_functions: async () => await import("./vault/functions"),
+    workflow_fork: async () => await import("./workflow/fork"),
     workflow_functions: async () => await import("./workflow/functions"),
     workflow_gallery: async () => await import("./workflow/gallery"),
-    workflow_fork: async () => await import("./workflow/fork"),
 } as const;
 
 /** A procedure by its generated path, e.g. `procedureAt("chat_functions", "getChildThreads")`. */
@@ -926,6 +926,7 @@ describe("stored media survives the owner's legitimate copies", () => {
         const countOf = async () => (await run(async (context) => await context.db.get(sourceProjectId))).galleryForkCount;
 
         const first = await fork();
+
         await fork();
         expect(await countOf()).toBe(2);
 

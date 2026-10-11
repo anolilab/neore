@@ -32,7 +32,7 @@ export const pruneRetainedActivity = internalMutation
     .input({})
     .output(v.object({ subAgentRuns: v.number(), usageDaily: v.number() }))
     .mutation(async ({ ctx }) => {
-        const now = ctx.now;
+        const {now} = ctx;
         const [usageDaily, subAgentRuns] = await Promise.all([
             pruneUsageDaysBefore(ctx, usageDailyCutoffDate(now), RETENTION_BATCH),
             pruneSubAgentRunsBefore(ctx, now - SUB_AGENT_RUN_RETENTION_DAYS * DAY_MS, RETENTION_BATCH),

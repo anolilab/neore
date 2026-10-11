@@ -297,7 +297,7 @@ export const switchBranch = authMutation
 
         await ctx.db.patch(args.threadId, { activeLeafMessageId: leaf._id });
 
-        ctx.log.event("agent.switch_branch", { threadId: args.threadId, leafFound: true });
+        ctx.log.event("agent.switch_branch", { leafFound: true, threadId: args.threadId });
 
         return null;
     });

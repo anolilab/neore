@@ -48,7 +48,7 @@ export const heartbeat = authMutation
 
         await requireWorkflowAccess(context, projectId, userId);
 
-        const now = context.now;
+        const {now} = context;
 
         // Check if presence record already exists for this session
         const existing = await context.db
@@ -156,7 +156,7 @@ export const listPresence = authQuery
     .query(async ({ args: { projectId }, ctx: context }) => {
         await requireWorkflowAccess(context, projectId, context.user.userId);
 
-        const now = context.now;
+        const {now} = context;
 
         const allPresence = await context.db
             .query("workflowPresence")
@@ -196,7 +196,7 @@ export const checkNodeLock = authQuery
 
         await requireWorkflowAccess(context, projectId, userId);
 
-        const now = context.now;
+        const {now} = context;
 
         const allPresence = await context.db
             .query("workflowPresence")

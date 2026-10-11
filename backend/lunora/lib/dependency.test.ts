@@ -17,7 +17,7 @@ describe("withDependency", () => {
         }).catch((error: unknown) => error);
 
         expect(failure).toBeInstanceOf(LunoraError);
-        expect(failure).toMatchObject({ code: "SERVICE_UNAVAILABLE", message: "mail failed", cause });
+        expect(failure).toMatchObject({ cause, code: "SERVICE_UNAVAILABLE", message: "mail failed" });
     });
 
     it("passes a coded error from the call through unchanged", async () => {
