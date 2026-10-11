@@ -206,7 +206,7 @@ export const compressThreadMemories = internalAction
 
         // LLM synthesis
         let synthesizedFacts: z.infer<typeof compressedFactSchema>[] = [];
-        let usage: { inputTokens?: number; outputTokens?: number } = {};
+        let usage: { inputTokens?: number; outputTokens?: number };
 
         try {
             const model = await getUtilityModel(gatewayFetch(ctx), { threadId: args.threadId, userId: args.userId });

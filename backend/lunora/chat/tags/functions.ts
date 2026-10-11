@@ -108,7 +108,7 @@ export const createThreadTag = authMutation
             throw new LunoraError("CONFLICT", "A tag with this name already exists");
         }
 
-        const now = context.now;
+        const {now} = context;
         const tagId = await context.db.insert("threadTags", {
             color,
             createdAt: now,
@@ -177,7 +177,7 @@ export const reorderThreadTags = authMutation
             throw new LunoraError("BAD_REQUEST", error);
         }
 
-        const now = context.now;
+        const {now} = context;
 
         await Promise.all(tagIds.map((tagId, order) => context.db.patch(tagId as Id<"threadTags">, { order, updatedAt: now })));
 

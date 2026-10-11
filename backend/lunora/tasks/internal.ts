@@ -247,7 +247,7 @@ export const claimRound = internalMutation
             }
         }
 
-        const now = ctx.now;
+        const {now} = ctx;
         const runId = await ctx.db.insert("taskRuns", {
             cycle,
             origin: round > 0 ? "repair" : origin,
@@ -367,7 +367,7 @@ export const completeRound = internalMutation
         }
 
         const { outcome } = args;
-        const now = ctx.now;
+        const {now} = ctx;
         const finalAnswer = outcome.kind === "error" ? undefined : outcome.finalAnswer.slice(0, FINAL_ANSWER_MAX);
         // What every outcome records on the run row; absent values stay absent.
         const runResult = withoutUndefined({ completedAt: now, finalAnswer, threadId: args.threadId });
@@ -526,7 +526,7 @@ export const checkDueTasks = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx }) => {
-        const now = ctx.now;
+        const {now} = ctx;
 
         const due = pickFairRecurrences(
             await ctx.db

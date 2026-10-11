@@ -4,7 +4,7 @@ import { purgeExpiredToolApprovalRuns } from "../../lib/tool-approval-cleanup";
 const BATCH_SIZE = 100;
 
 export const cleanupExpiredStreams = internalMutation.input({}).mutation(async ({ ctx }) => {
-    const now = ctx.now;
+    const {now} = ctx;
 
     // Query all streams that have expired, regardless of status
     // This is more efficient than checking status + calculating expiration

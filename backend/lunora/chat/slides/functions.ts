@@ -193,7 +193,7 @@ export const createPresentation = authMutation
             throw new LunoraError("NOT_FOUND", "Thread not found");
         }
 
-        const now = context.now;
+        const {now} = context;
         const insertedId = await context.db.insert("presentations", {
             createdAt: now,
             description,
@@ -225,7 +225,7 @@ export const createSlide = authMutation
     .mutation(async ({ args: { htmlContent, presentationId, slideNumber, title }, ctx: context }) => {
         await requireOwnedPresentation(context, presentationId as Id<"presentations">, context.user.userId);
 
-        const now = context.now;
+        const {now} = context;
 
         // Check if slide already exists (upsert semantics)
         const existing = await context.db
@@ -274,7 +274,7 @@ export const updateSlide = authMutation
     .mutation(async ({ args: { htmlContent, slideId, title }, ctx: context }) => {
         const slide = await requireOwnedSlide(context, slideId as Id<"presentationSlides">, context.user.userId);
 
-        const now = context.now;
+        const {now} = context;
         const patch: { htmlContent?: string; title?: string; updatedAt: number } = { updatedAt: now };
 
         if (title !== undefined) {
@@ -307,7 +307,7 @@ export const deleteSlide = authMutation
         await context.db.delete(slideId as Id<"presentationSlides">);
 
         // Update presentation timestamp
-        const now = context.now;
+        const {now} = context;
 
         await context.db.patch(slide.presentationId, { updatedAt: now });
 

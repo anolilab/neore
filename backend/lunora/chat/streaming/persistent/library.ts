@@ -31,7 +31,7 @@ export const createStream = internalMutation
         userId: v.string(),
     })
     .mutation(async ({ args, ctx }) => {
-        const now = ctx.now;
+        const {now} = ctx;
         const insertedId = await ctx.db.insert("persistentStreams", {
             expiresAt: now + STREAM_TTL_MS,
             messageId: args.messageId,
@@ -277,7 +277,7 @@ export const getChunksAfter = internalQuery
 const BATCH_SIZE = 100;
 
 export const cleanupExpiredStreams = internalMutation.input({}).mutation(async ({ ctx }) => {
-    const now = ctx.now;
+    const {now} = ctx;
     // Use by_expiresAt index to efficiently find expired streams
     const expiredStreams = await ctx.db
         .query("persistentStreams")

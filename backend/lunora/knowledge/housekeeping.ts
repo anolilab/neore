@@ -80,7 +80,7 @@ export const sweepKnowledgeFiles = internalMutation
     .input({})
     .output(v.object({ draining: v.boolean(), reaped: v.number() }))
     .mutation(async ({ ctx }) => {
-        const now = ctx.now;
+        const {now} = ctx;
         const { page: unfinished } = await ctx.db.knowledgeFiles.findMany({
             limit: REAP_BATCH,
             where: { status: { in: ["pending", "processing"] } },

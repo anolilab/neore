@@ -47,7 +47,7 @@ export const createPin = authMutation
     .output(v.string())
     .mutation(async ({ args: { messageId, messageRole, selectedText, threadId }, ctx: context }) => {
         const { userId } = context.user;
-        const now = context.now;
+        const {now} = context;
         const pinId = await context.db.insert("threadPins", {
             createdAt: now,
             messageId,

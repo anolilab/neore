@@ -73,7 +73,7 @@ export const createOAuthState = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { expiresAt, flow, stateHash, target, userId }, ctx }) => {
-        const now = ctx.now;
+        const {now} = ctx;
         const open = await ctx.db
             .query("oauthStates")
             .withIndex("by_userId", (q) => q.eq("userId", userId))

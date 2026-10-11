@@ -83,7 +83,7 @@ export const readIdentityRows = async (ctx: MutationCtx, { userEmail, userId }: 
         email ? ctx.db.signUpInvitation.findMany({ limit: BATCH, where: { email } }).then((result) => result.page) : Promise.resolve([]),
     ]);
 
-    return { apiKeys, invitations, members, memberCredits, passkeys, signUpInvitations, teamMembers, twoFactors };
+    return { apiKeys, invitations, memberCredits, members, passkeys, signUpInvitations, teamMembers, twoFactors };
 };
 
 export type IdentityRows = Awaited<ReturnType<typeof readIdentityRows>>;

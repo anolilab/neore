@@ -167,7 +167,7 @@ export const createPageInvite = authMutation
             throw new LunoraError("BAD_REQUEST", `An invite lasts between 1 and ${String(MAX_INVITE_DAYS)} days`);
         }
 
-        const now = ctx.now;
+        const {now} = ctx;
         const invites = await loadInvites(ctx, args.pageId);
         const pending = invites.filter((invite) => invite.status === "pending" && invite.expiresAt > now);
 
@@ -369,7 +369,7 @@ export const removePageGrant = authMutation
             await ctx.db.delete(favorite._id);
         }
 
-        ctx.log.event("pages.remove_page_grant", { removedGrant: grant !== null, removedFavorite: favorite !== null });
+        ctx.log.event("pages.remove_page_grant", { removedFavorite: favorite !== null, removedGrant: grant !== null });
 
         return null;
     });

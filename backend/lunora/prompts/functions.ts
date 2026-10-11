@@ -260,7 +260,7 @@ export const createPrompt = authMutation
         // After `assertOwnOrganizationId`, a truthy `organizationId` already equals the caller's active
         // organization, so the identity alone is the value — the write never takes it from `args`.
         const organizationIdToUse = ctx.user.activeOrganization?.id;
-        const now = ctx.now;
+        const {now} = ctx;
 
         await assertPromptQuota(ctx);
 
@@ -343,7 +343,7 @@ export const updatePrompt = authMutation
         }) => {
             const { userId } = ctx.user;
             const organizationId = ctx.user.activeOrganization?.id;
-            const now = ctx.now;
+            const {now} = ctx;
 
             const existing = await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } });
 
@@ -460,7 +460,7 @@ export const recordPromptUsage = authMutation
     .mutation(async ({ args: { promptId }, ctx }) => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
-        const now = ctx.now;
+        const {now} = ctx;
 
         const existing = await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } });
 
@@ -832,7 +832,7 @@ export const restorePromptVersion = authMutation
     .mutation(async ({ args: { promptId, version }, ctx }) => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
-        const now = ctx.now;
+        const {now} = ctx;
 
         // Get the prompt
         const prompt = await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } });
@@ -900,7 +900,7 @@ export const duplicatePrompt = authMutation
     .mutation(async ({ args: { promptId }, ctx }) => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
-        const now = ctx.now;
+        const {now} = ctx;
 
         const existing = await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } });
 
@@ -1000,7 +1000,7 @@ export const setThreadVariables = authMutation
     .output(v.string())
     .mutation(async ({ args: { threadId, variables }, ctx }) => {
         const { userId } = ctx.user;
-        const now = ctx.now;
+        const {now} = ctx;
 
         // Check if thread variables already exist
         const existing = await ctx.db
@@ -1053,7 +1053,7 @@ export const updateThreadVariable = authMutation
     .output(v.string())
     .mutation(async ({ args: { name, threadId, value }, ctx }) => {
         const { userId } = ctx.user;
-        const now = ctx.now;
+        const {now} = ctx;
 
         // Check if thread variables already exist
         const existing = await ctx.db
@@ -1113,7 +1113,7 @@ export const deleteThreadVariable = authMutation
     })
     .mutation(async ({ args: { name, threadId }, ctx }) => {
         const { userId } = ctx.user;
-        const now = ctx.now;
+        const {now} = ctx;
 
         const existing = await ctx.db
             .query("threadVariables")
@@ -1285,7 +1285,7 @@ export const setUserVariableDefaults = authMutation
     .output(v.string())
     .mutation(async ({ args: { variables }, ctx }) => {
         const { userId } = ctx.user;
-        const now = ctx.now;
+        const {now} = ctx;
 
         // Check if defaults already exist for this user
         const existing = await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } });
@@ -1330,7 +1330,7 @@ export const setOrganizationVariableDefaults = authMutation
         }
 
         const organizationId = ctx.user.activeOrganization.id;
-        const now = ctx.now;
+        const {now} = ctx;
 
         const memberRole = ctx.user.activeOrganization.role;
 

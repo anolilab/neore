@@ -25,7 +25,7 @@ export const createPresentation = internalMutation
     })
     .output(v.object({ presentationId: v.id("presentations") }))
     .mutation(async ({ args, ctx }) => {
-        const now = ctx.now;
+        const {now} = ctx;
         const insertedId = await ctx.db.insert("presentations", {
             createdAt: now,
             description: args.description,
@@ -64,7 +64,7 @@ export const createSlide = internalMutation
     })
     .output(v.object({ slideId: v.id("presentationSlides") }))
     .mutation(async ({ args, ctx }) => {
-        const now = ctx.now;
+        const {now} = ctx;
 
         // Upsert: check if slide with same number already exists
         const existing = await ctx.db
@@ -169,7 +169,7 @@ export const updateSlide = internalMutation
             throw new LunoraError("NOT_FOUND", `Slide ${args.slideNumber} not found in presentation`);
         }
 
-        const now = ctx.now;
+        const {now} = ctx;
         const patch: { htmlContent?: string; title?: string; updatedAt: number } = { updatedAt: now };
 
         if (args.title !== undefined) {

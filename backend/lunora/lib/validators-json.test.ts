@@ -32,7 +32,7 @@ describe("vJsonValue", () => {
     it("rejects values a JSON wire cannot carry", () => {
         expect(vJsonValue.safeParse(() => 1).ok).toBe(false);
         expect(vJsonValue.safeParse(new Date()).ok).toBe(false);
-        expect(vJsonValue.safeParse(Number.NaN).ok).toBe(false);
+        expect(vJsonValue.safeParse(NaN).ok).toBe(false);
         expect(vJsonValue.safeParse({ inner: undefined }).ok).toBe(false);
         expect(vJsonValue.safeParse(new Map()).ok).toBe(false);
     });
