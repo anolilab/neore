@@ -159,7 +159,7 @@ export const dispatchDueShards = internalMutation
     .input({})
     .output(v.object({ dispatched: v.number() }))
     .mutation(async ({ ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
         const { page: due } = await ctx.db.shardActivity.findMany({
             limit: DISPATCH_BATCH,
             orderBy: [{ nextDueAt: "asc" }],
@@ -180,7 +180,7 @@ export const dispatchShardHousekeeping = internalMutation
     .input({})
     .output(v.object({ dispatched: v.number() }))
     .mutation(async ({ ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
         const { page: recent } = await ctx.db.shardActivity.findMany({
             limit: DISPATCH_BATCH * 5,
             orderBy: [{ lastActiveAt: "desc" }],
@@ -207,7 +207,7 @@ export const runShardTick = internalMutation
         // Also schedules `checkDueTasks` (see `triggers/schedule.ts`).
         await ctx.runMutation(internal.triggers.schedule.checkDueTriggers, {});
 
-        const {now} = ctx;
+        const { now } = ctx;
         const [trigger, task] = await Promise.all([
             ctx.db
                 .query("triggers")

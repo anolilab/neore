@@ -31,7 +31,7 @@ export const createSession = internalMutation
         userId: v.string(),
     })
     .mutation(async ({ args: { sandboxId, templateId, threadId, timeoutMs, userId }, ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
         const insertedId = await ctx.db.insert("sandboxSessions", {
             lastActivityAt: now,
             sandboxId,

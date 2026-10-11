@@ -357,7 +357,7 @@ export const createSkill = authMutation
             }
 
             const organizationIdToUse = organizationId || activeOrganizationId;
-            const {now} = ctx;
+            const { now } = ctx;
 
             // Validate slug format
             const slugValidation = validateSlug(slug);
@@ -478,7 +478,7 @@ export const updateSkill = authMutation
         }) => {
             const { userId } = ctx.user;
             const organizationId = ctx.user.activeOrganization?.id;
-            const {now} = ctx;
+            const { now } = ctx;
 
             const existing = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
 
@@ -631,7 +631,7 @@ export const setSkillEnabled = authMutation
     })
     .mutation(async ({ args: { enabled, skillId }, ctx }) => {
         const { userId } = ctx.user;
-        const {now} = ctx;
+        const { now } = ctx;
 
         await assertSkillReadable(ctx, skillId, userId, ctx.user.activeOrganization?.id);
 
@@ -670,7 +670,7 @@ export const setSkillAutoRun = authMutation
     })
     .mutation(async ({ args: { autoRun, skillId }, ctx }) => {
         const { userId } = ctx.user;
-        const {now} = ctx;
+        const { now } = ctx;
 
         await assertSkillReadable(ctx, skillId, userId, ctx.user.activeOrganization?.id);
 
@@ -784,7 +784,7 @@ export const recordSkillInvocation = authMutation
     .mutation(async ({ args: { durationMs, errorMessage, parameters, skillId, status, threadId, trigger }, ctx }) => {
         assertJsonWithinLimit(parameters, "parameters");
         const { userId } = ctx.user;
-        const {now} = ctx;
+        const { now } = ctx;
 
         // Without this, any caller could inflate any skill's usage count.
         await assertSkillReadable(ctx, skillId, userId, ctx.user.activeOrganization?.id);

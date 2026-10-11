@@ -300,7 +300,7 @@ export const saveCustomProvider = authMutation
         }
 
         const id = args.id ?? generateCustomProviderId(name, new Set(Object.keys(providers)));
-        const {now} = ctx;
+        const { now } = ctx;
         const row: StoredCustomProvider = {
             ...native,
             createdAt: existing?.createdAt ?? now,

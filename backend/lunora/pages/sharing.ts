@@ -167,7 +167,7 @@ export const createPageInvite = authMutation
             throw new LunoraError("BAD_REQUEST", `An invite lasts between 1 and ${String(MAX_INVITE_DAYS)} days`);
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const invites = await loadInvites(ctx, args.pageId);
         const pending = invites.filter((invite) => invite.status === "pending" && invite.expiresAt > now);
 

@@ -16,7 +16,7 @@ export const cleanupExpiredExports = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx: context }) => {
-        const {now} = context;
+        const { now } = context;
         const expiredRequests = await context.db
             .query("gdprRequests")
             .withIndex("by_expires", (q) => q.lt("expiresAt", now))
@@ -52,7 +52,7 @@ export const handleGdprRequestTimeouts = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx: context }) => {
-        const {now} = context;
+        const { now } = context;
         const timeoutMs = 30 * 24 * 60 * 60 * 1000;
         const timeoutThreshold = now - timeoutMs;
 

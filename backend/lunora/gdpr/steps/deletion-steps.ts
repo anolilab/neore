@@ -14,8 +14,6 @@ import { eraseSkillsForUser } from "../../skills/gdpr";
 import { eraseBrowserDataForUser } from "../../browser/gdpr";
 import { BATCH, deleteParentsWithChildren } from "../batch";
 
-
-
 /**
  * Steps that return `{ hasMore }` follow the residual steps' contract
  * (`residual-deletion-steps.ts`): at most {@link BATCH} rows per table per
@@ -225,4 +223,4 @@ export const deleteUserBrowserData = internalMutation
         return null;
     });
 
-export {deleteParentsWithChildren} from "../batch";
+export { deleteParentsWithChildren } from "../batch";

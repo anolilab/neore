@@ -84,7 +84,7 @@ export const markAllNotificationsRead = authMutation
     .input({})
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
         const unread = await loadUnread(ctx, ctx.user.userId, WRITE_BATCH + 1);
 
         await Promise.all(unread.slice(0, WRITE_BATCH).map(async (row) => await ctx.db.patch(row._id, { readAt: now })));

@@ -23,7 +23,7 @@ export const saveNotifications = internalMutation
         userId: v.string(),
     })
     .mutation(async ({ args: { notifications, userId }, ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
 
         await Promise.all(
             notifications.map((n) =>

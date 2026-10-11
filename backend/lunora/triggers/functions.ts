@@ -109,7 +109,7 @@ export const createTrigger = authMutation
     .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
     .mutation(async ({ args, ctx: context }) => {
         const { userId } = context.user;
-        const {now} = context;
+        const { now } = context;
 
         // `v.from(zodSchema)` surfaces the field as `unknown` on the args type, so
         // re-parse here to recover the `"schedule" | "webhook" | "event"` union the

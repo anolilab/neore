@@ -478,7 +478,7 @@ export const createGoal = authMutation
             throw new LunoraError("BAD_REQUEST", `You can have at most ${String(MAX_GOALS_PER_USER)} goals`);
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const goalId = await ctx.db.insert("goals", {
             createdAt: now,
             description: optionalText(args.description, TASK_INSTRUCTIONS_MAX, "Description"),
@@ -534,7 +534,7 @@ export const deleteGoal = authMutation
             .query("tasks")
             .withIndex("by_user_and_goal", (q) => q.eq("userId", userId).eq("goalId", args.goalId))
             .take(MAX_TASKS_PER_USER);
-        const {now} = ctx;
+        const { now } = ctx;
 
         await Promise.all(tasks.map((task) => patchRow(ctx.db, task, { goalId: undefined, updatedAt: now })));
         await ctx.db.delete(args.goalId);
@@ -574,7 +574,7 @@ export const createTask = authMutation
         }
 
         const definition = await resolveDefinition(ctx, { organizationId: ctx.user.activeOrganization?.id, userId }, args, tasks);
-        const {now} = ctx;
+        const { now } = ctx;
         const taskId = await ctx.db.insert("tasks", {
             ...definition,
             attemptCount: 0,
@@ -623,7 +623,7 @@ export const updateTask = authMutation
 
         const tasks = await loadUserTasks(ctx, userId);
         const definition = await resolveDefinition(ctx, { organizationId: ctx.user.activeOrganization?.id, userId }, args, tasks, args.taskId);
-        const {now} = ctx;
+        const { now } = ctx;
         let nextRunAt: number | undefined;
 
         if (definition.cronExpression) {
@@ -675,7 +675,7 @@ export const deleteTask = authMutation
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
         const task = await requireOwnedTask(ctx, args.taskId, userId);
-        const {now} = ctx;
+        const { now } = ctx;
 
         const runs = await ctx.db
             .query("taskRuns")
@@ -735,7 +735,7 @@ export const runTask = authMutation
             throw new LunoraError("CONFLICT", "This task is waiting for your review");
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
 
         // A manual run starts clean; a reviewer's note belongs to "retry with note".
         await patchById(ctx.db, task._id, { reviewNote: undefined });
@@ -791,7 +791,7 @@ export const reviewTask = authMutation
             throw new LunoraError("CONFLICT", "This task is not waiting for review");
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
 
         if (args.decision === "approve") {
             await patchById(ctx.db, task._id, { lastError: undefined, reviewNote: undefined, status: "done", updatedAt: now });
