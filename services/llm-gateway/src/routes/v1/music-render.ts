@@ -259,12 +259,18 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
         .run()
         .catch(() => {});
 
+    // Once FAL has been called, a retry would start a second, billed job. Errors
+    // after that point (including persisting the result) are terminal.
+    let providerCalled = false;
+
     try {
         // Passthrough whitelist comes from the registry (single source of truth)
         // rather than the message envelope — that way a registry change rolls
         // out without re-versioning the queue schema.
         const allowedPassthrough = MUSIC_MODELS[body.model]?.allowedPassthroughParameters ?? [];
         const inputs = buildFalInputs(body, allowedPassthrough);
+
+        providerCalled = true;
 
         const result = await runFalMusicGeneration(modelInfo.modelApiId, apiKey, inputs);
 
@@ -343,7 +349,9 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
         return { costMicrodollars, kind: "completed", latencyMs };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        const isRetryable = isTransient(error);
+        // Only a failure before the provider was called can be retried. After it, a
+        // poll or a 429 can still be the same job, and a retry would bill it again.
+        const isRetryable = !providerCalled && isTransient(error);
 
         if (!isRetryable) {
             await markRenderFailed(env, message, errorMessage);
