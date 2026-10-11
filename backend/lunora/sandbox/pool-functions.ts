@@ -54,7 +54,7 @@ export const registerWarmSandbox = internalMutation
         sandboxId: v.string(),
     })
     .mutation(async ({ args: { sandboxId }, ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
 
         await ctx.db.insert("sandboxSessions", {
             lastActivityAt: now,

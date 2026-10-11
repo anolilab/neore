@@ -29,7 +29,7 @@ export const heartbeatPagePresence = authMutation
         await requirePageAccess(ctx, args.pageId, userId, "read");
 
         const sessionId = args.sessionId.slice(0, SESSION_ID_MAX);
-        const {now} = ctx;
+        const { now } = ctx;
         const rows = await ctx.db
             .query("pagePresence")
             .withIndex("by_page", (q) => q.eq("pageId", args.pageId))
@@ -96,7 +96,7 @@ export const listPagePresence = authQuery
     .query(async ({ args, ctx }) => {
         await requirePageAccess(ctx, args.pageId, ctx.user.userId, "read");
 
-        const {now} = ctx;
+        const { now } = ctx;
         const rows = await ctx.db
             .query("pagePresence")
             .withIndex("by_page", (q) => q.eq("pageId", args.pageId))

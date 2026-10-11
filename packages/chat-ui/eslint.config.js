@@ -47,6 +47,7 @@ export default createConfig(
             "import/exports-last": "off",
             "import/prefer-default-export": "off",
             "jsdoc/check-indentation": "off",
+            "jsdoc/text-escaping": "off",
             "no-await-in-loop": "off",
             "no-secrets/no-secrets": "warn",
             "no-underscore-dangle": "off",

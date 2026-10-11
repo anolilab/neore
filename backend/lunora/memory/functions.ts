@@ -181,7 +181,7 @@ export const updateMemory = authMutation
             throw new LunoraError("BAD_REQUEST", "A memory must be between 1 and 1000 characters");
         }
 
-        const {now} = context;
+        const { now } = context;
         const textChanged = text !== undefined && text !== existing.memory;
 
         await context.db.patch(
@@ -392,7 +392,7 @@ export const saveMemoryBatch = internalMutation
     })
     .output(v.array(v.id("memories")))
     .mutation(async ({ args, ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
         const memoryIds: Id<"memories">[] = [];
 
         for (const mem of args.memories) {
@@ -433,7 +433,7 @@ export const confirmMemories = internalMutation
     .input({ memoryIds: v.array(v.id("memories")), userId: v.string() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
 
         for (const memoryId of args.memoryIds) {
             const memory = await ctx.db.get(memoryId);

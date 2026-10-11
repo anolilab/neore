@@ -251,7 +251,7 @@ export const claimCase = internalMutation
 
         const caseId = run.caseIds[index]!;
         const evalCase = await ctx.db.get(caseId);
-        const {now} = ctx;
+        const { now } = ctx;
 
         if (!evalCase || evalCase.userId !== run.userId) {
             await ctx.db.insert("evalResults", {

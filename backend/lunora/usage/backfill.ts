@@ -247,7 +247,7 @@ export const runUsageBackfillStep = internalMutation
             return null;
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
         const step = await walk(
             ctx,
@@ -322,7 +322,7 @@ export const sweepUsageRollup = internalMutation
             return { pruned: 0, status: "idle" };
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const status = await ensureBackfill(ctx, userId, now);
 
         if (status !== "done") {

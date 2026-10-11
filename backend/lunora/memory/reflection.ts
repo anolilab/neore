@@ -120,7 +120,7 @@ export const noteMemoryActivity = internalMutation
             return null;
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const state = await loadState(ctx, userId);
         const plan = planActivityUpdate(state ?? undefined, now);
 
@@ -161,7 +161,7 @@ export const claimReflectionRun = internalMutation
     )
     .mutation(async ({ args: { userId }, ctx }) => {
         const [settings, state] = await Promise.all([loadUserSettings(ctx, userId), loadState(ctx, userId)]);
-        const {now} = ctx;
+        const { now } = ctx;
         const timeZone = settings?.timezone ?? undefined;
         const eligibility = checkReflectionEligibility({
             lastActiveAt: state?.lastActiveAt,
@@ -280,7 +280,7 @@ export const applyReflectionOps = internalMutation
     .input({ ops: v.array(vReflectionOp), userId: v.string() })
     .output(v.object({ applied: v.number(), promotedIds: v.array(v.string()), textChangedIds: v.array(v.string()) }))
     .mutation(async ({ args: { ops, userId }, ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
         const promotedIds: string[] = [];
         const textChangedIds: string[] = [];
         let applied = 0;

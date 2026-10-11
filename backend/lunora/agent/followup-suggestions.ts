@@ -49,7 +49,7 @@ export const cacheFollowupSuggestions = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { lastMessageId, suggestions, threadId }, ctx: context }) => {
-        const {now} = context;
+        const { now } = context;
 
         const existing = await context.db
             .query("followupSuggestions")
