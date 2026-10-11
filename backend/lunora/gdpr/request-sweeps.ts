@@ -10,17 +10,24 @@ import { v } from "lunorash/server";
 
 import { internalMutation } from "../_generated/server";
 import { cronsLogger } from "../lib/logger";
+import { patchRow } from "../lib/patch";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
+
+/** Expired exports handled per run; the next run (every tick slot) picks up the rest. */
+const EXPIRED_EXPORT_BATCH_SIZE = 100;
 
 export const cleanupExpiredExports = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx: context }) => {
         const { now } = context;
+        // Bounded, and each handled row leaves the `by_expires` index below. The
+        // sweep used to keep `expiresAt` set, so every run re-selected every
+        // expired export and wrote another audit row for each, forever.
         const expiredRequests = await context.db
             .query("gdprRequests")
             .withIndex("by_expires", (q) => q.lt("expiresAt", now))
-            .collect();
+            .take(EXPIRED_EXPORT_BATCH_SIZE);
 
         for (const request of expiredRequests) {
             if (request.storageId) {
@@ -31,9 +38,14 @@ export const cleanupExpiredExports = internalMutation
                 }
             }
 
-            await context.db.patch(request._id, {
+            // `undefined` removes the field: `expiresAt` is what puts a row in the
+            // index, so removing it is what makes this sweep terminal.
+            await patchRow(context.db, request, {
+                downloadUrl: undefined,
                 errorMessage: "Export expired and has been deleted",
+                expiresAt: undefined,
                 status: "completed",
+                storageId: undefined,
             });
 
             await context.db.insert("gdprAuditLog", {
