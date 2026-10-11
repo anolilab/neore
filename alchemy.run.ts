@@ -442,34 +442,9 @@ export const browserRenderer = await Worker("browser-renderer", {
     },
 });
 
-// ---------------------------------------------------------------------------
-// Embeddings service – Workers AI text embeddings
-// ---------------------------------------------------------------------------
-// Replaces Google AI text-embedding-004 for memory and knowledge base.
-// Default model: @cf/baai/bge-base-en-v1.5 (768 dimensions) to match existing vector table.
-// NOTHING CALLS IT: memory and knowledge embed through the gateway, so it was
-// left out of the move to service bindings (`backend/lunora.config.ts`) and no
-// Worker is bound to it. PRIVATE (`url: false`) and given no `SIGNING_SECRET`,
-// so it is unreachable, and `/embed` would answer 500 even if reached — its
-// HMAC check fails closed. Give it a caller and it moves the way the other
-// three did: declare it in `lunora.config.ts`, drop the HMAC from the Worker.
-export const embeddingsWorker = await Worker("embeddings", {
-    name: stage === "production" ? "embeddings" : "embeddings-preview",
-    entrypoint: "./src/index.ts",
-    cwd: "./services/embeddings",
-    url: false,
-    // Alchemy bundles unminified by default; see scripts/worker-bundle.ts.
-    bundle: WORKER_BUNDLE,
-    compatibilityDate: "2026-09-01",
-    compatibilityFlags: ["nodejs_compat_v2"],
-    placement: { mode: "smart" },
-    observability: WORKER_OBSERVABILITY,
-    adopt: true,
-    bindings: {
-        NODE_ENV: stage === "production" ? "production" : "development",
-        AI: Ai(),
-    },
-});
+// The embeddings Worker (`services/embeddings`) is not deployed: nothing calls it,
+// memory and knowledge embed through the gateway. Its source stays in the repo.
+// Deploying it again means declaring it here and giving it a caller.
 
 // ---------------------------------------------------------------------------
 // LLM Gateway service – Hono on Cloudflare Workers
@@ -568,7 +543,8 @@ export const llmGateway = await Worker("llm-gateway", {
     bundle: WORKER_BUNDLE,
     domains: customDomain(requireEnv("LLM_GATEWAY_URL"), "LLM_GATEWAY_URL"),
     // Pricing refresh, tier pools, usage aggregation, circuit-breaker reset.
-    crons: GATEWAY_CRONS,
+    // Production only, for the same reason as the backend's crons.
+    crons: stage === "production" ? GATEWAY_CRONS : [],
     compatibilityDate: "2026-09-01",
     compatibilityFlags: ["nodejs_compat_v2"],
     placement: { mode: "smart" },
@@ -862,7 +838,7 @@ export const backendJobs = await Queue("neore-backend-jobs", {
  *    have no workflow to run — the exact failure `lunora prepare` warns about,
  *    but only if you run it.
  *  - No `crons` means all six scheduled jobs never fire. Nothing errors; the
- *    work just never happens.
+ *    work just never happens. Production gets them; a preview deploy does not.
  *
  * Only the stage-INDEPENDENT half is read from the manifest. Class names, the
  * workflow list and the cron expressions come from the code and are identical in
@@ -927,7 +903,8 @@ export const backend = await Worker("neore-backend", {
     placement: { mode: "smart" },
     observability: WORKER_OBSERVABILITY,
     adopt: true,
-    crons: backendBindings.crons,
+    // Production only: a preview has no traffic to justify a tick every minute.
+    crons: stage === "production" ? backendBindings.crons : [],
     bindings: {
         // First, so every explicit binding below overrides its pass-through
         // counterpart — `ENVIRONMENT`, `SITE_URL` and friends are derived here,
