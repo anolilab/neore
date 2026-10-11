@@ -76,6 +76,7 @@ export default createConfig(
             "import/exports-last": "off",
             "import/prefer-default-export": "off",
             "jsdoc/check-indentation": "off",
+            "jsdoc/text-escaping": "off",
             "n/no-unsupported-features/node-builtins": "off",
             "no-await-in-loop": "off",
             "no-plusplus": "off",
