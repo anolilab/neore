@@ -15,10 +15,14 @@ import { UsageAggregator } from "../../usage/aggregator.js";
 
 const eventsRouter = new OpenAPIHono<HonoEnv>();
 
-/** Interval between usage polls (ms) */
-const USAGE_POLL_INTERVAL = 10_000;
+/**
+ * Interval between usage polls (ms). Each open connection runs an aggregate D1
+ * read per poll, so this is the per-tab cost; 30 s keeps the usage figure
+ * current enough for a status widget.
+ */
+const USAGE_POLL_INTERVAL = 30_000;
 /** Interval between health polls (ms) */
-const HEALTH_POLL_INTERVAL = 30_000;
+const HEALTH_POLL_INTERVAL = 60_000;
 /** Max connection duration (ms) — client reconnects after this */
 const MAX_CONNECTION_DURATION = 300_000;
 
