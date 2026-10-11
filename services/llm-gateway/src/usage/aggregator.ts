@@ -130,12 +130,17 @@ export class UsageAggregator {
         while (true) {
             const result = await this.db
                 .prepare(
+                    // Range comparisons, not `DATE(created_at)`: a function on the
+                    // column stops SQLite from using `idx_usage_log_created_at`, so every
+                    // batch used to scan the whole table. `created_at` is text
+                    // (`YYYY-MM-DD HH:MM:SS` or ISO), and it sorts within its day.
                     `DELETE FROM usage_log WHERE rowid IN (
                         SELECT usage_log.rowid FROM usage_log
-                        INNER JOIN usage_daily ON DATE(usage_log.created_at) = usage_daily.date
+                        INNER JOIN usage_daily ON usage_log.created_at >= usage_daily.date
+                            AND usage_log.created_at < DATE(usage_daily.date, '+1 day')
                             AND usage_log.user_id = usage_daily.user_id
                             AND usage_log.model_id = usage_daily.model_id
-                        WHERE DATE(usage_log.created_at) < ?
+                        WHERE usage_log.created_at < ?
                         LIMIT ?
                     )`,
                 )
