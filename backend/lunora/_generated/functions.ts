@@ -1230,6 +1230,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "tasks_internal:resolveTaskSkill": lunora_tasks_internal_157.resolveTaskSkill as unknown as RegisteredLunoraFunction,
     "triggers_execute:default": lunora_triggers_execute_158.default as unknown as RegisteredLunoraFunction,
     "triggers_execute:executeTrigger": lunora_triggers_execute_158.executeTrigger as unknown as RegisteredLunoraFunction,
+    "triggers_functions:admitTriggerRun": lunora_triggers_functions_159.admitTriggerRun as unknown as RegisteredLunoraFunction,
     "triggers_functions:createExecution": lunora_triggers_functions_159.createExecution as unknown as RegisteredLunoraFunction,
     "triggers_functions:createTrigger": lunora_triggers_functions_159.createTrigger as unknown as RegisteredLunoraFunction,
     "triggers_functions:deleteTrigger": lunora_triggers_functions_159.deleteTrigger as unknown as RegisteredLunoraFunction,
@@ -7589,6 +7590,12 @@ __has1 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "payload": __val1 } : {}), "triggerId": source["triggerId"] };
 });
+installCompiledValidatorMap(lunora_triggers_functions_159.admitTriggerRun.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["triggerId"] !== "string") return DEFER;
+return { "triggerId": source["triggerId"] };
+});
 installCompiledValidatorMap(lunora_triggers_functions_159.createExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9325,6 +9332,7 @@ export interface Caller {
             executeTrigger: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
+            admitTriggerRun: (args: { triggerId: Id<"triggers"> }) => Promise<null | string>;
             createExecution: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<Id<"triggerExecutions">>;
             createTrigger: (args: { cronExpression?: string; description?: string; inputTemplate?: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; type: "schedule" | "webhook" | "event" }) => Promise<{ triggerId: string; webhookSecret?: string }>;
             deleteTrigger: (args: { triggerId: Id<"triggers"> }) => Promise<void>;
@@ -10865,6 +10873,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             executeTrigger: (args) => callRegistered(context, "triggers_execute:executeTrigger", args),
         },
         functions: {
+            admitTriggerRun: (args) => callRegistered(context, "triggers_functions:admitTriggerRun", args),
             createExecution: (args) => callRegistered(context, "triggers_functions:createExecution", args),
             createTrigger: (args) => callRegistered(context, "triggers_functions:createTrigger", args),
             deleteTrigger: (args) => callRegistered(context, "triggers_functions:deleteTrigger", args),

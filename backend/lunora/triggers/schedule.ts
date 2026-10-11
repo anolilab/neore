@@ -139,6 +139,22 @@ const CRON_RANGES: ReadonlyArray<readonly [number, number]> = [
  * quietly treats garbage as a wildcard — so an expression that fails here would
  * fire every minute. Triggers and recurring tasks both refuse one at save time.
  */
+/**
+ * A trigger may fire at most once an hour: the minute field must be one literal
+ * minute. A per-minute trigger runs a full agent 1,440 times a day, and nothing
+ * else bounds that. The check is on the field's shape rather than on the gap
+ * between occurrences, so `0,1,2 * * * *` and `*\/30 * * * *` are refused too.
+ */
+export const isHourlyOrSlowerCronExpression = (expression: string): boolean => {
+    if (!isValidCronExpression(expression)) {
+        return false;
+    }
+
+    const [minute] = expression.trim().split(WHITESPACE_RE);
+
+    return minute !== undefined && /^\d+$/.test(minute);
+};
+
 export const isValidCronExpression = (expression: string): boolean => {
     const fields = expression.trim().split(WHITESPACE_RE);
 

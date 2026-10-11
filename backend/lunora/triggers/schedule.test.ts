@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getNextCronTime, isValidCronExpression } from "./schedule";
+import { getNextCronTime, isHourlyOrSlowerCronExpression, isValidCronExpression } from "./schedule";
 
 describe("getNextCronTime", () => {
     // Use a fixed reference: 2026-03-12 10:30:00 UTC (Thursday, dow=4)
@@ -112,5 +112,25 @@ describe(isValidCronExpression, () => {
         ]) {
             expect(isValidCronExpression(invalid), invalid).toBe(false);
         }
+    });
+});
+
+describe("isHourlyOrSlowerCronExpression", () => {
+    it("accepts expressions that fire at most once an hour", () => {
+        expect(isHourlyOrSlowerCronExpression("0 9 * * 1")).toBe(true);
+        expect(isHourlyOrSlowerCronExpression("30 * * * *")).toBe(true);
+        expect(isHourlyOrSlowerCronExpression("0 */2 * * *")).toBe(true);
+    });
+
+    it("refuses any minute field that repeats within an hour", () => {
+        expect(isHourlyOrSlowerCronExpression("* * * * *")).toBe(false);
+        expect(isHourlyOrSlowerCronExpression("*/5 * * * *")).toBe(false);
+        expect(isHourlyOrSlowerCronExpression("0,30 * * * *")).toBe(false);
+        expect(isHourlyOrSlowerCronExpression("0-30 * * * *")).toBe(false);
+    });
+
+    it("refuses anything that is not a valid 5-field expression", () => {
+        expect(isHourlyOrSlowerCronExpression("")).toBe(false);
+        expect(isHourlyOrSlowerCronExpression("0 9 * *")).toBe(false);
     });
 });

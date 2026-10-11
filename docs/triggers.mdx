@@ -31,7 +31,7 @@ Run the AI on a recurring cron schedule — for example, daily at 8 AM or every 
 |---|---|
 | `0 8 * * *` | Every day at 8:00 AM |
 | `0 9 * * 1` | Every Monday at 9:00 AM |
-| `*/30 * * * *` | Every 30 minutes |
+| `30 * * * *` | Every hour at 30 minutes past (triggers run at most hourly) |
 | `0 0 1 * *` | First day of every month at midnight |
 
 **How it works:** A background job polls every minute and checks if any enabled schedule triggers are due to fire. When one matches, a new thread is created and the agent runs your configured prompt.

@@ -3022,8 +3022,18 @@
     },
     {
       "from": "function:crons:deleteExpiredTemporaryChats",
+      "kind": "read",
+      "to": "table:temporaryThreads"
+    },
+    {
+      "from": "function:crons:deleteExpiredTemporaryChats",
       "kind": "schedule",
       "to": "function:crons:deleteExpiredTemporaryChats"
+    },
+    {
+      "from": "function:crons:deleteExpiredTemporaryChats",
+      "kind": "write",
+      "to": "table:temporaryThreads"
     },
     {
       "from": "function:crons:deleteUnusedFiles",
@@ -3524,11 +3534,6 @@
       "from": "function:gdpr_request_sweeps:cleanupExpiredExports",
       "kind": "write",
       "to": "table:gdprAuditLog"
-    },
-    {
-      "from": "function:gdpr_request_sweeps:cleanupExpiredExports",
-      "kind": "write",
-      "to": "table:gdprRequests"
     },
     {
       "from": "function:gdpr_request_sweeps:handleGdprRequestTimeouts",
@@ -5769,6 +5774,11 @@
       "from": "function:tasks_internal:completeRound",
       "kind": "write",
       "to": "table:tasks"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "call",
+      "to": "function:triggers_functions:admitTriggerRun"
     },
     {
       "from": "function:triggers_execute:default",
@@ -13247,6 +13257,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:triggers_functions:admitTriggerRun",
+      "kind": "function",
+      "name": "triggers.functions.admitTriggerRun",
+      "module": "triggers"
+    },
+    {
+      "detail": "mutation",
       "id": "function:triggers_functions:createExecution",
       "kind": "function",
       "name": "triggers.functions.createExecution",
@@ -16774,7 +16791,7 @@
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 227,
+      "line": 235,
       "reason": "the default export is not a registered function"
     },
     {
@@ -16882,13 +16899,13 @@
     {
       "file": "crons",
       "kind": "call",
-      "line": 319,
+      "line": 329,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "crons",
       "kind": "call",
-      "line": 331,
+      "line": 341,
       "reason": "\"runCronTick\" is not a registered function"
     },
     {
@@ -17716,7 +17733,7 @@
     {
       "file": "lib/shard-housekeeping",
       "kind": "call",
-      "line": 239,
+      "line": 242,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
