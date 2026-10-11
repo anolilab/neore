@@ -489,7 +489,7 @@ export const getDownloadUrl = authAction
             throw new LunoraError("NOT_FOUND", "File has no stored object");
         }
 
-        const {key} = attachment;
+        const { key } = attachment;
 
         const url = await withDependency("file storage", () => ctx.storage.getSignedUrl(key, { expiresInSeconds: 300 }));
 

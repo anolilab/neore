@@ -200,7 +200,7 @@ export const updateDeviceManifest = authMutation
             throw new LunoraError("FORBIDDEN", "Manifest signature is invalid");
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const manifest = parseSignedPayload(args.payload, "manifest", device._id as string);
         const issuedAt = manifest?.issuedAt;
 
@@ -255,7 +255,7 @@ export const claimDeviceCall = authMutation
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
         const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId, deviceId: args.deviceId, userId } });
-        const {now} = ctx;
+        const { now } = ctx;
 
         if (call?.status !== "pending" || now - call.createdAt > DEVICE_CLAIM_WINDOW_MS) {
             return { claimed: false };
@@ -298,7 +298,7 @@ export const completeDeviceCall = authMutation
             return { accepted: false };
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const output = typeof result.output === "string" ? capUtf8(result.output, MAX_DEVICE_OUTPUT_BYTES) : undefined;
         const error = typeof result.error === "string" ? result.error.slice(0, 1000) : undefined;
         const decision = typeof result.decision === "string" && DECISIONS.has(result.decision) ? result.decision : undefined;
@@ -338,7 +338,7 @@ export const reportDeviceCallProgress = authMutation
             throw new LunoraError("FORBIDDEN", "Progress signature is invalid");
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const report = parseSignedPayload(args.payload, "progress", device._id as string);
         const phase = report?.phase;
 

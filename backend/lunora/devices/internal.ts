@@ -110,7 +110,7 @@ export const createDeviceCall = internalMutation
             return { error: "ineligible" as const };
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
 
         if (!isDeviceOnline(device, now)) {
             return { error: "offline" as const };
@@ -242,7 +242,7 @@ export const sweepDeviceCalls = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx }) => {
-        const {now} = ctx;
+        const { now } = ctx;
 
         for (const status of OPEN_CALL_STATUSES) {
             const { page } = await ctx.db.deviceCalls.findMany({ limit: SWEEP_BATCH, where: { deadline: { lt: now }, status } });

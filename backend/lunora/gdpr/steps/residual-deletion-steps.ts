@@ -73,11 +73,6 @@ import { anonymiseGatewayUsage, deleteIdentityRows, deleteUserRecord, readIdenti
 import { eraseUsageForUser } from "../../usage/gdpr";
 import { eraseGatewayNotificationsForUser } from "../../saas/gdpr";
 
-
-
-
-
-
 const vBatchResult = v.object({ hasMore: v.boolean() });
 
 /** Rate-limit rows read per page while erasing a user's windows (`minimiseGdprRecords`). */
@@ -311,7 +306,7 @@ export const deleteUserWorkflowData = internalMutation
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => {
         const userExecutions = await eraseWorkflowExecutionsForUser(context, userId);
-        let {hasMore} = userExecutions;
+        let { hasMore } = userExecutions;
 
         // Versions and presence the user wrote, anywhere (`workflow/gdpr.ts`).
         const userVersions = await eraseWorkflowVersionsAndPresenceForUser(context, userId);
@@ -511,5 +506,5 @@ export const minimiseGdprRecords = internalMutation
         return null;
     });
 
-export {BATCH} from "../batch";
-export {DELETED_USER_MARKER} from "../constants";
+export { BATCH } from "../batch";
+export { DELETED_USER_MARKER } from "../constants";

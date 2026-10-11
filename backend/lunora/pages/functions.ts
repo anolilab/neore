@@ -575,7 +575,7 @@ export const createPage = authMutation
         }
 
         const orders = siblingOrders(owned, args.parentPageId);
-        const {now} = ctx;
+        const { now } = ctx;
         const pageId = await ctx.db.insert("pages", {
             contentRevision: 0,
             createdAt: now,
@@ -850,7 +850,7 @@ export const createPageFromDocument = authMutation
             throw new LunoraError("BAD_REQUEST", `You can have at most ${String(MAX_PAGES_PER_USER)} pages`);
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const contentJson: unknown = document.contentJson ?? undefined;
 
         const pageId = await ctx.db.insert("pages", {

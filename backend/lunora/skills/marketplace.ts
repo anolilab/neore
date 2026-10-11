@@ -305,7 +305,7 @@ export const forkSkill = authMutation
             throw new LunoraError("UNPROCESSABLE", "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skills.");
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const forkedId = (await ctx.db.insert("skills", {
             category: skill.category,
             config: skill.config,
@@ -388,7 +388,7 @@ export const rateSkill = authMutation
         // one rule computes it and a drifted stats row heals on the next rating.
         const [ratings, stats] = await Promise.all([ctx.db.skillRatings.findMany({ where: { skillId } }), ctx.db.skillStats.findFirst({ where: { skillId } })]);
         const existingRating = ratings.page.find((entry) => entry.userId === userId);
-        const {now} = ctx;
+        const { now } = ctx;
 
         if (existingRating) {
             await ctx.db.patch(existingRating._id, { rating: input.rating, updatedAt: now });

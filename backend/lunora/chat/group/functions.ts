@@ -253,7 +253,7 @@ export const createGroupChat = authMutation
 
         await requireUsableSkills(ctx, skillIds, { organizationId, userId });
 
-        const {now} = ctx;
+        const { now } = ctx;
         const threadId = await insertThread(ctx.db, {
             createdBy: userId,
             groupChat: {
@@ -331,7 +331,7 @@ export const createGroupChatFromTemplate = authMutation
         const synthesizerSkillId = slugOptions.synthesizerSkillId === undefined ? undefined : skillIds[slugs.indexOf(slugOptions.synthesizerSkillId)];
         const options = { ...slugOptions, ...(synthesizerSkillId !== undefined && { synthesizerSkillId }) };
 
-        const {now} = ctx;
+        const { now } = ctx;
         const threadId = await insertThread(ctx.db, {
             createdBy: userId,
             groupChat: {
@@ -412,7 +412,7 @@ export const updateGroupChat = authMutation
 
         await requireUsableSkills(ctx, added, { organizationId: ctx.user.activeOrganization?.id, userId });
 
-        const {now} = ctx;
+        const { now } = ctx;
         const addedAt = new Map((thread.groupChat?.participants ?? []).map((p) => [p.skillId, p.addedAt]));
 
         // The whole object is replaced, so options the new mode does not read are dropped.

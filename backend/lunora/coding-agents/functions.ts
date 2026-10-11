@@ -172,7 +172,7 @@ export const cancelRun = authMutation
             return null;
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
 
         await patchById(ctx.db, run._id, {
             completedAt: now,
@@ -288,7 +288,7 @@ export const createRun = internalMutation
             return { error: problem };
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const runId = await ctx.db.insert("codingAgentRuns", {
             agent: args.agent,
             branch,
@@ -336,7 +336,7 @@ export const claimRun = internalMutation
             return null;
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
 
         await patchById(ctx.db, run._id, { startedAt: now, status: "running", updatedAt: now });
 
@@ -431,7 +431,7 @@ export const completeRun = internalMutation
             return null;
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
 
         await patchById(ctx.db, runId, { ...outcome, completedAt: now, updatedAt: now });
 
@@ -458,7 +458,7 @@ export const expireRun = internalMutation
             return null;
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
         const error = `Timed out after ${String(RUN_TIMEOUT_MS / 60_000)} minutes`;
 
         await patchById(ctx.db, run._id, { completedAt: now, error, log: appendToLog(run.log, `${error}.\n`), status: "failed", updatedAt: now });
@@ -647,7 +647,7 @@ export const beginPullRequest = internalMutation
             return { error: "This run has no change that can be turned into a pull request." };
         }
 
-        const {now} = ctx;
+        const { now } = ctx;
 
         await patchById(ctx.db, run._id, { prFollowUp: args.followUp, prStartedAt: now, prStatus: "pending", updatedAt: now });
 
