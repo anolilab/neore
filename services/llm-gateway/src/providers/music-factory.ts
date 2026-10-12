@@ -49,37 +49,61 @@ const MAX_CONSECUTIVE_POLL_FAILURES = 5;
  * failures (network / 5xx / timeouts) so the render core's existing
  * `isTransient` heuristic can decide retry-vs-fail.
  */
+/** The FAL queue URLs a submitted job is polled and fetched through. */
+export interface FalQueueUrls {
+    responseUrl: string;
+    statusUrl: string;
+}
+
 export const runFalMusicGeneration = async (
     endpoint: string,
     apiKey: string,
     inputs: JSONObject,
-    options: { maxPollMs?: number; pollIntervalMs?: number } = {},
+    options: {
+        maxPollMs?: number;
+        onSubmitted?: (urls: FalQueueUrls) => void;
+        pollIntervalMs?: number;
+        /** URLs from an earlier submit: poll them and skip the submit, so the job is not billed twice. */
+        resume?: FalQueueUrls;
+    } = {},
 ): Promise<MusicRenderResult> => {
     const pollIntervalMs = options.pollIntervalMs ?? 2000;
     const maxPollMs = options.maxPollMs ?? 5 * 60 * 1000; // 5 min cap; music typically <30s
 
-    const submitUrl = `https://queue.fal.run/${endpoint}`;
-    const submitResponse = await fetch(submitUrl, {
-        body: JSON.stringify(inputs),
-        headers: {
-            Authorization: `Key ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-        method: "POST",
-        signal: AbortSignal.timeout(30_000),
-    });
+    let urls: FalQueueUrls | undefined = options.resume;
 
-    if (!submitResponse.ok) {
-        const text = await submitResponse.text().catch(() => "");
+    if (!urls) {
+        const submitUrl = `https://queue.fal.run/${endpoint}`;
+        const submitResponse = await fetch(submitUrl, {
+            body: JSON.stringify(inputs),
+            headers: {
+                Authorization: `Key ${apiKey}`,
+                "Content-Type": "application/json",
+            },
+            method: "POST",
+            signal: AbortSignal.timeout(30_000),
+        });
 
-        throw new GatewayError("PROVIDER_ERROR", `FAL submit failed (${submitResponse.status}): ${text.slice(0, 500)}`, { statusCode: submitResponse.status });
+        if (!submitResponse.ok) {
+            const text = await submitResponse.text().catch(() => "");
+
+            throw new GatewayError("PROVIDER_ERROR", `FAL submit failed (${submitResponse.status}): ${text.slice(0, 500)}`, {
+                statusCode: submitResponse.status,
+            });
+        }
+
+        const submit = (await submitResponse.json()) as { request_id?: string; response_url?: string; status_url?: string };
+
+        if (!submit.status_url || !submit.response_url) {
+            throw new GatewayError("PROVIDER_ERROR", "FAL submit returned malformed response (missing status_url / response_url)");
+        }
+
+        urls = { responseUrl: submit.response_url, statusUrl: submit.status_url };
+        // Recorded before the first poll, so a later failure can resume from these URLs.
+        options.onSubmitted?.(urls);
     }
 
-    const submit = (await submitResponse.json()) as { request_id?: string; response_url?: string; status_url?: string };
-
-    if (!submit.status_url || !submit.response_url) {
-        throw new GatewayError("PROVIDER_ERROR", "FAL submit returned malformed response (missing status_url / response_url)");
-    }
+    const queueUrls: FalQueueUrls = urls;
 
     const deadline = Date.now() + maxPollMs;
     // The job is already billed once submitted, so a blip while polling must not end it:
@@ -90,7 +114,7 @@ export const runFalMusicGeneration = async (
         let statusResponse: Response;
 
         try {
-            statusResponse = await fetch(submit.status_url, {
+            statusResponse = await fetch(queueUrls.statusUrl, {
                 headers: { Authorization: `Key ${apiKey}` },
                 signal: AbortSignal.timeout(15_000),
             });
@@ -134,7 +158,7 @@ export const runFalMusicGeneration = async (
         const status = (await statusResponse.json()) as { status?: string };
 
         if (status.status === "COMPLETED") {
-            const resultResponse = await fetch(submit.response_url, {
+            const resultResponse = await fetch(queueUrls.responseUrl, {
                 headers: { Authorization: `Key ${apiKey}` },
                 signal: AbortSignal.timeout(30_000),
             });

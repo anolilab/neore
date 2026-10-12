@@ -48,6 +48,7 @@ export interface MusicRenderMessage {
      * (≤4 days) to KV TTL (1 hour).
      */
     enqueuedAt: number;
+
     isByok: boolean;
     jobId: string;
     /** Subset of provider config needed at render time. */
@@ -56,7 +57,6 @@ export interface MusicRenderMessage {
         modelApiId: string;
         provider: string;
     };
-
     orgId: string | undefined;
 
     /** Request origin (host) for building polling/content URLs in webhooks. */
@@ -70,6 +70,13 @@ export interface MusicRenderMessage {
     parentTraceparent: string | undefined;
 
     requestId: string;
+
+    /**
+     * Set when a render was submitted to FAL and polling then failed: the queue URLs
+     * of that submission, and how many times the job has been resumed. A resumed
+     * delivery polls these URLs and does not submit the job again.
+     */
+    resume?: { responseUrl: string; resumes: number; statusUrl: string };
 
     userId: string;
 }

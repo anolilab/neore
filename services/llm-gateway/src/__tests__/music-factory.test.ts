@@ -70,6 +70,45 @@ describe("runFalMusicGeneration", () => {
         expect(fetchMock).toHaveBeenCalledTimes(5);
     });
 
+    it("reports the queue URLs once the job is submitted", async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(jsonResponse({ response_url: "https://q/result", status_url: "https://q/status" }))
+            .mockResolvedValueOnce(jsonResponse({ status: "COMPLETED" }))
+            .mockResolvedValueOnce(jsonResponse({ audio: { content_type: "audio/wav", sample_rate: 44_100, url: AUDIO_URL } }))
+            .mockResolvedValueOnce(new Response(new Uint8Array([1]), { headers: { "content-type": "audio/wav" }, status: 200 }));
+        const onSubmitted = vi.fn();
+
+        vi.stubGlobal("fetch", fetchMock);
+
+        await runFalMusicGeneration("fal-ai/stable-audio-25", "key", {}, { onSubmitted, pollIntervalMs: 1 });
+
+        expect(onSubmitted).toHaveBeenCalledExactlyOnceWith({ responseUrl: "https://q/result", statusUrl: "https://q/status" });
+    });
+
+    it("resumes from known queue URLs without submitting the job again", async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(jsonResponse({ status: "COMPLETED" }))
+            .mockResolvedValueOnce(jsonResponse({ audio: { content_type: "audio/wav", sample_rate: 44_100, url: AUDIO_URL } }))
+            .mockResolvedValueOnce(new Response(new Uint8Array([7]), { headers: { "content-type": "audio/wav" }, status: 200 }));
+        const onSubmitted = vi.fn();
+
+        vi.stubGlobal("fetch", fetchMock);
+
+        const result = await runFalMusicGeneration(
+            "fal-ai/stable-audio-25",
+            "key",
+            {},
+            { onSubmitted, pollIntervalMs: 1, resume: { responseUrl: "https://q/result", statusUrl: "https://q/status" } },
+        );
+
+        expect([...result.bytes]).toEqual([7]);
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("https://q/status");
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+        expect(onSubmitted).not.toHaveBeenCalled();
+    });
+
     it("still fails on a non-transient status error", async () => {
         const fetchMock = vi
             .fn()

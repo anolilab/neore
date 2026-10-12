@@ -79,37 +79,52 @@ const handleRenderMessage = async (message: Message<MusicRenderMessage>, queueNa
     try {
         const outcome = await runMusicRender(body, env, telemetry);
 
-        if (outcome.kind === "completed") {
-            outcomeStatus = "completed";
-            message.ack();
-
-            telemetry.recordHistogram(
-                "gateway.music.render_duration_ms",
-                outcome.latencyMs,
-                { "music.model_id": body.body.model, "music.provider": body.modelInfo.provider },
-                "ms",
-            );
-        } else if (outcome.kind === "skipped") {
-            outcomeStatus = "skipped";
-            message.ack();
-        } else {
-            renderError = new Error(outcome.errorMessage);
-
-            const isAttemptsLeft = message.attempts < MUSIC_RENDER_MAX_ATTEMPTS;
-
-            if (isAttemptsLeft && outcome.retryable) {
-                outcomeStatus = "retried";
-                message.retry({ delaySeconds: MUSIC_RENDER_RETRY_DELAY_SECONDS });
-            } else {
-                // `outcomeStatus` is already "failed" — its initial value.
-
-                if (outcome.retryable) {
-                    await markRenderFailed(env, body, `${outcome.errorMessage} (retries exhausted after ${message.attempts} attempts)`).catch((error) =>
-                        console.error("[music] failed to finalise render after retries exhausted:", error),
-                    );
-                }
-
+        switch (outcome.kind) {
+            case "completed": {
+                outcomeStatus = "completed";
                 message.ack();
+
+                telemetry.recordHistogram(
+                    "gateway.music.render_duration_ms",
+                    outcome.latencyMs,
+                    { "music.model_id": body.body.model, "music.provider": body.modelInfo.provider },
+                    "ms",
+                );
+
+                break;
+            }
+            case "requeued": {
+                // The render is already on the queue again, resuming from its FAL URLs.
+                outcomeStatus = "retried";
+                message.ack();
+
+                break;
+            }
+            case "skipped": {
+                outcomeStatus = "skipped";
+                message.ack();
+
+                break;
+            }
+            default: {
+                renderError = new Error(outcome.errorMessage);
+
+                const isAttemptsLeft = message.attempts < MUSIC_RENDER_MAX_ATTEMPTS;
+
+                if (isAttemptsLeft && outcome.retryable) {
+                    outcomeStatus = "retried";
+                    message.retry({ delaySeconds: MUSIC_RENDER_RETRY_DELAY_SECONDS });
+                } else {
+                    // `outcomeStatus` is already "failed" — its initial value.
+
+                    if (outcome.retryable) {
+                        await markRenderFailed(env, body, `${outcome.errorMessage} (retries exhausted after ${message.attempts} attempts)`).catch((error) =>
+                            console.error("[music] failed to finalise render after retries exhausted:", error),
+                        );
+                    }
+
+                    message.ack();
+                }
             }
         }
     } catch (error) {
