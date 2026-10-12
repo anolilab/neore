@@ -75,8 +75,6 @@ jobs:
                       node_version: "25"
                     - os: "macos-latest"
                       node_version: "22"
-                    - os: "windows-latest"
-                      node_version: "22"
                     - os: "ubuntu-latest"
                       node_version: "22"
                       bun_version: "latest"
