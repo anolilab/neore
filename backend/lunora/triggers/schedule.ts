@@ -112,11 +112,13 @@ const SEARCH_DAYS = 366 * 28;
  * Returns a timestamp in milliseconds.
  */
 export const findNextCronTime = (expression: string, after: number): number | undefined => {
-    const fields = expression.trim().split(WHITESPACE_RE);
-
-    if (fields.length !== 5) {
+    // Checked as a whole: the field parser reads an unknown token as a wildcard, so
+    // `bad 0 * * *` would otherwise come back as a time.
+    if (!isValidCronExpression(expression)) {
         return undefined;
     }
+
+    const fields = expression.trim().split(WHITESPACE_RE);
 
     const [minuteField, hourField, dayField, monthField, dowField] = fields;
 

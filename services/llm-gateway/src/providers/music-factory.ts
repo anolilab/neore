@@ -39,6 +39,9 @@ export interface MusicRenderResult {
     sampleRate?: number;
 }
 
+// Polls in a row that may fail (network, 429, 5xx) before the render is given up.
+const MAX_CONSECUTIVE_POLL_FAILURES = 5;
+
 /**
  * Run a single music generation against FAL via the queue API.
  *
@@ -79,20 +82,54 @@ export const runFalMusicGeneration = async (
     }
 
     const deadline = Date.now() + maxPollMs;
+    // The job is already billed once submitted, so a blip while polling must not end it:
+    // keep polling, and give up only after several polls in a row fail.
+    let consecutivePollFailures = 0;
 
     while (Date.now() < deadline) {
-        const statusResponse = await fetch(submit.status_url, {
-            headers: { Authorization: `Key ${apiKey}` },
-            signal: AbortSignal.timeout(15_000),
-        });
+        let statusResponse: Response;
+
+        try {
+            statusResponse = await fetch(submit.status_url, {
+                headers: { Authorization: `Key ${apiKey}` },
+                signal: AbortSignal.timeout(15_000),
+            });
+        } catch (error) {
+            consecutivePollFailures += 1;
+
+            if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+                throw error;
+            }
+
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, pollIntervalMs);
+            });
+
+            continue;
+        }
 
         if (!statusResponse.ok) {
+            const isTransient = statusResponse.status === 429 || statusResponse.status >= 500;
+
+            if (isTransient && consecutivePollFailures + 1 < MAX_CONSECUTIVE_POLL_FAILURES) {
+                consecutivePollFailures += 1;
+                await statusResponse.body?.cancel();
+
+                await new Promise<void>((resolve) => {
+                    setTimeout(resolve, pollIntervalMs);
+                });
+
+                continue;
+            }
+
             const text = await statusResponse.text().catch(() => "");
 
             throw new GatewayError("PROVIDER_ERROR", `FAL status poll failed (${statusResponse.status}): ${text.slice(0, 200)}`, {
                 statusCode: statusResponse.status,
             });
         }
+
+        consecutivePollFailures = 0;
 
         const status = (await statusResponse.json()) as { status?: string };
 

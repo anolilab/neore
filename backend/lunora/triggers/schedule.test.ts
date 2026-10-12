@@ -81,6 +81,10 @@ describe("getNextCronTime", () => {
         expect(next).toBe(new Date("2026-12-01T00:00:00Z").getTime());
     });
 
+    it("rejects an expression with an unknown field instead of reading it as a wildcard", () => {
+        expect(findNextCronTime("bad 0 * * *", NOW)).toBeUndefined();
+    });
+
     it("returns undefined from findNextCronTime when the schedule never fires", () => {
         // Feb 30 does not exist, so no fallback may be armed as a due run.
         expect(findNextCronTime("0 0 30 2 *", REF)).toBeUndefined();
