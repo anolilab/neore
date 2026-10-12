@@ -45,21 +45,23 @@ export const executeTrigger = internalAction
             triggerId,
         });
 
-        // 2b. Charge the run before any paid call. A refused run is recorded as a
-        // failed execution, so the user sees why it did not happen.
-        const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, { triggerId });
-
-        if (refusal) {
-            await ctx.runMutation(internal.triggers.functions.updateExecution, {
-                error: refusal,
-                executionId,
-                status: "failed",
-            });
-
-            return;
-        }
-
         try {
+            // 2b. Charge the run before any paid call. A refused run is recorded as a
+            // failed execution, so the user sees why it did not happen. Inside the try,
+            // so an admission error reaches the failure handler below instead of
+            // leaving the execution running.
+            const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, { triggerId });
+
+            if (refusal) {
+                await ctx.runMutation(internal.triggers.functions.updateExecution, {
+                    error: refusal,
+                    executionId,
+                    status: "failed",
+                });
+
+                return;
+            }
+
             // 3. Build the input message
             let inputMessage = "";
 

@@ -18,7 +18,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
-import { getNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
+import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { notifyQuietly } from "../notifications/notify";
@@ -42,10 +42,11 @@ const assertCronExpression = (cronExpression: string): void => {
 /**
  * The first run of a schedule trigger that has never run. Nothing else sets
  * `nextTriggerAt` before the first run, and the due query only matches a set
- * value, so an enabled trigger without one never fired.
+ * value, so an enabled trigger without one never fired. `undefined` when there is
+ * no such run: it is never stored as a due time.
  */
 const firstRunOf = (trigger: Doc<"triggers">, now: number): number | undefined =>
-    trigger.type === "schedule" && trigger.cronExpression && trigger.nextTriggerAt === undefined ? getNextCronTime(trigger.cronExpression, now) : undefined;
+    trigger.type === "schedule" && trigger.cronExpression && trigger.nextTriggerAt === undefined ? findNextCronTime(trigger.cronExpression, now) : undefined;
 
 // ============================================================================
 // cRPC-exposed queries/mutations (authenticated)
@@ -254,7 +255,17 @@ export const setTriggerEnabled = authMutation
             throw new LunoraError("NOT_FOUND", "Trigger not found");
         }
 
+        // Enabling re-checks the schedule: one stored before the hourly rule, or one
+        // that never fires, must not be armed (see the policy in `checkDueTriggers`).
+        if (args.enabled && trigger.type === "schedule" && trigger.cronExpression) {
+            assertCronExpression(trigger.cronExpression);
+        }
+
         const firstRun = args.enabled ? firstRunOf(trigger, context.now) : undefined;
+
+        if (args.enabled && trigger.type === "schedule" && trigger.nextTriggerAt === undefined && firstRun === undefined) {
+            throw new LunoraError("BAD_REQUEST", "This schedule never fires within the next 28 years. Check its day and month.");
+        }
 
         await context.db.patch(args.triggerId as Id<"triggers">, {
             enabled: args.enabled,

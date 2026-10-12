@@ -36,6 +36,8 @@ Run the AI on a recurring cron schedule — for example, daily at 8 AM or every 
 
 **How it works:** A background job polls every minute and checks if any enabled schedule triggers are due to fire. When one matches, a new thread is created and the agent runs your configured prompt.
 
+A schedule must run at most hourly, and it must fire at least once in the next 28 years. Saving or enabling one that breaks either rule is refused. A schedule that was saved before the rule, or that stops matching, is switched off the next time it comes due, and the reason appears in its last error. It does not run.
+
 ### Webhook
 
 Receive HTTP POST requests from external services (Stripe, GitHub, Zapier, etc.) and run the AI with the payload as context.
