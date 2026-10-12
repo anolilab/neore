@@ -24,6 +24,7 @@ jobs:
         name: "Release"
         if: "github.repository == 'anolilab/neore'"
         runs-on: "ubuntu-latest"
+        timeout-minutes: 15
         permissions:
             contents: "write" # to push the release tag and the release PR branch
             issues: "write" # to comment on released issues
@@ -46,36 +47,13 @@ jobs:
 
             - name: "Setup resources and environment"
               id: "setup"
-              uses: "anolilab/workflows/step/setup@b5d611c5dda8645e93f2407e3d3fee250a9f5376" # main
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
               with:
                   node-version: "22.x"
                   cache-prefix: "release"
 
-            # services/document-parser is a Rust Worker: `test` builds it (`build:worker`),
-            # so the affected run needs rustc + wasm32 + worker-build.
-            - name: "Setup Rust Worker toolchain"
-              uses: "./.github/actions/setup-rust-worker"
-
-            - name: "Build the document-parser Worker"
-              shell: "bash"
-              run: "pnpm --filter document-parser run build:worker"
-
-            - name: "Build Production"
-              run: "pnpm run build:packages:prod"
-
-            - name: "Test (affected)"
-              run: 'pnpm exec vis affected test --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
-              env:
-                  # Same refs as test.yml: only projects touched by this push are tested.
-                  # A manual run has no push range, and a push that creates the branch sends an
-                  # all-zero `before`. Both test against the previous commit.
-                  VIS_BASE: "${{ github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1' }}"
-                  VIS_HEAD: "${{ github.sha }}"
-                  # This is needed for the colorize integration test
-                  TEST_PROD_BUILD: "true"
-
-            # Setup and the builds write files into the checkout (the composite appends to
-            # `.npmrc`, postinstall regenerates `worker-configuration.d.ts`). `vis release`
+            # Setup writes files into the checkout (the composite appends to `.npmrc`,
+            # postinstall regenerates `worker-configuration.d.ts`). `vis release`
             # refuses to run on a dirty tree. Ignored paths (node_modules, dist) stay.
             - name: "Reset the working tree"
               shell: "bash"

@@ -1,0 +1,31 @@
+# Read by `zizmor` (workflows/zizmor.yml). Each entry is an audited exception,
+# not a backlog: the finding is real in general, and does not apply here.
+rules:
+    # `pull_request_target` runs with the base repository's token, which is only
+    # dangerous when it also checks out or executes the PR's code. None of these
+    # check anything out: they read event metadata (the PR title) or call
+    # reusable workflows that comment and label.
+    dangerous-triggers:
+        ignore:
+            - "allo-allo.yaml"
+            - "labeler.yml"
+            - "semantic-pull-request.yml"
+    # A cache written by a tag-triggered build is readable only by that tag, and
+    # pull request caches are scoped to their own ref, so a PR cannot plant one
+    # that a release restores. The cache is what keeps the Tauri build bearable.
+    cache-poisoning:
+        ignore:
+            - "native.yml"
+
+    # Vendored agent-skill templates under .agents/ are third-party and not ours
+    # to change; they are never run as this repository's workflows.
+    artipacked:
+        ignore:
+            - "bug-review-resolve.yml"
+            - "validate-skill.yml"
+    excessive-permissions:
+        ignore:
+            - "validate-skill.yml"
+    dependabot-cooldown:
+        ignore:
+            - "dependabot.yml"

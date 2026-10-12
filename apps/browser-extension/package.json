@@ -13,7 +13,8 @@
         "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc -b",
         "preview": "vite preview",
-        "test": "vitest run"
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary"
     },
     "dependencies": {
         "@lingui/core": "catalog:i18n",

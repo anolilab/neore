@@ -17,49 +17,41 @@ on: # yamllint disable-line rule:truthy
                     - "production"
                     - "preview"
 
+# Keyed on the target, not the ref: two tags (or a tag and a manual run) would
+# otherwise run two Alchemy deploys against the same state file at once.
 concurrency:
-    group: "${{ github.workflow }}-${{ github.ref }}"
+    group: "deploy-${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment) || 'production' }}"
     # Don't cancel in-progress deployments to avoid partial deploys
     cancel-in-progress: false
 
 permissions:
     contents: "read"
-    deployments: "write"
-    pull-requests: "write" # Required for posting preview URL comments on PRs
 
 jobs:
     # -----------------------------------------------------------------
-    # Step 1: Gate the deploy — audit, build the shared packages, and resolve
-    # the target environment for the job below.
+    # Step 1: Resolve the target environment for the job below. Nothing is
+    # built here: the deploy job builds what it ships (see the note there).
     # -----------------------------------------------------------------
-    build-packages:
-        name: "Build Packages"
+    resolve-env:
+        name: "Resolve environment"
         runs-on: "ubuntu-24.04"
+        timeout-minutes: 5
         outputs:
-            # Resolve target environment:
-            #   'production' → v* tag push OR manual dispatch with production selected
-            #   'preview'    → manual dispatch with preview selected
-            deploy-env: "${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && 'production' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment) || 'preview' }}"
+            # 'production' → v* tag push OR manual dispatch with production selected
+            # 'preview'    → manual dispatch with preview selected
+            deploy-env: "${{ steps.env.outputs.deploy-env }}"
         steps:
-            - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
-              with:
-                  egress-policy: "audit"
-
-            - name: "Git checkout"
-              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+            - name: "Resolve target environment"
+              id: "env"
               env:
-                  GIT_COMMITTER_NAME: "GitHub Actions Shell"
-                  GIT_AUTHOR_NAME: "GitHub Actions Shell"
-                  EMAIL: "github-actions[bot]@users.noreply.github.com"
-
-            - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@main"
-              with:
-                  node-version: "22"
-
-            - name: "Build shared packages"
-              run: "pnpm run build:packages"
+                  EVENT_NAME: "${{ github.event_name }}"
+                  INPUT_ENVIRONMENT: "${{ github.event.inputs.environment }}"
+              run: |
+                  if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+                      echo "deploy-env=${INPUT_ENVIRONMENT}" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "deploy-env=production" >> "$GITHUB_OUTPUT"
+                  fi
 
     # -----------------------------------------------------------------
     # Step 2a: Build app & deploy all Cloudflare Workers via Alchemy
@@ -69,11 +61,15 @@ jobs:
     # TanStack Start app and the document-parser service.
     # -----------------------------------------------------------------
     deploy-cloudflare:
-        name: "Deploy Cloudflare Workers via Alchemy (${{ needs.build-packages.outputs.deploy-env }})"
-        needs: "build-packages"
+        name: "Deploy Cloudflare Workers via Alchemy (${{ needs.resolve-env.outputs.deploy-env }})"
+        needs: "resolve-env"
         runs-on: "ubuntu-24.04"
+        timeout-minutes: 60
+        permissions:
+            contents: "read"
+            deployments: "write"
         environment:
-            name: "${{ needs.build-packages.outputs.deploy-env }}"
+            name: "${{ needs.resolve-env.outputs.deploy-env }}"
             url: "${{ steps.alchemy.outputs.website-url }}"
         steps:
             - name: "Harden Runner"
@@ -83,17 +79,15 @@ jobs:
 
             - name: "Git checkout"
               uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
-              env:
-                  GIT_COMMITTER_NAME: "GitHub Actions Shell"
-                  GIT_AUTHOR_NAME: "GitHub Actions Shell"
-                  EMAIL: "github-actions[bot]@users.noreply.github.com"
+              with:
+                  persist-credentials: false
 
             - name: "Setup resources and environment"
-              uses: "anolilab/workflows/step/setup@main"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
               with:
                   node-version: "22"
 
-            # Built here rather than carried from `build-packages` as an artifact.
+            # Built here rather than carried between jobs as an artifact.
             # `upload-artifact` strips the least common ancestor of the matched
             # files, so `packages/*/dist/` with two emitting packages (ai and
             # service-sdk) uploaded as `ai/dist/...` and `service-sdk/dist/...`.
@@ -110,7 +104,7 @@ jobs:
               working-directory: "apps/web"
               env:
                   # Node sizes the default old-space from available RAM: this is
-                  # a private repo, so the runner is 2-core/7GB and Node picked
+                  # the standard runner (2-core/7GB), where Node picked
                   # ~2080MB — the build died there with "Ineffective mark-compacts
                   # near heap limit". It succeeds on a workstation whose default
                   # is 4144MB, so match that rather than guess upward; the peak
@@ -170,7 +164,7 @@ jobs:
               env:
                   CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
                   CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
-                  DEPLOY_ENV: "${{ needs.build-packages.outputs.deploy-env }}"
+                  DEPLOY_ENV: "${{ needs.resolve-env.outputs.deploy-env }}"
                   CI: "true"
                   # alchemy.run.ts refuses to deploy without every one of these
                   # (REQUIRED_DEPLOY_ENV) — there are deliberately no defaults,
@@ -373,20 +367,6 @@ jobs:
                   url=$(echo "$output" | grep -oP "website: '?\Khttps?://[^'}\s]+" || true)
                   echo "website-url=${url}" >> "$GITHUB_OUTPUT"
 
-            - name: "Comment preview URL on PR"
-              if: "github.event_name == 'pull_request' && steps.alchemy.outputs.website-url != ''"
-              uses: "marocchino/sticky-pull-request-comment@0ea0beb66eb9baf113663a64ec522f60e49231c0" # v3.0.4
-              with:
-                  header: "cloudflare-app-preview"
-                  message: |
-                      ### Cloudflare Workers Preview — Alchemy
-
-                      | | |
-                      |-|-|
-                      | **App URL** | ${{ steps.alchemy.outputs.website-url }} |
-                      | **Stage** | `${{ needs.build-packages.outputs.deploy-env }}` |
-                      | **Commit** | `${{ github.sha }}` |
-
     # -----------------------------------------------------------------
     # There is no separate backend deploy job.
     #
@@ -394,22 +374,3 @@ jobs:
     # goes out with everything else in the Alchemy step above and needs no
     # job of its own.
     # -----------------------------------------------------------------
-
-    # -----------------------------------------------------------------
-    # Required check gate (mirrors pattern from test.yml / lint.yml)
-    # -----------------------------------------------------------------
-    deploy-required-check:
-        needs: ["build-packages", "deploy-cloudflare"]
-        name: "Check Deploy Run"
-        if: "always() && (needs.deploy-cloudflare.result == 'success' || needs.deploy-cloudflare.result == 'skipped')"
-        runs-on: "ubuntu-24.04"
-        steps:
-            - name: "Harden Runner"
-              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
-              with:
-                  egress-policy: "audit"
-
-            - name: "Check for failures"
-              if: "contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')"
-              run: |
-                  echo "One of the deploy jobs failed. Check the logs above." && exit 1

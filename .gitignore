@@ -80,3 +80,6 @@ backend/lunora.advisor.map.json
 # vis release subsystem
 .vis/release/.state.json
 .vis/release/.lock
+
+# Test coverage output
+coverage/

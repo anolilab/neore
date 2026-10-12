@@ -25,9 +25,14 @@ packages: &packages
     - "**/tsconfig*.json"
     - "pnpm-lock.yaml"
     - "package.json"
+    - "apps/**"
     - "backend/**"
     - "packages/**"
+    - "services/**"
     - "tools/**"
-
-codecov:
-    - "codecov.yml"
+    - "vis.config.ts"
+    - "pnpm-workspace.yaml"
+    # The jobs themselves: a change to how tests run is tested by running them.
+    - ".github/workflows/test.yml"
+    - ".github/actions/**"
+    - ".github/file-filters.yml"
