@@ -65,7 +65,11 @@ jobs:
             - name: "Release"
               shell: "bash"
               env:
-                  GH_TOKEN: "${{ github.token }}"
+                  # The PAT, not `github.token`: vis opens the release PR with `gh pr create`
+                  # under this variable. GITHUB_TOKEN cannot (the repository setting that
+                  # lets Actions create pull requests is off), and a PR it opened would not
+                  # start the checks the merge queue requires.
+                  GH_TOKEN: "${{ secrets.SEMANTIC_RELEASE_GITHUB_TOKEN }}"
                   VIS_GH_TOKEN: "${{ secrets.SEMANTIC_RELEASE_GITHUB_TOKEN }}"
                   PUSH_HEAD: "${{ github.sha }}"
                   GIT_AUTHOR_NAME: "github-actions-shell"
