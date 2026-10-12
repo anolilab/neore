@@ -47,6 +47,9 @@ export default defineConfig({
         ],
         privatePackages: { tag: true, version: true },
         releaseTagPattern: "v{version}",
+        // The title becomes the squash commit, and the required "Semantic Pull Request"
+        // check rejects the default ("🚀 Versioned release") as not conventional.
+        versionPr: { title: "chore(release): version packages" },
         workspaceChangelog: { file: "CHANGELOG.md" },
     },
     // Guards the dependency graph. A violation FAILS `vis run` (exit 1);
