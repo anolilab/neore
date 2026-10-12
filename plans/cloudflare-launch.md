@@ -114,7 +114,7 @@ deploy sends to both. Preview and production values may differ.
 
 Resources Alchemy creates (from `alchemy.run.ts`): Workers (`neore-chat`,
 `neore-chat-preview`, backend, llm-gateway, document-parser, browser-renderer,
-nsfw-checker, embeddings), D1 (2), R2 (3 buckets), KV (3 namespaces), Queues (6,
+nsfw-checker), D1 (2), R2 (3 buckets), KV (3 namespaces), Queues (6,
 incl. dead-letter), Vectorize indexes (plus a metadata index), Durable Objects
 (shard, scheduler, shard registry, ...), a Workflow, AI binding, Email sender,
 and custom domains.
@@ -148,7 +148,7 @@ yet, so the URLs have to be written down first. The Worker names are fixed by
 | web (`SITE_URL`) | `neore-chat` | `neore-chat-preview` | yes |
 | backend (`BACKEND_PUBLIC_ORIGIN`) | `neore-backend` | `neore-backend-preview` | yes |
 | gateway (`LLM_GATEWAY_URL`) | `llm-gateway` | `llm-gateway-preview` | yes |
-| document-parser, nsfw-checker, browser-renderer, embeddings | — | — | **private** (`url: false`) |
+| document-parser, nsfw-checker, browser-renderer | — | — | **private** (`url: false`) |
 
 Two options:
 
@@ -174,8 +174,9 @@ Two options:
         -H "Authorization: Bearer $LUNORA_ADMIN_TOKEN"
    ```
    It is idempotent. It returns a `signUpUrl` for each `ADMIN` address.
-5. **Sign up** with an `ADMIN` address through the preview site. Chat end to end,
-   with a mock model if no provider key is set.
+5. **Sign up** with an `ADMIN` address through the preview site. Chat end to end.
+   This needs a provider key on the preview stage: `MOCK_LLM` is read only from a
+   local `.dev.vars`, so a deployed stage cannot use the mock model.
 6. **Production**: set the §2 secrets on `production`, then either let
    the release PR merge push a `v<version>` tag (it uses the org PAT, §1) or run
    `gh workflow run deploy.yml -f environment=production`. Repeat step 4 once
