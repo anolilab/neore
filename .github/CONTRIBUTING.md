@@ -13,6 +13,7 @@ Here are a few guidelines that will help you along the way.
     -   [Request a Feature](#request-a-feature)
 -   Make Something?
     -   [Your First Pull Request](#first-pull-request)
+    -   [Contributor License Agreement](#contributor-license-agreement)
     -   [Project Setup](#project-setup)
     -   [Contribute Documentation](#contribute-documentation)
     -   [Contribute Code](#contribute-code)
@@ -107,6 +108,10 @@ If nobody is working on it at the moment, please leave a comment stating that yo
 
 If somebody claims an issue but doesn't follow up after more than a week, it's fine to take over, but you should still leave a comment.
 If there has been no activity on the issue for 7 to 14 days, then it's safe to assume that nobody is working on it.
+
+### Contributor License Agreement
+
+The project is licensed under the [Functional Source License](../LICENSE.md), so every contribution has to come with the right to use it under that license. Each pull request description must therefore contain the confirmation line that the [pull request template](PULL_REQUEST_TEMPLATE.md) already includes. Leave it in place when you fill the template in. The `CLA` check fails, and comments with the exact text, until it is there. Maintainers and bots are exempt.
 
 ## <a name="project-setup"></a> Project Setup
 
