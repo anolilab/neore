@@ -9,7 +9,8 @@ import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 
 import type { HonoEnv } from "../env.js";
-import { consumeRateLimit, RATE_LIMIT_VALUES, secondsUntilNextMinute, type RateLimitValue } from "./native-rate-limit.js";
+import type { RateLimitValue } from "./native-rate-limit.js";
+import { consumeRateLimit, RATE_LIMIT_VALUES, secondsUntilNextMinute } from "./native-rate-limit.js";
 
 const TIER_LIMITS: Record<string, number> = {
     enterprise: 600,

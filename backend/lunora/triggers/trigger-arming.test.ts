@@ -12,11 +12,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { setTriggerEnabledInternal } from "./functions";
 
-const { noteShardDue } = vi.hoisted(() => ({
-    noteShardDue: vi.fn(async () => {
-        return undefined;
-    }),
-}));
+const { noteShardDue } = vi.hoisted(() => {
+    return {
+        noteShardDue: vi.fn(async () => undefined),
+    };
+});
 
 vi.mock("../lib/shard-housekeeping", async (importOriginal) => {
     return {

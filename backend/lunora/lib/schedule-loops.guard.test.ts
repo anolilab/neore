@@ -54,7 +54,9 @@ const exportBlocks = (source: string): { body: string; name: string }[] => {
  */
 const MAKES_PROGRESS_RE = /\bcursor\b|\.patch\(|patchRow\(|\.delete\(/;
 // ponytail: any patch or delete counts, even on another table. Tighten to the sweep's own table if that is ever seen.
-const stripComments = (code: string): string => code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+const BLOCK_COMMENT_RE = /\/\*[\s\S]*?\*\//g;
+const LINE_COMMENT_RE = /\/\/[^\n]*/g;
+const stripComments = (code: string): string => code.replaceAll(BLOCK_COMMENT_RE, "").replaceAll(LINE_COMMENT_RE, "");
 
 const selfReschedulesUnderASecond = (source: string): string[] =>
     exportBlocks(source)

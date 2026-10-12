@@ -123,8 +123,8 @@ export const findNextCronTime = (expression: string, after: number): number | un
     const [minuteField, hourField, dayField, monthField, dowField] = fields;
 
     // Sorted, so the first match in the loops below is the earliest one.
-    const minutes = parseCronField(minuteField!, 0, 59).sort((a, b) => a - b);
-    const hours = parseCronField(hourField!, 0, 23).sort((a, b) => a - b);
+    const minutes = parseCronField(minuteField!, 0, 59).toSorted((a, b) => a - b);
+    const hours = parseCronField(hourField!, 0, 23).toSorted((a, b) => a - b);
     const days = parseCronField(dayField!, 1, 31);
     const months = parseCronField(monthField!, 1, 12);
     const dows = parseCronField(dowField!, 0, 6);
@@ -158,8 +158,8 @@ export const findNextCronTime = (expression: string, after: number): number | un
 };
 
 /**
- * {@link findNextCronTime}, or one hour from `after` when there is no match. Only
- * for callers that need a number (recurring tasks). Arming paths must use
+ * The next time from {@link findNextCronTime}, or one hour from `after` when there is no
+ * match. Only for callers that need a number (recurring tasks). Arming paths must use
  * `findNextCronTime`: the one-hour value would arm a run that was never scheduled.
  */
 export const getNextCronTime = (expression: string, after: number): number => findNextCronTime(expression, after) ?? after + 3_600_000;

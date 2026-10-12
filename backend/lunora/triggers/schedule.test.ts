@@ -149,13 +149,14 @@ describe("isHourlyOrSlowerCronExpression", () => {
 });
 
 const NOW = new Date("2026-03-12T10:30:00Z").getTime();
+const AT_MOST_HOURLY_RE = /at most hourly/;
 
 describe("dueScheduleStep", () => {
     it("switches off a per-minute schedule instead of running it", () => {
         const step = dueScheduleStep("* * * * *", NOW);
 
         expect(step).toMatchObject({ kind: "switchOff" });
-        expect(step.kind === "switchOff" && step.reason).toMatch(/at most hourly/);
+        expect(step.kind === "switchOff" && step.reason).toMatch(AT_MOST_HOURLY_RE);
     });
 
     it("switches off a schedule that never fires", () => {
