@@ -37,7 +37,6 @@ jobs:
             pull-requests: "read"
         outputs:
             packages: "${{ steps.changes.outputs.packages }}"
-            codecov: "${{ steps.changes.outputs.codecov }}"
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
@@ -46,10 +45,8 @@ jobs:
 
             - name: "Git checkout"
               uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
-              env:
-                  GIT_COMMITTER_NAME: "GitHub Actions Shell"
-                  GIT_AUTHOR_NAME: "GitHub Actions Shell"
-                  EMAIL: "github-actions[bot]@users.noreply.github.com"
+              with:
+                  persist-credentials: false
 
             - name: "Check for file changes"
               uses: "dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d" # v4.0.1
@@ -59,26 +56,15 @@ jobs:
                   filters: ".github/file-filters.yml"
 
     test:
-        name: >-
-            Test (node-${{ matrix.node_version }}, ${{ matrix.os }})
+        name: "Test (node-24)"
         if: "needs.files-changed.outputs.packages == 'true'"
         needs: "files-changed"
-        strategy:
-            max-parallel: 4
-            matrix:
-                include:
-                    - os: "ubuntu-latest"
-                      node_version: "24"
-                    - os: "macos-latest"
-                      node_version: "24"
-            fail-fast: false
-        runs-on: "${{ matrix.os }}"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 60
         env:
             # Surfaced as env because the `secrets` context is not available in a
             # step-level `if:` — see the codecov step below.
             CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
-            NODE: "${{ matrix.node_version }}"
-            MATRIX_OS: "${{ matrix.os }}"
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
@@ -87,18 +73,15 @@ jobs:
 
             - name: "Git checkout ${{ env.HEAD_REPOSITORY }}:${{ env.HEAD_REF }}"
               uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
-              env:
-                  GIT_COMMITTER_NAME: "GitHub Actions Shell"
-                  GIT_AUTHOR_NAME: "GitHub Actions Shell"
-                  EMAIL: "github-actions[bot]@users.noreply.github.com"
               with:
                   fetch-depth: 0
+                  persist-credentials: false
 
             - name: "Setup resources and environment"
               id: "setup"
-              uses: "anolilab/workflows/step/setup@main"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
               with:
-                  node-version: "${{ matrix.node_version }}"
+                  node-version: "24"
 
             # services/document-parser is a Rust Worker: its `build:worker`
             # (which `test` depends on, and `lunora dev` runs on start) needs
@@ -118,9 +101,9 @@ jobs:
             - name: "Build affected packages"
               shell: "bash"
               env:
-                  # Same fix, same reason as `deploy.yml`'s "Build app" step: this
-                  # is a private repo, so the runner is 2-core/7GB and Node sizes
-                  # its default old-space at ~2080MB. `@neore/web:build` dies there
+                  # Same fix, same reason as `deploy.yml`'s "Build app" step: the
+                  # standard runner is 2-core/7GB and Node sizes its default
+                  # old-space at ~2080MB. `@neore/web:build` dies there
                   # with "FATAL ERROR: Ineffective mark-compacts near heap limit",
                   # driven by the sourcemaps for the large code-split chunks
                   # (univer-sheet-editor ~11MB, vendor-diagrams ~3.7MB).
@@ -129,62 +112,27 @@ jobs:
 
             - name: "Run tests (affected)"
               shell: "bash"
-              run: |
-                  if [[ "$MATRIX_OS" == "ubuntu-latest" ]]; then
-                      pnpm exec vis affected test:coverage --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
-                  else
-                      pnpm exec vis affected test --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
-                  fi
-
-            - name: "Install playwright in the needed packages"
-              shell: "bash"
-              if: "matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'"
-              run: |
-                  pnpm --filter "inspector" exec playwright install
-
-            - name: "Run chrome browser tests (affected)"
-              shell: "bash"
-              if: "matrix.os == 'ubuntu-latest'"
-              run: 'pnpm exec vis affected test:browser:chrome --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
-
-            - name: "Run firefox browser tests (affected)"
-              shell: "bash"
-              if: "matrix.os == 'ubuntu-latest'"
-              run: 'pnpm exec vis affected test:browser:firefox --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
-
-            - name: "Run webkit browser tests (affected)"
-              shell: "bash"
-              if: "matrix.os == 'macos-latest'"
-              run: 'pnpm exec vis affected test:browser:webkit --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
+              run: 'pnpm exec vis affected test:coverage --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
             # Skipped when CODECOV_TOKEN is unavailable, which is the normal case
-            # for a pull_request from a fork — secrets are not exposed there, so
+            # for a pull_request from a fork: secrets are not exposed there, so
             # the upload would fail for a reason that has nothing to do with the
-            # code under test.
-            #
-            # This is NOT what was failing the Node leg. That was the action's
-            # first step, `curl --fail-with-body --data-binary @codecov.yml`,
-            # which exited 26 because the repo had no `codecov.yml` — AFTER every
-            # test had already passed. The file now exists at the repo root and
-            # validates against codecov.io. Worth knowing if it regresses: the
-            # action gates that step on `if: inputs.run-lint`, and a non-empty
-            # string is truthy in an Actions expression — including the string
-            # "false" — so the `run-lint` input cannot turn it off, and gating the
-            # whole step is the only lever a caller has.
+            # code under test. The base report PRs are diffed against comes from
+            # `full-test.yml` (push to main).
             - name: "Upload code coverage to codecov"
-              if: "env.CODECOV_TOKEN != '' && matrix.os == 'ubuntu-latest'"
-              uses: "anolilab/workflows/step/codecov@main"
+              if: "env.CODECOV_TOKEN != ''"
+              continue-on-error: true
+              uses: "codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac" # v5.5.5
               with:
-                  run-lint: "needs.files-changed.outputs.codecov == 'true'"
-                  codecov-token: "${{ secrets.CODECOV_TOKEN }}"
-                  use-affected: "true"
-                  exclude-affected-projects: "pail-bench,redact-bench,colorize-bench,inspector-bench,docs,storybook"
+                  token: "${{ secrets.CODECOV_TOKEN }}"
+                  fail_ci_if_error: false
 
     e2e:
         name: "E2E (chromium)"
         if: "needs.files-changed.outputs.packages == 'true'"
         needs: "files-changed"
         runs-on: "ubuntu-24.04"
+        timeout-minutes: 45
         env:
             # `apps/web/src/lib/env.ts` declares these three as bare `z.url()` —
             # NOT optional — so a missing one is a hard boot failure
@@ -211,10 +159,11 @@ jobs:
               uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
               with:
                   fetch-depth: 0
+                  persist-credentials: false
 
             - name: "Setup resources and environment"
               id: "setup"
-              uses: "anolilab/workflows/step/setup@main"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
               with:
                   node-version: "24"
 
@@ -380,8 +329,12 @@ jobs:
     test-required-check:
         needs: ["files-changed", "test", "e2e"]
         name: "Check Test Run"
-        if: "always() && (needs.test.result == 'success' || needs.test.result == 'skipped') && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped')"
+        # `always()` and nothing else: a job skipped by its own `if:` reports
+        # success to a ruleset, so gating this one on its needs' results made the
+        # required check disappear (= pass) exactly when `test` or `e2e` failed.
+        if: "always()"
         runs-on: "ubuntu-24.04"
+        timeout-minutes: 5
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4

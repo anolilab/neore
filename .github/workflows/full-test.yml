@@ -1,0 +1,79 @@
+# https://help.github.com/en/categories/automating-your-workflow-with-github-actions
+
+name: "Full test run"
+
+# Pull requests run `vis affected`, so a project nothing touched is never tested,
+# and Codecov compares a PR against the latest report on its BASE branch. Two jobs
+# for that, neither of them a merge gate:
+#
+#   - push to main: runs the whole tree and uploads the coverage report that PRs are
+#     diffed against. The merge queue's runs are on `gh-readonly-queue/*` branches, so
+#     they never become a base.
+#   - nightly: runs the whole tree against main, which catches breakage no push
+#     triggered (an expired fixture, a dependency that moved underneath the lockfile).
+on: # yamllint disable-line rule:truthy
+    push:
+        branches:
+            - "main"
+    schedule:
+        - cron: "0 3 * * *"
+    workflow_dispatch: # yamllint disable-line rule:empty-values
+
+concurrency:
+    # Only the newest tree is worth a baseline; a nightly run is never superseded.
+    group: "${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}"
+    cancel-in-progress: "${{ github.event_name == 'push' }}"
+
+permissions:
+    contents: "read" # to fetch code (actions/checkout)
+
+jobs:
+    full-test:
+        name: "Full test run"
+        if: "github.repository == 'anolilab/neore'"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 90
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              with:
+                  node-version: "24"
+                  skip-playwright: "true"
+
+            # services/document-parser is a Rust Worker: its tests need rustc +
+            # wasm32 + worker-build, built once up front as `test.yml` does.
+            - name: "Setup Rust Worker toolchain"
+              uses: "./.github/actions/setup-rust-worker"
+
+            - name: "Build the document-parser Worker"
+              shell: "bash"
+              run: "pnpm --filter document-parser run build:worker"
+
+            - name: "Build packages"
+              shell: "bash"
+              run: "pnpm run build:packages"
+
+            # Not the `affected` variant: this measures the whole tree.
+            - name: "Run all tests with coverage"
+              shell: "bash"
+              run: "pnpm exec vis run test:coverage"
+
+            # A Codecov outage must not paint main red; a missed upload only leaves
+            # the base where it was.
+            - name: "Upload coverage to Codecov"
+              if: "github.event_name == 'push'"
+              continue-on-error: true
+              uses: "codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac" # v5.5.5
+              with:
+                  token: "${{ secrets.CODECOV_TOKEN }}"
+                  fail_ci_if_error: false

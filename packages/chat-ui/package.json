@@ -23,7 +23,8 @@
         "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore",
         "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore",
         "lint:types": "tsc --noEmit",
-        "test": "vitest run"
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary"
     },
     "dependencies": {
         "@lingui/core": "catalog:i18n",

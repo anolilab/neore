@@ -123,9 +123,7 @@ native (Rust) binary: on a machine with a per-app firewall (OpenSnitch) each
 release needs its own allow rule — unapproved, `install`/`audit`/`dedupe`/`view`
 hang until a DNS error while `pnpm run` still works. Corepack 0.34 cannot run
 it at all (it fetches no `@pnpm/exe.*` binary). CI's `pnpm/action-setup` v6.1
-does; the lock-file-maintenance workflow (anolilab/workflows
-`pnpm-lock-file-maintenance.yml`) pins `step/setup@9b64c8ce`, which is still on
-action-setup v6.0.10 and cannot install 12 — that pin has to move upstream.
+does.
 
 Root prettier only covers `*.{json,yml,yaml,js,mjs,cjs,ts}` — **root markdown is
 not linted**, so do not "fix" its formatting.

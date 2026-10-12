@@ -30,6 +30,7 @@
         "preview": "npm run build && vite preview",
         "start": "node dist/server/index.mjs",
         "test": "vitest run",
+        "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary",
         "test:e2e": "playwright test",
         "test:e2e:ui": "playwright test --ui",
         "translate:auto": "node scripts/translate-catalogs.mjs",
