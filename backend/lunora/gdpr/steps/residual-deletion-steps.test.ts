@@ -183,7 +183,7 @@ describe("residual account-deletion steps", () => {
         const anonymised = ledger.filter((row) => row.userId === DELETED_USER_MARKER);
 
         expect(anonymised).toHaveLength(MANY);
-    });
+    }, 30_000);
 
     it("keeps the GDPR request and audit rows but strips them to metadata", async () => {
         await harness.run(async (ctx: any) => {

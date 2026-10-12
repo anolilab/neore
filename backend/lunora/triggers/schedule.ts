@@ -12,8 +12,30 @@ import { internal } from "../_generated/internal";
 import { internalMutation } from "../_generated/server";
 
 const WHITESPACE_RE = /\s+/;
+const DIGITS_RE = /^\d+$/;
 // Max triggers to process per cron run to avoid mutation limits
 const TRIGGER_BATCH_SIZE = 25;
+
+const SWITCHED_OFF_REASON = "Schedule must run at most hourly and fire at least once in the next 28 years. It was switched off.";
+
+/**
+ * What a due schedule does. One that breaks the hourly rule, or never fires, is
+ * switched off with a reason and never runs. This is the policy for triggers
+ * armed before the rule, and for any that stop matching. Enabling refuses the
+ * same schedules (`setTriggerEnabled`).
+ */
+export const dueScheduleStep = (
+    cronExpression: string | undefined,
+    now: number,
+): { kind: "run"; nextTime?: number } | { kind: "switchOff"; reason: string } => {
+    if (!cronExpression) {
+        return { kind: "run" };
+    }
+
+    const nextTime = isHourlyOrSlowerCronExpression(cronExpression) ? findNextCronTime(cronExpression, now) : undefined;
+
+    return nextTime === undefined ? { kind: "switchOff", reason: SWITCHED_OFF_REASON } : { kind: "run", nextTime };
+};
 
 export const checkDueTriggers = internalMutation
     .input({})
@@ -36,7 +58,13 @@ export const checkDueTriggers = internalMutation
 
         for (const trigger of batch) {
             const triggerId = trigger._id;
-            const { cronExpression } = trigger;
+            const step = dueScheduleStep(trigger.cronExpression, now);
+
+            if (step.kind === "switchOff") {
+                await ctx.db.patch(triggerId, { enabled: false, lastError: step.reason, updatedAt: now });
+
+                continue;
+            }
 
             // Schedule the execution as a background action
             void ctx.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
@@ -45,11 +73,9 @@ export const checkDueTriggers = internalMutation
             });
 
             // Compute next trigger time
-            if (cronExpression) {
-                const nextTime = getNextCronTime(cronExpression, now);
-
+            if (step.nextTime !== undefined) {
                 await ctx.db.patch(triggerId, {
-                    nextTriggerAt: nextTime,
+                    nextTriggerAt: step.nextTime,
                     updatedAt: now,
                 });
             }
@@ -66,60 +92,77 @@ export const checkDueTriggers = internalMutation
 // ─── Simple Cron Expression Parser ──────────────────────────────────────────
 
 /**
- * Parse a 5-field cron expression and compute the next occurrence after `after`.
+ * Searched days ahead: 28 years, the cycle after which a leap day falls on the same
+ * weekday again. A schedule on Feb 29 that is a given weekday is up to 28 years out.
+ * A gap across a century year that is not a leap year can be longer, and such a
+ * schedule is refused as "never fires".
+ */
+const SEARCH_DAYS = 366 * 28;
+
+/**
+ * The first time `expression` fires strictly after `after`, or `undefined` when
+ * it never does (an invalid expression, or one like Feb 30). Only whole days that
+ * match are searched in detail, so a monthly or yearly schedule costs a day loop,
+ * not a minute loop.
  *
  * Supports: minute (0-59), hour (0-23), day-of-month (1-31), month (1-12), day-of-week (0-6).
  * Supports: *, specific values, comma-separated lists, ranges (1-5), steps (0/15 * * * *).
+ * Day-of-month and day-of-week must BOTH match (AND), unlike standard cron's OR.
  *
  * Returns a timestamp in milliseconds.
  */
-export const getNextCronTime = (expression: string, after: number): number => {
-    const fields = expression.trim().split(WHITESPACE_RE);
-
-    if (fields.length !== 5) {
-        // Invalid cron expression, default to 1 hour from now
-        return after + 3_600_000;
+export const findNextCronTime = (expression: string, after: number): number | undefined => {
+    // Checked as a whole: the field parser reads an unknown token as a wildcard, so
+    // `bad 0 * * *` would otherwise come back as a time.
+    if (!isValidCronExpression(expression)) {
+        return undefined;
     }
+
+    const fields = expression.trim().split(WHITESPACE_RE);
 
     const [minuteField, hourField, dayField, monthField, dowField] = fields;
 
-    const minutes = parseCronField(minuteField!, 0, 59);
-    const hours = parseCronField(hourField!, 0, 23);
+    // Sorted, so the first match in the loops below is the earliest one.
+    const minutes = parseCronField(minuteField!, 0, 59).toSorted((a, b) => a - b);
+    const hours = parseCronField(hourField!, 0, 23).toSorted((a, b) => a - b);
     const days = parseCronField(dayField!, 1, 31);
     const months = parseCronField(monthField!, 1, 12);
     const dows = parseCronField(dowField!, 0, 6);
 
-    const start = new Date(after + 60_000); // Start from next minute
+    // The next whole minute after `after`.
+    const start = Math.floor((after + 60_000) / 60_000) * 60_000;
+    const startDate = new Date(start);
 
-    start.setUTCSeconds(0, 0);
+    for (let offset = 0; offset < SEARCH_DAYS; offset += 1) {
+        // UTC throughout, deliberately: a cron expression here is UTC by contract.
+        // Local getters made "0 8,12,18 * * *" depend on the process's time zone.
+        const dayStart = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate() + offset);
+        const day = new Date(dayStart);
 
-    // Search up to 31 days ahead (44,640 iterations max, down from 527K)
-    // If a cron expression doesn't match within 31 days, it's likely misconfigured
-    const maxIterations = 31 * 24 * 60;
+        if (!days.includes(day.getUTCDate()) || !months.includes(day.getUTCMonth() + 1) || !dows.includes(day.getUTCDay())) {
+            continue;
+        }
 
-    for (let i = 0; i < maxIterations; i += 1) {
-        const candidate = new Date(start.getTime() + i * 60_000);
-        // UTC getters, deliberately. These were `getMinutes()` / `getHours()` /
-        // `getDate()` / `getMonth()` / `getDay()`, which read the RUNTIME's local
-        // time zone — so "0 8,12,18 * * *" resolved against whatever TZ the process
-        // happened to be in. Cloudflare Workers run as UTC, so production was right
-        // by accident and only a developer machine could see it: on Europe/Berlin
-        // the schedule test resolved 12:00 to 11:00 UTC. A cron expression here is
-        // UTC by contract, and now says so.
-        const min = candidate.getUTCMinutes();
-        const hr = candidate.getUTCHours();
-        const day = candidate.getUTCDate();
-        const month = candidate.getUTCMonth() + 1; // 1-indexed
-        const dow = candidate.getUTCDay(); // 0=Sunday
+        for (const hour of hours) {
+            for (const minute of minutes) {
+                const candidate = dayStart + hour * 3_600_000 + minute * 60_000;
 
-        if (minutes.includes(min) && hours.includes(hr) && days.includes(day) && months.includes(month) && dows.includes(dow)) {
-            return candidate.getTime();
+                if (candidate >= start) {
+                    return candidate;
+                }
+            }
         }
     }
 
-    // Fallback: 1 hour from now
-    return after + 3_600_000;
+    return undefined;
 };
+
+/**
+ * The next time from {@link findNextCronTime}, or one hour from `after` when there is no
+ * match. Only for callers that need a number (recurring tasks). Arming paths must use
+ * `findNextCronTime`: the one-hour value would arm a run that was never scheduled.
+ */
+export const getNextCronTime = (expression: string, after: number): number => findNextCronTime(expression, after) ?? after + 3_600_000;
 
 // `*`, `n`, `*/s`, `n/s` or `a-b`. A stepped range (`1-5/2`) is refused because
 // `getNextCronTime` would read it as `1/2` and run far more often than written.
@@ -139,6 +182,22 @@ const CRON_RANGES: ReadonlyArray<readonly [number, number]> = [
  * quietly treats garbage as a wildcard — so an expression that fails here would
  * fire every minute. Triggers and recurring tasks both refuse one at save time.
  */
+/**
+ * A trigger may fire at most once an hour: the minute field must be one literal
+ * minute. A per-minute trigger runs a full agent 1,440 times a day, and nothing
+ * else bounds that. The check is on the field's shape rather than on the gap
+ * between occurrences, so `0,1,2 * * * *` and `*\/30 * * * *` are refused too.
+ */
+export const isHourlyOrSlowerCronExpression = (expression: string): boolean => {
+    if (!isValidCronExpression(expression)) {
+        return false;
+    }
+
+    const [minute] = expression.trim().split(WHITESPACE_RE);
+
+    return minute !== undefined && DIGITS_RE.test(minute);
+};
+
 export const isValidCronExpression = (expression: string): boolean => {
     const fields = expression.trim().split(WHITESPACE_RE);
 

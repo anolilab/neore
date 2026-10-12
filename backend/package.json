@@ -1,6 +1,6 @@
 {
     "name": "@neore/backend",
-    "version": "1.0.0",
+    "version": "0.0.0",
     "private": true,
     "description": "Lunora backend for the AI Chat application.",
     "license": "FSL-1.1-ALv2",
@@ -36,7 +36,6 @@
         "./skills/markdown": "./lunora/skills/markdown.ts"
     },
     "scripts": {
-        "advise": "lunora advisor",
         "build": "node scripts/run-then-codegen.mjs lunora build --emit-bindings lunora-bindings.json",
         "clean": "rimraf node_modules dist .eslintcache lunora/_generated",
         "codegen": "lunora codegen && node scripts/check-generated.mjs",
@@ -47,6 +46,7 @@
         "lint:prettier": "prettier --check . --ignore-path ../.prettierignore --ignore-path .prettierignore",
         "lint:prettier:fix": "prettier --write . --ignore-path ../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc --noEmit",
+        "lunora:advise": "lunora advisor",
         "prepare:deploy": "node scripts/run-then-codegen.mjs lunora prepare",
         "test": "vitest run",
         "test:watch": "vitest"

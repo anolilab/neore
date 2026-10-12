@@ -46,8 +46,8 @@ export const heartbeatPagePresence = authMutation
         if (own) {
             await ctx.db.patch(own._id, { isEditing: args.isEditing, lastHeartbeat: now });
 
-            ctx.log.event("pages.heartbeat_page_presence", { isEditing: args.isEditing, isNewSession: false });
-
+            // Logged on the first beat of a session only: a beat every 10 s per
+            // open tab would otherwise log ~8,600 events a day per tab.
             return null;
         }
 

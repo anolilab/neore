@@ -33,10 +33,24 @@ const usePagePresence = (pageId: string) => {
     useEffect(() => {
         beat();
 
-        const timer = setInterval(beat, HEARTBEAT_INTERVAL_MS);
+        // A hidden tab is away: it stops beating, its row goes stale, and the
+        // server stops returning it. It beats again as soon as it is visible.
+        const timer = setInterval(() => {
+            if (!document.hidden) {
+                beat();
+            }
+        }, HEARTBEAT_INTERVAL_MS);
+        const onVisible = () => {
+            if (!document.hidden) {
+                beat();
+            }
+        };
+
+        document.addEventListener("visibilitychange", onVisible);
 
         return () => {
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", onVisible);
             leave({ sessionId });
         };
     }, [beat, leave, sessionId]);

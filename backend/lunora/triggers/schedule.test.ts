@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getNextCronTime, isValidCronExpression } from "./schedule";
+import { dueScheduleStep, findNextCronTime, getNextCronTime, isHourlyOrSlowerCronExpression, isValidCronExpression } from "./schedule";
 
 describe("getNextCronTime", () => {
     // Use a fixed reference: 2026-03-12 10:30:00 UTC (Thursday, dow=4)
@@ -74,11 +74,24 @@ describe("getNextCronTime", () => {
         expect(d.getDate()).toBe(1);
     });
 
-    it("should fallback for months beyond 31-day search window", () => {
-        // "0 0 1 12 *" — December is ~9 months away, beyond 31-day window
+    it("finds a run months beyond the old 31-day window", () => {
+        // "0 0 1 12 *" — December is ~9 months away. It used to fall back to one hour from now.
         const next = getNextCronTime("0 0 1 12 *", REF);
 
-        expect(next).toBe(REF + 3_600_000); // fallback: 1 hour from now
+        expect(next).toBe(new Date("2026-12-01T00:00:00Z").getTime());
+    });
+
+    it("rejects an expression with an unknown field instead of reading it as a wildcard", () => {
+        expect(findNextCronTime("bad 0 * * *", NOW)).toBeUndefined();
+    });
+
+    it("returns undefined from findNextCronTime when the schedule never fires", () => {
+        // Feb 30 does not exist, so no fallback may be armed as a due run.
+        expect(findNextCronTime("0 0 30 2 *", REF)).toBeUndefined();
+    });
+
+    it("finds Feb 29 on a leap year within the search window", () => {
+        expect(findNextCronTime("0 0 29 2 *", REF)).toBe(new Date("2028-02-29T00:00:00Z").getTime());
     });
 
     it("should always return a time after the reference", () => {
@@ -112,5 +125,49 @@ describe(isValidCronExpression, () => {
         ]) {
             expect(isValidCronExpression(invalid), invalid).toBe(false);
         }
+    });
+});
+
+describe("isHourlyOrSlowerCronExpression", () => {
+    it("accepts expressions that fire at most once an hour", () => {
+        expect(isHourlyOrSlowerCronExpression("0 9 * * 1")).toBe(true);
+        expect(isHourlyOrSlowerCronExpression("30 * * * *")).toBe(true);
+        expect(isHourlyOrSlowerCronExpression("0 */2 * * *")).toBe(true);
+    });
+
+    it("refuses any minute field that repeats within an hour", () => {
+        expect(isHourlyOrSlowerCronExpression("* * * * *")).toBe(false);
+        expect(isHourlyOrSlowerCronExpression("*/5 * * * *")).toBe(false);
+        expect(isHourlyOrSlowerCronExpression("0,30 * * * *")).toBe(false);
+        expect(isHourlyOrSlowerCronExpression("0-30 * * * *")).toBe(false);
+    });
+
+    it("refuses anything that is not a valid 5-field expression", () => {
+        expect(isHourlyOrSlowerCronExpression("")).toBe(false);
+        expect(isHourlyOrSlowerCronExpression("0 9 * *")).toBe(false);
+    });
+});
+
+const NOW = new Date("2026-03-12T10:30:00Z").getTime();
+const AT_MOST_HOURLY_RE = /at most hourly/;
+
+describe("dueScheduleStep", () => {
+    it("switches off a per-minute schedule instead of running it", () => {
+        const step = dueScheduleStep("* * * * *", NOW);
+
+        expect(step).toMatchObject({ kind: "switchOff" });
+        expect(step.kind === "switchOff" && step.reason).toMatch(AT_MOST_HOURLY_RE);
+    });
+
+    it("switches off a schedule that never fires", () => {
+        expect(dueScheduleStep("0 0 30 2 *", NOW)).toMatchObject({ kind: "switchOff" });
+    });
+
+    it("runs an hourly schedule and arms its next time", () => {
+        expect(dueScheduleStep("30 * * * *", NOW)).toEqual({ kind: "run", nextTime: findNextCronTime("30 * * * *", NOW) });
+    });
+
+    it("runs a trigger that has no cron expression without arming a time", () => {
+        expect(dueScheduleStep(undefined, NOW)).toEqual({ kind: "run" });
     });
 });

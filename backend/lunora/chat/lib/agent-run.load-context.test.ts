@@ -38,6 +38,10 @@ const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{
             case internal.chat.functions.getThreadSettings: {
                 return await settings;
             }
+            case internal.lib.action_cache.get: {
+                // The memory cache misses on every call here: the test is about ordering.
+                return { kind: "miss" };
+            }
             default: {
                 throw new Error("unexpected query");
             }
@@ -55,12 +59,28 @@ const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{
         throw new Error("unexpected action");
     });
 
-    return { ctx: { runAction, runQuery } as unknown as Parameters<typeof loadRunContext>[0], runAction, runQuery };
+    const runMutation = vi.fn(async () => null);
+
+    return { ctx: { runAction, runMutation, runQuery } as unknown as Parameters<typeof loadRunContext>[0], runAction, runQuery };
 };
 
 const args = { promptText: "What should I drink?", threadId: "t1", userId: "u1" };
 
 describe(loadRunContext, () => {
+    it("does not search memories for a prompt of two words or fewer", async () => {
+        const prefs = deferred<{ memoryEnabled: boolean }>();
+        const settings = deferred<{ projectId?: string } | null>();
+        const { ctx, runAction } = makeCtx(prefs.promise, settings.promise);
+
+        const loading = loadRunContext(ctx, { ...args, promptText: "thanks again" });
+
+        prefs.resolve({ memoryEnabled: true });
+        settings.resolve(null);
+        await loading;
+
+        expect(runAction).not.toHaveBeenCalledWith(internal.memory.retrieve.retrieveRelevantMemories, expect.anything());
+    });
+
     it("starts knowledge retrieval before the preferences and settings are read", async () => {
         const prefs = deferred<{ memoryEnabled: boolean }>();
         const settings = deferred<{ projectId?: string } | null>();

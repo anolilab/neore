@@ -172,6 +172,42 @@ export interface MockEnvOptions {
     pricingKv?: MockKVNamespace;
     /** Custom RATE_LIMIT_KV state */
     rateLimitKv?: MockKVNamespace;
+    /** Requests already counted against a native limiter, keyed `RATE_LIMIT_<n>:<key>`. */
+    rateLimitUsed?: Record<string, number>;
+}
+
+/**
+ * In-memory stand-ins for the native Rate Limiting bindings. Each binding keeps
+ * the same fixed limit as its production declaration and counts per key.
+ */
+export function createMockRateLimitBindings(used: Record<string, number> = {}) {
+    const limits = [2, 5, 15, 20, 30, 60, 120, 600];
+    // Own copy: the bindings count against it, and the caller's seed object stays untouched.
+    const counts = { ...used };
+
+    return Object.fromEntries(
+        limits.map((limit) => {
+            const name = `RATE_LIMIT_${limit}`;
+
+            return [
+                name,
+                {
+                    limit: async ({ key }: { key: string }) => {
+                        const id = `${name}:${key}`;
+                        const count = counts[id] ?? 0;
+
+                        if (count >= limit) {
+                            return { success: false };
+                        }
+
+                        counts[id] = count + 1;
+
+                        return { success: true };
+                    },
+                },
+            ];
+        }),
+    );
 }
 
 export function createMockEnv(options: MockEnvOptions = {}) {
@@ -198,6 +234,7 @@ export function createMockEnv(options: MockEnvOptions = {}) {
         OPENROUTER_API_KEY: "test-openrouter-key",
         PRICING_KV: pricingKv as unknown as KVNamespace,
         RATE_LIMIT_KV: rateLimitKv as unknown as KVNamespace,
+        ...createMockRateLimitBindings(options.rateLimitUsed ?? {}),
         SIGNING_SECRET: "test-signing-secret",
         USAGE_DB: database as unknown as D1Database,
         XAI_API_KEY: "test-xai-key",

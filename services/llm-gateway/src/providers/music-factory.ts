@@ -39,6 +39,9 @@ export interface MusicRenderResult {
     sampleRate?: number;
 }
 
+// Polls in a row that may fail (network, 429, 5xx) before the render is given up.
+const MAX_CONSECUTIVE_POLL_FAILURES = 5;
+
 /**
  * Run a single music generation against FAL via the queue API.
  *
@@ -46,47 +49,103 @@ export interface MusicRenderResult {
  * failures (network / 5xx / timeouts) so the render core's existing
  * `isTransient` heuristic can decide retry-vs-fail.
  */
+/** The FAL queue URLs a submitted job is polled and fetched through. */
+export interface FalQueueUrls {
+    responseUrl: string;
+    statusUrl: string;
+}
+
 export const runFalMusicGeneration = async (
     endpoint: string,
     apiKey: string,
     inputs: JSONObject,
-    options: { maxPollMs?: number; pollIntervalMs?: number } = {},
+    options: {
+        maxPollMs?: number;
+        onSubmitted?: (urls: FalQueueUrls) => void;
+        pollIntervalMs?: number;
+        /** URLs from an earlier submit: poll them and skip the submit, so the job is not billed twice. */
+        resume?: FalQueueUrls;
+    } = {},
 ): Promise<MusicRenderResult> => {
     const pollIntervalMs = options.pollIntervalMs ?? 2000;
     const maxPollMs = options.maxPollMs ?? 5 * 60 * 1000; // 5 min cap; music typically <30s
 
-    const submitUrl = `https://queue.fal.run/${endpoint}`;
-    const submitResponse = await fetch(submitUrl, {
-        body: JSON.stringify(inputs),
-        headers: {
-            Authorization: `Key ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-        method: "POST",
-        signal: AbortSignal.timeout(30_000),
-    });
+    let urls: FalQueueUrls | undefined = options.resume;
 
-    if (!submitResponse.ok) {
-        const text = await submitResponse.text().catch(() => "");
-
-        throw new GatewayError("PROVIDER_ERROR", `FAL submit failed (${submitResponse.status}): ${text.slice(0, 500)}`, { statusCode: submitResponse.status });
-    }
-
-    const submit = (await submitResponse.json()) as { request_id?: string; response_url?: string; status_url?: string };
-
-    if (!submit.status_url || !submit.response_url) {
-        throw new GatewayError("PROVIDER_ERROR", "FAL submit returned malformed response (missing status_url / response_url)");
-    }
-
-    const deadline = Date.now() + maxPollMs;
-
-    while (Date.now() < deadline) {
-        const statusResponse = await fetch(submit.status_url, {
-            headers: { Authorization: `Key ${apiKey}` },
-            signal: AbortSignal.timeout(15_000),
+    if (!urls) {
+        const submitUrl = `https://queue.fal.run/${endpoint}`;
+        const submitResponse = await fetch(submitUrl, {
+            body: JSON.stringify(inputs),
+            headers: {
+                Authorization: `Key ${apiKey}`,
+                "Content-Type": "application/json",
+            },
+            method: "POST",
+            signal: AbortSignal.timeout(30_000),
         });
 
+        if (!submitResponse.ok) {
+            const text = await submitResponse.text().catch(() => "");
+
+            throw new GatewayError("PROVIDER_ERROR", `FAL submit failed (${submitResponse.status}): ${text.slice(0, 500)}`, {
+                statusCode: submitResponse.status,
+            });
+        }
+
+        const submit = (await submitResponse.json()) as { request_id?: string; response_url?: string; status_url?: string };
+
+        if (!submit.status_url || !submit.response_url) {
+            throw new GatewayError("PROVIDER_ERROR", "FAL submit returned malformed response (missing status_url / response_url)");
+        }
+
+        urls = { responseUrl: submit.response_url, statusUrl: submit.status_url };
+        // Recorded before the first poll, so a later failure can resume from these URLs.
+        options.onSubmitted?.(urls);
+    }
+
+    const queueUrls: FalQueueUrls = urls;
+
+    const deadline = Date.now() + maxPollMs;
+    // The job is already billed once submitted, so a blip while polling must not end it:
+    // keep polling, and give up only after several polls in a row fail.
+    let consecutivePollFailures = 0;
+
+    while (Date.now() < deadline) {
+        let statusResponse: Response;
+
+        try {
+            statusResponse = await fetch(queueUrls.statusUrl, {
+                headers: { Authorization: `Key ${apiKey}` },
+                signal: AbortSignal.timeout(15_000),
+            });
+        } catch (error) {
+            consecutivePollFailures += 1;
+
+            if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+                throw error;
+            }
+
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, pollIntervalMs);
+            });
+
+            continue;
+        }
+
         if (!statusResponse.ok) {
+            const isTransient = statusResponse.status === 429 || statusResponse.status >= 500;
+
+            if (isTransient && consecutivePollFailures + 1 < MAX_CONSECUTIVE_POLL_FAILURES) {
+                consecutivePollFailures += 1;
+                await statusResponse.body?.cancel();
+
+                await new Promise<void>((resolve) => {
+                    setTimeout(resolve, pollIntervalMs);
+                });
+
+                continue;
+            }
+
             const text = await statusResponse.text().catch(() => "");
 
             throw new GatewayError("PROVIDER_ERROR", `FAL status poll failed (${statusResponse.status}): ${text.slice(0, 200)}`, {
@@ -94,10 +153,12 @@ export const runFalMusicGeneration = async (
             });
         }
 
+        consecutivePollFailures = 0;
+
         const status = (await statusResponse.json()) as { status?: string };
 
         if (status.status === "COMPLETED") {
-            const resultResponse = await fetch(submit.response_url, {
+            const resultResponse = await fetch(queueUrls.responseUrl, {
                 headers: { Authorization: `Key ${apiKey}` },
                 signal: AbortSignal.timeout(30_000),
             });

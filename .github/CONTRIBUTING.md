@@ -135,16 +135,12 @@ And you should be ready to go!
 
 ## <a name="branching-model"></a> Branching Model
 
-This project uses a sophisticated branching model that integrates with `semantic-release` to manage different types of releases. Understanding these branches is key to contributing effectively.
+This project releases from `main` only, through `vis release`. Understanding this is key to contributing effectively.
 
--   **`main` branch:** Represents the latest stable production release. `semantic-release` publishes full releases from this branch.
--   **`next` branch:** Used for upcoming minor or patch releases. Commits here will trigger pre-releases (e.g., `v1.2.0-next.1`). This branch allows for staging and testing the next version before it's merged to `main`.
--   **`next-major` branch:** Similar to `next`, but specifically for upcoming major versions that include breaking changes. Commits here will trigger pre-releases for the next major (e.g., `v2.0.0-next.1`).
--   **`alpha` branch:** This is the primary development branch for cutting-edge features and initial integration. `semantic-release` creates alpha pre-releases from this branch (e.g., `v1.2.0-alpha.1`). Pull Requests for most new features and significant changes should target `alpha`.
--   **`beta` branch:** Used for more stable pre-releases after features have been tested in `alpha`. `semantic-release` creates beta pre-releases from this branch (e.g., `v1.2.0-beta.1`).
--   **Versioned maintenance branches (e.g., `1.x.x`, `2.x.x`, matching `([0-9])?(.{+([0-9]),x}).x`):** These branches are used for providing bug fixes and patches to older, specific versions of the software (Long-Term Support or LTS). `semantic-release` will publish patch releases for that specific version line from these branches (e.g., `v1.1.1` from branch `1.x.x`).
+-   **`main` branch:** The only branch that releases. A push to `main` opens or updates the release PR. Merging that PR tags `v<version>` and deploys production.
+-   **No pre-release channels:** `alpha`, `beta`, `next`, `next-major` and versioned maintenance branches are not release channels. `release.channels` in `vis.config.ts` lists only `main`.
 
--   **Feature branches:** For any new feature or bug fix, create a descriptive branch off the most appropriate development branch (usually `alpha`, but sometimes `next`, `beta`, or a maintenance branch for hotfixes).
+-   **Feature branches:** For any new feature or bug fix, create a descriptive branch off `main`.
     -   **Naming Convention:**
         -   For new features: `feat/your-feature-name` (e.g., `feat/user-profile-page`)
         -   For bug fixes: `fix/issue-number-or-bug-description` (e.g., `fix/login-button-bug` or `fix/123-fix-login-button`)
@@ -152,13 +148,9 @@ This project uses a sophisticated branching model that integrates with `semantic
         -   For chores/refactors: `chore/brief-description` or `refactor/area-being-refactored`
 
 **Pull Request Targeting:**
--   Most new features and general improvements should target the `alpha` branch.
--   Changes intended for the immediate next release (that are not breaking) might target `next`.
--   Changes for an upcoming major version might target `next-major`.
--   Stabilization changes might be promoted from `alpha` to `beta` or directly target `beta`.
--   Hotfixes for specific released versions should target the corresponding maintenance branch (e.g., `1.x.x`).
+-   Target `main`. There are no `alpha`, `beta`, `next` or maintenance branches to target.
 
-Always confirm the correct target branch if unsure, especially for larger contributions or fixes to older versions.
+Always confirm the correct target branch if unsure, especially for larger contributions.
 
 ## Contribute Documentation
 
@@ -252,7 +244,7 @@ function oldDateUtility() {
 
 ### <a name="major-version-docs"></a> Documenting changes for new major versions
 
-Since `semantic-release` automatically generates changelogs (e.g., on GitHub Releases) from [Conventional Commits](#committing), a separate `UPGRADE.MD` file for major versions is generally not maintained for this application.
+Since `vis release` generates changelogs (the root `CHANGELOG.md` and each package's) from [Conventional Commits](#committing), a separate `UPGRADE.MD` file for major versions is generally not maintained for this application.
 
 The key to documenting significant changes, especially breaking changes that affect other developers on the team, lies in the commit messages themselves:
 
@@ -261,7 +253,7 @@ The key to documenting significant changes, especially breaking changes that aff
     -   Including a footer in the commit message starting with `BREAKING CHANGE:`, followed by a detailed explanation of the change and any necessary migration guidance for other developers.
 -   **Deprecations:** For features or components being deprecated, follow the [Deprecation Workflow](#deprecation-workflow) and ensure your commit messages (e.g., using `refactor` or `feat` with a clear description) reflect these changes.
 
-`semantic-release` will use this information to correctly version the application and include details of breaking changes and significant features in the automatically generated release notes. This serves as the primary record of changes between versions for the development team.
+`vis release` uses this information to choose the version bump and include details of breaking changes and significant features in the automatically generated release notes. This serves as the primary record of changes between versions for the development team.
 
 ### <a name="js-docs"></a> JSDocs
 
@@ -654,9 +646,9 @@ Some notes:
 
 [Needs Collaborator](#join-the-project-team): Committer
 
-This project uses [semantic-release](https://github.com/semantic-release/semantic-release) to automate the entire package release workflow including: determining the next version number, generating the release notes, and publishing the package.
+This project uses `vis release` (the `release` block in `vis.config.ts`). Every workspace package is versioned together, under one version and one `v<version>` tag, and that tag is what `deploy.yml` deploys. The version comes from the [Conventional Commits](#committing) on `main`.
 
-Because of this automation, it is crucial that all contributions merged into the main branch adhere to the [Conventional Commits specification](https://www.conventionalcommits.org/) (as detailed in the [Committing](#committing) section). The commit messages dictate how `semantic-release` versions the software and generates changelogs.
+Because of this automation, it is crucial that all contributions merged into `main` adhere to the [Conventional Commits specification](https://www.conventionalcommits.org/) (as detailed in the [Committing](#committing) section). The commit messages decide the version bump and the changelog entries.
 
 Prerequisites for a commit to be included in a release (typically enforced before merging a Pull Request):
 
@@ -665,14 +657,12 @@ Prerequisites for a commit to be included in a release (typically enforced befor
 -   **Successful Code Review:** Contributions must undergo and pass a code review by at least one maintainer or designated reviewer.
 -   **Comprehensive Tests:** All existing tests must pass. New functionality should be accompanied by new tests, and bug fixes should include tests that demonstrate the fix.
 
-When commits are merged to the main branch (e.g., `main`, `alpha`), `semantic-release` will automatically run (usually in a CI environment), analyze the commits since the last release, and if new releasable changes are found, it will:
+The release runs in two steps, in `.github/workflows/release.yml`:
 
-1.  Determine the new semantic version (e.g., `v1.2.3`).
-2.  Create a Git tag for the new version.
-3.  Generate release notes based on the commit messages.
-4.  Publish the release (e.g., to GitHub Releases, npm registry if applicable).
+1.  **A push to `main` opens or updates the release PR** (`vis-release/version-packages`). It bumps every package to the same version and writes the changelogs.
+2.  **Merging the release PR publishes it:** the `v<version>` tag is pushed, the GitHub release is created, and `deploy.yml` deploys production.
 
-There is typically no manual intervention needed for the release process itself once `semantic-release` is configured and running, provided all pre-merge requirements are met.
+A release therefore needs a human to merge the release PR. Nothing reaches production from a push to `main` alone.
 
 ## Join the Project Team
 

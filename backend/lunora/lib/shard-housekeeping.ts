@@ -209,16 +209,19 @@ export const runShardTick = internalMutation
 
         const { now } = ctx;
         const [trigger, task] = await Promise.all([
+            // Only triggers with a first run armed. A webhook or event trigger has
+            // no `nextTriggerAt`, and `.first()` on the enabled prefix could return
+            // one, which then armed the shard to tick every minute for nothing.
             ctx.db
                 .query("triggers")
-                .withIndex("by_enabled_nextTriggerAt", (q) => q.eq("enabled", true))
+                .withIndex("by_enabled_nextTriggerAt", (q) => q.eq("enabled", true).gt("nextTriggerAt", 0))
                 .first(),
             ctx.db
                 .query("tasks")
                 .withIndex("by_recurring_and_nextRunAt", (q) => q.eq("recurring", true))
                 .first(),
         ]);
-        const candidates = [trigger?.nextTriggerAt ?? (trigger ? now : undefined), task?.nextRunAt].filter((at): at is number => at !== undefined);
+        const candidates = [trigger?.nextTriggerAt, task?.nextRunAt].filter((at): at is number => at !== undefined);
 
         if (candidates.length > 0) {
             await noteShardDue(ctx, Math.max(Math.min(...candidates), now + MIN_TICK_INTERVAL_MS));

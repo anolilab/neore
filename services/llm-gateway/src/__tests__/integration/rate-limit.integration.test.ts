@@ -7,7 +7,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { createMockEnv, makeVirtualKeyRow, MockKVNamespace } from "../helpers/mock-env.js";
+import { createMockEnv, makeVirtualKeyRow } from "../helpers/mock-env.js";
 import { useTrackedAppFetch } from "../helpers/tracked-app-fetch.js";
 
 // Mock generateText to prevent real LLM calls — needed since completions
@@ -48,15 +48,12 @@ const TEST_TOKEN_PRO = "gk_rate_limit_pro_test";
  */
 async function buildRateLimitedEnv(token: string, tier: "free" | "pro"): Promise<ReturnType<typeof createMockEnv>> {
     const keyRow = await makeVirtualKeyRow(token, { tier });
-    const rateLimitKv = new MockKVNamespace();
 
-    // TIER_LIMITS in the middleware: free=20, pro=120
+    // TIER_LIMITS in the middleware: free=20, pro=120. The native binding for
+    // that limit has already counted the whole budget for this user.
     const limit = tier === "free" ? 20 : 120;
-    const minuteBucket = Math.floor(Date.now() / 60_000);
 
-    rateLimitKv.setRaw(`rl:user-test-001:${minuteBucket}`, String(limit));
-
-    return createMockEnv({ apiKeyCacheRows: [keyRow], rateLimitKv });
+    return createMockEnv({ apiKeyCacheRows: [keyRow], rateLimitUsed: { [`RATE_LIMIT_${limit}:chat:user-test-001`]: limit } });
 }
 
 const freeEnv = await buildRateLimitedEnv(TEST_TOKEN_FREE, "free");

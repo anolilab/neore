@@ -56,6 +56,8 @@ docs/analyze/
 # The hook scripts are the reviewable part and belong in the repo; `_/` holds
 # generated dispatchers that `vis hook install` rebuilds from postinstall.
 !.vis/hooks/
+# The release change files are reviewable and committed; the state and lock are not.
+!.vis/release/
 .vis/hooks/_/
 
 # `lunora advisor` health map. Generated; not committed by default.
@@ -74,3 +76,7 @@ backend/lunora.advisor.map.json
 
 # Agent git worktrees (Claude Code isolation)
 /.worktrees/
+
+# vis release subsystem
+.vis/release/.state.json
+.vis/release/.lock

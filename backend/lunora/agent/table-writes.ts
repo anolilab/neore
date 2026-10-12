@@ -66,6 +66,20 @@ export const insertThreadRelationship = async (db: Database, row: NewRow<"thread
     await db.insert("threadRelationships", row);
 
 /** Grant `userId` read access to a stored chat file (a fork handing over the author's files). */
+/**
+ * Moves the expiry of a thread's marker rows to `expiresAt`. The expiry cron uses
+ * this as a lease while it deletes the thread (`deleteExpiredTemporaryChats`), so
+ * the marker is not selected again until the lease runs out.
+ */
+export const leaseTemporaryThreadMarkers = async (db: Database, threadId: Id<"threads">, expiresAt: number): Promise<void> => {
+    const markers = await db
+        .query("temporaryThreads")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .collect();
+
+    await Promise.all(markers.map((marker) => db.patch(marker._id, { expiresAt })));
+};
+
 export const insertChatFileAccess = async (db: Database, fileId: Id<"chatFiles">, userId: string): Promise<void> => {
     await db.insert("chatFileAccess", { createdAt: Date.now(), fileId, userId });
 };

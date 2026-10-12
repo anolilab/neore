@@ -904,7 +904,7 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
 - **Codegen runs the advisor as an exit gate**, and a gate that exits 1 does so
   _before_ the chained post-codegen step — so an advisory regression leaves the
   tree half-generated with no clue why. Run the advisor deliberately with
-  `pnpm --filter @neore/backend run advise`; it scores 692 procedures and takes
+  `pnpm --filter @neore/backend run lunora:advise`; it scores 692 procedures and takes
   `--baseline` for regression gating.
 
 ### Modules

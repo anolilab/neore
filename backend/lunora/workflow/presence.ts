@@ -22,7 +22,8 @@ const requireWorkflowAccess = async (context: Pick<QueryCtx, "db">, projectId: s
 };
 
 // Heartbeat interval and stale threshold
-const STALE_THRESHOLD_MS = 15_000; // Consider user offline after 15s without heartbeat
+// Offline after 45s without a heartbeat: three missed beats at the client's 15 s.
+const STALE_THRESHOLD_MS = 45_000;
 const MAX_PRESENCE_PER_PROJECT = 20; // Max concurrent users per workflow
 
 // Predefined user colors for presence indicators
@@ -72,8 +73,8 @@ export const heartbeat = authMutation
                 ...(editingNodeId !== undefined && { editingNodeId: editingNodeId ?? undefined }),
             });
 
-            context.log.event("workflow.heartbeat", { status: "updated" });
-
+            // No log event on a beat: one per open tab every 15 s is noise. The
+            // first beat of a session is logged below.
             return { status: "updated" as const };
         }
 
@@ -222,11 +223,13 @@ export const cleanupStalePresence = internalMutation
     .mutation(async ({ ctx: context }) => {
         const threshold = context.now - STALE_THRESHOLD_MS;
 
+        // A range on the heartbeat index: the old full-table `.filter` read every
+        // presence row on every minute tick. Bounded per run; the next tick
+        // takes the rest.
         const staleRecords = await context.db
             .query("workflowPresence")
-            .withIndex("by_heartbeat")
-            .filter((document) => document.lastHeartbeat < threshold)
-            .collect();
+            .withIndex("by_heartbeat", (q) => q.lt("lastHeartbeat", threshold))
+            .take(500);
 
         await Promise.all(staleRecords.map((record) => context.db.delete(record._id)));
 

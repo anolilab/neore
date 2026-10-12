@@ -894,6 +894,7 @@ export interface InternalApiTypes {
             executeTrigger: FunctionReference<"action", { payload?: string; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
+            admitTriggerRun: FunctionReference<"mutation", { triggerId: Id<"triggers"> }, null | string>;
             createExecution: FunctionReference<"mutation", { payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
@@ -1831,6 +1832,7 @@ export const internal: InternalApiTypes = {
             executeTrigger: { __lunoraRef: "triggers_execute:executeTrigger" },
         },
         functions: {
+            admitTriggerRun: { __lunoraRef: "triggers_functions:admitTriggerRun" },
             createExecution: { __lunoraRef: "triggers_functions:createExecution" },
             getDueScheduleTriggers: { __lunoraRef: "triggers_functions:getDueScheduleTriggers" },
             getTriggerInternal: { __lunoraRef: "triggers_functions:getTriggerInternal" },

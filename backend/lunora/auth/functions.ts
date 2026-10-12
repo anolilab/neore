@@ -115,15 +115,15 @@ const checkDevelopmentOnly = (isDevelopmentOnly?: boolean) => {
 };
 
 // Helper function to apply rate limiting
-const applyRateLimit = async (context: ActionContext | MutationContext, rateLimit: RateLimitName | null | undefined, user: SessionUser | null) => {
-    if (!rateLimit) {
+const applyRateLimit = async (context: ActionContext | MutationContext, limitName: RateLimitName | null | undefined, user: SessionUser | null) => {
+    if (!limitName) {
         return;
     }
 
     // Use the new rateLimitGuard helper
     await rateLimitGuard({
         ...context,
-        rateLimitKey: rateLimit,
+        rateLimitKey: limitName,
         user: user ? { plan: user.plan, userId: user.userId } : null,
     });
 };
@@ -718,7 +718,7 @@ export const createAuthInternalQuery = ({
 
 export const createAuthAction = ({
     isDevelopmentOnly,
-    rateLimit,
+    rateLimit: rateLimitKey,
     role,
 }: {
     isDevelopmentOnly?: boolean;
@@ -737,7 +737,7 @@ export const createAuthAction = ({
             roleGuard(role, user);
         }
 
-        await applyRateLimit(context, rateLimit, user);
+        await applyRateLimit(context, rateLimitKey, user);
 
         return {
             ...context,
@@ -806,7 +806,7 @@ export const createInternalMutation = ({ isDevelopmentOnly }: { isDevelopmentOnl
  */
 export const createAuthMutation = ({
     isDevelopmentOnly,
-    rateLimit,
+    rateLimit: rateLimitKey,
     role,
     shouldAllowAnonymous = true,
 }: {
@@ -821,7 +821,7 @@ export const createAuthMutation = ({
         const user = await getSessionUserWithAnonymous(context, shouldAllowAnonymous);
         const validatedUser = validateAuthUser(user, shouldAllowAnonymous, role, MUTATION_AUTH_REQUIRED_ERROR);
 
-        await applyRateLimit(context, rateLimit, validatedUser);
+        await applyRateLimit(context, rateLimitKey, validatedUser);
 
         return {
             ...context,
@@ -839,7 +839,7 @@ export const createAuthMutation = ({
  */
 export const createPublicMutation = ({
     isDevelopmentOnly,
-    rateLimit,
+    rateLimit: rateLimitKey,
 }: {
     isDevelopmentOnly?: boolean;
     rateLimit?: RateLimitName | null;
@@ -849,7 +849,7 @@ export const createPublicMutation = ({
 
         const user = await getSessionUserWriter(context);
 
-        await applyRateLimit(context, rateLimit, user);
+        await applyRateLimit(context, rateLimitKey, user);
 
         return {
             ...context,

@@ -39,6 +39,7 @@ import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
 import type { SearchMode } from "./tool-builder";
 import type { ToolRunConfig } from "./tool-run-config";
+import { ActionCache } from "../../lib/action-cache";
 import { callOnShard } from "../../lib/cross-shard";
 import { servesUser } from "../../lib/shard-context";
 import { runAfterOnShard } from "../../lib/shard-scheduler";
@@ -185,18 +186,51 @@ const RETRIEVAL_TEXT_LENGTH = 2000;
 /** A memory injected into a reply's prompt — recorded on the reply for the "why was this used" view. */
 export type RetrievedMemoryRef = { memoryId: string; score: number };
 
+/** A memory as retrieval returns it, for the per-minute cache. */
+type RetrievedMemory = { category: string; confidence: number; memory: string; memoryId: string; score: number };
+
+/** Fewer words than this and the prompt is not searched for memories. */
+const MIN_MEMORY_SEARCH_WORDS = 3;
+// Word-like segments by the locale's rules. Splitting on whitespace counts a Chinese or
+// Japanese sentence (no spaces) as one word, so such a prompt never reached memory search.
+const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
+const MEMORY_RETRIEVAL_CACHE_TTL_MS = 60_000;
+
+/** Word-like segments of a prompt, by the locale's rules (see {@link WORD_SEGMENTER}). */
+export const countSearchWords = (text: string): number => {
+    let count = 0;
+
+    for (const segment of WORD_SEGMENTER.segment(text)) {
+        if (segment.isWordLike) {
+            count += 1;
+        }
+    }
+
+    return count;
+};
+
 /** The memory block for the system prompt, and which memories went into it. */
-const retrieveMemories = async (
-    ctx: Pick<ActionCtx, "runAction">,
-    userId: string,
-    searchText: string,
-): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
+const retrieveMemories = async (ctx: ActionCtx, userId: string, searchText: string): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
+    // A prompt of two words or fewer ("thanks", "ok", "yes") has nothing to match
+    // a memory against, so it skips the embedding and the vector search.
+    if (countSearchWords(searchText) < MIN_MEMORY_SEARCH_WORDS) {
+        return { context: undefined, refs: [] };
+    }
+
     try {
         // A turn in a thread someone shared runs on THEIR shard, and this user's
         // memories live on their own — read there (`servesUser`). Only the
         // caller's own memories, for the caller's own turn: no wider access.
+        //
+        // The same question twice in a minute (a regenerate, a retry) is answered
+        // from a 60 s cache. A memory deleted in that minute can still reach one
+        // reply, which is the cost of skipping the embedding call.
         const memories = servesUser(userId)
-            ? await ctx.runAction(internal.memory.retrieve.retrieveRelevantMemories, { searchText, userId })
+            ? await new ActionCache<{ searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
+                  action: internal.memory.retrieve.retrieveRelevantMemories,
+                  name: "memory/retrieve",
+                  ttl: MEMORY_RETRIEVAL_CACHE_TTL_MS,
+              }).fetch(ctx, { searchText: searchText.trim().toLowerCase(), userId })
             : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, { searchText, userId }, { shardKey: userId });
 
         return {
@@ -212,7 +246,7 @@ const retrieveMemories = async (
     }
 };
 
-export const retrieveMemoryContext = async (ctx: Pick<ActionCtx, "runAction">, userId: string, searchText: string): Promise<string | undefined> => {
+export const retrieveMemoryContext = async (ctx: ActionCtx, userId: string, searchText: string): Promise<string | undefined> => {
     const { context } = await retrieveMemories(ctx, userId, searchText);
 
     return context;
@@ -245,7 +279,7 @@ const retrieveKnowledgeContext = async (
  * none). `customSystemPrompt` is the request's; the thread's setting wins.
  */
 export const loadRunContext = async (
-    ctx: Pick<ActionCtx, "runAction" | "runQuery">,
+    ctx: ActionCtx,
     args: {
         customSystemPrompt?: string;
         promptText?: string;

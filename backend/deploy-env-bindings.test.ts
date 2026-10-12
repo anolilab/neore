@@ -44,7 +44,8 @@ const GITHUB_TOKEN_FROM_ACTIONS_SECRET = /GITHUB_TOKEN:\s*"\$\{\{\s*secrets\.GIT
 const bindingLines = alchemyScript.split("\n").map((line) => line.trim());
 
 const GATEWAY_BACKEND_ORIGIN = /LUNORA_URL:\s*requireEnv\("BACKEND_PUBLIC_ORIGIN"\)/u;
-const GATEWAY_CRONS_PASSED = /crons: GATEWAY_CRONS/u;
+// Production only: the gateway passes its crons when the stage is production.
+const GATEWAY_CRONS_PASSED = /crons: stage === "production" \? GATEWAY_CRONS : \[\]/u;
 
 /** `wrangler.jsonc` with its comments stripped (string contents kept), as `deploy-bindings.test.ts` reads it. */
 const readJsonc = (path: string): unknown =>
@@ -249,19 +250,21 @@ describe("deploy env bindings", () => {
         expect(bindingLines.some((line) => line.startsWith("LLM_GATEWAY_URL:"))).toBe(false);
     });
 
-    it("keeps the uncalled embeddings Worker unbound, private and secretless", () => {
-        // Nothing calls it; a binding, a URL or a secret for it would be dead config.
-        const serviceWrangler = readJsonc(join(REPO_ROOT, "services/embeddings/wrangler.jsonc")) as { workers_dev?: boolean };
-        const workerBlock = alchemyScript.slice(alchemyScript.indexOf("export const embeddingsWorker = await Worker("));
-
+    it("does not deploy the uncalled embeddings Worker, and gives it no bindings or secrets", () => {
+        // Nothing calls it. Declaring it would deploy a Worker with no caller, and a
+        // binding, a URL or a secret for it would be dead config.
+        expect(alchemyScript).not.toContain("export const embeddingsWorker");
         expect(backendWrangler.services?.some((entry) => entry.service === "embeddings")).toBe(false);
-        expect(serviceWrangler.workers_dev).toBe(false);
-        expect(workerBlock.slice(0, workerBlock.indexOf("bindings:"))).toContain("url: false,");
 
         for (const dead of ["EMBEDDINGS_WORKER_SIGNING_SECRET", "EMBEDDINGS_WORKER_URL"]) {
             expect(alchemyScript).not.toContain(dead);
             expect(workflowEnvKeys()).not.toContain(dead);
         }
+    });
+
+    it("runs crons in production only, so a preview has no scheduled traffic", () => {
+        expect(alchemyScript).toContain('crons: stage === "production" ? backendBindings.crons : []');
+        expect(alchemyScript).toContain('crons: stage === "production" ? GATEWAY_CRONS : []');
     });
 
     it("gives the gateway the backend origin it forwards to", () => {

@@ -11,6 +11,7 @@ import {
     Queue,
     R2Bucket,
     R2RestStateStore,
+    RateLimit,
     TanStackStart,
     VectorizeIndex,
     VectorizeMetadataIndex,
@@ -31,6 +32,12 @@ import { BACKEND_BUNDLE, RUST_WORKER_OUTPUT, RUST_WORKER_UPLOAD, WORKER_BUNDLE }
 // DEPLOY_ENV is set by CI (production | preview).
 // Locally you can override with `DEPLOY_ENV=production pnpm deploy`.
 const stage = process.env.DEPLOY_ENV ?? "preview";
+
+/**
+ * Workers Logs bill per event, and logging every request is most of that bill.
+ * 10% head sampling keeps the shape of traffic at a tenth of the events.
+ */
+const WORKER_OBSERVABILITY = { enabled: true, headSamplingRate: 0.1 };
 
 /**
  * Deploy-time values that must be present, checked BEFORE anything is built or
@@ -343,7 +350,7 @@ export const website = await TanStackStart("website", {
         ),
     },
     placement: { mode: "smart" },
-    observability: { enabled: true },
+    observability: WORKER_OBSERVABILITY,
     // Adopt existing Workers on first Alchemy run (safe migration).
     adopt: true,
     // NO second build. Alchemy's Vite resource defaults `build` to `vite build`
@@ -376,7 +383,7 @@ export const documentParser = await Worker("document-parser", {
     ...RUST_WORKER_UPLOAD,
     compatibilityDate: "2026-09-01",
     placement: { mode: "smart" },
-    observability: { enabled: true },
+    observability: WORKER_OBSERVABILITY,
     adopt: true,
     // Parsing is pure CPU: a text-dense 24 MB / 5,765-page PDF took 36s locally,
     // past the 30s default. 60s = the backend's own deadline for the call
@@ -403,7 +410,7 @@ export const nsfwChecker = await Worker("nsfw-checker", {
     compatibilityDate: "2026-09-01",
     compatibilityFlags: ["nodejs_compat_v2"],
     placement: { mode: "smart" },
-    observability: { enabled: true },
+    observability: WORKER_OBSERVABILITY,
     adopt: true,
     bindings: {
         NODE_ENV: stage === "production" ? "production" : "development",
@@ -427,7 +434,7 @@ export const browserRenderer = await Worker("browser-renderer", {
     compatibilityDate: "2025-09-15",
     compatibilityFlags: ["nodejs_compat"],
     placement: { mode: "smart" },
-    observability: { enabled: true },
+    observability: WORKER_OBSERVABILITY,
     adopt: true,
     bindings: {
         NODE_ENV: stage === "production" ? "production" : "development",
@@ -435,34 +442,9 @@ export const browserRenderer = await Worker("browser-renderer", {
     },
 });
 
-// ---------------------------------------------------------------------------
-// Embeddings service – Workers AI text embeddings
-// ---------------------------------------------------------------------------
-// Replaces Google AI text-embedding-004 for memory and knowledge base.
-// Default model: @cf/baai/bge-base-en-v1.5 (768 dimensions) to match existing vector table.
-// NOTHING CALLS IT: memory and knowledge embed through the gateway, so it was
-// left out of the move to service bindings (`backend/lunora.config.ts`) and no
-// Worker is bound to it. PRIVATE (`url: false`) and given no `SIGNING_SECRET`,
-// so it is unreachable, and `/embed` would answer 500 even if reached — its
-// HMAC check fails closed. Give it a caller and it moves the way the other
-// three did: declare it in `lunora.config.ts`, drop the HMAC from the Worker.
-export const embeddingsWorker = await Worker("embeddings", {
-    name: stage === "production" ? "embeddings" : "embeddings-preview",
-    entrypoint: "./src/index.ts",
-    cwd: "./services/embeddings",
-    url: false,
-    // Alchemy bundles unminified by default; see scripts/worker-bundle.ts.
-    bundle: WORKER_BUNDLE,
-    compatibilityDate: "2026-09-01",
-    compatibilityFlags: ["nodejs_compat_v2"],
-    placement: { mode: "smart" },
-    observability: { enabled: true },
-    adopt: true,
-    bindings: {
-        NODE_ENV: stage === "production" ? "production" : "development",
-        AI: Ai(),
-    },
-});
+// The embeddings Worker (`services/embeddings`) is not deployed: nothing calls it,
+// memory and knowledge embed through the gateway. Its source stays in the repo.
+// Deploying it again means declaring it here and giving it a caller.
 
 // ---------------------------------------------------------------------------
 // LLM Gateway service – Hono on Cloudflare Workers
@@ -531,6 +513,23 @@ export const llmGatewayUsageDb = await D1Database("llm-gateway-usage", {
     migrationsDir: "./services/llm-gateway/migrations",
 });
 
+// Native rate-limit bindings for the gateway: one per per-minute limit value, as
+// `services/llm-gateway/src/middleware/native-rate-limit.ts` expects. A namespace id
+// is account-wide, so production (9101-9108, as in `services/llm-gateway/wrangler.jsonc`)
+// and preview (9201-9208) count apart. Moving preview onto production's ids would let
+// preview traffic spend a production user's budget.
+const RATE_LIMIT_NAMESPACE_BASE = stage === "production" ? 9100 : 9200;
+const gatewayRateLimits = {
+    RATE_LIMIT_2: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 1, simple: { limit: 2, period: 60 } }),
+    RATE_LIMIT_5: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 2, simple: { limit: 5, period: 60 } }),
+    RATE_LIMIT_15: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 3, simple: { limit: 15, period: 60 } }),
+    RATE_LIMIT_20: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 4, simple: { limit: 20, period: 60 } }),
+    RATE_LIMIT_30: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 5, simple: { limit: 30, period: 60 } }),
+    RATE_LIMIT_60: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 6, simple: { limit: 60, period: 60 } }),
+    RATE_LIMIT_120: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 7, simple: { limit: 120, period: 60 } }),
+    RATE_LIMIT_600: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 8, simple: { limit: 600, period: 60 } }),
+};
+
 export const llmGatewayRateLimitKv = await KVNamespace("llm-gateway-ratelimit", { title: `llm-gateway-ratelimit-${stage}`, adopt: true });
 export const llmGatewayPricingKv = await KVNamespace("llm-gateway-pricing", { title: `llm-gateway-pricing-${stage}`, adopt: true });
 export const llmGatewayCacheKv = await KVNamespace("llm-gateway-cache", { title: `llm-gateway-cache-${stage}`, adopt: true });
@@ -547,11 +546,12 @@ export const llmGateway = await Worker("llm-gateway", {
     bundle: WORKER_BUNDLE,
     domains: customDomain(requireEnv("LLM_GATEWAY_URL"), "LLM_GATEWAY_URL"),
     // Pricing refresh, tier pools, usage aggregation, circuit-breaker reset.
-    crons: GATEWAY_CRONS,
+    // Production only, for the same reason as the backend's crons.
+    crons: stage === "production" ? GATEWAY_CRONS : [],
     compatibilityDate: "2026-09-01",
     compatibilityFlags: ["nodejs_compat_v2"],
     placement: { mode: "smart" },
-    observability: { enabled: true },
+    observability: WORKER_OBSERVABILITY,
     adopt: true,
     // Video renders can spend most of their wall-clock waiting on provider
     // HTTP calls, but the render handler still needs more than the default
@@ -650,6 +650,7 @@ export const llmGateway = await Worker("llm-gateway", {
         ),
         USAGE_DB: llmGatewayUsageDb,
         RATE_LIMIT_KV: llmGatewayRateLimitKv,
+        ...gatewayRateLimits,
         PRICING_KV: llmGatewayPricingKv,
         CACHE_KV: llmGatewayCacheKv,
         VIDEO_BUCKET: llmGatewayVideoBucket,
@@ -733,8 +734,11 @@ export const llmGateway = await Worker("llm-gateway", {
 //
 // `lunora deploy` is deliberately NOT used — it wraps `wrangler deploy` and
 // would fight this graph. Codegen runs in the build (`pnpm --filter
-// @neore/backend codegen`); schema migrations run as a post-deploy step via
-// `lunora migrate up --url <worker>`.
+// @neore/backend codegen`). Table DDL needs no step: the runtime applies root and
+// `.shardBy()` tables from the schema, and `.global()` tables are created on first
+// access. The schema-drift gate runs in `pnpm build` (`lunora build`), before this
+// deploy. Only a data backfill (`defineMigration`) needs `lunora migrate up --prod
+// --yes --url <worker>` after the deploy; none exists yet.
 export const backendDatabase = await D1Database("neore-backend-db", {
     name: stage === "production" ? "neore-backend" : "neore-backend-preview",
     adopt: true,
@@ -837,7 +841,7 @@ export const backendJobs = await Queue("neore-backend-jobs", {
  *    have no workflow to run — the exact failure `lunora prepare` warns about,
  *    but only if you run it.
  *  - No `crons` means all six scheduled jobs never fire. Nothing errors; the
- *    work just never happens.
+ *    work just never happens. Production gets them; a preview deploy does not.
  *
  * Only the stage-INDEPENDENT half is read from the manifest. Class names, the
  * workflow list and the cron expressions come from the code and are identical in
@@ -900,9 +904,10 @@ export const backend = await Worker("neore-backend", {
     // See backend/wrangler.jsonc: keeps a Durable Object alive for its pending I/O.
     compatibilityFlags: ["nodejs_compat", "durable_object_io_tasks_prevent_eviction"],
     placement: { mode: "smart" },
-    observability: { enabled: true },
+    observability: WORKER_OBSERVABILITY,
     adopt: true,
-    crons: backendBindings.crons,
+    // Production only: a preview has no traffic to justify a tick every minute.
+    crons: stage === "production" ? backendBindings.crons : [],
     bindings: {
         // First, so every explicit binding below overrides its pass-through
         // counterpart — `ENVIRONMENT`, `SITE_URL` and friends are derived here,

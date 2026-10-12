@@ -406,7 +406,7 @@ describe("runVideoRender — successful render", () => {
 });
 
 describe("runVideoRender — error classification", () => {
-    it("returns retryable=true and does NOT call markRenderFailed for transient errors (HTTP 503)", async () => {
+    it("returns retryable=false for a 503 after the provider was called: a retry would start a second, billed job", async () => {
         const { cacheKv, env, rateLimitKv } = makeEnv();
         const message = makeMessage();
 
@@ -420,16 +420,14 @@ describe("runVideoRender — error classification", () => {
 
         if (outcome.kind !== "failed") throw new Error("unreachable");
 
-        expect(outcome.retryable).toBe(true);
+        expect(outcome.retryable).toBe(false);
 
-        // Job remains in_progress because the consumer may retry; the consumer
-        // is responsible for finalising failure when the retry budget runs out.
         const stored = (await rateLimitKv.get(`video_job:${message.jobId}`, "json")) as VideoJobState;
 
-        expect(stored.status).toBe("in_progress");
+        expect(stored.status).toBe("failed");
     });
 
-    it("returns retryable=true for AbortError", async () => {
+    it("returns retryable=false for AbortError after the provider was called", async () => {
         const { cacheKv, env } = makeEnv();
         const message = makeMessage();
 
@@ -444,10 +442,10 @@ describe("runVideoRender — error classification", () => {
 
         if (outcome.kind !== "failed") throw new Error("unreachable");
 
-        expect(outcome.retryable).toBe(true);
+        expect(outcome.retryable).toBe(false);
     });
 
-    it("returns retryable=true for an error carrying a numeric statusCode 429", async () => {
+    it("returns retryable=false for a 429 after the provider was called: a poll can fail on a job that was already billed", async () => {
         const { cacheKv, env } = makeEnv();
         const message = makeMessage();
 
@@ -461,7 +459,7 @@ describe("runVideoRender — error classification", () => {
 
         if (outcome.kind !== "failed") throw new Error("unreachable");
 
-        expect(outcome.retryable).toBe(true);
+        expect(outcome.retryable).toBe(false);
     });
 
     it("returns retryable=false and persists failed state for terminal errors (validation)", async () => {
@@ -486,7 +484,7 @@ describe("runVideoRender — error classification", () => {
         expect(stored.errorMessage).toBe("prompt failed safety review");
     });
 
-    it("returns retryable=true when the error's statusCode is 500", async () => {
+    it("returns retryable=false when the error's statusCode is 500 after the provider was called", async () => {
         const { cacheKv, env } = makeEnv();
         const message = makeMessage();
 
@@ -500,6 +498,6 @@ describe("runVideoRender — error classification", () => {
 
         if (outcome.kind !== "failed") throw new Error("unreachable");
 
-        expect(outcome.retryable).toBe(true);
+        expect(outcome.retryable).toBe(false);
     });
 });

@@ -32,7 +32,7 @@ const workerCalls = [...alchemyScript.matchAll(/await Worker\("([^"]+)",\s*\{([\
 describe("deployed Worker bundles", () => {
     it("finds every bundled Worker in alchemy.run.ts", () => {
         expect(new Set(workerCalls.map(({ name }) => name))).toStrictEqual(
-            new Set(["browser-renderer", "document-parser", "embeddings", "llm-gateway", "neore-backend", "nsfw-checker"]),
+            new Set(["browser-renderer", "document-parser", "llm-gateway", "neore-backend", "nsfw-checker"]),
         );
     });
 

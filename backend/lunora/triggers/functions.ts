@@ -1,3 +1,4 @@
+import { MODEL_LOOKUP } from "@neore/ai/models";
 import type { Infer } from "lunorash/server";
 
 /**
@@ -17,20 +18,35 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
-import { isValidCronExpression } from "./schedule";
+import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { notifyQuietly } from "../notifications/notify";
 import { MAX_LENGTH } from "../lib/validators";
+import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
+import { isTaskModelAllowed } from "../tasks/logic";
 
 const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
 
-/** `getNextCronTime` reads garbage as a wildcard, so an unchecked expression would fire every minute. */
+/**
+ * A schedule must be a 5-field cron that fires at most hourly. An unchecked
+ * expression fires every minute (`getNextCronTime` reads garbage as a wildcard),
+ * and each run is a paid agent turn.
+ */
 const assertCronExpression = (cronExpression: string): void => {
-    if (!isValidCronExpression(cronExpression)) {
-        throw new LunoraError("BAD_REQUEST", 'Schedule must be a 5-field cron expression (UTC), e.g. "0 9 * * 1"');
+    if (!isHourlyOrSlowerCronExpression(cronExpression)) {
+        throw new LunoraError("BAD_REQUEST", 'Schedule must be a 5-field cron expression (UTC) that runs at most hourly, e.g. "0 9 * * 1"');
     }
 };
+
+/**
+ * The first run of a schedule trigger that has never run. Nothing else sets
+ * `nextTriggerAt` before the first run, and the due query only matches a set
+ * value, so an enabled trigger without one never fired. `undefined` when there is
+ * no such run: it is never stored as a due time.
+ */
+const firstRunOf = (trigger: Doc<"triggers">, now: number): number | undefined =>
+    trigger.type === "schedule" && trigger.cronExpression && trigger.nextTriggerAt === undefined ? findNextCronTime(trigger.cronExpression, now) : undefined;
 
 // ============================================================================
 // cRPC-exposed queries/mutations (authenticated)
@@ -239,14 +255,27 @@ export const setTriggerEnabled = authMutation
             throw new LunoraError("NOT_FOUND", "Trigger not found");
         }
 
+        // Enabling re-checks the schedule: one stored before the hourly rule, or one
+        // that never fires, must not be armed (see the policy in `checkDueTriggers`).
+        if (args.enabled && trigger.type === "schedule" && trigger.cronExpression) {
+            assertCronExpression(trigger.cronExpression);
+        }
+
+        const firstRun = args.enabled ? firstRunOf(trigger, context.now) : undefined;
+
+        if (args.enabled && trigger.type === "schedule" && trigger.nextTriggerAt === undefined && firstRun === undefined) {
+            throw new LunoraError("BAD_REQUEST", "This schedule never fires within the next 28 years. Check its day and month.");
+        }
+
         await context.db.patch(args.triggerId as Id<"triggers">, {
             enabled: args.enabled,
             updatedAt: context.now,
+            ...(firstRun !== undefined && { nextTriggerAt: firstRun }),
         });
 
         if (args.enabled) {
             // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
-            await noteShardDue(context, trigger.nextTriggerAt ?? context.now, userId);
+            await noteShardDue(context, firstRun ?? trigger.nextTriggerAt ?? context.now, userId);
         }
 
         context.log.event("triggers.set_trigger_enabled", { enabled: args.enabled });
@@ -433,6 +462,43 @@ export const updateTriggerStats = internalMutation
         return null;
     });
 
+/**
+ * Charges one run before the paid call. A trigger draws on the same daily
+ * task-run quota and model allowlist as a task round (`tasks/internal.ts`), so a
+ * schedule cannot run more agent turns than a task can. Returns the refusal
+ * reason, or `null` when the run may go ahead.
+ */
+export const admitTriggerRun = internalMutation
+    .input({ triggerId: v.id("triggers") })
+    .output(v.union(v.null(), v.string()))
+    .mutation(async ({ args: { triggerId }, ctx }) => {
+        const trigger = await ctx.db.get(triggerId);
+
+        if (!trigger) {
+            return "Trigger not found";
+        }
+
+        const account = await loadTaskAccount(ctx, trigger.userId);
+        const problem = taskAccessProblem(account);
+
+        if (problem || !account) {
+            return problem ?? "Your account no longer exists.";
+        }
+
+        const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
+        const model = trigger.model || DEFAULT_CHAT_MODEL;
+
+        if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
+            return `The model '${model}' is no longer available for triggers. Pick another model and enable the trigger again.`;
+        }
+
+        if (!(await chargeRound(ctx, trigger.userId, account))) {
+            return DAILY_LIMIT_MESSAGE;
+        }
+
+        return null;
+    });
+
 export const createExecution = internalMutation
     .input({
         payload: v.optional(v.string()),
@@ -494,11 +560,12 @@ export const setTriggerEnabledInternal = internalMutation
     .output(v.null())
     .mutation(async ({ args: { enabled, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
+        const firstRun = enabled && trigger ? firstRunOf(trigger, ctx.now) : undefined;
 
-        await ctx.db.patch(triggerId, { enabled, updatedAt: ctx.now });
+        await ctx.db.patch(triggerId, { enabled, updatedAt: ctx.now, ...(firstRun !== undefined && { nextTriggerAt: firstRun }) });
 
         if (enabled && trigger) {
-            await noteShardDue(ctx, trigger.nextTriggerAt ?? ctx.now, trigger.userId);
+            await noteShardDue(ctx, firstRun ?? trigger.nextTriggerAt ?? ctx.now, trigger.userId);
         }
 
         return null;

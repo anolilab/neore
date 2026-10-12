@@ -21,6 +21,7 @@ import type { JSONObject, JSONValue } from "@ai-sdk/provider";
 import type { AppEnv } from "../../env.js";
 import { GatewayError } from "../../lib/errors.js";
 import type { RequestTelemetry } from "../../lib/otel/index.js";
+import type { FalQueueUrls } from "../../providers/music-factory.js";
 import { MUSIC_MODELS, runFalMusicGeneration } from "../../providers/music-factory.js";
 import { UsageTracker } from "../../usage/tracker.js";
 import type { MusicRenderMessage } from "./music-types.js";
@@ -131,8 +132,12 @@ export const fireWebhook = async (callbackUrl: string, jobId: string, status: Jo
 
 export type RenderOutcome =
     | { costMicrodollars: number; kind: "completed"; latencyMs: number }
+    | { kind: "requeued" }
     | { kind: "skipped"; reason: "already-completed" }
     | { errorMessage: string; kind: "failed"; retryable: boolean };
+
+/** How many times a submitted render may be resumed from its FAL URLs before it fails. */
+export const MUSIC_RENDER_MAX_RESUMES = 5;
 
 /**
  * Persist terminal failure for a job. Idempotent — no-ops on rows that are
@@ -259,6 +264,13 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
         .run()
         .catch(() => {});
 
+    // Once FAL has been called, a retry would start a second, billed job. Errors
+    // after that point (including persisting the result) are terminal.
+    let isProviderCalled = false;
+    // The FAL URLs of the submission, once there is one: a resume reuses them, and a
+    // poll failure after submit re-queues the render with them.
+    let falUrls: FalQueueUrls | undefined = message.resume ? { responseUrl: message.resume.responseUrl, statusUrl: message.resume.statusUrl } : undefined;
+
     try {
         // Passthrough whitelist comes from the registry (single source of truth)
         // rather than the message envelope — that way a registry change rolls
@@ -266,7 +278,14 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
         const allowedPassthrough = MUSIC_MODELS[body.model]?.allowedPassthroughParameters ?? [];
         const inputs = buildFalInputs(body, allowedPassthrough);
 
-        const result = await runFalMusicGeneration(modelInfo.modelApiId, apiKey, inputs);
+        isProviderCalled = true;
+
+        const result = await runFalMusicGeneration(modelInfo.modelApiId, apiKey, inputs, {
+            onSubmitted: (urls) => {
+                falUrls = urls;
+            },
+            resume: falUrls,
+        });
 
         const latencyMs = Date.now() - startTime;
         const extension = result.mimeType.includes("mpeg") || result.mimeType.includes("mp3") ? "mp3" : "wav";
@@ -343,7 +362,24 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
         return { costMicrodollars, kind: "completed", latencyMs };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        const isRetryable = isTransient(error);
+        const resumes = message.resume?.resumes ?? 0;
+
+        // A transient poll failure after submit does not end the job: the render is re-sent
+        // with its FAL URLs and polls those. A plain retry would submit it again and bill it
+        // twice. If the re-send fails, the render falls through to the terminal path below.
+        if (isProviderCalled && falUrls && isTransient(error) && resumes < MUSIC_RENDER_MAX_RESUMES) {
+            try {
+                await env.MUSIC_RENDER_QUEUE.send({ ...message, resume: { ...falUrls, resumes: resumes + 1 } });
+
+                return { kind: "requeued" };
+            } catch (sendError) {
+                console.error("[music] failed to re-queue a submitted render; failing it:", sendError);
+            }
+        }
+
+        // Only a failure before the provider was called can be retried. After it, a
+        // poll or a 429 can still be the same job, and a retry would bill it again.
+        const isRetryable = !isProviderCalled && isTransient(error);
 
         if (!isRetryable) {
             await markRenderFailed(env, message, errorMessage);

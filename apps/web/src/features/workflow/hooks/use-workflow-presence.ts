@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
-const HEARTBEAT_INTERVAL = 5000; // 5 seconds
+const HEARTBEAT_INTERVAL = 15_000; // 15 seconds; the server reaps after 3 missed beats
 const CURSOR_DEBOUNCE = 100; // Debounce cursor updates to 100ms
 
 /**
@@ -96,12 +96,24 @@ const useWorkflowPresence = (projectId: string | null) => {
         // Send initial heartbeat
         sendHeartbeat();
 
+        // A hidden tab stops beating, so its presence goes stale and the server
+        // stops returning it. It beats again as soon as the tab is visible.
         const interval = setInterval(() => {
-            sendHeartbeat();
+            if (!document.hidden) {
+                sendHeartbeat();
+            }
         }, HEARTBEAT_INTERVAL);
+        const onVisible = () => {
+            if (!document.hidden) {
+                sendHeartbeat();
+            }
+        };
+
+        document.addEventListener("visibilitychange", onVisible);
 
         return () => {
             clearInterval(interval);
+            document.removeEventListener("visibilitychange", onVisible);
         };
     }, [projectId, sendHeartbeat]);
 
