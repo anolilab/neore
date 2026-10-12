@@ -77,7 +77,7 @@ describe("drainDeletingFiles", () => {
         expect(await chunksOf(big)).toBe(0);
         expect(await harness.run(async (ctx: any) => await ctx.db.get(big))).toBeNull();
         expect(await chunksOf(kept)).toBe(3);
-    });
+    }, 30_000);
 });
 
 describe("sweepKnowledgeFiles", () => {

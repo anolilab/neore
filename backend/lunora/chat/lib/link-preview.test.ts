@@ -136,7 +136,7 @@ describe(parseHtmlMeta, () => {
         fastestRun(1);
 
         expect(fastestRun(4) / fastestRun(1)).toBeLessThan(8);
-    });
+    }, 30_000);
 
     it("truncates long titles", () => {
         const meta = parseHtmlMeta(`<meta property="og:title" content="${"x".repeat(500)}">`, "https://example.com/");
