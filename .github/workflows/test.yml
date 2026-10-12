@@ -279,6 +279,11 @@ jobs:
                       echo "PUBLIC_ORIGIN=\"http://localhost:8788\""
                       echo "LUNORA_ORIGIN_URL=\"http://localhost:8788\""
 
+                      # The deletion workflow's confirmation email reads MAIL_FROM
+                      # before it picks a transport, so a missing one fails that step
+                      # on every retry and the workflow never reaches its last step.
+                      echo "MAIL_FROM=\"Neore <noreply@neore.localhost>\""
+
                       # Every model call goes through the LLM gateway — over the
                       # `SERVICE_LLM_GATEWAY` binding, to the copy `lunora dev`
                       # runs inside the backend's session (no URL). The secret is
