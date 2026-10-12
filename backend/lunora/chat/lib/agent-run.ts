@@ -191,13 +191,14 @@ type RetrievedMemory = { category: string; confidence: number; memory: string; m
 
 /** Fewer words than this and the prompt is not searched for memories. */
 const MIN_MEMORY_SEARCH_WORDS = 3;
+const WHITESPACE_RUN_RE = /\s+/;
 const MEMORY_RETRIEVAL_CACHE_TTL_MS = 60_000;
 
 /** The memory block for the system prompt, and which memories went into it. */
 const retrieveMemories = async (ctx: ActionCtx, userId: string, searchText: string): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
     // A prompt of two words or fewer ("thanks", "ok", "yes") has nothing to match
     // a memory against, so it skips the embedding and the vector search.
-    if (searchText.trim().split(/\s+/).length < MIN_MEMORY_SEARCH_WORDS) {
+    if (searchText.trim().split(WHITESPACE_RUN_RE).length < MIN_MEMORY_SEARCH_WORDS) {
         return { context: undefined, refs: [] };
     }
 
