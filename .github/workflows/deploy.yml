@@ -155,6 +155,8 @@ jobs:
             # worker-build) and refuses to start without `build/`.
             - name: "Setup Rust Worker toolchain"
               uses: "./.github/actions/setup-rust-worker"
+              with:
+                  cache-build: "false"
 
             - name: "Build the document-parser Worker"
               run: "pnpm --filter document-parser run build:worker"

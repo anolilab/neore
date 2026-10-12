@@ -37,6 +37,7 @@ jobs:
             pull-requests: "read"
         outputs:
             packages: "${{ steps.changes.outputs.packages }}"
+            e2e: "${{ steps.changes.outputs.e2e }}"
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
@@ -135,11 +136,17 @@ jobs:
                   fail_ci_if_error: false
 
     e2e:
-        name: "E2E (chromium)"
-        if: "needs.files-changed.outputs.packages == 'true'"
+        name: "E2E (chromium, shard ${{ matrix.shard }}/3)"
+        # Only what the browser suite exercises, and split three ways: one worker ran all
+        # 59 tests in ~12 minutes of the job, and the shards each get their own backend.
+        if: "needs.files-changed.outputs.e2e == 'true'"
         needs: "files-changed"
         runs-on: "ubuntu-24.04"
         timeout-minutes: 45
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: [1, 2, 3]
         env:
             # `apps/web/src/lib/env.ts` declares these three as bare `z.url()` —
             # NOT optional — so a missing one is a hard boot failure
@@ -315,7 +322,7 @@ jobs:
             # time out twelve times over.
             - name: "Run e2e tests"
               shell: "bash"
-              run: "pnpm --filter @neore/web run test:e2e"
+              run: "pnpm --filter @neore/web run test:e2e --shard=${{ matrix.shard }}/3"
 
             - name: "Upload the Playwright report"
               if: "!cancelled()"
@@ -329,7 +336,7 @@ jobs:
                   # The step still reported success, so the report was silently
                   # missing exactly when a failing run needed it.
                   include-hidden-files: "true"
-                  name: "playwright-report"
+                  name: "playwright-report-${{ matrix.shard }}"
                   path: "apps/web/e2e/.report"
                   retention-days: 7
 

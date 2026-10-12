@@ -5,6 +5,15 @@ description: >-
     wasm-bindgen, wasm-opt and esbuild itself on first use. The cargo registry,
     the service's target/ and ~/.cargo/bin (worker-build) are cached.
 
+inputs:
+    cache-build:
+        description: >-
+            Cache the built Worker (services/document-parser/build) on the hash of its
+            sources, so a run that did not touch them skips the ~6 minute release build.
+            Off for the deploy: what ships is built from the tag, never restored.
+        required: false
+        default: "true"
+
 runs:
     using: "composite"
     steps:
@@ -25,3 +34,18 @@ runs:
         - name: "Install worker-build"
           shell: "bash"
           run: "cargo install worker-build --version 0.8.7 --locked"
+
+        - name: "Restore the built Worker"
+          id: "worker-cache"
+          if: "inputs.cache-build == 'true'"
+          uses: "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+          with:
+              path: "services/document-parser/build"
+              key: "document-parser-build-${{ runner.os }}-${{ hashFiles('services/document-parser/Cargo.toml', 'services/document-parser/Cargo.lock', 'services/document-parser/.cargo/config.toml', 'services/document-parser/scripts/build.mjs', 'services/document-parser/src/**') }}"
+
+        # `scripts/build.mjs` skips when `build/` is newer than every source. The cache
+        # keeps the mtimes it was archived with, which are older than this checkout.
+        - name: "Mark the restored Worker as up to date"
+          if: "steps.worker-cache.outputs.cache-hit == 'true'"
+          shell: "bash"
+          run: "find services/document-parser/build -type f -exec touch {} +"
