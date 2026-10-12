@@ -57,7 +57,7 @@ jobs:
 
             - name: "Setup resources and environment"
               id: "setup"
-              uses: "anolilab/workflows/step/setup@main"
+              uses: "anolilab/workflows/step/setup@b5d611c5dda8645e93f2407e3d3fee250a9f5376" # main
               with:
                   node-version: "22.x"
                   cache-prefix: "release"
@@ -78,8 +78,9 @@ jobs:
               run: 'pnpm exec vis affected test --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
               env:
                   # Same refs as test.yml: only projects touched by this push are tested.
-                  # A manual run has no push range, so it tests against the previous commit.
-                  VIS_BASE: "${{ github.event.before || 'HEAD~1' }}"
+                  # A manual run has no push range, and a push that creates the branch sends an
+                  # all-zero `before`. Both test against the previous commit.
+                  VIS_BASE: "${{ github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1' }}"
                   VIS_HEAD: "${{ github.sha }}"
                   # This is needed for the colorize integration test
                   TEST_PROD_BUILD: "true"
