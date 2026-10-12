@@ -6,10 +6,8 @@ on:
         branches: ["main"]
 permissions: {}
 
-concurrency:
-    group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
-    cancel-in-progress: "${{ github.event_name == 'pull_request' }}"
-
+# No `concurrency` here: the shared workflow sets its own, and a caller group equal to
+# the callee's ("<workflow>-<PR number>") deadlocks the run into a startup failure.
 jobs:
     zizmor:
         permissions:
