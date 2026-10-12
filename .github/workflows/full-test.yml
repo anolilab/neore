@@ -82,3 +82,33 @@ jobs:
               with:
                   token: "${{ secrets.CODECOV_TOKEN }}"
                   fail_ci_if_error: false
+
+    # Nobody watches the nightly run, and a red push to main is easy to miss: open an
+    # issue, or comment on the one that is already open.
+    notify:
+        name: "Report a failure"
+        needs: "full-test"
+        if: "always() && needs.full-test.result == 'failure' && github.event_name != 'workflow_dispatch'"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 5
+        permissions:
+            contents: "read"
+            issues: "write"
+        steps:
+            - name: "Open or update the issue"
+              uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
+              with:
+                  script: |
+                      const title = "Full test run is failing";
+                      const { owner, repo } = context.repo;
+                      const url = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+                      const line = `${context.eventName === "schedule" ? "Nightly run" : `Push ${context.sha.slice(0, 7)}`}: ${url}`;
+
+                      const { data: open } = await github.rest.issues.listForRepo({ owner, repo, state: "open", labels: "ci", per_page: 100 });
+                      const existing = open.find((issue) => issue.title === title && !issue.pull_request);
+
+                      if (existing) {
+                          await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body: line });
+                      } else {
+                          await github.rest.issues.create({ owner, repo, title, labels: ["ci"], body: `The full test run on \`main\` failed.\n\n${line}\n\nFurther failures are added as comments. Close this issue once the run is green.` });
+                      }

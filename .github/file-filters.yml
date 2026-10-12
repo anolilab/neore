@@ -21,6 +21,22 @@ yaml_lintable:
     - "**/*.yaml"
     - "pnpm-lock.yaml"
 
+# What the browser suite exercises: the web app, the backend, the gateway and the
+# packages they build on. The CLI, the extension and the native shell are not in it.
+e2e:
+    - "apps/web/**"
+    - "backend/**"
+    - "packages/**"
+    - "services/**"
+    - "**/tsconfig*.json"
+    - "pnpm-lock.yaml"
+    - "pnpm-workspace.yaml"
+    - "package.json"
+    - "vis.config.ts"
+    - ".github/workflows/test.yml"
+    - ".github/actions/**"
+    - ".github/file-filters.yml"
+
 packages: &packages
     - "**/tsconfig*.json"
     - "pnpm-lock.yaml"
