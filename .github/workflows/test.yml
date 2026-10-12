@@ -60,7 +60,7 @@ jobs:
 
     test:
         name: >-
-            Test (node-${{ matrix.node_version }}, ${{ matrix.os }}${{ matrix.deno_version && format(', deno {0}', matrix.deno_version) || '' }}${{ matrix.bun_version && format(', bun {0}', matrix.bun_version) || '' }})
+            Test (node-${{ matrix.node_version }}, ${{ matrix.os }})
         if: "needs.files-changed.outputs.packages == 'true'"
         needs: "files-changed"
         strategy:
@@ -68,19 +68,9 @@ jobs:
             matrix:
                 include:
                     - os: "ubuntu-latest"
-                      node_version: "22"
-                    - os: "ubuntu-latest"
                       node_version: "24"
-                    - os: "ubuntu-latest"
-                      node_version: "25"
                     - os: "macos-latest"
-                      node_version: "22"
-                    - os: "ubuntu-latest"
-                      node_version: "22"
-                      bun_version: "latest"
-                    - os: "ubuntu-latest"
-                      node_version: "22"
-                      deno_version: "lts"
+                      node_version: "24"
             fail-fast: false
         runs-on: "${{ matrix.os }}"
         env:
@@ -89,9 +79,6 @@ jobs:
             CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
             NODE: "${{ matrix.node_version }}"
             MATRIX_OS: "${{ matrix.os }}"
-            MATRIX_NODE: "${{ matrix.node_version }}"
-            MATRIX_DENO: "${{ matrix.deno_version }}"
-            MATRIX_BUN: "${{ matrix.bun_version }}"
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
@@ -112,37 +99,6 @@ jobs:
               uses: "anolilab/workflows/step/setup@main"
               with:
                   node-version: "${{ matrix.node_version }}"
-                  # The setup action installs `npm@latest` by default, and npm 12
-                  # declares `node: ^22.22.2 || ^24.15.0 || >=26.0.0` — which
-                  # excludes 25. On that leg the global install aborts with
-                  # EBADENGINE and the job dies before a single test runs. Node 25
-                  # ships npm 11.12.1, which is fine, so just skip the upgrade
-                  # there rather than dropping the newest runtime from the matrix.
-                  upgrade-npm-version: "${{ matrix.node_version != '25' }}"
-                  install-bun: "matrix.os == 'ubuntu-latest'"
-                  skip-playwright: "(matrix.node_version != 22 && matrix.os != 'ubuntu-latest') || (matrix.node_version != 22 && matrix.os != 'macos-latest')"
-
-            - name: "Setup Deno"
-              if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && matrix.deno_version"
-              uses: "denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282" # v2.0.4
-              with:
-                  deno-version: "${{ matrix.deno_version }}"
-                  # `cache: true` makes the action save `DENO_DIR` in a post-job
-                  # step — but nothing in this job ever invokes deno (the test
-                  # command is `vis affected test`, which runs vitest under node),
-                  # so that directory is never created and the save fails the job
-                  # AFTER every test has passed:
-                  #   Error: Path Validation Error: Path(s) specified in the action
-                  #   for caching do(es) not exist, hence no cache is being saved.
-                  # There is nothing to cache until this leg actually runs
-                  # something under deno.
-                  cache: false
-
-            - name: "Setup Bun"
-              if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && matrix.bun_version"
-              uses: "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6" # v2.2.0
-              with:
-                  bun-version: "${{ matrix.bun_version }}"
 
             # services/document-parser is a Rust Worker: its `build:worker`
             # (which `test` depends on, and `lunora dev` runs on start) needs
@@ -174,7 +130,7 @@ jobs:
             - name: "Run tests (affected)"
               shell: "bash"
               run: |
-                  if [[ "$MATRIX_OS" == "ubuntu-latest" && "$MATRIX_NODE" == "22" && -z "$MATRIX_DENO" && -z "$MATRIX_BUN" ]]; then
+                  if [[ "$MATRIX_OS" == "ubuntu-latest" ]]; then
                       pnpm exec vis affected test:coverage --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
                   else
                       pnpm exec vis affected test --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
@@ -182,23 +138,23 @@ jobs:
 
             - name: "Install playwright in the needed packages"
               shell: "bash"
-              if: "((matrix.os == 'ubuntu-latest' && matrix.node_version == 22) || (matrix.node_version == 22 && matrix.os == 'macos-latest')) && !matrix.deno_version && !matrix.bun_version"
+              if: "matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'"
               run: |
                   pnpm --filter "inspector" exec playwright install
 
             - name: "Run chrome browser tests (affected)"
               shell: "bash"
-              if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
+              if: "matrix.os == 'ubuntu-latest'"
               run: 'pnpm exec vis affected test:browser:chrome --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
             - name: "Run firefox browser tests (affected)"
               shell: "bash"
-              if: "matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
+              if: "matrix.os == 'ubuntu-latest'"
               run: 'pnpm exec vis affected test:browser:firefox --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
             - name: "Run webkit browser tests (affected)"
               shell: "bash"
-              if: "matrix.os == 'macos-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
+              if: "matrix.os == 'macos-latest'"
               run: 'pnpm exec vis affected test:browser:webkit --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
             # Skipped when CODECOV_TOKEN is unavailable, which is the normal case
@@ -206,7 +162,7 @@ jobs:
             # the upload would fail for a reason that has nothing to do with the
             # code under test.
             #
-            # This is NOT what was failing the node-22 leg. That was the action's
+            # This is NOT what was failing the Node leg. That was the action's
             # first step, `curl --fail-with-body --data-binary @codecov.yml`,
             # which exited 26 because the repo had no `codecov.yml` — AFTER every
             # test had already passed. The file now exists at the repo root and
@@ -216,7 +172,7 @@ jobs:
             # "false" — so the `run-lint` input cannot turn it off, and gating the
             # whole step is the only lever a caller has.
             - name: "Upload code coverage to codecov"
-              if: "env.CODECOV_TOKEN != '' && matrix.os == 'ubuntu-latest' && matrix.node_version == 22 && !matrix.deno_version && !matrix.bun_version"
+              if: "env.CODECOV_TOKEN != '' && matrix.os == 'ubuntu-latest'"
               uses: "anolilab/workflows/step/codecov@main"
               with:
                   run-lint: "needs.files-changed.outputs.codecov == 'true'"
@@ -260,7 +216,7 @@ jobs:
               id: "setup"
               uses: "anolilab/workflows/step/setup@main"
               with:
-                  node-version: "22"
+                  node-version: "24"
 
             # Playwright's first `webServer` is the backend, and `buildAuth(env)`
             # refuses to start without a signing secret:
