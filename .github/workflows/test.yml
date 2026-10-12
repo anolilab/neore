@@ -114,6 +114,13 @@ jobs:
               shell: "bash"
               run: 'pnpm exec vis affected test:coverage --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
+            # The Rust Worker is the one project with a `test` target and no
+            # `test:coverage` (cargo test has no v8 coverage), so it is not part
+            # of the step above.
+            - name: "Run the Rust Worker tests (affected)"
+              shell: "bash"
+              run: 'pnpm exec vis affected test --tag document-parser --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
+
             # Skipped when CODECOV_TOKEN is unavailable, which is the normal case
             # for a pull_request from a fork: secrets are not exposed there, so
             # the upload would fail for a reason that has nothing to do with the

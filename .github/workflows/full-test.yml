@@ -68,6 +68,11 @@ jobs:
               shell: "bash"
               run: "pnpm exec vis run test:coverage"
 
+            # The one project with a `test` target and no `test:coverage`.
+            - name: "Run the Rust Worker tests"
+              shell: "bash"
+              run: "pnpm exec vis run test --projects document-parser"
+
             # A Codecov outage must not paint main red; a missed upload only leaves
             # the base where it was.
             - name: "Upload coverage to Codecov"
