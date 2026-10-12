@@ -75,7 +75,6 @@
     },
     "devDependencies": {
         "@anolilab/commitlint-config": "catalog:lint",
-        "@anolilab/multi-semantic-release": "catalog:release",
         "@anolilab/prettier-config": "catalog:lint",
         "@commitlint/cli": "catalog:lint",
         "@commitlint/config-conventional": "catalog:lint",
@@ -103,7 +102,6 @@
         "prettier": "catalog:lint",
         "prettier-plugin-tailwindcss": "catalog:lint",
         "react-dropzone": "catalog:forms",
-        "semantic-release": "catalog:release",
         "shiki": "catalog:syntax",
         "sort-package-json": "catalog:utils",
         "tslib": "catalog:bundler",

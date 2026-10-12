@@ -314,9 +314,6 @@ catalogs:
     react: 19.3.0
     react-compiler-runtime: ^1.0.0
     react-dom: 19.3.0
-  release:
-    "@anolilab/multi-semantic-release": 4.4.23
-    semantic-release: ^25.0.9
   security:
     "@hcaptcha/react-hcaptcha": 2.2.0
     "@marsidev/react-turnstile": 1.6.1

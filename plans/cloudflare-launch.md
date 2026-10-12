@@ -26,10 +26,10 @@ Deploys are CI's job (`AGENTS.md`). Do not run `pnpm run deploy` locally.
 | `services/document-parser/build/` | absent locally; CI builds it (`build:worker`) |
 
 CI setup: `deploy.yml` uses `anolilab/workflows/step/setup@main`, the same
-reference lint and test use, and both are green. Semantic-release pushes tags
-with the org secret `SEMANTIC_RELEASE_GITHUB_TOKEN` (a PAT), so a release tag
-triggers `deploy.yml`. A `GITHUB_TOKEN` tag would not. Check that the PAT has
-not expired before relying on it.
+reference lint and test use, and both are green. `release.yml` pushes the
+`v<version>` tag when the release PR is merged, with the org secret
+`SEMANTIC_RELEASE_GITHUB_TOKEN` (a PAT), so the tag triggers `deploy.yml`. A
+`GITHUB_TOKEN` tag would not. Check that the PAT has not expired before relying on it.
 
 ## 2. Secrets (GitHub environment secrets, on `production` AND `preview`)
 
@@ -177,7 +177,7 @@ Two options:
 5. **Sign up** with an `ADMIN` address through the preview site. Chat end to end,
    with a mock model if no provider key is set.
 6. **Production**: set the §2 secrets on `production`, then either let
-   semantic-release push a `vX.Y.Z` tag (it uses the org PAT, §1) or run
+   the release PR merge push a `v<version>` tag (it uses the org PAT, §1) or run
    `gh workflow run deploy.yml -f environment=production`. Repeat step 4 once
    after the production deploy.
 

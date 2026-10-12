@@ -10,6 +10,45 @@ import { defineConfig } from "@visulima/vis/config";
 // tracking without any error — keep them strictly separate.
 
 export default defineConfig({
+    // Releases: every workspace package moves together under one version and one
+    // `v<version>` tag, which is what `deploy.yml` matches. Versions come from
+    // conventional commits (`vis release ci release --generate`). Merging the
+    // release PR publishes, so a push to `main` alone never tags or deploys.
+    // `vis release` is flagged unstable (RFC §21.2), hence the acknowledgement.
+    release: {
+        acknowledgeUnstable: true,
+        channels: {
+            main: { mode: "version-pr", tag: "latest" },
+        },
+        defaultManaged: true,
+        fixed: [
+            {
+                name: "neore",
+                packages: [
+                    "neore",
+                    "@neore/ai",
+                    "@neore/backend",
+                    "@neore/browser-extension",
+                    "@neore/chat-ui",
+                    "@neore/cli",
+                    "@neore/native",
+                    "@neore/service-sdk",
+                    "@neore/ui",
+                    "@neore/web",
+                    "browser-renderer",
+                    "document-parser",
+                    "embeddings",
+                    "llm-gateway",
+                    "nsfw-checker",
+                ],
+                syncGitTag: true,
+                tagPattern: "v{version}",
+            },
+        ],
+        privatePackages: { tag: true, version: true },
+        releaseTagPattern: "v{version}",
+        workspaceChangelog: { file: "CHANGELOG.md" },
+    },
     // Guards the dependency graph. A violation FAILS `vis run` (exit 1);
     // `--skip-constraints` bypasses it. The rules below describe the graph as it
     // actually is today, so adding one is a deliberate act, not an accident.
