@@ -34,7 +34,13 @@ export const cleanupExpiredExports = internalMutation
                 try {
                     await scheduleObjectDeletion(context, [request.storageId as string]);
                 } catch (error) {
+                    // Keep the row as it is, so the next run retries the deletion. Clearing
+                    // `storageId` here would orphan the stored file.
+                    // ponytail: a row that keeps failing stays at the front of `by_expires`
+                    // and can hold back its batch; add a retry counter if that is seen.
                     cronsLogger.error(`Failed to delete storage for request ${request._id}:`, error);
+
+                    continue;
                 }
             }
 
