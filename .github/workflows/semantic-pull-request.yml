@@ -9,12 +9,16 @@ on: # yamllint disable-line rule:truthy
             - "reopened"
             - "edited"
             - "synchronize"
+    merge_group: # yamllint disable-line rule:empty-values
 
 permissions:
     contents: "read"
 
 jobs:
     semantic-pull-request:
+        # A merge queue run has no pull request to read, so the job is skipped there.
+        # A skipped required check still counts as passed.
+        if: "github.event_name != 'merge_group'"
         permissions:
             pull-requests: "write" # to analyze PRs (amannn/action-semantic-pull-request)
             statuses: "write" # to mark status of analyzed PR (amannn/action-semantic-pull-request)
