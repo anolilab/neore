@@ -21,13 +21,13 @@ const LUNORA_ROOT = join(__dirname, "..");
 const EXPORT_RE = /^export const (\w+) = /gm;
 const SUB_SECOND_SELF_RESCHEDULE_RE = /runAfter\(\s*([\d_]+)\s*,/g;
 
-const sourceFiles = (dir: string): string[] =>
-    readdirSync(dir).flatMap((entry) => {
+const sourceFiles = (directory: string): string[] =>
+    readdirSync(directory).flatMap((entry) => {
         if (entry === "node_modules" || entry === "_generated") {
             return [];
         }
 
-        const path = join(dir, entry);
+        const path = join(directory, entry);
 
         if (statSync(path).isDirectory()) {
             return sourceFiles(path);
@@ -47,13 +47,19 @@ const exportBlocks = (source: string): { body: string; name: string }[] => {
     });
 };
 
-/** Progress in the same body: a cursor handed on, or a write that takes rows out of the selection. */
-const MAKES_PROGRESS_RE = /cursor|\.patch\(|patchRow\(|\.delete\(|\.insert\(/;
+/**
+ * Progress in the same body: a cursor handed on, or a patch/delete that can take
+ * rows out of the selection. Comments are stripped first, so a note that says
+ * "cursor" does not count. An insert does not count: it adds rows to a selection.
+ */
+const MAKES_PROGRESS_RE = /\bcursor\b|\.patch\(|patchRow\(|\.delete\(/;
+// ponytail: any patch or delete counts, even on another table. Tighten to the sweep's own table if that is ever seen.
+const stripComments = (code: string): string => code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
 const selfReschedulesUnderASecond = (source: string): string[] =>
     exportBlocks(source)
         .filter(({ body, name }) => {
-            if (MAKES_PROGRESS_RE.test(body)) {
+            if (MAKES_PROGRESS_RE.test(stripComments(body))) {
                 return false;
             }
 
