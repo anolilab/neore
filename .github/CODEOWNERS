@@ -1,1 +1,9 @@
 *               @prisis
+
+# CI and deploy run with write tokens and the production secrets, so they are
+# named on their own. Turn on "Require review from Code Owners" in the ruleset
+# the day a second maintainer joins.
+/.github/workflows/   @prisis
+/.github/actions/     @prisis
+/.github/zizmor.yml   @prisis
+/alchemy.run.ts       @prisis
