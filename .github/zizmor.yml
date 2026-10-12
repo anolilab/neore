@@ -4,11 +4,14 @@ rules:
     # `pull_request_target` runs with the base repository's token, which is only
     # dangerous when it also checks out or executes the PR's code. None of these
     # check anything out: they read event metadata (the PR title) or call
-    # reusable workflows that comment and label.
+    # reusable workflows that read the event or the API, then comment and label.
     dangerous-triggers:
         ignore:
             - "allo-allo.yaml"
+            - "cla.yml"
             - "labeler.yml"
+            - "pr-size.yml"
+            - "pr-vouch.yml"
             - "semantic-pull-request.yml"
     # A cache written by a tag-triggered build is readable only by that tag, and
     # pull request caches are scoped to their own ref, so a PR cannot plant one
