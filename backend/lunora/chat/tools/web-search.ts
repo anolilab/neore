@@ -52,12 +52,15 @@ interface ExaSearchResponse {
 /**
  * Search using Tavily API.
  */
+const RETRYABLE_SEARCH_ERROR_RE = /rate limit|\b429\b/i;
+
 /**
- * Retry a paid search only when the provider refused the call or dropped it. A
- * timeout is not retried: the search may have completed server-side and been
- * billed already, and a retry bills it again.
+ * Retry a paid search only when the provider refused the call (rate limit, 429).
+ * A timeout or a dropped connection is not retried: the provider may have
+ * accepted and billed the search before the connection failed, and a retry
+ * bills it again.
  */
-const isPaidSearchRetryable = (error: unknown): boolean => error instanceof Error && /rate limit|\b429\b|econnreset|socket hang up/i.test(error.message);
+const isPaidSearchRetryable = (error: unknown): boolean => error instanceof Error && RETRYABLE_SEARCH_ERROR_RE.test(error.message);
 
 const searchWithTavily = async (
     query: string,
