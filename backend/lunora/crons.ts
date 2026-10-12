@@ -5,6 +5,7 @@ import { v } from "lunorash/server";
 import { internal } from "./_generated/internal";
 import type { ActionCtx } from "./_generated/server";
 import { internalAction, internalMutation } from "./_generated/server";
+import { leaseTemporaryThreadMarkers } from "./agent/table-writes";
 import type { PeriodicJob } from "./lib/cron-schedule";
 import { dueJobs } from "./lib/cron-schedule";
 import { HISTORY_PAGE } from "./lib/document-history";
@@ -145,6 +146,8 @@ export const vacuumDocumentHistory = internalMutation
 
 // Batch size for processing temporary threads to avoid timeouts
 const TEMPORARY_THREAD_BATCH_SIZE = 50;
+// How long a claimed thread stays out of the expired set while its deletion chain runs.
+const TEMPORARY_THREAD_LEASE_MS = 10 * 60_000;
 
 export const deleteExpiredTemporaryChats = internalMutation
     .input({})
@@ -170,16 +173,12 @@ export const deleteExpiredTemporaryChats = internalMutation
 
         for (const threadId of batch) {
             try {
-                // The marker goes first. `deleteAllForThreadIdAsync` deletes it only
-                // when the thread's message chain finishes, and that chain runs on
-                // the scheduler: until then every run here found the same ids and
-                // started a duplicate chain for each, every 100 ms.
-                const markers = await context.db
-                    .query("temporaryThreads")
-                    .withIndex("by_thread", (q) => q.eq("threadId", threadId))
-                    .collect();
-
-                await Promise.all(markers.map((marker) => context.db.delete(marker._id)));
+                // The marker is leased, not deleted. `deleteAllForThreadIdAsync` deletes
+                // it when the message chain finishes, and that chain runs on the
+                // scheduler: without a lease every run here found the same ids and
+                // started a duplicate chain. If the chain dies, the lease lapses and the
+                // thread is selected again.
+                await leaseTemporaryThreadMarkers(context.db, threadId, context.now + TEMPORARY_THREAD_LEASE_MS);
 
                 // Delete the thread and all its associated data (messages, streams).
                 await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, {
@@ -194,9 +193,9 @@ export const deleteExpiredTemporaryChats = internalMutation
 
         cronsLogger.info(`deleteExpiredTemporaryChats: Deleted ${deletedCount} expired temporary threads`);
 
-        // If there are more expired threads, schedule another run. Markers are
-        // gone by now, so the next run selects new ids; the wait only spaces out
-        // the batches.
+        // If there are more expired threads, schedule another run. The threads done
+        // here are leased, so the next run selects the ones not yet claimed; the wait
+        // only spaces out the batches.
         if (expiredThreadIds.length > TEMPORARY_THREAD_BATCH_SIZE) {
             cronsLogger.debug(`deleteExpiredTemporaryChats: More expired threads remain, scheduling follow-up`);
             await context.scheduler.runAfter(10_000, internal.crons.deleteExpiredTemporaryChats, {});

@@ -386,6 +386,16 @@ export const deleteAllForThreadIdAsync = internalMutation
                 streamsDone: streamResult.isDone,
                 threadId: args.threadId,
             });
+        } else {
+            // The thread is fully gone, so its expiry marker goes with it. Until now the
+            // cron leases the marker (`deleteExpiredTemporaryChats`), so it is still here
+            // only while a chain is running or has died.
+            const markers = await ctx.db
+                .query("temporaryThreads")
+                .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+                .collect();
+
+            await Promise.all(markers.map((marker) => ctx.db.delete(marker._id)));
         }
 
         return { isDone };

@@ -548,6 +548,56 @@ describe("crons", () => {
         expect(await run(async (context) => await context.db.query("temporaryThreads").collect())).toHaveLength(1);
     });
 
+    it("a thread larger than one deletion page keeps a leased marker until its chain finishes", async () => {
+        // 105 messages: the first page (100) goes in the cron run, the rest in the chained run.
+        const threadId = await newThread(OWNER, { isTemporary: true });
+
+        await run(async (context) => {
+            for (let index = 0; index < 105; index += 1) {
+                await context.db.insert("messages", {
+                    message: { content: `m${String(index)}`, role: "user" },
+                    order: index,
+                    status: "success",
+                    stepOrder: 0,
+                    text: `m${String(index)}`,
+                    threadId,
+                    tool: false,
+                    userId: OWNER,
+                });
+            }
+
+            await context.db.insert("temporaryThreads", { expiresAt: Date.now() - 1000, threadId, userId: OWNER });
+        });
+
+        await run(async (context) => await context.runMutation(procedureAt("crons", "deleteExpiredTemporaryChats"), {}));
+
+        // The chain is queued, so the thread and its marker stay. The marker is leased into the future.
+        expect(await run(async (context) => await context.db.get(threadId))).not.toBeNull();
+        const [leased] = await run(async (context) => await context.db.query("temporaryThreads").collect());
+
+        expect(leased.expiresAt).toBeGreaterThan(Date.now());
+
+        // A second run does not select the leased thread, so it queues no second chain.
+        await run(async (context) => await context.runMutation(procedureAt("crons", "deleteExpiredTemporaryChats"), {}));
+
+        const chainJobs = () => harness.scheduler.list().filter((job) => (job.args as { threadId?: string }).threadId === threadId);
+        const chains = chainJobs();
+
+        expect(chains).toHaveLength(1);
+
+        // Running the chain to its end removes the thread and, last, its marker.
+        // The harness cannot dispatch a job scheduled by reference, so run each queued
+        // chain step's body with its own args. A step queues the next one, until the last page.
+        for (let ran = 0; ran < chainJobs().length; ran += 1) {
+            const { args } = chainJobs()[ran]!;
+
+            await run(async (context) => await context.runMutation(procedureAt("agent_threads", "deleteAllForThreadIdAsync"), args as never));
+        }
+
+        expect(await run(async (context) => await context.db.get(threadId))).toBeNull();
+        expect(await run(async (context) => await context.db.query("temporaryThreads").collect())).toHaveLength(0);
+    });
+
     it("any thread delete takes the temporary-chat marker with it, not only the expiry cron", async () => {
         const threadId = await newThread(OWNER, { isTemporary: true });
 
@@ -923,7 +973,11 @@ describe("stored media survives the owner's legitimate copies", () => {
         );
         const fork = async () =>
             ((await as(STRANGER).action(procedureAt("workflow_fork", "forkWorkflow"), { sourceProjectId } as never)) as { projectId: string }).projectId;
-        const countOf = async () => (await run(async (context) => await context.db.get(sourceProjectId))).galleryForkCount;
+        const countOf = async () => {
+            const project = await run(async (context) => await context.db.get(sourceProjectId));
+
+            return project.galleryForkCount;
+        };
 
         const first = await fork();
 

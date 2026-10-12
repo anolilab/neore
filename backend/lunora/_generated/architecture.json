@@ -3022,18 +3022,8 @@
     },
     {
       "from": "function:crons:deleteExpiredTemporaryChats",
-      "kind": "read",
-      "to": "table:temporaryThreads"
-    },
-    {
-      "from": "function:crons:deleteExpiredTemporaryChats",
       "kind": "schedule",
       "to": "function:crons:deleteExpiredTemporaryChats"
-    },
-    {
-      "from": "function:crons:deleteExpiredTemporaryChats",
-      "kind": "write",
-      "to": "table:temporaryThreads"
     },
     {
       "from": "function:crons:deleteUnusedFiles",
@@ -15596,14 +15586,26 @@
     },
     {
       "file": "agent/table-writes",
+      "kind": "read",
+      "line": 75,
+      "reason": "\"leaseTemporaryThreadMarkers\" is not a registered function"
+    },
+    {
+      "file": "agent/table-writes",
       "kind": "write",
-      "line": 70,
+      "line": 80,
+      "reason": "\"leaseTemporaryThreadMarkers\" is not a registered function"
+    },
+    {
+      "file": "agent/table-writes",
+      "kind": "write",
+      "line": 84,
       "reason": "\"insertChatFileAccess\" is not a registered function"
     },
     {
       "file": "agent/table-writes",
       "kind": "write",
-      "line": 75,
+      "line": 89,
       "reason": "\"deleteVectorRow\" is not a registered function"
     },
     {
@@ -15615,7 +15617,7 @@
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1366,
+      "line": 1376,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -16191,98 +16193,74 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 106,
+      "line": 107,
       "reason": "\"resolveRunModel\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 126,
+      "line": 127,
       "reason": "\"resolveRunModel\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 177,
+      "line": 178,
       "reason": "\"loadUserProviderKeys\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 199,
+      "line": 249,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 199,
-      "reason": "\"retrieveMemoryContext\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 230,
+      "line": 283,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 264,
+      "line": 284,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 265,
+      "line": 292,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 273,
-      "reason": "\"loadRunContext\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 384,
+      "line": 403,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 396,
+      "line": 415,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 405,
+      "line": 424,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 417,
+      "line": 436,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 435,
+      "line": 454,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 526,
-      "reason": "\"finishRun\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 534,
-      "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
@@ -16293,25 +16271,37 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 615,
+      "line": 553,
+      "reason": "\"finishRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 564,
+      "reason": "\"finishRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 634,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 708,
+      "line": 727,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 726,
+      "line": 745,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 732,
+      "line": 751,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -16791,7 +16781,7 @@
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 235,
+      "line": 237,
       "reason": "the default export is not a registered function"
     },
     {
@@ -16899,13 +16889,13 @@
     {
       "file": "crons",
       "kind": "call",
-      "line": 329,
+      "line": 328,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "crons",
       "kind": "call",
-      "line": 341,
+      "line": 340,
       "reason": "\"runCronTick\" is not a registered function"
     },
     {
