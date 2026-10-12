@@ -64,9 +64,12 @@ jobs:
             - name: "Build Production"
               run: "pnpm run build:packages:prod"
 
-            - name: "test and coverage"
-              run: "pnpm run test:coverage"
+            - name: "test (affected)"
+              run: 'pnpm exec vis affected test --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
               env:
+                  # Same refs as test.yml: only projects touched by this push are tested
+                  VIS_BASE: "${{ github.event.before }}"
+                  VIS_HEAD: "${{ github.sha }}"
                   # This is needed for the colorize integration test
                   TEST_PROD_BUILD: "true"
 
