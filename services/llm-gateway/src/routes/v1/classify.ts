@@ -184,7 +184,7 @@ classifyRouter.openapi(
     {
         method: "post",
         // Tighter cap on /batch since each call multiplies cost by up to 100x.
-        middleware: [classifyAuth, classifyRateLimit("classify-batch", 0.2)] as const,
+        middleware: [classifyAuth, classifyRateLimit("classify-batch", 0.5)] as const,
         path: "/v1/classify/batch",
         request: {
             body: {

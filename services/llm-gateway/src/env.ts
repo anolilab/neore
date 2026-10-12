@@ -125,7 +125,6 @@ export interface AppEnv {
      */
     PUBLIC_GATEWAY_URL?: string;
 
-    RATE_LIMIT_KV: KVNamespace;
     /** Native per-minute rate-limit bindings, one per limit value (`middleware/native-rate-limit.ts`). */
     RATE_LIMIT_2?: RateLimit;
     RATE_LIMIT_5?: RateLimit;
@@ -135,6 +134,7 @@ export interface AppEnv {
     RATE_LIMIT_60?: RateLimit;
     RATE_LIMIT_120?: RateLimit;
     RATE_LIMIT_600?: RateLimit;
+    RATE_LIMIT_KV: KVNamespace;
     REQUESTY_API_KEY?: string;
 
     /**

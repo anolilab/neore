@@ -514,17 +514,20 @@ export const llmGatewayUsageDb = await D1Database("llm-gateway-usage", {
 });
 
 // Native rate-limit bindings for the gateway: one per per-minute limit value, as
-// `services/llm-gateway/src/middleware/native-rate-limit.ts` expects. The ids match
-// `services/llm-gateway/wrangler.jsonc`.
+// `services/llm-gateway/src/middleware/native-rate-limit.ts` expects. A namespace id
+// is account-wide, so production (9101-9108, as in `services/llm-gateway/wrangler.jsonc`)
+// and preview (9201-9208) count apart. Moving preview onto production's ids would let
+// preview traffic spend a production user's budget.
+const RATE_LIMIT_NAMESPACE_BASE = stage === "production" ? 9100 : 9200;
 const gatewayRateLimits = {
-    RATE_LIMIT_2: RateLimit({ namespace_id: 9101, simple: { limit: 2, period: 60 } }),
-    RATE_LIMIT_5: RateLimit({ namespace_id: 9102, simple: { limit: 5, period: 60 } }),
-    RATE_LIMIT_15: RateLimit({ namespace_id: 9103, simple: { limit: 15, period: 60 } }),
-    RATE_LIMIT_20: RateLimit({ namespace_id: 9104, simple: { limit: 20, period: 60 } }),
-    RATE_LIMIT_30: RateLimit({ namespace_id: 9105, simple: { limit: 30, period: 60 } }),
-    RATE_LIMIT_60: RateLimit({ namespace_id: 9106, simple: { limit: 60, period: 60 } }),
-    RATE_LIMIT_120: RateLimit({ namespace_id: 9107, simple: { limit: 120, period: 60 } }),
-    RATE_LIMIT_600: RateLimit({ namespace_id: 9108, simple: { limit: 600, period: 60 } }),
+    RATE_LIMIT_2: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 1, simple: { limit: 2, period: 60 } }),
+    RATE_LIMIT_5: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 2, simple: { limit: 5, period: 60 } }),
+    RATE_LIMIT_15: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 3, simple: { limit: 15, period: 60 } }),
+    RATE_LIMIT_20: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 4, simple: { limit: 20, period: 60 } }),
+    RATE_LIMIT_30: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 5, simple: { limit: 30, period: 60 } }),
+    RATE_LIMIT_60: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 6, simple: { limit: 60, period: 60 } }),
+    RATE_LIMIT_120: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 7, simple: { limit: 120, period: 60 } }),
+    RATE_LIMIT_600: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 8, simple: { limit: 600, period: 60 } }),
 };
 
 export const llmGatewayRateLimitKv = await KVNamespace("llm-gateway-ratelimit", { title: `llm-gateway-ratelimit-${stage}`, adopt: true });

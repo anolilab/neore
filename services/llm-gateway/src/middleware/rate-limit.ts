@@ -9,7 +9,7 @@ import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 
 import type { HonoEnv } from "../env.js";
-import { consumeRateLimit, secondsUntilNextMinute } from "./native-rate-limit.js";
+import { consumeRateLimit, RATE_LIMIT_VALUES, secondsUntilNextMinute, type RateLimitValue } from "./native-rate-limit.js";
 
 const TIER_LIMITS: Record<string, number> = {
     enterprise: 600,
@@ -82,14 +82,33 @@ export const rateLimitMiddleware = createMiddleware<HonoEnv>(async (c, next) => 
  * - IP fallback when userId is unknown so anonymous-leaning paths are
  *   still bucketed instead of unlimited.
  */
-export const expensiveEndpointRateLimit = (options?: { bucket?: string; tierMultiplier?: number }) =>
-    createMiddleware<HonoEnv>(async (c, next) => {
+const TIER_BASE_LIMITS: Record<string, number> = { enterprise: 120, free: 5, pro: 30 };
+
+/**
+ * Throws when a tier's limit under `multiplier` has no native binding. Such a
+ * limit would answer 503 on every request, so the factory refuses it up front.
+ */
+const assertBoundLimits = (multiplier: number): void => {
+    for (const base of Object.values(TIER_BASE_LIMITS)) {
+        const limit = Math.max(1, Math.floor(base * multiplier));
+
+        if (!RATE_LIMIT_VALUES.includes(limit as RateLimitValue)) {
+            throw new Error(`tierMultiplier ${multiplier} gives ${limit} RPM, which has no native rate-limit binding (${RATE_LIMIT_VALUES.join(", ")})`);
+        }
+    }
+};
+
+export const expensiveEndpointRateLimit = (options?: { bucket?: string; tierMultiplier?: number }) => {
+    const multiplier = options?.tierMultiplier ?? 1;
+
+    assertBoundLimits(multiplier);
+
+    return createMiddleware<HonoEnv>(async (c, next) => {
         const bucket = options?.bucket ?? "exp";
         const userId = c.get("userId");
         const tier = c.get("userTier") ?? "free";
-        const baseLimits: Record<string, number> = { enterprise: 120, free: 5, pro: 30 };
-        const baseLimit = baseLimits[tier] ?? 5;
-        const limit = Math.max(1, Math.floor(baseLimit * (options?.tierMultiplier ?? 1)));
+        const baseLimit = TIER_BASE_LIMITS[tier] ?? 5;
+        const limit = Math.max(1, Math.floor(baseLimit * multiplier));
 
         // IP fallback for paths where userId might be unset for some reason
         const ip = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "anonymous";
@@ -130,3 +149,4 @@ export const expensiveEndpointRateLimit = (options?: { bucket?: string; tierMult
 
         return undefined;
     });
+};

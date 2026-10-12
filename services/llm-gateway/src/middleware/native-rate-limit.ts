@@ -3,9 +3,13 @@
  *
  * A native binding fixes its limit and period, so every limit the gateway
  * enforces has its own binding (`RATE_LIMIT_<n>`, declared in `alchemy.run.ts`
- * and `wrangler.jsonc`). The check is atomic and writes nothing to KV: the old
- * KV counter did a read, then a write, so a burst could pass the check before
- * the first write landed, and every request paid a KV read and a KV write.
+ * and `wrangler.jsonc`). It writes nothing to KV, which the old counter did on
+ * every request.
+ *
+ * The counter is local to each Cloudflare location and eventually consistent. A
+ * user spread over several locations can exceed the stated RPM, and a burst can
+ * pass before the counters converge. This is abuse protection, not an exact
+ * budget: anything that must cap paid calls exactly needs a global check.
  */
 /** The per-minute limits the gateway enforces; each one is a binding. */
 export const RATE_LIMIT_VALUES = [2, 5, 15, 20, 30, 60, 120, 600] as const;
@@ -21,7 +25,7 @@ export type RateLimitBindings = Partial<Record<RateLimitBindingName, RateLimit>>
  * (503), the same as a missing KV binding did before.
  */
 export const consumeRateLimit = async (env: RateLimitBindings, limit: number, key: string): Promise<boolean | null> => {
-    if (!(RATE_LIMIT_VALUES as readonly number[]).includes(limit)) {
+    if (!(RATE_LIMIT_VALUES as ReadonlyArray<number>).includes(limit)) {
         return null;
     }
 

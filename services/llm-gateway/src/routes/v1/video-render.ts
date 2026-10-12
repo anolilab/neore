@@ -252,12 +252,12 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
 
     // Once the provider has been called, a retry would start a second, billed
     // job. Errors after that point (including persisting the result) are terminal.
-    let providerCalled = false;
+    let isProviderCalled = false;
 
     try {
         const model = await createVideoModel(modelInfo.provider, modelInfo.modelApiId, apiKey);
 
-        providerCalled = true;
+        isProviderCalled = true;
 
         const result = await experimental_generateVideo({
             // The SDK's own retries would re-submit the paid job too.
@@ -350,7 +350,7 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
         // Transient: network, abort, 5xx. Terminal: validation, auth, model-not-found.
         // Only a failure before the provider was called can be retried. After it, a
         // poll or a 429 can still be the same job, and a retry would bill it again.
-        const isRetryable = !providerCalled && isTransient(error);
+        const isRetryable = !isProviderCalled && isTransient(error);
 
         // Non-retryable failures are terminal at this attempt — persist failed
         // state now. Transient failures leave the row as `in_progress` so a

@@ -7,7 +7,13 @@ import { describe, expect, it } from "vitest";
 
 import { consumeRateLimit, RATE_LIMIT_VALUES, secondsUntilNextMinute } from "./native-rate-limit.js";
 
-const binding = (success: boolean) => ({ limit: async () => ({ success }) });
+const binding = (isAllowed: boolean) => {
+    return {
+        limit: async () => {
+            return { success: isAllowed };
+        },
+    };
+};
 
 describe("consumeRateLimit", () => {
     it("passes the key to the binding for the requested limit", async () => {

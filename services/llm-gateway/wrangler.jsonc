@@ -58,7 +58,8 @@
         }
     ],
     // Native rate limits, one binding per per-minute limit value (see
-    // src/middleware/native-rate-limit.ts). Alchemy declares the same ids in alchemy.run.ts.
+    // src/middleware/native-rate-limit.ts). These are the production ids; alchemy.run.ts
+    // declares them for production and gives preview its own range (9201-9208).
     "ratelimits": [
         {
             "name": "RATE_LIMIT_2",

@@ -182,6 +182,8 @@ export interface MockEnvOptions {
  */
 export function createMockRateLimitBindings(used: Record<string, number> = {}) {
     const limits = [2, 5, 15, 20, 30, 60, 120, 600];
+    // Own copy: the bindings count against it, and the caller's seed object stays untouched.
+    const counts = { ...used };
 
     return Object.fromEntries(
         limits.map((limit) => {
@@ -192,13 +194,13 @@ export function createMockRateLimitBindings(used: Record<string, number> = {}) {
                 {
                     limit: async ({ key }: { key: string }) => {
                         const id = `${name}:${key}`;
-                        const count = used[id] ?? 0;
+                        const count = counts[id] ?? 0;
 
                         if (count >= limit) {
                             return { success: false };
                         }
 
-                        used[id] = count + 1;
+                        counts[id] = count + 1;
 
                         return { success: true };
                     },
