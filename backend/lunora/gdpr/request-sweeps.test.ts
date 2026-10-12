@@ -7,7 +7,15 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
+import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { cleanupExpiredExports } from "./request-sweeps";
+
+vi.mock("../lib/storage-cleanup", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/storage-cleanup")>()),
+        scheduleObjectDeletion: vi.fn(),
+    };
+});
 
 const NOW = 1_800_000_000_000;
 const DAY = 24 * 60 * 60 * 1000;
@@ -61,5 +69,29 @@ describe("cleanupExpiredExports", () => {
         const audit = await harness.run(async (ctx: any) => await ctx.db.query("gdprAuditLog").collect());
 
         expect(audit).toHaveLength(0);
+    });
+
+    it("keeps the stored file reference when its deletion cannot be scheduled, and completes on a later run", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.insert("gdprRequests", { ...exportRow, storageId: "exports/user-a.zip" }));
+
+        vi.mocked(scheduleObjectDeletion).mockRejectedValueOnce(new Error("scheduler unavailable"));
+
+        await sweep();
+
+        const [failed] = await harness.run(async (ctx: any) => await ctx.db.query("gdprRequests").collect());
+        const auditAfterFailure = await harness.run(async (ctx: any) => await ctx.db.query("gdprAuditLog").collect());
+
+        // The file is still referenced, so the next run can still delete it.
+        expect(failed.storageId).toBe("exports/user-a.zip");
+        expect(failed.expiresAt).toBeDefined();
+        expect(auditAfterFailure).toHaveLength(0);
+
+        await sweep();
+
+        const [done] = await harness.run(async (ctx: any) => await ctx.db.query("gdprRequests").collect());
+        const auditAfterRetry = await harness.run(async (ctx: any) => await ctx.db.query("gdprAuditLog").collect());
+
+        expect(done.expiresAt).toBeUndefined();
+        expect(auditAfterRetry.filter((row: { action: string }) => row.action === "export_expired")).toHaveLength(1);
     });
 });

@@ -196,19 +196,24 @@ const MIN_MEMORY_SEARCH_WORDS = 3;
 const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
 const MEMORY_RETRIEVAL_CACHE_TTL_MS = 60_000;
 
+/** Word-like segments of a prompt, by the locale's rules (see {@link WORD_SEGMENTER}). */
+export const countSearchWords = (text: string): number => {
+    let count = 0;
+
+    for (const segment of WORD_SEGMENTER.segment(text)) {
+        if (segment.isWordLike) {
+            count += 1;
+        }
+    }
+
+    return count;
+};
+
 /** The memory block for the system prompt, and which memories went into it. */
 const retrieveMemories = async (ctx: ActionCtx, userId: string, searchText: string): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
     // A prompt of two words or fewer ("thanks", "ok", "yes") has nothing to match
     // a memory against, so it skips the embedding and the vector search.
-    let wordCount = 0;
-
-    for (const segment of WORD_SEGMENTER.segment(searchText)) {
-        if (segment.isWordLike) {
-            wordCount += 1;
-        }
-    }
-
-    if (wordCount < MIN_MEMORY_SEARCH_WORDS) {
+    if (countSearchWords(searchText) < MIN_MEMORY_SEARCH_WORDS) {
         return { context: undefined, refs: [] };
     }
 
