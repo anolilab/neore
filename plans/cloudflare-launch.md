@@ -149,7 +149,7 @@ yet, so the URLs have to be written down first. The Worker names are fixed by
 | web (`SITE_URL`) | `neore-chat` | `neore-chat-preview` | yes |
 | backend (`BACKEND_PUBLIC_ORIGIN`) | `neore-backend` | `neore-backend-preview` | yes |
 | gateway (`LLM_GATEWAY_URL`) | `llm-gateway` | `llm-gateway-preview` | yes |
-| document-parser, nsfw-checker, browser-renderer | — | — | **private** (`url: false`) |
+| document-parser, nsfw-checker, browser-renderer | — | — | **private** (`workersDev: false`) |
 
 Two options:
 

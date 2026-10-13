@@ -1869,7 +1869,7 @@ error")` (any transport, including the SSRF-guarded tool
   `lunora/_generated/openapi.{ts,json}`.** It saves ~860 KiB raw, but run
   `pnpm codegen` afterwards or you commit their deletion by accident.
 - **The backend reaches its services over SERVICE BINDINGS, not URLs.**
-  document-parser, browser-renderer and nsfw-checker are private (`url: false`
+  document-parser, browser-renderer and nsfw-checker are private (`workersDev: false`
   in Alchemy, `workers_dev: false` in wrangler) with no auth of their own — the
   binding is the only way in. The gateway keeps its custom domain (browser
   `/v1/*`) and ONE shared secret, `LLM_GATEWAY_SIGNING_SECRET` ↔ gateway
