@@ -561,9 +561,14 @@ jobs:
               with:
                   if-no-files-found: "warn"
                   name: "worker-bundles-${{ needs.resolve-env.outputs.stage }}"
-                  # The whole directory: the layout under it is Alchemy 2's, not the one the
-                  # notes in AGENTS.md were written against, and the listing above shows it.
-                  path: ".alchemy"
+                  # Module files only. The rest of `.alchemy` may hold state, traces or resolved
+                  # props, and a run's artifacts are readable by everyone who can read the repo.
+                  # The listing above shows the layout, for narrowing this further.
+                  path: |
+                      .alchemy/**/*.js
+                      .alchemy/**/*.mjs
+                      .alchemy/**/*.wasm
+                      !.alchemy/**/node_modules/**
                   retention-days: 3
 
     # -----------------------------------------------------------------
