@@ -43,6 +43,7 @@ const GITHUB_TOKEN_FROM_ACTIONS_SECRET = /GITHUB_TOKEN:\s*"\$\{\{\s*secrets\.GIT
 /** Every line of alchemy.run.ts with its indentation trimmed. */
 const bindingLines = alchemyScript.split("\n").map((line) => line.trim());
 
+const NAMED_WITH_STAGE = /\(stage === "production" \? name : `\$\{name\}-\$\{stage\}`\)/u;
 const GATEWAY_BACKEND_ORIGIN = /LUNORA_URL:\s*requireEnv\("BACKEND_PUBLIC_ORIGIN"\)/u;
 // Production only: the gateway passes its crons when the stage is production.
 const GATEWAY_CRONS_PASSED = /crons: stage === "production" \? \[\.\.\.GATEWAY_CRONS\] : \[\]/u;
@@ -294,5 +295,40 @@ describe("deploy env bindings", () => {
 
         expect(wrangler.triggers?.crons?.toSorted(byText)).toStrictEqual(GATEWAY_CRONS.toSorted(byText));
         expect(alchemyScript).toMatch(GATEWAY_CRONS_PASSED);
+    });
+
+    // The deploy workflow knows the Worker URLs before the build from the stage and the
+    // account's workers.dev subdomain; alchemy.run.ts names the Workers. The two
+    // must agree, or the app is built against hostnames nothing serves.
+    describe("stages", () => {
+        const originsStep = deployWorkflow.slice(deployWorkflow.indexOf('name: "Resolve the origins"'), deployWorkflow.indexOf('name: "Build app"'));
+
+        it("suffixes every non-production name with the stage, and the backend strips it from its queues", () => {
+            expect(alchemyScript).toMatch(NAMED_WITH_STAGE);
+            expect(alchemyScript).toContain('STAGE: stage === "production" ? "" : stage');
+        });
+
+        it.each([
+            ["site", "neore-chat"],
+            ["backend", "neore-backend"],
+            ["gateway", "llm-gateway"],
+        ])("derives the %s workers.dev origin from the name alchemy.run.ts gives that Worker (%s)", (key, workerName) => {
+            expect(originsStep).toContain(`${key}="https://${workerName}-\${STAGE}.\${WORKERS_DEV_SUBDOMAIN}.workers.dev"`);
+            expect(alchemyScript).toContain(`named("${workerName}")`);
+        });
+
+        it("builds the app and deploys the backend against the same origins", () => {
+            // Anchored: `SITE_URL` alone is also the tail of `VITE_SITE_URL`.
+            for (const [name, output] of [
+                ["VITE_LUNORA_URL", "backend"],
+                ["BACKEND_PUBLIC_ORIGIN", "backend"],
+                ["VITE_LLM_GATEWAY_URL", "gateway"],
+                ["LLM_GATEWAY_URL", "gateway"],
+                ["VITE_SITE_URL", "site"],
+                ["SITE_URL", "site"],
+            ] as const) {
+                expect(deployWorkflow).toMatch(new RegExp(String.raw`^\s+${name}: "\$\{\{ steps\.origins\.outputs\.${output} \}\}"$`, "mu"));
+            }
+        });
     });
 });

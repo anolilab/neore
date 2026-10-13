@@ -236,6 +236,26 @@ describe("handleVideoRenderBatch", () => {
         expect(message.ack).toHaveBeenCalledTimes(1);
     });
 
+    it.each(["llm-gateway-video-renders-dlq-staging", "llm-gateway-video-renders-dlq-pr-12"])(
+        "treats the deploy's stage-suffixed DLQ name %s as a DLQ",
+        async (queueName) => {
+            const message = makeMessage({}, { attempts: 3 });
+
+            await handleVideoRenderBatch(makeBatch([message], queueName), baseEnv, makeContext());
+
+            expect(runVideoRenderMock).not.toHaveBeenCalled();
+            expect(message.ack).toHaveBeenCalledTimes(1);
+        },
+    );
+
+    it("does not take a stage-suffixed primary queue for a DLQ", async () => {
+        runVideoRenderMock.mockResolvedValue({ costMicrodollars: 1, kind: "completed", latencyMs: 100 });
+
+        await handleVideoRenderBatch(makeBatch([makeMessage({})], "llm-gateway-video-renders-pr-12"), baseEnv, makeContext());
+
+        expect(runVideoRenderMock).toHaveBeenCalledTimes(1);
+    });
+
     it("flushes telemetry for DLQ messages", async () => {
         const context = makeContext();
         const message = makeMessage({}, { attempts: 3 });

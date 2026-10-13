@@ -16,10 +16,17 @@ import { BACKEND_BUILD, RUST_WORKER_OUTPUT, RUST_WORKER_UPLOAD, WORKER_BUILD } f
 // ---------------------------------------------------------------------------
 // Stage resolution
 // ---------------------------------------------------------------------------
-// DEPLOY_ENV is set by CI (production | preview) and passed as `--stage` too, so the
-// state scope and the physical names below cannot disagree.
+// DEPLOY_ENV is set by CI (production | staging | preview | pr-<n>) and passed as
+// `--stage` too, so the state scope and the physical names below cannot disagree.
 // Locally you can override with `DEPLOY_ENV=production alchemy deploy`.
+//
+// The stage is also a suffix of every physical name and a DNS label of the
+// workers.dev hostnames, so it is held to a label that fits both.
 const stage = process.env.DEPLOY_ENV ?? process.env.ALCHEMY_STAGE ?? "preview";
+
+if (!/^[a-z0-9](?:[a-z0-9-]{0,18}[a-z0-9])?$/u.test(stage)) {
+    throw new Error(`Cannot deploy — the stage ${JSON.stringify(stage)} must be 1-20 lowercase letters, digits or hyphens, not starting or ending with one.`);
+}
 
 /**
  * Workers Logs bill per event, and logging every request is most of that bill.
@@ -294,8 +301,12 @@ if (stage === "production" && !mailFrom && !destroying) {
     );
 }
 
-/** Physical names carry the stage; production keeps the bare name. */
-const named = (name: string): string => (stage === "production" ? name : `${name}-preview`);
+/**
+ * Physical names carry the stage; production keeps the bare name. The backend strips
+ * the suffix from its queue names to route them (`backend/src/queue-stage.ts`), so the
+ * stage must stay the LAST part of a queue name.
+ */
+const named = (name: string): string => (stage === "production" ? name : `${name}-${stage}`);
 const staged = (name: string): string => `${name}-${stage}`;
 
 const COMPATIBILITY_DATE = "2026-09-01";
@@ -411,10 +422,10 @@ const EMBEDDING_METADATA_PROPERTIES = ["model_table_threadId", "model_table_user
  *
  * Names, `maxRetries` and `retryDelay` come from the `defineQueue` exports;
  * batch size, batch wait and concurrency from `JOBS_QUEUE_CONSUMER`. Both are
- * what `backend/wrangler.jsonc` is tested against. A preview deploy suffixes
- * the names with `-preview`; the generated consumer knows those names from the
- * `env.preview` producers in `backend/wrangler.jsonc` (codegen reads them) —
- * keep the two in step.
+ * what `backend/wrangler.jsonc` is tested against. A non-production deploy
+ * suffixes the names with its stage and the backend's `queue()` strips it again
+ * (`STAGE` below); the `env.preview` producers in `backend/wrangler.jsonc` are what
+ * `lunora dev` and codegen read.
  */
 const queueName = (definition: { name?: string }): string => {
     if (!definition.name) {
@@ -448,7 +459,7 @@ const BackendJobs = Cloudflare.Queues.Queue("neore-backend-jobs", { name: jobsNa
  * Only the stage-INDEPENDENT half is read from the manifest. Class names, the
  * workflow list and the cron expressions come from the code and are identical in
  * every environment. The D1 database, R2 bucket and Vectorize indexes are NOT
- * taken from it: those carry `-preview` suffixes and are Alchemy resources with
+ * taken from it: those carry the stage suffix and are Alchemy resources with
  * their own lifecycle, so they stay declared above.
  *
  * Regenerate with `pnpm --filter @neore/backend run build`, which passes
@@ -587,7 +598,7 @@ export const Website = Cloudflare.Worker("website", {
     domain: customDomain(requireEnv("SITE_URL"), "SITE_URL"),
     env: boundWhereSet(["ELEVENLABS_API_KEY", "POSTHOG_PERSONAL_API_KEY"]),
     main: "./apps/web/dist/server/index.js",
-    name: stage === "production" ? "neore-chat" : "neore-chat-preview",
+    name: named("neore-chat"),
     observability: WORKER_OBSERVABILITY,
     placement: { mode: "smart" },
 });
@@ -822,6 +833,9 @@ export default Alchemy.Stack(
                 BETTER_AUTH_SECRET: secret(requireEnv("BETTER_AUTH_SECRET")),
                 ENCRYPTION_KEY: secret(requireEnv("ENCRYPTION_KEY")),
                 ENVIRONMENT: stage === "production" ? "production" : "preview",
+                // Empty in production. The backend strips it from the queue names it is
+                // delivered (`backend/src/queue-stage.ts`).
+                STAGE: stage === "production" ? "" : stage,
                 JWKS: process.env.JWKS ?? "",
                 // Verifies the gateway's calls back here and signs stream tokens. The
                 // backend reaches the gateway itself over `SERVICE_LLM_GATEWAY` below.

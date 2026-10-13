@@ -48,14 +48,15 @@ export const VIDEO_RENDER_MAX_ATTEMPTS = 3;
 export const VIDEO_RENDER_RETRY_DELAY_SECONDS = 60;
 
 /**
- * Queue name suffix used to recognise the DLQ vs the primary queue. Alchemy
- * names these `llm-gateway-video-renders` and `llm-gateway-video-renders-dlq`
- * across stages.
+ * Recognises the DLQ vs the primary queue by name. The deploy names them
+ * `llm-gateway-video-renders-<stage>` and `llm-gateway-video-renders-dlq-<stage>`,
+ * so `-dlq` is not the end of the name: matching the end treated every dead
+ * letter as a render and re-ran it.
  */
-const DLQ_SUFFIX = "-dlq";
+const DLQ_NAME = /-dlq(?:-|$)/u;
 
 export const handleVideoRenderBatch = async (batch: MessageBatch<VideoRenderMessage>, env: AppEnv, context: ExecutionContext): Promise<void> => {
-    const isDlq = batch.queue.endsWith(DLQ_SUFFIX);
+    const isDlq = DLQ_NAME.test(batch.queue);
 
     for (const message of batch.messages) {
         if (isDlq) {

@@ -1806,6 +1806,23 @@ error")` (any transport, including the SSRF-guarded tool
   against that state. There is no `ALCHEMY_PASSWORD` any more.
 - **`--adopt` is for the FIRST deploy of a name that already exists**, not a standing flag:
   it takes over any same-named resource. `deploy.yml` has an `adopt` input, off by default.
+- **Three tiers, three accounts.** `production` (the neore account), `staging` and `preview`
+  (their own Cloudflare accounts, each with a GitHub environment holding its token and
+  account id). The GitHub ENVIRONMENT picks the account and secrets; the Alchemy STAGE picks
+  names and state. They differ only for a pull request preview: environment `preview`,
+  stage `pr-<number>` (`preview.yml`, on the `preview` label, same-repo PRs, destroyed on
+  close). `named()` suffixes everything with `-<stage>` except production, and the stage
+  must stay the LAST part of a queue name: the backend binds `STAGE` and strips it in
+  `queue()` (`backend/src/queue-stage.ts`), and the gateway's consumers tell a DLQ by
+  `-dlq` in the name, not at its end.
+- **Non-production stages live on workers.dev**, because the `neore.ai` zone is in the
+  production account and a custom domain needs its zone in the Worker's account. The app
+  bakes its URLs in at build time, so `deploy.yml` derives them BEFORE the build from the
+  environment variable `WORKERS_DEV_SUBDOMAIN` (the account's workers.dev subdomain,
+  registered once in the dashboard; names are global) and the Worker names:
+  `https://<neore-chat|neore-backend|llm-gateway>-<stage>.<subdomain>.workers.dev`.
+  `backend/deploy-env-bindings.test.ts` pins that the YAML and `alchemy.run.ts` agree.
+  Unset, a non-production run falls back to the `VITE_*_URL` secrets.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).

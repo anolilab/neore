@@ -25,7 +25,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                environment: ["preview", "production"]
+                environment: ["staging", "production"]
         # `production` needs its reviewer's approval to run, like a deploy: the job holds
         # the same Cloudflare token.
         environment: "${{ matrix.environment }}"
@@ -56,6 +56,7 @@ jobs:
                   CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
                   CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
                   DEPLOY_ENV: "${{ matrix.environment }}"
+                  CLOUDFLARE_WORKERS_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"
                   # alchemy.run.ts skips its deploy guards: this reads the cloud and builds nothing.
                   READ_ONLY: "true"
               run: |
