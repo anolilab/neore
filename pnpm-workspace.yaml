@@ -28,8 +28,8 @@ autoInstallPeers: false
 
 blockExoticSubdeps: true
 catalog:
-  "@lunora/client": 1.0.0-alpha.193
-  "@lunora/react": 1.0.0-alpha.206
+  "@lunora/client": 1.0.0-alpha.199
+  "@lunora/react": 1.0.0-alpha.212
   "@lunora/workflow": 1.0.0-alpha.72
   '@visulima/vis': 4.2.0
   "@visulima/yaml": 1.0.0
@@ -74,11 +74,11 @@ catalogs:
     workers-ai-provider: 4.0.0
   analytics:
     "@posthog/react": 1.11.3
-    posthog-js: 1.438.7
-    posthog-node: 5.55.1
+    posthog-js: 1.438.8
+    posthog-node: 5.55.2
   animation:
     "@rive-app/react-webgl2": 4.36.0
-    motion: 14.0.0
+    motion: 14.1.0
   auth:
     # `@lunora/auth` (alpha.197) depends on
     # `@better-auth/{api-key,passkey,mcp,scim,oauth-provider}` at EXACTLY 1.7.7,
@@ -99,7 +99,7 @@ catalogs:
     "@cloudflare/vite-plugin": 1.63.1
     # wrangler peer-requires ^5.<its workerd date> — 4.145.0 wants ^5.20260930.2.
     # Bump with wrangler.
-    "@cloudflare/workers-types": 5.20261009.1
+    "@cloudflare/workers-types": 5.20261012.1
     "@crxjs/vite-plugin": 3.0.0
     "@prosopo/vite-plugin-watch-workspace": 2.6.33
     "@rolldown/plugin-babel": 0.2.4
@@ -108,6 +108,10 @@ catalogs:
     # CommonJS loader cannot run in their ESM node build (`Dynamic require of
     # "fs"`, then `__dirname`, then ENOENT hb.wasm) — `scripts/generate-og.mjs`,
     # and so `apps/web`'s `pnpm run build`, fails. 1.0.1 has no harfbuzz.
+    # HELD AT 1.0.1 — 1.0.2 and 1.0.3 ship `dist/index.node.js` with a bundled
+    # `require("fs")` that Node's ESM loader rejects ("Dynamic require of "fs" is not
+    # supported"), so `apps/web/scripts/generate-og.mjs` and with it `pnpm build` fail.
+    # Re-check on each release by running `node apps/web/scripts/generate-og.mjs`.
     "@vercel/og": 1.0.1
     "@visulima/dev-toolbar": 1.1.18
     "@visulima/vite-overlay": 2.0.41
@@ -129,7 +133,7 @@ catalogs:
   bundler:
     "@swc-node/register": ~1.12.1
     "@swc/cli": 0.8.1
-    "@swc/core": 1.16.13
+    "@swc/core": 1.16.18
     "@swc/helpers": 0.5.23
     "@visulima/packem": 2.1.0
     # Required (non-optional) peer of packem, pinned exactly by it — move with
@@ -141,14 +145,14 @@ catalogs:
     # happened to sit in the tree and `pnpm dedupe` flipped between "with" and
     # "without" on every run, so `pnpm dedupe --check` (part of `pnpm lint`)
     # could never pass.
-    rollup: 4.64.4
+    rollup: 4.64.5
     tslib: ^2.8.1
   canvas-spreadsheet:
-    "@univerjs/preset-sheets-core": 1.0.3
-    "@univerjs/preset-sheets-filter": 1.0.3
-    "@univerjs/preset-sheets-find-replace": 1.0.3
-    "@univerjs/preset-sheets-sort": 1.0.3
-    "@univerjs/presets": 1.0.3
+    "@univerjs/preset-sheets-core": 1.0.4
+    "@univerjs/preset-sheets-filter": 1.0.4
+    "@univerjs/preset-sheets-find-replace": 1.0.4
+    "@univerjs/preset-sheets-sort": 1.0.4
+    "@univerjs/presets": 1.0.4
     papaparse: ^5.7.0
     read-excel-file: 9.3.12
     rxjs: ^7.8.2
@@ -156,7 +160,7 @@ catalogs:
     "@xyflow/react": 12.12.0
     recharts: 3.10.1
   cli:
-    "@tauri-apps/cli": 2.12.1
+    "@tauri-apps/cli": 2.12.2
     commitizen: ^4.3.2
     jiti: 2.7.0
     plop: 4.0.5
@@ -187,9 +191,9 @@ catalogs:
     "@dnd-kit/utilities": ^3.2.2
   editor:
     "@fellow/prosemirror-recreate-transform": 1.2.3
-    slate: 0.132.0
-    slate-dom: 0.132.0
-    slate-react: 0.132.0
+    slate: 0.133.3
+    slate-dom: 0.133.5
+    slate-react: 0.133.5
   file-renderers:
     hls.js: 1.7.3
     mammoth: 1.13.0
@@ -228,7 +232,7 @@ catalogs:
     tsx: 4.23.15
   icons:
     "@lobehub/icons": 5.23.0
-    lucide-react: 1.54.0
+    lucide-react: 1.55.0
     react-icons: 5.7.0
   lint:
     "@anolilab/commitlint-config": 10.1.5
@@ -239,7 +243,7 @@ catalogs:
     # `@anolilab/eslint-config` 30.0.2 peer-pins this, `@eslint/css`, the query
     # plugin, react-refresh, zod and tailwind-csstree to exact older versions; the
     # unmet-peer warnings are expected and `pnpm lint` passes on the newer ones.
-    "@eslint-react/eslint-plugin": 5.24.10
+    "@eslint-react/eslint-plugin": 5.26.3
     "@eslint/css": 2.0.0
     "@eslint/js": 10.0.1
     eslint: 10.12.0
@@ -256,28 +260,28 @@ catalogs:
     eslint-plugin-validate-jsx-nesting: ^0.1.1
     eslint-plugin-zod: 5.0.0
     jsonc-eslint-parser: 3.3.0
-    prettier: 3.9.9
+    prettier: 3.9.10
     prettier-plugin-tailwindcss: 0.8.1
     tailwind-csstree: 0.4.1
     typescript-eslint: 8.71.1
   lunora:
-    "@lunora/auth": 1.0.0-alpha.201
-    "@lunora/bindings": 1.0.0-alpha.103
-    "@lunora/cli": 1.0.0-alpha.377
-    "@lunora/d1": 1.0.0-alpha.169
-    "@lunora/mail": 1.0.0-alpha.104
-    "@lunora/notify": 1.0.0-alpha.77
-    "@lunora/payment": 1.0.0-alpha.193
-    "@lunora/queue": 1.0.0-alpha.97
-    "@lunora/ratelimit": 1.0.0-alpha.122
-    "@lunora/scheduler": 1.0.0-alpha.116
-    "@lunora/seed": 1.0.0-alpha.207
-    "@lunora/server": 1.0.0-alpha.190
-    "@lunora/storage": 1.0.0-alpha.123
-    "@lunora/studio": 1.0.0-alpha.284
-    "@lunora/testing": 1.0.0-alpha.253
+    "@lunora/auth": 1.0.0-alpha.205
+    "@lunora/bindings": 1.0.0-alpha.106
+    "@lunora/cli": 1.0.0-alpha.388
+    "@lunora/d1": 1.0.0-alpha.172
+    "@lunora/mail": 1.0.0-alpha.105
+    "@lunora/notify": 1.0.0-alpha.78
+    "@lunora/payment": 1.0.0-alpha.196
+    "@lunora/queue": 1.0.0-alpha.100
+    "@lunora/ratelimit": 1.0.0-alpha.126
+    "@lunora/scheduler": 1.0.0-alpha.119
+    "@lunora/seed": 1.0.0-alpha.212
+    "@lunora/server": 1.0.0-alpha.193
+    "@lunora/storage": 1.0.0-alpha.127
+    "@lunora/studio": 1.0.0-alpha.289
+    "@lunora/testing": 1.0.0-alpha.257
     "@lunora/workflow": 1.0.0-alpha.72
-    lunorash: 1.0.0-alpha.376
+    lunorash: 1.0.0-alpha.387
   markdown:
     "@streamdown/cjk": 1.0.4
     "@streamdown/math": 1.0.3
@@ -310,12 +314,12 @@ catalogs:
     react-dom: 19.3.0
   security:
     "@hcaptcha/react-hcaptcha": 2.2.0
-    "@marsidev/react-turnstile": 1.6.1
+    "@marsidev/react-turnstile": 1.6.2
     "@visulima/content-safety": 1.0.1
-    dompurify: 3.4.16
+    dompurify: 3.4.17
     tldts: 7.4.18
   server:
-    "@aws-sdk/client-s3": 3.1148.0
+    "@aws-sdk/client-s3": 3.1149.0
     "@hono/swagger-ui": 0.6.1
     "@hono/zod-openapi": 1.6.3
     "@visulima/health-check": 6.0.0
@@ -339,14 +343,14 @@ catalogs:
     # es-module-lexer. 12 also re-lays-out and recolours existing diagrams.
     mermaid: 12.1.0
   tanstack:
-    "@tanstack/eslint-plugin-query": 5.104.1
+    "@tanstack/eslint-plugin-query": 5.104.2
     "@tanstack/eslint-plugin-router": 1.162.0
     "@tanstack/form-core": 1.33.5
     # Travels with @tanstack/react-table below.
     "@tanstack/match-sorter-utils": 9.2.6
-    "@tanstack/query-core": 5.104.1
+    "@tanstack/query-core": 5.104.2
     "@tanstack/react-form": 1.33.5
-    "@tanstack/react-query": 5.104.1
+    "@tanstack/react-query": 5.104.2
     # MOVE AS A SET. react-router 1.170.27 / react-start 1.168.44 /
     # router-plugin 1.168.30 once broke hydration: SSR emitted a
     # `<script type="module">` inside the __root__ match that the client render
@@ -357,24 +361,24 @@ catalogs:
     # and Vite at 8.2.1 it does not. Later releases fixed it. Router and Start ship
     # in lockstep — move them together, and load a page in a browser before
     # believing it works.
-    "@tanstack/react-router": 1.170.41
+    "@tanstack/react-router": 1.170.42
     "@tanstack/react-router-ssr-query": 1.167.3
-    "@tanstack/react-start": 1.168.60
-    "@tanstack/react-table": 9.2.8
-    "@tanstack/react-virtual": 3.14.14
+    "@tanstack/react-start": 1.168.61
+    "@tanstack/react-table": 9.3.1
+    "@tanstack/react-virtual": 3.14.17
     "@tanstack/store": 0.11.2
   test:
     "@playwright/test": 1.64.0
     "@testing-library/dom": ^10.4.2
     "@testing-library/react": ^16.3.3
-    "@vitest/browser": 5.0.3
-    "@vitest/browser-playwright": 5.0.3
-    "@vitest/coverage-v8": 5.0.3
-    "@vitest/ui": 5.0.3
+    "@vitest/browser": 5.0.4
+    "@vitest/browser-playwright": 5.0.4
+    "@vitest/coverage-v8": 5.0.4
+    "@vitest/ui": 5.0.4
     axe-core: 4.14.0
     jsdom: 30.1.2
     playwright: 1.64.0
-    vitest: 5.0.3
+    vitest: 5.0.4
     vitest-browser-react: 2.3.0
   tiptap:
     "@tiptap/core": 3.31.4
@@ -417,7 +421,7 @@ catalogs:
     # Re-confirmed against 7.0.2 with packem 2.1.0 / packem-rollup 1.1.0: still held.
     typescript: 6.0.3
   types:
-    "@types/chrome": 0.3.4
+    "@types/chrome": 0.3.5
     "@types/json-schema": ^7.0.15
     "@types/node": 26.6.5
     "@types/papaparse": 5.5.2
@@ -425,7 +429,7 @@ catalogs:
     "@types/react-dom": 19.3.0
   ui:
     "@base-ui/react": 1.9.0
-    "@radix-ui/react-use-controllable-state": 1.2.6
+    "@radix-ui/react-use-controllable-state": 1.3.0
     "@silvia-odwyer/photon": 0.3.3
     class-variance-authority: 0.7.1
     clsx: 2.1.1
@@ -434,12 +438,15 @@ catalogs:
     facehash: 0.1.0
     input-otp: 1.5.0
     next-themes: 0.4.6
-    react-resizable-panels: 4.14.3
+    react-resizable-panels: 4.14.4
     shadcn: 4.21.4
     sonner: 2.0.8
     tailwind-merge: 3.7.0
     vaul: 1.1.2
   utils:
+    # HELD AT 2.3 — 3.0 is a migration, not a bump: `ConsentManagerProvider` is now
+    # `ConsentProvider` and `ConsentManagerOptions` is gone (`apps/web/src/routes/__root.tsx`
+    # fails to compile), and the consent config shape moved with them. Do it as its own change.
     "@c15t/react": 2.3.0
     # Imported at runtime by `apps/web/src/lib/consent/show-banner.ts`; moves
     # with `@c15t/react`, which depends on exactly this version through `c15t`.
@@ -466,7 +473,7 @@ catalogs:
     rooks: 9.9.0
     sort-package-json: 4.0.0
     tokenlens: ^1.3.1
-    zod: 4.6.5
+    zod: 4.6.7
 cleanupUnusedCatalogs: true
 
 minimumReleaseAge: 1440
