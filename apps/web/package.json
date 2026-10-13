@@ -83,7 +83,6 @@
         "@onboardjs/posthog-plugin": "catalog:onboarding",
         "@onboardjs/react": "catalog:onboarding",
         "@posthog/react": "catalog:analytics",
-        "@streamdown/code": "catalog:markdown",
         "@t3-oss/env-core": "catalog:node",
         "@tailwindcss/vite": "catalog:build",
         "@tanstack/query-core": "catalog:tanstack",

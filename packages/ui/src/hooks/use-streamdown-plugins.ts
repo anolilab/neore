@@ -1,7 +1,8 @@
 import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
 import { useEffect, useState } from "react";
 import type { PluginConfig } from "streamdown";
+
+import { code } from "../utils/code-highlighter";
 
 /**
  * Streamdown plugins, with the heavy two loaded on demand.

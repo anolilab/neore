@@ -33,7 +33,6 @@
         "@neore/ai": "workspace:*",
         "@neore/ui": "workspace:*",
         "@streamdown/cjk": "catalog:markdown",
-        "@streamdown/code": "catalog:markdown",
         "@streamdown/math": "catalog:markdown",
         "@streamdown/mermaid": "catalog:markdown",
         "clsx": "catalog:ui",

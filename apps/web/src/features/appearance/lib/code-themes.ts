@@ -2,12 +2,13 @@ import type { StreamdownAppearance } from "@neore/ui/hooks/use-streamdown-appear
 import { DEFAULT_STREAMDOWN_APPEARANCE } from "@neore/ui/hooks/use-streamdown-appearance";
 
 /**
- * Code-block (Shiki) theme pairs and Mermaid themes offered in Appearance.
+ * Code-block theme pairs and Mermaid themes offered in Appearance.
  *
- * Only Shiki's BUNDLED theme NAMES are listed — never theme JSON. `@streamdown/code`
- * hands the names to Shiki's `createHighlighter`, which `import()`s each theme on
- * first use, so a choice here costs nothing until a code block renders with it.
- * The accepted ids are mirrored in `backend/lunora/auth/fields.ts`.
+ * Only theme NAMES are listed — never theme JSON. The code highlighter
+ * (`@neore/ui/utils/code-highlighter`, on TanStack Highlight) looks each name up in its own
+ * palettes (`code-highlight-themes.ts`), and the names are the ones Shiki used, so a stored
+ * choice keeps its meaning. A name added here needs a palette there. The accepted ids are
+ * mirrored in `backend/lunora/auth/fields.ts`.
  */
 
 export const CODE_HIGHLIGHT_THEME_IDS = ["default", "github", "one", "vitesse", "catppuccin", "min", "solarized"] as const;

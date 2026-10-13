@@ -5,7 +5,7 @@ import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
-import { code } from "@streamdown/code";
+import { code } from "@neore/ui/utils/code-highlighter";
 import { useMutation } from "@tanstack/react-query";
 import clsx from "clsx";
 import { ChevronDownIcon, LocateFixedIcon, PencilIcon, PinIcon, Trash2Icon } from "lucide-react";

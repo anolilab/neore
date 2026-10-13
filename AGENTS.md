@@ -1823,6 +1823,21 @@ error")` (any transport, including the SSRF-guarded tool
   `https://<neore-chat|neore-backend|llm-gateway>-<stage>.<subdomain>.workers.dev`.
   `backend/deploy-env-bindings.test.ts` pins that the YAML and `alchemy.run.ts` agree.
   Unset, a non-production run falls back to the `VITE_*_URL` secrets.
+- **Code blocks are highlighted by TanStack Highlight, not Shiki.** `@neore/ui/utils/code-highlighter`
+  is a Streamdown `CodeHighlighterPlugin` (`name: "shiki"` is Streamdown's literal type, not a lie
+  about the engine) over `@tanstack/highlight`: 39 languages in ~11 KB, where `@streamdown/code`
+  pulled every Shiki grammar and theme (8 MiB of source in the server bundle, 133 language chunks
+  in the client). A language it lacks (R, Scala, Haskell, Elixir, PowerShell, GraphQL, LaTeX, HCL,
+  Zig, Julia, Objective-C...) renders as plain text, because `supportsLanguage` answers false and
+  Streamdown skips highlighting. `EXTRA_ALIASES` maps `c`/`h` to the C++ grammar and `ini` to TOML.
+  Streamdown reads a token's `color` as the light colour and `--shiki-dark` in its `htmlStyle` as the
+  dark one, and `global.css` still has the matching `html.dark` rules; the plugin emits that shape. The
+  Appearance theme NAMES are unchanged (so stored choices and `backend/lunora/auth/fields.ts` stay
+  valid), and `code-highlight-themes.ts` holds a palette per name: five come from TanStack, the other
+  eight are approximated from each theme's main colours. A theme name added to `code-themes.ts` needs
+  a palette there, or it falls back to GitHub. Streamdown's own default pair is
+  `["poimandres", "min-light"]` in `use-streamdown-appearance.ts`, a dark theme in the LIGHT slot;
+  that predates the swap and was kept as is. `fumadocs` still bundles Shiki for the docs pages.
 - **Cloudflare Access in front of staging and preview is opt-in** (`ACCESS_ENABLED=true`, an
   environment variable). It gates the web Worker only, to the `ADMIN` addresses: the browser
   calls the backend and gateway cross-origin, where the web hostname's Access login does not

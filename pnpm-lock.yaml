@@ -751,15 +751,15 @@ catalogs:
     '@streamdown/cjk':
       specifier: 1.0.4
       version: 1.0.4
-    '@streamdown/code':
-      specifier: 2.0.0
-      version: 2.0.0
     '@streamdown/math':
       specifier: 1.0.3
       version: 1.0.3
     '@streamdown/mermaid':
       specifier: 1.0.3
       version: 1.0.3
+    '@tanstack/highlight':
+      specifier: 1.1.0
+      version: 1.1.0
     rehype-parse:
       specifier: 9.0.1
       version: 9.0.1
@@ -1459,9 +1459,6 @@ importers:
       react-dropzone:
         specifier: catalog:forms
         version: 20.1.3(@types/react@19.3.0)(react@19.3.0)
-      shiki:
-        specifier: 4.5.0
-        version: 4.5.0
       sort-package-json:
         specifier: catalog:utils
         version: 4.0.0
@@ -1754,9 +1751,6 @@ importers:
       '@posthog/react':
         specifier: catalog:analytics
         version: 1.11.3(@types/react@19.3.0)(posthog-js@1.438.7(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
-      '@streamdown/code':
-        specifier: catalog:markdown
-        version: 2.0.0(react@19.3.0)
       '@t3-oss/env-core':
         specifier: catalog:node
         version: 0.13.11(typescript@6.0.3)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.5)
@@ -2462,9 +2456,6 @@ importers:
       '@streamdown/cjk':
         specifier: catalog:markdown
         version: 1.0.4(@types/mdast@4.0.4)(micromark-util-types@2.0.3)(micromark@4.0.3(supports-color@10.2.2))(react@19.3.0)(supports-color@10.2.2)(unified@11.0.5)
-      '@streamdown/code':
-        specifier: catalog:markdown
-        version: 2.0.0(react@19.3.0)
       '@streamdown/math':
         specifier: catalog:markdown
         version: 1.0.3(react@19.3.0)(supports-color@10.2.2)
@@ -2592,9 +2583,6 @@ importers:
       '@streamdown/cjk':
         specifier: catalog:markdown
         version: 1.0.4(@types/mdast@4.0.4)(micromark-util-types@2.0.3)(micromark@4.0.3(supports-color@10.2.2))(react@19.3.0)(supports-color@10.2.2)(unified@11.0.5)
-      '@streamdown/code':
-        specifier: catalog:markdown
-        version: 2.0.0(react@19.3.0)
       '@streamdown/math':
         specifier: catalog:markdown
         version: 1.0.3(react@19.3.0)(supports-color@10.2.2)
@@ -2607,6 +2595,9 @@ importers:
       '@tanstack/form-core':
         specifier: catalog:tanstack
         version: 1.33.5
+      '@tanstack/highlight':
+        specifier: catalog:markdown
+        version: 1.1.0
       '@tanstack/match-sorter-utils':
         specifier: catalog:tanstack
         version: 9.2.6
@@ -2859,9 +2850,6 @@ importers:
       shadcn:
         specifier: catalog:ui
         version: 4.21.4(@cfworker/json-schema@4.1.1)(babel-plugin-macros@3.1.0)(supports-color@10.2.2)
-      shiki:
-        specifier: 4.5.0
-        version: 4.5.0
       sonner:
         specifier: catalog:ui
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -9983,12 +9971,6 @@ packages:
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@streamdown/code@2.0.0':
-    resolution: {integrity: sha512-sSyX/9gOOcivbP7204+sfAam+gotxjUNV+T4EuN3aa6i5x1LaqtB6Ln/Mxzd1XGvm0vNApO4oKLZs+7gzFI1kQ==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      react: ^18.0.0 || ^19.0.0
-
   '@streamdown/math@1.0.3':
     resolution: {integrity: sha512-TOTRlPYs4LBNT8GaIWNCEVrcGVQsVcfc8WZ/x/0IyO+Rvsu6W+nF+YCS4Pl3JTVWQK8QX7LbWUChSilwlyzPZw==}
     peerDependencies:
@@ -10339,6 +10321,10 @@ packages:
 
   '@tanstack/form-core@1.33.5':
     resolution: {integrity: sha512-3dfx9MBP0aq5sXKteikG629X9oviptrQj0IFRk9YGcb+lB7Kv5x8S17oOSk1wUWgjQZ4xVJEMbKwOAODymocgA==}
+
+  '@tanstack/highlight@1.1.0':
+    resolution: {integrity: sha512-mDn/fhny+WgSVHUH0sAcARlSfbXCQJWebu2NRmCOcD+3I4/73m2D9rcMISgIiXJrhl1vyk9hmAJn7sSnWAbfvQ==}
+    engines: {node: '>=18'}
 
   '@tanstack/history@1.162.4':
     resolution: {integrity: sha512-utTS5L2OkeYUzXGohL1Z8sefu1GLNOJcxe8Hd6iIdc/Xo1K1nDB2JEp4iSFhvYh33xKC9V91TxrS8qfrpoKobQ==}
@@ -29221,11 +29207,6 @@ snapshots:
       - supports-color
       - unified
 
-  '@streamdown/code@2.0.0(react@19.3.0)':
-    dependencies:
-      react: 19.3.0
-      shiki: 4.5.0
-
   '@streamdown/math@1.0.3(react@19.3.0)(supports-color@10.2.2)':
     dependencies:
       katex: 0.19.0
@@ -29544,6 +29525,8 @@ snapshots:
       '@tanstack/devtools-event-client': 0.4.4
       '@tanstack/pacer-lite': 0.1.1
       '@tanstack/store': 0.11.2
+
+  '@tanstack/highlight@1.1.0': {}
 
   '@tanstack/history@1.162.4': {}
 
