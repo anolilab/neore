@@ -67,7 +67,9 @@ const REQUIRED_DEPLOY_ENV = [
     "STORAGE_SIGNING_SECRET",
 ] as const;
 
-const destroying = process.env.DESTROY === "true";
+// Destroying and checking drift read the cloud; they need none of the build output or
+// secrets below, so the guards stand down. A deploy never sets either variable.
+const destroying = process.env.DESTROY === "true" || process.env.READ_ONLY === "true";
 const missingDeployEnv = REQUIRED_DEPLOY_ENV.filter((name) => !process.env[name]?.trim());
 
 if (missingDeployEnv.length > 0 && !destroying) {

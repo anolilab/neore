@@ -16,6 +16,11 @@ on: # yamllint disable-line rule:truthy
                 options:
                     - "production"
                     - "preview"
+            adopt:
+                description: "Take over existing resources of the same names (first deploy over a manually created or older setup only)"
+                required: false
+                default: false
+                type: "boolean"
             dry_run:
                 description: "Only show the plan: create and change nothing (the state store is still created on its first run)"
                 required: false
@@ -212,6 +217,7 @@ jobs:
                   # means no captcha anywhere, which is what ships today.
                   TURNSTILE_SECRET_KEY: "${{ secrets.TURNSTILE_SECRET_KEY }}"
                   VITE_TURNSTILE_SITE_KEY: "${{ secrets.VITE_TURNSTILE_SITE_KEY }}"
+                  ADOPT: "${{ github.event.inputs.adopt }}"
                   DRY_RUN: "${{ github.event.inputs.dry_run }}"
                   #
                   # ---------------------------------------------------------
@@ -359,13 +365,14 @@ jobs:
               run: |
                   # `--stage` equals DEPLOY_ENV, which alchemy.run.ts reads for the physical
                   # names: the state scope and the names cannot disagree. `--yes` skips the
-                  # approval prompt (and bootstraps the state store on its first run);
-                  # `--adopt` takes over resources of the same name that a previous
-                  # deploy tool created, and re-uses a custom domain it already attached.
-                  args=(deploy --stage "$DEPLOY_ENV" --yes --adopt)
+                  # approval prompt (and bootstraps the state store on its first run).
+                  # `--adopt` takes over resources of the same name that something else
+                  # created: only for a first deploy over such resources, hence an input.
+                  args=(deploy --stage "$DEPLOY_ENV" --yes)
+                  if [[ "$ADOPT" == "true" ]]; then args+=(--adopt); fi
                   if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
 
-                  pnpm exec alchemy provider check-env
+                  pnpm exec alchemy provider check-env --provider Cloudflare
                   output=$(pnpm exec alchemy "${args[@]}" 2>&1) || { echo "$output"; exit 1; }
                   echo "$output"
 
