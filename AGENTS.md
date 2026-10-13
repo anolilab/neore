@@ -1839,6 +1839,20 @@ error")` (any transport, including the SSRF-guarded tool
   React renders it on the client instead; a new heavy lazy chunk goes in the list, not in the
   cap. Cloudflare's error names no file, only "exceeded the uncompressed size limit", and
   every Worker that depends on the website fails with the same message.
+- **Source maps go to PostHog and are deleted before the deploy.** `vite build` writes a `.map`
+  per chunk (`sourcemap: "hidden"`); `dist/client` alone had 2,700 of them (~118 MiB, two thirds
+  of the static-asset upload, all publicly served). `deploy.yml`'s "Upload the web source maps"
+  step runs `posthog-cli sourcemap process` on `dist/client` (it injects a `//# chunkId=`
+  comment into each chunk, which is how PostHog finds the map), then deletes every `.map`
+  under `dist/`. One build produces both, so they cannot disagree; **never rebuild between
+  upload and deploy**. Client only: a Worker stack trace has no chunk to look up, and the
+  server maps are not uploaded by the rules anyway. The CLI is a pinned GitHub release with
+  its SHA-256 (the npm package runs an unverified download script). Needs the environment
+  secrets `POSTHOG_CLI_API_KEY` (a personal key with error-tracking write and organization
+  read) and `POSTHOG_CLI_PROJECT_ID`, and the variable `POSTHOG_CLI_HOST` (the app host,
+  `https://eu.posthog.com` for EU, not the ingestion host). Without them the maps are
+  deleted un-uploaded; a failed upload only warns. `POSTHOG_PERSONAL_API_KEY` is a different
+  thing (local feature-flag evaluation).
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).
