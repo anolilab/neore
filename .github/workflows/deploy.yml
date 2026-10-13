@@ -21,6 +21,14 @@ on: # yamllint disable-line rule:truthy
                 required: false
                 default: false
                 type: "boolean"
+            log_level:
+                description: "alchemy --log-level (use debug to see the failing API call)"
+                required: false
+                default: "info"
+                type: "choice"
+                options:
+                    - "info"
+                    - "debug"
             dry_run:
                 description: "Only show the plan: create and change nothing (the state store is still created on its first run)"
                 required: false
@@ -218,6 +226,7 @@ jobs:
                   TURNSTILE_SECRET_KEY: "${{ secrets.TURNSTILE_SECRET_KEY }}"
                   VITE_TURNSTILE_SITE_KEY: "${{ secrets.VITE_TURNSTILE_SITE_KEY }}"
                   ADOPT: "${{ github.event.inputs.adopt }}"
+                  LOG_LEVEL: "${{ github.event.inputs.log_level }}"
                   DRY_RUN: "${{ github.event.inputs.dry_run }}"
                   #
                   # ---------------------------------------------------------
@@ -368,7 +377,7 @@ jobs:
                   # approval prompt (and bootstraps the state store on its first run).
                   # `--adopt` takes over resources of the same name that something else
                   # created: only for a first deploy over such resources, hence an input.
-                  args=(deploy --stage "$DEPLOY_ENV" --yes)
+                  args=(deploy --stage "$DEPLOY_ENV" --yes --log-level "${LOG_LEVEL:-info}")
                   if [[ "$ADOPT" == "true" ]]; then args+=(--adopt); fi
                   if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
 
