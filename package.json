@@ -58,7 +58,7 @@
         "lint:affected:types": "vis affected lint:types",
         "lint:dedupe": "pnpm dedupe --check",
         "lint:eslint": "vis run lint:eslint",
-        "lint:eslint:deploy": "eslint alchemy.run.ts scripts/worker-bundle.ts",
+        "lint:eslint:deploy": "eslint alchemy.run.ts scripts/worker-bundle.ts scripts/check-web-size.ts",
         "lint:eslint:fix": "vis run lint:eslint:fix",
         "lint:prettier": "pnpm run lint:prettier:root && vis run lint:prettier",
         "lint:prettier:fix": "pnpm run lint:prettier:root:fix && vis run lint:prettier:fix",

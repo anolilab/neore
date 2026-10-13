@@ -105,3 +105,27 @@ export const BACKEND_BUILD = {
         transform: { define: { "process.env.NODE_ENV": JSON.stringify("production") } },
     },
 };
+
+/**
+ * Cloudflare rejects a Worker whose modules add up to more than 64 MiB uncompressed. The
+ * web app's SSR output is one chunk per `import()` target, and most of its 3,300 chunks
+ * (about 68 MiB of JavaScript) are browser-only code the server never runs; the
+ * spreadsheet editor alone is 12 MiB.
+ *
+ * These chunks are loaded only by a click or an effect in the browser, so they are
+ * left out of the upload. Were the server ever to import one, the lazy boundary fails and
+ * React renders that part on the client instead. Chunk names are `<name>-<hash>.js`.
+ * (`xlsx` also covers `xlsx-convert`, the thin loader in front of it.)
+ */
+export const WEB_CLIENT_ONLY_CHUNKS = ["elk", "jspdf.es.min", "pptxgen.es", "univer-sheet-editor", "xlsx"] as const;
+
+/** Wrangler's default module rules, minus {@link WEB_CLIENT_ONLY_CHUNKS}. */
+export const WEB_UPLOAD_RULES = [
+    { globs: ["**/*.js", "**/*.mjs", ...WEB_CLIENT_ONLY_CHUNKS.map((name) => `!**/${name}-*.js`)] },
+    { globs: ["**/*.wasm"] },
+    { globs: ["**/*.txt", "**/*.html", "**/*.sql"] },
+    { globs: ["**/*.bin"] },
+];
+
+/** The file extensions {@link WEB_UPLOAD_RULES} uploads. */
+export const WEB_UPLOAD_EXTENSIONS = [".js", ".mjs", ".wasm", ".txt", ".html", ".sql", ".bin"] as const;

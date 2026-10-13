@@ -11,7 +11,7 @@ import { OPTIONAL_ENV_KEYS, REQUIRED_ENV_KEYS } from "./backend/lunora/lib/env-v
 import { JOBS_QUEUE_CONSUMER } from "./backend/lunora/lib/job-queue-config";
 import { jobs, jobsDeadLetters } from "./backend/lunora/queues";
 import { GATEWAY_CRONS } from "./services/llm-gateway/src/crons";
-import { BACKEND_BUILD, RUST_WORKER_OUTPUT, RUST_WORKER_UPLOAD, WORKER_BUILD } from "./scripts/worker-bundle";
+import { BACKEND_BUILD, RUST_WORKER_OUTPUT, RUST_WORKER_UPLOAD, WEB_UPLOAD_RULES, WORKER_BUILD } from "./scripts/worker-bundle";
 
 // ---------------------------------------------------------------------------
 // Stage resolution
@@ -627,6 +627,8 @@ export const Website = Cloudflare.Worker("website", {
     name: named("neore-chat"),
     observability: WORKER_OBSERVABILITY,
     placement: { mode: "smart" },
+    // Under Cloudflare's 64 MiB module cap only because the browser-only chunks are left out.
+    rules: WEB_UPLOAD_RULES,
 });
 
 // ---------------------------------------------------------------------------
