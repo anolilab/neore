@@ -96,7 +96,8 @@ describe("code highlighter plugin", () => {
 
         run(block, "ts", undefined, true);
 
-        // A budget, not a benchmark: ten times what it takes on a laptop.
-        expect(performance.now() - start).toBeLessThan(500);
+        // A budget, not a benchmark: it takes ~50 ms on a laptop and CI runs this beside the other
+        // suites, so the ceiling only has to catch a quadratic regression (seconds), not jitter.
+        expect(performance.now() - start).toBeLessThan(2500);
     });
 });
