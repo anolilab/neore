@@ -1879,6 +1879,14 @@ error")` (any transport, including the SSRF-guarded tool
   keys: the public project key (`VITE_POSTHOG_API_KEY`, events), the CI key above, and
   `POSTHOG_PERSONAL_API_KEY` (a runtime key bound to the Workers: local feature-flag
   evaluation and the GDPR person-delete, both OFF while it is unset). Keep them separate.
+- **A Worker that passes the size cap can still fail Cloudflare's startup check** ("Script startup
+  exceeded CPU time limit", error 10021): the module-level code of the whole bundle may take 1 s of
+  CPU, and it is checked at upload, so it first shows on a deploy. `cd backend && pnpm exec wrangler
+  check startup` profiles `lunora build`'s esbuild bundle, which is NOT what deploys (Alchemy bundles
+  with rolldown); to profile the real one, take the `worker-bundles-<stage>` artifact that
+  `deploy.yml` keeps (also when the deploy fails) and run `pnpm exec tsx
+  scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (mostly GC): take
+  the best of several.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).
