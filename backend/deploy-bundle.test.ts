@@ -24,10 +24,28 @@ const alchemyScript = readFileSync(join(REPO_ROOT, "alchemy.run.ts"), "utf8");
 
 const ENGLISH_REGISTERED_DIRECTLY = /import en from "\.\.\/locales\/en\.js";[\s\S]*config\(en\(\)\)/u;
 
-/** Each `Cloudflare.Worker("name", { … })` call's option block, up to the closing `});`. */
-const workerCalls = [...alchemyScript.matchAll(/Cloudflare\.Worker\("([^"]+)",\s*\{([\s\S]*?)\n\s*\}\);/gu)].map(([, name, options]) => {
-    return { name: name as string, options: options as string };
-});
+const WORKER_CALL_START = /Cloudflare\.Worker\("([^"]+)",\s*\{/u;
+const ENGLISH_ONLY_RE_EXPORT = /^export \{ default as en \} from "[^"]+\/en\.js";$/u;
+
+/** Each `Cloudflare.Worker("name", { … })` call's option block, up to the line that closes it with `});`. */
+const workerCalls = (() => {
+    const calls: { name: string; options: string }[] = [];
+    const lines = alchemyScript.split("\n");
+
+    for (const [index, line] of lines.entries()) {
+        const start = WORKER_CALL_START.exec(line);
+
+        if (!start) {
+            continue;
+        }
+
+        const end = lines.findIndex((candidate, offset) => offset > index && candidate.trim() === "});");
+
+        calls.push({ name: start[1] as string, options: lines.slice(index + 1, end).join("\n") });
+    }
+
+    return calls;
+})();
 
 describe("deployed Worker bundles", () => {
     it("finds every bundled Worker in alchemy.run.ts", () => {
@@ -104,7 +122,7 @@ describe("zodEnglishOnlyLocales", () => {
         const resolved = zodEnglishOnlyLocales.resolveId("../locales/index.js", join(zodRoot, "v4", "core", "index.js"));
         const code = zodEnglishOnlyLocales.load(resolved?.id as string)?.code as string;
 
-        expect(code).toMatch(/^export \{ default as en \} from "[^"]+\/en\.js";$/u);
+        expect(code).toMatch(ENGLISH_ONLY_RE_EXPORT);
         expect(readFileSync(join(zodRoot, "v4", "locales", "en.js"), "utf8")).toContain("export default function");
     });
 
