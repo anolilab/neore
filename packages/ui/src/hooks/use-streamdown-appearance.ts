@@ -9,8 +9,8 @@ import { useSyncExternalStore } from "react";
  * web app pushes its Appearance settings in with `setStreamdownAppearance`,
  * and anything else (SSR, the extension) keeps the defaults below.
  *
- * `shikiTheme` holds bundled theme NAMES only — Shiki `import()`s a theme the
- * first time it highlights with it. `mermaidTheme` goes into the Mermaid config
+ * `shikiTheme` holds theme NAMES only, which `code-highlighter` resolves to its own
+ * palettes (the prop keeps Streamdown's name for it). `mermaidTheme` goes into the Mermaid config
  * Streamdown passes to the lazily loaded plugin (`use-streamdown-plugins`), so
  * nothing here imports Mermaid.
  */

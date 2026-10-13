@@ -280,9 +280,9 @@ catalogs:
     lunorash: 1.0.0-alpha.376
   markdown:
     "@streamdown/cjk": 1.0.4
-    "@streamdown/code": 2.0.0
     "@streamdown/math": 1.0.3
     "@streamdown/mermaid": 1.0.3
+    "@tanstack/highlight": 1.1.0
     rehype-parse: 9.0.1
     rehype-remark: 10.0.1
     remark-directive: ^4.0.0
@@ -338,7 +338,6 @@ catalogs:
     # `dist/mermaid.esm.min.mjs` — which 12 makes unparseable for Vite's
     # es-module-lexer. 12 also re-lays-out and recolours existing diagrams.
     mermaid: 12.1.0
-    shiki: 4.5.0
   tanstack:
     "@tanstack/eslint-plugin-query": 5.104.1
     "@tanstack/eslint-plugin-router": 1.162.0

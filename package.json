@@ -104,7 +104,6 @@
         "prettier": "catalog:lint",
         "prettier-plugin-tailwindcss": "catalog:lint",
         "react-dropzone": "catalog:forms",
-        "shiki": "catalog:syntax",
         "sort-package-json": "catalog:utils",
         "tslib": "catalog:bundler",
         "tsx": "catalog:iac",
