@@ -44,6 +44,7 @@ const GITHUB_TOKEN_FROM_ACTIONS_SECRET = /GITHUB_TOKEN:\s*"\$\{\{\s*secrets\.GIT
 const bindingLines = alchemyScript.split("\n").map((line) => line.trim());
 
 const NAMED_WITH_STAGE = /\(stage === "production" \? name : `\$\{name\}-\$\{stage\}`\)/u;
+const PINNED_SHA256 = /sha256="[\da-f]{64}"/u;
 const ACCESS_ENABLED_FROM_VARIABLE = /^ +ACCESS_ENABLED: "\$\{\{ vars\.ACCESS_ENABLED \}\}"$/mu;
 const GATEWAY_BACKEND_ORIGIN = /LUNORA_URL:\s*requireEnv\("BACKEND_PUBLIC_ORIGIN"\)/u;
 // Production only: the gateway passes its crons when the stage is production.
@@ -325,6 +326,17 @@ describe("deploy env bindings", () => {
             expect(alchemyScript).toContain('const accessEnabled = stage !== "production" && process.env.ACCESS_ENABLED === "true";');
             expect(alchemyScript.split("...(accessEnabled ?")).toHaveLength(2);
             expect(deployWorkflow).toMatch(ACCESS_ENABLED_FROM_VARIABLE);
+        });
+
+        it("uploads the web source maps to PostHog before it deletes them, ahead of the deploy", () => {
+            const upload = deployWorkflow.indexOf('name: "Upload the web source maps to PostHog, then delete them"');
+            const deploy = deployWorkflow.indexOf('name: "Deploy all Cloudflare Workers via Alchemy"');
+
+            expect(upload).toBeGreaterThan(-1);
+            expect(upload).toBeLessThan(deploy);
+            // Pinned with its checksum, deleted whether or not the upload ran.
+            expect(deployWorkflow).toMatch(PINNED_SHA256);
+            expect(deployWorkflow).toContain("find apps/web/dist -name '*.map' -delete");
         });
 
         it("builds the app and deploys the backend against the same origins", () => {

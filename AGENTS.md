@@ -1862,6 +1862,23 @@ error")` (any transport, including the SSRF-guarded tool
   except `@lunora/workflow`, kept at 72 (the one `@lunora/runtime` pins); `@lunora/agent` still pulls
   75 through codegen, so two copies of the branded `workflow` exist, but nothing that `tsc` sees
   reaches the second.
+- **Source maps go to PostHog and are deleted before the deploy.** `vite build` writes a `.map`
+  per chunk (`sourcemap: "hidden"`); `dist/client` alone had 2,700 of them (~118 MiB, two thirds
+  of the static-asset upload, all publicly served). `deploy.yml`'s "Upload the web source maps"
+  step runs `posthog-cli sourcemap process` on `dist/client` (it injects a `//# chunkId=`
+  comment into each chunk, which is how PostHog finds the map), then deletes every `.map`
+  under `dist/`. One build produces both, so they cannot disagree; **never rebuild between
+  upload and deploy**. Client only: a Worker stack trace has no chunk to look up, and the
+  server maps are not uploaded by the rules anyway. The CLI is a pinned GitHub release with
+  its SHA-256 (the npm package runs an unverified download script). Needs the environment
+  secrets `POSTHOG_CLI_API_KEY` (a personal key with error-tracking write and organization
+  read) and `VITE_POSTHOG_HOST`, and the variable `POSTHOG_PROJECT_ID`. The CLI wants the APP
+  host, so the step derives `eu.posthog.com` from the ingestion host `eu.i.posthog.com`; the
+  GDPR person-delete does the same (`gdpr/posthog-host.ts`). Without the key and project id
+  the maps are deleted un-uploaded; a failed upload only warns. There are three different
+  keys: the public project key (`VITE_POSTHOG_API_KEY`, events), the CI key above, and
+  `POSTHOG_PERSONAL_API_KEY` (a runtime key bound to the Workers: local feature-flag
+  evaluation and the GDPR person-delete, both OFF while it is unset). Keep them separate.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).

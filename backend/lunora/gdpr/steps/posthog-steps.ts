@@ -2,6 +2,7 @@ import { v } from "lunorash/server";
 
 import { internalAction } from "../../_generated/server";
 import { FETCH_TIMEOUT_SHORT_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
+import { posthogAppHost } from "../posthog-host";
 
 export const deletePostHogPerson = internalAction
     .input({ userId: v.string() })
@@ -15,7 +16,8 @@ export const deletePostHogPerson = internalAction
             return null;
         }
 
-        const host = process.env.POSTHOG_HOST || "https://us.posthog.com";
+        // The private API lives on the app host, not on the ingestion host `POSTHOG_HOST` names.
+        const host = posthogAppHost(process.env.POSTHOG_HOST);
         // Use the Persons v3 bulk-delete endpoint which accepts distinct_ids directly
         const url = `${host}/api/projects/${projectId}/persons/bulk_delete/`;
 
