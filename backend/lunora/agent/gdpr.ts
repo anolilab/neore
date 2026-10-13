@@ -18,9 +18,6 @@ const EMBEDDING_TABLES = [
     "embeddings_1024",
     "embeddings_1408",
     "embeddings_1536",
-    "embeddings_2048",
-    "embeddings_3072",
-    "embeddings_4096",
 ] as const;
 
 /** Deletes an embedding row that may already be gone (a retried round, or a dangling id). */

@@ -775,66 +775,6 @@ export const schema = defineSchema({
             metric: "cosine",
         }),
 
-    embeddings_2048: defineTable({
-        model: v.string(),
-        model_table_threadId: v.optional(v.string()),
-        model_table_userId: v.optional(v.string()),
-        table: v.string(),
-        threadId: v.optional(v.string()),
-        userId: v.optional(v.string()),
-        vector: v.array(v.number()),
-    })
-        .shardBy("userId")
-        .index("by_userId", ["userId"])
-        .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
-            dimensions: 2048,
-            embed,
-            index: "embeddings-2048",
-            metadata: ["model_table_userId", "model_table_threadId"],
-            metric: "cosine",
-        }),
-
-    embeddings_3072: defineTable({
-        model: v.string(),
-        model_table_threadId: v.optional(v.string()),
-        model_table_userId: v.optional(v.string()),
-        table: v.string(),
-        threadId: v.optional(v.string()),
-        userId: v.optional(v.string()),
-        vector: v.array(v.number()),
-    })
-        .shardBy("userId")
-        .index("by_userId", ["userId"])
-        .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
-            dimensions: 3072,
-            embed,
-            index: "embeddings-3072",
-            metadata: ["model_table_userId", "model_table_threadId"],
-            metric: "cosine",
-        }),
-
-    embeddings_4096: defineTable({
-        model: v.string(),
-        model_table_threadId: v.optional(v.string()),
-        model_table_userId: v.optional(v.string()),
-        table: v.string(),
-        threadId: v.optional(v.string()),
-        userId: v.optional(v.string()),
-        vector: v.array(v.number()),
-    })
-        .shardBy("userId")
-        .index("by_userId", ["userId"])
-        .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
-            dimensions: 4096,
-            embed,
-            index: "embeddings-4096",
-            metadata: ["model_table_userId", "model_table_threadId"],
-            metric: "cosine",
-        }),
-
     // Evals (`evals/`): datasets of cases, runs of a dataset against a target,
     // and one result per case per run. Sharded together — the runner's
     // claim/complete mutations write a run and its results in one transaction.

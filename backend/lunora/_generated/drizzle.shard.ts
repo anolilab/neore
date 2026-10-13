@@ -361,51 +361,6 @@ export const embeddings_1536 = sqliteTable("embeddings_1536", {
     by_userId: index("by_userId").on(t.userId),
 }));
 
-export const embeddings_2048 = sqliteTable("embeddings_2048", {
-    _id: text("_id").primaryKey(),
-    _creationTime: integer("_creationTime").notNull(),
-    model: text("model").notNull(),
-    model_table_threadId: text("model_table_threadId"),
-    model_table_userId: text("model_table_userId"),
-    table: text("table").notNull(),
-    threadId: text("threadId"),
-    userId: text("userId"),
-    vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
-}, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
-    by_userId: index("by_userId").on(t.userId),
-}));
-
-export const embeddings_3072 = sqliteTable("embeddings_3072", {
-    _id: text("_id").primaryKey(),
-    _creationTime: integer("_creationTime").notNull(),
-    model: text("model").notNull(),
-    model_table_threadId: text("model_table_threadId"),
-    model_table_userId: text("model_table_userId"),
-    table: text("table").notNull(),
-    threadId: text("threadId"),
-    userId: text("userId"),
-    vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
-}, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
-    by_userId: index("by_userId").on(t.userId),
-}));
-
-export const embeddings_4096 = sqliteTable("embeddings_4096", {
-    _id: text("_id").primaryKey(),
-    _creationTime: integer("_creationTime").notNull(),
-    model: text("model").notNull(),
-    model_table_threadId: text("model_table_threadId"),
-    model_table_userId: text("model_table_userId"),
-    table: text("table").notNull(),
-    threadId: text("threadId"),
-    userId: text("userId"),
-    vector: text("vector", { mode: "json" }).$type<Array<number>>().notNull(),
-}, (t) => ({
-    model_table_threadId: index("model_table_threadId").on(t.model, t.table, t.threadId),
-    by_userId: index("by_userId").on(t.userId),
-}));
-
 export const evalCases = sqliteTable("evalCases", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

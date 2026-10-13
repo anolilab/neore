@@ -49,7 +49,7 @@ interface Env {
     DB: D1DatabaseLike;
 
     /**
-     * The ten Vectorize indexes, one per embedding width.
+     * The seven Vectorize indexes, one per embedding width.
      *
      * Declared here because `.vectors(...)` below needs them typed — they were
      * absent from this interface while the schema declared the indexes, which is
@@ -62,9 +62,6 @@ interface Env {
     EMBEDDINGS_1024: Vectorize;
     EMBEDDINGS_1408: Vectorize;
     EMBEDDINGS_1536: Vectorize;
-    EMBEDDINGS_2048: Vectorize;
-    EMBEDDINGS_3072: Vectorize;
-    EMBEDDINGS_4096: Vectorize;
     FILES: R2BucketLike;
 
     /**
@@ -344,7 +341,7 @@ const app = defineApp<Env>()
     .scheduler({ namespace: (env) => shardScopedSchedulerNamespace(env.SCHEDULER) })
     .payment(creemPayments)
     /**
-     * The ten Vectorize indexes backing `ctx.vectors`.
+     * The seven Vectorize indexes backing `ctx.vectors`.
      *
      * Required whenever the schema declares vector indexes. Omitting it makes
      * `ctx.vectors` a throwing stub and `buildWorkerOptions` reject EVERY
@@ -355,7 +352,7 @@ const app = defineApp<Env>()
      * keep the prose, and `verify` exited 0 (anolilab/lunora#674). Fixed in
      * cli@245: the gate now reads the chain on `defineApp()`, and re-testing that
      * exact edit on 2026-09-11 — call gone, comment kept, two literal
-     * `.vectors(` still in the file — exits 1 naming all ten indexes.
+     * `.vectors(` still in the file — exits 1 naming all seven indexes.
      *
      * Keys are the schema's index names (`embeddings-<dim>`, mirrored in
      * `_generated/vectors.ts`); values are the wrangler bindings. The two must
@@ -371,9 +368,6 @@ const app = defineApp<Env>()
             "embeddings-1024": env.EMBEDDINGS_1024,
             "embeddings-1408": env.EMBEDDINGS_1408,
             "embeddings-1536": env.EMBEDDINGS_1536,
-            "embeddings-2048": env.EMBEDDINGS_2048,
-            "embeddings-3072": env.EMBEDDINGS_3072,
-            "embeddings-4096": env.EMBEDDINGS_4096,
         };
     })
     // The 20 webhook/streaming endpoints in `lunora/http.ts`, mounted ahead of
