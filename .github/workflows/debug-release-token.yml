@@ -1,0 +1,25 @@
+name: "Debug release token"
+on: # yamllint disable-line rule:truthy
+    pull_request:
+        paths:
+            - ".github/workflows/debug-release-token.yml"
+permissions: {}
+jobs:
+    probe:
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 5
+        steps:
+            - name: "Probe what vis' gh calls hit"
+              env:
+                  GH_TOKEN: "${{ secrets.SEMANTIC_RELEASE_GITHUB_TOKEN }}"
+                  GH_REPO: "${{ github.repository }}"
+              run: |
+                  gh --version | head -1
+                  echo "--- token scopes / expiry (headers only)"
+                  curl -sI -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user | grep -iE "^(x-oauth-scopes|x-accepted-oauth-scopes|github-authentication-token-expiration|x-github-request-id):" || true
+                  echo "--- gh pr list --head"
+                  gh pr list --head vis-release/version-packages --state open --json number || echo "exit $?"
+                  echo "--- gh pr edit title only"
+                  gh pr edit 240 --title "chore(release): version packages" || echo "exit $?"
+                  echo "--- gh pr edit add-label"
+                  gh pr edit 240 --add-label "autorelease: pending" || echo "exit $?"
