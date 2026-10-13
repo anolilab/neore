@@ -317,6 +317,12 @@ describe("deploy env bindings", () => {
             expect(alchemyScript).toContain(`named("${workerName}")`);
         });
 
+        it("puts Access in front of the web Worker only, opt-in, and never in production", () => {
+            expect(alchemyScript).toContain('const accessEnabled = stage !== "production" && process.env.ACCESS_ENABLED === "true";');
+            expect(alchemyScript.match(/\.\.\.\(accessEnabled \?/gu)).toHaveLength(1);
+            expect(deployWorkflow).toMatch(/^\s+ACCESS_ENABLED: "\$\{\{ vars\.ACCESS_ENABLED \}\}"$/mu);
+        });
+
         it("builds the app and deploys the backend against the same origins", () => {
             // Anchored: `SITE_URL` alone is also the tail of `VITE_SITE_URL`.
             for (const [name, output] of [

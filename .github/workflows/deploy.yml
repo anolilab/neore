@@ -274,6 +274,10 @@ jobs:
                   # Skips Alchemy's lookup of the account's workers.dev subdomain, which
                   # a new account has none of until one is registered.
                   CLOUDFLARE_WORKERS_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"
+                  # Cloudflare Access in front of the web app of staging and preview
+                  # ("true" on those environments once the account has a Zero Trust
+                  # organisation and the token the Access permissions). Never production.
+                  ACCESS_ENABLED: "${{ vars.ACCESS_ENABLED }}"
                   CI: "true"
                   # alchemy.run.ts refuses to deploy without every one of these
                   # (REQUIRED_DEPLOY_ENV) — there are deliberately no defaults,

@@ -289,6 +289,28 @@ if (Boolean(turnstileSecret) !== Boolean(turnstileSiteKey) && !destroying) {
 }
 
 /**
+ * Cloudflare Access in front of the web app of a non-production stage. Staging and
+ * preview live on public workers.dev URLs; with this on, nobody who is not on the
+ * `ADMIN` list even reaches the app. Only the web Worker is gated: the browser calls
+ * the backend and the gateway cross-origin, and an Access login on the web hostname
+ * does not carry over to theirs (they stay public, but every call needs a session
+ * the invite-only sign-up hands out).
+ *
+ * Opt-in with `ACCESS_ENABLED=true` (a GitHub environment variable): Access needs a
+ * Zero Trust organisation in the account and a token with the Access permissions, and a
+ * deploy fails without them. Production never uses it.
+ */
+const accessEmails = (process.env.ADMIN ?? "")
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+const accessEnabled = stage !== "production" && process.env.ACCESS_ENABLED === "true";
+
+if (accessEnabled && accessEmails.length === 0 && !destroying) {
+    throw new Error(`Cannot deploy (stage: ${stage}) — ACCESS_ENABLED is set but ADMIN lists no address to let through.`);
+}
+
+/**
  * Production must be able to send mail. `@lunora/mail` throws without a sender,
  * so with `MAIL_FROM` unset every sign-up, password reset and invitation that
  * sends mail fails. With it set there is always a transport: the EMAIL binding,
@@ -597,6 +619,8 @@ export const Website = Cloudflare.Worker("website", {
     },
     domain: customDomain(requireEnv("SITE_URL"), "SITE_URL"),
     env: boundWhereSet(["ELEVENLABS_API_KEY", "POSTHOG_PERSONAL_API_KEY"]),
+    // Only the web Worker, and only where ACCESS_ENABLED asks for it (see above).
+    ...(accessEnabled ? { access: { policies: [{ decision: "allow" as const, include: accessEmails.map((email) => ({ email })) }], previews: false } } : {}),
     main: "./apps/web/dist/server/index.js",
     name: named("neore-chat"),
     observability: WORKER_OBSERVABILITY,

@@ -1823,6 +1823,12 @@ error")` (any transport, including the SSRF-guarded tool
   `https://<neore-chat|neore-backend|llm-gateway>-<stage>.<subdomain>.workers.dev`.
   `backend/deploy-env-bindings.test.ts` pins that the YAML and `alchemy.run.ts` agree.
   Unset, a non-production run falls back to the `VITE_*_URL` secrets.
+- **Cloudflare Access in front of staging and preview is opt-in** (`ACCESS_ENABLED=true`, an
+  environment variable). It gates the web Worker only, to the `ADMIN` addresses: the browser
+  calls the backend and gateway cross-origin, where the web hostname's Access login does not
+  apply. It needs a Zero Trust organisation in the account and the token's account-scoped
+  `Access: Apps and Policies Write` and `Access: Organizations, Identity Providers, and Groups
+  Write`; without them the deploy fails, hence the switch.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).
