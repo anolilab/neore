@@ -1,3 +1,13 @@
 {
     extends: ["github>anolilab/renovate-config"],
+    packageRules: [
+        {
+            // Alchemy 2 is a beta that ships about weekly and moves APIs between releases:
+            // a bump is a deliberate step (type check, deploy tests, a `dry_run` deploy),
+            // so it waits for approval on the dependency dashboard and never automerges.
+            matchPackageNames: ["alchemy"],
+            automerge: false,
+            dependencyDashboardApproval: true,
+        },
+    ],
 }

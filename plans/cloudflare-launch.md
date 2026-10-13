@@ -21,7 +21,7 @@ Deploys are CI's job (`AGENTS.md`). Do not run `pnpm run deploy` locally.
 | --- | --- |
 | `pnpm build:packages` | passes |
 | `pnpm run lint:types:deploy` (`tsconfig.deploy.json`) | passes |
-| `esbuild alchemy.run.ts` parse-check | passes |
+| `pnpm run lint:eslint:deploy` | passes |
 | `backend`: `deploy-bindings`, `deploy-bundle`, `deploy-env-bindings` tests | 121 / 121 |
 | `services/document-parser/build/` | absent locally; CI builds it (`build:worker`) |
 
@@ -42,7 +42,6 @@ The deploy refuses to start if any is blank.
 
 | Secret | How to get it |
 | --- | --- |
-| `ALCHEMY_PASSWORD` | `openssl rand -hex 32`. **Never rotate:** it encrypts the state file. |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 48` |
 | `ENCRYPTION_KEY` | `openssl rand -base64 48` (≥ 32 chars). Treat it as stable: it encrypts stored data. |
 | `LLM_GATEWAY_SIGNING_SECRET` | `openssl rand -hex 32` (gateway ↔ backend, shared) |
@@ -123,12 +122,14 @@ Before the first deploy:
 
 1. **Workers Paid plan**: Queues and Vectorize require it.
 2. **R2 activated** in the dashboard.
-3. **CI state bucket `neore-chat-alchemy-state`** (`alchemy.run.ts` in CI uses
-   `R2RestStateStore`). Create it up front. Do not rely on auto-creation until
-   the first run has proved it works.
+3. **State store.** Alchemy 2 keeps state in a Worker + Durable Object in this
+   account (`Cloudflare.state()`), created by the first `alchemy deploy --yes` in CI,
+   with its key in the account's Secrets Store. Nothing to create up front, but the
+   token needs Secrets Store access (step 4). Run `Deploy` with `dry_run` on `preview`
+   first: it creates only the state store.
 4. **API token** with: Workers Scripts (Edit), Workers KV (Edit), D1 (Edit),
    R2 (Edit), Queues (Edit), Vectorize (Edit), Workers AI (Edit), Email Sending
-   (Edit), Workers Routes / Custom Domains (Edit) on the zone, Zone (Read).
+   (Edit), Secrets Store (Edit; the state store), Workers Routes / Custom Domains (Edit) on the zone, Zone (Read).
    Scopes are from the resource list above, not from Alchemy's docs. Confirm
    them on the preview run and widen only if the error names one.
 5. **Zone** (only if using a custom domain): it must be ACTIVE in this account.
@@ -148,7 +149,7 @@ yet, so the URLs have to be written down first. The Worker names are fixed by
 | web (`SITE_URL`) | `neore-chat` | `neore-chat-preview` | yes |
 | backend (`BACKEND_PUBLIC_ORIGIN`) | `neore-backend` | `neore-backend-preview` | yes |
 | gateway (`LLM_GATEWAY_URL`) | `llm-gateway` | `llm-gateway-preview` | yes |
-| document-parser, nsfw-checker, browser-renderer | — | — | **private** (`url: false`) |
+| document-parser, nsfw-checker, browser-renderer | — | — | **private** (`workersDev: false`) |
 
 Two options:
 
@@ -184,13 +185,13 @@ Two options:
 
 ## 6. Known risks
 
-- **Changing `ALCHEMY_PASSWORD` or `ENCRYPTION_KEY` breaks existing state or
-  data.** Set them once.
+- **Changing `ENCRYPTION_KEY` breaks stored data.** Set it once.
 - **The deploy job uses `setup@main`.** A workflows-repo change can break it
   without a change here. Pin it once the first deploy is green.
 - **Custom domain + pending zone** fails the whole deploy late. Check the zone
   before starting.
 - **First deploy writes to production state** if `environment=production` is
   chosen. Do the preview run first.
-- **No environment protection rules** are set on `production`. Anyone who can
-  push a `v*` tag can deploy. Consider adding required reviewers.
+- **`production` is protected**: a required reviewer, and only `main` and `v*` tags may
+  deploy to it. `preview` has neither, so its secrets are reachable by anyone who can
+  dispatch a workflow on any branch.

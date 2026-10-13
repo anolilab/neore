@@ -97,9 +97,10 @@ cd backend && pnpm codegen
 
 # Deployment (CI does this; do not run locally)
 # Since pnpm 11 a script named `deploy` (also `clean`, `setup`, `rebuild`)
-# SHADOWS the built-in, so bare `pnpm deploy` now RUNS alchemy.run.ts — it no
+# SHADOWS the built-in, so bare `pnpm deploy` now RUNS `alchemy deploy` — it no
 # longer fails harmlessly with ERR_PNPM_NOTHING_TO_DEPLOY as it did on pnpm 10.
-# Write `pnpm run deploy` anyway; `pnpm pm deploy` is the built-in.
+# Write `pnpm run deploy` anyway; `pnpm pm deploy` is the built-in. CI calls the
+# CLI itself: `alchemy deploy --stage "$DEPLOY_ENV" --yes` (deploy.yml).
 DEPLOY_ENV=preview pnpm run deploy
 ```
 
@@ -199,9 +200,9 @@ written here is what is not.
       `lunora.config.ts`, run `pnpm --filter @neore/backend run prepare:deploy`
       (or start `lunora dev`) and commit both files.
     - **Deploy: Alchemy binds the same names by hand** (`alchemy.run.ts`:
-      `SERVICE_DOCUMENT_PARSER: documentParser`, `SERVICE_LLM_GATEWAY:
-      Worker.experimentalEntrypoint(llmGateway, "InternalApi")`), and the three
-      private Workers get `url: false` — Alchemy does not read their
+      `SERVICE_DOCUMENT_PARSER: DocumentParser`, `SERVICE_LLM_GATEWAY:
+      Cloudflare.WorkerEntrypoint(gateway, "InternalApi")`), and the three
+      private Workers get `workersDev: false` — Alchemy does not read their
       `wrangler.jsonc` `workers_dev: false`. `deploy-env-bindings.test.ts` pins
       config ↔ wrangler ↔ alchemy and that no `*_URL` / `*_SIGNING_SECRET`
       survives for them.
@@ -237,7 +238,7 @@ written here is what is not.
       is ~6 min). worker-build downloads wasm-bindgen/wasm-opt/esbuild itself;
       where a firewall blocks that, installed copies in PATH / `~/.cargo/bin`
       are picked up (or `WASM_BINDGEN_BIN` / `WASM_OPT_BIN` / `ESBUILD_BIN`).
-      Alchemy uploads `build/` as built (`noBundle`) and refuses to start
+      Alchemy uploads `build/` as built (`bundle: false`) and refuses to start
       without it. The 25 MB document cap is one number in three places —
       `src/shape.rs#MAX_DOCUMENT_BYTES`, `lib/document-limits.ts` (backend, and
       the composer through `@neore/backend/document-limits`) —
@@ -254,7 +255,7 @@ written here is what is not.
 - **Video render queue** — `POST /v1/videos` enqueues and returns 202; the
   Worker's `queue()` handler consumes it. **Cross-config invariant:**
   `VIDEO_RENDER_MAX_ATTEMPTS = 3` in the consumer MUST equal `maxRetries: 2`
-  (+ initial delivery) on `eventSources` in `alchemy.run.ts` — a mismatch
+  (+ initial delivery) on the `Queues.Consumer` `settings` in `alchemy.run.ts` — a mismatch
   silently drops messages on the final attempt, before the DLQ. Provider keys go
   in `CACHE_KV` under `video_render_secret:{jobId}` (TTL 2h) so the queue payload
   never carries secrets. `markRenderFailed` is idempotent and is called from both
@@ -1788,11 +1789,49 @@ error")` (any transport, including the SSRF-guarded tool
 
 ### Build and deploy
 
-- **`alchemy.run.ts` is not typechecked.** No root `tsconfig.json` exists, so
-  `pnpm lint:types` never sees the deploy entrypoint — and you cannot run it to
-  check, because `tsx alchemy.run.ts` IS `pnpm run deploy`. Parse-check edits
-  with `./node_modules/.bin/esbuild alchemy.run.ts --format=esm --outfile=/dev/null`
-  and read carefully; a type error there surfaces for the first time in CI.
+- **Alchemy is 2.0 (beta), pinned EXACTLY** in the `iac` catalog. The beta ships about
+  weekly and each release can move APIs; `minimumReleaseAge` also holds back the newest
+  ones. Bump it deliberately, run `lint:types:deploy`, the three `deploy-*.test.ts`, then
+  a `Deploy` workflow run with `dry_run` on `preview` before a real one. It is an
+  Effect-based rewrite: `alchemy.run.ts` default-exports an `Alchemy.Stack`, and a
+  resource's attributes (`worker.url`) are lazy `Output`s — compose them with
+  `Output.map`, and never put one in a template literal (it prints `[object Object]`,
+  which as a logical id collapses every id to one). `alchemy.run.ts` IS typechecked and
+  linted (`pnpm lint:types:deploy`, `lint:eslint:deploy`, `tsconfig.deploy.json`), but
+  running it is the deploy, so only the `dry_run` workflow input exercises it.
+- **State lives in a Worker + Durable Object in the Cloudflare account**
+  (`Cloudflare.state()`), bootstrapped by the first `alchemy deploy --yes` in CI. The CI token
+  therefore needs Secrets Store access as well as Workers/R2/D1/Queues/Vectorize/KV. Local
+  runs would use `.alchemy/`. `alchemy drift` (the `drift.yml` workflow) re-reads the cloud
+  against that state. There is no `ALCHEMY_PASSWORD` any more.
+- **`--adopt` is for the FIRST deploy of a name that already exists**, not a standing flag:
+  it takes over any same-named resource. `deploy.yml` has an `adopt` input, off by default.
+- **Three tiers, three accounts.** `production` (the neore account), `staging` and `preview`
+  (their own Cloudflare accounts, each with a GitHub environment holding its token and
+  account id). The GitHub ENVIRONMENT picks the account and secrets; the Alchemy STAGE picks
+  names and state. They differ only for a pull request preview: environment `preview`,
+  stage `pr-<number>` (`preview.yml`, on the `preview` label, same-repo PRs, destroyed on
+  close). `named()` suffixes everything with `-<stage>` except production, and the stage
+  must stay the LAST part of a queue name: the backend binds `STAGE` and strips it in
+  `queue()` (`backend/src/queue-stage.ts`), and the gateway's consumers tell a DLQ by
+  `-dlq` in the name, not at its end.
+- **Non-production stages live on workers.dev**, because the `neore.ai` zone is in the
+  production account and a custom domain needs its zone in the Worker's account. The app
+  bakes its URLs in at build time, so `deploy.yml` derives them BEFORE the build from the
+  environment variable `WORKERS_DEV_SUBDOMAIN` (the account's workers.dev subdomain,
+  registered once in the dashboard; names are global) and the Worker names:
+  `https://<neore-chat|neore-backend|llm-gateway>-<stage>.<subdomain>.workers.dev`.
+  `backend/deploy-env-bindings.test.ts` pins that the YAML and `alchemy.run.ts` agree.
+  Unset, a non-production run falls back to the `VITE_*_URL` secrets.
+- **Cloudflare Access in front of staging and preview is opt-in** (`ACCESS_ENABLED=true`, an
+  environment variable). It gates the web Worker only, to the `ADMIN` addresses: the browser
+  calls the backend and gateway cross-origin, where the web hostname's Access login does not
+  apply. It needs a Zero Trust organisation in the account and the token's account-scoped
+  `Access: Apps and Policies Write` and `Access: Organizations, Identity Providers, and Groups
+  Write`; without them the deploy fails, hence the switch.
+- **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
+  takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
+  API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).
 - **`backend/lunora-bindings.json` is a BUILD artifact.** Only
   `pnpm --filter @neore/backend run build` should write it (via
   `--emit-bindings`), and `alchemy.run.ts` reads it to derive the backend's
@@ -1810,14 +1849,15 @@ error")` (any transport, including the SSRF-guarded tool
   their exact names — only internal identifiers mangle. The largest Worker is
   the Rust document-parser at 14.4 MiB.
 - **What deploys is NOT `lunora build`'s bundle.** Alchemy bundles every Worker
-  itself from its `entrypoint`, ignores `wrangler.jsonc`, and defaults to an
-  unminified build with `process.env.NODE_ENV` = `"undefined"` (React's
-  development builds). Unset, the backend would ship at 19.9 MB / 3051 KiB gzip.
-  The deploy's esbuild options live in `scripts/worker-bundle.ts` (minify, an
-  English-only zod-locales plugin, `NODE_ENV=production` for the backend) and
-  `backend/deploy-bundle.test.ts` pins that every `Worker(...)` passes them.
-  To measure the real deploy bundle without deploying, call Alchemy's
-  `normalizeWorkerBundle(...).create()` from `alchemy/lib/cloudflare/worker-bundle.js`.
+  itself (rolldown) from its `main`, ignores `wrangler.jsonc`, and defaults to an
+  unminified build (React's development builds, ~19.9 MB / 3051 KiB gzip for the backend
+  under Alchemy 0.x). The deploy's options live in `scripts/worker-bundle.ts` (minify,
+  `keepNames`, an English-only zod-locales rolldown plugin, `NODE_ENV=production` for the
+  backend) and `backend/deploy-bundle.test.ts` pins that every bundled Worker passes them.
+  The web app and the Rust parser are NOT bundled by Alchemy (`bundle: false`): they are
+  built ahead and uploaded as built. The real bundle lands in
+  `.alchemy/bundles/<stack>-<stage>-<id>` after a run — re-measure the backend there; the
+  figure above is from the old bundler.
 - **A barrel import can defeat tree-shaking even when every package says
   `sideEffects: false`.** `@react-email/components` re-exports `Tailwind` and
   `CodeBlock`, which were bundled at 435 + 555 KiB despite **zero** usages;
@@ -1829,7 +1869,7 @@ error")` (any transport, including the SSRF-guarded tool
   `lunora/_generated/openapi.{ts,json}`.** It saves ~860 KiB raw, but run
   `pnpm codegen` afterwards or you commit their deletion by accident.
 - **The backend reaches its services over SERVICE BINDINGS, not URLs.**
-  document-parser, browser-renderer and nsfw-checker are private (`url: false`
+  document-parser, browser-renderer and nsfw-checker are private (`workersDev: false`
   in Alchemy, `workers_dev: false` in wrangler) with no auth of their own — the
   binding is the only way in. The gateway keeps its custom domain (browser
   `/v1/*`) and ONE shared secret, `LLM_GATEWAY_SIGNING_SECRET` ↔ gateway

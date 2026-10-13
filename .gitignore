@@ -23,7 +23,7 @@ vitest.config.*.timestamp*
 # paths did not move with it, so the artifacts below were tracked by accident.
 apps/web/public/og.png
 
-# Alchemy IaC local state (CI uses R2RestStateStore instead)
+# Alchemy IaC local state and bundles (CI uses the Cloudflare-hosted state store)
 .alchemy/
 
 # Fumadocs MDX generated types

@@ -27,6 +27,7 @@ import { requestBearer, requestWsTicket } from "../lunora/lib/request-bearer.js"
 import { handleWsTicketRequest, purgeExpiredWsTickets, redeemWsTicket } from "../lunora/lib/ws-ticket.js";
 import { runInShard } from "../lunora/lib/shard-context.js";
 import { shardScopedSchedulerNamespace } from "../lunora/lib/shard-scheduler.js";
+import { withoutStage } from "./queue-stage.js";
 import { createGrantLookup, createShardAuthorizer, isShardRoutedRequest, withCallerShard } from "./shard-routing.js";
 
 interface Env {
@@ -108,6 +109,8 @@ interface Env {
     SHARD_ROUTING?: string;
     /** DEV-ONLY: `on` logs `[timing]` lines (`src/development-timing.ts`). */
     SHARD_TIMING?: string;
+    /** The deploy's stage, empty in production. Queue names carry it (`queue-stage.ts`). */
+    STAGE?: string;
     STORAGE_SIGNING_SECRET?: string;
 }
 
@@ -743,12 +746,13 @@ export default {
 
     /**
      * Queue consumers: `jobs` and its DLQ, declared in `lunora/queues.ts` and
-     * dispatched by the generated handler. A preview deploy's `-preview` queue
-     * names reach the same handlers through the `env.preview` producers in
-     * `wrangler.jsonc`, which codegen reads as routing aliases.
+     * dispatched by the generated handler. A non-production deploy suffixes the
+     * queue names with its stage and `withoutStage` routes them by the declared name.
+     * The `env.preview` producers in `wrangler.jsonc` are what `lunora dev` and
+     * codegen read.
      */
     async queue(batch: MessageBatchLike, env: Env, context: ExecutionContextLike): Promise<void> {
-        await app.queue?.(batch, env, context);
+        await app.queue?.(withoutStage(batch, env.STAGE), env, context);
     },
 
     /**

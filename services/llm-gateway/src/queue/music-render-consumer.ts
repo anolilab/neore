@@ -22,10 +22,11 @@ export const MUSIC_RENDER_MAX_ATTEMPTS = 3;
 /** Backoff (seconds) before redelivery. */
 export const MUSIC_RENDER_RETRY_DELAY_SECONDS = 30;
 
-const DLQ_SUFFIX = "-dlq";
+/** `llm-gateway-music-renders-dlq-<stage>`: `-dlq` is not the end of the name (see the video consumer). */
+const DLQ_NAME = /-dlq(?:-|$)/u;
 
 export const handleMusicRenderBatch = async (batch: MessageBatch<MusicRenderMessage>, env: AppEnv, context: ExecutionContext): Promise<void> => {
-    const isDlq = batch.queue.endsWith(DLQ_SUFFIX);
+    const isDlq = DLQ_NAME.test(batch.queue);
 
     for (const message of batch.messages) {
         if (isDlq) {

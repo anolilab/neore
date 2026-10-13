@@ -1,0 +1,90 @@
+# https://help.github.com/en/categories/automating-your-workflow-with-github-actions
+
+name: "Drift"
+
+# Re-reads every deployed resource and compares it with what the last deploy recorded:
+# an edit made in the dashboard shows as drifted, a deleted resource as missing. Report
+# only; `--repair` would undo a change somebody made on purpose.
+on: # yamllint disable-line rule:truthy
+    schedule:
+        - cron: "30 5 * * 1" # Mondays 05:30 UTC
+    workflow_dispatch: # yamllint disable-line rule:empty-values
+
+permissions: {}
+
+jobs:
+    drift:
+        name: "Drift (${{ matrix.environment }})"
+        if: "github.repository == 'anolilab/neore'"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 20
+        # The group `deploy.yml` uses, so a check never reads the state mid-deploy.
+        concurrency:
+            group: "deploy-${{ matrix.environment }}"
+            cancel-in-progress: false
+        strategy:
+            fail-fast: false
+            matrix:
+                # Not production: that environment only accepts `v*` tags, and a scheduled run
+                # is always on the default branch. Check it by hand from a tag, with the
+                # same command: `alchemy drift --stage production`.
+                environment: ["staging"]
+        environment: "${{ matrix.environment }}"
+        permissions:
+            contents: "read"
+            issues: "write" # to report drift
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              with:
+                  node-version: "24"
+                  skip-playwright: "true"
+
+            - name: "Check for drift"
+              id: "drift"
+              env:
+                  CI: "true"
+                  CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+                  CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+                  DEPLOY_ENV: "${{ matrix.environment }}"
+                  CLOUDFLARE_WORKERS_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"
+                  # alchemy.run.ts skips its deploy guards: this reads the cloud and builds nothing.
+                  READ_ONLY: "true"
+              run: |
+                  output=$(pnpm exec alchemy drift --stage "$DEPLOY_ENV" 2>&1) || { echo "$output"; exit 1; }
+                  echo "$output"
+
+                  if printf '%s' "$output" | grep -qiE 'drifted|missing'; then
+                      echo "drifted=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: "Open or update the issue"
+              if: "steps.drift.outputs.drifted == 'true'"
+              uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
+              env:
+                  ENVIRONMENT: "${{ matrix.environment }}"
+              with:
+                  script: |
+                      const title = `Infrastructure drift on ${process.env.ENVIRONMENT}`;
+                      const { owner, repo } = context.repo;
+                      const url = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+                      const line = `Drift found: ${url}`;
+
+                      const { data: open } = await github.rest.issues.listForRepo({ owner, repo, state: "open", labels: "ci", per_page: 100 });
+                      const existing = open.find((issue) => issue.title === title && !issue.pull_request);
+
+                      if (existing) {
+                          await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body: line });
+                      } else {
+                          await github.rest.issues.create({ owner, repo, title, labels: ["ci"], body: `${line}\n\n\`alchemy drift\` found resources that were changed or deleted outside a deploy. Read the log for which, then either redeploy to restore them or accept the change in the code. Close this issue when they agree again.` });
+                      }

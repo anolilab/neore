@@ -9,18 +9,69 @@ on: # yamllint disable-line rule:truthy
     workflow_dispatch:
         inputs:
             environment:
-                description: "Target environment (production or preview)"
+                description: "Target environment: the GitHub environment and Cloudflare account (production only runs from a v* tag: pick the tag under \"Use workflow from\")"
                 required: true
                 default: "production"
                 type: "choice"
                 options:
                     - "production"
+                    - "staging"
                     - "preview"
+            stage:
+                description: "Alchemy stage (names, state): defaults to the environment. A pull request preview uses pr-<number> on the preview environment"
+                required: false
+                default: ""
+                type: "string"
+            adopt:
+                description: "Take over existing resources of the same names (first deploy over a manually created or older setup only)"
+                required: false
+                default: false
+                type: "boolean"
+            log_level:
+                description: "alchemy --log-level (use debug to see the failing API call)"
+                required: false
+                default: "info"
+                type: "choice"
+                options:
+                    - "info"
+                    - "debug"
+            dry_run:
+                description: "Only show the plan: create and change nothing (the state store is still created on its first run)"
+                required: false
+                default: false
+                type: "boolean"
+    workflow_call:
+        inputs:
+            environment:
+                required: true
+                type: "string"
+            stage:
+                required: false
+                default: ""
+                type: "string"
+            adopt:
+                required: false
+                default: false
+                type: "boolean"
+            log_level:
+                required: false
+                default: "info"
+                type: "string"
+            dry_run:
+                required: false
+                default: false
+                type: "boolean"
+        outputs:
+            website-url:
+                description: "The deployed web app's URL"
+                value: "${{ jobs.deploy-cloudflare.outputs.website-url }}"
 
-# Keyed on the target, not the ref: two tags (or a tag and a manual run) would
-# otherwise run two Alchemy deploys against the same state file at once.
+# Keyed on the stage, not the ref: two tags (or a tag and a manual run) would
+# otherwise run two Alchemy deploys against the same state at once, while two pull
+# request previews can deploy side by side. A caller must NOT use this group itself:
+# a caller and its callee holding one group deadlock.
 concurrency:
-    group: "deploy-${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment) || 'production' }}"
+    group: "deploy-${{ inputs.stage || inputs.environment || 'production' }}"
     # Don't cancel in-progress deployments to avoid partial deploys
     cancel-in-progress: false
 
@@ -37,21 +88,40 @@ jobs:
         runs-on: "ubuntu-24.04"
         timeout-minutes: 5
         outputs:
-            # 'production' → v* tag push OR manual dispatch with production selected
-            # 'preview'    → manual dispatch with preview selected
+            # The GitHub environment, which decides the Cloudflare account and the secrets.
+            # 'production' for a v* tag push; the chosen one for a dispatch or a call.
             deploy-env: "${{ steps.env.outputs.deploy-env }}"
+            # The Alchemy stage: the environment unless one was given (pr-<number>).
+            stage: "${{ steps.env.outputs.stage }}"
         steps:
             - name: "Resolve target environment"
               id: "env"
               env:
-                  EVENT_NAME: "${{ github.event_name }}"
-                  INPUT_ENVIRONMENT: "${{ github.event.inputs.environment }}"
+                  INPUT_ENVIRONMENT: "${{ inputs.environment }}"
+                  INPUT_STAGE: "${{ inputs.stage }}"
               run: |
-                  if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-                      echo "deploy-env=${INPUT_ENVIRONMENT}" >> "$GITHUB_OUTPUT"
-                  else
-                      echo "deploy-env=production" >> "$GITHUB_OUTPUT"
+                  environment="${INPUT_ENVIRONMENT:-production}"
+                  stage="${INPUT_STAGE:-$environment}"
+
+                  case "$environment" in
+                      production|staging|preview) ;;
+                      *) echo "::error::unknown environment '$environment'"; exit 1 ;;
+                  esac
+
+                  # The stage ends up in resource names and a workers.dev hostname.
+                  if [[ ! "$stage" =~ ^[a-z0-9]([a-z0-9-]{0,18}[a-z0-9])?$ ]]; then
+                      echo "::error::the stage must be 1-20 lowercase letters, digits or hyphens"
+                      exit 1
                   fi
+
+                  # Production is the production environment and nothing else.
+                  if [[ "$environment" == "production" && "$stage" != "production" ]] || [[ "$environment" != "production" && "$stage" == "production" ]]; then
+                      echo "::error::the production stage belongs to the production environment only"
+                      exit 1
+                  fi
+
+                  echo "deploy-env=${environment}" >> "$GITHUB_OUTPUT"
+                  echo "stage=${stage}" >> "$GITHUB_OUTPUT"
 
     # -----------------------------------------------------------------
     # Step 2a: Build app & deploy all Cloudflare Workers via Alchemy
@@ -61,13 +131,15 @@ jobs:
     # TanStack Start app and the document-parser service.
     # -----------------------------------------------------------------
     deploy-cloudflare:
-        name: "Deploy Cloudflare Workers via Alchemy (${{ needs.resolve-env.outputs.deploy-env }})"
+        name: "Deploy Cloudflare Workers via Alchemy (${{ needs.resolve-env.outputs.stage }})"
         needs: "resolve-env"
         runs-on: "ubuntu-24.04"
         timeout-minutes: 60
         permissions:
             contents: "read"
             deployments: "write"
+        outputs:
+            website-url: "${{ steps.alchemy.outputs.website-url }}"
         environment:
             name: "${{ needs.resolve-env.outputs.deploy-env }}"
             url: "${{ steps.alchemy.outputs.website-url }}"
@@ -85,7 +157,7 @@ jobs:
             - name: "Setup resources and environment"
               uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
               with:
-                  node-version: "22"
+                  node-version: "24"
 
             # Built here rather than carried between jobs as an artifact.
             # `upload-artifact` strips the least common ancestor of the matched
@@ -99,6 +171,37 @@ jobs:
             # is ~20s and nx-cached; that is cheaper than the trap.
             - name: "Build shared packages"
               run: "pnpm run build:packages"
+
+            # The three origins the app is built against and the backend verifies its
+            # tokens against, from ONE place so they cannot disagree. Production uses
+            # its custom domains (the VITE_* secrets). Every other stage lives on the
+            # environment's workers.dev subdomain under the Worker names alchemy.run.ts
+            # gives it (`<name>-<stage>`), which is known before the build; the app
+            # bakes these URLs in, so they cannot wait for the deploy to report them.
+            - name: "Resolve the origins"
+              id: "origins"
+              env:
+                  STAGE: "${{ needs.resolve-env.outputs.stage }}"
+                  WORKERS_DEV_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"
+                  SECRET_SITE_URL: "${{ secrets.VITE_SITE_URL }}"
+                  SECRET_LUNORA_URL: "${{ secrets.VITE_LUNORA_URL }}"
+                  SECRET_GATEWAY_URL: "${{ secrets.VITE_LLM_GATEWAY_URL }}"
+              run: |
+                  if [[ "$STAGE" != "production" && -n "$WORKERS_DEV_SUBDOMAIN" ]]; then
+                      site="https://neore-chat-${STAGE}.${WORKERS_DEV_SUBDOMAIN}.workers.dev"
+                      backend="https://neore-backend-${STAGE}.${WORKERS_DEV_SUBDOMAIN}.workers.dev"
+                      gateway="https://llm-gateway-${STAGE}.${WORKERS_DEV_SUBDOMAIN}.workers.dev"
+                  else
+                      site="$SECRET_SITE_URL"
+                      backend="$SECRET_LUNORA_URL"
+                      gateway="$SECRET_GATEWAY_URL"
+                  fi
+
+                  {
+                      echo "site=${site}"
+                      echo "backend=${backend}"
+                      echo "gateway=${gateway}"
+                  } >> "$GITHUB_OUTPUT"
 
             - name: "Build app"
               working-directory: "apps/web"
@@ -130,9 +233,9 @@ jobs:
                   # JWKS fetch cannot succeed, so every RPC comes back
                   # FORBIDDEN_SHARD. An unset secret failing the deploy is the
                   # cheaper outcome.
-                  VITE_LUNORA_URL: "${{ secrets.VITE_LUNORA_URL }}"
-                  VITE_LLM_GATEWAY_URL: "${{ secrets.VITE_LLM_GATEWAY_URL }}"
-                  VITE_SITE_URL: "${{ secrets.VITE_SITE_URL }}"
+                  VITE_LUNORA_URL: "${{ steps.origins.outputs.backend }}"
+                  VITE_LLM_GATEWAY_URL: "${{ steps.origins.outputs.gateway }}"
+                  VITE_SITE_URL: "${{ steps.origins.outputs.site }}"
                   VITE_DPO_EMAIL: "${{ secrets.VITE_DPO_EMAIL }}"
                   VITE_DPO_NAME: "${{ secrets.VITE_DPO_NAME }}"
                   VITE_PRIVACY_POLICY_URL: "${{ secrets.VITE_PRIVACY_POLICY_URL }}"
@@ -166,20 +269,29 @@ jobs:
               env:
                   CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
                   CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
-                  DEPLOY_ENV: "${{ needs.resolve-env.outputs.deploy-env }}"
+                  # The Alchemy stage (names and state), not the GitHub environment.
+                  DEPLOY_ENV: "${{ needs.resolve-env.outputs.stage }}"
+                  # Skips Alchemy's lookup of the account's workers.dev subdomain, which
+                  # a new account has none of until one is registered.
+                  CLOUDFLARE_WORKERS_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"
+                  # Cloudflare Access in front of the web app of staging and preview
+                  # ("true" on those environments once the account has a Zero Trust
+                  # organisation and the token the Access permissions). Never production.
+                  ACCESS_ENABLED: "${{ vars.ACCESS_ENABLED }}"
                   CI: "true"
                   # alchemy.run.ts refuses to deploy without every one of these
                   # (REQUIRED_DEPLOY_ENV) — there are deliberately no defaults,
                   # because a blank auth secret deploys a working-looking app
                   # with forgeable sessions.
                   #
-                  # BACKEND_PUBLIC_ORIGIN is fed from VITE_LUNORA_URL on
+                  # BACKEND_PUBLIC_ORIGIN is fed from the same value as
+                  # VITE_LUNORA_URL (the "Resolve the origins" step) on
                   # purpose. That is the origin the app proxies /api/auth/* to,
                   # and the backend mints its JWTs with whatever host it is
                   # reached on, then verifies iss/aud against PUBLIC_ORIGIN. Two
                   # separate secrets would let those drift, and the failure is
                   # silent: every bearer token verifies as anonymous.
-                  BACKEND_PUBLIC_ORIGIN: "${{ secrets.VITE_LUNORA_URL }}"
+                  BACKEND_PUBLIC_ORIGIN: "${{ steps.origins.outputs.backend }}"
                   BETTER_AUTH_SECRET: "${{ secrets.BETTER_AUTH_SECRET }}"
                   ENCRYPTION_KEY: "${{ secrets.ENCRYPTION_KEY }}"
                   # Gateway -> backend only (chunk polling, usage reports, key
@@ -188,7 +300,7 @@ jobs:
                   # over service bindings — no URL and no secret for those.
                   LLM_GATEWAY_SIGNING_SECRET: "${{ secrets.LLM_GATEWAY_SIGNING_SECRET }}"
                   # The gateway's PUBLIC origin (custom domain, PUBLIC_GATEWAY_URL).
-                  LLM_GATEWAY_URL: "${{ secrets.VITE_LLM_GATEWAY_URL }}"
+                  LLM_GATEWAY_URL: "${{ steps.origins.outputs.gateway }}"
                   # Authenticates the backend's own job dispatch (the jobs queue
                   # consumer and the SchedulerDO). A long random string; nothing
                   # outside the backend Worker ever sends it.
@@ -201,18 +313,15 @@ jobs:
                   # sending domain); set the key to send through Resend instead.
                   MAIL_FROM: "${{ secrets.MAIL_FROM }}"
                   RESEND_API_KEY: "${{ secrets.RESEND_API_KEY }}"
-                  SITE_URL: "${{ secrets.VITE_SITE_URL }}"
+                  SITE_URL: "${{ steps.origins.outputs.site }}"
                   # Optional, but paired with VITE_TURNSTILE_SITE_KEY in the
                   # build step above — set both or neither. Unset on both sides
                   # means no captcha anywhere, which is what ships today.
                   TURNSTILE_SECRET_KEY: "${{ secrets.TURNSTILE_SECRET_KEY }}"
                   VITE_TURNSTILE_SITE_KEY: "${{ secrets.VITE_TURNSTILE_SITE_KEY }}"
-                  # Encrypts every `alchemy.secret()` into the R2 state file.
-                  # No default anywhere — unset, the deploy dies partway through
-                  # the graph with "Cannot serialize secret without password".
-                  # It must stay STABLE: rotating it makes the existing state
-                  # file undecryptable.
-                  ALCHEMY_PASSWORD: "${{ secrets.ALCHEMY_PASSWORD }}"
+                  ADOPT: "${{ inputs.adopt }}"
+                  LOG_LEVEL: "${{ inputs.log_level }}"
+                  DRY_RUN: "${{ inputs.dry_run }}"
                   #
                   # ---------------------------------------------------------
                   # Everything below is passed through to the backend Worker by
@@ -357,16 +466,21 @@ jobs:
                   OTEL_EXPORTER_OTLP_ENDPOINT: "${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}"
                   OTEL_EXPORTER_OTLP_HEADERS: "${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}"
               run: |
-                  # `pnpm run deploy`, spelled out. On pnpm 10 bare `deploy` was the
-                  # built-in (deploy a workspace package to a directory) and failed
-                  # with ERR_PNPM_NOTHING_TO_DEPLOY; since pnpm 11 a `deploy` script
-                  # shadows the built-in, so both spellings now run alchemy — keep
-                  # the explicit one so the intent survives another change.
-                  output=$(pnpm run deploy 2>&1) || { echo "$output"; exit 1; }
+                  # `--stage` equals DEPLOY_ENV (the stage), which alchemy.run.ts reads for the physical
+                  # names: the state scope and the names cannot disagree. `--yes` skips the
+                  # approval prompt (and bootstraps the state store on its first run).
+                  # `--adopt` takes over resources of the same name that something else
+                  # created: only for a first deploy over such resources, hence an input.
+                  args=(deploy --stage "$DEPLOY_ENV" --yes --log-level "${LOG_LEVEL:-info}")
+                  if [[ "$ADOPT" == "true" ]]; then args+=(--adopt); fi
+                  if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+
+                  pnpm exec alchemy provider check-env --provider Cloudflare
+                  output=$(pnpm exec alchemy "${args[@]}" 2>&1) || { echo "$output"; exit 1; }
                   echo "$output"
 
                   # Extract website URL from Alchemy output for GitHub environment
-                  url=$(echo "$output" | grep -oP "website: '?\Khttps?://[^'}\s]+" || true)
+                  url=$(echo "$output" | grep -oP "website: ['\"]?\Khttps?://[^'\"}\s]+" || true)
                   echo "website-url=${url}" >> "$GITHUB_OUTPUT"
 
     # -----------------------------------------------------------------

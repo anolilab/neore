@@ -218,19 +218,13 @@ catalogs:
     "@lingui/vite-plugin": 6.9.1
     "@visulima/iso-locale": ^1.0.1
   iac:
-    # HELD AT 0.x — npm's `latest` tag is 2.0.0-beta.80 (still the 2.0 beta;
-    # 0.94.0 is the newest 0.x), and taking it breaks deployment outright:
-    # `alchemy.run.ts` imports `alchemy/cloudflare`, which no longer resolves
-    # (the subpath is `./Cloudflare`, and the `./*` wildcard falls
-    # through to a file that does not exist), so `tsx alchemy.run.ts` throws
-    # ERR_MODULE_NOT_FOUND before any resource is evaluated.
-    #
-    # Correcting the specifier is not enough. 2.0 is an Effect-based rewrite:
-    # `R2RestStateStore` is gone entirely, `TanStackStart` has no replacement
-    # (Website ships Astro/Nextjs/Nuxt/Octane/StaticSite/SvelteKit/Vite/Waku), and
-    # D1Database/R2Bucket/Queue/VectorizeIndex moved under D1.*/R2.*/Queues.*/
-    # Vectorize.* namespaces. Porting is a project, not a version bump.
-    alchemy: 0.94.0
+    # 2.0 is an Effect-based rewrite. The beta ships roughly weekly and each release can
+    # move APIs, so the version is EXACT. beta.82 and .83 are younger than
+    # `minimumReleaseAge`; take a newer one once it is a day old and a preview deploy
+    # passes. Peers: `effect` ^4 and, for the CLI, `@effect/platform-node`.
+    alchemy: 2.0.0-beta.81
+    "@effect/platform-node": 4.0.3
+    effect: 4.0.3
     tsx: 4.23.15
   icons:
     "@lobehub/icons": 5.23.0
@@ -614,11 +608,6 @@ overrides:
   "@xmldom/xmldom@<0.9.12": ">=0.9.12"
   ai@<6.0.35: ">=6.0.35"
   ajv@>=7.0.0-alpha.0 <8.18.0: ">=8.18.0"
-  # GHSA-g7r4-m6w7-qqqr. Scoped to `alchemy`, which is the only thing on a
-  # vulnerable esbuild (0.27.4). The other copies are deliberately left alone:
-  # Copies on 0.25.12 and 0.27.0 sit outside the advisory's `>=0.27.3 <0.28.1`
-  # range, and the rest of the tree is already on 0.28.x.
-  alchemy>esbuild: ">=0.28.1"
   axios@>=1.0.0 <=1.13.4: ">=1.13.5"
   # ...but NOT for the React Compiler. It declares `@babel/types@^7.26.0`;
   # Babel 8 removed `AssignmentPattern` from the `LVal` alias, and under 8.x the

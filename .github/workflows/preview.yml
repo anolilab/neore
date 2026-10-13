@@ -1,0 +1,153 @@
+# https://help.github.com/en/categories/automating-your-workflow-with-github-actions
+
+name: "Preview"
+
+# A pull request carrying the `preview` label gets its own copy of the whole stack
+# (stage `pr-<number>`) in the preview Cloudflare account, redeployed on every push and
+# destroyed when the pull request closes or loses the label. Nothing else deploys it.
+#
+# Same-repository pull requests only: the deploy job holds the preview environment's
+# Cloudflare token and runs the pull request's code, which a fork must never do. The
+# label is the opt-in, because a full deploy is slow and every preview is a set of
+# billed resources.
+on: # yamllint disable-line rule:truthy
+    pull_request:
+        types:
+            - "labeled"
+            - "unlabeled"
+            - "synchronize"
+            - "reopened"
+            - "closed"
+
+# One run per pull request. The deploy workflow serialises its own state under
+# `deploy-pr-<number>`; this group must NOT be that one, or caller and callee wait
+# on each other forever.
+concurrency:
+    group: "preview-${{ github.event.pull_request.number }}"
+    cancel-in-progress: false
+
+permissions: {}
+
+env:
+    STAGE: "pr-${{ github.event.pull_request.number }}"
+
+jobs:
+    deploy:
+        name: "Deploy the preview"
+        if: >-
+            github.repository == 'anolilab/neore'
+            && github.event.pull_request.head.repo.full_name == github.repository
+            && github.event.action != 'closed'
+            && github.event.action != 'unlabeled'
+            && contains(github.event.pull_request.labels.*.name, 'preview')
+            && (github.event.action != 'labeled' || github.event.label.name == 'preview')
+        permissions:
+            contents: "read"
+            deployments: "write"
+        uses: "./.github/workflows/deploy.yml"
+        with:
+            environment: "preview"
+            stage: "pr-${{ github.event.pull_request.number }}"
+
+    comment:
+        name: "Comment the preview URL"
+        needs: "deploy"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 5
+        permissions:
+            pull-requests: "write"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Post or update the comment"
+              uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
+              env:
+                  WEBSITE_URL: "${{ needs.deploy.outputs.website-url }}"
+                  RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              with:
+                  script: |
+                      const marker = "<!-- neore-preview -->";
+                      const { owner, repo } = context.repo;
+                      const issue_number = context.payload.pull_request.number;
+                      const sha = context.payload.pull_request.head.sha.slice(0, 7);
+                      const url = process.env.WEBSITE_URL;
+
+                      const body = [
+                          marker,
+                          `**Preview** for \`${sha}\`: ${url ? url : "deployed (the run did not report a URL)"}`,
+                          "",
+                          "It is a full copy of the stack in the preview account with its own data. Registration is invite-only, so seed an invitation with the preview's admin token (`POST <backend>/admin/seed-invitations`).",
+                          "",
+                          `[Deploy run](${process.env.RUN_URL}). It is destroyed when this pull request closes or loses the \`preview\` label.`,
+                      ].join("\n");
+
+                      const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+                      const existing = comments.find((comment) => comment.body?.startsWith(marker));
+
+                      if (existing) {
+                          await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+                      } else {
+                          await github.rest.issues.createComment({ owner, repo, issue_number, body });
+                      }
+
+    destroy:
+        name: "Destroy the preview"
+        if: >-
+            github.repository == 'anolilab/neore'
+            && github.event.pull_request.head.repo.full_name == github.repository
+            && (github.event.action == 'closed'
+            || (github.event.action == 'unlabeled' && github.event.label.name == 'preview'))
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 30
+        environment: "preview"
+        permissions:
+            contents: "read"
+            pull-requests: "write"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            # The code that deployed it: the stack's providers and resource list come from
+            # `alchemy.run.ts`, and the merge ref of a merged pull request is gone.
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+                  ref: "${{ github.event.pull_request.head.sha }}"
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              with:
+                  node-version: "24"
+                  skip-playwright: "true"
+
+            - name: "Destroy the stage"
+              env:
+                  CI: "true"
+                  CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+                  CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+                  CLOUDFLARE_WORKERS_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"
+                  DEPLOY_ENV: "${{ env.STAGE }}"
+                  # alchemy.run.ts skips its deploy guards and builds nothing.
+                  DESTROY: "true"
+              run: 'pnpm exec alchemy destroy --stage "$DEPLOY_ENV" --yes'
+
+            - name: "Update the comment"
+              uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
+              with:
+                  script: |
+                      const marker = "<!-- neore-preview -->";
+                      const { owner, repo } = context.repo;
+                      const issue_number = context.payload.pull_request.number;
+
+                      const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+                      const existing = comments.find((comment) => comment.body?.startsWith(marker));
+
+                      if (existing) {
+                          await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: `${marker}\nThe preview was destroyed.` });
+                      }
