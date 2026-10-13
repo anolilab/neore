@@ -202,5 +202,6 @@
             "binding": "SERVICE_NSFW_CHECKER",
             "service": "nsfw-checker"
         }
-    ]
+    ],
+    "upload_source_maps": true
 }
