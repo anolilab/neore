@@ -302,7 +302,10 @@ describe("deploy env bindings", () => {
     // account's workers.dev subdomain; alchemy.run.ts names the Workers. The two
     // must agree, or the app is built against hostnames nothing serves.
     describe("stages", () => {
-        const originsStep = deployWorkflow.slice(deployWorkflow.indexOf('name: "Resolve the origins"'), deployWorkflow.indexOf('name: "Setup Rust Worker toolchain"'));
+        const originsStep = deployWorkflow.slice(
+            deployWorkflow.indexOf('name: "Resolve the origins"'),
+            deployWorkflow.indexOf('name: "Setup Rust Worker toolchain"'),
+        );
 
         it("suffixes every non-production name with the stage, and the backend strips it from its queues", () => {
             expect(alchemyScript).toMatch(NAMED_WITH_STAGE);

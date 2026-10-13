@@ -1,0 +1,8 @@
+# actionlint 1.7.12 does not know `parallel:` step groups yet (GitHub Actions parallel
+# steps, June 2026), so it reports the group as a step with neither `run` nor `uses`.
+# That one message is ignored for the one workflow that uses a group; everything else
+# in the file is still checked. Drop this when actionlint supports the syntax.
+paths:
+    .github/workflows/deploy.yml:
+        ignore:
+            - 'step must run script with "run" section or run action with "uses" section'
