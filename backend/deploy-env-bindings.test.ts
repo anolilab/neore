@@ -45,7 +45,7 @@ const bindingLines = alchemyScript.split("\n").map((line) => line.trim());
 
 const GATEWAY_BACKEND_ORIGIN = /LUNORA_URL:\s*requireEnv\("BACKEND_PUBLIC_ORIGIN"\)/u;
 // Production only: the gateway passes its crons when the stage is production.
-const GATEWAY_CRONS_PASSED = /crons: stage === "production" \? GATEWAY_CRONS : \[\]/u;
+const GATEWAY_CRONS_PASSED = /crons: stage === "production" \? \[\.\.\.GATEWAY_CRONS\] : \[\]/u;
 
 /** `wrangler.jsonc` with its comments stripped (string contents kept), as `deploy-bindings.test.ts` reads it. */
 const readJsonc = (path: string): unknown =>
@@ -143,11 +143,21 @@ describe("deploy env bindings", () => {
         expect(deployWorkflow).not.toMatch(GITHUB_TOKEN_FROM_ACTIONS_SECRET);
     });
 
-    it("keeps ALCHEMY_PASSWORD in the up-front guard and in the workflow", () => {
-        // Alchemy has no default for it; unset, the run dies mid-graph at the
-        // first `alchemy.secret()` rather than at the guard.
-        expect(alchemyScript).toContain('"ALCHEMY_PASSWORD"');
-        expect(workflowEnvKeys()).toContain("ALCHEMY_PASSWORD");
+    it.each(["BACKEND_PUBLIC_ORIGIN", "BETTER_AUTH_SECRET", "ENCRYPTION_KEY", "LUNORA_ADMIN_TOKEN", "STORAGE_SIGNING_SECRET"])(
+        "keeps %s in the up-front guard and in the workflow",
+        (name) => {
+            // Checked before anything is built or created; a blank auth secret deploys
+            // a working-looking app with forgeable sessions.
+            expect(alchemyScript).toContain(`"${name}",`);
+            expect(workflowEnvKeys()).toContain(name);
+        },
+    );
+
+    it("does not ask for ALCHEMY_PASSWORD any more", () => {
+        // Alchemy 0.x encrypted its R2 state file with it. Alchemy 2's state store keeps
+        // its own key in the account's Secrets Store.
+        expect(alchemyScript).not.toContain("ALCHEMY_PASSWORD");
+        expect(workflowEnvKeys()).not.toContain("ALCHEMY_PASSWORD");
     });
 
     it("does not double-prefix the gateway's ALLOWED_ORIGINS", () => {
@@ -167,10 +177,10 @@ describe("deploy env bindings", () => {
      * runtime naming a binding that a green deploy never created.
      */
     const SERVICES = [
-        { key: "browserRenderer", private: true, worker: "browserRenderer" },
-        { key: "documentParser", private: true, worker: "documentParser" },
-        { key: "llmGateway", private: false, worker: "llmGateway" },
-        { key: "nsfwChecker", private: true, worker: "nsfwChecker" },
+        { key: "browserRenderer", private: true, worker: "BrowserRenderer" },
+        { key: "documentParser", private: true, worker: "DocumentParser" },
+        { key: "llmGateway", private: false, worker: "gateway" },
+        { key: "nsfwChecker", private: true, worker: "NsfwChecker" },
     ] as const;
 
     const bindingName = (key: string): string => `SERVICE_${key.replaceAll(/(?<=[a-z0-9])(?=[A-Z])/gu, "_").toUpperCase()}`;
@@ -203,7 +213,7 @@ describe("deploy env bindings", () => {
         expect(wranglerEntry?.entrypoint).toBe(entrypoint);
 
         // Deploy: the same name, on the backend Worker, pointing at the same Worker (and entrypoint).
-        const deployed = entrypoint === undefined ? `${binding}: ${worker},` : `${binding}: Worker.experimentalEntrypoint(${worker}, "${entrypoint}"),`;
+        const deployed = entrypoint === undefined ? `${binding}: ${worker},` : `${binding}: Cloudflare.WorkerEntrypoint(${worker}, "${entrypoint}"),`;
 
         expect(bindingLines).toContain(deployed);
     });
@@ -212,11 +222,13 @@ describe("deploy env bindings", () => {
         const declared = lunoraConfig.services[key] as { dir: string };
         const serviceWrangler = readJsonc(join(REPO_ROOT, "backend", declared.dir, "wrangler.jsonc")) as { workers_dev?: boolean };
         const prefix = bindingName(key).replace("SERVICE_", "");
-        const workerBlock = alchemyScript.slice(alchemyScript.indexOf(`export const ${worker} = await Worker(`));
+        const workerStart = alchemyScript.indexOf(`export const ${worker} = Cloudflare.Worker(`);
+        const workerBlock = alchemyScript.slice(workerStart, alchemyScript.indexOf("\n});", workerStart));
 
         // No public URL on either side — wrangler for dev/`lunora doctor`, Alchemy for the deploy.
         expect(serviceWrangler.workers_dev).toBe(false);
-        expect(workerBlock.slice(0, workerBlock.indexOf("bindings:"))).toContain("url: false,");
+        expect(workerStart).toBeGreaterThan(-1);
+        expect(workerBlock).toContain("workersDev: false,");
 
         // The binding is the auth: the old per-service HMAC secret and URL are gone everywhere.
         for (const dead of [`${prefix}_SIGNING_SECRET`, `${prefix}_URL`]) {
@@ -235,13 +247,13 @@ describe("deploy env bindings", () => {
         expect(lunoraConfig.services.llmGateway).toEqual({ dir: "../services/llm-gateway" });
         expect(backendWrangler.services?.find((entry) => entry.binding === "SERVICE_LLM_GATEWAY")?.entrypoint).toBe("InternalApi");
         expect(lunoraOwnedServices).not.toContain("SERVICE_LLM_GATEWAY");
-        expect(bindingLines).not.toContain("SERVICE_LLM_GATEWAY: llmGateway,");
+        expect(bindingLines).not.toContain("SERVICE_LLM_GATEWAY: gateway,");
     });
 
     it("keeps LLM_GATEWAY_SIGNING_SECRET on both ends for the gateway -> backend direction", () => {
         // Chunk polling, usage reports, key validation and stream tokens are still
         // HMAC-signed with it; only backend -> gateway moved to the binding.
-        const binding = 'alchemy.secret(requireEnv("LLM_GATEWAY_SIGNING_SECRET"))';
+        const binding = 'secret(requireEnv("LLM_GATEWAY_SIGNING_SECRET"))';
 
         expect(workflowEnvKeys()).toContain("LLM_GATEWAY_SIGNING_SECRET");
         expect(bindingLines).toContain(`SIGNING_SECRET: ${binding},`);
@@ -263,8 +275,8 @@ describe("deploy env bindings", () => {
     });
 
     it("runs crons in production only, so a preview has no scheduled traffic", () => {
-        expect(alchemyScript).toContain('crons: stage === "production" ? backendBindings.crons : []');
-        expect(alchemyScript).toContain('crons: stage === "production" ? GATEWAY_CRONS : []');
+        expect(alchemyScript).toContain('crons: stage === "production" ? [...backendBindings.crons] : []');
+        expect(alchemyScript).toContain('crons: stage === "production" ? [...GATEWAY_CRONS] : []');
     });
 
     it("gives the gateway the backend origin it forwards to", () => {

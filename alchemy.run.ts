@@ -1,37 +1,25 @@
 import { existsSync } from "node:fs";
 
-import alchemy from "alchemy";
-import type { Secret } from "alchemy";
-import {
-    Ai,
-    D1Database,
-    DurableObjectNamespace,
-    EmailSender,
-    KVNamespace,
-    Queue,
-    R2Bucket,
-    R2RestStateStore,
-    RateLimit,
-    TanStackStart,
-    VectorizeIndex,
-    VectorizeMetadataIndex,
-    Worker,
-    Workflow,
-} from "alchemy/cloudflare";
+import * as Alchemy from "alchemy";
+import * as Cloudflare from "alchemy/Cloudflare";
+import * as Output from "alchemy/Output";
+import * as Effect from "effect/Effect";
+import * as Redacted from "effect/Redacted";
 
 import backendBindings from "./backend/lunora-bindings.json" with { type: "json" };
 import { OPTIONAL_ENV_KEYS, REQUIRED_ENV_KEYS } from "./backend/lunora/lib/env-validation";
 import { JOBS_QUEUE_CONSUMER } from "./backend/lunora/lib/job-queue-config";
 import { jobs, jobsDeadLetters } from "./backend/lunora/queues";
 import { GATEWAY_CRONS } from "./services/llm-gateway/src/crons";
-import { BACKEND_BUNDLE, RUST_WORKER_OUTPUT, RUST_WORKER_UPLOAD, WORKER_BUNDLE } from "./scripts/worker-bundle";
+import { BACKEND_BUILD, RUST_WORKER_OUTPUT, RUST_WORKER_UPLOAD, WORKER_BUILD } from "./scripts/worker-bundle";
 
 // ---------------------------------------------------------------------------
 // Stage resolution
 // ---------------------------------------------------------------------------
-// DEPLOY_ENV is set by CI (production | preview).
-// Locally you can override with `DEPLOY_ENV=production pnpm deploy`.
-const stage = process.env.DEPLOY_ENV ?? "preview";
+// DEPLOY_ENV is set by CI (production | preview) and passed as `--stage` too, so the
+// state scope and the physical names below cannot disagree.
+// Locally you can override with `DEPLOY_ENV=production alchemy deploy`.
+const stage = process.env.DEPLOY_ENV ?? process.env.ALCHEMY_STAGE ?? "preview";
 
 /**
  * Workers Logs bill per event, and logging every request is most of that bill.
@@ -55,20 +43,6 @@ const WORKER_OBSERVABILITY = { enabled: true, headSamplingRate: 0.1 };
  *    and touches nothing.
  */
 const REQUIRED_DEPLOY_ENV = [
-    /**
-     * Alchemy encrypts every `alchemy.secret()` into the state file with this,
-     * and it has no default — `alchemy()` falls back to `process.env.ALCHEMY_PASSWORD`
-     * and nothing else. Unset, the deploy dies at the first secret binding with
-     * "Cannot serialize secret without password", which is a fatal stop partway
-     * through the graph rather than a clean refusal. It belongs in the same
-     * up-front guard as the values it protects.
-     *
-     * It must also stay STABLE across deploys: rotate it and the existing state
-     * file can no longer be decrypted, so every secret reads as unrecoverable.
-     */
-    // An env var NAME, not a value — the scanner's "Generic Password" rule
-    // matches on the word alone.
-    "ALCHEMY_PASSWORD", // secret-scanner:allow
     "BACKEND_PUBLIC_ORIGIN",
     "BETTER_AUTH_SECRET",
     "ENCRYPTION_KEY",
@@ -93,9 +67,10 @@ const REQUIRED_DEPLOY_ENV = [
     "STORAGE_SIGNING_SECRET",
 ] as const;
 
+const destroying = process.env.DESTROY === "true";
 const missingDeployEnv = REQUIRED_DEPLOY_ENV.filter((name) => !process.env[name]?.trim());
 
-if (missingDeployEnv.length > 0 && process.env.DESTROY !== "true") {
+if (missingDeployEnv.length > 0 && !destroying) {
     throw new Error(
         `Cannot deploy (stage: ${stage}) — these are unset: ${missingDeployEnv.join(", ")}. ` +
             `Set them as repository secrets; there are deliberately no defaults, because a wrong or empty value here deploys a working-looking app with forgeable sessions.`,
@@ -105,13 +80,19 @@ if (missingDeployEnv.length > 0 && process.env.DESTROY !== "true") {
 // The document parser is a Rust Worker deployed from its prebuilt output
 // (`RUST_WORKER_UPLOAD`); Alchemy does not build it. Refused here, before
 // anything is created, rather than as a "No files found" halfway through.
-if (!RUST_WORKER_OUTPUT.every((file) => existsSync(`./services/document-parser/build/${file}`)) && process.env.DESTROY !== "true") {
+if (!RUST_WORKER_OUTPUT.every((file) => existsSync(`./services/document-parser/build/${file}`)) && !destroying) {
     throw new Error(
         "Cannot deploy: services/document-parser/build/ is missing. Run `pnpm --filter document-parser run build:worker` first (needs the Rust toolchain).",
     );
 }
 
-const requireEnv = (name: (typeof REQUIRED_DEPLOY_ENV)[number]): string => process.env[name]!.trim();
+// The web app is built ahead of the deploy (`pnpm build` in deploy.yml: every `VITE_*`
+// value, the raised heap, OG images, the service worker) and uploaded as built.
+if (!existsSync("./apps/web/dist/server/index.js") && !destroying) {
+    throw new Error("Cannot deploy: apps/web/dist/server/index.js is missing. Run `pnpm build` in apps/web first.");
+}
+
+const requireEnv = (name: (typeof REQUIRED_DEPLOY_ENV)[number]): string => process.env[name]?.trim() ?? "";
 
 /**
  * The custom domain a Worker should serve on, derived from the origin it is
@@ -130,8 +111,15 @@ const requireEnv = (name: (typeof REQUIRED_DEPLOY_ENV)[number]): string => proce
  * be ACTIVE in this account — a zone still `pending` its nameserver change fails
  * here — so the cutover is: deploy on workers.dev, move the zone, flip the three
  * secrets, redeploy.
+ *
+ * A redeploy re-uses the hostname it already created (`--adopt` in CI). It does
+ * not take over a hostname another Worker is serving: that stays a visible failure.
  */
-const customDomain = (origin: string, name: (typeof REQUIRED_DEPLOY_ENV)[number]): { adopt: true; domainName: string }[] => {
+const customDomain = (origin: string, name: (typeof REQUIRED_DEPLOY_ENV)[number]): string | undefined => {
+    if (destroying) {
+        return undefined;
+    }
+
     let hostname: string;
 
     try {
@@ -142,16 +130,12 @@ const customDomain = (origin: string, name: (typeof REQUIRED_DEPLOY_ENV)[number]
         );
     }
 
-    // `adopt` so a redeploy re-uses the hostname it already created instead of
-    // failing on "already exists". It deliberately does NOT set
-    // `overrideExistingOrigin`: stealing a hostname that another Worker is
-    // serving should be a visible failure, not a silent takeover.
-    return hostname.endsWith(".workers.dev") ? [] : [{ adopt: true, domainName: hostname }];
+    return hostname.endsWith(".workers.dev") ? undefined : hostname;
 };
 
 /**
  * Keys that are safe to ship as a PLAIN worker var. Everything else in the
- * pass-through below is wrapped in `alchemy.secret()`.
+ * pass-through below is bound as a secret.
  *
  * The default is deliberately "secret": binding a non-secret as a secret costs
  * only dashboard visibility, while binding a secret as plain text puts it in
@@ -189,6 +173,9 @@ const PLAIN_ENV_KEYS = new Set([
     "VAPID_SUBJECT",
 ]);
 
+/** A value bound as a secret (`secret_text`); a plain string is bound as `plain_text`. */
+const secret = (value: string): Redacted.Redacted<string> => Redacted.make(value);
+
 /**
  * Bind one env var, as a secret unless it is in `PLAIN_ENV_KEYS`.
  *
@@ -197,15 +184,19 @@ const PLAIN_ENV_KEYS = new Set([
  * — which would turn "this optional provider is not configured" into a failed
  * deploy.
  */
-const bindEnv = (name: string): string | Secret => {
+const bindEnv = (name: string): string | Redacted.Redacted<string> => {
     const value = process.env[name]?.trim() ?? "";
 
     if (value === "") {
         return "";
     }
 
-    return PLAIN_ENV_KEYS.has(name) ? value : alchemy.secret(value);
+    return PLAIN_ENV_KEYS.has(name) ? value : secret(value);
 };
+
+/** The listed env vars that have a value, bound by `bindEnv`. Unset ones stay absent. */
+const boundWhereSet = (names: readonly string[]): Record<string, string | Redacted.Redacted<string>> =>
+    Object.fromEntries(names.filter((name) => (process.env[name]?.trim() ?? "") !== "").map((name) => [name, bindEnv(name)]));
 
 /**
  * Every key `backend/lunora/lib/env-validation.ts` requires in production, bound
@@ -224,6 +215,16 @@ const bindEnv = (name: string): string | Secret => {
  * `backend/deploy-env-bindings.test.ts` fails if this stops covering it.
  */
 const requiredEnvPassthrough = Object.fromEntries(REQUIRED_ENV_KEYS.map((name) => [name, bindEnv(name)]));
+
+/**
+ * The optional half, bound only where a value exists.
+ *
+ * These are `.optional()` in the schema, so absence is fine and binding twenty
+ * empty strings would only add noise. Passing them through anyway means an
+ * operator can turn on PostHog or Featurebase by adding a repo secret, with no
+ * change to this file.
+ */
+const optionalEnvPassthrough = boundWhereSet(OPTIONAL_ENV_KEYS);
 
 /**
  * Cloudflare Email Service, bound only when it is the transport to use.
@@ -248,23 +249,7 @@ const requiredEnvPassthrough = Object.fromEntries(REQUIRED_ENV_KEYS.map((name) =
 const mailFrom = process.env.MAIL_FROM?.trim() ?? "";
 /** `allowedSenderAddresses` takes the bare address of a `Name <addr@host>` sender. */
 const mailFromAddress = /<([^<>]+)>\s*$/u.exec(mailFrom)?.[1]?.trim() ?? mailFrom;
-
-// A record rather than `{ EMAIL } | {}`: spread, that union reads as an
-// `EMAIL?: undefined` binding, which Alchemy's `Bindings` rejects.
-const emailServiceBinding: Record<string, EmailSender> =
-    mailFrom && !process.env.RESEND_API_KEY?.trim() ? { EMAIL: EmailSender({ allowedSenderAddresses: [mailFromAddress] }) } : {};
-
-/**
- * The optional half, bound only where a value exists.
- *
- * These are `.optional()` in the schema, so absence is fine and binding twenty
- * empty strings would only add noise. Passing them through anyway means an
- * operator can turn on PostHog or Featurebase by adding a repo secret, with no
- * change to this file.
- */
-const optionalEnvPassthrough = Object.fromEntries(
-    OPTIONAL_ENV_KEYS.filter((name) => (process.env[name]?.trim() ?? "") !== "").map((name) => [name, bindEnv(name)]),
-);
+const useEmailService = mailFrom !== "" && !process.env.RESEND_API_KEY?.trim();
 
 /**
  * Turnstile is two independent variables with nothing tying them together, and
@@ -285,7 +270,7 @@ const optionalEnvPassthrough = Object.fromEntries(
 const turnstileSecret = process.env.TURNSTILE_SECRET_KEY?.trim() ?? "";
 const turnstileSiteKey = process.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
 
-if (Boolean(turnstileSecret) !== Boolean(turnstileSiteKey) && process.env.DESTROY !== "true") {
+if (Boolean(turnstileSecret) !== Boolean(turnstileSiteKey) && !destroying) {
     throw new Error(
         `Cannot deploy (stage: ${stage}) — Turnstile is half-configured. ` +
             `TURNSTILE_SECRET_KEY is ${turnstileSecret ? "set" : "unset"} and VITE_TURNSTILE_SITE_KEY is ${turnstileSiteKey ? "set" : "unset"}. ` +
@@ -300,161 +285,24 @@ if (Boolean(turnstileSecret) !== Boolean(turnstileSiteKey) && process.env.DESTRO
  * sends mail fails. With it set there is always a transport: the EMAIL binding,
  * or Resend when its key is set (see above).
  */
-if (stage === "production" && !mailFrom && process.env.DESTROY !== "true") {
+if (stage === "production" && !mailFrom && !destroying) {
     throw new Error(
         "Cannot deploy (stage: production) — no outbound mail. Set MAIL_FROM to a verified sender: a Cloudflare Email Service " +
             "sending domain, or a Resend domain together with RESEND_API_KEY. Without it, password resets and invitations are never sent.",
     );
 }
 
-// ---------------------------------------------------------------------------
-// Alchemy app
-// ---------------------------------------------------------------------------
-const app = await alchemy("neore-chat", {
-    stage,
-    // Explicit rather than relying on alchemy()'s own `process.env.ALCHEMY_PASSWORD`
-    // fallback, so the coupling to the guard above is visible at the use site.
-    password: requireEnv("ALCHEMY_PASSWORD"), // secret-scanner:allow — reads the env var, holds no literal
-    phase: process.env.DESTROY === "true" ? "destroy" : undefined,
-    // In CI use R2 for persistent state so every run sees previous state.
-    // Locally, Alchemy defaults to the `.alchemy/` directory.
-    stateStore:
-        process.env.CI === "true"
-            ? (scope) =>
-                  new R2RestStateStore(scope, {
-                      bucketName: "neore-chat-alchemy-state",
-                  })
-            : undefined,
-});
+/** Physical names carry the stage; production keeps the bare name. */
+const named = (name: string): string => (stage === "production" ? name : `${name}-preview`);
+const staged = (name: string): string => `${name}-${stage}`;
+
+const COMPATIBILITY_DATE = "2026-09-01";
 
 // ---------------------------------------------------------------------------
-// Main application – TanStack Start on Cloudflare Workers
-// ---------------------------------------------------------------------------
-// The app is pre-built by deploy.yml's "Build app" step (`pnpm build`: OG images,
-// vite build, SW gen, tsc) — that step is where every `VITE_*` value and the
-// raised NODE_OPTIONS heap live. This resource only UPLOADS the result:
-// dist/server/index.js as the Worker (TanStackStart's default entrypoint,
-// unbundled) and dist/client as assets.
-export const website = await TanStackStart("website", {
-    name: stage === "production" ? "neore-chat" : "neore-chat-preview",
-    cwd: "./apps/web",
-    domains: customDomain(requireEnv("SITE_URL"), "SITE_URL"),
-    compatibilityDate: "2026-09-01",
-    // The server routes read these through `process.env` (`api/scribe-token.ts`,
-    // `lib/posthog/server.ts`). Since 2025-04-01 nodejs_compat fills it from the
-    // bindings by default (`nodejs_compat_populate_process_env`).
-    compatibilityFlags: ["nodejs_compat_v2"],
-    bindings: {
-        ...Object.fromEntries(
-            ["ELEVENLABS_API_KEY", "POSTHOG_PERSONAL_API_KEY"].filter((name) => (process.env[name]?.trim() ?? "") !== "").map((name) => [name, bindEnv(name)]),
-        ),
-    },
-    placement: { mode: "smart" },
-    observability: WORKER_OBSERVABILITY,
-    // Adopt existing Workers on first Alchemy run (safe migration).
-    adopt: true,
-    // NO second build. Alchemy's Vite resource defaults `build` to `vite build`
-    // and runs it on every deploy, which would overwrite the prebuilt output with
-    // one made in THIS step's environment — no `VITE_*` secrets, so the shipped
-    // bundle has no backend URL, and no raised heap. An empty command is how to
-    // opt out: `spreadBuildProps` keeps "" (it only defaults a nullish command)
-    // and `Website` runs its build Exec only when the command is truthy, so
-    // nothing is spawned at all.
-    build: { command: "" },
-});
-
-// ---------------------------------------------------------------------------
-// Document parser service – Rust (workers-rs + xberg) on Cloudflare Workers
-// ---------------------------------------------------------------------------
-//
-// PRIVATE (`url: false` — Alchemy's `workers_dev: false`; it does not read the
-// service's wrangler.jsonc): no workers.dev URL and no route, so the backend's
-// `SERVICE_DOCUMENT_PARSER` binding is the only way in, and the Worker carries
-// no auth of its own.
-//
-// Uploaded AS BUILT (`noBundle`): `pnpm --filter document-parser run
-// build:worker` (worker-build) already emitted the bundled ES module and its
-// wasm, and the deploy job runs it before this script (guarded above).
-export const documentParser = await Worker("document-parser", {
-    name: stage === "production" ? "document-parser" : "document-parser-preview",
-    entrypoint: "./build/index.js",
-    cwd: "./services/document-parser",
-    url: false,
-    ...RUST_WORKER_UPLOAD,
-    compatibilityDate: "2026-09-01",
-    placement: { mode: "smart" },
-    observability: WORKER_OBSERVABILITY,
-    adopt: true,
-    // Parsing is pure CPU: a text-dense 24 MB / 5,765-page PDF took 36s locally,
-    // past the 30s default. 60s = the backend's own deadline for the call
-    // (`FETCH_TIMEOUT_LONG_MS`); past that nobody is waiting for the answer.
-    limits: {
-        cpu_ms: 60_000,
-    },
-    // The Rust Worker reads no env: no vars, no secrets.
-    bindings: {},
-});
-
-// ---------------------------------------------------------------------------
-// NSFW checker service – Hono on Cloudflare Workers
-// ---------------------------------------------------------------------------
-//
-// PRIVATE, like the document parser: reached only through `SERVICE_NSFW_CHECKER`.
-export const nsfwChecker = await Worker("nsfw-checker", {
-    name: stage === "production" ? "nsfw-checker" : "nsfw-checker-preview",
-    entrypoint: "./src/index.ts",
-    cwd: "./services/nsfw-checker",
-    url: false,
-    // Alchemy bundles unminified by default; see scripts/worker-bundle.ts.
-    bundle: WORKER_BUNDLE,
-    compatibilityDate: "2026-09-01",
-    compatibilityFlags: ["nodejs_compat_v2"],
-    placement: { mode: "smart" },
-    observability: WORKER_OBSERVABILITY,
-    adopt: true,
-    bindings: {
-        NODE_ENV: stage === "production" ? "production" : "development",
-        AI: Ai(),
-    },
-});
-
-// ---------------------------------------------------------------------------
-// Browser renderer service – @cloudflare/playwright on Cloudflare Workers
-// ---------------------------------------------------------------------------
-// Replaces Browserbase for AI agent browser automation.
-// Uses CF Browser Rendering binding for serverless headless Chrome.
-// PRIVATE, like the document parser: reached only through `SERVICE_BROWSER_RENDERER`.
-export const browserRenderer = await Worker("browser-renderer", {
-    name: stage === "production" ? "browser-renderer" : "browser-renderer-preview",
-    entrypoint: "./src/index.ts",
-    cwd: "./services/browser-renderer",
-    url: false,
-    // Alchemy bundles unminified by default; see scripts/worker-bundle.ts.
-    bundle: WORKER_BUNDLE,
-    compatibilityDate: "2025-09-15",
-    compatibilityFlags: ["nodejs_compat"],
-    placement: { mode: "smart" },
-    observability: WORKER_OBSERVABILITY,
-    adopt: true,
-    bindings: {
-        NODE_ENV: stage === "production" ? "production" : "development",
-        BROWSER: { type: "browser" },
-    },
-});
-
-// The embeddings Worker (`services/embeddings`) is not deployed: nothing calls it,
-// memory and knowledge embed through the gateway. Its source stays in the repo.
-// Deploying it again means declaring it here and giving it a caller.
-
-// ---------------------------------------------------------------------------
-// LLM Gateway service – Hono on Cloudflare Workers
+// Resources
 // ---------------------------------------------------------------------------
 // R2 bucket for generated video blobs. Served via GET /v1/videos/:id/content.
-// ---------------------------------------------------------------------------
-export const llmGatewayVideoBucket = await R2Bucket("llm-gateway-videos", {
-    name: `llm-gateway-videos-${stage}`,
-    adopt: true,
-});
+const VideoBucket = Cloudflare.R2.Bucket("llm-gateway-videos", { name: staged("llm-gateway-videos") });
 
 // Cloudflare Queues for video render jobs.
 //
@@ -465,52 +313,27 @@ export const llmGatewayVideoBucket = await R2Bucket("llm-gateway-videos", {
 // Decoupling the render from the HTTP request lifecycle is what makes this
 // migration valuable: the render gets its own CPU/wall-clock budget, free
 // retries for transient provider failures, and a clean telemetry root span.
-export const llmGatewayVideoRendersDlq = await Queue("llm-gateway-video-renders-dlq", {
-    name: `llm-gateway-video-renders-dlq-${stage}`,
-    adopt: true,
-    settings: {
-        // Retain DLQ messages for the full 14 days so on-call can inspect
-        // permanently-failed renders without racing a short retention window.
-        messageRetentionPeriod: 14 * 24 * 60 * 60,
-    },
-});
-
-export const llmGatewayVideoRenders = await Queue("llm-gateway-video-renders", {
-    name: `llm-gateway-video-renders-${stage}`,
-    adopt: true,
-    dlq: llmGatewayVideoRendersDlq,
-});
+//
+// NOT EXPRESSIBLE in Alchemy 2: the 14-day `messageRetentionPeriod` the DLQs had
+// (`Queue` takes only a name), so they keep Cloudflare's default until it does.
+const VideoRendersDlq = Cloudflare.Queues.Queue("llm-gateway-video-renders-dlq", { name: staged("llm-gateway-video-renders-dlq") });
+const VideoRenders = Cloudflare.Queues.Queue("llm-gateway-video-renders", { name: staged("llm-gateway-video-renders") });
 
 // R2 bucket for generated music blobs. Served via GET /v1/music/:id/content.
-export const llmGatewayMusicBucket = await R2Bucket("llm-gateway-music", {
-    name: `llm-gateway-music-${stage}`,
-    adopt: true,
-});
+const MusicBucket = Cloudflare.R2.Bucket("llm-gateway-music", { name: staged("llm-gateway-music") });
 
 // Cloudflare Queues for music render jobs (same pattern as video — see above).
 // Music typically renders faster (<30s) so retry_delay is tighter.
-export const llmGatewayMusicRendersDlq = await Queue("llm-gateway-music-renders-dlq", {
-    name: `llm-gateway-music-renders-dlq-${stage}`,
-    adopt: true,
-    settings: {
-        messageRetentionPeriod: 14 * 24 * 60 * 60,
-    },
-});
+const MusicRendersDlq = Cloudflare.Queues.Queue("llm-gateway-music-renders-dlq", { name: staged("llm-gateway-music-renders-dlq") });
+const MusicRenders = Cloudflare.Queues.Queue("llm-gateway-music-renders", { name: staged("llm-gateway-music-renders") });
 
-export const llmGatewayMusicRenders = await Queue("llm-gateway-music-renders", {
-    name: `llm-gateway-music-renders-${stage}`,
-    adopt: true,
-    dlq: llmGatewayMusicRendersDlq,
-});
-
-// Usage/API-key/health tables and the KV namespaces the gateway binds. A raw
-// `{ type: "d1", database_name }` binding has no id, so the upload would fail;
-// these are real resources. `migrationsDir` applies `migrations/*.sql` on every
-// deploy (tracked in `d1_migrations`, the table `wrangler d1 migrations` uses).
-export const llmGatewayUsageDb = await D1Database("llm-gateway-usage", {
-    name: `llm-gateway-usage-${stage}`,
-    adopt: true,
-    migrationsDir: "./services/llm-gateway/migrations",
+// Usage/API-key/health tables and the KV namespaces the gateway binds. `migrations`
+// applies `migrations/*.sql` on every deploy; a database previously migrated with
+// `wrangler d1 migrations apply` is converted ONE WAY to Alchemy's own bookkeeping
+// table (`__alchemy_migrations`) on the first deploy.
+const GatewayUsageDb = Cloudflare.D1.Database("llm-gateway-usage", {
+    migrations: "./services/llm-gateway/migrations",
+    name: staged("llm-gateway-usage"),
 });
 
 // Native rate-limit bindings for the gateway: one per per-minute limit value, as
@@ -519,218 +342,20 @@ export const llmGatewayUsageDb = await D1Database("llm-gateway-usage", {
 // and preview (9201-9208) count apart. Moving preview onto production's ids would let
 // preview traffic spend a production user's budget.
 const RATE_LIMIT_NAMESPACE_BASE = stage === "production" ? 9100 : 9200;
-const gatewayRateLimits = {
-    RATE_LIMIT_2: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 1, simple: { limit: 2, period: 60 } }),
-    RATE_LIMIT_5: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 2, simple: { limit: 5, period: 60 } }),
-    RATE_LIMIT_15: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 3, simple: { limit: 15, period: 60 } }),
-    RATE_LIMIT_20: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 4, simple: { limit: 20, period: 60 } }),
-    RATE_LIMIT_30: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 5, simple: { limit: 30, period: 60 } }),
-    RATE_LIMIT_60: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 6, simple: { limit: 60, period: 60 } }),
-    RATE_LIMIT_120: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 7, simple: { limit: 120, period: 60 } }),
-    RATE_LIMIT_600: RateLimit({ namespace_id: RATE_LIMIT_NAMESPACE_BASE + 8, simple: { limit: 600, period: 60 } }),
-};
+const gatewayRateLimits = Object.fromEntries(
+    [2, 5, 15, 20, 30, 60, 120, 600].map((limit, index) => [
+        `RATE_LIMIT_${limit}`,
+        Cloudflare.RateLimit(`RATE_LIMIT_${limit}`, { namespaceId: RATE_LIMIT_NAMESPACE_BASE + index + 1, simple: { limit, period: 60 } }),
+    ]),
+);
 
-export const llmGatewayRateLimitKv = await KVNamespace("llm-gateway-ratelimit", { title: `llm-gateway-ratelimit-${stage}`, adopt: true });
-export const llmGatewayPricingKv = await KVNamespace("llm-gateway-pricing", { title: `llm-gateway-pricing-${stage}`, adopt: true });
-export const llmGatewayCacheKv = await KVNamespace("llm-gateway-cache", { title: `llm-gateway-cache-${stage}`, adopt: true });
+const GatewayRateLimitKv = Cloudflare.KV.Namespace("llm-gateway-ratelimit", { title: staged("llm-gateway-ratelimit") });
+const GatewayPricingKv = Cloudflare.KV.Namespace("llm-gateway-pricing", { title: staged("llm-gateway-pricing") });
+const GatewayCacheKv = Cloudflare.KV.Namespace("llm-gateway-cache", { title: staged("llm-gateway-cache") });
 
-// ---------------------------------------------------------------------------
-// Proxies all LLM API calls with token counting, cost tracking,
-// smart routing, and usage analytics. D1 for usage storage, KV for rate limiting.
-// NOTE: provider API keys must be set as Cloudflare secrets.
-export const llmGateway = await Worker("llm-gateway", {
-    name: stage === "production" ? "llm-gateway" : "llm-gateway-preview",
-    entrypoint: "./src/index.ts",
-    cwd: "./services/llm-gateway",
-    // Alchemy bundles unminified by default; see scripts/worker-bundle.ts.
-    bundle: WORKER_BUNDLE,
-    domains: customDomain(requireEnv("LLM_GATEWAY_URL"), "LLM_GATEWAY_URL"),
-    // Pricing refresh, tier pools, usage aggregation, circuit-breaker reset.
-    // Production only, for the same reason as the backend's crons.
-    crons: stage === "production" ? GATEWAY_CRONS : [],
-    compatibilityDate: "2026-09-01",
-    compatibilityFlags: ["nodejs_compat_v2"],
-    placement: { mode: "smart" },
-    observability: WORKER_OBSERVABILITY,
-    adopt: true,
-    // Video renders can spend most of their wall-clock waiting on provider
-    // HTTP calls, but the render handler still needs more than the default
-    // 30s CPU ceiling on cold paths (R2 streaming + token accounting).
-    // 5 min is the platform maximum.
-    limits: {
-        cpu_ms: 300_000,
-    },
-    bindings: {
-        APP_NAME: "llm-gateway",
-        APP_VERSION: "1.0.0",
-        NODE_ENV: stage === "production" ? "production" : "development",
-        // The same secret the backend gets as LLM_GATEWAY_SIGNING_SECRET, from
-        // the same source. It signs the gateway's calls BACK to the backend
-        // (chunk polling, usage reports, key validation) and verifies the stream
-        // tokens the backend mints — equal on both ends or every one is a 401.
-        // It no longer guards `/internal/*`: those are served only to the
-        // backend's `SERVICE_LLM_GATEWAY` binding, through the `InternalApi`
-        // entrypoint, and the public handler answers them 404.
-        SIGNING_SECRET: alchemy.secret(requireEnv("LLM_GATEWAY_SIGNING_SECRET")),
-        // `website.url` is ALREADY a full origin — Alchemy's `createWorkerUrl`
-        // returns `https://<name>.<subdomain>.workers.dev`. Interpolating it into
-        // `https://${...}` produced `https://https://…`, and `middleware/security.ts`
-        // splits this on "," and compares each entry to the request's `Origin`
-        // header verbatim. It never matched, so every browser call to the gateway
-        // was CORS-rejected — i.e. no chat at all, from a gateway that looked
-        // configured.
-        //
-        // SITE_URL leads because that is the origin users actually arrive on
-        // (a custom domain, once one is attached); the workers.dev URL is kept
-        // alongside it so the deploy stays reachable before that happens.
-        ALLOWED_ORIGINS: [
-            ...new Set([requireEnv("SITE_URL"), website.url].filter((origin): origin is string => Boolean(origin))),
-            ...(stage === "production" ? [] : ["http://localhost:3005", "http://localhost:5173", "http://localhost:4173"]),
-        ].join(","),
-
-        /**
-         * The Lunora backend origin this gateway forwards to.
-         *
-         * Unbound, `forwardToBackend` in `routes/v1/chat.ts` answers every chat
-         * request with a 500 `{"error":"Gateway not configured"}`, and the chunk
-         * relay, the API-key check in `middleware/auth.ts` and the usage reporter
-         * all fail the same way. Since the browser reaches the backend THROUGH
-         * this worker, missing it means the product does nothing at all.
-         *
-         * Same value as the backend's own PUBLIC_ORIGIN and the app's
-         * VITE_LUNORA_URL: three names for one origin, and drift between them
-         * fails silently.
-         */
-        LUNORA_URL: requireEnv("BACKEND_PUBLIC_ORIGIN"),
-
-        /**
-         * This gateway's own canonical origin.
-         *
-         * `resolveCanonicalOrigin` prefers this over the request Host header when
-         * it mints polling, content and webhook URLs — the header is attacker-
-         * controlled, and a spoofed one would point a client at an origin where
-         * the stream token (bearer-equivalent) gets replayed.
-         */
-        PUBLIC_GATEWAY_URL: requireEnv("LLM_GATEWAY_URL"),
-
-        /** Where user-facing gateway errors deep-link their "fix-it" actions. */
-        PUBLIC_DASHBOARD_URL: requireEnv("SITE_URL"),
-
-        /**
-         * Platform fee on BYOK model calls, as a fraction of model cost (0..1).
-         * Bound only where set: unset, the gateway's `resolveByokFeeRate` uses its
-         * 0.10 default; an invalid value is logged and also falls back to 0.10.
-         */
-        ...((process.env.BYOK_FEE_RATE?.trim() ?? "") === "" ? {} : { BYOK_FEE_RATE: process.env.BYOK_FEE_RATE!.trim() }),
-
-        /**
-         * Platform provider keys. Optional in `AppEnv`, so the gateway boots
-         * without them — and then every model call fails unless the user brought
-         * their own key. Bound only where set, so an unconfigured provider stays
-         * absent rather than becoming an empty-string key that looks present.
-         */
-        ...Object.fromEntries(
-            [
-                "BFL_API_KEY",
-                "CLOUDFLARE_ACCOUNT_ID",
-                "CLOUDFLARE_API_KEY",
-                "FAL_API_KEY",
-                "GATEWAY_ADMIN_USER_IDS",
-                "GOOGLE_API_KEY",
-                "GROQ_API_KEY",
-                "OPENAI_API_KEY",
-                "OPENROUTER_API_KEY",
-                "OTEL_EXPORTER_OTLP_ENDPOINT",
-                "OTEL_EXPORTER_OTLP_HEADERS",
-                "REQUESTY_API_KEY",
-                "XAI_API_KEY",
-            ]
-                .filter((name) => (process.env[name]?.trim() ?? "") !== "")
-                .map((name) => [name, bindEnv(name)]),
-        ),
-        USAGE_DB: llmGatewayUsageDb,
-        RATE_LIMIT_KV: llmGatewayRateLimitKv,
-        ...gatewayRateLimits,
-        PRICING_KV: llmGatewayPricingKv,
-        CACHE_KV: llmGatewayCacheKv,
-        VIDEO_BUCKET: llmGatewayVideoBucket,
-        VIDEO_RENDER_QUEUE: llmGatewayVideoRenders,
-        MUSIC_BUCKET: llmGatewayMusicBucket,
-        MUSIC_RENDER_QUEUE: llmGatewayMusicRenders,
-        AI: Ai(),
-    },
-    eventSources: [
-        {
-            queue: llmGatewayVideoRenders,
-            settings: {
-                // One render per invocation — each render is heavy and we
-                // already get parallelism via maxConcurrency.
-                batchSize: 1,
-                // Up to 10 concurrent render invocations cluster-wide. Each
-                // invocation drives one provider HTTP call; cap reflects the
-                // provider rate budget we're willing to spend.
-                maxConcurrency: 10,
-                // 2 retries on top of the initial delivery = 3 total
-                // attempts. After that, DLQ.
-                // MUST stay aligned with VIDEO_RENDER_MAX_ATTEMPTS in
-                // services/llm-gateway/src/queue/video-render-consumer.ts —
-                // the consumer's ack-vs-retry decision is gated on that
-                // constant, and a mismatch silently drops messages on the
-                // final attempt before the DLQ kicks in.
-                maxRetries: 2,
-                // Don't wait — flush each message immediately.
-                maxWaitTimeMs: 1000,
-                // 60s backoff matches the consumer's retry decision in
-                // queue/video-render-consumer.ts.
-                retryDelay: 60,
-                deadLetterQueue: llmGatewayVideoRendersDlq,
-            },
-        },
-        {
-            queue: llmGatewayVideoRendersDlq,
-            settings: {
-                // DLQ is observed for logging, not retried. Use a small
-                // batch + low concurrency since these are rare.
-                batchSize: 10,
-                maxConcurrency: 1,
-                maxRetries: 0,
-                maxWaitTimeMs: 30_000,
-            },
-        },
-        {
-            queue: llmGatewayMusicRenders,
-            settings: {
-                batchSize: 1,
-                maxConcurrency: 10,
-                // MUST stay aligned with MUSIC_RENDER_MAX_ATTEMPTS in
-                // services/llm-gateway/src/queue/music-render-consumer.ts.
-                maxRetries: 2,
-                maxWaitTimeMs: 1000,
-                // 30s backoff matches MUSIC_RENDER_RETRY_DELAY_SECONDS —
-                // music providers usually clear transient failures faster
-                // than video.
-                retryDelay: 30,
-                deadLetterQueue: llmGatewayMusicRendersDlq,
-            },
-        },
-        {
-            queue: llmGatewayMusicRendersDlq,
-            settings: {
-                batchSize: 10,
-                maxConcurrency: 1,
-                maxRetries: 0,
-                maxWaitTimeMs: 30_000,
-            },
-        },
-    ],
-});
-
-// ---------------------------------------------------------------------------
-// Lunora backend – Durable Objects + D1 + R2 + Vectorize
-// ---------------------------------------------------------------------------
-// Alchemy owns the real resource ids; the
-// placeholder ids in `backend/wrangler.jsonc` exist only to satisfy Lunora's
-// wrangler validator during `lunora codegen` and are never deployed.
+// Alchemy owns the real resource ids; the placeholder ids in `backend/wrangler.jsonc`
+// exist only to satisfy Lunora's wrangler validator during `lunora codegen` and are
+// never deployed.
 //
 // `lunora deploy` is deliberately NOT used — it wraps `wrangler deploy` and
 // would fight this graph. Codegen runs in the build (`pnpm --filter
@@ -739,24 +364,18 @@ export const llmGateway = await Worker("llm-gateway", {
 // access. The schema-drift gate runs in `pnpm build` (`lunora build`), before this
 // deploy. Only a data backfill (`defineMigration`) needs `lunora migrate up --prod
 // --yes --url <worker>` after the deploy; none exists yet.
-export const backendDatabase = await D1Database("neore-backend-db", {
-    name: stage === "production" ? "neore-backend" : "neore-backend-preview",
-    adopt: true,
-});
+const BackendDatabase = Cloudflare.D1.Database("neore-backend-db", { name: named("neore-backend") });
 
-export const backendFiles = await R2Bucket("neore-backend-files", {
-    name: stage === "production" ? "neore-files" : "neore-files-preview",
-    adopt: true,
+const BackendFiles = Cloudflare.R2.Bucket("neore-backend-files", {
+    name: named("neore-files"),
     // TUS uploads stream into multipart uploads. A part of one that never
     // completes is billed and invisible in a listing, so abort it after a week
     // (long enough that a paused, resumable upload can still finish).
-    lifecycle: [
+    lifecycleRules: [
         {
-            id: "abort-incomplete-multipart-uploads",
+            abortMultipartUploadsTransition: { condition: { maxAge: 7 * 24 * 60 * 60, type: "Age" } },
             enabled: true,
-            abortMultipartUploadsTransition: {
-                condition: { maxAge: 7 * 24 * 60 * 60, type: "Age" },
-            },
+            id: "abort-incomplete-multipart-uploads",
         },
     ],
 });
@@ -765,28 +384,20 @@ export const backendFiles = await R2Bucket("neore-backend-files", {
 // `dimensions` for its whole life.
 const EMBEDDING_DIMENSIONS = [128, 256, 512, 768, 1024, 1408, 1536, 2048, 3072, 4096] as const;
 
-export const backendVectorIndexes = await Promise.all(
-    EMBEDDING_DIMENSIONS.map(async (dimensions) =>
-        VectorizeIndex(`neore-embeddings-${dimensions}`, {
-            name: stage === "production" ? `embeddings-${dimensions}` : `embeddings-${dimensions}-preview`,
-            dimensions,
-            metric: "cosine",
-            adopt: true,
-        }),
-    ),
-);
+const embeddingIndexes = EMBEDDING_DIMENSIONS.map((dimensions) => ({
+    dimensions,
+    index: Cloudflare.Vectorize.Index(`neore-embeddings-${dimensions}`, {
+        dimensions,
+        metric: "cosine",
+        name: named(`embeddings-${dimensions}`),
+    }),
+}));
 
 // Vectorize filters only on properties with a metadata index, and only for
 // vectors inserted AFTER the index exists. Message and memory search filter on
 // these two keys (`agent/vector/index.ts#searchVectors`); without the indexes
 // every filtered query matches nothing.
-await Promise.all(
-    backendVectorIndexes.flatMap((index) =>
-        (["model_table_threadId", "model_table_userId"] as const).map(
-            async (propertyName) => await VectorizeMetadataIndex(`${index.name}-${propertyName}`, { index, indexType: "string", propertyName }),
-        ),
-    ),
-);
+const EMBEDDING_METADATA_PROPERTIES = ["model_table_threadId", "model_table_userId"] as const;
 
 /**
  * The backend's jobs queue and its DLQ (`backend/lunora/queues.ts`).
@@ -810,22 +421,11 @@ const queueName = (definition: { name?: string }): string => {
 
     return definition.name;
 };
-const jobsName = queueName(jobs);
-const jobsDlqName = queueName(jobsDeadLetters);
+const jobsName = named(queueName(jobs));
+const jobsDlqName = named(queueName(jobsDeadLetters));
 
-export const backendJobsDlq = await Queue("neore-backend-jobs-dlq", {
-    name: stage === "production" ? jobsDlqName : `${jobsDlqName}-preview`,
-    adopt: true,
-    settings: {
-        messageRetentionPeriod: 14 * 24 * 60 * 60,
-    },
-});
-
-export const backendJobs = await Queue("neore-backend-jobs", {
-    name: stage === "production" ? jobsName : `${jobsName}-preview`,
-    adopt: true,
-    dlq: backendJobsDlq,
-});
+const BackendJobsDlq = Cloudflare.Queues.Queue("neore-backend-jobs-dlq", { name: jobsDlqName });
+const BackendJobs = Cloudflare.Queues.Queue("neore-backend-jobs", { name: jobsName });
 
 /**
  * Durable Objects, Workflows and cron triggers the backend needs, taken from the
@@ -864,16 +464,18 @@ interface EmittedBinding {
 
 const emitted = backendBindings.bindings as EmittedBinding[];
 
+// Alchemy 2 creates new Durable Object classes SQLite-backed, which is what every
+// class in the manifest is (`sqlite: true`); a KV-backed class would need a different tool.
 const backendDurableObjects = Object.fromEntries(
     emitted
         .filter((binding) => binding.type === "durable_object")
-        .map((binding) => [
-            binding.binding,
-            DurableObjectNamespace(binding.binding.toLowerCase(), {
-                className: binding.className as string,
-                sqlite: binding.sqlite === true,
-            }),
-        ]),
+        .map((binding) => {
+            if (binding.sqlite !== true) {
+                throw new Error(`backend/lunora-bindings.json: ${binding.binding} is not SQLite-backed, which Alchemy 2 cannot create.`);
+            }
+
+            return [binding.binding, Cloudflare.DurableObject(binding.className as string)] as const;
+        }),
 );
 
 const backendWorkflows = Object.fromEntries(
@@ -881,129 +483,416 @@ const backendWorkflows = Object.fromEntries(
         .filter((binding) => binding.type === "workflow")
         .map((binding) => [
             binding.binding,
-            Workflow(binding.binding.toLowerCase(), {
-                className: binding.className as string,
-                // `resource` is the workflow NAME (`account-deletion-workflow`),
-                // which is what Cloudflare provisions; `className` is the exported
-                // class it dispatches to. Suffixed per stage like every other
-                // named resource here, so preview cannot adopt production's.
-                workflowName: stage === "production" ? (binding.resource as string) : `${binding.resource as string}-preview`,
-            }),
+            // `resource` is the workflow NAME (`account-deletion-workflow`), which is what
+            // Cloudflare provisions; `className` is the exported class it dispatches to.
+            // Suffixed per stage like every other named resource here, so preview cannot
+            // adopt production's.
+            Cloudflare.Workflow(binding.className as string, { workflowName: named(binding.resource as string) }),
         ]),
 );
 
-export const backend = await Worker("neore-backend", {
-    name: stage === "production" ? "neore-backend" : "neore-backend-preview",
-    entrypoint: "./src/server.ts",
-    cwd: "./backend",
-    // Minified, React production builds, English-only zod locales — see
-    // scripts/worker-bundle.ts. `wrangler.jsonc`'s `minify` does not reach this.
-    bundle: BACKEND_BUNDLE,
-    domains: customDomain(requireEnv("BACKEND_PUBLIC_ORIGIN"), "BACKEND_PUBLIC_ORIGIN"),
-    compatibilityDate: "2026-06-10",
-    // See backend/wrangler.jsonc: keeps a Durable Object alive for its pending I/O.
-    compatibilityFlags: ["nodejs_compat", "durable_object_io_tasks_prevent_eviction"],
-    placement: { mode: "smart" },
+// ---------------------------------------------------------------------------
+// Workers
+// ---------------------------------------------------------------------------
+// Document parser service – Rust (workers-rs + xberg) on Cloudflare Workers
+//
+// PRIVATE (`workersDev: false`): no workers.dev URL and no route, so the backend's
+// `SERVICE_DOCUMENT_PARSER` binding is the only way in, and the Worker carries
+// no auth of its own.
+//
+// Uploaded AS BUILT (`bundle: false`): `pnpm --filter document-parser run
+// build:worker` (worker-build) already emitted the bundled ES module and its
+// wasm, and the deploy job runs it before this script (guarded above).
+export const DocumentParser = Cloudflare.Worker("document-parser", {
+    ...RUST_WORKER_UPLOAD,
+    compatibility: { date: COMPATIBILITY_DATE },
+    // Parsing is pure CPU: a text-dense 24 MB / 5,765-page PDF took 36s locally,
+    // past the 30s default. 60s = the backend's own deadline for the call
+    // (`FETCH_TIMEOUT_LONG_MS`); past that nobody is waiting for the answer.
+    limits: { cpuMs: 60_000 },
+    main: "./services/document-parser/build/index.js",
+    name: named("document-parser"),
     observability: WORKER_OBSERVABILITY,
-    adopt: true,
-    // Production only: a preview has no traffic to justify a tick every minute.
-    crons: stage === "production" ? backendBindings.crons : [],
-    bindings: {
-        // First, so every explicit binding below overrides its pass-through
-        // counterpart — `ENVIRONMENT`, `SITE_URL` and friends are derived here,
-        // not copied from the deploy runner's environment.
-        ...requiredEnvPassthrough,
-        ...optionalEnvPassthrough,
-        ...backendDurableObjects,
-        ...backendWorkflows,
-        DB: backendDatabase,
-        FILES: backendFiles,
-        // Producer bindings under the names codegen derives from the exports
-        // (`queueBindingName`); the DLQ's is how `@lunora/queue` would re-send
-        // a message — it is bound for every declared queue.
-        QUEUE_JOBS: backendJobs,
-        QUEUE_JOBS_DEAD_LETTERS: backendJobsDlq,
-        LUNORA_ADMIN_TOKEN: alchemy.secret(requireEnv("LUNORA_ADMIN_TOKEN")),
+    placement: { mode: "smart" },
+    workersDev: false,
+});
+
+// NSFW checker service – Hono on Cloudflare Workers
+//
+// PRIVATE, like the document parser: reached only through `SERVICE_NSFW_CHECKER`.
+export const NsfwChecker = Cloudflare.Worker("nsfw-checker", {
+    build: WORKER_BUILD,
+    compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2"] },
+    env: {
+        AI: Cloudflare.Workers.AI(),
         NODE_ENV: stage === "production" ? "production" : "development",
-
-        // Signing, encryption and the outbound services the backend cannot boot
-        // without. `lib/env-validation.ts` is the full list; these are the ones
-        // that were never bound at all.
-        ADMIN: process.env.ADMIN ?? "",
-        AUTH_SECRET: alchemy.secret(requireEnv("BETTER_AUTH_SECRET")),
-        BETTER_AUTH_SECRET: alchemy.secret(requireEnv("BETTER_AUTH_SECRET")),
-        ENCRYPTION_KEY: alchemy.secret(requireEnv("ENCRYPTION_KEY")),
-        ENVIRONMENT: stage === "production" ? "production" : "preview",
-        JWKS: process.env.JWKS ?? "",
-        // Verifies the gateway's calls back here and signs stream tokens. The
-        // backend reaches the gateway itself over `SERVICE_LLM_GATEWAY` below.
-        LLM_GATEWAY_SIGNING_SECRET: alchemy.secret(requireEnv("LLM_GATEWAY_SIGNING_SECRET")),
-
-        // The sibling Workers, as service bindings under the names Lunora
-        // generates from `backend/lunora.config.ts` (`SERVICE_<KEY>`, also
-        // written into backend/wrangler.jsonc `services[]`). No URL, no secret:
-        // the three private ones have no other way in, and the gateway's
-        // internal routes answer only its `InternalApi` entrypoint. Unbound, a
-        // call fails naming the binding (`ctx.services.<key>`), and the optional
-        // features (text extraction, NSFW check, browser tool) skip themselves.
-        SERVICE_BROWSER_RENDERER: browserRenderer,
-        SERVICE_DOCUMENT_PARSER: documentParser,
-        SERVICE_LLM_GATEWAY: Worker.experimentalEntrypoint(llmGateway, "InternalApi"),
-        SERVICE_NSFW_CHECKER: nsfwChecker,
-        // `MAIL_FROM` and Resend's key ride `requiredEnvPassthrough` above; only
-        // the Email Service binding is decided here. See `email/mailer.ts`.
-        ...emailServiceBinding,
-        R2_ENDPOINT: requireEnv("R2_ENDPOINT"),
-        SITE_URL: requireEnv("SITE_URL"),
-        STORAGE_SIGNING_SECRET: alchemy.secret(requireEnv("STORAGE_SIGNING_SECRET")),
-
-        // The JWKS URL bearer tokens verify against, the base for signed storage
-        // URLs, and the origin `ctx.scheduler` + crons dispatch back to.
-        //
-        // No default. A `workers.dev` URL is
-        // `<worker>.<account-subdomain>.workers.dev`, and this script cannot know
-        // the account subdomain — the single-label guess that used to be here
-        // resolves to nothing, so the JWKS fetch could never succeed and every
-        // browser RPC came back FORBIDDEN_SHARD.
-        // The SchedulerDO reads this from its own env; without it every
-        // `ctx.scheduler.runAfter/runAt` fails with "LUNORA_ORIGIN_URL env
-        // binding must be set on the SchedulerDO". Same value as PUBLIC_ORIGIN —
-        // it is the origin the scheduler calls back on.
-        LUNORA_ORIGIN_URL: requireEnv("BACKEND_PUBLIC_ORIGIN"),
-        PUBLIC_ORIGIN: requireEnv("BACKEND_PUBLIC_ORIGIN"),
-
-        // Both halves. `auth.ts` loads the captcha plugin only when it has the
-        // secret AND knows a site key exists, so binding one without the other
-        // degrades to "no captcha" rather than locking every credential flow.
-        // The guard above refuses to deploy in that state regardless.
-        TURNSTILE_SECRET_KEY: turnstileSecret,
-        TURNSTILE_SITE_KEY: turnstileSiteKey,
-        ...Object.fromEntries(EMBEDDING_DIMENSIONS.map((dimensions, index) => [`EMBEDDINGS_${dimensions}`, backendVectorIndexes[index]])),
     },
-    eventSources: [
-        {
-            queue: backendJobs,
-            settings: { ...JOBS_QUEUE_CONSUMER, deadLetterQueue: backendJobsDlq, maxRetries: jobs.maxRetries, retryDelay: jobs.retryDelay },
-        },
-        {
+    main: "./services/nsfw-checker/src/index.ts",
+    name: named("nsfw-checker"),
+    observability: WORKER_OBSERVABILITY,
+    placement: { mode: "smart" },
+    workersDev: false,
+});
+
+// Browser renderer service – @cloudflare/playwright on Cloudflare Workers
+// Replaces Browserbase for AI agent browser automation.
+// Uses CF Browser Rendering binding for serverless headless Chrome.
+// PRIVATE, like the document parser: reached only through `SERVICE_BROWSER_RENDERER`.
+export const BrowserRenderer = Cloudflare.Worker("browser-renderer", {
+    build: WORKER_BUILD,
+    compatibility: { date: "2025-09-15", flags: ["nodejs_compat"] },
+    env: {
+        BROWSER: Cloudflare.Browser(),
+        NODE_ENV: stage === "production" ? "production" : "development",
+    },
+    main: "./services/browser-renderer/src/index.ts",
+    name: named("browser-renderer"),
+    observability: WORKER_OBSERVABILITY,
+    placement: { mode: "smart" },
+    workersDev: false,
+});
+
+// The embeddings Worker (`services/embeddings`) is not deployed: nothing calls it,
+// memory and knowledge embed through the gateway. Its source stays in the repo.
+// Deploying it again means declaring it here and giving it a caller.
+
+// Main application – TanStack Start on Cloudflare Workers
+//
+// The app is pre-built by deploy.yml's "Build app" step (`pnpm build`: OG images,
+// vite build, SW gen, tsc) — that step is where every `VITE_*` value and the
+// raised NODE_OPTIONS heap live. This Worker only UPLOADS the result
+// (`bundle: false`): dist/server/index.js with its chunks, and dist/client as
+// assets. It is a plain Worker rather than `Website.Vite` because that one runs
+// `vite build` itself, in this step's environment — no `VITE_*` secrets, so the
+// shipped bundle would have no backend URL — and replaces `@cloudflare/vite-plugin`.
+// The assets block is `apps/web/wrangler.jsonc`'s.
+export const Website = Cloudflare.Worker("website", {
+    assets: {
+        directory: "./apps/web/dist/client",
+        htmlHandling: "none",
+        notFoundHandling: "none",
+        // Server routes that override static files in dist/client.
+        runWorkerFirst: ["/robots.txt", "/sitemap.xml"],
+    },
+    bundle: false,
+    compatibility: {
+        date: COMPATIBILITY_DATE,
+        // The server routes read these through `process.env` (`api/scribe-token.ts`,
+        // `lib/posthog/server.ts`). Since 2025-04-01 nodejs_compat fills it from the
+        // bindings by default (`nodejs_compat_populate_process_env`).
+        flags: ["nodejs_compat_v2"],
+    },
+    domain: customDomain(requireEnv("SITE_URL"), "SITE_URL"),
+    env: boundWhereSet(["ELEVENLABS_API_KEY", "POSTHOG_PERSONAL_API_KEY"]),
+    main: "./apps/web/dist/server/index.js",
+    name: stage === "production" ? "neore-chat" : "neore-chat-preview",
+    observability: WORKER_OBSERVABILITY,
+    placement: { mode: "smart" },
+});
+
+// ---------------------------------------------------------------------------
+// LLM Gateway service – Hono on Cloudflare Workers
+// ---------------------------------------------------------------------------
+// Proxies all LLM API calls with token counting, cost tracking,
+// smart routing, and usage analytics. D1 for usage storage, KV for rate limiting.
+// NOTE: provider API keys must be set as Cloudflare secrets.
+const llmGatewayEnv = (siteOrigins: Output.Output<string | undefined>) => ({
+    APP_NAME: "llm-gateway",
+    APP_VERSION: "1.0.0",
+    // `siteOrigins` is the Website's workers.dev origin, ALREADY a full origin — built
+    // as `https://${...}` once, it produced `https://https://…`, and
+    // `middleware/security.ts` splits ALLOWED_ORIGINS on "," and compares each entry
+    // to the request's `Origin` header verbatim. It never matched, so every browser
+    // call to the gateway was CORS-rejected — i.e. no chat at all, from a gateway
+    // that looked configured.
+    //
+    // SITE_URL leads because that is the origin users actually arrive on
+    // (a custom domain, once one is attached); the workers.dev URL is kept
+    // alongside it so the deploy stays reachable before that happens.
+    ALLOWED_ORIGINS: Output.map(siteOrigins, (workersDevOrigin) =>
+        [
+            ...new Set([requireEnv("SITE_URL"), workersDevOrigin ?? ""].filter((origin) => origin !== "")),
+            ...(stage === "production" ? [] : ["http://localhost:3005", "http://localhost:5173", "http://localhost:4173"]),
+        ].join(","),
+    ),
+    CACHE_KV: GatewayCacheKv,
+    // The Lunora backend origin this gateway forwards to.
+    //
+    // Unbound, `forwardToBackend` in `routes/v1/chat.ts` answers every chat
+    // request with a 500 `{"error":"Gateway not configured"}`, and the chunk
+    // relay, the API-key check in `middleware/auth.ts` and the usage reporter
+    // all fail the same way. Since the browser reaches the backend THROUGH
+    // this worker, missing it means the product does nothing at all.
+    //
+    // Same value as the backend's own PUBLIC_ORIGIN and the app's
+    // VITE_LUNORA_URL: three names for one origin, and drift between them
+    // fails silently.
+    LUNORA_URL: requireEnv("BACKEND_PUBLIC_ORIGIN"),
+    MUSIC_BUCKET: MusicBucket,
+    MUSIC_RENDER_QUEUE: MusicRenders,
+    NODE_ENV: stage === "production" ? "production" : "development",
+    PRICING_KV: GatewayPricingKv,
+    // Where user-facing gateway errors deep-link their "fix-it" actions.
+    PUBLIC_DASHBOARD_URL: requireEnv("SITE_URL"),
+    // This gateway's own canonical origin.
+    //
+    // `resolveCanonicalOrigin` prefers this over the request Host header when
+    // it mints polling, content and webhook URLs — the header is attacker-
+    // controlled, and a spoofed one would point a client at an origin where
+    // the stream token (bearer-equivalent) gets replayed.
+    PUBLIC_GATEWAY_URL: requireEnv("LLM_GATEWAY_URL"),
+    RATE_LIMIT_KV: GatewayRateLimitKv,
+    ...gatewayRateLimits,
+    // The same secret the backend gets as LLM_GATEWAY_SIGNING_SECRET, from
+    // the same source. It signs the gateway's calls BACK to the backend
+    // (chunk polling, usage reports, key validation) and verifies the stream
+    // tokens the backend mints — equal on both ends or every one is a 401.
+    // It no longer guards `/internal/*`: those are served only to the
+    // backend's `SERVICE_LLM_GATEWAY` binding, through the `InternalApi`
+    // entrypoint, and the public handler answers them 404.
+    SIGNING_SECRET: secret(requireEnv("LLM_GATEWAY_SIGNING_SECRET")),
+    USAGE_DB: GatewayUsageDb,
+    VIDEO_BUCKET: VideoBucket,
+    VIDEO_RENDER_QUEUE: VideoRenders,
+    AI: Cloudflare.Workers.AI(),
+    // Platform fee on BYOK model calls, as a fraction of model cost (0..1).
+    // Bound only where set: unset, the gateway's `resolveByokFeeRate` uses its
+    // 0.10 default; an invalid value is logged and also falls back to 0.10.
+    ...((process.env.BYOK_FEE_RATE?.trim() ?? "") === "" ? {} : { BYOK_FEE_RATE: process.env.BYOK_FEE_RATE!.trim() }),
+    // Platform provider keys. Optional in `AppEnv`, so the gateway boots
+    // without them — and then every model call fails unless the user brought
+    // their own key. Bound only where set, so an unconfigured provider stays
+    // absent rather than becoming an empty-string key that looks present.
+    ...boundWhereSet([
+        "BFL_API_KEY",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_API_KEY",
+        "FAL_API_KEY",
+        "GATEWAY_ADMIN_USER_IDS",
+        "GOOGLE_API_KEY",
+        "GROQ_API_KEY",
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        "REQUESTY_API_KEY",
+        "XAI_API_KEY",
+    ]),
+});
+
+// ---------------------------------------------------------------------------
+// The stack
+// ---------------------------------------------------------------------------
+export default Alchemy.Stack(
+    "neore-chat",
+    {
+        providers: Cloudflare.providers(),
+        // Persisted in a Worker + Durable Object in this account, bootstrapped by the
+        // first `alchemy deploy --yes` (CI=true). Locally the default is `.alchemy/`.
+        state: Cloudflare.state(),
+    },
+    Effect.gen(function* () {
+        const website = yield* Website;
+
+        const gateway = yield* Cloudflare.Worker("llm-gateway", {
+            build: WORKER_BUILD,
+            // Pricing refresh, tier pools, usage aggregation, circuit-breaker reset.
+            // Production only, for the same reason as the backend's crons.
+            compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2"] },
+            crons: stage === "production" ? [...GATEWAY_CRONS] : [],
+            domain: customDomain(requireEnv("LLM_GATEWAY_URL"), "LLM_GATEWAY_URL"),
+            env: llmGatewayEnv(website.url),
+            // Video renders can spend most of their wall-clock waiting on provider
+            // HTTP calls, but the render handler still needs more than the default
+            // 30s CPU ceiling on cold paths (R2 streaming + token accounting).
+            // 5 min is the platform maximum.
+            limits: { cpuMs: 300_000 },
+            main: "./services/llm-gateway/src/index.ts",
+            name: named("llm-gateway"),
+            observability: WORKER_OBSERVABILITY,
+            placement: { mode: "smart" },
+        });
+
+        // Queue consumers. `maxRetries` + the first delivery is the attempt count the
+        // consumers assume: VIDEO_RENDER_MAX_ATTEMPTS / MUSIC_RENDER_MAX_ATTEMPTS in
+        // `services/llm-gateway/src/queue/` MUST stay aligned with `maxRetries` + 1 —
+        // the consumer's ack-vs-retry decision is gated on that constant, and a
+        // mismatch silently drops messages on the final attempt before the DLQ.
+        const videoRenders = yield* VideoRenders;
+        const videoRendersDlq = yield* VideoRendersDlq;
+        const musicRenders = yield* MusicRenders;
+        const musicRendersDlq = yield* MusicRendersDlq;
+
+        yield* Cloudflare.Queues.Consumer("llm-gateway-video-renders-consumer", {
+            deadLetterQueue: videoRendersDlq.queueName,
+            queueId: videoRenders.queueId,
+            scriptName: gateway.workerName,
+            settings: {
+                // One render per invocation — each render is heavy and we already get
+                // parallelism via maxConcurrency.
+                batchSize: 1,
+                // Up to 10 concurrent render invocations cluster-wide. Each invocation
+                // drives one provider HTTP call; cap reflects the provider rate budget
+                // we're willing to spend.
+                maxConcurrency: 10,
+                // 2 retries on top of the initial delivery = 3 total attempts. After that, DLQ.
+                maxRetries: 2,
+                // Don't wait — flush each message immediately.
+                maxWaitTimeMs: 1000,
+                // 60s backoff matches the consumer's retry decision in queue/video-render-consumer.ts.
+                retryDelay: 60,
+            },
+        });
+        yield* Cloudflare.Queues.Consumer("llm-gateway-video-renders-dlq-consumer", {
+            queueId: videoRendersDlq.queueId,
+            scriptName: gateway.workerName,
+            // DLQ is observed for logging, not retried. Use a small batch + low
+            // concurrency since these are rare.
+            settings: { batchSize: 10, maxConcurrency: 1, maxRetries: 0, maxWaitTimeMs: 30_000 },
+        });
+        yield* Cloudflare.Queues.Consumer("llm-gateway-music-renders-consumer", {
+            deadLetterQueue: musicRendersDlq.queueName,
+            queueId: musicRenders.queueId,
+            scriptName: gateway.workerName,
+            settings: {
+                batchSize: 1,
+                maxConcurrency: 10,
+                maxRetries: 2,
+                maxWaitTimeMs: 1000,
+                // 30s backoff matches MUSIC_RENDER_RETRY_DELAY_SECONDS — music providers
+                // usually clear transient failures faster than video.
+                retryDelay: 30,
+            },
+        });
+        yield* Cloudflare.Queues.Consumer("llm-gateway-music-renders-dlq-consumer", {
+            queueId: musicRendersDlq.queueId,
+            scriptName: gateway.workerName,
+            settings: { batchSize: 10, maxConcurrency: 1, maxRetries: 0, maxWaitTimeMs: 30_000 },
+        });
+
+        for (const { dimensions, index } of embeddingIndexes) {
+            const vectorIndex = yield* index;
+
+            for (const propertyName of EMBEDDING_METADATA_PROPERTIES) {
+                // The logical id is built from the dimensions: `vectorIndex.indexName` is an
+                // Output, and in a template it would collapse every id to "[object Object]-…".
+                yield* Cloudflare.Vectorize.MetadataIndex(`neore-embeddings-${dimensions}-${propertyName}`, {
+                    indexName: vectorIndex.indexName,
+                    indexType: "string",
+                    propertyName,
+                });
+            }
+        }
+
+        const backend = yield* Cloudflare.Worker("neore-backend", {
+            // Minified, React production builds, English-only zod locales — see
+            // scripts/worker-bundle.ts. `wrangler.jsonc`'s `minify` does not reach this.
+            build: BACKEND_BUILD,
+            // See backend/wrangler.jsonc: `durable_object_io_tasks_prevent_eviction` keeps a
+            // Durable Object alive for its pending I/O.
+            compatibility: { date: "2026-06-10", flags: ["nodejs_compat", "durable_object_io_tasks_prevent_eviction"] },
+            // Production only: a preview has no traffic to justify a tick every minute.
+            crons: stage === "production" ? [...backendBindings.crons] : [],
+            domain: customDomain(requireEnv("BACKEND_PUBLIC_ORIGIN"), "BACKEND_PUBLIC_ORIGIN"),
+            env: {
+                // First, so every explicit binding below overrides its pass-through
+                // counterpart — `ENVIRONMENT`, `SITE_URL` and friends are derived here,
+                // not copied from the deploy runner's environment.
+                ...requiredEnvPassthrough,
+                ...optionalEnvPassthrough,
+                ...backendDurableObjects,
+                ...backendWorkflows,
+                DB: BackendDatabase,
+                FILES: BackendFiles,
+                // Producer bindings under the names codegen derives from the exports
+                // (`queueBindingName`); the DLQ's is how `@lunora/queue` would re-send
+                // a message — it is bound for every declared queue.
+                QUEUE_JOBS: BackendJobs,
+                QUEUE_JOBS_DEAD_LETTERS: BackendJobsDlq,
+                LUNORA_ADMIN_TOKEN: secret(requireEnv("LUNORA_ADMIN_TOKEN")),
+                NODE_ENV: stage === "production" ? "production" : "development",
+
+                // Signing, encryption and the outbound services the backend cannot boot
+                // without. `lib/env-validation.ts` is the full list; these are the ones
+                // that were never bound at all.
+                ADMIN: process.env.ADMIN ?? "",
+                AUTH_SECRET: secret(requireEnv("BETTER_AUTH_SECRET")),
+                BETTER_AUTH_SECRET: secret(requireEnv("BETTER_AUTH_SECRET")),
+                ENCRYPTION_KEY: secret(requireEnv("ENCRYPTION_KEY")),
+                ENVIRONMENT: stage === "production" ? "production" : "preview",
+                JWKS: process.env.JWKS ?? "",
+                // Verifies the gateway's calls back here and signs stream tokens. The
+                // backend reaches the gateway itself over `SERVICE_LLM_GATEWAY` below.
+                LLM_GATEWAY_SIGNING_SECRET: secret(requireEnv("LLM_GATEWAY_SIGNING_SECRET")),
+
+                // The sibling Workers, as service bindings under the names Lunora
+                // generates from `backend/lunora.config.ts` (`SERVICE_<KEY>`, also
+                // written into backend/wrangler.jsonc `services[]`). No URL, no secret:
+                // the three private ones have no other way in, and the gateway's
+                // internal routes answer only its `InternalApi` entrypoint. Unbound, a
+                // call fails naming the binding (`ctx.services.<key>`), and the optional
+                // features (text extraction, NSFW check, browser tool) skip themselves.
+                SERVICE_BROWSER_RENDERER: BrowserRenderer,
+                SERVICE_DOCUMENT_PARSER: DocumentParser,
+                SERVICE_LLM_GATEWAY: Cloudflare.WorkerEntrypoint(gateway, "InternalApi"),
+                SERVICE_NSFW_CHECKER: NsfwChecker,
+                // `MAIL_FROM` and Resend's key ride `requiredEnvPassthrough` above; only
+                // the Email Service binding is decided here. See `email/mailer.ts`.
+                ...(useEmailService ? { EMAIL: Cloudflare.Email.SendEmail("EMAIL", { allowedSenderAddresses: [mailFromAddress] }) } : {}),
+                R2_ENDPOINT: requireEnv("R2_ENDPOINT"),
+                SITE_URL: requireEnv("SITE_URL"),
+                STORAGE_SIGNING_SECRET: secret(requireEnv("STORAGE_SIGNING_SECRET")),
+
+                // The JWKS URL bearer tokens verify against, the base for signed storage
+                // URLs, and the origin `ctx.scheduler` + crons dispatch back to.
+                //
+                // No default. A `workers.dev` URL is
+                // `<worker>.<account-subdomain>.workers.dev`, and this script cannot know
+                // the account subdomain — the single-label guess that used to be here
+                // resolves to nothing, so the JWKS fetch could never succeed and every
+                // browser RPC came back FORBIDDEN_SHARD.
+                // The SchedulerDO reads this from its own env; without it every
+                // `ctx.scheduler.runAfter/runAt` fails with "LUNORA_ORIGIN_URL env
+                // binding must be set on the SchedulerDO". Same value as PUBLIC_ORIGIN —
+                // it is the origin the scheduler calls back on.
+                LUNORA_ORIGIN_URL: requireEnv("BACKEND_PUBLIC_ORIGIN"),
+                PUBLIC_ORIGIN: requireEnv("BACKEND_PUBLIC_ORIGIN"),
+
+                // Both halves. `auth.ts` loads the captcha plugin only when it has the
+                // secret AND knows a site key exists, so binding one without the other
+                // degrades to "no captcha" rather than locking every credential flow.
+                // The guard above refuses to deploy in that state regardless.
+                TURNSTILE_SECRET_KEY: turnstileSecret,
+                TURNSTILE_SITE_KEY: turnstileSiteKey,
+                ...Object.fromEntries(embeddingIndexes.map(({ dimensions, index }) => [`EMBEDDINGS_${dimensions}`, index])),
+            },
+            main: "./backend/src/server.ts",
+            name: named("neore-backend"),
+            observability: WORKER_OBSERVABILITY,
+            placement: { mode: "smart" },
+        });
+
+        yield* Cloudflare.Queues.Consumer("neore-backend-jobs-consumer", {
+            deadLetterQueue: (yield* BackendJobsDlq).queueName,
+            queueId: (yield* BackendJobs).queueId,
+            scriptName: backend.workerName,
+            settings: { ...JOBS_QUEUE_CONSUMER, maxRetries: jobs.maxRetries, retryDelay: jobs.retryDelay },
+        });
+        yield* Cloudflare.Queues.Consumer("neore-backend-jobs-dlq-consumer", {
+            queueId: (yield* BackendJobsDlq).queueId,
+            scriptName: backend.workerName,
             // Observed for logging, not retried (`jobsDeadLetters` acks it).
-            queue: backendJobsDlq,
             settings: { batchSize: 10, maxConcurrency: 1, maxRetries: jobsDeadLetters.maxRetries, maxWaitTimeMs: 30_000 },
-        },
-    ],
-});
+        });
 
-// ---------------------------------------------------------------------------
-// Output
-// ---------------------------------------------------------------------------
-console.log({
-    stage,
-    website: website.url,
-    backend: backend.url,
-    // documentParser / nsfwChecker / browserRenderer: private (`url: false`) —
-    // reached only through the backend's service bindings. embeddings: private
-    // and unbound.
-    llmGateway: llmGateway.url,
-});
-
-await app.finalize();
+        // documentParser / nsfwChecker / browserRenderer: private (`workersDev: false`) —
+        // reached only through the backend's service bindings. embeddings: private and
+        // unbound.
+        return {
+            backend: backend.url,
+            llmGateway: gateway.url,
+            stage,
+            website: website.url,
+        };
+    }),
+);

@@ -1,13 +1,12 @@
 /**
- * esbuild options for the Workers `alchemy.run.ts` deploys.
+ * Rolldown options for the Workers `alchemy.run.ts` deploys.
  *
- * Alchemy bundles each Worker itself, from its `entrypoint` — it does NOT read
- * `wrangler.jsonc` and does not use `lunora build`'s output — and its defaults
- * are a development build: no minify, and `process.env.NODE_ENV` defined as the
- * string "undefined". So the `"minify": true` in `backend/wrangler.jsonc` never
- * reached the deploy. Measured with Alchemy's own bundler (0.93.12) on
- * 2026-09-25, the backend would go out at 19.9 MB raw / 3051 KiB gzip — at the
- * Free plan's 3 MB limit — carrying React's development builds.
+ * Alchemy bundles each Worker itself, from its `main` — it does NOT read
+ * `wrangler.jsonc` and does not use `lunora build`'s output — and its defaults are
+ * a development build: no minify. So the `"minify": true` in `backend/wrangler.jsonc`
+ * never reaches the deploy. The backend measured 19.9 MB raw / 3051 KiB gzip
+ * unminified under Alchemy 0.93's esbuild; Alchemy 2 bundles with rolldown, so the
+ * size is re-measured by the first preview deploy (`.alchemy/bundles/<stack>-<stage>-<id>`).
  *
  * `alchemy.run.ts` cannot be run to check it (running it IS the deploy) and
  * `pnpm lint:types:deploy` only type-checks it, so this module is where the
@@ -15,26 +14,21 @@
  */
 import path from "node:path";
 
-/** The slice of esbuild's plugin API used here, so this file needs no esbuild import. */
+/** The slice of rolldown's plugin API used here, so this file needs no rolldown import. */
 interface BundlerPlugin {
+    load: (id: string) => { code: string } | null;
     name: string;
-    setup: (build: {
-        onLoad: (
-            options: { filter: RegExp; namespace: string },
-            callback: (args: { path: string }) => { contents: string; loader: "js"; resolveDir: string },
-        ) => void;
-        onResolve: (options: { filter: RegExp }, callback: (args: { resolveDir: string }) => { namespace: string; path: string } | undefined) => void;
-    }) => void;
+    resolveId: (source: string, importer: string | undefined) => { id: string } | null;
 }
 
-const ZOD_LOCALES_NAMESPACE = "zod-english-only-locales";
+const ZOD_LOCALES_PREFIX = "\0zod-english-only-locales:";
 
 /**
  * Bundle only zod's English locale.
  *
  * `zod` and `zod/v4` export `z.locales` — all ~60 message catalogues, 251 KiB
  * minified — as a namespace object, and `import { z } from "zod/v4"` (which
- * every `@ai-sdk/*` provider uses) keeps the whole `z` namespace, so esbuild
+ * every `@ai-sdk/*` provider uses) keeps the whole `z` namespace, so the bundler
  * cannot drop any of them. Nothing in these Workers selects a locale:
  * zod registers English itself (`v4/classic/schemas.js` imports
  * `../locales/en.js` directly, which this leaves alone), and
@@ -43,27 +37,39 @@ const ZOD_LOCALES_NAMESPACE = "zod-english-only-locales";
  * would fail as "not a function" — drop this plugin if one is ever wanted.
  */
 export const zodEnglishOnlyLocales: BundlerPlugin = {
-    name: ZOD_LOCALES_NAMESPACE,
-    setup(build) {
-        // No `u` flag on either filter: esbuild compiles them as Go regexps and
-        // rejects the `(?u)` it would translate that flag into.
-        build.onResolve({ filter: /^\.\.\/locales\/index\.js$/ }, ({ resolveDir }) => {
-            if (!/[/\\]zod[/\\]v4[/\\](?:classic|core|mini)$/u.test(resolveDir)) {
-                return undefined;
-            }
+    load(id) {
+        if (!id.startsWith(ZOD_LOCALES_PREFIX)) {
+            return null;
+        }
 
-            return { namespace: ZOD_LOCALES_NAMESPACE, path: path.join(resolveDir, "../locales") };
-        });
-        build.onLoad({ filter: /.*/, namespace: ZOD_LOCALES_NAMESPACE }, (args) => {
-            return { contents: `export { default as en } from "./en.js";`, loader: "js", resolveDir: args.path };
-        });
+        // Absolute, because a virtual module has no directory to resolve `./en.js` from.
+        const localesDir = id.slice(ZOD_LOCALES_PREFIX.length).replaceAll("\\", "/");
+
+        return { code: `export { default as en } from "${localesDir}/en.js";` };
+    },
+    name: "zod-english-only-locales",
+    resolveId(source, importer) {
+        if (source !== "../locales/index.js" || importer === undefined) {
+            return null;
+        }
+
+        const importerDir = path.dirname(importer);
+
+        if (!/[/\\]zod[/\\]v4[/\\](?:classic|core|mini)$/u.test(importerDir)) {
+            return null;
+        }
+
+        return { id: ZOD_LOCALES_PREFIX + path.join(importerDir, "../locales") };
     },
 };
 
-/** For every deployed Worker. Alchemy keeps `keepNames: true` underneath, so class and function names survive minify. */
-export const WORKER_BUNDLE = {
-    minify: true,
-    plugins: [zodEnglishOnlyLocales],
+/**
+ * For every bundled Worker (`Cloudflare.Worker`'s `build`). `keepNames` keeps class
+ * and function names through the minifier, as Alchemy 0.x did underneath.
+ */
+export const WORKER_BUILD = {
+    input: { plugins: [zodEnglishOnlyLocales] },
+    output: { keepNames: true, minify: true },
 };
 
 /**
@@ -74,16 +80,15 @@ export const WORKER_BUNDLE = {
 export const RUST_WORKER_OUTPUT = ["index.js", "index_bg.wasm"] as const;
 
 /**
- * The Rust document parser is uploaded as built, not re-bundled: worker-build
- * already ran esbuild (minified) over the wasm-bindgen glue, and Alchemy's own
- * bundle would only wrap it again. `rules` names the two modules relative to
- * the entrypoint's directory — Alchemy's default (`**\/*.js`, `**\/*.mjs`,
- * `**\/*.wasm`) would also upload the unused shim. No source maps exist for it.
+ * The Rust document parser is uploaded as built, not re-bundled (`bundle: false`):
+ * worker-build already ran esbuild (minified) over the wasm-bindgen glue, and
+ * rolldown would only wrap it again. `rules` names the two modules relative to the
+ * entry's directory — the default (`**\/*.js`, `**\/*.mjs`, `**\/*.wasm`) would also
+ * upload the unused shim.
  */
 export const RUST_WORKER_UPLOAD = {
-    noBundle: true,
+    bundle: false,
     rules: [{ globs: [...RUST_WORKER_OUTPUT] }],
-    sourceMap: false,
 };
 
 /**
@@ -93,7 +98,10 @@ export const RUST_WORKER_UPLOAD = {
  * Vercel-gateway auth error — and `lunora build` already bundles the
  * production branch.
  */
-export const BACKEND_BUNDLE = {
-    ...WORKER_BUNDLE,
-    define: { "process.env.NODE_ENV": JSON.stringify("production") },
+export const BACKEND_BUILD = {
+    ...WORKER_BUILD,
+    input: {
+        ...WORKER_BUILD.input,
+        transform: { define: { "process.env.NODE_ENV": JSON.stringify("production") } },
+    },
 };

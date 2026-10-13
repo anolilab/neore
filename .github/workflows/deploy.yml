@@ -16,6 +16,11 @@ on: # yamllint disable-line rule:truthy
                 options:
                     - "production"
                     - "preview"
+            dry_run:
+                description: "Only show the plan: create and change nothing (the state store is still created on its first run)"
+                required: false
+                default: false
+                type: "boolean"
 
 # Keyed on the target, not the ref: two tags (or a tag and a manual run) would
 # otherwise run two Alchemy deploys against the same state file at once.
@@ -85,7 +90,7 @@ jobs:
             - name: "Setup resources and environment"
               uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
               with:
-                  node-version: "22"
+                  node-version: "24"
 
             # Built here rather than carried between jobs as an artifact.
             # `upload-artifact` strips the least common ancestor of the matched
@@ -207,12 +212,7 @@ jobs:
                   # means no captcha anywhere, which is what ships today.
                   TURNSTILE_SECRET_KEY: "${{ secrets.TURNSTILE_SECRET_KEY }}"
                   VITE_TURNSTILE_SITE_KEY: "${{ secrets.VITE_TURNSTILE_SITE_KEY }}"
-                  # Encrypts every `alchemy.secret()` into the R2 state file.
-                  # No default anywhere — unset, the deploy dies partway through
-                  # the graph with "Cannot serialize secret without password".
-                  # It must stay STABLE: rotating it makes the existing state
-                  # file undecryptable.
-                  ALCHEMY_PASSWORD: "${{ secrets.ALCHEMY_PASSWORD }}"
+                  DRY_RUN: "${{ github.event.inputs.dry_run }}"
                   #
                   # ---------------------------------------------------------
                   # Everything below is passed through to the backend Worker by
@@ -357,16 +357,20 @@ jobs:
                   OTEL_EXPORTER_OTLP_ENDPOINT: "${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}"
                   OTEL_EXPORTER_OTLP_HEADERS: "${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}"
               run: |
-                  # `pnpm run deploy`, spelled out. On pnpm 10 bare `deploy` was the
-                  # built-in (deploy a workspace package to a directory) and failed
-                  # with ERR_PNPM_NOTHING_TO_DEPLOY; since pnpm 11 a `deploy` script
-                  # shadows the built-in, so both spellings now run alchemy — keep
-                  # the explicit one so the intent survives another change.
-                  output=$(pnpm run deploy 2>&1) || { echo "$output"; exit 1; }
+                  # `--stage` equals DEPLOY_ENV, which alchemy.run.ts reads for the physical
+                  # names: the state scope and the names cannot disagree. `--yes` skips the
+                  # approval prompt (and bootstraps the state store on its first run);
+                  # `--adopt` takes over resources of the same name that a previous
+                  # deploy tool created, and re-uses a custom domain it already attached.
+                  args=(deploy --stage "$DEPLOY_ENV" --yes --adopt)
+                  if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+
+                  pnpm exec alchemy provider check-env
+                  output=$(pnpm exec alchemy "${args[@]}" 2>&1) || { echo "$output"; exit 1; }
                   echo "$output"
 
                   # Extract website URL from Alchemy output for GitHub environment
-                  url=$(echo "$output" | grep -oP "website: '?\Khttps?://[^'}\s]+" || true)
+                  url=$(echo "$output" | grep -oP "website: ['\"]?\Khttps?://[^'\"}\s]+" || true)
                   echo "website-url=${url}" >> "$GITHUB_OUTPUT"
 
     # -----------------------------------------------------------------
