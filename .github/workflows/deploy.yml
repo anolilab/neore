@@ -551,13 +551,19 @@ jobs:
             # because "Script startup exceeded CPU time limit" is rejected at upload, which is
             # exactly when the bundle is wanted: profile it with
             # `scripts/profile-worker-startup.ts`. Three days is plenty; the maps are the bulk.
+            - name: "List where Alchemy wrote its bundles"
+              if: "${{ !cancelled() && !inputs.dry_run }}"
+              run: "find .alchemy -maxdepth 4 -type d | sort | head -60 || true"
+
             - name: "Keep the Worker bundles"
               if: "${{ !cancelled() && !inputs.dry_run }}"
               uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
               with:
                   if-no-files-found: "warn"
                   name: "worker-bundles-${{ needs.resolve-env.outputs.stage }}"
-                  path: ".alchemy/bundles"
+                  # The whole directory: the layout under it is Alchemy 2's, not the one the
+                  # notes in AGENTS.md were written against, and the listing above shows it.
+                  path: ".alchemy"
                   retention-days: 3
 
     # -----------------------------------------------------------------
