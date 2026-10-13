@@ -1875,7 +1875,10 @@ error")` (any transport, including the SSRF-guarded tool
   read) and `POSTHOG_CLI_PROJECT_ID`, and the variable `POSTHOG_CLI_HOST` (the app host,
   `https://eu.posthog.com` for EU, not the ingestion host). Without them the maps are
   deleted un-uploaded; a failed upload only warns. `POSTHOG_PERSONAL_API_KEY` is a different
-  thing (local feature-flag evaluation).
+  thing (local feature-flag evaluation). Two hosts, not one: `POSTHOG_HOST` (from the secret
+  `VITE_POSTHOG_HOST`, `eu.i.posthog.com`) is where events are posted, and `POSTHOG_API_HOST` (the
+  same variable as `POSTHOG_CLI_HOST`, `eu.posthog.com`) is where the GDPR person-delete API lives;
+  the deletion step stays off until `POSTHOG_PERSONAL_API_KEY` and `POSTHOG_PROJECT_ID` are set.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).

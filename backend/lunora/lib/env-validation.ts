@@ -117,6 +117,7 @@ const optionalEnvSchema = z.object({
     // Checked by `parseOidcIssuer`, not here: this schema runs per request, and
     // a bad issuer must switch off OIDC alone rather than every route.
     OIDC_ISSUER: z.string().trim().optional(),
+    POSTHOG_API_HOST: z.string().trim().optional(),
     POSTHOG_API_KEY: z.string().trim().optional(),
     POSTHOG_HOST: z.string().trim().optional(),
     POSTHOG_PERSONAL_API_KEY: z.string().trim().optional(),

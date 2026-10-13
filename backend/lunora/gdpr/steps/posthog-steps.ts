@@ -15,7 +15,9 @@ export const deletePostHogPerson = internalAction
             return null;
         }
 
-        const host = process.env.POSTHOG_HOST || "https://us.posthog.com";
+        // The private API lives on the app host (`eu.posthog.com`), not on the ingestion host
+        // `POSTHOG_HOST` names (`eu.i.posthog.com`), which the error-tracking sink posts to.
+        const host = (process.env.POSTHOG_API_HOST || "https://us.posthog.com").replace(/\/+$/u, "");
         // Use the Persons v3 bulk-delete endpoint which accepts distinct_ids directly
         const url = `${host}/api/projects/${projectId}/persons/bulk_delete/`;
 

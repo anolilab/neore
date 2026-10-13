@@ -488,6 +488,8 @@ jobs:
                   APP_NAME: "${{ secrets.APP_NAME }}"
                   POSTHOG_API_KEY: "${{ secrets.VITE_POSTHOG_API_KEY }}"
                   POSTHOG_HOST: "${{ secrets.VITE_POSTHOG_HOST }}"
+                  # The app host the person-deletion API lives on; the ingestion host above has no such route.
+                  POSTHOG_API_HOST: "${{ vars.POSTHOG_CLI_HOST }}"
                   POSTHOG_PERSONAL_API_KEY: "${{ secrets.POSTHOG_PERSONAL_API_KEY }}"
                   # Realtime dictation token for the web Worker; unset = Web Speech fallback.
                   ELEVENLABS_API_KEY: "${{ secrets.ELEVENLABS_API_KEY }}"
