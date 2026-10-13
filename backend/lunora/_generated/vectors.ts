@@ -26,10 +26,7 @@ export const LUNORA_VECTOR_INDEXES: ReadonlyArray<LunoraVectorIndex> = [
     { name: "embeddings-128", table: "embeddings_128", field: "vector", dimensions: 128, metric: "cosine", metadata: ["model_table_userId","model_table_threadId"] },
     { name: "embeddings-1408", table: "embeddings_1408", field: "vector", dimensions: 1408, metric: "cosine", metadata: ["model_table_userId","model_table_threadId"] },
     { name: "embeddings-1536", table: "embeddings_1536", field: "vector", dimensions: 1536, metric: "cosine", metadata: ["model_table_userId","model_table_threadId"] },
-    { name: "embeddings-2048", table: "embeddings_2048", field: "vector", dimensions: 2048, metric: "cosine", metadata: ["model_table_userId","model_table_threadId"] },
     { name: "embeddings-256", table: "embeddings_256", field: "vector", dimensions: 256, metric: "cosine", metadata: ["model_table_userId","model_table_threadId"] },
-    { name: "embeddings-3072", table: "embeddings_3072", field: "vector", dimensions: 3072, metric: "cosine", metadata: ["model_table_userId","model_table_threadId"] },
-    { name: "embeddings-4096", table: "embeddings_4096", field: "vector", dimensions: 4096, metric: "cosine", metadata: ["model_table_userId","model_table_threadId"] },
     { name: "embeddings-512", table: "embeddings_512", field: "vector", dimensions: 512, metric: "cosine", metadata: ["model_table_userId","model_table_threadId"] },
     { name: "embeddings-768", table: "embeddings_768", field: "vector", dimensions: 768, metric: "cosine", metadata: ["model_table_userId","model_table_threadId"] },
 ];

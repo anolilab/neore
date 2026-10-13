@@ -416,8 +416,10 @@ const BackendFiles = Cloudflare.R2.Bucket("neore-backend-files", {
 });
 
 // One Vectorize index per embedding width, because a vector index pins
-// `dimensions` for its whole life.
-const EMBEDDING_DIMENSIONS = [128, 256, 512, 768, 1024, 1408, 1536, 2048, 3072, 4096] as const;
+// `dimensions` for its whole life. Vectorize caps an index at 1536 dimensions
+// (`IndexInvalidConfig: Dimensions must be in range: [32, 1536]`), so no wider
+// width exists here or in `backend/lunora/agent/vector/tables.ts`.
+const EMBEDDING_DIMENSIONS = [128, 256, 512, 768, 1024, 1408, 1536] as const;
 
 const embeddingIndexes = EMBEDDING_DIMENSIONS.map((dimensions) => ({
     dimensions,

@@ -8149,8 +8149,8 @@ export interface Caller {
         vector: {
             deleteBatch: (args: { ids: Array<unknown> }) => Promise<null>;
             deleteBatchForThread: (args: { cursor?: string; limit: number; model: string; threadId: string; vectorDimension: unknown }) => Promise<{ continueCursor: string | null; isDone: boolean }>;
-            insertBatch: (args: { vectorDimension: unknown; vectors: Array<{ messageId?: Id<"messages">; model: string; table: string; threadId?: string; userId?: string; vector: Array<number> }> }) => Promise<import("lunorash/server").Id<"embeddings_128" | "embeddings_256" | "embeddings_512" | "embeddings_768" | "embeddings_1024" | "embeddings_1408" | "embeddings_1536" | "embeddings_2048" | "embeddings_3072" | "embeddings_4096">[]>;
-            paginate: (args: { cursor?: string; limit: number; table?: string; targetModel: string; vectorDimension: unknown }) => Promise<{} & { continueCursor: string | null; ids: import("lunorash/server").Id<"embeddings_128" | "embeddings_256" | "embeddings_512" | "embeddings_768" | "embeddings_1024" | "embeddings_1408" | "embeddings_1536" | "embeddings_2048" | "embeddings_3072" | "embeddings_4096">[]; isDone: boolean; }>;
+            insertBatch: (args: { vectorDimension: unknown; vectors: Array<{ messageId?: Id<"messages">; model: string; table: string; threadId?: string; userId?: string; vector: Array<number> }> }) => Promise<import("lunorash/server").Id<"embeddings_128" | "embeddings_256" | "embeddings_512" | "embeddings_768" | "embeddings_1024" | "embeddings_1408" | "embeddings_1536">[]>;
+            paginate: (args: { cursor?: string; limit: number; table?: string; targetModel: string; vectorDimension: unknown }) => Promise<{} & { continueCursor: string | null; ids: import("lunorash/server").Id<"embeddings_128" | "embeddings_256" | "embeddings_512" | "embeddings_768" | "embeddings_1024" | "embeddings_1408" | "embeddings_1536">[]; isDone: boolean; }>;
             updateBatch: (args: { vectors: Array<{ id: unknown; model: string; vector: Array<number> }> }) => Promise<null>;
         };
         workflow_executions: {

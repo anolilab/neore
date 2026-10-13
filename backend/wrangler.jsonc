@@ -88,10 +88,7 @@
         { "binding": "EMBEDDINGS_768", "index_name": "embeddings-768" },
         { "binding": "EMBEDDINGS_1024", "index_name": "embeddings-1024" },
         { "binding": "EMBEDDINGS_1408", "index_name": "embeddings-1408" },
-        { "binding": "EMBEDDINGS_1536", "index_name": "embeddings-1536" },
-        { "binding": "EMBEDDINGS_2048", "index_name": "embeddings-2048" },
-        { "binding": "EMBEDDINGS_3072", "index_name": "embeddings-3072" },
-        { "binding": "EMBEDDINGS_4096", "index_name": "embeddings-4096" }
+        { "binding": "EMBEDDINGS_1536", "index_name": "embeddings-1536" }
     ],
 
     // The jobs queue and its DLQ (`lunora/queues.ts`). Long and latency-critical

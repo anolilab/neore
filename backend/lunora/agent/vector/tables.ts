@@ -32,7 +32,9 @@ export const vEmbeddingsWithoutDenormalizedFieldsFields = omit(embeddings, ["mod
 export const vEmbeddingsWithoutDenormalizedFields = v.object(vEmbeddingsWithoutDenormalizedFieldsFields);
 export type EmbeddingsWithoutDenormalizedFields = Infer<typeof vEmbeddingsWithoutDenormalizedFields>;
 
-export const VectorDimensions = [128, 256, 512, 768, 1024, 1408, 1536, 2048, 3072, 4096] as const;
+// Cloudflare Vectorize accepts 32-1536 dimensions per index, so 1536 is the widest
+// embedding the deploy can store. A wider model must be asked for fewer dimensions.
+export const VectorDimensions = [128, 256, 512, 768, 1024, 1408, 1536] as const;
 
 export function validateVectorDimension(dimension: number): asserts dimension is VectorDimension {
     if (!VectorDimensions.includes(dimension as VectorDimension)) {
