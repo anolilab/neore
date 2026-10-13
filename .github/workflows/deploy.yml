@@ -285,14 +285,17 @@ jobs:
             - name: "Upload the web source maps to PostHog, then delete them"
               env:
                   POSTHOG_CLI_API_KEY: "${{ secrets.POSTHOG_CLI_API_KEY }}"
-                  POSTHOG_CLI_PROJECT_ID: "${{ secrets.POSTHOG_CLI_PROJECT_ID }}"
-                  POSTHOG_CLI_HOST: "${{ vars.POSTHOG_CLI_HOST }}"
+                  POSTHOG_CLI_PROJECT_ID: "${{ vars.POSTHOG_PROJECT_ID }}"
+                  VITE_POSTHOG_HOST: "${{ secrets.VITE_POSTHOG_HOST }}"
                   RELEASE_VERSION: "${{ github.sha }}"
                   RELEASE_BUILD: "${{ github.run_number }}"
               run: |
                   if [[ -z "$POSTHOG_CLI_API_KEY" || -z "$POSTHOG_CLI_PROJECT_ID" ]]; then
-                      echo "::notice::POSTHOG_CLI_API_KEY / POSTHOG_CLI_PROJECT_ID are not set on this environment: the source maps are deleted without being uploaded."
+                      echo "::notice::POSTHOG_CLI_API_KEY / POSTHOG_PROJECT_ID are not set on this environment: the source maps are deleted without being uploaded."
                   else
+                      # The CLI talks to the app host (eu.posthog.com), events go to eu.i.posthog.com.
+                      export POSTHOG_CLI_HOST="${VITE_POSTHOG_HOST/.i./.}"
+
                       version="0.18.10"
                       sha256="29f2d4409f08205bab7d52f9cc919e964ea2c867ec568b3acdd9ee3eb4149c3d"
                       archive="posthog-cli-x86_64-unknown-linux-gnu.tar.gz"
@@ -488,12 +491,10 @@ jobs:
                   APP_NAME: "${{ secrets.APP_NAME }}"
                   POSTHOG_API_KEY: "${{ secrets.VITE_POSTHOG_API_KEY }}"
                   POSTHOG_HOST: "${{ secrets.VITE_POSTHOG_HOST }}"
-                  # The app host the person-deletion API lives on; the ingestion host above has no such route.
-                  POSTHOG_API_HOST: "${{ vars.POSTHOG_CLI_HOST }}"
                   POSTHOG_PERSONAL_API_KEY: "${{ secrets.POSTHOG_PERSONAL_API_KEY }}"
                   # Realtime dictation token for the web Worker; unset = Web Speech fallback.
                   ELEVENLABS_API_KEY: "${{ secrets.ELEVENLABS_API_KEY }}"
-                  POSTHOG_PROJECT_ID: "${{ secrets.POSTHOG_PROJECT_ID }}"
+                  POSTHOG_PROJECT_ID: "${{ vars.POSTHOG_PROJECT_ID }}"
                   # The address the account-deletion email names; the web build
                   # shows the same one (VITE_DPO_EMAIL).
                   DPO_EMAIL: "${{ secrets.VITE_DPO_EMAIL }}"
