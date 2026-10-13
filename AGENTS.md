@@ -1854,6 +1854,14 @@ error")` (any transport, including the SSRF-guarded tool
   React renders it on the client instead; a new heavy lazy chunk goes in the list, not in the
   cap. Cloudflare's error names no file, only "exceeded the uncompressed size limit", and
   every Worker that depends on the website fails with the same message.
+- **Held back on purpose when the dependencies were last bumped (2026-10-13)**, each with a
+  comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7),
+  `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
+  `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
+  beta is a day old and a deploy has passed on it. The Lunora catalog follows the `alpha` tags,
+  except `@lunora/workflow`, kept at 72 (the one `@lunora/runtime` pins); `@lunora/agent` still pulls
+  75 through codegen, so two copies of the branded `workflow` exist, but nothing that `tsc` sees
+  reaches the second.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).
