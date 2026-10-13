@@ -9,7 +9,7 @@ on: # yamllint disable-line rule:truthy
     workflow_dispatch:
         inputs:
             environment:
-                description: "Target environment: the GitHub environment and Cloudflare account"
+                description: "Target environment: the GitHub environment and Cloudflare account (production only runs from a v* tag: pick the tag under \"Use workflow from\")"
                 required: true
                 default: "production"
                 type: "choice"

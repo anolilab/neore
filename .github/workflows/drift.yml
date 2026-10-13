@@ -25,9 +25,10 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                environment: ["staging", "production"]
-        # `production` needs its reviewer's approval to run, like a deploy: the job holds
-        # the same Cloudflare token.
+                # Not production: that environment only accepts `v*` tags, and a scheduled run
+                # is always on the default branch. Check it by hand from a tag, with the
+                # same command: `alchemy drift --stage production`.
+                environment: ["staging"]
         environment: "${{ matrix.environment }}"
         permissions:
             contents: "read"

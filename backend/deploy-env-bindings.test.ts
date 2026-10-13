@@ -44,6 +44,7 @@ const GITHUB_TOKEN_FROM_ACTIONS_SECRET = /GITHUB_TOKEN:\s*"\$\{\{\s*secrets\.GIT
 const bindingLines = alchemyScript.split("\n").map((line) => line.trim());
 
 const NAMED_WITH_STAGE = /\(stage === "production" \? name : `\$\{name\}-\$\{stage\}`\)/u;
+const ACCESS_ENABLED_FROM_VARIABLE = /^ +ACCESS_ENABLED: "\$\{\{ vars\.ACCESS_ENABLED \}\}"$/mu;
 const GATEWAY_BACKEND_ORIGIN = /LUNORA_URL:\s*requireEnv\("BACKEND_PUBLIC_ORIGIN"\)/u;
 // Production only: the gateway passes its crons when the stage is production.
 const GATEWAY_CRONS_PASSED = /crons: stage === "production" \? \[\.\.\.GATEWAY_CRONS\] : \[\]/u;
@@ -319,8 +320,8 @@ describe("deploy env bindings", () => {
 
         it("puts Access in front of the web Worker only, opt-in, and never in production", () => {
             expect(alchemyScript).toContain('const accessEnabled = stage !== "production" && process.env.ACCESS_ENABLED === "true";');
-            expect(alchemyScript.match(/\.\.\.\(accessEnabled \?/gu)).toHaveLength(1);
-            expect(deployWorkflow).toMatch(/^\s+ACCESS_ENABLED: "\$\{\{ vars\.ACCESS_ENABLED \}\}"$/mu);
+            expect(alchemyScript.split("...(accessEnabled ?")).toHaveLength(2);
+            expect(deployWorkflow).toMatch(ACCESS_ENABLED_FROM_VARIABLE);
         });
 
         it("builds the app and deploys the backend against the same origins", () => {
