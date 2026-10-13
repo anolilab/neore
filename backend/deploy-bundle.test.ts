@@ -17,7 +17,7 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { BACKEND_BUILD, RUST_WORKER_UPLOAD, WORKER_BUILD, zodEnglishOnlyLocales } from "../scripts/worker-bundle";
+import { BACKEND_BUILD, RUST_WORKER_UPLOAD, WEB_CLIENT_ONLY_CHUNKS, WEB_UPLOAD_RULES, WORKER_BUILD, zodEnglishOnlyLocales } from "../scripts/worker-bundle";
 
 const REPO_ROOT = join(import.meta.dirname, "..");
 const alchemyScript = readFileSync(join(REPO_ROOT, "alchemy.run.ts"), "utf8");
@@ -134,5 +134,23 @@ describe("zodEnglishOnlyLocales", () => {
         for (const entry of ["classic/external.js", "core/index.js", "mini/external.js"]) {
             expect(readFileSync(join(zodRoot, "v4", entry), "utf8")).toContain(`export * as locales from "../locales/index.js";`);
         }
+    });
+});
+
+describe("web Worker upload", () => {
+    it("is uploaded under the module rules that leave the browser-only chunks out", () => {
+        const website = workerCalls.find(({ name }) => name === "website");
+
+        expect(website?.options).toContain("rules: WEB_UPLOAD_RULES");
+    });
+
+    it("excludes every browser-only chunk and keeps wrangler's default module kinds", () => {
+        const globs = WEB_UPLOAD_RULES.flatMap((rule) => rule.globs);
+
+        for (const chunk of WEB_CLIENT_ONLY_CHUNKS) {
+            expect(globs).toContain(`!**/${chunk}-*.js`);
+        }
+
+        expect(globs).toStrictEqual(expect.arrayContaining(["**/*.js", "**/*.mjs", "**/*.wasm"]));
     });
 });

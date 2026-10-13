@@ -1829,6 +1829,16 @@ error")` (any transport, including the SSRF-guarded tool
   apply. It needs a Zero Trust organisation in the account and the token's account-scoped
   `Access: Apps and Policies Write` and `Access: Organizations, Identity Providers, and Groups
   Write`; without them the deploy fails, hence the switch.
+- **The web Worker is near Cloudflare's 64 MiB module cap, so it uploads without its browser-only
+  chunks.** The SSR output is one chunk per `import()` target: ~3,300 chunks, ~68 MiB of JS,
+  and the spreadsheet editor alone is 12 MiB. `WEB_CLIENT_ONLY_CHUNKS` in
+  `scripts/worker-bundle.ts` names the ones only a click or effect loads (univer, elk, xlsx,
+  jspdf, pptxgen); `WEB_UPLOAD_RULES` leaves them out (~52 MiB uploaded) and
+  `scripts/check-web-size.ts` fails the deploy before the upload when the total passes 60 MiB.
+  Excluding a chunk the server DOES import makes that lazy boundary fail on the server, and
+  React renders it on the client instead; a new heavy lazy chunk goes in the list, not in the
+  cap. Cloudflare's error names no file, only "exceeded the uncompressed size limit", and
+  every Worker that depends on the website fails with the same message.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).

@@ -7,7 +7,7 @@ import tseslint from "typescript-eslint";
  * types without checking them; `tsconfig.deploy.json` is the program both this
  * and `pnpm lint:types:deploy` type-check it with.
  */
-const DEPLOY_FILES = ["alchemy.run.ts", "scripts/worker-bundle.ts"];
+const DEPLOY_FILES = ["alchemy.run.ts", "scripts/worker-bundle.ts", "scripts/check-web-size.ts"];
 
 export default [
     {
