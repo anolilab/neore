@@ -37,6 +37,7 @@ import { motion } from "motion/react";
 import type { ReactNode } from "react";
 
 import { LinkButton } from "@/components/link-button";
+import SignUpOpenOnly from "@/features/auth/components/sign-up-open-only";
 import { localizeModelDescription } from "@/lib/model-descriptions";
 
 import LandingFooter from "./landing-footer";
@@ -458,11 +459,13 @@ const ModelsPage = () => {
                             <p className="mb-8 max-w-2xl text-base leading-relaxed text-white/50 sm:text-lg">
                                 {t`${TEXT_CATALOG.length}+ text models, ${IMAGE_CATALOG.length}+ image models, and ${VIDEO_CATALOG.length}+ video models — from Claude and GPT-5 to Flux and Veo — all included in one plan. Switch between any of them mid-conversation.`}
                             </p>
-                            <div className="flex flex-wrap gap-3">
-                                <LinkButton size="marketing" to="/chat" variant="marketing">
-                                    {t`Try it free`} <ArrowRight className="ml-1.5 size-3.5" />
-                                </LinkButton>
-                            </div>
+                            <SignUpOpenOnly>
+                                <div className="flex flex-wrap gap-3">
+                                    <LinkButton size="marketing" to="/chat" variant="marketing">
+                                        {t`Try it free`} <ArrowRight className="ml-1.5 size-3.5" />
+                                    </LinkButton>
+                                </div>
+                            </SignUpOpenOnly>
                         </motion.div>
                     </section>
 
@@ -512,9 +515,11 @@ const ModelsPage = () => {
                                 </Trans>
                             </h2>
                             <p className="mx-auto mb-8 max-w-md text-base text-white/50">{t`Start free with 20 messages a day — no credit card required.`}</p>
-                            <LinkButton size="marketing" to="/chat" variant="marketing">
-                                {t`Get started free`} <ArrowRight className="ml-2 size-4" />
-                            </LinkButton>
+                            <SignUpOpenOnly>
+                                <LinkButton size="marketing" to="/chat" variant="marketing">
+                                    {t`Get started free`} <ArrowRight className="ml-2 size-4" />
+                                </LinkButton>
+                            </SignUpOpenOnly>
                         </motion.div>
                     </section>
                 </div>

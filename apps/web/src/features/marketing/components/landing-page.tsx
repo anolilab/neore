@@ -27,6 +27,7 @@ import type { ComponentType, FC, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LinkButton } from "@/components/link-button";
+import SignUpOpenOnly from "@/features/auth/components/sign-up-open-only";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import Composer from "@/features/chat/thread/composer";
@@ -613,9 +614,11 @@ const LandingPage: FC = () => {
                         </FadeIn>
 
                         <div className="flex flex-wrap items-center gap-3">
-                            <LinkButton size="marketing" to="/chat" variant="marketing">
-                                {t`Try it free`}
-                            </LinkButton>
+                            <SignUpOpenOnly>
+                                <LinkButton size="marketing" to="/chat" variant="marketing">
+                                    {t`Try it free`}
+                                </LinkButton>
+                            </SignUpOpenOnly>
                             <Button size="marketing" variant="marketing-ghost">
                                 {t`Contact sales`} <ArrowRight className="ml-1.5 size-3.5" />
                             </Button>
@@ -745,11 +748,13 @@ const LandingPage: FC = () => {
                                                 {i18n._(feature.description)}
                                             </p>
 
-                                            <div>
-                                                <LinkButton size="marketing" to="/chat" variant="marketing">
-                                                    {t`Get started`} <ArrowRight className="ml-2 size-4" />
-                                                </LinkButton>
-                                            </div>
+                                            <SignUpOpenOnly>
+                                                <div>
+                                                    <LinkButton size="marketing" to="/chat" variant="marketing">
+                                                        {t`Get started`} <ArrowRight className="ml-2 size-4" />
+                                                    </LinkButton>
+                                                </div>
+                                            </SignUpOpenOnly>
                                         </div>
                                     </FadeIn>
                                 </div>
@@ -1046,9 +1051,16 @@ const LandingPage: FC = () => {
                                         </Button>
                                     )}
                                     {(!(tier.id === "pro" || tier.id === "team") || (!isSignedIn && !isSessionUnknown)) && (
-                                        <LinkButton className="w-full" size="marketing" to={tier.href} variant={tier.popular ? "marketing" : "marketing-ghost"}>
-                                            {i18n._(tier.cta)}
-                                        </LinkButton>
+                                        <SignUpOpenOnly>
+                                            <LinkButton
+                                                className="w-full"
+                                                size="marketing"
+                                                to={tier.href}
+                                                variant={tier.popular ? "marketing" : "marketing-ghost"}
+                                            >
+                                                {i18n._(tier.cta)}
+                                            </LinkButton>
+                                        </SignUpOpenOnly>
                                     )}
                                 </motion.div>
                             ))}
@@ -1080,11 +1092,13 @@ const LandingPage: FC = () => {
                                 {t`30+ models. Images, video, code, and documents. 20 free messages a day — no credit card, cancel anytime.`}
                             </p>
                             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                                <motion.div className="w-full sm:w-auto" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                                    <LinkButton size="marketing" to="/chat" variant="marketing">
-                                        {t`Get started free`} <ArrowRight className="ml-2 size-4" />
-                                    </LinkButton>
-                                </motion.div>
+                                <SignUpOpenOnly>
+                                    <motion.div className="w-full sm:w-auto" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                                        <LinkButton size="marketing" to="/chat" variant="marketing">
+                                            {t`Get started free`} <ArrowRight className="ml-2 size-4" />
+                                        </LinkButton>
+                                    </motion.div>
+                                </SignUpOpenOnly>
                                 <Button size="marketing" variant="marketing-ghost">
                                     {t`Talk to sales`}
                                 </Button>

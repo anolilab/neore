@@ -10,7 +10,10 @@ import { useState } from "react";
 
 import Neore from "@/assets/logo/neore.svg?react";
 import { LinkButton } from "@/components/link-button";
+import SignUpOpenOnly from "@/features/auth/components/sign-up-open-only";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
+import { isSignUpOpen } from "@/features/auth/lib/sign-up-open";
+import env from "@/lib/env";
 
 export type NavTheme = "dark" | "light";
 
@@ -98,9 +101,11 @@ const Navbar: FC<{ theme?: NavTheme }> = ({ theme = "dark" }) => {
                             <LinkButton size="marketing" to="/auth/sign-in" variant="marketing-ghost">
                                 {t`Login`}
                             </LinkButton>
-                            <LinkButton size="marketing" to="/chat" variant="marketing">
-                                {t`Try it free`}
-                            </LinkButton>
+                            <SignUpOpenOnly>
+                                <LinkButton size="marketing" to="/chat" variant="marketing">
+                                    {t`Try it free`}
+                                </LinkButton>
+                            </SignUpOpenOnly>
                         </>
                     )}
                 </div>
@@ -196,10 +201,12 @@ const Navbar: FC<{ theme?: NavTheme }> = ({ theme = "dark" }) => {
                                         {t`Login`}
                                     </LinkButton>
                                 )}
-                                <LinkButton className="w-full" size="marketing" to="/chat" variant="marketing">
-                                    {isAuthenticated ? t`Go to chat` : t`Get Access`}
-                                    <ArrowRight className="ml-1.5 size-3.5" />
-                                </LinkButton>
+                                {(isAuthenticated || isSignUpOpen(env.VITE_SIGNUP_INVITE_ONLY)) && (
+                                    <LinkButton className="w-full" size="marketing" to="/chat" variant="marketing">
+                                        {isAuthenticated ? t`Go to chat` : t`Get Access`}
+                                        <ArrowRight className="ml-1.5 size-3.5" />
+                                    </LinkButton>
+                                )}
                             </div>
                         </nav>
                     </div>
