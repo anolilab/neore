@@ -18,6 +18,13 @@ describe(posthogErrorSink, () => {
         expect(posthogErrorSink({})).toBeUndefined();
     });
 
+    it("leaves ctx.db uninstrumented, so its table facades survive", () => {
+        // With database telemetry on, Lunora wraps `ctx.db` in a proxy that loses the members
+        // assigned onto it afterwards, which are the facades: `ctx.db.<table>` reads as
+        // undefined in any Worker that has a sink. Drop this test with the workaround.
+        expect(posthogErrorSink(ENV)?.instrumentDatabase).toBe("off");
+    });
+
     it("reports a 5xx RPC and a logged error, and ignores a 4xx and a log line without one", () => {
         const fetchMock = vi.fn(async () => new Response(null));
 
