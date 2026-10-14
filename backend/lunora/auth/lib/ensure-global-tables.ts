@@ -102,10 +102,14 @@ export const resetEnsureGlobalTablesForTests = (): void => {
  * `CREATE TABLE IF NOT EXISTS` derived from it.
  *
  * Memoised per isolate, and skipped per DATABASE once done: the sweep is
- * idempotent but far from free — ~370 sequential statements for the 42 global
- * tables (a CREATE, a column probe and a sqlite_master read + CREATE INDEX per
- * index, per table), which every cold isolate paid on its first request —
- * any route, since `server.ts` awaits this ahead of the router.
+ * idempotent but not free — ~370 statements for the 42 global tables (a CREATE,
+ * a column probe and a sqlite_master read + CREATE INDEX per index, per table),
+ * which every cold isolate paid on its first request — any route, since
+ * `server.ts` awaits this ahead of the router. They were sequential D1 round
+ * trips (64 s for a fresh database from a deployed Worker); `@lunora/sql-store`
+ * alpha.176 sends them in a few batches when the executor has `batch`
+ * (`d1Executor` forwards it since `@lunora/auth` alpha.208): a re-sweep of the 42
+ * existing tables took ~3.4 s on staging (2026-10-14).
  * Now a cold isolate pays ONE read of `globalSchemaMarker` and sweeps only when
  * the schema's fingerprint (see `globalSchemaFingerprint`) has never been
  * provisioned on this database — i.e. once per schema change, per database.
