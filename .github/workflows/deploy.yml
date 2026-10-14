@@ -580,3 +580,65 @@ jobs:
                       .alchemy/**/*.wasm
                       !.alchemy/**/node_modules/**
                   retention-days: 3
+
+            # A deploy that "succeeds" is not a working app: the first staging deploys passed
+            # Alchemy while every real backend request failed (a 404 from a refused
+            # Worker-to-Worker fetch, then a 500 from a Lunora defect) and nothing noticed
+            # until a browser did. So call the new deployment: the backend's status, its
+            # health, one RPC that reads a `.global()` table (the path that broke), the
+            # gateway and the web app. The first request after a deploy can be slow, hence the
+            # retries. On a failure outside production, replay the RPC while tailing the
+            # Worker's logs; production's logs stay out of this public run log.
+            - name: "Smoke test the deployment"
+              if: "${{ !inputs.dry_run && steps.alchemy.conclusion == 'success' }}"
+              timeout-minutes: 20
+              env:
+                  BACKEND: "${{ steps.origins.outputs.backend }}"
+                  GATEWAY: "${{ steps.origins.outputs.gateway }}"
+                  SITE: "${{ steps.origins.outputs.site }}"
+                  STAGE: "${{ needs.resolve-env.outputs.stage }}"
+                  CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+                  CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+              run: |
+                  failed=0
+                  rpc='{"functionPath":"changelog_functions:getChangelogs","args":{}}'
+
+                  # check <label> <expected status regex> <curl arguments...>
+                  check() {
+                      local label=$1 expected=$2 attempt code=""
+                      shift 2
+
+                      for attempt in 1 2 3; do
+                          code="$(curl --silent --show-error --output "$RUNNER_TEMP/smoke.out" --write-out '%{http_code}' --max-time 150 "$@" || true)"
+
+                          if [[ "$code" =~ $expected ]]; then
+                              echo "ok     ${label}: ${code}"
+                              return 0
+                          fi
+
+                          echo "retry  ${label}: ${code:-no answer} (attempt ${attempt})"
+                          sleep 15
+                      done
+
+                      echo "::error::${label} answered ${code:-nothing}, expected ${expected}"
+                      head -c 600 "$RUNNER_TEMP/smoke.out"
+                      echo
+                      failed=1
+                  }
+
+                  check "backend status" '^200$' "${BACKEND}/_lunora/status"
+                  check "backend health" '^200$' "${BACKEND}/api/health"
+                  check "backend rpc (reads a global table)" '^200$' --request POST --header 'content-type: application/json' --data "$rpc" "${BACKEND}/_lunora/rpc"
+                  check "gateway health" '^200$' "${GATEWAY}/health"
+                  check "web app" '^(200|302)$' "${SITE}/"
+
+                  if [[ "$failed" -ne 0 && "$STAGE" != "production" ]]; then
+                      echo "---- replaying the RPC while tailing the Worker's logs"
+                      ( timeout 30 pnpm --filter @neore/backend exec wrangler tail "neore-backend-${STAGE}" --format json > "$RUNNER_TEMP/tail.log" 2>&1 & )
+                      sleep 10
+                      curl --silent --output /dev/null --max-time 60 --request POST --header 'content-type: application/json' --data "$rpc" "${BACKEND}/_lunora/rpc" || true
+                      sleep 15
+                      tail -c 8000 "$RUNNER_TEMP/tail.log" || true
+                  fi
+
+                  exit "$failed"
