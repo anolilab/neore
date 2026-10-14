@@ -4728,7 +4728,8 @@ export type Insert<T extends keyof DataModel> = InsertModel[T];
  * as type parameters only — there is no runtime value — so the `with` argument
  * and its return type can be inferred from {@link Relations}.
  */
-export interface OneRelation<Target extends keyof DataModel> {
+export interface OneRelation<Target extends keyof DataModel, Field extends string> {
+    readonly __field: Field;
     readonly __relationKind: "one";
     readonly __target: Target;
 }
@@ -4764,11 +4765,11 @@ export interface Relations {
     devices: {};
     documentHistory: {};
     documents: {
-        thread: OneRelation<"threads">;
+        thread: OneRelation<"threads", "threadId">;
         versions: ManyRelation<"documentVersions">;
     };
     documentVersions: {
-        document: OneRelation<"documents">;
+        document: OneRelation<"documents", "documentId">;
     };
     emails: {};
     embeddings_128: {};
@@ -4783,12 +4784,12 @@ export interface Relations {
     evalResults: {};
     evalRuns: {};
     files: {
-        folder: OneRelation<"folders">;
+        folder: OneRelation<"folders", "folderId">;
     };
     folders: {
         children: ManyRelation<"folders">;
         files: ManyRelation<"files">;
-        parent: OneRelation<"folders">;
+        parent: OneRelation<"folders", "parentId">;
     };
     followupSuggestions: {};
     gatewayNotifications: {};
@@ -4811,7 +4812,7 @@ export interface Relations {
     memoryDigests: {};
     memoryReflectionState: {};
     messages: {
-        thread: OneRelation<"threads">;
+        thread: OneRelation<"threads", "threadId">;
     };
     messengerConnections: {};
     nodeExecutions: {};
@@ -4827,7 +4828,7 @@ export interface Relations {
     pageVersions: {};
     passkey: {};
     persistentChunks: {
-        stream: OneRelation<"persistentStreams">;
+        stream: OneRelation<"persistentStreams", "streamId">;
     };
     persistentStreams: {
         chunks: ManyRelation<"persistentChunks">;
@@ -4840,7 +4841,7 @@ export interface Relations {
         threads: ManyRelation<"threads">;
     };
     promptHistory: {
-        prompt: OneRelation<"prompts">;
+        prompt: OneRelation<"prompts", "promptId">;
     };
     prompts: {
         history: ManyRelation<"promptHistory">;
@@ -4854,13 +4855,13 @@ export interface Relations {
     shardRoutes: {};
     signUpInvitation: {};
     skillFiles: {
-        skill: OneRelation<"skills">;
+        skill: OneRelation<"skills", "skillId">;
     };
     skillHistory: {
-        skill: OneRelation<"skills">;
+        skill: OneRelation<"skills", "skillId">;
     };
     skillInvocations: {
-        skill: OneRelation<"skills">;
+        skill: OneRelation<"skills", "skillId">;
     };
     skillRatings: {};
     skills: {
@@ -4870,7 +4871,7 @@ export interface Relations {
         userSkills: ManyRelation<"userSkills">;
     };
     skillStats: {
-        skill: OneRelation<"skills">;
+        skill: OneRelation<"skills", "skillId">;
     };
     streamDeltas: {};
     streamingMessages: {};
@@ -4883,18 +4884,18 @@ export interface Relations {
     teamSettings: {};
     temporaryThreads: {};
     threadAccess: {
-        thread: OneRelation<"threads">;
+        thread: OneRelation<"threads", "threadId">;
     };
     threadInvites: {
-        thread: OneRelation<"threads">;
+        thread: OneRelation<"threads", "threadId">;
     };
     threadKnowledge: {};
     threadPins: {
-        thread: OneRelation<"threads">;
+        thread: OneRelation<"threads", "threadId">;
     };
     threadRelationships: {
-        parentThread: OneRelation<"threads">;
-        thread: OneRelation<"threads">;
+        parentThread: OneRelation<"threads", "parentThreadId">;
+        thread: OneRelation<"threads", "threadId">;
     };
     threads: {
         access: ManyRelation<"threadAccess">;
@@ -4903,7 +4904,7 @@ export interface Relations {
         messages: ManyRelation<"messages">;
         parentRelationships: ManyRelation<"threadRelationships">;
         pins: ManyRelation<"threadPins">;
-        project: OneRelation<"projects">;
+        project: OneRelation<"projects", "projectId">;
         relationships: ManyRelation<"threadRelationships">;
     };
     threadTags: {};
@@ -4917,11 +4918,11 @@ export interface Relations {
     usageReplies: {};
     user: {};
     userConnectors: {
-        definition: OneRelation<"connectorDefinitions">;
+        definition: OneRelation<"connectorDefinitions", "connectorDefinitionId">;
     };
     userSettings: {};
     userSkills: {
-        skill: OneRelation<"skills">;
+        skill: OneRelation<"skills", "skillId">;
     };
     userVariableDefaults: {};
     verification: {};
