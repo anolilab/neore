@@ -25,9 +25,16 @@ describe("staging.yml (the request)", () => {
         expect(stagingWorkflow).toContain('-f environment=staging -f ref="$HEAD_SHA"');
     });
 
-    it("runs only for the staging label on a same-repository pull request", () => {
+    it("requests a deploy only when the staging label is applied to a same-repository pull request", () => {
+        expect(stagingWorkflow).toContain("github.event.action == 'labeled'");
+        expect(stagingWorkflow).toContain("github.event.label.name == 'staging'");
         expect(stagingWorkflow).toContain("github.event.pull_request.head.repo.full_name == github.repository");
-        expect(stagingWorkflow).toContain("contains(github.event.pull_request.labels.*.name, 'staging')");
+    });
+
+    it("takes the label off a pull request that changes, so an approval covers one commit", () => {
+        expect(stagingWorkflow).toContain("github.event.action == 'synchronize' || github.event.action == 'reopened'");
+        expect(stagingWorkflow).toContain('name: "staging"');
+        expect(stagingWorkflow).toContain("removeLabel");
     });
 
     it("holds no environment and no secrets of its own", () => {

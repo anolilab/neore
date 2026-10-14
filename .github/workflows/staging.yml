@@ -2,10 +2,15 @@
 
 name: "Staging"
 
-# A pull request carrying the `staging` label is built and deployed to the staging
-# environment (stage `staging`, the staging account) without being merged, and again on
-# every push while the label stays. There is ONE staging stack, so this replaces whatever
-# is deployed there, and the next deploy from `main` replaces it in turn.
+# Applying the `staging` label to a pull request builds and deploys its head commit to the
+# staging environment (stage `staging`, the staging account), without merging it. There is ONE
+# staging stack, so this replaces whatever is deployed there, and the next deploy from `main`
+# replaces it in turn.
+#
+# The label approves ONE COMMIT: the head when it was applied. A push (or a reopen) removes the
+# label again, so new code is never deployed because of an approval given to older code; to
+# deploy the new head, read it and apply the label again. A label cannot prove that anybody
+# else reviewed the code, only that somebody with triage rights asked for it.
 #
 # This file only asks. The staging environment accepts deployments from `main` alone, and
 # `deploy.yml` runs from `main` too, so the request is a dispatch of that workflow with
@@ -33,9 +38,9 @@ jobs:
         name: "Deploy this pull request to staging"
         if: >-
             github.repository == 'anolilab/neore'
+            && github.event.action == 'labeled'
+            && github.event.label.name == 'staging'
             && github.event.pull_request.head.repo.full_name == github.repository
-            && contains(github.event.pull_request.labels.*.name, 'staging')
-            && (github.event.action != 'labeled' || github.event.label.name == 'staging')
         runs-on: "ubuntu-24.04"
         timeout-minutes: 5
         permissions:
@@ -68,7 +73,7 @@ jobs:
                           marker,
                           `**Staging** deploy requested for \`${sha.slice(0, 7)}\`: [Deploy runs](${runs}).`,
                           "",
-                          "There is one staging stack: this replaces what is deployed there, and the next push to this pull request (while it keeps the `staging` label) or the next deploy from `main` replaces it again.",
+                          "There is one staging stack: this replaces what is deployed there, and the next deploy from `main` replaces it again. The label covers this commit only: a push removes it, and applying it again deploys the new head.",
                       ].join("\n");
 
                       const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
@@ -79,3 +84,35 @@ jobs:
                       } else {
                           await github.rest.issues.createComment({ owner, repo, issue_number, body });
                       }
+
+    revoke:
+        name: "Take the label off new code"
+        if: >-
+            github.repository == 'anolilab/neore'
+            && (github.event.action == 'synchronize' || github.event.action == 'reopened')
+            && github.event.pull_request.head.repo.full_name == github.repository
+            && contains(github.event.pull_request.labels.*.name, 'staging')
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 5
+        permissions:
+            pull-requests: "write"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Remove the label and say why"
+              uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
+              with:
+                  script: |
+                      const { owner, repo } = context.repo;
+                      const issue_number = context.payload.pull_request.number;
+
+                      await github.rest.issues.removeLabel({ owner, repo, issue_number, name: "staging" });
+                      await github.rest.issues.createComment({
+                          owner,
+                          repo,
+                          issue_number,
+                          body: `The \`staging\` label was removed because this pull request changed (\`${context.payload.pull_request.head.sha.slice(0, 7)}\`). Read the new commits and apply the label again to deploy them.`,
+                      });
