@@ -22,6 +22,11 @@ on: # yamllint disable-line rule:truthy
                 required: false
                 default: ""
                 type: "string"
+            ref:
+                description: "Commit to build and deploy instead of the one this workflow runs from (a full SHA; not for production). The label-triggered staging deploy of a pull request passes its head"
+                required: false
+                default: ""
+                type: "string"
             adopt:
                 description: "Take over existing resources of the same names (first deploy over a manually created or older setup only)"
                 required: false
@@ -46,6 +51,10 @@ on: # yamllint disable-line rule:truthy
                 required: true
                 type: "string"
             stage:
+                required: false
+                default: ""
+                type: "string"
+            ref:
                 required: false
                 default: ""
                 type: "string"
@@ -87,6 +96,9 @@ jobs:
         name: "Resolve environment"
         runs-on: "ubuntu-24.04"
         timeout-minutes: 5
+        permissions:
+            contents: "read"
+            pull-requests: "read"
         outputs:
             # The GitHub environment, which decides the Cloudflare account and the secrets.
             # 'production' for a v* tag push; the chosen one for a dispatch or a call.
@@ -99,6 +111,8 @@ jobs:
               env:
                   INPUT_ENVIRONMENT: "${{ inputs.environment }}"
                   INPUT_STAGE: "${{ inputs.stage }}"
+                  INPUT_REF: "${{ inputs.ref }}"
+                  GH_TOKEN: "${{ github.token }}"
               run: |
                   environment="${INPUT_ENVIRONMENT:-production}"
                   stage="${INPUT_STAGE:-$environment}"
@@ -118,6 +132,31 @@ jobs:
                   if [[ "$environment" == "production" && "$stage" != "production" ]] || [[ "$environment" != "production" && "$stage" == "production" ]]; then
                       echo "::error::the production stage belongs to the production environment only"
                       exit 1
+                  fi
+
+                  # A commit other than the workflow's own is for the label-triggered staging
+                  # deploy of a pull request. This workflow always runs from the default branch,
+                  # so the check is the one thing a pull request cannot edit: the commit must be
+                  # a full SHA, the HEAD of an open pull request from this repository, and that
+                  # pull request must carry the `staging` label. Production deploys the tag it
+                  # runs from and never takes a ref.
+                  if [[ -n "$INPUT_REF" ]]; then
+                      if [[ ! "$INPUT_REF" =~ ^[0-9a-f]{40}$ ]]; then
+                          echo "::error::ref must be a full 40-character commit SHA"
+                          exit 1
+                      fi
+
+                      if [[ "$environment" != "staging" ]]; then
+                          echo "::error::a ref other than the workflow's own is for the staging environment only"
+                          exit 1
+                      fi
+
+                      labelled="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${INPUT_REF}/pulls" --jq "[.[] | select(.state == \"open\" and .head.sha == \"${INPUT_REF}\" and .head.repo.full_name == \"${GITHUB_REPOSITORY}\" and ([.labels[].name] | index(\"staging\")))] | length")"
+
+                      if [[ "$labelled" == "0" ]]; then
+                          echo "::error::${INPUT_REF} is not the head of an open pull request from this repository that carries the 'staging' label"
+                          exit 1
+                      fi
                   fi
 
                   echo "deploy-env=${environment}" >> "$GITHUB_OUTPUT"
@@ -153,6 +192,8 @@ jobs:
               uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
               with:
                   persist-credentials: false
+                  # Empty: the commit this run was started on.
+                  ref: "${{ inputs.ref }}"
 
             - name: "Setup resources and environment"
               uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
@@ -287,7 +328,7 @@ jobs:
                   POSTHOG_CLI_API_KEY: "${{ secrets.POSTHOG_CLI_API_KEY }}"
                   POSTHOG_CLI_PROJECT_ID: "${{ vars.POSTHOG_PROJECT_ID }}"
                   VITE_POSTHOG_HOST: "${{ secrets.VITE_POSTHOG_HOST }}"
-                  RELEASE_VERSION: "${{ github.sha }}"
+                  RELEASE_VERSION: "${{ inputs.ref || github.sha }}"
                   RELEASE_BUILD: "${{ github.run_number }}"
               run: |
                   if [[ -z "$POSTHOG_CLI_API_KEY" || -z "$POSTHOG_CLI_PROJECT_ID" ]]; then

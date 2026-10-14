@@ -1,0 +1,81 @@
+# https://help.github.com/en/categories/automating-your-workflow-with-github-actions
+
+name: "Staging"
+
+# A pull request carrying the `staging` label is built and deployed to the staging
+# environment (stage `staging`, the staging account) without being merged, and again on
+# every push while the label stays. There is ONE staging stack, so this replaces whatever
+# is deployed there, and the next deploy from `main` replaces it in turn.
+#
+# This file only asks. The staging environment accepts deployments from `main` alone, and
+# `deploy.yml` runs from `main` too, so the request is a dispatch of that workflow with
+# the pull request's head commit as `ref`. The authorisation is `deploy.yml`'s: it checks
+# that the commit is the head of an open pull request from this repository with the
+# `staging` label, so editing THIS file in a pull request cannot widen it.
+#
+# Same-repository pull requests only, like the preview.
+on: # yamllint disable-line rule:truthy
+    pull_request:
+        types:
+            - "labeled"
+            - "synchronize"
+            - "reopened"
+
+# One request at a time per pull request; the deploy serialises itself under `deploy-staging`.
+concurrency:
+    group: "staging-request-${{ github.event.pull_request.number }}"
+    cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+    request:
+        name: "Deploy this pull request to staging"
+        if: >-
+            github.repository == 'anolilab/neore'
+            && github.event.pull_request.head.repo.full_name == github.repository
+            && contains(github.event.pull_request.labels.*.name, 'staging')
+            && (github.event.action != 'labeled' || github.event.label.name == 'staging')
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 5
+        permissions:
+            actions: "write"
+            pull-requests: "write"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Dispatch the deploy from the default branch"
+              env:
+                  GH_TOKEN: "${{ github.token }}"
+                  DEFAULT_BRANCH: "${{ github.event.repository.default_branch }}"
+                  HEAD_SHA: "${{ github.event.pull_request.head.sha }}"
+              run: 'gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH" -f environment=staging -f ref="$HEAD_SHA"'
+
+            - name: "Post or update the comment"
+              uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
+              with:
+                  script: |
+                      const marker = "<!-- neore-staging -->";
+                      const { owner, repo } = context.repo;
+                      const issue_number = context.payload.pull_request.number;
+                      const sha = context.payload.pull_request.head.sha;
+                      const runs = `${context.serverUrl}/${owner}/${repo}/actions/workflows/deploy.yml`;
+
+                      const body = [
+                          marker,
+                          `**Staging** deploy requested for \`${sha.slice(0, 7)}\`: [Deploy runs](${runs}).`,
+                          "",
+                          "There is one staging stack: this replaces what is deployed there, and the next push to this pull request (while it keeps the `staging` label) or the next deploy from `main` replaces it again.",
+                      ].join("\n");
+
+                      const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+                      const existing = comments.find((comment) => comment.body?.startsWith(marker));
+
+                      if (existing) {
+                          await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+                      } else {
+                          await github.rest.issues.createComment({ owner, repo, issue_number, body });
+                      }

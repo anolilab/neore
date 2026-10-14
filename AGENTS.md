@@ -1879,6 +1879,16 @@ error")` (any transport, including the SSRF-guarded tool
   keys: the public project key (`VITE_POSTHOG_API_KEY`, events), the CI key above, and
   `POSTHOG_PERSONAL_API_KEY` (a runtime key bound to the Workers: local feature-flag
   evaluation and the GDPR person-delete, both OFF while it is unset). Keep them separate.
+- **A pull request can be deployed to staging without merging: give it the `staging` label**
+  (`staging.yml`, same-repository pull requests; redeploys on every push while the label stays).
+  There is ONE staging stack, so it replaces whatever is deployed there, and the next deploy from
+  `main` replaces it again. It works around, and does not widen, the rule that the `staging`
+  environment accepts deployments from `main` alone: `staging.yml` only dispatches `deploy.yml`
+  from `main` with the PR's head SHA as `ref`, and `deploy.yml` (always the `main` copy) checks
+  that the SHA is the head of an open same-repository pull request carrying the label before it
+  builds anything, so editing `staging.yml` in a PR changes nothing. `backend/deploy-staging-label.test.ts`
+  pins it. The build runs the PR's code with staging's secrets, which is why the label is the gate:
+  only label a PR whose code you have read.
 - **Known gap: the three dead-letter queues' 14-day retention is not set.** `Queues.Queue`
   takes only a name, so they keep Cloudflare's default (4 days). Raise it with the Cloudflare
   API/CLI until Alchemy exposes it (alchemy-run/alchemy#2226).

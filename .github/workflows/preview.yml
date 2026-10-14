@@ -44,6 +44,9 @@ jobs:
         permissions:
             contents: "read"
             deployments: "write"
+            # deploy.yml's first job reads pull requests (for the staging label check); a
+            # called workflow cannot hold more than its caller grants.
+            pull-requests: "read"
         uses: "./.github/workflows/deploy.yml"
         with:
             environment: "preview"
