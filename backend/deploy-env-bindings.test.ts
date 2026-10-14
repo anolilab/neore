@@ -354,3 +354,16 @@ describe("deploy env bindings", () => {
         });
     });
 });
+
+describe("Worker-to-Worker fetch over workers.dev", () => {
+    // Without the flag the runtime answers a fetch to another Worker of the same account
+    // on workers.dev with a 404 ("error code: 1042"): the auth proxy and the gateway's
+    // calls back to the backend failed in milliseconds. Both callers need it.
+    it("is set on the Workers that call the backend by its public URL", () => {
+        const website = alchemyScript.slice(alchemyScript.indexOf('Cloudflare.Worker("website"'));
+        const gateway = alchemyScript.slice(alchemyScript.indexOf('Cloudflare.Worker("llm-gateway"'));
+
+        expect(website.slice(0, website.indexOf("name: named")).includes("global_fetch_strictly_public")).toBe(true);
+        expect(gateway.slice(0, gateway.indexOf("name: named")).includes("global_fetch_strictly_public")).toBe(true);
+    });
+});

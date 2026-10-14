@@ -1879,6 +1879,12 @@ error")` (any transport, including the SSRF-guarded tool
   keys: the public project key (`VITE_POSTHOG_API_KEY`, events), the CI key above, and
   `POSTHOG_PERSONAL_API_KEY` (a runtime key bound to the Workers: local feature-flag
   evaluation and the GDPR person-delete, both OFF while it is unset). Keep them separate.
+- **A Worker cannot fetch another Worker of the same account on `workers.dev` unless it sets
+  `global_fetch_strictly_public`.** The runtime answers with a **404** ("error code: 1042") in a few
+  milliseconds, which looks like a missing route. Every non-production stage lives on workers.dev,
+  and the web app (auth proxy `/api/auth/*`, server-side calls) and the gateway (its calls back to the
+  backend) reach the backend by its public URL, so both carry the flag in `alchemy.run.ts`. A new Worker
+  that calls another by URL needs it too; a service binding does not.
 - **A Worker that passes the size cap can still fail Cloudflare's startup check** ("Script startup
   exceeded CPU time limit", error 10021): the module-level code of the whole bundle may take 1 s of
   CPU, and it is checked at upload, so it first shows on a deploy. `cd backend && pnpm exec wrangler
