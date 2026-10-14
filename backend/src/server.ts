@@ -244,10 +244,15 @@ const resolveSessionIdentity = async (env: Env, request: Request): Promise<null 
                 // `sid` was added simply carries none.
                 return { userId: payload.sub, ...(typeof payload.sid === "string" && { sessionId: payload.sid }) };
             }
-        } catch {
+        } catch (error) {
             // Expired, wrong signature, unreachable JWKS — fall through
             // to the cookie rather than assuming anonymous, so a stale
-            // bearer does not mask a valid same-origin session.
+            // bearer does not mask a valid same-origin session. The reason is
+            // logged (never the token): a rejected bearer otherwise surfaces
+            // only as "Please sign in to continue" on every RPC.
+            const { claim, code, message } = error as { claim?: string; code?: string; message?: string };
+
+            console.warn(JSON.stringify({ claim, code, message, source: "bearer-rejected" }));
         }
     }
 

@@ -47,6 +47,7 @@ import {
     OIDC_CLIENT_ID,
     OIDC_CLIENT_SECRET,
     OIDC_ISSUER,
+    PUBLIC_ORIGIN,
     SITE_URL,
     TRUSTED_EXTENSION_ORIGINS,
     SIGNUP_INVITE_ONLY,
@@ -454,6 +455,13 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
                 // everything that checks the session row — account deletion's
                 // freshness guard first — refused every user.
                 jwt: {
+                    // The verifier (`src/server.ts`) pins `iss` and `aud` to this Worker's
+                    // `PUBLIC_ORIGIN`. better-auth defaults both to `baseURL`, which is
+                    // `SITE_URL` — the WEB origin in every deployed topology — so a token
+                    // minted for the app origin was rejected on every RPC (anonymous on
+                    // `__root__`, "Please sign in to continue"). Only local dev, where
+                    // `@lunora/auth` allows the request's own loopback host, matched by luck.
+                    ...(PUBLIC_ORIGIN && { audience: PUBLIC_ORIGIN, issuer: PUBLIC_ORIGIN }),
                     definePayload: ({ session, user }) => {
                         return { ...user, sid: session.id };
                     },
