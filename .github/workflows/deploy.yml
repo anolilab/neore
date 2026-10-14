@@ -271,6 +271,10 @@ jobs:
                         # secret alone kills every credential flow, the site key alone
                         # shows a challenge nothing checks.
                         VITE_TURNSTILE_SITE_KEY: "${{ secrets.VITE_TURNSTILE_SITE_KEY }}"
+                        # The same switch the backend gets below; the marketing pages
+                        # hide their "try it free" buttons while registration is
+                        # invite-only (unset means invite-only on both sides).
+                        VITE_SIGNUP_INVITE_ONLY: "${{ vars.SIGNUP_INVITE_ONLY }}"
                     run: |
                         pnpm --workspace-root run build:packages
                         pnpm --dir apps/web build
