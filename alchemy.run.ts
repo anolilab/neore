@@ -838,7 +838,11 @@ export default Alchemy.Stack(
             build: BACKEND_BUILD,
             // See backend/wrangler.jsonc: `durable_object_io_tasks_prevent_eviction` keeps a
             // Durable Object alive for its pending I/O.
-            compatibility: { date: "2026-06-10", flags: ["nodejs_compat", "durable_object_io_tasks_prevent_eviction"] },
+            // `global_fetch_strictly_public`: the jobs queue and the scheduler dispatch each
+            // job to the backend's own public URL, which on workers.dev is a Worker of this
+            // account (see `Website`); without the flag every dispatch was a 404 (1042) and
+            // the guest-account merge after sign-up never ran.
+            compatibility: { date: "2026-06-10", flags: ["nodejs_compat", "durable_object_io_tasks_prevent_eviction", "global_fetch_strictly_public"] },
             // Production only: a preview has no traffic to justify a tick every minute.
             crons: stage === "production" ? [...backendBindings.crons] : [],
             domain: customDomain(requireEnv("BACKEND_PUBLIC_ORIGIN"), "BACKEND_PUBLIC_ORIGIN"),

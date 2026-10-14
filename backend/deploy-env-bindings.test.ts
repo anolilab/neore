@@ -366,4 +366,11 @@ describe("Worker-to-Worker fetch over workers.dev", () => {
         expect(website.slice(0, website.indexOf("name: named")).includes("global_fetch_strictly_public")).toBe(true);
         expect(gateway.slice(0, gateway.indexOf("name: named")).includes("global_fetch_strictly_public")).toBe(true);
     });
+
+    // The jobs queue and the scheduler dispatch to the backend's own public URL.
+    it("is set on the backend, which dispatches its queued jobs to itself", () => {
+        const backend = alchemyScript.slice(alchemyScript.indexOf('Cloudflare.Worker("neore-backend"'));
+
+        expect(backend.slice(0, backend.indexOf("name: named")).includes("global_fetch_strictly_public")).toBe(true);
+    });
 });
