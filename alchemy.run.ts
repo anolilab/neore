@@ -617,7 +617,12 @@ export const Website = Cloudflare.Worker("website", {
         // The server routes read these through `process.env` (`api/scribe-token.ts`,
         // `lib/posthog/server.ts`). Since 2025-04-01 nodejs_compat fills it from the
         // bindings by default (`nodejs_compat_populate_process_env`).
-        flags: ["nodejs_compat_v2"],
+        // `global_fetch_strictly_public`: the auth proxy and the server-side calls reach the
+        // backend by its public URL. Without the flag a Worker's fetch to another Worker of
+        // the SAME ACCOUNT on workers.dev (every non-production stage) is refused by the
+        // runtime with a 404 ("error code: 1042"), so sign-up and every server-rendered
+        // call failed in 3 ms while the backend answered fine to a browser.
+        flags: ["nodejs_compat_v2", "global_fetch_strictly_public"],
     },
     domain: customDomain(requireEnv("SITE_URL"), "SITE_URL"),
     env: boundWhereSet(["ELEVENLABS_API_KEY", "POSTHOG_PERSONAL_API_KEY"]),
@@ -739,7 +744,9 @@ export default Alchemy.Stack(
             build: WORKER_BUILD,
             // Pricing refresh, tier pools, usage aggregation, circuit-breaker reset.
             // Production only, for the same reason as the backend's crons.
-            compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2"] },
+            // `global_fetch_strictly_public`: the gateway calls the backend by its public URL,
+            // which on workers.dev is another Worker of this account (see `Website`).
+            compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2", "global_fetch_strictly_public"] },
             crons: stage === "production" ? [...GATEWAY_CRONS] : [],
             domain: customDomain(requireEnv("LLM_GATEWAY_URL"), "LLM_GATEWAY_URL"),
             env: llmGatewayEnv(website.url),
