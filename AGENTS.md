@@ -1386,15 +1386,15 @@ first real request. They were found by driving the app in a browser
   on the Worker's `scheduled()` tick). It rides as `?token=` only because that is the one
   name `LunoraClient`'s `wsToken` provider appends; `requestBearer` reads the
   `Authorization` header alone, and `?token=` is only ever redeemed as a ticket.
-- **The backend mints JWTs with whatever host it is reached on, not `SITE_URL`.**
-  `@lunora/auth` resolves the base URL per request and the app's auth proxy
-  rewrites the Host header, so a token minted through `/api/auth/token` on the
-  APP origin still comes back with `iss = aud =` the backend origin. The
-  consequence is a config coupling with no compile-time or runtime check:
-  **`VITE_LUNORA_URL` must equal the backend's `PUBLIC_ORIGIN`**, because
-  `server.ts` pins `jwtVerify` to it. If they drift, every bearer token verifies
-  as anonymous and the app looks signed-out with no error. The deploy job feeds
-  both from one secret — do not split them.
+- **The JWT's `iss` and `aud` are the backend's `PUBLIC_ORIGIN`, set explicitly** on the
+  `jwt()` plugin in `auth.ts`. better-auth defaults both to `baseURL`, which is `SITE_URL`
+  (the WEB origin in every deployed topology), and `@lunora/auth` only allows the request's
+  own host for a loopback `baseURL` — so locally the token matched `PUBLIC_ORIGIN` by luck,
+  and on staging every bearer failed `server.ts`'s pin: RPCs ran anonymous on `__root__`
+  ("Please sign in to continue") with no error logged, and the app looked signed-out. A
+  rejected bearer now logs its jose error (`bearer-rejected`). The config coupling stays:
+  **`VITE_LUNORA_URL` must equal the backend's `PUBLIC_ORIGIN`**. The deploy job feeds both
+  from one secret — do not split them.
 - **`<Unauthenticated>` means "no token", not "no session".** The RPC token is
   fetched after the session cookie lands, so a just-signed-in user reads as
   logged-out for a window. Two bugs lived in that gap (auto guest sign-in minting

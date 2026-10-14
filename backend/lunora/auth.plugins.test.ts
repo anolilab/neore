@@ -51,6 +51,22 @@ describe("buildAuthOptions plugins", { timeout: 30_000 }, () => {
     });
 });
 
+describe("buildAuthOptions bearer token", () => {
+    // `src/server.ts` pins `iss`/`aud` to PUBLIC_ORIGIN. better-auth defaults both to
+    // `baseURL` (SITE_URL, the web origin), which made every deployed RPC anonymous.
+    it("mints its JWTs for this Worker's PUBLIC_ORIGIN, not for SITE_URL", async () => {
+        vi.resetModules();
+        vi.stubEnv("PUBLIC_ORIGIN", "https://api.example.test");
+        vi.stubEnv("SITE_URL", "https://app.example.test");
+
+        const { buildAuthOptions } = await import("./auth");
+        const jwtPlugin = (buildAuthOptions().plugins ?? []).find((plugin) => plugin.id === "jwt") as { options?: { jwt?: { audience?: string; issuer?: string } } } | undefined;
+
+        expect(jwtPlugin?.options?.jwt?.issuer).toBe("https://api.example.test");
+        expect(jwtPlugin?.options?.jwt?.audience).toBe("https://api.example.test");
+    }, 30_000);
+});
+
 describe("buildAuthOptions account deletion", () => {
     // better-auth's `/delete-user` removes only its own rows, so turning it on
     // would let a user "delete" their account and leave all app data behind.
