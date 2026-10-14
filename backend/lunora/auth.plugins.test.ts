@@ -60,7 +60,8 @@ describe("buildAuthOptions bearer token", () => {
         vi.stubEnv("SITE_URL", "https://app.example.test");
 
         const { buildAuthOptions } = await import("./auth");
-        const jwtPlugin = (buildAuthOptions().plugins ?? []).find((plugin) => plugin.id === "jwt") as { options?: { jwt?: { audience?: string; issuer?: string } } } | undefined;
+        const jwtPlugin = (buildAuthOptions().plugins ?? []).find((plugin) => plugin.id === "jwt") as
+            { options?: { jwt?: { audience?: string; issuer?: string } } } | undefined;
 
         expect(jwtPlugin?.options?.jwt?.issuer).toBe("https://api.example.test");
         expect(jwtPlugin?.options?.jwt?.audience).toBe("https://api.example.test");
