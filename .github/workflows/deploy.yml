@@ -130,6 +130,14 @@ jobs:
     # with a single TypeScript IaC script that manages both the main
     # TanStack Start app and the document-parser service.
     # -----------------------------------------------------------------
+    # -----------------------------------------------------------------
+    # There is no separate backend deploy job.
+    #
+    # The backend is the `neore-backend` Worker in `alchemy.run.ts`, so it
+    # goes out with everything else in the Alchemy step above and needs no
+    # job of its own.
+    # -----------------------------------------------------------------
+
     deploy-cloudflare:
         name: "Deploy Cloudflare Workers via Alchemy (${{ needs.resolve-env.outputs.stage }})"
         needs: "resolve-env"
@@ -546,10 +554,29 @@ jobs:
                   url=$(echo "$output" | grep -oP "website: ['\"]?\Khttps?://[^'\"}\s]+" || true)
                   echo "website-url=${url}" >> "$GITHUB_OUTPUT"
 
-    # -----------------------------------------------------------------
-    # There is no separate backend deploy job.
-    #
-    # The backend is the `neore-backend` Worker in `alchemy.run.ts`, so it
-    # goes out with everything else in the Alchemy step above and needs no
-    # job of its own.
-    # -----------------------------------------------------------------
+            # Alchemy bundles every Worker itself (rolldown), so this is the script Cloudflare
+            # actually validates; `lunora build`'s bundle is a different one. Kept on failure too,
+            # because "Script startup exceeded CPU time limit" is rejected at upload, which is
+            # exactly when the bundle is wanted: profile it with
+            # `scripts/profile-worker-startup.ts`. Three days is plenty; the maps are the bulk.
+            - name: "List where Alchemy wrote its bundles"
+              if: "${{ !cancelled() && !inputs.dry_run }}"
+              run: "find .alchemy -maxdepth 4 -type d | sort | head -60 || true"
+
+            - name: "Keep the Worker bundles"
+              if: "${{ !cancelled() && !inputs.dry_run }}"
+              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              with:
+                  # `.alchemy` is a hidden directory, which upload-artifact skips unless told not to.
+                  include-hidden-files: true
+                  if-no-files-found: "warn"
+                  name: "worker-bundles-${{ needs.resolve-env.outputs.stage }}"
+                  # Module files only. The rest of `.alchemy` may hold state, traces or resolved
+                  # props, and a run's artifacts are readable by everyone who can read the repo.
+                  # The listing above shows the layout, for narrowing this further.
+                  path: |
+                      .alchemy/**/*.js
+                      .alchemy/**/*.mjs
+                      .alchemy/**/*.wasm
+                      !.alchemy/**/node_modules/**
+                  retention-days: 3
