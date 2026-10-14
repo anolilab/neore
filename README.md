@@ -8,6 +8,9 @@ document processing.
 > **License:** [FSL-1.1-ALv2](LICENSE.md) (Functional Source License). This is
 > source-available, not open source under the OSI definition.
 
+Daniel Bannert's work is supported by the community on
+[GitHub Sponsors](https://github.com/sponsors/prisis).
+
 ## Prerequisites
 
 - **Node.js** 22.22 (see `.nvmrc`)
