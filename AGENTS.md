@@ -1170,8 +1170,10 @@ first real request. They were found by driving the app in a browser
   from the local sqlite file until something touches it —
   `SELECT sql FROM sqlite_master WHERE name='x'` returning empty proves nothing
   about whether your schema change landed. Exercise the route, then re-read.
-  The Worker's own sweep (`auth/lib/ensure-global-tables.ts`, ~350 sequential
-  statements even when every table exists) is skipped once `globalSchemaMarker`
+  The Worker's own sweep (`auth/lib/ensure-global-tables.ts`, ~350 statements
+  even when every table exists, sent in a few D1 batches since `@lunora/sql-store`
+  alpha.176: ~3.4 s for a re-sweep on staging, 64 s when they were sequential round
+  trips) is skipped once `globalSchemaMarker`
   holds the schema's fingerprint, so a schema change is picked up by the next
   cold isolate; drop that row if you drop a table by hand. The ShardDO's lazy
   sweep inside Lunora still runs once per DO isolate.
@@ -1326,7 +1328,8 @@ first real request. They were found by driving the app in a browser
   ~30ms.** The 3s is Lunora creating the global tables lazily (368 statements,
   99 of them `sqlite_master` reads, measured 2026-09-25), and it re-runs after
   EVERY hot reload or restart — which is why "the first request is slow" in
-  dev. It is keyed on the D1 binding object: anything that hands `.global({ d1 })`
+  dev. (Locally the round trips are cheap; from a deployed Worker to D1 the same
+  sequential sweep was a minute, hence the batching above.) It is keyed on the D1 binding object: anything that hands `.global({ d1 })`
   a fresh wrapper per request re-runs it on every request (a timing proxy once
   did, costing ~3s per read). The old note here ("~1s per request, miniflare's
   loopback") was a misreading of this.

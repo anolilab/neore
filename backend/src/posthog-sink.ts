@@ -56,14 +56,7 @@ export const posthogErrorSink = (env: PostHogEnv): ObservabilitySink | undefined
         };
     };
 
-    // Instrumenting `ctx.db` wraps it in a proxy that, in this Lunora version, drops
-    // the members assigned onto it afterwards, and the table facades (`ctx.db.<table>`,
-    // `ctx.orm.<table>`) are exactly that: with a sink configured every read of a
-    // facade is `undefined` ("Cannot read properties of undefined (reading
-    // 'findFirst')"), which only shows in a deployed Worker because `lunora dev` has no
-    // sink. Turn the database telemetry off until the fix is released (the proxy
-    // forwards `set`), then drop this line.
-    const sink = webhookSink({
+    return webhookSink({
         transform: (event) =>
             event.error && event.error.status >= 500
                 ? capture(event.error, { code: event.error.code, function_path: event.functionPath, trace_id: event.traceId })
@@ -72,6 +65,4 @@ export const posthogErrorSink = (env: PostHogEnv): ObservabilitySink | undefined
             event.error ? capture(event.error, { function_path: event.functionPath, shard_key: event.shardKey, trace_id: event.traceId }, event.userId) : null,
         url: `${(env.POSTHOG_HOST?.trim() || DEFAULT_HOST).replace(TRAILING_SLASH, "")}/i/v0/e/`,
     });
-
-    return { ...sink, instrumentDatabase: "off" };
 };
