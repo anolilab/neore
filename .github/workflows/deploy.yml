@@ -130,6 +130,14 @@ jobs:
     # with a single TypeScript IaC script that manages both the main
     # TanStack Start app and the document-parser service.
     # -----------------------------------------------------------------
+    # -----------------------------------------------------------------
+    # There is no separate backend deploy job.
+    #
+    # The backend is the `neore-backend` Worker in `alchemy.run.ts`, so it
+    # goes out with everything else in the Alchemy step above and needs no
+    # job of its own.
+    # -----------------------------------------------------------------
+
     deploy-cloudflare:
         name: "Deploy Cloudflare Workers via Alchemy (${{ needs.resolve-env.outputs.stage }})"
         needs: "resolve-env"
@@ -559,6 +567,8 @@ jobs:
               if: "${{ !cancelled() && !inputs.dry_run }}"
               uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
               with:
+                  # `.alchemy` is a hidden directory, which upload-artifact skips unless told not to.
+                  include-hidden-files: true
                   if-no-files-found: "warn"
                   name: "worker-bundles-${{ needs.resolve-env.outputs.stage }}"
                   # Module files only. The rest of `.alchemy` may hold state, traces or resolved
@@ -570,11 +580,3 @@ jobs:
                       .alchemy/**/*.wasm
                       !.alchemy/**/node_modules/**
                   retention-days: 3
-
-    # -----------------------------------------------------------------
-    # There is no separate backend deploy job.
-    #
-    # The backend is the `neore-backend` Worker in `alchemy.run.ts`, so it
-    # goes out with everything else in the Alchemy step above and needs no
-    # job of its own.
-    # -----------------------------------------------------------------
