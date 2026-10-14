@@ -1858,10 +1858,12 @@ error")` (any transport, including the SSRF-guarded tool
   comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7),
   `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
   `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
-  beta is a day old and a deploy has passed on it. The Lunora catalog follows the `alpha` tags,
-  except `@lunora/workflow`, kept at 72 (the one `@lunora/runtime` pins); `@lunora/agent` still pulls
-  75 through codegen, so two copies of the branded `workflow` exist, but nothing that `tsc` sees
-  reaches the second.
+  beta is a day old and a deploy has passed on it. The Lunora catalog follows the `alpha` tags
+  and every `@lunora/*` package resolves to one version (2026-10-14: `lunorash` 390, `cli` 391,
+  `workflow` 76 everywhere). A meta-package release lags the package it pins by one release wave
+  (`lunorash` 389 still pinned the `observability` that had the `ctx.db` facade bug when that was
+  fixed), so wait until `npm view lunorash@alpha dependencies` shows the fixed version before
+  bumping, rather than overriding.
 - **Source maps go to PostHog and are deleted before the deploy.** `vite build` writes a `.map`
   per chunk (`sourcemap: "hidden"`); `dist/client` alone had 2,700 of them (~118 MiB, two thirds
   of the static-asset upload, all publicly served). `deploy.yml`'s "Upload the web source maps"
