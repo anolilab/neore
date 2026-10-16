@@ -34,7 +34,7 @@ const AppSidebar: FC<
             <SidebarShortcut />
             <Sidebar className={cn("left-16 [&>div]:flex-row", className)} collapsible="offcanvas" name="left" variant="inset">
                 <div className="relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
-                    <SidebarHeader>{header}</SidebarHeader>
+                    {header && <SidebarHeader>{header}</SidebarHeader>}
                     <SidebarContent>{content}</SidebarContent>
                     <SidebarFooter>
                         {footer}
