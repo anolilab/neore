@@ -19,6 +19,7 @@ export const onboardingSteps: OnboardingStep[] = [
             icon: "sparkles",
             title: "welcome-title",
         } satisfies NeoreOnboardingPayload,
+        nextStep: "models",
     },
     {
         id: "models",
@@ -27,6 +28,7 @@ export const onboardingSteps: OnboardingStep[] = [
             icon: "repeat",
             title: "models-title",
         } satisfies NeoreOnboardingPayload,
+        nextStep: "media",
     },
     {
         id: "media",
@@ -35,6 +37,7 @@ export const onboardingSteps: OnboardingStep[] = [
             icon: "brain-circuit",
             title: "media-title",
         } satisfies NeoreOnboardingPayload,
+        nextStep: "canvas",
     },
     {
         id: "canvas",
@@ -43,6 +46,7 @@ export const onboardingSteps: OnboardingStep[] = [
             icon: "file-text",
             title: "canvas-title",
         } satisfies NeoreOnboardingPayload,
+        nextStep: "start",
     },
     {
         id: "start",
@@ -51,5 +55,7 @@ export const onboardingSteps: OnboardingStep[] = [
             icon: "message-square",
             title: "start-title",
         } satisfies NeoreOnboardingPayload,
+        // Last step: an explicit end, not the array order running out.
+        nextStep: null,
     },
 ];
