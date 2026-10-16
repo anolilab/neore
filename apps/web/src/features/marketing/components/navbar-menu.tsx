@@ -1,6 +1,7 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import cn from "@neore/ui/utils/cn";
 import clsx from "clsx";
 import { ArrowRight } from "lucide-react";
@@ -18,7 +19,10 @@ const Navbar: FC<{ theme?: NavTheme }> = ({ theme = "dark" }) => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const isDark = theme === "dark";
     const { isAnonymous, user } = useIsAnonymous();
-    const isAuthenticated = !!user && !isAnonymous;
+    // The session is only known after hydration: the server renders the signed-out menu, and
+    // a browser with a session would otherwise render a different one on its first pass (#418).
+    const isHydrated = useIsHydrated();
+    const isAuthenticated = isHydrated && !!user && !isAnonymous;
 
     const toggleMobileMenu = () => {
         setMobileMenuOpen((previous) => !previous);

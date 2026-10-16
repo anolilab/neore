@@ -18,6 +18,7 @@ import StabilityText from "@lobehub/icons/es/Stability/components/Text";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@neore/ui/components/accordion";
 import { Button } from "@neore/ui/components/button";
 import LazyImage from "@neore/ui/components/lazy-image";
+import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import cn from "@neore/ui/utils/cn";
 import clsx from "clsx";
 import { ArrowRight, Bot, Brain, Check, FileText, Globe, Lightbulb, MessageSquareText, Search, Shield, Sparkles, Users, Zap } from "lucide-react";
@@ -488,7 +489,9 @@ const LandingPage: FC = () => {
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const [scrollContainerMounted, setScrollContainerMounted] = useState(false);
     const { isAnonymous, user } = useIsAnonymous();
-    const isSignedIn = !!user && !isAnonymous;
+    // Same as the navbar: the signed-in state is not known until after hydration (#418).
+    const isHydrated = useIsHydrated();
+    const isSignedIn = isHydrated && !!user && !isAnonymous;
     const { isPending: checkoutPending, startCheckout } = useCheckout();
 
     const setScrollContainerRefCallback = useCallback((node: HTMLDivElement | null) => {
