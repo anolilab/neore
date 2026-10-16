@@ -18,6 +18,7 @@ import StabilityText from "@lobehub/icons/es/Stability/components/Text";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@neore/ui/components/accordion";
 import { Button } from "@neore/ui/components/button";
 import LazyImage from "@neore/ui/components/lazy-image";
+import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import cn from "@neore/ui/utils/cn";
 import clsx from "clsx";
 import { ArrowRight, Bot, Brain, Check, FileText, Globe, Lightbulb, MessageSquareText, Search, Shield, Sparkles, Users, Zap } from "lucide-react";
@@ -487,8 +488,10 @@ const LandingPage: FC = () => {
     const { i18n, t } = useLingui();
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const [scrollContainerMounted, setScrollContainerMounted] = useState(false);
-    const { isAnonymous, user } = useIsAnonymous();
-    const isSignedIn = !!user && !isAnonymous;
+    const { isAnonymous, isSessionUnknown, user } = useIsAnonymous();
+    // Same as the navbar: the signed-in state is not known until after hydration (#418).
+    const isHydrated = useIsHydrated();
+    const isSignedIn = isHydrated && !!user && !isAnonymous;
     const { isPending: checkoutPending, startCheckout } = useCheckout();
 
     const setScrollContainerRefCallback = useCallback((node: HTMLDivElement | null) => {
@@ -1023,7 +1026,13 @@ const LandingPage: FC = () => {
                                         ))}
                                     </ul>
 
-                                    {isSignedIn && (tier.id === "pro" || tier.id === "team") ? (
+                                    {(tier.id === "pro" || tier.id === "team") && isSessionUnknown && (
+                                        // A failed session read: keep the paid tiers unclickable rather than send a signed-in user to sign-up.
+                                        <Button className="w-full" disabled size="marketing" variant={tier.popular ? "marketing" : "marketing-ghost"}>
+                                            {t`Upgrade`}
+                                        </Button>
+                                    )}
+                                    {(tier.id === "pro" || tier.id === "team") && isSignedIn && (
                                         <Button
                                             className="w-full"
                                             disabled={checkoutPending}
@@ -1035,7 +1044,8 @@ const LandingPage: FC = () => {
                                         >
                                             {t`Upgrade`}
                                         </Button>
-                                    ) : (
+                                    )}
+                                    {(!(tier.id === "pro" || tier.id === "team") || (!isSignedIn && !isSessionUnknown)) && (
                                         <LinkButton className="w-full" size="marketing" to={tier.href} variant={tier.popular ? "marketing" : "marketing-ghost"}>
                                             {i18n._(tier.cta)}
                                         </LinkButton>
