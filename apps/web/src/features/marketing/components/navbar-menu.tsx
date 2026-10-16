@@ -18,7 +18,7 @@ const Navbar: FC<{ theme?: NavTheme }> = ({ theme = "dark" }) => {
     const { t } = useLingui();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const isDark = theme === "dark";
-    const { isAnonymous, user } = useIsAnonymous();
+    const { isAnonymous, isSessionUnknown, user } = useIsAnonymous();
     // The session is only known after hydration: the server renders the signed-out menu, and
     // a browser with a session would otherwise render a different one on its first pass (#418).
     const isHydrated = useIsHydrated();
@@ -88,11 +88,12 @@ const Navbar: FC<{ theme?: NavTheme }> = ({ theme = "dark" }) => {
 
                 {/* Desktop CTA */}
                 <div className="hidden items-center gap-3 md:flex">
-                    {isAuthenticated ? (
+                    {isAuthenticated && (
                         <LinkButton size="marketing" to="/chat" variant="marketing">
                             {t`Go to chat`}
                         </LinkButton>
-                    ) : (
+                    )}
+                    {!isAuthenticated && !isSessionUnknown && (
                         <>
                             <LinkButton size="marketing" to="/auth/sign-in" variant="marketing-ghost">
                                 {t`Login`}
@@ -185,7 +186,7 @@ const Navbar: FC<{ theme?: NavTheme }> = ({ theme = "dark" }) => {
                                 {t`FAQ`}
                             </a>
                             <div className="flex flex-col gap-2 px-4 py-4 sm:px-6">
-                                {!isAuthenticated && (
+                                {!isAuthenticated && !isSessionUnknown && (
                                     <LinkButton
                                         className={cn("w-full rounded-none", isDark ? "border-white/20 text-white" : "border-brand-silver text-brand-obsidian")}
                                         size="sm"

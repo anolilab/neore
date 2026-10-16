@@ -488,7 +488,7 @@ const LandingPage: FC = () => {
     const { i18n, t } = useLingui();
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const [scrollContainerMounted, setScrollContainerMounted] = useState(false);
-    const { isAnonymous, user } = useIsAnonymous();
+    const { isAnonymous, isSessionUnknown, user } = useIsAnonymous();
     // Same as the navbar: the signed-in state is not known until after hydration (#418).
     const isHydrated = useIsHydrated();
     const isSignedIn = isHydrated && !!user && !isAnonymous;
@@ -1026,7 +1026,13 @@ const LandingPage: FC = () => {
                                         ))}
                                     </ul>
 
-                                    {isSignedIn && (tier.id === "pro" || tier.id === "team") ? (
+                                    {(tier.id === "pro" || tier.id === "team") && isSessionUnknown && (
+                                        // A failed session read: keep the paid tiers unclickable rather than send a signed-in user to sign-up.
+                                        <Button className="w-full" disabled size="marketing" variant={tier.popular ? "marketing" : "marketing-ghost"}>
+                                            {t`Upgrade`}
+                                        </Button>
+                                    )}
+                                    {(tier.id === "pro" || tier.id === "team") && isSignedIn && (
                                         <Button
                                             className="w-full"
                                             disabled={checkoutPending}
@@ -1038,7 +1044,8 @@ const LandingPage: FC = () => {
                                         >
                                             {t`Upgrade`}
                                         </Button>
-                                    ) : (
+                                    )}
+                                    {(!(tier.id === "pro" || tier.id === "team") || (!isSignedIn && !isSessionUnknown)) && (
                                         <LinkButton className="w-full" size="marketing" to={tier.href} variant={tier.popular ? "marketing" : "marketing-ghost"}>
                                             {i18n._(tier.cta)}
                                         </LinkButton>
