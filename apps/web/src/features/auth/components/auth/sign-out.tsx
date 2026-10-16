@@ -34,7 +34,7 @@ const SignOut = () => {
             authClient.signOut({
                 fetchOptions: {
                     onError: () => {
-                        resetAnalyticsIdentity();
+                        // The session may still be active: keep the analytics identity.
                         globalThis.location.replace(signInPath);
                     },
                     onSuccess: () => {
