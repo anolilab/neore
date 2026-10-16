@@ -14,6 +14,7 @@ import type { ImageSize, ModelDefinition } from "@neore/ai/models";
 import { MODEL_LOOKUP } from "@neore/ai/models";
 import { getFollowupSuggestionsPrompt, getThreadTitlePrompt } from "@neore/ai/prompts";
 import { buildCinemaPrompt } from "@neore/ai/prompts/cinema";
+import { markAiGeneratedImage, withPngOutput } from "@neore/ai/provenance";
 import {
     buildIteratePrompt,
     buildSystemOptimizerPrompt,
@@ -328,6 +329,29 @@ const createBlobFromImage = (imageData: Uint8Array, mimeType: string): Blob => {
     new Uint8Array(buffer).set(imageData);
 
     return new Blob([buffer], { type: mimeType });
+};
+
+/**
+ * Stores an AI-generated still: marks it (Art. 50(2)), stores it, and queues the
+ * NSFW check. Every generated image goes through here, so no path can skip the
+ * marker or the check. Edits of a user's own photo are included: that is the
+ * path that can turn a real person into an explicit image.
+ */
+const storeGeneratedImage = async (
+    context: ActionContext,
+    bytes: Uint8Array,
+    mimeType: string,
+    scope: { threadId?: string; userId?: string },
+): ReturnType<typeof storeFile> => {
+    const stored = await storeFile(context, createBlobFromImage(markAiGeneratedImage(bytes), mimeType), scope);
+
+    await context.scheduler.runAfter(0, internal.agent.nsfw_check.checkImageNsfwForChatFile, {
+        fileId: stored.file.fileId as Id<"chatFiles">,
+        mediaType: mimeType,
+        storageId: String(stored.file.storageId),
+    });
+
+    return stored;
 };
 
 /**
@@ -3845,7 +3869,12 @@ export const generateImage = internalAction
                         ...(size ? { size } : { aspectRatio }),
                         n: numberImages,
                         ...(seed !== undefined && { seed }),
-                        ...(Object.keys(providerOptions).length > 0 && providerName && { providerOptions: { [providerName]: providerOptions } }),
+                        // PNG where the provider takes a format: the marker cannot mark WebP (Art. 50(2)).
+                        providerOptions: withPngOutput(
+                            Object.keys(providerOptions).length > 0 ? { [providerName]: providerOptions } : {},
+                            modelDefinition.provider,
+                            modelDefinition.modelApiId,
+                        ),
                     });
 
                     images = result.images || [];
@@ -3861,22 +3890,10 @@ export const generateImage = internalAction
                 const storedImages = await Promise.all(
                     images.map(async (image) => {
                         const mimeType = image.mimeType || "image/png";
-                        const blob = createBlobFromImage(image.uint8Array, mimeType);
-                        const { file, filePart } = await storeFile(context, blob, { threadId, userId });
+                        const { file, filePart } = await storeGeneratedImage(context, image.uint8Array, mimeType, { threadId, userId });
 
                         return { file, filePart, mimeType };
                     }),
-                );
-
-                // Schedule NSFW checks for all generated images
-                await Promise.all(
-                    storedImages.map(({ file, mimeType }) =>
-                        context.scheduler.runAfter(0, internal.agent.nsfw_check.checkImageNsfwForChatFile, {
-                            fileId: file.fileId as Id<"chatFiles">,
-                            mediaType: mimeType,
-                            storageId: String(file.storageId),
-                        }),
-                    ),
                 );
 
                 // Serialize warnings to the format expected by the validator
@@ -4682,7 +4699,7 @@ export const generateImg2Img = internalAction
         const imageBlob = await imageResponse.blob();
         const mimeType = generatedImage!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
 
         return {
             imageUrl: file.url,
@@ -4771,7 +4788,7 @@ export const generateUpscale = internalAction
         const imageBlob = await imageResponse.blob();
         const mimeType = result.image.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
 
         return {
             imageUrl: file.url,
@@ -4844,7 +4861,7 @@ export const generateInpaint = internalAction
         const imageBlob = await imageResponse.blob();
         const mimeType = imageSource!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
 
         return {
             imageUrl: file.url,
@@ -4964,7 +4981,7 @@ export const generateCharacterRef = internalAction
         const imageBlob = await imageResponse.blob();
         const mimeType = generatedImage!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
 
         return {
             imageUrl: file.url,
@@ -5085,7 +5102,7 @@ export const generateStyleRef = internalAction
         const imageBlob = await imageResponse.blob();
         const mimeType = generatedImage!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
 
         return {
             imageUrl: file.url,
@@ -5180,7 +5197,10 @@ export const generateParallelCompare = internalAction
                 const imageBlob = await imageResponse.blob();
                 const mimeType = imageSource!.content_type ?? "image/png";
 
-                const { file } = await storeFile(context, imageBlob, { threadId, userId });
+                const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+                    threadId,
+                    userId,
+                });
 
                 return {
                     imageUrl: file.url,
@@ -5313,7 +5333,7 @@ export const generateOutpaint = internalAction
         const imageBlob = await imageResponse.blob();
         const mimeType = imageSource!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
 
         return {
             imageUrl: file.url,
@@ -5373,7 +5393,7 @@ export const generateBackgroundRemoval = internalAction
         const imageBlob = await imageResponse.blob();
         const mimeType = result.image.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
 
         return {
             imageUrl: file.url,
@@ -5445,7 +5465,7 @@ export const generateObjectEdit = internalAction
         const imageResponse = await fetchWithDeadline(outputUrl, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
 
         return {
             imageUrl: file.url,
@@ -5593,7 +5613,7 @@ export const generateControlNet = internalAction
         const imageBlob = await imageResponse.blob();
         const mimeType = imageSource!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
 
         return {
             controlType,
