@@ -18,8 +18,9 @@ runs:
     using: "composite"
     steps:
         - name: "Install Rust (stable + wasm32)"
-          uses: "dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249" # stable
+          uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
           with:
+              toolchain: "stable"
               targets: "wasm32-unknown-unknown"
 
         - name: "Cache Rust build"

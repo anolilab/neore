@@ -912,6 +912,10 @@ export default Alchemy.Stack(
                 // it is the origin the scheduler calls back on.
                 LUNORA_ORIGIN_URL: requireEnv("BACKEND_PUBLIC_ORIGIN"),
                 PUBLIC_ORIGIN: requireEnv("BACKEND_PUBLIC_ORIGIN"),
+                // Lunora's identity memo would otherwise reuse a resolved session for
+                // better-auth's cookie-cache window (60 s), so a revoked session or a
+                // changed role keeps authorising for that long. 0 = resolve per request.
+                LUNORA_IDENTITY_CACHE_MS: "0",
 
                 // Both halves. `auth.ts` loads the captcha plugin only when it has the
                 // secret AND knows a site key exists, so binding one without the other

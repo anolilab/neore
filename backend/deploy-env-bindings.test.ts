@@ -47,6 +47,7 @@ const NAMED_WITH_STAGE = /\(stage === "production" \? name : `\$\{name\}-\$\{sta
 const PINNED_SHA256 = /sha256="[\da-f]{64}"/u;
 const ACCESS_ENABLED_FROM_VARIABLE = /^ +ACCESS_ENABLED: "\$\{\{ vars\.ACCESS_ENABLED \}\}"$/mu;
 const GATEWAY_BACKEND_ORIGIN = /LUNORA_URL:\s*requireEnv\("BACKEND_PUBLIC_ORIGIN"\)/u;
+const IDENTITY_MEMO_OFF = /LUNORA_IDENTITY_CACHE_MS: "0"/u;
 // Production only: the gateway passes its crons when the stage is production.
 const GATEWAY_CRONS_PASSED = /crons: stage === "production" \? \[\.\.\.GATEWAY_CRONS\] : \[\]/u;
 
@@ -286,6 +287,12 @@ describe("deploy env bindings", () => {
         // Without it `/v1/chat` answers 500 "Gateway not configured" — and the
         // browser reaches the backend only through this worker.
         expect(alchemyScript).toMatch(GATEWAY_BACKEND_ORIGIN);
+    });
+
+    it("turns Lunora's identity memo off on the backend", () => {
+        // The memo keys on the auth headers only, not the path, so with a cache window
+        // an API key resolved on /api/v1 is reused on a route that ignores it.
+        expect(alchemyScript).toMatch(IDENTITY_MEMO_OFF);
     });
 
     it("deploys the gateway crons wrangler.jsonc runs in dev", () => {

@@ -28,9 +28,9 @@ autoInstallPeers: false
 
 blockExoticSubdeps: true
 catalog:
-  "@lunora/client": 1.0.0-alpha.202
-  "@lunora/react": 1.0.0-alpha.215
-  "@lunora/workflow": 1.0.0-alpha.76
+  "@lunora/client": 1.0.0-alpha.213
+  "@lunora/react": 1.0.0-alpha.227
+  "@lunora/workflow": 1.0.0-alpha.78
   '@visulima/vis': 4.2.0
   "@visulima/yaml": 1.0.0
 catalogMode: prefer
@@ -265,23 +265,23 @@ catalogs:
     tailwind-csstree: 0.4.1
     typescript-eslint: 8.71.1
   lunora:
-    "@lunora/auth": 1.0.0-alpha.208
-    "@lunora/bindings": 1.0.0-alpha.108
-    "@lunora/cli": 1.0.0-alpha.391
-    "@lunora/d1": 1.0.0-alpha.175
-    "@lunora/mail": 1.0.0-alpha.106
-    "@lunora/notify": 1.0.0-alpha.79
-    "@lunora/payment": 1.0.0-alpha.198
-    "@lunora/queue": 1.0.0-alpha.102
-    "@lunora/ratelimit": 1.0.0-alpha.128
-    "@lunora/scheduler": 1.0.0-alpha.121
-    "@lunora/seed": 1.0.0-alpha.214
-    "@lunora/server": 1.0.0-alpha.195
-    "@lunora/storage": 1.0.0-alpha.129
-    "@lunora/studio": 1.0.0-alpha.292
-    "@lunora/testing": 1.0.0-alpha.259
-    "@lunora/workflow": 1.0.0-alpha.76
-    lunorash: 1.0.0-alpha.390
+    "@lunora/auth": 1.0.0-alpha.214
+    "@lunora/bindings": 1.0.0-alpha.114
+    "@lunora/cli": 1.0.0-alpha.398
+    "@lunora/d1": 1.0.0-alpha.182
+    "@lunora/mail": 1.0.0-alpha.108
+    "@lunora/notify": 1.0.0-alpha.81
+    "@lunora/payment": 1.0.0-alpha.210
+    "@lunora/queue": 1.0.0-alpha.107
+    "@lunora/ratelimit": 1.0.0-alpha.138
+    "@lunora/scheduler": 1.0.0-alpha.129
+    "@lunora/seed": 1.0.0-alpha.225
+    "@lunora/server": 1.0.0-alpha.206
+    "@lunora/storage": 1.0.0-alpha.134
+    "@lunora/studio": 1.0.0-alpha.304
+    "@lunora/testing": 1.0.0-alpha.270
+    "@lunora/workflow": 1.0.0-alpha.78
+    lunorash: 1.0.0-alpha.397
   markdown:
     "@streamdown/cjk": 1.0.4
     "@streamdown/math": 1.0.3
@@ -570,7 +570,7 @@ overrides:
   # The @lunora/* packages peer on differing @lunora/auth versions, so without
   # this five copies resolve at once — and better-auth plugin types are nominal
   # across copies for the same reason as above. One copy only.
-  "@lunora/auth@*": 1.0.0-alpha.208
+  "@lunora/auth@*": 1.0.0-alpha.214
   "@modelcontextprotocol/sdk@<1.25.2": ">=1.25.2"
   "@opentelemetry/core@<2.8.0": ">=2.8.0"
   "@protobufjs/utf8@<=1.1.0": ">=1.1.1"

@@ -330,6 +330,10 @@ const main = async () => {
     console.log("\n  Public origin:");
     setBackendAligned("PUBLIC_ORIGIN", `http://localhost:${BACKEND_DEV_PORT}`);
 
+    // Lunora's identity memo, switched off so dev resolves sessions per request, as
+    // deploy does (alchemy.run.ts). Otherwise dev and e2e run a 60 s cache deploy does not.
+    setBackendAligned("LUNORA_IDENTITY_CACHE_MS", "0");
+
     // Cryptographic keys
     console.log("\n  Cryptographic keys:");
     for (const [key, gen] of [

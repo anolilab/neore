@@ -9373,10 +9373,18 @@
           ],
           "unique": true
         },
-        "by_reference_feature": {
+        "by_reference_created": {
           "fields": [
             "referenceId",
-            "featureId"
+            "createdAt"
+          ],
+          "unique": false
+        },
+        "by_reference_feature_created": {
+          "fields": [
+            "referenceId",
+            "featureId",
+            "createdAt"
           ],
           "unique": false
         }
