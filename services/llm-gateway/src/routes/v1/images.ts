@@ -7,6 +7,7 @@
  * Usage tracked per image with cost deducted from user balance.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { markAiGeneratedImage, withPngOutput } from "@neore/ai/provenance";
 import { generateImage } from "ai";
 import { z } from "zod";
 
@@ -48,6 +49,24 @@ const generateRequestSchema = z.object({
 // ---------------------------------------------------------------------------
 // Middleware
 // ---------------------------------------------------------------------------
+
+/** Base64 in, base64 out, with the AI-generated marker applied to the bytes. */
+const markBase64Image = (base64: string): string => {
+    const bytes = Uint8Array.from(atob(base64), (char) => char.codePointAt(0) ?? 0);
+    const marked = markAiGeneratedImage(bytes);
+
+    if (marked === bytes) {
+        return base64;
+    }
+
+    let binary = "";
+
+    for (let offset = 0; offset < marked.byteLength; offset += 0x80_00) {
+        binary += String.fromCodePoint(...marked.subarray(offset, offset + 0x80_00));
+    }
+
+    return btoa(binary);
+};
 
 imagesRouter.use("/v1/images/*", bearerAuth);
 
@@ -113,13 +132,18 @@ imagesRouter.post("/v1/images/generations", expensiveEndpointRateLimit({ bucket:
             n: body.n,
             prompt: body.prompt,
             ...(requestedSize && { size: requestedSize as `${number}x${number}` }),
-            providerOptions: {
-                openai: {
-                    ...(body.quality && { quality: body.quality }),
-                    ...(body.style && { style: body.style }),
+            // PNG where the provider takes a format: the marker cannot mark WebP (Art. 50(2)).
+            providerOptions: withPngOutput(
+                {
+                    openai: {
+                        ...(body.quality && { quality: body.quality }),
+                        ...(body.style && { style: body.style }),
+                    },
+                    ...(Object.keys(falReferenceInput).length > 0 && { fal: { ...falReferenceInput } }),
                 },
-                ...(Object.keys(falReferenceInput).length > 0 && { fal: { ...falReferenceInput } }),
-            },
+                modelInfo.provider,
+                modelInfo.modelApiId,
+            ),
         });
 
         const latencyMs = Date.now() - startTime;
@@ -171,11 +195,14 @@ imagesRouter.post("/v1/images/generations", expensiveEndpointRateLimit({ bucket:
         );
 
         // Build OpenAI-compatible response
+        // Art. 50(2): every generated image leaves the gateway marked as AI-generated.
         const data = result.images.map((img) => {
+            const base64 = markBase64Image(img.base64);
+
             return {
-                b64_json: body.response_format === "b64_json" ? img.base64 : undefined,
+                b64_json: body.response_format === "b64_json" ? base64 : undefined,
                 revised_prompt: undefined as string | undefined,
-                url: body.response_format === "url" ? `data:${img.mediaType};base64,${img.base64}` : undefined,
+                url: body.response_format === "url" ? `data:${img.mediaType};base64,${base64}` : undefined,
             };
         });
 

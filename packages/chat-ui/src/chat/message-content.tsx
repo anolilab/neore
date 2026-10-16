@@ -337,6 +337,15 @@ FileLoadingFallback.displayName = "FileLoadingFallback";
  * Placeholder shown when an image is blocked by the NSFW classifier
  * or is still being checked.
  */
+const isGeneratedMediaType = (mediaType: string | undefined): boolean =>
+    mediaType?.startsWith("image/") === true || mediaType?.startsWith("video/") === true || mediaType?.startsWith("audio/") === true;
+
+const AiGeneratedLabel: FC = memo(() => {
+    const { t } = useLingui();
+
+    return <span className="text-muted-foreground block text-xs">{t`AI-generated`}</span>;
+});
+
 const NsfwBlockedPlaceholder: FC<{ nsfwStatus: string }> = memo(({ nsfwStatus }) => {
     const { t } = useLingui();
 
@@ -796,6 +805,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                     );
                 }
 
+                // Art. 50(4): generated media is labelled where it is shown, not only on hover.
+                if (message.role === "assistant" && isGeneratedMediaType(filePart.mediaType) && fileUrl) {
+                    renderedParts.push(<AiGeneratedLabel key={`${key}-ai-label`} />);
+                }
+
                 break;
             }
 
@@ -803,6 +817,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                 const imagePart = part as unknown as ImagePart;
 
                 renderedParts.push(<Image key={key} part={generationPrompt ? { ...imagePart, prompt: generationPrompt } : imagePart} />);
+
+                if (message.role === "assistant") {
+                    renderedParts.push(<AiGeneratedLabel key={`${key}-ai-label`} />);
+                }
+
                 break;
             }
 
