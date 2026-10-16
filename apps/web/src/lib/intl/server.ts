@@ -96,7 +96,12 @@ const getLocaleFromRequest = (request: Request): LocaleResult => {
         const firstLang = acceptedLanguage.split(",", 1)[0]?.split(";", 1)[0]?.trim().split("-", 1)[0] ?? "";
 
         if (firstLang && isLocaleValid(firstLang)) {
-            return { locale: firstLang };
+            // Persist it: the client reads only the cookie and the URL, so without this the
+            // page hydrates in the default locale while the server rendered the browser's.
+            return {
+                headers: [{ key: "Set-Cookie", value: serialize("locale", firstLang, { maxAge: 30 * 24 * 60 * 60, path: "/" }) }],
+                locale: firstLang,
+            };
         }
     }
 

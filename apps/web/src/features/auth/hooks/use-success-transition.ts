@@ -1,5 +1,5 @@
 import { useSearch } from "@tanstack/react-router";
-import { useCallback, useEffect, useEffectEvent, useState, useTransition } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
@@ -32,11 +32,18 @@ const useOnSuccessTransition = ({ redirectTo: redirectToProperty, stayOnPage = f
         });
     });
 
+    // `isPending` flips true → false around each transition, and the effect below
+    // depends on it. Without this guard every navigation re-ran the effect and
+    // navigated again, which re-ran the root `beforeLoad` (one server-function call
+    // per pass). Navigate once per success.
+    const navigatedRef = useRef(false);
+
     useEffect(() => {
-        if (!success || isPending) {
+        if (!success || isPending || navigatedRef.current) {
             return;
         }
 
+        navigatedRef.current = true;
         onNavigate(getRedirectTo());
     }, [success, isPending, getRedirectTo]);
 
