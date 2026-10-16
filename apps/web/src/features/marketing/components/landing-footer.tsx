@@ -266,7 +266,7 @@ const LandingFooter: FC = () => {
                 {/* ── Bottom bar ─────────────────────────────────── */}
                 <div className="flex flex-col items-center justify-between gap-3 px-4 py-6 sm:flex-row sm:px-6 lg:px-8">
                     <p className="font-mono text-[10px] tracking-widest text-white/25 uppercase">
-                        © {new Date().getFullYear()} Neore. {t`All rights reserved.`}
+                        © <span suppressHydrationWarning>{new Date().getFullYear()}</span> Neore. {t`All rights reserved.`}
                     </p>
                     <div className="flex gap-4 font-mono text-[10px] tracking-wider text-white/25 uppercase">
                         <Link className="transition-colors hover:text-white/50" to="/datenschutz">{t`Privacy`}</Link>

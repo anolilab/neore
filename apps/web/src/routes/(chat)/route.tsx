@@ -117,7 +117,9 @@ export const Route = createFileRoute("/(chat)")({
                         );
                     };
 
-                    void seedThreadCaches();
+                    // Best-effort prefetch: a failure here must not surface as an unhandled rejection;
+                    // the page loads its own data when it needs it.
+                    void seedThreadCaches().catch(() => undefined);
                 }
             }
         } catch (error) {

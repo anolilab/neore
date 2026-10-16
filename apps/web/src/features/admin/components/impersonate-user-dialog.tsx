@@ -32,6 +32,7 @@ const ImpersonateUserDialog = ({ onOpenChange, onSuccess, open, userId, userName
         try {
             // Use Better Auth client to start impersonation
             await authClient.admin.impersonateUser({
+                fetchOptions: { throw: true },
                 userId,
             });
 

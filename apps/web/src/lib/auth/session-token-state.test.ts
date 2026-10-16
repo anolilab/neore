@@ -137,18 +137,24 @@ describe(requireSession, () => {
     };
 
     it("redirects to sign-in only when the backend answered 'no session'", () => {
-        const thrown = redirectOf(() => requireSession({ authStatus: "unauthenticated", isAuthenticated: false }));
+        const thrown = redirectOf(() =>
+            requireSession({ authStatus: "unauthenticated", isAuthenticated: false }, { href: "/dashboard", pathname: "/dashboard" }),
+        );
 
         expect(isRedirect(thrown)).toBe(true);
         expect(isSignedOut({ authStatus: "unauthenticated" })).toBe(true);
     });
 
     it("never redirects on a failed read (unknown)", () => {
-        expect(redirectOf(() => requireSession({ authStatus: "unknown", isAuthenticated: false }))).toBeUndefined();
+        expect(
+            redirectOf(() => requireSession({ authStatus: "unknown", isAuthenticated: false }, { href: "/dashboard", pathname: "/dashboard" })),
+        ).toBeUndefined();
     });
 
     it("lets an authenticated visitor through", () => {
-        expect(redirectOf(() => requireSession({ authStatus: "authenticated", isAuthenticated: true }))).toBeUndefined();
+        expect(
+            redirectOf(() => requireSession({ authStatus: "authenticated", isAuthenticated: true }, { href: "/dashboard", pathname: "/dashboard" })),
+        ).toBeUndefined();
     });
 
     it("falls back to isAuthenticated for a context without a status", () => {

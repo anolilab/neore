@@ -145,8 +145,8 @@ const RouteComponent = () => {
 };
 
 export const Route = createFileRoute("/admin")({
-    beforeLoad: async ({ context }) => {
-        requireSession(context);
+    beforeLoad: async ({ context, location }) => {
+        requireSession(context, location);
 
         try {
             const result = await context.lunoraClient.query(api.auth.admin.isCurrentUserAdmin, {});
@@ -159,7 +159,9 @@ export const Route = createFileRoute("/admin")({
                 throw error;
             }
 
-            throw redirect({ to: "/dashboard/settings/auth/account" });
+            // A failed check says nothing about the user's role. Surface the error (with its
+            // retry) rather than sending an admin to the account page during an outage.
+            throw error;
         }
     },
     component: RouteComponent,

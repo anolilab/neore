@@ -16,7 +16,7 @@ interface GlobalErrorBoundaryProviderProperties {
 }
 
 const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderProperties) => {
-    const [isOnline, setIsOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+    const [isOnline, setIsOnline] = useState(true);
     // Identifies the error occurrence for support. Minted when the boundary
     // catches, not while rendering the fallback — `Date.now()` in render would
     // hand out a different id on every re-paint of the same crash.
@@ -25,6 +25,9 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
 
     // Monitor network status
     useEffect(() => {
+        // Read the real state after mount: `navigator` is not the same on the server.
+        setIsOnline(navigator.onLine);
+
         const handleOnline = () => {
             setIsOnline(true);
             networkToast.online();

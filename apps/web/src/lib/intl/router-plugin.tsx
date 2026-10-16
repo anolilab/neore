@@ -75,7 +75,7 @@ const routerWithLingui = <TRouter extends AnyRouter>(router: ValidateRouter<TRou
     } else {
         // eslint-disable-next-line no-param-reassign
         router.options.hydrate = async (dehydrated) => {
-            ogOptions.hydrate?.(dehydrated);
+            await ogOptions.hydrate?.(dehydrated);
 
             // Only hydrate i18n if dehydrated data exists. Router-core awaits
             // `hydrate` before React hydrates, so the catalog is active in time

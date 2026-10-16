@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
-import { trackEvent } from "@/lib/analytics";
+import { resetAnalyticsIdentity, trackEvent } from "@/lib/analytics";
 
 const SignOut = () => {
     const signingOut = useRef(false);
@@ -34,9 +34,11 @@ const SignOut = () => {
             authClient.signOut({
                 fetchOptions: {
                     onError: () => {
+                        resetAnalyticsIdentity();
                         globalThis.location.replace(signInPath);
                     },
                     onSuccess: () => {
+                        resetAnalyticsIdentity();
                         globalThis.location.replace(signInPath);
                     },
                 },

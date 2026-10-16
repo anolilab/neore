@@ -34,8 +34,9 @@ import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
 import { seedHydratedAuthToken } from "@/lib/lunora/hydrate-auth-token";
+import { TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@/lib/lunora/token-refresh";
 import NativeBridge from "@/lib/native/native-bridge";
-import { readRequestContext } from "@/lib/request-context";
+import { readRequestContext, rememberClientPostHog } from "@/lib/request-context";
 import { jsonLd, seo } from "@/lib/seo";
 import { syncConsentToPostHog } from "@/providers/analytics-provider";
 import type { AppContext } from "@/router";
@@ -141,6 +142,61 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
     // The post-login refetch timer below outlives the effect run that scheduled it on purpose —
     // a re-run must not cancel it — so it is released on unmount instead.
     useEffect(() => () => clearTimeout(postLoginRefetchRef.current), []);
+
+    // Renew the RPC bearer before it expires (see `lib/lunora/token-refresh.ts`). Each new
+    // token re-runs this effect with the new schedule. A failed renewal keeps the current token.
+    useEffect(() => {
+        if (rpcToken === null) {
+            return undefined;
+        }
+
+        const delay = tokenRefreshDelayMs(rpcToken);
+
+        if (delay === undefined) {
+            return undefined;
+        }
+
+        let isCancelled = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+
+        const scheduleRenewal = (wait: number) => {
+            timer = setTimeout(async () => {
+                try {
+                    const token = await getSessionToken();
+
+                    if (isCancelled) {
+                        return;
+                    }
+
+                    if (!token) {
+                        return;
+                    }
+
+                    // The server can answer the token it already minted (it caches for a minute).
+                    // Setting the same string changes nothing, so the effect would never re-run
+                    // and renewal would stop for this session. Retry instead.
+                    if (token === rpcToken) {
+                        scheduleRenewal(TOKEN_RETRY_DELAY_MS);
+
+                        return;
+                    }
+
+                    lunoraClient.setAuthToken(token);
+                } catch {
+                    if (!isCancelled) {
+                        scheduleRenewal(TOKEN_RETRY_DELAY_MS);
+                    }
+                }
+            }, wait);
+        };
+
+        scheduleRenewal(delay);
+
+        return () => {
+            isCancelled = true;
+            clearTimeout(timer);
+        };
+    }, [rpcToken, lunoraClient]);
 
     /**
      * Forces the backend connection to re-authenticate with a fresh token.
@@ -270,6 +326,17 @@ const RootComponent = () => {
     const router = useRouter();
     const { i18n } = useLingui();
     const direction = useUIStateStore((state) => state.layout.direction);
+    const { posthog: renderedPostHog } = useRouteContext({ from: Route.id });
+
+    useEffect(() => {
+        rememberClientPostHog(renderedPostHog);
+    }, [renderedPostHog]);
+
+    // `<html dir>` is rendered from the persisted store, which a reload restores before the
+    // first paint. Keep the attribute in step with the store, or the document stays LTR.
+    useEffect(() => {
+        document.documentElement.dir = direction;
+    }, [direction]);
 
     // Memoize navigation callbacks to prevent AuthUIProviderTanstack re-renders
     const handleNavigate = useCallback(
@@ -389,7 +456,14 @@ export const Route = createRootRouteWithContext<AppContext>()({
         // arrive as `serverContext`, not on the router context — see
         // `readRequestContext`. Read in parallel with the token: during SSR both
         // are network round trips on the TTFB path.
-        const [{ status: authStatus, token }, { nonce, posthog }] = await Promise.all([getSessionAuthState(), readRequestContext(context)]);
+        // A failed token read (offline, 5xx, network) is `unknown`, not a thrown error: a throw
+        // here replaces the whole document with the error component.
+        const [{ status: authStatus, token }, { nonce, posthog }] = await Promise.all([
+            getSessionAuthState().catch(() => {
+                return { status: "unknown" as const, token: undefined };
+            }),
+            readRequestContext(context),
+        ]);
 
         if (token) {
             context.context.lunoraClient.setAuthToken(token);

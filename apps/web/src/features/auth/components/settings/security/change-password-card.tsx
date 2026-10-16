@@ -10,8 +10,10 @@ import * as z from "zod";
 
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
+import Captcha from "@/features/auth/components/captcha/captcha";
 import { useListAccounts } from "@/features/auth/hooks/account-management";
 import { useSession } from "@/features/auth/hooks/session-user-management";
+import useCaptcha from "@/features/auth/hooks/use-captcha";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 
@@ -44,6 +46,7 @@ const ChangePasswordCardContent = ({
     const passwordValidation = { ...contextPasswordValidation, ...passwordValidationProperty };
 
     const { data: sessionData } = useSession(authClient);
+    const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha();
 
     const formSchema = z
         .object({
@@ -175,7 +178,7 @@ const ChangePasswordCardContent = ({
             try {
                 await authClient.requestPasswordReset({
                     email,
-                    fetchOptions: { throw: true },
+                    fetchOptions: { headers: await getCaptchaHeaders("/request-password-reset"), throw: true },
                     redirectTo: `${baseURL}${basePath}/${viewPaths.RESET_PASSWORD}`,
                 });
 
@@ -184,6 +187,8 @@ const ChangePasswordCardContent = ({
                     variant: "success",
                 });
             } catch (error) {
+                resetCaptcha();
+
                 toast({
                     message: getLocalizedError({ error, t }),
                     variant: "error",
@@ -217,6 +222,7 @@ const ChangePasswordCardContent = ({
                         isPending={isPending}
                         title={t`Set Password`}
                     />
+                    <Captcha action="/request-password-reset" ref={captchaRef} />
                 </form>
             </setPasswordForm.AppForm>
         );

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import getLocaleFromRequest from "./server";
 
+const LOCALE_DE_COOKIE = /^locale=de;/;
+
 const request = (headers: Record<string, string> = {}) => new Request("https://neore.example/auth/sign-in", { headers });
 
 describe("getLocaleFromRequest", () => {
@@ -9,7 +11,7 @@ describe("getLocaleFromRequest", () => {
         const result = getLocaleFromRequest(request({ "accept-language": "de-DE,de;q=0.9" }));
 
         expect(result.locale).toBe("de");
-        expect(result.headers).toStrictEqual([expect.objectContaining({ key: "Set-Cookie", value: expect.stringMatching(/^locale=de;/) })]);
+        expect(result.headers).toStrictEqual([expect.objectContaining({ key: "Set-Cookie", value: expect.stringMatching(LOCALE_DE_COOKIE) })]);
     });
 
     it("sets no cookie when the locale comes from the cookie already", () => {

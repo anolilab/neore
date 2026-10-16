@@ -53,7 +53,7 @@ const SignUpForm = ({
 }: SignUpFormProperties) => {
     const { t } = useLingui();
     const isHydrated = useIsHydrated();
-    const { captchaRef, getCaptchaHeaders } = useCaptcha();
+    const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha();
 
     const {
         additionalFields,
@@ -337,6 +337,8 @@ const SignUpForm = ({
                     navigate(`${basePath}/${viewPaths.SIGN_IN}${globalThis.location.search}`);
                 }
             } catch (error) {
+                resetCaptcha();
+
                 toast({
                     message: getLocalizedError({ error, t }),
                     variant: "error",

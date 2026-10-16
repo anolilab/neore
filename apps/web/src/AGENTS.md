@@ -615,7 +615,7 @@ import { requireSession } from "@/lib/auth/route-guard";
 
 export const Route = createFileRoute("/dashboard")({
     beforeLoad: ({ context }) => {
-        requireSession(context);
+        requireSession(context, location);
     },
     loader: async ({ context }) => {
         // No token yet: these would fail unauthenticated, so let AuthRecovery fetch them.

@@ -8,8 +8,8 @@ const RouteComponent = () => <SecuritySettingsCards />;
 export const Route = createFileRoute("/dashboard/settings/auth/security")({
     // Preload cache stays fresh for 10 seconds - prevents validation from running on every hover
     preloadStaleTime: 10_000,
-    beforeLoad: ({ context }) => {
-        requireSession(context);
+    beforeLoad: ({ context, location }) => {
+        requireSession(context, location);
     },
     component: RouteComponent,
 });

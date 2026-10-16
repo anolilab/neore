@@ -34,7 +34,7 @@ const ImpersonationBanner = () => {
             await logStop.mutateAsync({});
 
             // Use Better Auth client to stop impersonation
-            await authClient.admin.stopImpersonating();
+            await authClient.admin.stopImpersonating({ fetchOptions: { throw: true } });
 
             showSuccess(t`You have returned to your admin account`);
 

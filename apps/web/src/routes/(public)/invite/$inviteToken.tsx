@@ -77,9 +77,9 @@ const InvitePage = () => {
 };
 
 export const Route = createFileRoute("/(public)/invite/$inviteToken")({
-    beforeLoad: async ({ context, params: _params }) => {
+    beforeLoad: async ({ context, location, params: _params }) => {
         // Check if user is authenticated
-        requireSession(context);
+        requireSession(context, location);
     },
     component: InvitePage,
 });

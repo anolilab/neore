@@ -29,6 +29,7 @@ import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import updateLocale, { isSupportedLocale } from "@/functions/update-locale";
+import { resetAnalyticsIdentity } from "@/lib/analytics";
 import type { AuthClient } from "@/lib/auth/client";
 import { DEFAULT_LOCALE, deLocalizeUrl, dynamicActivate, locales as appLocales, shouldIgnorePath } from "@/lib/intl/client";
 
@@ -276,7 +277,13 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     await releasePush();
                     await authClient.signOut({
                         fetchOptions: {
+                            onError: () => {
+                                // Reload either way: a page that still shows the account is the wrong state to leave.
+                                resetAnalyticsIdentity();
+                                globalThis.location.reload();
+                            },
                             onSuccess: () => {
+                                resetAnalyticsIdentity();
                                 globalThis.location.reload();
                             },
                         },

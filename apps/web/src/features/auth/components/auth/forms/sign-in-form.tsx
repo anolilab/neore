@@ -40,7 +40,7 @@ export interface SignInFormProperties {
 const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, redirectTo, setIsSubmitting }: SignInFormProperties): React.JSX.Element => {
     const { t } = useLingui();
     const isHydrated = useIsHydrated();
-    const { captchaRef, getCaptchaHeaders } = useCaptcha();
+    const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha();
     const { lastSignIn, saveLastSignIn } = useLastSignInMethod();
 
     const { authClient, basePath, credentials, navigate, toast, viewPaths } = useAuth();
@@ -202,6 +202,8 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                 }
             } catch (error) {
                 form.setFieldValue("password", "");
+
+                resetCaptcha();
 
                 toast({
                     message: getLocalizedError({ error, t }),

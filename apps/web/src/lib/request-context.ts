@@ -33,8 +33,27 @@ interface ServerContextShape {
  * Async because the PostHog flags arrive as a promise; await it alongside the
  * route's other server work rather than before it.
  */
+
+/**
+ * The PostHog data the page was rendered with, kept in the BROWSER only. A client
+ * navigation has no server context, so without this it reset the flags to empty and
+ * route gates such as `/workflow` bounced the user to `/`. Written from an effect, never
+ * during SSR, so one request's flags cannot reach another request.
+ */
+const clientPostHog: { current?: PostHogRequestData } = {};
+
+export const rememberClientPostHog = (data: PostHogRequestData): void => {
+    if (typeof window !== "undefined") {
+        clientPostHog.current = data;
+    }
+};
+
 export const readRequestContext = async (options: unknown): Promise<RequestContextData> => {
     const serverContext = (options as { serverContext?: ServerContextShape } | null | undefined)?.serverContext;
+
+    if (!serverContext) {
+        return { nonce: undefined, posthog: clientPostHog.current ?? { distinctId: null, flags: {} } };
+    }
 
     return {
         nonce: serverContext?.security?.nonce,

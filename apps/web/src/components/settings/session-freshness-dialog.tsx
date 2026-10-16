@@ -10,7 +10,9 @@ import cn from "@neore/ui/utils/cn";
 import type { ComponentProps } from "react";
 import { useState } from "react";
 
+import Captcha from "@/features/auth/components/captcha/captcha";
 import { useSession } from "@/features/auth/hooks/session-user-management";
+import useCaptcha from "@/features/auth/hooks/use-captcha";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 
@@ -30,6 +32,7 @@ const SessionFreshnessDialog = ({ classNames, onOpenChange, onVerified, ...prope
     const [password, setPassword] = useState("");
     const [isPending, setIsPending] = useState(false);
     const [error, setError] = useState("");
+    const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha();
     const { t } = useLingui();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -54,7 +57,7 @@ const SessionFreshnessDialog = ({ classNames, onOpenChange, onVerified, ...prope
             // throws on invalid credentials — that's what gates the sensitive action.
             await authClient.signIn.email({
                 email: userEmail,
-                fetchOptions: { throw: true },
+                fetchOptions: { headers: await getCaptchaHeaders("/sign-in/email"), throw: true },
                 password,
                 rememberMe: true,
             });
@@ -63,6 +66,8 @@ const SessionFreshnessDialog = ({ classNames, onOpenChange, onVerified, ...prope
             onOpenChange?.(false);
             setPassword("");
         } catch (verificationError) {
+            resetCaptcha();
+
             setError(getLocalizedError({ error: verificationError, t }) || t`Invalid password. Please try again.`);
         } finally {
             setIsPending(false);
@@ -112,6 +117,8 @@ const SessionFreshnessDialog = ({ classNames, onOpenChange, onVerified, ...prope
                         >
                             {t`Cancel`}
                         </Button>
+
+                        <Captcha action="/sign-in/email" ref={captchaRef} />
 
                         <Button className={cn(classNames?.button, classNames?.primaryButton)} disabled={!password.trim() || isPending} type="submit">
                             {isPending ? t`Verifying...` : t`Verify`}

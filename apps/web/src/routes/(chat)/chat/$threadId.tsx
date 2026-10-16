@@ -111,13 +111,13 @@ export const Route = createFileRoute("/(chat)/chat/$threadId")({
         const isValidId = isLunoraId(params.threadId);
 
         if (!isValidId) {
-            const searchString = typeof location.search === "string" ? location.search : "";
-            const searchParams = new URLSearchParams(searchString);
+            // `location.search` is already parsed, and this route's type does not declare `promptId`.
+            const { promptId } = location.search as { promptId?: unknown };
 
             throw redirect({
                 to: "/chat",
                 search: {
-                    promptId: searchParams.get("promptId") ?? undefined,
+                    promptId: typeof promptId === "string" ? promptId : undefined,
                     redirectReason: "invalid-thread-id",
                 },
                 replace: true,

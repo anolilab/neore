@@ -40,7 +40,7 @@ const MagicLinkForm = ({
 }: MagicLinkFormProperties) => {
     const { t } = useLingui();
     const isHydrated = useIsHydrated();
-    const { captchaRef, getCaptchaHeaders } = useCaptcha();
+    const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha();
 
     const { authClient, basePath, baseURL, persistClient, redirectTo: contextRedirectTo, toast, viewPaths } = useAuth();
 
@@ -79,6 +79,8 @@ const MagicLinkForm = ({
 
                 form.reset();
             } catch (error) {
+                resetCaptcha();
+
                 toast({
                     message: getLocalizedError({ error, t }),
                     variant: "error",

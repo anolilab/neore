@@ -2,6 +2,7 @@ import type { I18n } from "@lingui/core";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 
+import getLocaleFromRequest from "./server";
 import { DEFAULT_LOCALE, extractLocaleFromPath, parseLocaleCookie, shouldIgnorePath } from "./shared";
 
 // Re-export everything from shared so existing import paths keep working
@@ -46,15 +47,10 @@ export const deLocalizeUrl = ({ url }: { url: URL }): URL | undefined => {
 export const getCurrentLocale = createIsomorphicFn()
     .server(() => {
         try {
-            const request = getRequest();
-            const { pathname } = new URL(request.url);
-            const urlLocale = extractLocaleFromPath(pathname);
-
-            if (urlLocale && !shouldIgnorePath(pathname)) {
-                return urlLocale;
-            }
-
-            return parseLocaleCookie(request.headers.get("cookie") ?? "") ?? DEFAULT_LOCALE;
+            // The same resolution the locale middleware uses (URL, ?locale=, cookie, Accept-Language).
+            // Reading only the URL and cookie here built links in a different locale from the
+            // markup the middleware rendered, for a first visit with no cookie.
+            return getLocaleFromRequest(getRequest()).locale;
         } catch {
             return DEFAULT_LOCALE;
         }
