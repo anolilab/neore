@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Image, MessageSquare, Video } from
 import { motion } from "motion/react";
 
 import { LinkButton } from "@/components/link-button";
+import SignUpOpenOnly from "@/features/auth/components/sign-up-open-only";
 import { localizeModelDescription } from "@/lib/model-descriptions";
 
 import type { MarketingModel } from "../data/models-data";
@@ -284,9 +285,11 @@ const ModelDetailPage = ({ model }: ModelDetailPageProps) => {
                                 </Trans>
                             </h2>
                             <p className="mx-auto mb-8 max-w-sm text-sm text-white/40">{t`Available on Neore — free to start, no credit card required.`}</p>
-                            <LinkButton size="marketing" to="/chat" variant="marketing">
-                                {t`Get started free`} <ArrowRight className="ml-2 size-4" />
-                            </LinkButton>
+                            <SignUpOpenOnly>
+                                <LinkButton size="marketing" to="/chat" variant="marketing">
+                                    {t`Get started free`} <ArrowRight className="ml-2 size-4" />
+                                </LinkButton>
+                            </SignUpOpenOnly>
                         </motion.div>
                     </section>
                 </div>

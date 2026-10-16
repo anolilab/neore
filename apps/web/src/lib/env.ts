@@ -21,6 +21,7 @@ const env = createEnv({
         VITE_POSTHOG_HOST: z.url().optional(),
         VITE_PRIVACY_POLICY_URL: z.url().optional(),
 
+        VITE_SIGNUP_INVITE_ONLY: z.string().optional(),
         VITE_SITE_URL: z.url(),
         // Cloudflare Turnstile CAPTCHA
         VITE_TURNSTILE_SITE_KEY: z.string().optional(),
