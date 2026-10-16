@@ -7,7 +7,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { ScrollArea } from "@neore/ui/components/scroll-area";
 import { SidebarInset, SidebarTrigger } from "@neore/ui/components/sidebar";
 import ModeToggle from "@neore/ui/components/theme-toggle";
-import { createFileRoute, isRedirect, Outlet, redirect, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useLocation } from "@tanstack/react-router";
 import { ClipboardList, LayoutDashboard, MessageSquare, ShieldAlert, Trash2, Users } from "lucide-react";
 import { Fragment } from "react";
 
@@ -148,20 +148,12 @@ export const Route = createFileRoute("/admin")({
     beforeLoad: async ({ context, location }) => {
         requireSession(context, location);
 
-        try {
-            const result = await context.lunoraClient.query(api.auth.admin.isCurrentUserAdmin, {});
+        // A failed check throws and is not turned into a redirect: it says nothing about the
+        // user's role, and an admin sent to the account page during an outage would be wrong.
+        const result = await context.lunoraClient.query(api.auth.admin.isCurrentUserAdmin, {});
 
-            if (!result?.isAdmin) {
-                throw redirect({ to: "/dashboard/settings/auth/account" });
-            }
-        } catch (error) {
-            if (isRedirect(error)) {
-                throw error;
-            }
-
-            // A failed check says nothing about the user's role. Surface the error (with its
-            // retry) rather than sending an admin to the account page during an outage.
-            throw error;
+        if (!result?.isAdmin) {
+            throw redirect({ to: "/dashboard/settings/auth/account" });
         }
     },
     component: RouteComponent,
