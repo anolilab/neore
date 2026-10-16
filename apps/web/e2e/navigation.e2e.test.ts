@@ -44,7 +44,7 @@ test.describe("Protected routes while signed out", () => {
     test("sends /dashboard to sign-in", async ({ page }) => {
         await page.goto(PROTECTED_PATHS.dashboard);
 
-        await expect(page).toHaveURL(new RegExp(`${AUTH_PATHS.signIn}(\\?.*)?$`));
+        await expect(page).toHaveURL(new RegExp(String.raw`${AUTH_PATHS.signIn}(\?.*)?$`));
     });
 
     test("sends /dashboard/settings to sign-in", async ({ page }) => {
