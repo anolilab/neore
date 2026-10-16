@@ -55,7 +55,7 @@ const PublicPageView: FC<{ page: PublicPage | null; status: "error" | "ok" | "un
                         <p className="text-muted-foreground mb-8 text-xs">
                             <Trans>
                                 Last updated{" "}
-                                <time dateTime={new Date(page.updatedAt).toISOString()}>
+                                <time dateTime={new Date(page.updatedAt).toISOString()} suppressHydrationWarning>
                                     {new Intl.DateTimeFormat(i18n.locale, { dateStyle: "long" }).format(page.updatedAt)}
                                 </time>
                             </Trans>

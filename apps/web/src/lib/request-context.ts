@@ -15,6 +15,20 @@ interface ServerContextShape {
 }
 
 /**
+ * The PostHog data the page was rendered with, kept in the BROWSER only. A client
+ * navigation has no server context, so without this it reset the flags to empty and
+ * route gates such as `/workflow` bounced the user to `/`. Written from an effect, never
+ * during SSR, so one request's flags cannot reach another request.
+ */
+const clientPostHog: { current?: PostHogRequestData } = {};
+
+export const rememberClientPostHog = (data: PostHogRequestData): void => {
+    if (typeof window !== "undefined") {
+        clientPostHog.current = data;
+    }
+};
+
+/**
  * Reads what the request middleware (`security-middleware.ts`,
  * `posthog-middleware.ts`) put into the Start context, from a route's
  * `beforeLoad`/`loader` options.
@@ -33,8 +47,18 @@ interface ServerContextShape {
  * Async because the PostHog flags arrive as a promise; await it alongside the
  * route's other server work rather than before it.
  */
+
+/** Forget the cached flags, when the signed-in identity changes without a page load. */
+export const forgetClientPostHog = (): void => {
+    clientPostHog.current = undefined;
+};
+
 export const readRequestContext = async (options: unknown): Promise<RequestContextData> => {
     const serverContext = (options as { serverContext?: ServerContextShape } | null | undefined)?.serverContext;
+
+    if (!serverContext) {
+        return { nonce: undefined, posthog: clientPostHog.current ?? { distinctId: null, flags: {} } };
+    }
 
     return {
         nonce: serverContext?.security?.nonce,

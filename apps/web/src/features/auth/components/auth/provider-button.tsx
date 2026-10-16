@@ -47,7 +47,8 @@ const ProviderButton = ({
     );
 
     const getCallbackURL = useCallback(
-        () => `${baseURL}${callbackURLProperty || (persistClient ? `${basePath}/${viewPaths.CALLBACK}?redirectTo=${getRedirectTo()}` : getRedirectTo())}`,
+        () =>
+            `${baseURL}${callbackURLProperty || (persistClient ? `${basePath}/${viewPaths.CALLBACK}?redirectTo=${encodeURIComponent(getRedirectTo())}` : getRedirectTo())}`,
         [callbackURLProperty, persistClient, basePath, viewPaths, baseURL, getRedirectTo],
     );
 

@@ -26,7 +26,8 @@ const csrfMiddleware = createCsrfMiddleware({
 
 export const startInstance = createStart(() => {
     return {
-        functionMiddleware: [logMiddleware],
+        // Development only: it logs every server-function call, and production logs are not for that.
+        functionMiddleware: import.meta.env.DEV ? [logMiddleware] : [],
         // Security middleware runs first to set headers and generate nonce — it
         // wraps the downstream response, so a CSRF 403 still carries them.
         requestMiddleware: [securityMiddleware, csrfMiddleware, posthogMiddleware, linguiMiddleware],

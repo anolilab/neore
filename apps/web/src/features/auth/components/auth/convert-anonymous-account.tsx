@@ -13,6 +13,8 @@ import { useStore } from "@tanstack/react-form";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { strictObject, string } from "zod";
 
+import Captcha from "@/features/auth/components/captcha/captcha";
+import useCaptcha from "@/features/auth/hooks/use-captcha";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { withInviteToken } from "@/features/auth/lib/invite-token";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
@@ -82,6 +84,8 @@ const ConvertAnonymousAccount = ({ className, classNames, onSuccess, passwordVal
         path: ["confirmPassword"],
     });
 
+    const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha();
+
     const form = useAppForm({
         defaultValues: {
             confirmPassword: "",
@@ -99,7 +103,7 @@ const ConvertAnonymousAccount = ({ className, classNames, onSuccess, passwordVal
                 await authClient.signUp.email(
                     withInviteToken({
                         email: value.email,
-                        fetchOptions: { throw: true },
+                        fetchOptions: { headers: await getCaptchaHeaders("/sign-up/email"), throw: true },
                         name: defaultName,
                         password: value.password,
                     }),
@@ -116,6 +120,8 @@ const ConvertAnonymousAccount = ({ className, classNames, onSuccess, passwordVal
                     onSuccess();
                 }
             } catch (error) {
+                resetCaptcha();
+
                 toast({
                     message: getLocalizedError({ error, t }),
                     variant: "error",
@@ -228,6 +234,8 @@ const ConvertAnonymousAccount = ({ className, classNames, onSuccess, passwordVal
                                 </field.FormItem>
                             )}
                         </form.AppField>
+
+                        <Captcha action="/sign-up/email" ref={captchaRef} />
 
                         <Button className={cn("w-full", classNames?.button)} disabled={isSubmitting} type="submit">
                             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

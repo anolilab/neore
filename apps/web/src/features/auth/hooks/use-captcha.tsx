@@ -7,7 +7,7 @@ import { useRef } from "react";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 // Default captcha endpoints
-const DEFAULT_CAPTCHA_ENDPOINTS = ["/sign-up/email", "/sign-in/email", "/forget-password"];
+const DEFAULT_CAPTCHA_ENDPOINTS = ["/sign-up/email", "/sign-in/email", "/request-password-reset"];
 
 const useCaptcha = () => {
     const { captcha } = useAuth();
@@ -64,9 +64,21 @@ const useCaptcha = () => {
         return undefined;
     };
 
+    // A captcha token is single-use: after a failed submit the widget must issue a new one.
+    const resetCaptcha = () => {
+        const instance = captchaReference.current;
+
+        if (captcha?.provider === "hcaptcha") {
+            instance?.resetCaptcha?.();
+        } else {
+            instance?.reset?.();
+        }
+    };
+
     return {
         captchaRef: captchaReference,
         getCaptchaHeaders,
+        resetCaptcha,
     };
 };
 

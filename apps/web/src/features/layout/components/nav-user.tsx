@@ -29,6 +29,7 @@ import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
 import updateLocale, { isSupportedLocale } from "@/functions/update-locale";
+import { resetAnalyticsIdentity } from "@/lib/analytics";
 import type { AuthClient } from "@/lib/auth/client";
 import { DEFAULT_LOCALE, deLocalizeUrl, dynamicActivate, locales as appLocales, shouldIgnorePath } from "@/lib/intl/client";
 
@@ -276,7 +277,15 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     await releasePush();
                     await authClient.signOut({
                         fetchOptions: {
+                            onError: () => {
+                                // The session may still be active, so keep the identity and say so.
+                                toast({
+                                    message: t`Sign-out failed. Please try again.`,
+                                    variant: "error",
+                                });
+                            },
                             onSuccess: () => {
+                                resetAnalyticsIdentity();
                                 globalThis.location.reload();
                             },
                         },

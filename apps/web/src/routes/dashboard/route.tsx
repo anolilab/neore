@@ -273,8 +273,8 @@ const RouteComponent = () => {
 export const Route = createFileRoute("/dashboard")({
     staleTime: 60_000, // 1 minute - dashboard data changes infrequently
     gcTime: 10 * 60 * 1000, // 10 minutes - keep dashboard data cached
-    beforeLoad: ({ context }) => {
-        requireSession(context);
+    beforeLoad: ({ context, location }) => {
+        requireSession(context, location);
     },
     loader: async ({ context }) => {
         // No token yet (the session read failed and the guard let the page render):

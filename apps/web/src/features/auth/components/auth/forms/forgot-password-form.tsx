@@ -30,7 +30,7 @@ export interface ForgotPasswordFormProperties {
 const ForgotPasswordForm = ({ className, classNames, isSubmitting, setIsSubmitting }: ForgotPasswordFormProperties) => {
     const { t } = useLingui();
     const isHydrated = useIsHydrated();
-    const { captchaRef, getCaptchaHeaders } = useCaptcha();
+    const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha();
 
     const { authClient, basePath, baseURL, navigate, toast, viewPaths } = useAuth();
 
@@ -45,7 +45,7 @@ const ForgotPasswordForm = ({ className, classNames, isSubmitting, setIsSubmitti
         onSubmit: async ({ value }) => {
             try {
                 const fetchOptions: BetterFetchOption = {
-                    headers: await getCaptchaHeaders("/forget-password"),
+                    headers: await getCaptchaHeaders("/request-password-reset"),
                     throw: true,
                 };
 
@@ -62,6 +62,8 @@ const ForgotPasswordForm = ({ className, classNames, isSubmitting, setIsSubmitti
 
                 navigate(`${basePath}/${viewPaths.SIGN_IN}${globalThis.location.search}`);
             } catch (error) {
+                resetCaptcha();
+
                 toast({
                     message: getLocalizedError({ error, t }),
                     variant: "error",
@@ -124,7 +126,7 @@ const ForgotPasswordForm = ({ className, classNames, isSubmitting, setIsSubmitti
                     )}
                 </form.AppField>
 
-                <Captcha action="/forget-password" ref={captchaRef} />
+                <Captcha action="/request-password-reset" ref={captchaRef} />
 
                 <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting }) as unknown as typeof state}>
                     {({ canSubmit, isSubmitting: isSubmittingState }) => (

@@ -32,7 +32,7 @@ const logMiddleware = createMiddleware({ type: "function" })
         const now = new Date();
 
         console.log("Client Req/Res:", {
-            duration: result.context.clientTime.getTime() - now.getTime(),
+            duration: now.getTime() - result.context.clientTime.getTime(),
             durationFromServer: now.getTime() - result.context.serverTime.getTime(),
             durationToServer: result.context.durationToServer,
         });

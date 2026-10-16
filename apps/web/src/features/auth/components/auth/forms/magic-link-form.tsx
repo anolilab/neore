@@ -40,7 +40,7 @@ const MagicLinkForm = ({
 }: MagicLinkFormProperties) => {
     const { t } = useLingui();
     const isHydrated = useIsHydrated();
-    const { captchaRef, getCaptchaHeaders } = useCaptcha();
+    const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha();
 
     const { authClient, basePath, baseURL, persistClient, redirectTo: contextRedirectTo, toast, viewPaths } = useAuth();
 
@@ -49,7 +49,7 @@ const MagicLinkForm = ({
     const getRedirectTo = () => redirectToProperty || search.redirectTo || contextRedirectTo;
 
     const getCallbackURL = () =>
-        `${baseURL}${callbackURLProperty || (persistClient ? `${basePath}/${viewPaths.CALLBACK}?redirectTo=${getRedirectTo()}` : getRedirectTo())}`;
+        `${baseURL}${callbackURLProperty || (persistClient ? `${basePath}/${viewPaths.CALLBACK}?redirectTo=${encodeURIComponent(getRedirectTo())}` : getRedirectTo())}`;
 
     const formSchema = z.strictObject({
         email: emailSchema,
@@ -79,6 +79,8 @@ const MagicLinkForm = ({
 
                 form.reset();
             } catch (error) {
+                resetCaptcha();
+
                 toast({
                     message: getLocalizedError({ error, t }),
                     variant: "error",

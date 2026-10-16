@@ -6,7 +6,7 @@ import type { RefObject } from "react";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 // Default captcha endpoints
-const DEFAULT_CAPTCHA_ENDPOINTS = ["/sign-up/email", "/sign-in/email", "/forget-password"];
+const DEFAULT_CAPTCHA_ENDPOINTS = ["/sign-up/email", "/sign-in/email", "/request-password-reset"];
 
 interface CaptchaProperties {
     action?: string; // Optional action to check if it's in the endpoints list

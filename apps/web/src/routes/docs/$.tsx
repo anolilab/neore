@@ -5,6 +5,7 @@ import { useFumadocsLoader } from "fumadocs-core/source/client";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import type { CSSProperties } from "react";
 import { Suspense } from "react";
+import { array, string } from "zod";
 
 import docsClientLoader from "@/lib/docs-client-loader";
 // Static import — TanStack Start's Vite plugin tree-shakes this from the client bundle
@@ -12,7 +13,8 @@ import docsClientLoader from "@/lib/docs-client-loader";
 import docsSource from "@/lib/source";
 
 const serverLoader = createServerFn({ method: "GET" })
-    .validator((slugs: string[]) => slugs)
+    // Each segment is bounded too: an unbounded one reaches the page lookup as-is.
+    .validator(array(string().max(256)).max(32))
     .handler(async ({ data: slugs }) => {
         const page = docsSource.getPage(slugs);
 
