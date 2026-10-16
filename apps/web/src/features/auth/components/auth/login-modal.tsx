@@ -42,7 +42,8 @@ const LoginModal: FC<LoginModalProperties> = ({ onOpenChange, open }) => {
                 </DialogHeader>
                 <AuthCard
                     classNames={{
-                        base: "border-0 shadow-none ring-0 bg-transparent",
+                        // Centered: the card is narrower than the dialog, and a left-aligned card leaves the gap on the right.
+                        base: "mx-auto border-0 shadow-none ring-0 bg-transparent",
                     }}
                     view="SIGN_IN"
                 />
