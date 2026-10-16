@@ -73,8 +73,9 @@ jobs:
                   sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
             - name: "Install Rust"
-              uses: "dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec" # stable
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
               with:
+                  toolchain: "stable"
                   targets: "${{ matrix.rust-targets }}"
 
             - name: "Cache Rust build"
