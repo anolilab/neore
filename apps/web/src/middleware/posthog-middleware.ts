@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { createMiddleware } from "@tanstack/react-start";
 
 import env from "@/lib/env";
@@ -24,18 +22,15 @@ const posthogMiddleware = createMiddleware({ type: "request" }).server(async ({ 
         return next();
     }
 
-    // Get distinct ID from cookie or generate a new one
+    // Only a distinct ID that PostHog itself stored in a cookie is used. PostHog stores it only
+    // after consent (`cookieless_mode: "on_reject"`). A new visitor has none, so no ID is made up
+    // and no flag request goes out: sending a generated ID to PostHog would identify them before
+    // they consent.
     const cookieHeader = request.headers.get("cookie");
-    let distinctId = getDistinctIdFromCookie(cookieHeader, env.VITE_POSTHOG_API_KEY);
-
-    // If no distinct ID found, generate a temporary one
-    // This will be replaced by PostHog on the client side
-    if (!distinctId) {
-        distinctId = randomUUID();
-    }
+    const distinctId = getDistinctIdFromCookie(cookieHeader, env.VITE_POSTHOG_API_KEY);
 
     // `getFeatureFlags` never rejects (it logs and answers null).
-    const flags = getFeatureFlags(distinctId).then((result) => result ?? {});
+    const flags = distinctId ? getFeatureFlags(distinctId).then((result) => result ?? {}) : Promise.resolve({});
 
     // Pass flags and distinct ID to the next middleware/route
     const result = await next({
