@@ -13,7 +13,8 @@ import docsClientLoader from "@/lib/docs-client-loader";
 import docsSource from "@/lib/source";
 
 const serverLoader = createServerFn({ method: "GET" })
-    .validator(array(string()).max(32))
+    // Each segment is bounded too: an unbounded one reaches the page lookup as-is.
+    .validator(array(string().max(256)).max(32))
     .handler(async ({ data: slugs }) => {
         const page = docsSource.getPage(slugs);
 

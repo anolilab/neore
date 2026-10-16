@@ -36,6 +36,7 @@ import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
 import { seedHydratedAuthToken } from "@/lib/lunora/hydrate-auth-token";
 import { TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@/lib/lunora/token-refresh";
 import NativeBridge from "@/lib/native/native-bridge";
+import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
 import { jsonLd, seo } from "@/lib/seo";
 import { syncConsentToPostHog } from "@/providers/analytics-provider";
@@ -366,9 +367,15 @@ const RootComponent = () => {
 
     const handleSessionChange = useCallback(async () => {
         console.log("[Root] Session changed - invalidating router");
-        // The cached flags belong to the previous identity: drop them before the reload of the
-        // route data, so a route gate cannot read the account that was active before the switch.
-        forgetClientPostHog();
+
+        // Load the flags of the identity that is now signed in before the routes reload. Without
+        // this, a gate would read the previous account's flags, or none, until the next full load.
+        try {
+            rememberClientPostHog(await getClientPostHogState());
+        } catch {
+            forgetClientPostHog();
+        }
+
         await router.invalidate();
     }, [router]);
 
