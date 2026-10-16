@@ -1,5 +1,5 @@
 import { useSearch } from "@tanstack/react-router";
-import { useCallback, useEffect, useEffectEvent, useState, useTransition } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
@@ -20,7 +20,8 @@ const useOnSuccessTransition = ({ redirectTo: redirectToProperty, stayOnPage = f
     );
 
     const [isPending, startTransition] = useTransition();
-    const [success, setSuccess] = useState(false);
+    // Counts successful sign-ins on this mounted form, so each one navigates once.
+    const [successCount, setSuccessCount] = useState(0);
 
     const { authClient, navigate, onSessionChange } = useAuth();
 
@@ -32,19 +33,26 @@ const useOnSuccessTransition = ({ redirectTo: redirectToProperty, stayOnPage = f
         });
     });
 
+    // `isPending` flips true → false around each transition, and the effect below
+    // depends on it. Without this guard every navigation re-ran the effect and
+    // navigated again, which re-ran the root `beforeLoad` (one server-function call
+    // per pass). Navigate once per success; a later success gets a new count.
+    const navigatedForRef = useRef(0);
+
     useEffect(() => {
-        if (!success || isPending) {
+        if (successCount === 0 || isPending || navigatedForRef.current === successCount) {
             return;
         }
 
+        navigatedForRef.current = successCount;
         onNavigate(getRedirectTo());
-    }, [success, isPending, getRedirectTo]);
+    }, [successCount, isPending, getRedirectTo]);
 
     const onSuccess = useCallback(async () => {
         await refetchSession?.();
 
         if (!stayOnPage) {
-            setSuccess(true);
+            setSuccessCount((count) => count + 1);
         }
 
         if (onSessionChange) {
