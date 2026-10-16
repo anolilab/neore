@@ -182,6 +182,9 @@ const ChangePasswordCardContent = ({
                     redirectTo: `${baseURL}${basePath}/${viewPaths.RESET_PASSWORD}`,
                 });
 
+                // The response was single-use: a second request needs a fresh one.
+                resetCaptcha();
+
                 toast({
                     message: t`Password reset email sent`,
                     variant: "success",

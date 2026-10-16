@@ -48,6 +48,11 @@ export const rememberClientPostHog = (data: PostHogRequestData): void => {
     }
 };
 
+/** Forget the cached flags, when the signed-in identity changes without a page load. */
+export const forgetClientPostHog = (): void => {
+    clientPostHog.current = undefined;
+};
+
 export const readRequestContext = async (options: unknown): Promise<RequestContextData> => {
     const serverContext = (options as { serverContext?: ServerContextShape } | null | undefined)?.serverContext;
 

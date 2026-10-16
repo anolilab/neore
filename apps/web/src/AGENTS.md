@@ -614,7 +614,7 @@ answered "no session"; a failed session read lets the page render:
 import { requireSession } from "@/lib/auth/route-guard";
 
 export const Route = createFileRoute("/dashboard")({
-    beforeLoad: ({ context }) => {
+    beforeLoad: ({ context, location }) => {
         requireSession(context, location);
     },
     loader: async ({ context }) => {

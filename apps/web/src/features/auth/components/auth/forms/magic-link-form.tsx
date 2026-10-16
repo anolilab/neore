@@ -49,7 +49,7 @@ const MagicLinkForm = ({
     const getRedirectTo = () => redirectToProperty || search.redirectTo || contextRedirectTo;
 
     const getCallbackURL = () =>
-        `${baseURL}${callbackURLProperty || (persistClient ? `${basePath}/${viewPaths.CALLBACK}?redirectTo=${getRedirectTo()}` : getRedirectTo())}`;
+        `${baseURL}${callbackURLProperty || (persistClient ? `${basePath}/${viewPaths.CALLBACK}?redirectTo=${encodeURIComponent(getRedirectTo())}` : getRedirectTo())}`;
 
     const formSchema = z.strictObject({
         email: emailSchema,

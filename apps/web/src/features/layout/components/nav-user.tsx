@@ -278,9 +278,11 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     await authClient.signOut({
                         fetchOptions: {
                             onError: () => {
-                                // Reload either way: a page that still shows the account is the wrong state to leave.
-                                resetAnalyticsIdentity();
-                                globalThis.location.reload();
+                                // The session may still be active, so keep the identity and say so.
+                                toast({
+                                    message: t`Sign-out failed. Please try again.`,
+                                    variant: "error",
+                                });
                             },
                             onSuccess: () => {
                                 resetAnalyticsIdentity();

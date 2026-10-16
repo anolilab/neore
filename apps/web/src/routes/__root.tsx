@@ -36,7 +36,7 @@ import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
 import { seedHydratedAuthToken } from "@/lib/lunora/hydrate-auth-token";
 import { TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@/lib/lunora/token-refresh";
 import NativeBridge from "@/lib/native/native-bridge";
-import { readRequestContext, rememberClientPostHog } from "@/lib/request-context";
+import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
 import { jsonLd, seo } from "@/lib/seo";
 import { syncConsentToPostHog } from "@/providers/analytics-provider";
 import type { AppContext } from "@/router";
@@ -162,26 +162,31 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
         const scheduleRenewal = (wait: number) => {
             timer = setTimeout(async () => {
                 try {
-                    const token = await getSessionToken();
+                    // The status tells an ended session apart from a failed read: only the first
+                    // stops renewal. A `unknown` read (network, 429, 5xx) must be retried.
+                    const { status, token } = await getSessionAuthState();
 
                     if (isCancelled) {
                         return;
                     }
 
-                    if (!token) {
+                    if (status === "unauthenticated") {
+                        // The session has ended: drop the bearer and stop renewing it.
+                        lunoraClient.setAuthToken(null);
+
                         return;
                     }
 
                     // The server can answer the token it already minted (it caches for a minute).
                     // Setting the same string changes nothing, so the effect would never re-run
-                    // and renewal would stop for this session. Retry instead.
-                    if (token === rpcToken) {
-                        scheduleRenewal(TOKEN_RETRY_DELAY_MS);
+                    // and renewal would stop for this session. Treat it as a failed attempt.
+                    if (token && token !== rpcToken) {
+                        lunoraClient.setAuthToken(token);
 
                         return;
                     }
 
-                    lunoraClient.setAuthToken(token);
+                    scheduleRenewal(TOKEN_RETRY_DELAY_MS);
                 } catch {
                     if (!isCancelled) {
                         scheduleRenewal(TOKEN_RETRY_DELAY_MS);
@@ -361,6 +366,9 @@ const RootComponent = () => {
 
     const handleSessionChange = useCallback(async () => {
         console.log("[Root] Session changed - invalidating router");
+        // The cached flags belong to the previous identity: drop them before the reload of the
+        // route data, so a route gate cannot read the account that was active before the switch.
+        forgetClientPostHog();
         await router.invalidate();
     }, [router]);
 

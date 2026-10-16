@@ -34,7 +34,7 @@ const useAuthenticate = <TAuthClient extends AuthClient>(options?: AuthenticateO
             return;
         }
 
-        replace(`${basePath}/${viewPaths[authView]}?redirectTo=${globalThis.location.href.replace(globalThis.location.origin, "")}`);
+        replace(`${basePath}/${viewPaths[authView]}?redirectTo=${encodeURIComponent(globalThis.location.href.replace(globalThis.location.origin, ""))}`);
     }, [isPending, sessionData, basePath, viewPaths, replace, authView, enabled]);
 
     return {

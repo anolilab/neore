@@ -89,7 +89,8 @@ const SignUpForm = ({
     const getRedirectTo = useCallback(() => redirectTo || search?.redirectTo || contextRedirectTo, [redirectTo, search?.redirectTo, contextRedirectTo]);
 
     const getCallbackURL = useCallback(
-        () => `${baseURL}${callbackURL || (persistClient ? `${basePath}/${viewPaths.CALLBACK}?redirectTo=${getRedirectTo()}` : getRedirectTo())}`,
+        () =>
+            `${baseURL}${callbackURL || (persistClient ? `${basePath}/${viewPaths.CALLBACK}?redirectTo=${encodeURIComponent(getRedirectTo())}` : getRedirectTo())}`,
         [callbackURL, persistClient, basePath, viewPaths, baseURL, getRedirectTo],
     );
 
