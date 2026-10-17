@@ -11,11 +11,15 @@
  *   longer remember typing is sent without them asking for it.
  */
 
+import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
+
 export interface QueuedPrompt<A> {
     attachments: A[];
     /** Attachments that did not survive a reload (they are `File`s, which sessionStorage cannot hold). */
     droppedAttachments?: number;
     id: string;
+    /** Reference images selected when the prompt was queued, so a later draft's picks do not replace them. */
+    references?: ReferenceSelection[];
     text: string;
 }
 

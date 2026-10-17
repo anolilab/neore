@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
 import { Search, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { SettingsCardProperties } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
@@ -15,6 +15,22 @@ import SettingsCard from "@/components/settings/settings-card";
 import { useAdminUsers } from "../hooks/use-admin";
 import type { UserData } from "./user-cell";
 import UserCell from "./user-cell";
+
+const SEARCH_DEBOUNCE_MS = 300;
+
+// Same shape as the private helper in skill-marketplace.tsx; a live query keyed on the
+// raw keystroke would open a subscription per character.
+const useDebouncedValue = <T,>(value: T, delay: number): T => {
+    const [debounced, setDebounced] = useState(value);
+
+    useEffect(() => {
+        const timer = setTimeout(setDebounced, delay, value);
+
+        return () => clearTimeout(timer);
+    }, [value, delay]);
+
+    return debounced;
+};
 
 interface UsersManagementCardProps extends Omit<SettingsCardProperties, "title" | "description"> {
     /**
@@ -59,9 +75,10 @@ const UsersManagementCard = ({
     const [roleFilter, setRoleFilter] = useState<"all" | "user" | "admin">("all");
     const [userTypeFilter, setUserTypeFilter] = useState<"all" | "user" | "anonymous">("all");
 
+    const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
     const { data, isPending, refetch } = useAdminUsers({
         role: roleFilter,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         userType: userTypeFilter,
     });
 

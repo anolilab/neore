@@ -90,6 +90,14 @@ const Favicon = memo(({ className, url }: { className?: string; url: string }) =
 
 Favicon.displayName = "Favicon";
 
+const isHttpUrl = (url: string | undefined): boolean => {
+    try {
+        return url !== undefined && ["http:", "https:"].includes(new URL(url).protocol);
+    } catch {
+        return false;
+    }
+};
+
 export type SourceProps = ComponentProps<"a"> & {
     /** Whether this source is highlighted (e.g. from hovering an inline citation marker) */
     highlighted?: boolean;
@@ -97,41 +105,45 @@ export type SourceProps = ComponentProps<"a"> & {
     index?: number;
 };
 
-export const Source = ({ children, className, highlighted, href, index, title, ...props }: SourceProps) => (
-    <a
-        className={cn(
-            "flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800",
-            highlighted && "bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-950/40 dark:ring-blue-800",
-            className,
-        )}
-        data-source-index={index}
-        href={href}
-        rel="noreferrer"
-        role="listitem"
-        target="_blank"
-        {...props}
-    >
-        {children ?? (
-            <>
-                {index != null && (
-                    <span
-                        className={cn(
-                            "flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold transition-colors",
-                            highlighted
-                                ? "bg-blue-200 text-blue-700 dark:bg-blue-800 dark:text-blue-200"
-                                : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
-                        )}
-                    >
-                        {index}
-                    </span>
-                )}
-                {href && href !== "#" ? <Favicon url={href} /> : <GlobeIcon aria-hidden="true" className="size-4 shrink-0 text-gray-400" />}
-                <span className="block truncate font-medium">{title}</span>
-                {href && href !== "#" && <span className="hidden truncate text-gray-400 sm:block">{extractDomain(href)}</span>}
-            </>
-        )}
-    </a>
-);
+export const Source = ({ children, className, highlighted, href: rawHref, index, title, ...props }: SourceProps) => {
+    const href = isHttpUrl(rawHref) ? rawHref : undefined;
+
+    return (
+        <a
+            className={cn(
+                "flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800",
+                highlighted && "bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-950/40 dark:ring-blue-800",
+                className,
+            )}
+            data-source-index={index}
+            href={href}
+            rel="noreferrer"
+            role="listitem"
+            target="_blank"
+            {...props}
+        >
+            {children ?? (
+                <>
+                    {index != null && (
+                        <span
+                            className={cn(
+                                "flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold transition-colors",
+                                highlighted
+                                    ? "bg-blue-200 text-blue-700 dark:bg-blue-800 dark:text-blue-200"
+                                    : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
+                            )}
+                        >
+                            {index}
+                        </span>
+                    )}
+                    {href ? <Favicon url={href} /> : <GlobeIcon aria-hidden="true" className="size-4 shrink-0 text-gray-400" />}
+                    <span className="block truncate font-medium">{title}</span>
+                    {href && <span className="hidden truncate text-gray-400 sm:block">{extractDomain(href)}</span>}
+                </>
+            )}
+        </a>
+    );
+};
 
 /**
  * Inline citation marker for use within text content.
@@ -141,12 +153,13 @@ export type CitationMarkerProps = ComponentProps<"a"> & {
     index: number;
 };
 
-export const CitationMarker = ({ className, index, ...props }: CitationMarkerProps) => (
+export const CitationMarker = ({ className, href, index, ...props }: CitationMarkerProps) => (
     <a
         className={cn(
             "ml-0.5 inline-flex size-4 items-center justify-center rounded-full bg-gray-200 align-super text-[9px] font-bold text-gray-600 no-underline transition-colors hover:bg-blue-100 hover:text-blue-700 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-blue-900 dark:hover:text-blue-300",
             className,
         )}
+        href={isHttpUrl(href) ? href : undefined}
         rel="noreferrer"
         target="_blank"
         {...props}

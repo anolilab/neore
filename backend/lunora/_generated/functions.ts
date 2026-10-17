@@ -245,10 +245,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "admin_cleanup:previewCleanup": lunora_admin_cleanup_1.previewCleanup as unknown as RegisteredLunoraFunction,
     "admin_cleanup:updateCleanupConfig": lunora_admin_cleanup_1.updateCleanupConfig as unknown as RegisteredLunoraFunction,
     "admin_cleanup:writeCleanupLog": lunora_admin_cleanup_1.writeCleanupLog as unknown as RegisteredLunoraFunction,
-    "admin_gateway_analytics:createGatewayKeyAction": lunora_admin_gateway_analytics_2.createGatewayKeyAction as unknown as RegisteredLunoraFunction,
     "admin_gateway_analytics:getGatewayAnalytics": lunora_admin_gateway_analytics_2.getGatewayAnalytics as unknown as RegisteredLunoraFunction,
-    "admin_gateway_analytics:listGatewayKeysAction": lunora_admin_gateway_analytics_2.listGatewayKeysAction as unknown as RegisteredLunoraFunction,
-    "admin_gateway_analytics:revokeGatewayKeyAction": lunora_admin_gateway_analytics_2.revokeGatewayKeyAction as unknown as RegisteredLunoraFunction,
     "agent_api_keys:destroy": lunora_agent_api_keys_3.destroy as unknown as RegisteredLunoraFunction,
     "agent_api_keys:issue": lunora_agent_api_keys_3.issue as unknown as RegisteredLunoraFunction,
     "agent_api_keys:validate": lunora_agent_api_keys_3.validate as unknown as RegisteredLunoraFunction,
@@ -821,6 +818,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "evals_internal:reapCase": lunora_evals_internal_83.reapCase as unknown as RegisteredLunoraFunction,
     "file:finalizeChatUpload": lunora_file_84.finalizeChatUpload as unknown as RegisteredLunoraFunction,
     "file:getChatFileExtraction": lunora_file_84.getChatFileExtraction as unknown as RegisteredLunoraFunction,
+    "file:getChatFileImageUrl": lunora_file_84.getChatFileImageUrl as unknown as RegisteredLunoraFunction,
     "file:purgeStagedChatUploads": lunora_file_84.purgeStagedChatUploads as unknown as RegisteredLunoraFunction,
     "file:sweepStagedChatUploads": lunora_file_84.sweepStagedChatUploads as unknown as RegisteredLunoraFunction,
     "gdpr_functions:cancelStuckExport": lunora_gdpr_functions_85.cancelStuckExport as unknown as RegisteredLunoraFunction,
@@ -5096,6 +5094,12 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
+installCompiledValidatorMap(lunora_file_84.getChatFileImageUrl.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["fileId"] !== "string") return DEFER;
+return { "fileId": source["fileId"] };
+});
 installCompiledValidatorMap(lunora_file_84.purgeStagedChatUploads.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8004,10 +8008,7 @@ export interface Caller {
             writeCleanupLog: (args: { deletedCount: number; durationMs: number; eligibleCount: number; mode: "dry_run" | "execute"; runAt: number; triggeredBy: string }) => Promise<null>;
         };
         gateway_analytics: {
-            createGatewayKeyAction: (args: { expiresAt?: string; maxBudgetUsd?: number; name?: string; orgId?: string; rpmLimit?: number; tier?: "free" | "pro" | "enterprise"; tpmLimit?: number; userId: string }) => Promise<{} & { createdAt: string; expiresAt: string | null; isActive: boolean; keyId: string; lastUsedAt: string | null; maxBudgetUsd: number | null; name: string; prefix: string; rawKey: string; rpmLimit: number; spentUsd: number; tier: string; tpmLimit: number; }>;
             getGatewayAnalytics: (args: { period?: "24h" | "7d" }) => Promise<{} & { costTrend: ({} & { costMicrodollars: number; date: string; requestCount: number; })[]; modelBreakdown: ({} & { avgLatencyMs: number; costMicrodollars: number; count: number; errorCount: number; modelId: string; provider: string; })[]; overview: {} & { avgLatencyMs: number; cacheHitRate: number; errorRate: number; totalCostMicrodollars: number; totalRequests: number; }; period: "24h" | "7d"; providerHealth: ({} & { avgLatency5mMs: number; circuitBreakerUntil: string | null; errorRate5m: number; lastFailureAt: string | null; lastSuccessAt: string | null; modelApiId: string; provider: string; status: string; })[]; tierDistribution: ({} & { count: number; tier: string; })[]; }>;
-            listGatewayKeysAction: (args: { userId: string }) => Promise<({} & { createdAt: string; expiresAt: string | null; isActive: boolean; keyId: string; lastUsedAt: string | null; maxBudgetUsd: number | null; name: string; prefix: string; rpmLimit: number; spentUsd: number; tier: string; tpmLimit: number; })[]>;
-            revokeGatewayKeyAction: (args: { keyId: string }) => Promise<{ revoked: boolean }>;
         };
     };
     agent: {
@@ -8116,7 +8117,7 @@ export interface Caller {
             getThreadAccess: (args: { threadId: Id<"threads">; userId: string }) => Promise<{ _creationTime: number; _id: Id<"threadAccess">; expiresAt?: number; grantedAt: number; grantedBy: string; ownerId?: string; permission: "read" | "write" | "admin"; threadId: Id<"threads">; userId: string } | null>;
             getThreadInvite: (args: { inviteToken: string }) => Promise<{ _creationTime: number; _id: Id<"threadInvites">; acceptedAt?: number; acceptedBy?: string; expiresAt: number; invitedBy: string; invitedEmail: string; inviteToken: string; ownerId?: string; permission: "read" | "write" | "admin"; status: "pending" | "accepted" | "expired" | "revoked"; threadId: Id<"threads"> } | null>;
             getThreadInviteById: (args: { inviteId: Id<"threadInvites"> }) => Promise<{ _creationTime: number; _id: Id<"threadInvites">; acceptedAt?: number; acceptedBy?: string; expiresAt: number; invitedBy: string; invitedEmail: string; inviteToken: string; ownerId?: string; permission: "read" | "write" | "admin"; status: "pending" | "accepted" | "expired" | "revoked"; threadId: Id<"threads"> } | null>;
-            getThreadInvitesWithAccessCheck: (args: { threadId: Id<"threads">; userId: string }) => Promise<({ acceptedAt?: number | undefined; acceptedBy?: string | undefined; ownerId?: string | undefined; } & { _creationTime: number; _id: import("lunorash/server").Id<"threadInvites">; expiresAt: number; invitedBy: string; invitedEmail: string; inviteToken: string; permission: "read" | "write" | "admin"; status: "revoked" | "pending" | "expired" | "accepted"; threadId: string; })[] | null>;
+            getThreadInvitesWithAccessCheck: (args: { threadId: Id<"threads">; userId: string }) => Promise<({ acceptedAt?: number | undefined; acceptedBy?: string | undefined; ownerId?: string | undefined; } & { _creationTime: number; _id: import("lunorash/server").Id<"threadInvites">; expiresAt: number; invitedBy: string; invitedEmail: string; inviteToken: string; permission: "read" | "write" | "admin"; status: "pending" | "revoked" | "expired" | "accepted"; threadId: string; })[] | null>;
             listThreadAccess: (args: { threadId: Id<"threads"> }) => Promise<({ expiresAt?: number | undefined; ownerId?: string | undefined; } & { _creationTime: number; _id: import("lunorash/server").Id<"threadAccess">; grantedAt: number; grantedBy: string; permission: "read" | "write" | "admin"; threadId: import("lunorash/server").Id<"threads">; userId: string; })[]>;
             listThreadInvites: (args: { threadId: Id<"threads"> }) => Promise<Array<{ _creationTime: number; _id: Id<"threadInvites">; acceptedAt?: number; acceptedBy?: string; expiresAt: number; invitedBy: string; invitedEmail: string; inviteToken: string; ownerId?: string; permission: "read" | "write" | "admin"; status: "pending" | "accepted" | "expired" | "revoked"; threadId: string }>>;
             updateThreadAccess: (args: { accessId: Id<"threadAccess">; expiresAt?: number; permission?: "read" | "write" | "admin" }) => Promise<null>;
@@ -8520,7 +8521,7 @@ export interface Caller {
             getPublicThread: (args: { publicAccessToken: string }) => Promise<({ title?: string | undefined; } & { createdAt: number; messages: ({ speakerName?: string | undefined; } & { createdAt: number; id: string; parts: (({} & { text: string; type: "text"; }) | ({ title?: string | undefined; } & { type: "source-url"; url: string; }) | ({ filename?: string | undefined; } & { mediaType: string; type: "file"; url: string; }) | ({ mediaType?: string | undefined; } & { type: "attachment"; }) | ({} & { toolName: string; type: "tool"; }))[]; role: "user" | "assistant"; })[]; truncated: boolean; }) | null>;
             getPublicThreadOwner: (args: { publicAccessToken: string }) => Promise<string | null>;
             getThreadAccess: (args: { threadId: Id<"threads"> }) => Promise<{ publicAccessToken?: string | undefined; } & { isOwner: boolean; isPublic: boolean; permission: "read" | "write" | "admin"; users: ({ expiresAt?: number | undefined; name?: string | undefined; } & { email: string; grantedAt: number; permission: "read" | "write" | "admin"; userId: string; })[]; }>;
-            getThreadInvites: (args: { threadId: Id<"threads"> }) => Promise<({} & { _id: string; expiresAt: number; invitedAt: number; invitedEmail: string; inviteToken: string; permission: "read" | "write" | "admin"; status: "revoked" | "pending" | "expired" | "accepted"; })[]>;
+            getThreadInvites: (args: { threadId: Id<"threads"> }) => Promise<({} & { _id: string; expiresAt: number; invitedAt: number; invitedEmail: string; inviteToken: string; permission: "read" | "write" | "admin"; status: "pending" | "revoked" | "expired" | "accepted"; })[]>;
             getThreadShareToken: (args: { threadId: Id<"threads"> }) => Promise<string | null>;
             readPublicThread: (args: { publicAccessToken: string }) => Promise<({ title?: string | undefined; } & { createdAt: number; messages: ({ speakerName?: string | undefined; } & { createdAt: number; id: string; parts: (({} & { text: string; type: "text"; }) | ({ title?: string | undefined; } & { type: "source-url"; url: string; }) | ({ filename?: string | undefined; } & { mediaType: string; type: "file"; url: string; }) | ({ mediaType?: string | undefined; } & { type: "attachment"; }) | ({} & { toolName: string; type: "tool"; }))[]; role: "user" | "assistant"; })[]; truncated: boolean; }) | null>;
             readThreadShareToken: (args: { threadId: Id<"threads"> }) => Promise<string | null>;
@@ -8781,6 +8782,7 @@ export interface Caller {
     file: {
         finalizeChatUpload: (args: { filename: string; uploadId: string }) => Promise<{ fileId: Id<"chatFiles">; url: string }>;
         getChatFileExtraction: (args: { fileId: Id<"chatFiles"> }) => Promise<null | { status: "pending" | "processing" | "completed" | "failed" | "unsupported" }>;
+        getChatFileImageUrl: (args: { fileId: Id<"chatFiles"> }) => Promise<null | string>;
         purgeStagedChatUploads: (args: { userId: string }) => Promise<{ deleted: number }>;
         sweepStagedChatUploads: (args?: {}) => Promise<null>;
     };
@@ -9560,10 +9562,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             writeCleanupLog: (args) => callRegistered(context, "admin_cleanup:writeCleanupLog", args),
         },
         gateway_analytics: {
-            createGatewayKeyAction: (args) => callRegistered(context, "admin_gateway_analytics:createGatewayKeyAction", args),
             getGatewayAnalytics: (args) => callRegistered(context, "admin_gateway_analytics:getGatewayAnalytics", args),
-            listGatewayKeysAction: (args) => callRegistered(context, "admin_gateway_analytics:listGatewayKeysAction", args),
-            revokeGatewayKeyAction: (args) => callRegistered(context, "admin_gateway_analytics:revokeGatewayKeyAction", args),
         },
     },
     agent: {
@@ -10337,6 +10336,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
     file: {
         finalizeChatUpload: (args) => callRegistered(context, "file:finalizeChatUpload", args),
         getChatFileExtraction: (args) => callRegistered(context, "file:getChatFileExtraction", args),
+        getChatFileImageUrl: (args) => callRegistered(context, "file:getChatFileImageUrl", args),
         purgeStagedChatUploads: (args) => callRegistered(context, "file:purgeStagedChatUploads", args),
         sweepStagedChatUploads: (args) => callRegistered(context, "file:sweepStagedChatUploads", args),
     },

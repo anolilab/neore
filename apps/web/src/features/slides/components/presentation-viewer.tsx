@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@neore/ui/components/c
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { ScrollArea } from "@neore/ui/components/scroll-area";
 import { AlertTriangle, Download, ExternalLink, FileText, Presentation } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import usePresentationViewerStore from "../hooks/use-presentation-viewer-store";
 import type { DownloadFormat } from "../types";
@@ -61,6 +61,7 @@ const PresentationViewer = ({
     streamingSlideTitle,
 }: PresentationViewerProps) => {
     const { t } = useLingui();
+    const listRef = useRef<HTMLDivElement>(null);
     const [visibleSlide, setVisibleSlide] = useState<number | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
     const [hasScrolledToCurrentSlide, setHasScrolledToCurrentSlide] = useState(false);
@@ -85,7 +86,7 @@ const PresentationViewer = ({
         }
 
         const handleScroll = () => {
-            const scrollArea = document.querySelector("[data-radix-scroll-area-viewport]");
+            const scrollArea = listRef.current?.querySelector('[data-slot="scroll-area-viewport"]');
 
             if (!scrollArea || slides.length === 0) {
                 return;
@@ -141,7 +142,7 @@ const PresentationViewer = ({
             scrollTimeout = setTimeout(handleScroll, 50);
         };
 
-        const scrollArea = document.querySelector("[data-radix-scroll-area-viewport]");
+        const scrollArea = listRef.current?.querySelector('[data-slot="scroll-area-viewport"]');
 
         if (scrollArea) {
             scrollArea.addEventListener("scroll", debouncedHandleScroll);
@@ -356,7 +357,9 @@ const PresentationViewer = ({
                 </CardHeader>
             )}
 
-            <CardContent className="relative h-full flex-1 overflow-hidden p-0">{slideBody}</CardContent>
+            <CardContent className="relative h-full flex-1 overflow-hidden p-0" ref={listRef}>
+                {slideBody}
+            </CardContent>
 
             <div className="border-border/40 bg-muted/20 flex h-9 items-center justify-between border-t px-4 py-2">
                 <div className="text-muted-foreground font-mono text-xs">

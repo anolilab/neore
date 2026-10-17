@@ -6424,30 +6424,9 @@
     },
     {
       "detail": "action",
-      "id": "function:admin_gateway_analytics:createGatewayKeyAction",
-      "kind": "function",
-      "name": "admin.gateway_analytics.createGatewayKeyAction",
-      "module": "admin"
-    },
-    {
-      "detail": "action",
       "id": "function:admin_gateway_analytics:getGatewayAnalytics",
       "kind": "function",
       "name": "admin.gateway_analytics.getGatewayAnalytics",
-      "module": "admin"
-    },
-    {
-      "detail": "action",
-      "id": "function:admin_gateway_analytics:listGatewayKeysAction",
-      "kind": "function",
-      "name": "admin.gateway_analytics.listGatewayKeysAction",
-      "module": "admin"
-    },
-    {
-      "detail": "action",
-      "id": "function:admin_gateway_analytics:revokeGatewayKeyAction",
-      "kind": "function",
-      "name": "admin.gateway_analytics.revokeGatewayKeyAction",
       "module": "admin"
     },
     {
@@ -10444,6 +10423,12 @@
       "id": "function:file:getChatFileExtraction",
       "kind": "function",
       "name": "file.getChatFileExtraction"
+    },
+    {
+      "detail": "query",
+      "id": "function:file:getChatFileImageUrl",
+      "kind": "function",
+      "name": "file.getChatFileImageUrl"
     },
     {
       "detail": "action",
@@ -15378,19 +15363,7 @@
     {
       "file": "agent/files",
       "kind": "write",
-      "line": 271,
-      "reason": "\"changeRefcount\" is not a registered function"
-    },
-    {
-      "file": "agent/files",
-      "kind": "write",
-      "line": 285,
-      "reason": "\"changeRefcount\" is not a registered function"
-    },
-    {
-      "file": "agent/files",
-      "kind": "write",
-      "line": 306,
+      "line": 329,
       "reason": "\"copyFileHandler\" is not a registered function"
     },
     {
@@ -16992,13 +16965,13 @@
     {
       "file": "crons",
       "kind": "call",
-      "line": 328,
+      "line": 327,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "crons",
       "kind": "call",
-      "line": 340,
+      "line": 339,
       "reason": "\"runCronTick\" is not a registered function"
     },
     {

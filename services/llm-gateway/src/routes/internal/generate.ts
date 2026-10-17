@@ -173,20 +173,30 @@ generateRouter.openapi(
         if (hasActiveFilters(filterRules)) {
             const candidate = MODEL_MAP.get(body.modelId);
 
-            if (candidate) {
-                const rejectionReason = getModelRejectionReason(candidate, filterRules);
-
-                if (rejectionReason) {
-                    return c.json(
-                        {
-                            error: {
-                                code: "MODEL_BLOCKED",
-                                message: rejectionReason,
-                            },
+            if (!candidate) {
+                return c.json(
+                    {
+                        error: {
+                            code: "MODEL_UNKNOWN",
+                            message: `Cannot validate compliance for unknown modelId: ${body.modelId}`,
                         },
-                        403,
-                    );
-                }
+                    },
+                    403,
+                );
+            }
+
+            const rejectionReason = getModelRejectionReason(candidate, filterRules);
+
+            if (rejectionReason) {
+                return c.json(
+                    {
+                        error: {
+                            code: "MODEL_BLOCKED",
+                            message: rejectionReason,
+                        },
+                    },
+                    403,
+                );
             }
         }
 

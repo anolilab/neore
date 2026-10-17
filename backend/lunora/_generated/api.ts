@@ -21,10 +21,7 @@ export interface ApiTypes {
             updateCleanupConfig: FunctionReference<"mutation", { batchSize?: number; isEnabled?: boolean; thresholdDays?: number }, null>;
         };
         gateway_analytics: {
-            createGatewayKeyAction: FunctionReference<"action", { expiresAt?: string; maxBudgetUsd?: number; name?: string; orgId?: string; rpmLimit?: number; tier?: "free" | "pro" | "enterprise"; tpmLimit?: number; userId: string }, {} & { createdAt: string; expiresAt: string | null; isActive: boolean; keyId: string; lastUsedAt: string | null; maxBudgetUsd: number | null; name: string; prefix: string; rawKey: string; rpmLimit: number; spentUsd: number; tier: string; tpmLimit: number; }>;
             getGatewayAnalytics: FunctionReference<"action", { period?: "24h" | "7d" }, {} & { costTrend: ({} & { costMicrodollars: number; date: string; requestCount: number; })[]; modelBreakdown: ({} & { avgLatencyMs: number; costMicrodollars: number; count: number; errorCount: number; modelId: string; provider: string; })[]; overview: {} & { avgLatencyMs: number; cacheHitRate: number; errorRate: number; totalCostMicrodollars: number; totalRequests: number; }; period: "24h" | "7d"; providerHealth: ({} & { avgLatency5mMs: number; circuitBreakerUntil: string | null; errorRate5m: number; lastFailureAt: string | null; lastSuccessAt: string | null; modelApiId: string; provider: string; status: string; })[]; tierDistribution: ({} & { count: number; tier: string; })[]; }>;
-            listGatewayKeysAction: FunctionReference<"action", { userId: string }, ({} & { createdAt: string; expiresAt: string | null; isActive: boolean; keyId: string; lastUsedAt: string | null; maxBudgetUsd: number | null; name: string; prefix: string; rpmLimit: number; spentUsd: number; tier: string; tpmLimit: number; })[]>;
-            revokeGatewayKeyAction: FunctionReference<"action", { keyId: string }, { revoked: boolean }>;
         };
     };
     agent: {
@@ -275,7 +272,7 @@ export interface ApiTypes {
             createThreadInvite: FunctionReference<"mutation", { customHours?: number; expirationType: "1_day" | "7_days" | "custom"; invitedEmail: string; permission: "read" | "write" | "admin"; threadId: Id<"threads"> }, { expiresAt: number; inviteToken: string }>;
             getPublicThread: FunctionReference<"action", { publicAccessToken: string }, ({ title?: string | undefined; } & { createdAt: number; messages: ({ speakerName?: string | undefined; } & { createdAt: number; id: string; parts: (({} & { text: string; type: "text"; }) | ({ title?: string | undefined; } & { type: "source-url"; url: string; }) | ({ filename?: string | undefined; } & { mediaType: string; type: "file"; url: string; }) | ({ mediaType?: string | undefined; } & { type: "attachment"; }) | ({} & { toolName: string; type: "tool"; }))[]; role: "user" | "assistant"; })[]; truncated: boolean; }) | null>;
             getThreadAccess: FunctionReference<"query", { threadId: Id<"threads"> }, { publicAccessToken?: string | undefined; } & { isOwner: boolean; isPublic: boolean; permission: "read" | "write" | "admin"; users: ({ expiresAt?: number | undefined; name?: string | undefined; } & { email: string; grantedAt: number; permission: "read" | "write" | "admin"; userId: string; })[]; }>;
-            getThreadInvites: FunctionReference<"query", { threadId: Id<"threads"> }, ({} & { _id: string; expiresAt: number; invitedAt: number; invitedEmail: string; inviteToken: string; permission: "read" | "write" | "admin"; status: "revoked" | "pending" | "expired" | "accepted"; })[]>;
+            getThreadInvites: FunctionReference<"query", { threadId: Id<"threads"> }, ({} & { _id: string; expiresAt: number; invitedAt: number; invitedEmail: string; inviteToken: string; permission: "read" | "write" | "admin"; status: "pending" | "revoked" | "expired" | "accepted"; })[]>;
             getThreadShareToken: FunctionReference<"action", { threadId: Id<"threads"> }, string | null>;
             removeThreadAccess: FunctionReference<"mutation", { targetUserId: string; threadId: Id<"threads"> }, void>;
             resolveThreadShard: FunctionReference<"query", { threadId: string }, string | null>;
@@ -392,6 +389,7 @@ export interface ApiTypes {
     file: {
         finalizeChatUpload: FunctionReference<"action", { filename: string; uploadId: string }, { fileId: Id<"chatFiles">; url: string }>;
         getChatFileExtraction: FunctionReference<"query", { fileId: Id<"chatFiles"> }, null | { status: "pending" | "processing" | "completed" | "failed" | "unsupported" }>;
+        getChatFileImageUrl: FunctionReference<"query", { fileId: Id<"chatFiles"> }, null | string>;
     };
     gdpr: {
         functions: {
@@ -759,10 +757,7 @@ export const api: ApiTypes = {
             updateCleanupConfig: { __lunoraRef: "admin_cleanup:updateCleanupConfig" },
         },
         gateway_analytics: {
-            createGatewayKeyAction: { __lunoraRef: "admin_gateway_analytics:createGatewayKeyAction" },
             getGatewayAnalytics: { __lunoraRef: "admin_gateway_analytics:getGatewayAnalytics" },
-            listGatewayKeysAction: { __lunoraRef: "admin_gateway_analytics:listGatewayKeysAction" },
-            revokeGatewayKeyAction: { __lunoraRef: "admin_gateway_analytics:revokeGatewayKeyAction" },
         },
     },
     agent: {
@@ -1130,6 +1125,7 @@ export const api: ApiTypes = {
     file: {
         finalizeChatUpload: { __lunoraRef: "file:finalizeChatUpload" },
         getChatFileExtraction: { __lunoraRef: "file:getChatFileExtraction" },
+        getChatFileImageUrl: { __lunoraRef: "file:getChatFileImageUrl" },
     },
     gdpr: {
         functions: {

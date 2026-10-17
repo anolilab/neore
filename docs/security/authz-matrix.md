@@ -153,10 +153,7 @@ for a schema table that is neither policed nor listed:
 | `admin_cleanup.listCleanupLogs` | query | adminQuery | cleanupLogs | admin role | ok |
 | `admin_cleanup.previewCleanup` | query | adminQuery | cleanupConfigs | admin role | ok |
 | `admin_cleanup.updateCleanupConfig` | mutation | adminMutation | cleanupConfigs | admin role | ok |
-| `admin_gateway_analytics.createGatewayKeyAction` | action | adminAction | — | admin role | ok |
 | `admin_gateway_analytics.getGatewayAnalytics` | action | adminAction | — | admin role | ok |
-| `admin_gateway_analytics.listGatewayKeysAction` | action | adminAction | — | admin role | ok |
-| `admin_gateway_analytics.revokeGatewayKeyAction` | action | adminAction | — | admin role | ok |
 | `agent_branches.switchBranch` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `agent_document_history.getVersion` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
 | `agent_document_history.listVersions` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
@@ -408,6 +405,7 @@ for a schema table that is neither policed nor listed:
 | `evals_functions.updateCase` | mutation | authMutation + RL | evalCases | owner helper | ok |
 | `evals_functions.updateDataset` | mutation | authMutation + RL | evalDatasets | owner helper | ok |
 | `file.getChatFileExtraction` | query | authQuery | chatFileAccess, chatFiles | caller's own `chatFileAccess` grant on the id, else `null` (same as missing); returns the extraction STATUS only, never the text | ok — new |
+| `file.getChatFileImageUrl` | query | authQuery | chatFileAccess, chatFiles | caller's own `chatFileAccess` grant on the id, else `null` (same as missing); returns a short-lived signed display URL, never the storage key | ok — new |
 | `file.finalizeChatUpload` | action | authAction + RL | chatFiles, chatFileAccess (via `storeFile`) | key rebuilt under the CALLER's staging prefix from `uploadId`, else answered as expired; real size (per-kind cap), type (allowlist) and leading bytes re-checked; grant written for the caller only | ok — the bytes arrive on the TUS upload route (see HTTP routes) |
 | `gdpr_functions.cancelStuckExport` | mutation | authMutation + RL | gdprAuditLog | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.getDataAccessSummary` | query | authQuery | gdprRequests | caller-scoped (ctx.user) | ok |

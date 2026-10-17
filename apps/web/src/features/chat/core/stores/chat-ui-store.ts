@@ -19,11 +19,13 @@ import type { ReferenceSelection } from "@/features/chat/components/reference-pi
  * Falls back to immediate execution in SSR environments.
  */
 const createBatcher = <T>() => {
-    let pending: T | null = null;
+    let pending: T;
+    let hasPending = false;
     let isScheduled = false;
 
     return (callback: (value: T) => void, value: T) => {
         pending = value;
+        hasPending = true;
 
         if (globalThis.window === undefined) {
             callback(value);
@@ -36,9 +38,9 @@ const createBatcher = <T>() => {
             requestAnimationFrame(() => {
                 isScheduled = false;
 
-                if (pending !== null) {
+                if (hasPending) {
+                    hasPending = false;
                     callback(pending);
-                    pending = null;
                 }
             });
         }
@@ -118,6 +120,8 @@ interface ChatUIStore {
     removeEditAttachment: (id: string) => void;
     // Reset
     reset: () => void;
+    /** Puts a failed send back into the composer, unless a new draft was started meanwhile. */
+    restoreComposer: (draft: { attachedReferences: ReferenceSelection[]; composerAttachments: PendingAttachment[]; composerText: string }) => void;
     setActiveDocumentId: (documentId: string | null) => void;
     // Right sidebar tab actions
     setActiveRightSidebarTab: (tab: string) => void;
@@ -298,6 +302,16 @@ export const useChatUIStore = create<ChatUIStore>()(
                 // Reset
                 reset: () => {
                     set(initialState);
+                },
+
+                restoreComposer: (draft) => {
+                    const { attachedReferences, composerAttachments, composerText } = get();
+
+                    if (composerText || composerAttachments.length > 0 || attachedReferences.length > 0) {
+                        return;
+                    }
+
+                    set(draft);
                 },
 
                 setActiveDocumentId: (documentId) => {

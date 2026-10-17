@@ -93,7 +93,8 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
     const [open, setOpen] = useState(false);
     const defaultPlaceholder = t`Select model...`;
     const { isAnonymous } = useIsAnonymous();
-    const gatewayModels = useFeatureFlaggedModels();
+    const gatewayModels = useFeatureFlaggedModels({ applyUserOverrides: true });
+    const allGatewayModels = useFeatureFlaggedModels();
     // Custom endpoints only when the picker opens, or when the current pick is
     // one (its label comes from that list) — not on every first paint.
     const customModels = useCustomModels(includeCustomModels && (open || Boolean(modelId?.startsWith("custom:"))));
@@ -108,11 +109,11 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
         }
 
         if (modelId) {
-            return findModelById(featureFlaggedModels, modelId);
+            return findModelById(featureFlaggedModels, modelId) ?? findModelById(allGatewayModels, modelId);
         }
 
         return undefined;
-    }, [modelProp, modelId, featureFlaggedModels]);
+    }, [modelProp, modelId, featureFlaggedModels, allGatewayModels]);
 
     const handleSelect = useCallback(
         (selectedModelId: string) => {

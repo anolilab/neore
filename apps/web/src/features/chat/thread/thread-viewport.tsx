@@ -232,10 +232,6 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
             return undefined;
         }
 
-        if (userScrolledRef.current) {
-            return undefined;
-        }
-
         const viewport = viewportRef.current;
 
         if (!viewport) {

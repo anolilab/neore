@@ -281,7 +281,7 @@ export const MCPServerForm: FC<MCPServerFormProps> = ({ formData, isEditing, isT
                     </Button>
                 </div>
                 {formData.headers.map((header, index) => (
-                    <div className="flex items-center gap-2" key={`header-${header.key || index}`}>
+                    <div className="flex items-center gap-2" key={index}>
                         <Input
                             aria-label={t`Header name`}
                             className="flex-1"

@@ -190,6 +190,7 @@ export interface Doc_chatFiles {
     nsfwStatus?: "pending" | "checking" | "safe" | "blocked" | "failed";
     refcount: number;
     storageId: string;
+    unreferencedSince?: number;
 }
 
 export interface Doc_chatImportJobs {
@@ -2846,6 +2847,7 @@ export interface Insert_chatFiles {
     nsfwStatus?: "pending" | "checking" | "safe" | "blocked" | "failed";
     refcount: number;
     storageId: string;
+    unreferencedSince?: number;
 }
 
 export interface Insert_chatImportJobs {

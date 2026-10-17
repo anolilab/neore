@@ -25,6 +25,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 
 import type { HonoEnv } from "../../env.js";
+import { isProductionEnv } from "../../env.js";
 import { GatewayError, toSafeErrorPayload, toSafeValidationPayload } from "../../lib/errors.js";
 import { bearerAuth } from "../../middleware/auth.js";
 import { expensiveEndpointRateLimit } from "../../middleware/rate-limit.js";
@@ -45,14 +46,20 @@ const TRAILING_SLASH_RE = /\/$/;
  * into pointing at an attacker-controlled origin (same rationale as in
  * env.ts).
  *
- * Falls back to the request origin only when the env var is unset — that
- * branch is for local dev where Host is trusted.
+ * Falls back to the request origin only outside production, where Host is
+ * trusted; in production an unset env var throws rather than echo the Host.
  */
 export const resolveCanonicalOrigin = (env: HonoEnv["Bindings"], requestUrl: string): string => {
     const configured = env.PUBLIC_GATEWAY_URL?.replace(TRAILING_SLASH_RE, "");
 
     if (configured) {
         return configured;
+    }
+
+    if (isProductionEnv(env)) {
+        console.error("[gateway:media] PUBLIC_GATEWAY_URL is not configured in production — cannot advertise polling URLs");
+
+        throw new Error("Gateway not configured");
     }
 
     return new URL(requestUrl).origin;
@@ -98,8 +105,9 @@ const generateRequestSchema = z.object({
 
 videoRouter.use("/v1/videos/*", bearerAuth);
 // Video generation is the highest cost-per-call provider call we expose;
-// keep its bucket tighter than other expensive endpoints.
-videoRouter.use("/v1/videos/*", expensiveEndpointRateLimit({ bucket: "video", tierMultiplier: 0.5 }));
+// keep its bucket tighter than other expensive endpoints. Submit only: polling
+// and content downloads must not spend the bucket.
+videoRouter.post("/v1/videos", expensiveEndpointRateLimit({ bucket: "video", tierMultiplier: 0.5 }));
 
 // ─── POST /v1/videos ────────────────────────────────────────────────────────────
 

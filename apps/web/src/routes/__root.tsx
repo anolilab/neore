@@ -48,6 +48,24 @@ import appCss from "@/styles.css?url";
 
 const TRAILING_SLASH_RE = /\/$/;
 
+/**
+ * Turns an auth-UI href such as `/auth/sign-in?redirectTo=/x` into a router target. The router
+ * reads a string `to` as a bare pathname, so the query must become `search` or it is encoded
+ * into the path and lost.
+ */
+const toRouteTarget = (href: string) => {
+    const queryStart = href.indexOf("?");
+    const rawPath = queryStart === -1 ? href : href.slice(0, queryStart);
+    const normalizedPath = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+    const to = normalizedPath.replaceAll(/\/+/g, "/") as FileRouteTypes["to"];
+
+    if (queryStart === -1) {
+        return { to };
+    }
+
+    return { search: Object.fromEntries(new URLSearchParams(href.slice(queryStart + 1))), to };
+};
+
 /** Keeps PostHog identity in sync with the current auth session. */
 const PostHogIdentitySync = () => {
     usePostHogIdentity();
@@ -211,8 +229,12 @@ const AuthRecovery = ({ children }: { children: ReactNode }) => {
      * Required when the user identity changes (e.g., anonymous → real user).
      */
     const forceLunoraReauth = useEffectEvent(() => {
-        void getSessionToken().then((token) => lunoraClient.setAuthToken(token ?? null));
-        queryClient.clear();
+        void (async () => {
+            const token = await getSessionToken();
+
+            lunoraClient.setAuthToken(token ?? null);
+            queryClient.clear();
+        })();
     });
 
     useEffect(() => {
@@ -349,20 +371,14 @@ const RootComponent = () => {
     // Memoize navigation callbacks to prevent AuthUIProviderTanstack re-renders
     const handleNavigate = useCallback(
         (href: string) => {
-            const normalizedPath = href.startsWith("/") ? href : `/${href}`;
-            const cleanPath = normalizedPath.replaceAll(/\/+/g, "/");
-
-            router.navigate({ to: cleanPath as FileRouteTypes["to"] });
+            router.navigate(toRouteTarget(href));
         },
         [router],
     );
 
     const handleReplace = useCallback(
         (href: string) => {
-            const normalizedPath = href.startsWith("/") ? href : `/${href}`;
-            const cleanPath = normalizedPath.replaceAll(/\/+/g, "/");
-
-            router.navigate({ replace: true, to: cleanPath as FileRouteTypes["to"] });
+            router.navigate({ ...toRouteTarget(href), replace: true });
         },
         [router],
     );

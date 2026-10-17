@@ -418,6 +418,12 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
 
     const { mutateAsync: updateDocument } = useMutation(crpc.agent.documents.updateDocument.mutationOptions());
 
+    useEffect(() => {
+        lastSeenVersionRef.current = 0;
+        localSaveRef.current = false;
+        setShowAiDiffBanner(false);
+    }, [activeDocumentId]);
+
     // Detect version bumps from non-local sources (AI updates)
     useEffect(() => {
         if (!document?.version) {

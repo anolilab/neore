@@ -233,6 +233,9 @@ const ComposerVoiceInput: FC<ComposerVoiceInputProps> = ({ compact, disabled, hi
 
             sessionRef.current = session;
             setStatus(session ? "listening" : "idle");
+        } catch (error) {
+            reportMicrophoneError(error);
+            setStatus("idle");
         } finally {
             busyRef.current = false;
         }

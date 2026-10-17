@@ -75,7 +75,7 @@ describe(UsageReporter, () => {
 
         const { reporter, sleep } = makeReporter(3);
 
-        await expect(reporter.report(report)).resolves.toBeUndefined();
+        await expect(reporter.report(report)).resolves.toBe(false);
         expect(fetchMock).toHaveBeenCalledTimes(3);
         // No sleep after the final attempt.
         expect(sleep).toHaveBeenCalledTimes(2);

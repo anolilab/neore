@@ -138,11 +138,14 @@ const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) =>
             {/* Content */}
             <div className="overflow-auto p-4" style={{ maxHeight: "500px" }}>
                 {isLoading && (
-                    <div className="space-y-3">
-                        <div className="bg-muted h-4 w-3/4 animate-pulse rounded" />
-                        <div className="bg-muted h-4 w-full animate-pulse rounded" />
-                        <div className="bg-muted h-4 w-5/6 animate-pulse rounded" />
-                        <div className="bg-muted h-4 w-2/3 animate-pulse rounded" />
+                    <div aria-live="polite" role="status">
+                        <span className="sr-only">{t`Loading document…`}</span>
+                        <div aria-hidden="true" className="space-y-3">
+                            <div className="bg-muted h-4 w-3/4 animate-pulse rounded" />
+                            <div className="bg-muted h-4 w-full animate-pulse rounded" />
+                            <div className="bg-muted h-4 w-5/6 animate-pulse rounded" />
+                            <div className="bg-muted h-4 w-2/3 animate-pulse rounded" />
+                        </div>
                     </div>
                 )}
                 {html && <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: html }} />}

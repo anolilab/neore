@@ -251,6 +251,33 @@ const PAGE_TIMEOUT = 30_000;
 /** Max time to wait for navigation (ms) */
 const NAV_TIMEOUT = 60_000;
 
+const routedContexts = new WeakMap<WeakKey, Promise<void>>();
+
+/** Every request any page in the context makes (clicks, redirects, subresources, popups) passes the same SSRF check. */
+const guardPage = async (page: import("@cloudflare/playwright").Page) => {
+    const context = page.context();
+    let installed = routedContexts.get(context);
+
+    if (!installed) {
+        installed = context
+            .route("**/*", async (route) => {
+                if (validateUrl(route.request().url()) === null) {
+                    await route.continue();
+                } else {
+                    await route.abort("blockedbyclient");
+                }
+            })
+            .catch((error: unknown) => {
+                routedContexts.delete(context);
+
+                throw error;
+            });
+        routedContexts.set(context, installed);
+    }
+
+    await installed;
+};
+
 app.post("/action", async (c) => {
     // Parse request — catch malformed JSON
     let body: unknown;
@@ -318,6 +345,7 @@ app.post("/action", async (c) => {
         const page = existingPage ?? (await browser.newPage());
 
         page.setDefaultTimeout(PAGE_TIMEOUT);
+        await guardPage(page);
 
         let result: ActionResult;
 

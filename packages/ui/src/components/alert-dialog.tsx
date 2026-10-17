@@ -2,9 +2,6 @@ import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog
 import { Button } from "@ui/components/button";
 import cn from "@ui/utils/cn";
 import * as React from "react";
-import { Activity, createContext, use } from "react";
-
-const AlertDialogContext = createContext<{ open: boolean } | null>(null);
 
 export interface AlertDialogProps extends Omit<AlertDialogPrimitive.Root.Props, "onOpenChange"> {
     /**
@@ -25,15 +22,7 @@ const AlertDialog = ({ onOpenChange, onOpenChangeWithDetails, open, ...props }: 
         onOpenChangeWithDetails?.(newOpen, eventDetails);
     };
 
-    const contextValue = React.useMemo(() => {
-        return { open: open ?? false };
-    }, [open]);
-
-    return (
-        <AlertDialogContext value={contextValue}>
-            <AlertDialogPrimitive.Root data-slot="alert-dialog" onOpenChange={handleOpenChange} open={open} {...props} />
-        </AlertDialogContext>
-    );
+    return <AlertDialogPrimitive.Root data-slot="alert-dialog" onOpenChange={handleOpenChange} open={open} {...props} />;
 };
 
 const AlertDialogTrigger = ({ ...props }: AlertDialogPrimitive.Trigger.Props) => <AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />;
@@ -58,27 +47,22 @@ const AlertDialogContent = ({
     ...props
 }: AlertDialogPrimitive.Popup.Props & {
     size?: "default" | "sm";
-}) => {
-    const context = use(AlertDialogContext);
-    const open = context?.open ?? true; // Default to true since Content is only rendered when dialog is open
-
-    return (
-        <AlertDialogPortal>
-            <AlertDialogOverlay />
-            <AlertDialogPrimitive.Popup
-                className={cn(
-                    "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 bg-background ring-foreground/10 group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-3 rounded-xl p-4 ring-1 duration-100 outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-64 data-[size=default]:sm:max-w-sm",
-                    className,
-                )}
-                data-size={size}
-                data-slot="alert-dialog-content"
-                {...props}
-            >
-                <Activity mode={open ? "visible" : "hidden"}>{children}</Activity>
-            </AlertDialogPrimitive.Popup>
-        </AlertDialogPortal>
-    );
-};
+}) => (
+    <AlertDialogPortal>
+        <AlertDialogOverlay />
+        <AlertDialogPrimitive.Popup
+            className={cn(
+                "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 bg-background ring-foreground/10 group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-3 rounded-xl p-4 ring-1 duration-100 outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-64 data-[size=default]:sm:max-w-sm",
+                className,
+            )}
+            data-size={size}
+            data-slot="alert-dialog-content"
+            {...props}
+        >
+            {children}
+        </AlertDialogPrimitive.Popup>
+    </AlertDialogPortal>
+);
 
 const AlertDialogHeader = ({ className, ...props }: React.ComponentProps<"div">) => (
     <div

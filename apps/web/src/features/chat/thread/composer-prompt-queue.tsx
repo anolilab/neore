@@ -38,6 +38,10 @@ const useSendQueuedPrompt = () => {
         (prompt: QueuedChatPrompt) => {
             const { attachedReferences, composerAttachments, composerText } = useChatUIStore.getState();
 
+            if (prompt.references) {
+                useChatUIStore.setState({ attachedReferences: prompt.references });
+            }
+
             void sendMessage(prompt.text, prompt.attachments);
 
             useChatUIStore.setState({ attachedReferences, composerAttachments, composerText });

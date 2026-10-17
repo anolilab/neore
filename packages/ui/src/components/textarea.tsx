@@ -67,6 +67,15 @@ const Textarea = ({ className, expandable = false, expandableDialogTitle, onChan
         handleExpand();
     };
 
+    const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        props.onKeyDown?.(e);
+
+        if (expandable && !isExpanded && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            handleExpand();
+        }
+    };
+
     const textareaElement = (
         <FieldPrimitive.Control
             render={(defaultProps) => (
@@ -84,7 +93,12 @@ const Textarea = ({ className, expandable = false, expandableDialogTitle, onChan
                     // Field.Control's own default props carry an `onChange`, and a
                     // spread after the explicit props replaced ours — every
                     // controlled Textarea then ignored typing entirely.
-                    {...mergeProps(defaultProps, { ...props, ...(onChange && { onChange }), ...(value !== undefined && { value }) })}
+                    {...mergeProps(defaultProps, {
+                        ...props,
+                        onKeyDown: handleTextareaKeyDown,
+                        ...(onChange && { onChange }),
+                        ...(value !== undefined && { value }),
+                    })}
                 />
             )}
         />
@@ -111,9 +125,9 @@ const Textarea = ({ className, expandable = false, expandableDialogTitle, onChan
                 {expandable && (
                     <Button
                         aria-label={t`Expand textarea`}
-                        className="pointer-events-none absolute end-1 top-1 z-10 size-6 opacity-60"
+                        className="absolute end-1 top-1 z-10 size-6 opacity-60"
+                        onClick={handleExpand}
                         size="icon-sm"
-                        tabIndex={-1}
                         type="button"
                         variant="ghost"
                     >

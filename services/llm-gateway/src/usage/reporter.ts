@@ -82,10 +82,13 @@ export class UsageReporter {
      * backoff; any other status is final. Retries are safe because the backend
      * dedupes on `requestId` (also sent as `Idempotency-Key`) — a report that
      * landed but whose reply was lost is ignored the second time. Never throws.
+     *
+     * Resolves `false` only when every attempt failed on a retryable error, so a
+     * caller with durable state can try again later; any other outcome is final.
      */
-    async report(usage: UsageReport): Promise<void> {
+    async report(usage: UsageReport): Promise<boolean> {
         if (!this.lunoraUrl) {
-            return;
+            return true;
         }
 
         const url = `${this.lunoraUrl}/gateway/usage-report`;
@@ -108,7 +111,7 @@ export class UsageReporter {
                 await response.body?.cancel();
 
                 if (response.ok) {
-                    return;
+                    return true;
                 }
 
                 isRetryable = isRetryableStatus(response.status);
@@ -119,7 +122,7 @@ export class UsageReporter {
             }
 
             if (!isRetryable) {
-                return;
+                return false;
             }
 
             if (attempt < this.maxAttempts) {
@@ -128,6 +131,8 @@ export class UsageReporter {
         }
 
         console.error(`[UsageReporter] Gave up on usage report ${usage.requestId} after ${this.maxAttempts} attempts — credits not deducted`);
+
+        return false;
     }
 }
 

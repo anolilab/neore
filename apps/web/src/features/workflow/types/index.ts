@@ -61,6 +61,7 @@ export interface AINodeData extends BaseNodeData {
 // Image node - input or generate images
 export interface ImageNodeData extends BaseNodeData {
     aspectRatio?: string; // 1:1, 16:9, 9:16, 4:3, etc.
+    imageFileId?: string; // Stored chat file for an input image too large to inline; imageUrl is resolved from it
     imageUrl?: string; // For input mode
     mode: "input" | "generate";
     model?: string; // For generation (fal:flux-dev, fal:flux-pro, fal:sdxl-lightning)

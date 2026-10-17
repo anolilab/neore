@@ -492,7 +492,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const { i18n, t } = useLingui();
 
     // Use provided models list or fall back to the feature-flagged gateway models
-    const featureFlaggedModels = useFeatureFlaggedModels();
+    const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
     const sourceModels = useMemo(() => modelsProp ?? featureFlaggedModels, [modelsProp, featureFlaggedModels]);
 
     // Compute provider sidebar info from the current source models

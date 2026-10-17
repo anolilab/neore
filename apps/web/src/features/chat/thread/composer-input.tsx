@@ -744,7 +744,7 @@ const ComposerInput = ({
                 return;
             }
 
-            usePromptQueueStore.getState().enqueue(threadId, { attachments, text });
+            usePromptQueueStore.getState().enqueue(threadId, { attachments, references: useChatUIStore.getState().attachedReferences, text });
             clear();
 
             return;

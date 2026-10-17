@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { fetchWithDeadline } from "../../lib/fetch-timeout";
 import { gatewayFetch, gatewayFetchFor, isServiceBound, NO_SERVICE_FETCH, SERVICE_ORIGIN, serviceFetch, type ServicesContext } from "../../lib/services";
-import { createNotificationRule, listGatewayKeys, revokeGatewayKey } from "./gateway-client";
+import { createNotificationRule, deleteNotificationRule, listNotificationRules } from "./gateway-client";
 import { createGatewayEmbeddingModel } from "./gateway-embedding-model";
 import { GatewayLanguageModel } from "./gateway-language-model";
 
@@ -213,27 +213,27 @@ describe("GatewayEmbeddingModel over the gateway binding", () => {
 
 describe("gateway-client over the gateway binding", () => {
     it("sends each admin call to the action's binding", async () => {
-        const gateway = new FakeBinding((call) => (call.method === "GET" ? Response.json({ keys: [{ keyId: "k1" }] }) : Response.json({ id: "r1" })));
+        const gateway = new FakeBinding((call) => (call.method === "GET" ? Response.json({ rules: [{ id: "r1" }] }) : Response.json({ id: "r1" })));
         const ctx = servicesCtx({ llmGateway: gateway }) as never;
 
-        expect(await listGatewayKeys(ctx, "user 1")).toEqual([{ keyId: "k1" }]);
+        expect(await listNotificationRules(ctx, "user 1")).toEqual([{ id: "r1" }]);
         await createNotificationRule(ctx, { metric: "daily_cost", name: "cap", threshold: 5, userId: "u1" });
-        await revokeGatewayKey(ctx, "k/1");
+        await deleteNotificationRule(ctx, "r/1", "u1");
 
         expect(gateway.calls.map((call) => `${call.method} ${new URL(call.url).pathname}${new URL(call.url).search}`)).toEqual([
-            "GET /internal/keys?userId=user%201",
+            "GET /internal/notification-rules?userId=user%201",
             "POST /internal/notification-rules",
-            "DELETE /internal/keys/k%2F1",
+            "DELETE /internal/notification-rules/r%2F1?userId=u1",
         ]);
         expect(gateway.calls.every((call) => call.headers.get("X-Signature") === null)).toBe(true);
     });
 
     it("keeps no client across requests: each ctx's own binding is used", async () => {
-        const first = new FakeBinding(() => Response.json({ keys: [] }));
-        const second = new FakeBinding(() => Response.json({ keys: [] }));
+        const first = new FakeBinding(() => Response.json({ rules: [] }));
+        const second = new FakeBinding(() => Response.json({ rules: [] }));
 
-        await listGatewayKeys(servicesCtx({ llmGateway: first }) as never, "u1");
-        await listGatewayKeys(servicesCtx({ llmGateway: second }) as never, "u2");
+        await listNotificationRules(servicesCtx({ llmGateway: first }) as never, "u1");
+        await listNotificationRules(servicesCtx({ llmGateway: second }) as never, "u2");
 
         expect(first.calls).toHaveLength(1);
         expect(second.calls).toHaveLength(1);

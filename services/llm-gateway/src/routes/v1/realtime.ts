@@ -17,6 +17,8 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { HonoEnv } from "../../env.js";
 import { logger } from "../../lib/logger.js";
 import { bearerAuth } from "../../middleware/auth.js";
+import { resolveByokFeeRate } from "../../usage/billing.js";
+import { UsageReporter } from "../../usage/reporter.js";
 
 /** Supported realtime models */
 const REALTIME_MODELS = new Set(["gpt-4o-mini-realtime-preview", "gpt-4o-realtime-preview"]);
@@ -94,7 +96,7 @@ async function logRealtimeSession(
              (id, request_id, user_id, org_id, model_id, provider, model_api_id,
               prompt_tokens, completion_tokens, cost_microdollars, latency_ms,
               is_streaming, finish_reason, source, api_key_id, session_type, duration_ms, created_at)
-             VALUES (?, ?, ?, ?, ?, 'openai', ?, ?, ?, ?, ?, 1, 'stop', 'saas', ?, 'realtime', ?, datetime('now'))`,
+             VALUES (?, ?, ?, ?, ?, 'openai', ?, ?, ?, ?, ?, 1, 'stop', 'saas_api', ?, 'realtime', ?, datetime('now'))`,
         )
         .bind(
             crypto.randomUUID(),
@@ -244,13 +246,15 @@ realtimeRouter.get("/v1/realtime", bearerAuth, async (c) => {
         isCleanupDone = true;
 
         const durationMs = Date.now() - sessionStart;
-        const costMicrodollars = inputTokens * REALTIME_INPUT_COST_PER_TOKEN_MICRODOLLARS + outputTokens * REALTIME_OUTPUT_COST_PER_TOKEN_MICRODOLLARS;
+        const costMicrodollars = Math.round(
+            inputTokens * REALTIME_INPUT_COST_PER_TOKEN_MICRODOLLARS + outputTokens * REALTIME_OUTPUT_COST_PER_TOKEN_MICRODOLLARS,
+        );
 
         await Promise.allSettled([
             unregisterSession(c.env.RATE_LIMIT_KV, userId, sessionId),
             logRealtimeSession(c.env.USAGE_DB, {
                 apiKeyId,
-                costMicrodollars: Math.round(costMicrodollars),
+                costMicrodollars,
                 durationMs,
                 inputTokens,
                 model,
@@ -259,6 +263,21 @@ realtimeRouter.get("/v1/realtime", bearerAuth, async (c) => {
                 requestId,
                 userId,
             }),
+            ...(costMicrodollars > 0
+                ? [
+                      new UsageReporter(c.env).report({
+                          billingMode: usesOwnKeys ? "byok" : "platform",
+                          byokFeeRate: resolveByokFeeRate(c.env.BYOK_FEE_RATE),
+                          completionTokens: outputTokens,
+                          costMicrodollars,
+                          modelId: model,
+                          orgId,
+                          promptTokens: inputTokens,
+                          requestId,
+                          userId,
+                      }),
+                  ]
+                : []),
         ]);
     };
 

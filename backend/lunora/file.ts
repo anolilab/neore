@@ -26,6 +26,7 @@ import { internal } from "./_generated/internal";
 import { internalAction, internalMutation } from "./_generated/server";
 import { finalizeStagedUpload, purgeStagedUploads } from "./lib/chat-upload";
 import { authAction, authQuery, rateLimit } from "./lib/crpc";
+import { displayUrlExpiresInSeconds } from "./lib/storage-ref";
 import { currentUserShard } from "./lib/shard-context";
 import { MAX_LENGTH } from "./lib/validators";
 
@@ -79,6 +80,31 @@ export const getChatFileExtraction = authQuery
         const file = await ctx.db.chatFiles.findFirst({ where: { _id: args.fileId } });
 
         return file ? { status: file.extractionStatus ?? "pending" } : null;
+    });
+
+/**
+ * A short-lived display URL for a chat file the caller holds a grant for. Used by
+ * features that keep a file reference rather than the URL (a workflow image node),
+ * because a signed URL expires. `null` for a file without a grant, like one that
+ * does not exist.
+ */
+export const getChatFileImageUrl = authQuery
+    .input({ fileId: v.id("chatFiles") })
+    .output(v.union(v.null(), v.string()))
+    .query(async ({ args, ctx }) => {
+        const grant = await ctx.db.chatFileAccess.findFirst({ where: { fileId: args.fileId, userId: ctx.user.userId } });
+
+        if (!grant) {
+            return null;
+        }
+
+        const file = await ctx.db.chatFiles.findFirst({ where: { _id: args.fileId } });
+
+        if (!file) {
+            return null;
+        }
+
+        return await ctx.storage.getSignedUrl(file.storageId, { expiresInSeconds: displayUrlExpiresInSeconds() });
     });
 
 /**

@@ -256,6 +256,29 @@ export const useExistingFile = internalMutation
         return { fileId: file._id, storageId: file.storageId };
     });
 
+export const UNTOUCHED_FILE_RETENTION_MS = 1000 * 60 * 60 * 24;
+
+export const UNREFERENCED_FILE_GRACE_MS = 1000 * 60 * 60 * 24;
+
+type RefcountedFile = { lastTouchedAt: number; refcount: number; unreferencedSince?: number };
+
+const refcountChange = (file: RefcountedFile, refcount: number): { refcount: number; unreferencedSince?: number } => {
+    if (refcount === 0) {
+        return { refcount, unreferencedSince: Date.now() };
+    }
+
+    return file.unreferencedSince === undefined ? { refcount } : { refcount, unreferencedSince: undefined };
+};
+
+/**
+ * A released file is kept for {@link UNREFERENCED_FILE_GRACE_MS} after its last reference went, so an undo that
+ * restores the reference still finds it. A file never referenced only waits out the untouched retention.
+ */
+export const isUnusedFileDue = (file: RefcountedFile, now: number): boolean =>
+    file.refcount === 0 &&
+    file.lastTouchedAt < now - UNTOUCHED_FILE_RETENTION_MS &&
+    (file.unreferencedSince === undefined || file.unreferencedSince < now - UNREFERENCED_FILE_GRACE_MS);
+
 export const changeRefcount = async (context: MutationContext, previous: Id<"chatFiles">[], next: Id<"chatFiles">[]) => {
     const previousSet = new Set(previous);
     const nextSet = new Set(next);
@@ -268,7 +291,7 @@ export const changeRefcount = async (context: MutationContext, previous: Id<"cha
         const file = await context.db.chatFiles.findFirst({ where: { _id: fileId } });
 
         if (file) {
-            await context.db.patch(fileId, { refcount: file.refcount - 1 });
+            await patchRow(context.db, file, refcountChange(file, file.refcount - 1));
         } else {
             console.error(`File ${fileId} not found when decrementing refcount`);
         }
@@ -282,7 +305,7 @@ export const changeRefcount = async (context: MutationContext, previous: Id<"cha
         const file = await context.db.chatFiles.findFirst({ where: { _id: fileId } });
 
         if (file) {
-            await context.db.patch(fileId, { refcount: file.refcount + 1 });
+            await patchRow(context.db, file, refcountChange(file, file.refcount + 1));
         } else {
             throw new Error(`File ${fileId} not found when incrementing refcount`);
         }

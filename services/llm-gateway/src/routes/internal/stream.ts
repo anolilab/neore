@@ -314,7 +314,9 @@ streamRouter.openapi(
                 MODEL_MAP.get(body.modelId)?.supportsReasoning,
             );
 
+            const abortController = new AbortController();
             const result = streamText({
+                abortSignal: abortController.signal,
                 messages: cachedMessages as Parameters<typeof streamText>[0]["messages"],
                 model,
                 system: body.system,
@@ -412,14 +414,25 @@ streamRouter.openapi(
             // Capture executionCtx so background work survives after response completes
             const execContext = c.executionCtx;
 
+            let isCancelled = false;
+
             const stream = new ReadableStream({
+                cancel(reason) {
+                    isCancelled = true;
+                    abortController.abort(reason);
+                },
                 async start(controller) {
                     const encoder = new TextEncoder();
+                    const send = (text: string): void => {
+                        if (!isCancelled) {
+                            controller.enqueue(encoder.encode(text));
+                        }
+                    };
 
                     try {
                         // Replay the buffered first chunk from the warm-up peek.
                         if (firstChunk !== undefined) {
-                            controller.enqueue(encoder.encode(firstChunk));
+                            send(firstChunk);
                         }
 
                         // Drain the rest of the iterator. After the peek call,
@@ -427,12 +440,18 @@ streamRouter.openapi(
                         // plain `for-await` covers the remaining stream.
                         const remainingChunks = { [Symbol.asyncIterator]: () => sseIterator };
 
+                        let isErrored = false;
+
                         for await (const chunk of remainingChunks) {
                             if (ttftMs === undefined) {
                                 ttftMs = Date.now() - startTime;
                             }
 
-                            controller.enqueue(encoder.encode(chunk));
+                            if (chunk.includes('"type":"error"')) {
+                                isErrored = true;
+                            }
+
+                            send(chunk);
                         }
 
                         // Wait for the result to complete and get final usage
@@ -465,7 +484,7 @@ streamRouter.openapi(
                             },
                         });
 
-                        controller.enqueue(encoder.encode(finishChunk));
+                        send(finishChunk);
 
                         // Record usage via waitUntil so it survives after stream/response ends.
                         // Use allSettled so individual failures don't cause uncaught rejections.
@@ -494,7 +513,8 @@ streamRouter.openapi(
                                     },
                                     c.var.telemetry,
                                 ),
-                                healthService.recordSuccess(body.provider, body.modelApiId, latencyMs),
+                                ...(isCancelled || isErrored ? [] : [healthService.recordSuccess(body.provider, body.modelApiId, latencyMs)]),
+                                ...(isErrored && !isCancelled ? [healthService.recordFailure(body.provider, body.modelApiId)] : []),
                                 usageReporter.report({
                                     billingMode,
                                     byokFeeRate,
@@ -517,12 +537,15 @@ streamRouter.openapi(
                             type: "error",
                         });
 
-                        controller.enqueue(encoder.encode(errorChunk));
+                        send(errorChunk);
 
-                        // Record failure via waitUntil
-                        execContext.waitUntil(healthService.recordFailure(body.provider, body.modelApiId));
+                        if (!isCancelled) {
+                            execContext.waitUntil(healthService.recordFailure(body.provider, body.modelApiId));
+                        }
                     } finally {
-                        controller.close();
+                        if (!isCancelled) {
+                            controller.close();
+                        }
                     }
                 },
             });

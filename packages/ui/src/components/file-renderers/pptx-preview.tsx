@@ -233,7 +233,7 @@ const PptxPreview: FC<PptxPreviewProps> = memo(({ className, data, fileName }) =
 
     if (loading) {
         return (
-            <div className={`flex items-center justify-center p-8 ${className ?? ""}`}>
+            <div aria-live="polite" className={`flex items-center justify-center p-8 ${className ?? ""}`} role="status">
                 <div className="animate-pulse text-gray-400">{t`Loading presentation…`}</div>
             </div>
         );

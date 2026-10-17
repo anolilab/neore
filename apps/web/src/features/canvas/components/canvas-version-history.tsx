@@ -17,7 +17,7 @@ import type { JSONContent } from "@tiptap/core";
 import { getSchema } from "@tiptap/core";
 import { ArrowLeftIcon, RotateCcwIcon } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -75,11 +75,11 @@ const CanvasVersionHistory: FC<CanvasVersionHistoryProps> = ({ document }) => {
 
     const { mutateAsync: updateDocument } = useMutation(crpc.agent.documents.updateDocument.mutationOptions());
 
-    // Create a schema for diff computation (fallback path)
-    const schema = getSchema(getCanvasExtensions());
+    // Schema for diff computation (fallback path), built once
+    const [schema] = useState(() => getSchema(getCanvasExtensions()));
 
     // Build the diff commit for display
-    const buildDiffCommit = (): DiffCommit | null => {
+    const diffCommit = useMemo((): DiffCommit | null => {
         if (!selectedVersionData || document.kind !== "text") {
             return null;
         }
@@ -103,9 +103,7 @@ const CanvasVersionHistory: FC<CanvasVersionHistoryProps> = ({ document }) => {
         } catch {
             return null;
         }
-    };
-
-    const diffCommit = buildDiffCommit();
+    }, [schema, selectedVersionData, nextVersionData, document.contentJson, document.kind]);
 
     // Code diff data for code documents
     const buildCodeDiff = () => {

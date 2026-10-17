@@ -61,12 +61,7 @@ const RemoveMemberDialog = ({ classNames, member, onOpenChange, ...properties }:
 
     return (
         <Dialog onOpenChange={onOpenChange} {...properties}>
-            <DialogContent
-                className={classNames?.dialog?.content}
-                onOpenAutoFocus={(e) => {
-                    e.preventDefault();
-                }}
-            >
+            <DialogContent className={classNames?.dialog?.content}>
                 <DialogHeader className={classNames?.dialog?.header}>
                     <DialogTitle className={cn("text-lg md:text-xl", classNames?.title)}>{t`Remove Member`}</DialogTitle>
 

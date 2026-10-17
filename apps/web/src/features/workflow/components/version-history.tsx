@@ -4,11 +4,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@ui/components/responsi
 import { ScrollArea } from "@ui/components/scroll-area";
 import { Separator } from "@ui/components/separator";
 import { Clock, History, Redo2, RotateCcw, Undo2 } from "lucide-react";
-import { useEffect } from "react";
 
 import type { HistoryEntry } from "../stores/history-store";
-import { MAX_HISTORY_ENTRIES, useCanRedo, useCanUndo, useHistoryEntries, useHistoryStore } from "../stores/history-store";
-import { useWorkflowStore } from "../stores/workflow-store";
+import {
+    MAX_HISTORY_ENTRIES,
+    redoWorkflow,
+    restoreWorkflowEntry,
+    undoWorkflow,
+    useCanRedo,
+    useCanUndo,
+    useHistoryEntries,
+    useHistoryStore,
+} from "../stores/history-store";
 
 /** `justNow` is the (translated) text for anything under a minute old. */
 const formatTimestamp = (timestamp: number, locale: string, justNow: string): string => {
@@ -57,7 +64,7 @@ const HistoryEntryItem = ({ entry, isCurrent, onRestore }: HistoryEntryItemProps
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                     <span className={`text-sm font-medium ${isCurrent ? "text-primary" : ""}`}>
-                        {entry.label ?? (entry.isAutoSave ? t`Auto-save` : t`Manual save`)}
+                        {entry.label ?? (entry.isAutoSave ? t`Auto-save` : t`Edit`)}
                     </span>
                     {isCurrent && (
                         <span className="bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-xs">
@@ -78,57 +85,15 @@ const VersionHistory = () => {
     const entries = useHistoryEntries();
     const canUndo = useCanUndo();
     const canRedo = useCanRedo();
-    const { currentIndex, pushEntry, redo, restoreEntry, setNavigating, undo } = useHistoryStore();
-    const { getContent, loadContent } = useWorkflowStore();
+    const currentIndex = useHistoryStore((state) => state.currentIndex);
     const { t } = useLingui();
-
-    // Create initial history entry on mount if empty
-    useEffect(() => {
-        if (entries.length > 0) {
-            return;
-        }
-
-        const content = getContent();
-
-        if (content.nodes.length > 0) {
-            pushEntry(content, t`Initial state`);
-        }
-    }, [entries.length, getContent, pushEntry, t]);
-
-    const handleUndo = () => {
-        const entry = undo();
-
-        if (entry) {
-            loadContent(entry.content);
-            // Allow new entries after a short delay
-            setTimeout(setNavigating, 100, false);
-        }
-    };
-
-    const handleRedo = () => {
-        const entry = redo();
-
-        if (entry) {
-            loadContent(entry.content);
-            setTimeout(setNavigating, 100, false);
-        }
-    };
-
-    const handleRestore = (entry: HistoryEntry) => {
-        const restoredEntry = restoreEntry(entry.id);
-
-        if (restoredEntry) {
-            loadContent(restoredEntry.content);
-            setTimeout(setNavigating, 100, false);
-        }
-    };
 
     return (
         <div className="flex items-center gap-1">
-            <Button aria-label={t`Undo (Ctrl+Z)`} disabled={!canUndo} onClick={handleUndo} size="icon" title={t`Undo (Ctrl+Z)`} variant="ghost">
+            <Button aria-label={t`Undo (Ctrl+Z)`} disabled={!canUndo} onClick={undoWorkflow} size="icon" title={t`Undo (Ctrl+Z)`} variant="ghost">
                 <Undo2 className="size-4" />
             </Button>
-            <Button aria-label={t`Redo (Ctrl+Shift+Z)`} disabled={!canRedo} onClick={handleRedo} size="icon" title={t`Redo (Ctrl+Shift+Z)`} variant="ghost">
+            <Button aria-label={t`Redo (Ctrl+Shift+Z)`} disabled={!canRedo} onClick={redoWorkflow} size="icon" title={t`Redo (Ctrl+Shift+Z)`} variant="ghost">
                 <Redo2 className="size-4" />
             </Button>
 
@@ -166,7 +131,12 @@ const VersionHistory = () => {
                                 </div>
                             ) : (
                                 entries.map((entry, index) => (
-                                    <HistoryEntryItem entry={entry} isCurrent={index === currentIndex} key={entry.id} onRestore={handleRestore} />
+                                    <HistoryEntryItem
+                                        entry={entry}
+                                        isCurrent={index === currentIndex}
+                                        key={entry.id}
+                                        onRestore={(restored) => restoreWorkflowEntry(restored.id)}
+                                    />
                                 ))
                             )}
                         </div>

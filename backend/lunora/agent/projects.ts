@@ -5,7 +5,7 @@
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, type MutationCtx } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
@@ -23,6 +23,24 @@ import {
     vThreadDoc as vThreadDocument,
 } from "./validators";
 import { admitOrganization } from "../lib/rls/scope";
+import { countedWorkflowImageIds } from "../workflow/images";
+import { changeRefcount } from "./files";
+
+/**
+ * A workflow keeps its images as chat-file references (`imageFileId`), and a
+ * chat file nothing counts is deleted by the unused-file sweep. So every write
+ * of `workflowContent` retains the owner-granted files it adds and releases
+ * the ones it drops — as message `fileIds` do.
+ */
+const recountWorkflowImages = async (ctx: MutationCtx, ownerId: string | undefined, previousContent: unknown, nextContent: unknown): Promise<void> => {
+    if (!ownerId) {
+        return;
+    }
+
+    const { next, previous } = await countedWorkflowImageIds(ctx.db, ownerId, previousContent, nextContent);
+
+    await changeRefcount(ctx, previous, next);
+};
 // Helper to convert thread to public format (omits parentThreadIds)
 const publicThread = (thread: Doc<"threads">): ThreadDoc =>
     // Safe cast: optional fields are never null at runtime (only undefined).
@@ -180,6 +198,8 @@ export const createProject = internalMutation
         });
         const projectId = insertedId as Id<"projects">;
 
+        await recountWorkflowImages(ctx, args.userId, undefined, args.workflowContent);
+
         const project = await ctx.db.projects.findFirst({ where: { _id: projectId } });
 
         assert(project, `Project ${projectId} not found`);
@@ -234,6 +254,10 @@ export const updateProject = internalMutation
 
         await patchRow(ctx.db, project, changes);
 
+        if (args.patch.workflowContent !== undefined) {
+            await recountWorkflowImages(ctx, project.userId, project.workflowContent, args.patch.workflowContent);
+        }
+
         const updatedProject = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
 
         assert(updatedProject, `Project ${args.projectId} not found`);
@@ -271,6 +295,7 @@ export const deleteProject = internalMutation
         }
 
         await ctx.db.delete(args.projectId);
+        await recountWorkflowImages(ctx, project.userId, project.workflowContent, undefined);
 
         return null;
     });

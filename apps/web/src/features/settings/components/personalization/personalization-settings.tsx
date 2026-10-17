@@ -24,6 +24,10 @@ const MAX_CUSTOM_INSTRUCTIONS_LENGTH = 3000;
 const MAX_NICKNAME_LENGTH = 50;
 const MAX_PROFESSION_LENGTH = 100;
 
+const SYNCED_FIELDS = ["nickname", "profession", "aboutMe", "customInstructions"] as const;
+
+type SyncedField = (typeof SYNCED_FIELDS)[number];
+
 const PersonalizationSettings: FC = () => {
     const { t } = useLingui();
     const { data: userSettings, isLoading } = useUserSettings();
@@ -51,16 +55,33 @@ const PersonalizationSettings: FC = () => {
         [updateSettingsMutation],
     );
 
-    // Sync local state with server data. Adjusted during render rather than in an
-    // effect, so the fields never paint once with the previous value.
-    const [syncedSettings, setSyncedSettings] = useState<typeof userSettings | undefined>(undefined);
+    // Sync each local field only when its own server value changed, so saving one
+    // setting does not wipe text typed into another. Adjusted during render rather
+    // than in an effect, so the fields never paint once with the previous value.
+    const [lastSynced, setLastSynced] = useState<Partial<Record<SyncedField, string>>>({});
 
-    if (userSettings && userSettings !== syncedSettings) {
-        setSyncedSettings(userSettings);
-        setNickname(userSettings.nickname ?? "");
-        setProfession(userSettings.profession ?? "");
-        setAboutMe(userSettings.aboutMe ?? "");
-        setCustomInstructions(userSettings.customInstructions ?? "");
+    if (userSettings) {
+        const server: Record<SyncedField, string> = {
+            aboutMe: userSettings.aboutMe ?? "",
+            customInstructions: userSettings.customInstructions ?? "",
+            nickname: userSettings.nickname ?? "",
+            profession: userSettings.profession ?? "",
+        };
+        const setters: Record<SyncedField, (value: string) => void> = {
+            aboutMe: setAboutMe,
+            customInstructions: setCustomInstructions,
+            nickname: setNickname,
+            profession: setProfession,
+        };
+        const changed = SYNCED_FIELDS.filter((field) => server[field] !== lastSynced[field]);
+
+        if (changed.length > 0) {
+            setLastSynced(server);
+
+            for (const field of changed) {
+                setters[field](server[field]);
+            }
+        }
     }
 
     const handleUpdateSetting = useCallback(

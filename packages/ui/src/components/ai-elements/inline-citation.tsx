@@ -95,15 +95,20 @@ export const InlineCitationCarouselIndex = ({ children, className, ...props }: I
 
     useEffect(() => {
         if (!api) {
-            return;
+            return undefined;
         }
+
+        const onSelect = () => {
+            setCurrent(api.selectedScrollSnap() + 1);
+        };
 
         setCount(api.scrollSnapList().length);
         setCurrent(api.selectedScrollSnap() + 1);
+        api.on("select", onSelect);
 
-        api.on("select", () => {
-            setCurrent(api.selectedScrollSnap() + 1);
-        });
+        return () => {
+            api.off("select", onSelect);
+        };
     }, [api]);
 
     return (

@@ -98,6 +98,10 @@ const Composer = memo(
         };
 
         const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+            if (event.nativeEvent.isComposing) {
+                return;
+            }
+
             if (event.key !== "Enter" || event.shiftKey) {
                 return;
             }

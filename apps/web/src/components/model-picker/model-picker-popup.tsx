@@ -20,7 +20,7 @@ const ModelPickerPopup: FC = () => {
     const { isOpen, options } = useModelPickerPopupState();
     const { close } = useModelPickerPopupActions();
     const { isAnonymous } = useIsAnonymous();
-    const featureFlaggedModels = useFeatureFlaggedModels();
+    const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
     const { favoriteModelIds, toggleFavorite } = useFavoriteModels();
 
     const handleSelect = (modelId: string) => {

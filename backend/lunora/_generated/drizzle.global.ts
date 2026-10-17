@@ -120,6 +120,7 @@ export const chatFiles = sqliteTable("chatFiles", {
     nsfwStatus: text("nsfwStatus", { mode: "json" }).$type<"pending" | "checking" | "safe" | "blocked" | "failed">(),
     refcount: real("refcount").notNull(),
     storageId: text("storageId").notNull(),
+    unreferencedSince: real("unreferencedSince"),
 }, (t) => ({
     refcount: index("refcount").on(t.refcount),
     hash_filename: index("hash_filename").on(t.hash, t.filename),

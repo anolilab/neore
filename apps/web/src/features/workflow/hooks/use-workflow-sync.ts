@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
+import { withoutHistory } from "../stores/history-store";
 import { useWorkflowStore } from "../stores/workflow-store";
 import type { WorkflowContent } from "../types";
+import { withoutResolvedImageUrls } from "../utils/resolved-image";
 
 const SYNC_DEBOUNCE_MS = 1500; // Debounce outgoing saves to 1.5s
 
@@ -65,6 +67,7 @@ const useWorkflowSync = (projectId: string | undefined) => {
     const lastSavedJsonRef = useRef<string | null>(null);
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isSavingRef = useRef(false);
+    const scheduleSaveRef = useRef<() => void>(() => undefined);
 
     const shouldQuery = isAuthenticated && !authLoading && !!projectId;
 
@@ -117,7 +120,16 @@ const useWorkflowSync = (projectId: string | undefined) => {
                 });
                 lastSavedFingerprintRef.current = fingerprint;
                 lastSavedJsonRef.current = contentJson;
-                setDirty(false);
+
+                // An edit made while the request was in flight (an undo, say) is not saved yet.
+                if (JSON.stringify(getContent()) === contentJson) {
+                    setDirty(false);
+                } else {
+                    isSavingRef.current = false;
+                    scheduleSaveRef.current();
+
+                    return;
+                }
             } catch (error) {
                 console.error("Failed to save workflow:", error);
                 // Keep dirty state so user knows save failed
@@ -126,6 +138,10 @@ const useWorkflowSync = (projectId: string | undefined) => {
             isSavingRef.current = false;
         }, SYNC_DEBOUNCE_MS);
     }, [projectId, getContent, setDirty]);
+
+    useEffect(() => {
+        scheduleSaveRef.current = debouncedSave;
+    });
 
     // Auto-save when local state is dirty
     useEffect(() => {
@@ -144,16 +160,15 @@ const useWorkflowSync = (projectId: string | undefined) => {
         }
 
         const remoteContent = workflow.workflowContent as WorkflowContent;
-        const remoteFingerprint = computeContentFingerprint(remoteContent);
+        // Compare what we would save: a resolved image URL is never part of the saved content.
+        const comparable = withoutResolvedImageUrls(remoteContent);
+        const remoteFingerprint = computeContentFingerprint(comparable);
+        const remoteJson = JSON.stringify(comparable);
 
         // Quick check: if fingerprint matches our last save, likely an echo
-        if (remoteFingerprint === lastSavedFingerprintRef.current) {
-            // Verify with full comparison for edge cases (same structure, different data)
-            const remoteJson = JSON.stringify(remoteContent);
-
-            if (remoteJson === lastSavedJsonRef.current) {
-                return;
-            }
+        // Verify with the full comparison too: same structure can hide different data.
+        if (remoteFingerprint === lastSavedFingerprintRef.current && remoteJson === lastSavedJsonRef.current) {
+            return;
         }
 
         // If we have unsaved local changes, don't overwrite them —
@@ -164,9 +179,9 @@ const useWorkflowSync = (projectId: string | undefined) => {
         }
 
         // Apply remote content to local store
-        loadContent(remoteContent);
+        withoutHistory(() => loadContent(remoteContent));
         lastSavedFingerprintRef.current = remoteFingerprint;
-        lastSavedJsonRef.current = JSON.stringify(remoteContent);
+        lastSavedJsonRef.current = remoteJson;
     }, [workflow?.workflowContent, isDirty, loadContent]);
 
     // Cleanup on unmount

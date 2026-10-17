@@ -46,11 +46,12 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
     const queryClient = useQueryClient();
 
     const threadMetadata = useThreadStore((state) => state.threadMetadata);
-    const { addOptimisticDeletion, deleteThreadMetadata, setThreadMetadata } = useThreadStore(
+    const { addOptimisticDeletion, deleteThreadMetadata, removeOptimisticDeletion, setThreadMetadata } = useThreadStore(
         useShallow((state) => {
             return {
                 addOptimisticDeletion: state.addOptimisticDeletion,
                 deleteThreadMetadata: state.deleteThreadMetadata,
+                removeOptimisticDeletion: state.removeOptimisticDeletion,
                 setThreadMetadata: state.setThreadMetadata,
             };
         }),
@@ -158,7 +159,7 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
         return branchId;
     };
 
-    const deleteBranch = async (threadId: string) => {
+    const deleteBranch = async (threadId: string): Promise<string[]> => {
         if (threadId === "default") {
             throw new Error("Cannot delete the default thread");
         }
@@ -190,12 +191,29 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
         trackEvent("thread_deleted", {});
 
         // Server deletion runs in background
-        Promise.all([
-            ...childBranches.map((childId) => deleteThreadMutation({ threadId: childId as Id<"threads"> })),
-            deleteThreadMutation({ threadId: threadId as Id<"threads"> }),
-        ]).catch((error) => {
-            providerLogger.error("[ThreadManager] Failed to delete thread(s)", { error, threadId });
-        });
+        const deletedIds = [threadId, ...childBranches];
+
+        // Each row settles on its own: a row whose delete failed reappears, one that was deleted stays hidden.
+        const targets = [...childBranches, threadId];
+
+        Promise.allSettled(targets.map((id) => deleteThreadMutation({ threadId: id as Id<"threads"> })))
+            .then((results) => {
+                targets.forEach((id, index) => {
+                    const result = results[index];
+
+                    if (result?.status === "rejected") {
+                        providerLogger.error("[ThreadManager] Failed to delete thread", { error: result.reason, threadId: id });
+                        removeOptimisticDeletion(id);
+                    }
+                });
+
+                return undefined;
+            })
+            .catch((error) => {
+                providerLogger.error("[ThreadManager] Failed to settle thread deletes", { error });
+            });
+
+        return deletedIds;
     };
 
     const getBranchTree = (rootThreadId?: string): BranchNode[] => {

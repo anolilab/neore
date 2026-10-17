@@ -104,29 +104,33 @@ export const streamReply = async (gatewayOrigin: string, streamToken: string, on
             onDelta({ reasoning: parsed.reasoning, speaker: parsed.speaker, text: parsed.text });
         };
 
-        while (true) {
-            let result: ReadableStreamReadResult<Uint8Array>;
+        try {
+            while (true) {
+                let result: ReadableStreamReadResult<Uint8Array>;
 
-            try {
-                result = await reader.read();
-            } catch {
-                return signal.aborted ? "finished" : "disconnected";
-            }
-
-            if (result.done) {
-                for (const line of lines.flush()) {
-                    handle(line);
+                try {
+                    result = await reader.read();
+                } catch {
+                    return signal.aborted ? "finished" : "disconnected";
                 }
 
-                return isResumed ? "resume" : "done";
-            }
+                if (result.done) {
+                    for (const line of lines.flush()) {
+                        handle(line);
+                    }
 
-            // eslint-disable-next-line unicorn/no-return-array-push -- the line buffer's `push`, which returns the lines it completed
-            const complete = lines.push(decoder.decode(result.value, { stream: true }));
+                    return isResumed ? "resume" : "done";
+                }
 
-            for (const line of complete) {
-                handle(line);
+                // eslint-disable-next-line unicorn/no-return-array-push -- the line buffer's `push`, which returns the lines it completed
+                const complete = lines.push(decoder.decode(result.value, { stream: true }));
+
+                for (const line of complete) {
+                    handle(line);
+                }
             }
+        } finally {
+            await reader.cancel().catch(() => {});
         }
     };
 
@@ -166,4 +170,10 @@ export const streamReply = async (gatewayOrigin: string, streamToken: string, on
         });
         reconnects += 1;
     }
+
+    if (signal.aborted) {
+        return;
+    }
+
+    throw new Error("Lost the connection to the reply. Reopen the chat to see what was saved.");
 };

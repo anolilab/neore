@@ -30,12 +30,12 @@ const useAuthenticate = <TAuthClient extends AuthClient>(options?: AuthenticateO
         | undefined;
 
     useEffect(() => {
-        if (!enabled || isPending || sessionData) {
+        if (!enabled || isPending || sessionData || error) {
             return;
         }
 
         replace(`${basePath}/${viewPaths[authView]}?redirectTo=${encodeURIComponent(globalThis.location.href.replace(globalThis.location.origin, ""))}`);
-    }, [isPending, sessionData, basePath, viewPaths, replace, authView, enabled]);
+    }, [isPending, sessionData, error, basePath, viewPaths, replace, authView, enabled]);
 
     return {
         data: sessionData,

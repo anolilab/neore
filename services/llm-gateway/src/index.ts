@@ -21,7 +21,6 @@ import { healthRouter } from "./routes/health.js";
 import { adminTierPoolsRouter } from "./routes/internal/admin-tier-pools.js";
 import { canaryRouter } from "./routes/internal/canary.js";
 import { generateRouter } from "./routes/internal/generate.js";
-import { keysRouter } from "./routes/internal/keys.js";
 import { modelProxyRouter } from "./routes/internal/model-proxy.js";
 import { notificationRulesRouter } from "./routes/internal/notification-rules.js";
 import { routeRouter } from "./routes/internal/route.js";
@@ -44,6 +43,7 @@ import { videoRouter } from "./routes/v1/video.js";
 import type { VideoRenderMessage } from "./routes/v1/video-types.js";
 import { recomputeTierPools } from "./routing/tier-assignment.js";
 import { UsageAggregator } from "./usage/aggregator.js";
+import { sweepPendingUsage } from "./usage/pending.js";
 
 export const app = new OpenAPIHono<HonoEnv>();
 
@@ -73,7 +73,7 @@ app.onError(async (error, c) => {
     return c.json(
         {
             details: isDevelopment ? error.stack : undefined,
-            error: error.message ?? "Internal Server Error",
+            error: isDevelopment ? (error.message ?? "Internal Server Error") : "Internal Server Error",
         },
         500,
     );
@@ -104,7 +104,6 @@ app.route("/", routeRouter);
 app.route("/", modelProxyRouter);
 app.route("/", speechRouter);
 app.route("/", webhooksRouter);
-app.route("/", keysRouter);
 app.route("/", canaryRouter);
 app.route("/", notificationRulesRouter);
 app.route("/", adminTierPoolsRouter);
@@ -244,7 +243,7 @@ export default {
                 break;
             }
 
-            // Every 5 minutes — reset expired circuit breakers
+            // Every 5 minutes — reset expired circuit breakers, retry deferred usage charges
             case "*/5 * * * *": {
                 try {
                     await env.USAGE_DB.prepare(
@@ -253,6 +252,10 @@ export default {
                 } catch {
                     // Non-critical
                 }
+
+                await sweepPendingUsage(env).catch((error: unknown) =>
+                    logger.error("[Cron] Pending usage sweep failed", error instanceof Error ? error : undefined),
+                );
 
                 break;
             }

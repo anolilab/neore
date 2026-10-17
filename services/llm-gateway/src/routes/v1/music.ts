@@ -47,14 +47,13 @@ const generateRequestSchema = z.object({
 // ─── Middleware ─────────────────────────────────────────────────────────────────
 
 musicRouter.use("/v1/music/*", bearerAuth);
-// Music renders cost less than video but are still provider-billed; reuse
-// the expensive-endpoint limiter with the dedicated "music" bucket so
-// abuse is contained without sharing video's tighter budget.
-musicRouter.use("/v1/music/*", expensiveEndpointRateLimit({ bucket: "music", tierMultiplier: 1 }));
 
 // ─── POST /v1/music ─────────────────────────────────────────────────────────────
 
-musicRouter.post("/v1/music", async (c) => {
+// Music renders cost less than video but are still provider-billed; reuse
+// the expensive-endpoint limiter with the dedicated "music" bucket so
+// abuse is contained without sharing video's tighter budget.
+musicRouter.post("/v1/music", expensiveEndpointRateLimit({ bucket: "music", tierMultiplier: 1 }), async (c) => {
     const requestId = c.get("requestId") ?? crypto.randomUUID();
     const rawBody = await c.req.json();
     const parsed = generateRequestSchema.safeParse(rawBody);

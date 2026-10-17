@@ -53,6 +53,35 @@ const classifyRoute = createRoute({
 
 const ALLOWED_MIME_TYPES = new Set(["image/bmp", "image/gif", "image/jpeg", "image/png", "image/webp"]);
 
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+const readBodyCapped = async (request: Request, maxBytes: number): Promise<Uint8Array | undefined> => {
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+
+    if (request.body) {
+        for await (const chunk of request.body) {
+            total += chunk.byteLength;
+
+            if (total > maxBytes) {
+                return undefined;
+            }
+
+            chunks.push(chunk);
+        }
+    }
+
+    const body = new Uint8Array(total);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+        body.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+
+    return body;
+};
+
 const classifyRouter = new OpenAPIHono<{ Bindings: AppEnv }>();
 
 classifyRouter.openapi(classifyRoute, async (c) => {
@@ -63,18 +92,22 @@ classifyRouter.openapi(classifyRoute, async (c) => {
         return c.json({ error: "Unsupported media type. Accepted: image/jpeg, image/png, image/gif, image/webp, image/bmp." }, 400);
     }
 
-    const body = await c.req.arrayBuffer();
+    const declaredLength = Number(c.req.header("Content-Length") ?? 0);
 
-    if (body.byteLength === 0) {
-        return c.json({ error: "Empty request body" }, 400);
-    }
-
-    // 10 MB limit
-    if (body.byteLength > 10 * 1024 * 1024) {
+    if (declaredLength > MAX_IMAGE_BYTES) {
         return c.json({ error: "File too large. Maximum size is 10 MB." }, 413);
     }
 
-    const imageBytes = new Uint8Array(body);
+    const imageBytes = await readBodyCapped(c.req.raw, MAX_IMAGE_BYTES);
+
+    if (!imageBytes) {
+        return c.json({ error: "File too large. Maximum size is 10 MB." }, 413);
+    }
+
+    if (imageBytes.byteLength === 0) {
+        return c.json({ error: "Empty request body" }, 400);
+    }
+
     const scores = await classifyImage(c.env, imageBytes);
 
     return c.json(scores, 200);

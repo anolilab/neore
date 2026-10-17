@@ -80,7 +80,8 @@ const ModelsSettings: FC = () => {
     // (a straight port of the Lunora column), so it arrives here as `unknown`. The write
     // validator in `backend/lunora/auth/fields.ts` is `v.record(v.string(), v.boolean())`,
     // and this page is the only writer — so the runtime shape really is model-id -> enabled.
-    const modelOverrides = (aiPreferences?.modelOverrides ?? {}) as Record<string, boolean>;
+    const storedOverrides = aiPreferences?.modelOverrides as Record<string, boolean> | undefined;
+    const modelOverrides = storedOverrides ?? {};
 
     const [searchQuery, setSearchQuery] = useState("");
     const [activeFilters, setActiveFilters] = useState<Set<ModelFilterCapability>>(new Set());
@@ -91,16 +92,19 @@ const ModelsSettings: FC = () => {
 
     // Single-pass derivation of all filter metadata + enabled state from models array
     const { baseEnabledState, currentEnabledState, enabledCount, modes, providers, states } = useMemo(() => {
-        const enabledState: Record<string, boolean> = {};
+        const baseState: Record<string, boolean> = {};
+        const currentState: Record<string, boolean> = {};
         const providerSet = new Set<string>();
         const modeSet = new Set<string>();
         const stateSet = new Set<string>();
         let count = 0;
 
         for (const model of models) {
-            const enabled = model.enabled ?? false;
+            const baseEnabled = model.enabled ?? false;
+            const enabled = storedOverrides?.[model.id] ?? baseEnabled;
 
-            enabledState[model.id] = enabled;
+            baseState[model.id] = baseEnabled;
+            currentState[model.id] = enabled;
 
             if (enabled) count += 1;
 
@@ -120,14 +124,14 @@ const ModelsSettings: FC = () => {
         }
 
         return {
-            baseEnabledState: enabledState,
-            currentEnabledState: enabledState,
+            baseEnabledState: baseState,
+            currentEnabledState: currentState,
             enabledCount: count,
             modes: [...modeSet].toSorted(byCodeUnit),
             providers: [...providerSet].toSorted(byCodeUnit),
             states: [...stateSet].toSorted(byCodeUnit),
         };
-    }, [models]);
+    }, [models, storedOverrides]);
 
     const toggleFilter = (capability: ModelFilterCapability) => {
         setActiveFilters((previous) => {
@@ -289,11 +293,19 @@ const ModelsSettings: FC = () => {
 
     const disableAll = async () => {
         try {
-            await updateAIUserPreferencesMutation.mutateAsync({
-                modelOverrides: undefined,
+            const newOverrides: Record<string, boolean> = {};
+
+            models.forEach((model) => {
+                if (currentEnabledState[model.id] === true) {
+                    newOverrides[model.id] = false;
+                }
             });
 
-            toast.success(t`All models disabled (reset to defaults)`);
+            await updateAIUserPreferencesMutation.mutateAsync({
+                modelOverrides: Object.keys(newOverrides).length > 0 ? newOverrides : undefined,
+            });
+
+            toast.success(t`All models disabled`);
         } catch (error) {
             toast.error(t`Failed to disable all models`);
             console.error(error);
@@ -510,7 +522,6 @@ const ModelsSettings: FC = () => {
                                     <div className="space-y-2">
                                         {providerModels.map((model) => {
                                             const isEnabled = currentEnabledState[model.id] ?? false;
-                                            const baseEnabled = baseEnabledState[model.id] ?? false;
                                             const isOverridden = modelOverrides[model.id] !== undefined;
 
                                             return (
@@ -568,7 +579,7 @@ const ModelsSettings: FC = () => {
                                                                             "bg-orange-500/10 text-orange-600 dark:text-orange-400",
                                                                             "px-1.5 py-0.5 text-[10px]",
                                                                         )}
-                                                                        title={baseEnabled ? t`Overridden: Enabled` : t`Overridden: Disabled`}
+                                                                        title={isEnabled ? t`Overridden: Enabled` : t`Overridden: Disabled`}
                                                                     >
                                                                         {t`Overridden`}
                                                                     </Badge>

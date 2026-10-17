@@ -64,9 +64,8 @@ const PromptListView = ({ onDelete, onDeleteMany, onEdit, onOptimize, onToggleFa
             const ids = rows.map((row) => row._id);
 
             await onDeleteMany(ids);
-            toast.success(t`Deleted ${plural(ids.length, { one: "# prompt", other: "# prompts" })}`);
         },
-        [onDelete, onDeleteMany, t],
+        [onDelete, onDeleteMany],
     );
 
     const columns = useMemo<UseDataGridProps<Doc<"prompts">>["columns"]>(

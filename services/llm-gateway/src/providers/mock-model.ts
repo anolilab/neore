@@ -35,6 +35,7 @@ import type {
 } from "@ai-sdk/provider";
 
 import type { AppEnv } from "../env.js";
+import { isProductionEnv } from "../env.js";
 import type { ModelPricing } from "./pricing.js";
 
 /** The explicit model id — `provider/modelApiId` in gateway terms. */
@@ -52,12 +53,10 @@ const TRUTHY = new Set(["1", "on", "true", "yes"]);
 /** The env keys the mock gate reads. */
 export type MockLlmEnv = Pick<AppEnv, "ENVIRONMENT" | "MOCK_LLM" | "NODE_ENV">;
 
-const isProduction = (env: MockLlmEnv): boolean => env.NODE_ENV === "production" || env.ENVIRONMENT === "production";
-
 const isFlagSet = (env: MockLlmEnv): boolean => TRUTHY.has((env.MOCK_LLM ?? "").trim().toLowerCase());
 
 /** True when the mock replaces every provider for this request. */
-export const isMockLlmEnabled = (env: MockLlmEnv): boolean => isFlagSet(env) && !isProduction(env);
+export const isMockLlmEnabled = (env: MockLlmEnv): boolean => isFlagSet(env) && !isProductionEnv(env);
 
 /**
  * Throws when `MOCK_LLM` is set in a production environment. Called from a
@@ -65,7 +64,7 @@ export const isMockLlmEnabled = (env: MockLlmEnv): boolean => isFlagSet(env) && 
  * startup" means "fail every request" rather than letting one slip through.
  */
 export const assertMockLlmAllowed = (env: MockLlmEnv): void => {
-    if (isFlagSet(env) && isProduction(env)) {
+    if (isFlagSet(env) && isProductionEnv(env)) {
         throw new Error("MOCK_LLM is set in a production environment. The mock language model is for dev and e2e only — unset MOCK_LLM.");
     }
 };

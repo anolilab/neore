@@ -66,11 +66,7 @@ const MemberCell = ({ className, classNames, hideActions, member }: MemberCellPr
                             }
                         />
 
-                        <DropdownMenuContent
-                            onCloseAutoFocus={(e) => {
-                                e.preventDefault();
-                            }}
-                        >
+                        <DropdownMenuContent>
                             <DropdownMenuItem
                                 onClick={() => {
                                     setUpdateRoleDialogOpen(true);

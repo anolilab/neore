@@ -13,13 +13,19 @@ import type { ChangeEvent } from "react";
 import { useRef, useState } from "react";
 
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { useLunora } from "@/lib/lunora/crpc";
+import { showError } from "@/lib/toast";
 
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { ImageNodeData, WorkflowNodeData, WorkflowNodeType } from "../../types";
 import NODE_CONFIGS from "../../types";
 import type { BaseModelOption } from "../../utils/model-options";
 import { getModelLabel, toBaseOption } from "../../utils/model-options";
+import { isCurrentImageSelection, startImageSelection, storeWorkflowImage } from "../../utils/workflow-image";
 import NodeExpandModal from "./node-expand-modal";
+
+// Inline images travel inside the workflow save, which is capped at 1 MiB per RPC body.
+const MAX_INLINE_IMAGE_BYTES = 300 * 1024;
 
 // ─── Model Options (derived from gateway + country-filtered models) ─────────
 
@@ -188,6 +194,7 @@ export interface NodeTopToolbarProps {
 }
 
 const NodeTopToolbar = ({ data, nodeId, nodeType, selected = false }: NodeTopToolbarProps) => {
+    const lunora = useLunora();
     const updateNode = useWorkflowStore((state) => state.updateNode);
     const detachFromGroup = useWorkflowStore((state) => state.detachFromGroup);
     const nodeParentId = useWorkflowStore((state) => state.nodes.find((n) => n.id === nodeId)?.parentId);
@@ -279,18 +286,44 @@ const NodeTopToolbar = ({ data, nodeId, nodeType, selected = false }: NodeTopToo
             return;
         }
 
+        const modeUpdate = nodeType === "image" ? { mode: "input" } : {};
+        const token = startImageSelection(nodeId);
+        const { projectId } = useWorkflowStore.getState();
+        const isStillWanted = (): boolean => isCurrentImageSelection(nodeId, token) && useWorkflowStore.getState().projectId === projectId;
+
+        if (file.size > MAX_INLINE_IMAGE_BYTES) {
+            // Too big to inline in the workflow save: store it in the background and keep the reference.
+            e.target.value = "";
+
+            void storeWorkflowImage(lunora, file)
+                .then((imageFileId) => {
+                    if (isStillWanted()) {
+                        updateNode(nodeId, { imageFileId, imageUrl: undefined, ...modeUpdate } as Partial<WorkflowNodeData>);
+                    }
+
+                    return undefined;
+                })
+                .catch(() => {
+                    if (isStillWanted()) {
+                        showError(t`Image upload failed. Try again.`);
+                    }
+                });
+
+            return;
+        }
+
         // Read file as data URL and set as node image input
         const reader = new FileReader();
 
         reader.addEventListener("load", () => {
+            if (!isStillWanted()) {
+                return;
+            }
+
             const dataUrl = reader.result as string;
 
-            if (nodeType === "image") {
-                updateNode(nodeId, { imageUrl: dataUrl, mode: "input" } as Partial<WorkflowNodeData>);
-            } else {
-                // For other media nodes, pass the URL as an upstream image
-                updateNode(nodeId, { imageUrl: dataUrl } as Partial<WorkflowNodeData>);
-            }
+            // A small replacement drops the reference to any earlier stored image.
+            updateNode(nodeId, { imageFileId: undefined, imageUrl: dataUrl, ...modeUpdate } as Partial<WorkflowNodeData>);
         });
         reader.readAsDataURL(file);
 

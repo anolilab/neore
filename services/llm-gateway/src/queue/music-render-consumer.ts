@@ -7,7 +7,7 @@
  */
 import type { AppEnv } from "../env.js";
 import { createQueueMessageTelemetry } from "../lib/otel/index.js";
-import { markRenderFailed, runMusicRender } from "../routes/v1/music-render.js";
+import { deferPendingUsage, markRenderFailed, runMusicRender } from "../routes/v1/music-render.js";
 import type { MusicRenderMessage } from "../routes/v1/music-types.js";
 import { MUSIC_RENDER_MESSAGE_VERSION } from "../routes/v1/music-types.js";
 
@@ -122,6 +122,7 @@ const handleRenderMessage = async (message: Message<MusicRenderMessage>, queueNa
                         await markRenderFailed(env, body, `${outcome.errorMessage} (retries exhausted after ${message.attempts} attempts)`).catch((error) =>
                             console.error("[music] failed to finalise render after retries exhausted:", error),
                         );
+                        await deferPendingUsage(env, body.jobId).catch((error) => console.error("[music] failed to defer pending usage:", error));
                     }
 
                     message.ack();
@@ -137,6 +138,7 @@ const handleRenderMessage = async (message: Message<MusicRenderMessage>, queueNa
         } else {
             outcomeStatus = "failed";
             await markRenderFailed(env, body, `Consumer error: ${renderError.message}`).catch(() => {});
+            await deferPendingUsage(env, body.jobId).catch((deferError) => console.error("[music] failed to defer pending usage:", deferError));
             message.ack();
         }
     } finally {

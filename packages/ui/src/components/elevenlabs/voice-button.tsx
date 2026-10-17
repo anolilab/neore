@@ -131,6 +131,14 @@ const VoiceButton = ({
     const isSuccess = state === "success";
     const isError = state === "error";
 
+    const stateLabels: Record<VoiceButtonState, string> = {
+        error: t`Voice input failed`,
+        idle: t`Voice Button`,
+        processing: t`Processing voice input`,
+        recording: t`Recording voice input`,
+        success: t`Voice input complete`,
+    };
+
     const buttonVariant = variant;
     const isDisabled = disabled || isProcessing;
 
@@ -141,7 +149,7 @@ const VoiceButton = ({
 
     return (
         <Button
-            aria-label={t`Voice Button`}
+            aria-label={stateLabels[state]}
             className={cn("gap-2 transition-all duration-200", size === "icon" && "relative", className)}
             disabled={isDisabled}
             onClick={handleClick}

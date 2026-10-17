@@ -301,7 +301,9 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
 
         if (body.stream) {
             // ── Streaming mode ──
+            const abortController = new AbortController();
             const result = streamText({
+                abortSignal: abortController.signal,
                 maxOutputTokens: body.max_tokens,
                 messages: effectiveMessages as Parameters<typeof streamText>[0]["messages"],
                 model,
@@ -310,18 +312,30 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
             } as Parameters<typeof streamText>[0]);
 
             const execContext = c.executionCtx;
+            let isCancelled = false;
 
             const stream = new ReadableStream({
+                cancel(reason) {
+                    isCancelled = true;
+                    abortController.abort(reason);
+                },
                 async start(controller) {
                     const encoder = new TextEncoder();
-                    const sendChunk = (data: ChatCompletionChunk) => {
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+                    const send = (text: string): void => {
+                        if (!isCancelled) {
+                            controller.enqueue(encoder.encode(text));
+                        }
                     };
+                    const sendChunk = (data: ChatCompletionChunk) => {
+                        send(`data: ${JSON.stringify(data)}\n\n`);
+                    };
+                    let hasFailed = false;
 
                     try {
                         for await (const part of result.fullStream) {
                             switch (part.type) {
                                 case "error": {
+                                    hasFailed = true;
                                     sendChunk({
                                         choices: [{ delta: {}, finish_reason: "error", index: 0 }],
                                         created,
@@ -389,7 +403,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                             object: "chat.completion.chunk",
                         });
 
-                        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                        send("data: [DONE]\n\n");
 
                         // Record usage
                         const finalUsage = await result.usage;
@@ -429,7 +443,13 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                     },
                                     c.var.telemetry,
                                 ),
-                                healthService.recordSuccess(provider, modelApiId, latencyMs),
+                                ...(isCancelled
+                                    ? []
+                                    : [
+                                          hasFailed
+                                              ? healthService.recordFailure(provider, modelApiId)
+                                              : healthService.recordSuccess(provider, modelApiId, latencyMs),
+                                      ]),
                                 usageReporter.report({
                                     // Platform env keys only on this route — never BYOK.
                                     billingMode: "platform",
@@ -442,23 +462,27 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                     userId,
                                 }),
                                 // Fire completion webhook (non-blocking)
-                                deliverEvent(
-                                    c.env.USAGE_DB,
-                                    buildEvent(
-                                        "completion",
-                                        userId,
-                                        {
-                                            completionTokens: tokens.completionTokens,
-                                            costMicrodollars,
-                                            finishReason,
-                                            latencyMs,
-                                            modelId,
-                                            promptTokens: tokens.promptTokens,
-                                            requestId,
-                                        },
-                                        orgId,
-                                    ),
-                                ),
+                                ...(hasFailed || isCancelled
+                                    ? []
+                                    : [
+                                          deliverEvent(
+                                              c.env.USAGE_DB,
+                                              buildEvent(
+                                                  "completion",
+                                                  userId,
+                                                  {
+                                                      completionTokens: tokens.completionTokens,
+                                                      costMicrodollars,
+                                                      finishReason,
+                                                      latencyMs,
+                                                      modelId,
+                                                      promptTokens: tokens.promptTokens,
+                                                      requestId,
+                                                  },
+                                                  orgId,
+                                              ),
+                                          ),
+                                      ]),
                             ]),
                         );
                     } catch (error) {
@@ -466,28 +490,33 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                         // SSE frame to client: sanitized payload with requestId.
                         const safe = toSafeErrorPayload(error, { code: "PROVIDER_ERROR", env: c.env, requestId });
 
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: { ...safe, type: "server_error" } })}\n\n`));
-                        execContext.waitUntil(
-                            Promise.allSettled([
-                                healthService.recordFailure(provider, modelApiId),
-                                deliverEvent(
-                                    c.env.USAGE_DB,
-                                    buildEvent(
-                                        "provider_error",
-                                        userId,
-                                        {
-                                            errorMessage,
-                                            latencyMs: Date.now() - startTime,
-                                            modelId,
-                                            requestId,
-                                        },
-                                        orgId,
+                        send(`data: ${JSON.stringify({ error: { ...safe, type: "server_error" } })}\n\n`);
+
+                        if (!isCancelled) {
+                            execContext.waitUntil(
+                                Promise.allSettled([
+                                    healthService.recordFailure(provider, modelApiId),
+                                    deliverEvent(
+                                        c.env.USAGE_DB,
+                                        buildEvent(
+                                            "provider_error",
+                                            userId,
+                                            {
+                                                errorMessage,
+                                                latencyMs: Date.now() - startTime,
+                                                modelId,
+                                                requestId,
+                                            },
+                                            orgId,
+                                        ),
                                     ),
-                                ),
-                            ]),
-                        );
+                                ]),
+                            );
+                        }
                     } finally {
-                        controller.close();
+                        if (!isCancelled) {
+                            controller.close();
+                        }
                     }
                 },
             });

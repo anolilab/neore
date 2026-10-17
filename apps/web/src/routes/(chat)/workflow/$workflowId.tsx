@@ -1,5 +1,6 @@
 import { Trans } from "@lingui/react/macro";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
 import {
@@ -12,16 +13,23 @@ import {
     useWorkflowSync,
     WorkflowCanvas,
 } from "@/features/workflow";
+import { useResolveWorkflowImages } from "@/features/workflow/hooks/use-resolve-workflow-images";
+import { startHistoryRecording } from "@/features/workflow/stores/history-store";
 import { isLunoraId } from "@/lib/lunora/ids";
 
 const WorkflowPage = () => {
     const workflowId = Route.useParams({ select: ({ workflowId: selected }) => selected });
+
+    useEffect(startHistoryRecording, []);
 
     // Load workflow data into store
     const { workflow, isLoading } = useWorkflow(workflowId);
 
     // Real-time sync (replaces useAutoSaveWorkflow — handles both auto-save and remote changes)
     useWorkflowSync(workflowId);
+
+    // Display URLs for images kept by reference (they expire, so they are fetched on load)
+    useResolveWorkflowImages();
 
     // Manual save (for explicit Ctrl+S / button click)
     const { save } = useSaveWorkflow(workflowId);

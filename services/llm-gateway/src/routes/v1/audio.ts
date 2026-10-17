@@ -18,6 +18,7 @@ import { bearerAuth } from "../../middleware/auth.js";
 import { expensiveEndpointRateLimit } from "../../middleware/rate-limit.js";
 import { createSpeechModel, createTranscriptionModel, STT_MODELS, TTS_MODELS } from "../../providers/audio-factory.js";
 import { resolveApiKey } from "../../providers/factory.js";
+import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
 
 const audioRouter = new OpenAPIHono<HonoEnv>();
@@ -40,13 +41,12 @@ const speechRequestSchema = z.object({
 // ---------------------------------------------------------------------------
 
 audioRouter.use("/v1/audio/*", bearerAuth);
-audioRouter.use("/v1/audio/*", expensiveEndpointRateLimit({ bucket: "audio" }));
 
 // ---------------------------------------------------------------------------
 // POST /v1/audio/speech — Text-to-Speech
 // ---------------------------------------------------------------------------
 
-audioRouter.post("/v1/audio/speech", async (c) => {
+audioRouter.post("/v1/audio/speech", expensiveEndpointRateLimit({ bucket: "audio" }), async (c) => {
     const requestId = c.get("requestId") ?? crypto.randomUUID();
     const rawBody = await c.req.json();
     const parsed = speechRequestSchema.safeParse(rawBody);
@@ -107,27 +107,44 @@ audioRouter.post("/v1/audio/speech", async (c) => {
         const usageTracker = new UsageTracker(c.env);
 
         c.executionCtx.waitUntil(
-            usageTracker.record(
-                {
-                    apiKeyId,
-                    cachedTokens: 0,
-                    completionTokens: 0,
-                    costMicrodollars,
-                    finishReason: "stop",
-                    isStreaming: false,
-                    latencyMs,
-                    modelApiId: modelInfo.modelApiId,
-                    modelId: body.model,
-                    orgId,
-                    promptTokens: charCount,
-                    provider: modelInfo.provider,
-                    reasoningTokens: 0,
-                    requestId,
-                    source: "saas_api",
-                    userId,
-                },
-                c.var.telemetry,
-            ),
+            Promise.allSettled([
+                usageTracker.record(
+                    {
+                        apiKeyId,
+                        cachedTokens: 0,
+                        completionTokens: 0,
+                        costMicrodollars,
+                        finishReason: "stop",
+                        isStreaming: false,
+                        latencyMs,
+                        modelApiId: modelInfo.modelApiId,
+                        modelId: body.model,
+                        orgId,
+                        promptTokens: charCount,
+                        provider: modelInfo.provider,
+                        reasoningTokens: 0,
+                        requestId,
+                        source: "saas_api",
+                        userId,
+                    },
+                    c.var.telemetry,
+                ),
+                ...(costMicrodollars > 0
+                    ? [
+                          new UsageReporter(c.env).report({
+                              // Platform env keys only on this route — never BYOK.
+                              billingMode: "platform",
+                              completionTokens: 0,
+                              costMicrodollars,
+                              modelId: body.model,
+                              orgId,
+                              promptTokens: charCount,
+                              requestId,
+                              userId,
+                          }),
+                      ]
+                    : []),
+            ]),
         );
 
         const mimeTypeMap: Record<string, string> = {
@@ -162,13 +179,13 @@ audioRouter.post("/v1/audio/speech", async (c) => {
 // POST /v1/audio/transcriptions — Speech-to-Text
 // ---------------------------------------------------------------------------
 
-audioRouter.post("/v1/audio/transcriptions", async (c) => handleTranscription(c, "transcribe"));
+audioRouter.post("/v1/audio/transcriptions", expensiveEndpointRateLimit({ bucket: "audio" }), async (c) => handleTranscription(c, "transcribe"));
 
 // ---------------------------------------------------------------------------
 // POST /v1/audio/translations — Speech-to-English translation
 // ---------------------------------------------------------------------------
 
-audioRouter.post("/v1/audio/translations", async (c) => handleTranscription(c, "translate"));
+audioRouter.post("/v1/audio/translations", expensiveEndpointRateLimit({ bucket: "audio" }), async (c) => handleTranscription(c, "translate"));
 
 // ---------------------------------------------------------------------------
 // GET /v1/audio/models — List available TTS and STT models
@@ -313,30 +330,47 @@ async function handleTranscription(c: Context<HonoEnv>, task: "transcribe" | "tr
         const usageTracker = new UsageTracker(c.env);
 
         c.executionCtx.waitUntil(
-            usageTracker.record(
-                {
-                    apiKeyId,
-                    cachedTokens: 0,
-                    completionTokens: 0,
-                    costMicrodollars,
-                    finishReason: "stop",
-                    isStreaming: false,
-                    latencyMs,
-                    modelApiId: modelInfo.modelApiId,
-                    // Track the model that actually served the request so usage_log rows
-                    // are consistent with provider/modelApiId rather than the user's
-                    // (possibly swapped) request.
-                    modelId: effectiveModelId,
-                    orgId,
-                    promptTokens: Math.round(estimatedDurationSeconds),
-                    provider: modelInfo.provider,
-                    reasoningTokens: 0,
-                    requestId,
-                    source: "saas_api",
-                    userId,
-                },
-                c.var.telemetry,
-            ),
+            Promise.allSettled([
+                usageTracker.record(
+                    {
+                        apiKeyId,
+                        cachedTokens: 0,
+                        completionTokens: 0,
+                        costMicrodollars,
+                        finishReason: "stop",
+                        isStreaming: false,
+                        latencyMs,
+                        modelApiId: modelInfo.modelApiId,
+                        // Track the model that actually served the request so usage_log rows
+                        // are consistent with provider/modelApiId rather than the user's
+                        // (possibly swapped) request.
+                        modelId: effectiveModelId,
+                        orgId,
+                        promptTokens: Math.round(estimatedDurationSeconds),
+                        provider: modelInfo.provider,
+                        reasoningTokens: 0,
+                        requestId,
+                        source: "saas_api",
+                        userId,
+                    },
+                    c.var.telemetry,
+                ),
+                ...(costMicrodollars > 0
+                    ? [
+                          new UsageReporter(c.env).report({
+                              // Platform env keys only on this route — never BYOK.
+                              billingMode: "platform",
+                              completionTokens: 0,
+                              costMicrodollars,
+                              modelId: effectiveModelId,
+                              orgId,
+                              promptTokens: Math.round(estimatedDurationSeconds),
+                              requestId,
+                              userId,
+                          }),
+                      ]
+                    : []),
+            ]),
         );
 
         const responseHeaders: Record<string, string> = { "X-Model-Used": effectiveModelId, "X-Request-Id": requestId };

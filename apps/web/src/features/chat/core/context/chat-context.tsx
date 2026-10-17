@@ -327,6 +327,13 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         authGate.set(isAuthenticated);
     }, [authGate, isAuthenticated, jwtToken]);
 
+    // Read at send time: the route's token is captured at load and never renewed; the client's is.
+    const authHeader = useCallback((): Record<string, string> => {
+        const bearer = lunora.getAuthToken() ?? jwtTokenRef.current;
+
+        return bearer ? { Authorization: `Bearer ${bearer}` } : {};
+    }, [lunora]);
+
     // Only subscribe to model store values needed in render output
     // setPendingSettings, getComposerMode, setComposerMode are only used in callbacks
     // and are accessed via useModelStore.getState() there
@@ -462,6 +469,14 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         // assertion back to the query's own row type.
         initialData: initialThread && initialThread._id === threadId ? (initialThread as unknown as ThreadRow) : undefined,
     });
+
+    // Read by the send/reload/edit callbacks, so a live push of the thread row does not
+    // recreate them (and re-render every message row through the actions context).
+    const threadDataRef = useRef(threadData);
+
+    useLayoutEffect(() => {
+        threadDataRef.current = threadData;
+    }, [threadData]);
 
     // CRITICAL: Validate that initialThread matches current threadId before using it.
     // During navigation, the component can re-render with NEW threadId but OLD initialThread (from previous route).
@@ -853,18 +868,20 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                         }
                     },
                     prompt: text,
-                    systemPrompt: isCreatingNewThread ? pendingSettings?.customSystemPrompt : threadData?.customSystemPrompt,
+                    systemPrompt: isCreatingNewThread ? pendingSettings?.customSystemPrompt : threadDataRef.current?.customSystemPrompt,
                     threadId,
                 });
 
                 return;
             }
 
+            const { attachedReferences } = useChatUIStore.getState();
+
             try {
                 // For new threads: send all pending settings
                 // For existing threads: only send settings that have changed from cached values
                 const pendingSettings = isCreatingNewThread ? getPendingSettingsFromStore() : null;
-                const changedSettings = isCreatingNewThread ? null : getChangedSettings(threadData);
+                const changedSettings = isCreatingNewThread ? null : getChangedSettings(threadDataRef.current);
 
                 let fileIds: string[] | undefined;
 
@@ -919,8 +936,6 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     // is the "1, 2, 3..." badge the user sees in the composer strip,
                     // and downstream tools forward this order to providers that
                     // support multi-ref (FAL Nano-Banana et al.).
-                    const { attachedReferences } = useChatUIStore.getState();
-
                     if (attachedReferences.length > 0) {
                         requestBody.referenceImages = attachedReferences.map((ref) => ref.url);
                     }
@@ -959,13 +974,15 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     body: JSON.stringify(requestBody),
                     headers: {
                         "Content-Type": "application/json",
-                        ...(jwtTokenRef.current && { Authorization: `Bearer ${jwtTokenRef.current}` }),
+                        ...authHeader(),
                     },
                     method: "POST",
                 });
 
                 if (!response.ok) {
-                    const errorData = (await response.json()) as { bannedWords?: string[]; error?: string; message?: string };
+                    const errorData = (await response.json().catch(() => {
+                        return {};
+                    })) as { bannedWords?: string[]; error?: string; message?: string };
 
                     if (errorData.error === "BANNED_CONTENT") {
                         // Restore composer text so the user can edit their message
@@ -1089,7 +1106,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                             }),
                             headers: {
                                 "Content-Type": "application/json",
-                                ...(jwtTokenRef.current && { Authorization: `Bearer ${jwtTokenRef.current}` }),
+                                ...authHeader(),
                             },
                             method: "POST",
                         }).catch((error_) => {
@@ -1108,6 +1125,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     model,
                 });
 
+                // The composer was cleared before the request; hand the draft back unless a new one is there.
+                useChatUIStore.getState().restoreComposer({ attachedReferences, composerAttachments: attachments ?? [], composerText: text });
+
                 handleError(error_);
 
                 if (error_ instanceof Error && (error_.message.includes("401") || error_.message.includes("403"))) {
@@ -1119,7 +1139,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             authGate,
             threadId,
             model,
-            threadData,
+            authHeader,
             navigate,
             queryClient,
             refetchSession,
@@ -1147,6 +1167,14 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             return;
         }
 
+        // The ref is set only by the provider that started the stream; the first reply of a
+        // new thread was started on `/chat`, so this thread's provider finds it from the messages.
+        if (streamingMessageRef.current?.threadId !== threadId) {
+            const streamingId = messagesRef.current.find((m) => m.status === "streaming")?.id;
+
+            streamingMessageRef.current = threadId && streamingId ? { messageId: streamingId, threadId } : null;
+        }
+
         if (streamingMessageRef.current) {
             trackEvent("stream_cancelled", { model });
 
@@ -1161,7 +1189,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
             streamingMessageRef.current = null;
         }
-    }, [abortStreamMutation, setIsRegenerating, model, cancelLocalTurn]);
+    }, [abortStreamMutation, setIsRegenerating, model, cancelLocalTurn, threadId]);
 
     const reloadMessage = useCallback(
         async (messageId: string) => {
@@ -1237,7 +1265,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                         }
                     },
                     prompt: userMessage.text,
-                    systemPrompt: threadData?.customSystemPrompt,
+                    systemPrompt: threadDataRef.current?.customSystemPrompt,
                     threadId,
                 });
 
@@ -1249,7 +1277,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
             try {
                 // Only send settings that have changed from cached values
-                const changedSettings = getChangedSettings(threadData);
+                const changedSettings = getChangedSettings(threadDataRef.current);
 
                 const reloadMode = useModelStore.getState().getComposerMode(threadId || undefined);
                 const requestBody: Record<string, unknown> = {
@@ -1270,13 +1298,15 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     body: JSON.stringify(requestBody),
                     headers: {
                         "Content-Type": "application/json",
-                        ...(jwtToken && { Authorization: `Bearer ${jwtToken}` }),
+                        ...authHeader(),
                     },
                     method: "POST",
                 });
 
                 if (!response.ok) {
-                    const errorData = (await response.json()) as { error?: string; message?: string };
+                    const errorData = (await response.json().catch(() => {
+                        return {};
+                    })) as { error?: string; message?: string };
 
                     throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
                 }
@@ -1309,7 +1339,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                             body: JSON.stringify({ messageId: data.messageId, streamingConfig: data.streamingConfig, threadId: data.threadId }),
                             headers: {
                                 "Content-Type": "application/json",
-                                ...(jwtToken && { Authorization: `Bearer ${jwtToken}` }),
+                                ...authHeader(),
                             },
                             method: "POST",
                         }).catch((error_) => {
@@ -1336,7 +1366,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 handleError(error_);
             }
         },
-        [threadId, isAuthenticated, threadData, jwtToken, model, handleError, getChangedSettings, defaultLanguage, localTarget, sendLocalTurn, startTurn],
+        [threadId, isAuthenticated, authHeader, model, handleError, getChangedSettings, defaultLanguage, localTarget, sendLocalTurn, startTurn],
     );
 
     const editMessage = useCallback(
@@ -1415,7 +1445,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                         }
                     },
                     prompt: newText,
-                    systemPrompt: threadData?.customSystemPrompt,
+                    systemPrompt: threadDataRef.current?.customSystemPrompt,
                     threadId,
                 });
 
@@ -1436,13 +1466,15 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     body: JSON.stringify(requestBody),
                     headers: {
                         "Content-Type": "application/json",
-                        ...(jwtToken && { Authorization: `Bearer ${jwtToken}` }),
+                        ...authHeader(),
                     },
                     method: "POST",
                 });
 
                 if (!response.ok) {
-                    const errorData = (await response.json()) as { error?: string; message?: string };
+                    const errorData = (await response.json().catch(() => {
+                        return {};
+                    })) as { error?: string; message?: string };
 
                     throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
                 }
@@ -1472,7 +1504,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 handleError(error_);
             }
         },
-        [threadId, isAuthenticated, jwtToken, handleError, localTarget, sendLocalTurn, threadData, startTurn],
+        [threadId, isAuthenticated, authHeader, handleError, localTarget, sendLocalTurn, startTurn],
     );
 
     const copyMessage = useCallback((messageId: string) => {

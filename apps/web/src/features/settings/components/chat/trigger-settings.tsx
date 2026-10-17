@@ -8,6 +8,7 @@ import type { Id } from "@neore/backend/dataModel";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardHeading, CardTitle } from "@neore/ui/components/card";
+import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
@@ -31,6 +32,7 @@ import {
     Play,
     Plus,
     Trash2,
+    X,
     XCircle,
     Zap,
 } from "lucide-react";
@@ -377,6 +379,9 @@ const TriggerSettings: FC = () => {
     const [editingTriggerId, setEditingTriggerId] = useState<Id<"triggers"> | null>(null);
     const [editFormData, setEditFormData] = useState<TriggerFormData>(EMPTY_FORM);
     const [expandedTriggerId, setExpandedTriggerId] = useState<Id<"triggers"> | null>(null);
+    // The plaintext webhook secret is returned only by `createTrigger`, so it is shown once, here.
+    const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
+    const [deletingTrigger, setDeletingTrigger] = useState<TriggerRow | null>(null);
 
     // Queries
     const { data: triggers, isLoading, refetch } = useQuery(crpc.triggers.functions.getTriggers.queryOptions({}));
@@ -429,10 +434,7 @@ const TriggerSettings: FC = () => {
                     setFormData(EMPTY_FORM);
                     void refetch();
 
-                    if ("webhookSecret" in data && data.webhookSecret) {
-                        toast.info(t`Webhook secret copied to clipboard`, { duration: 5000 });
-                        void navigator.clipboard.writeText(data.webhookSecret);
-                    }
+                    setNewWebhookSecret(data.webhookSecret ?? null);
                 },
             },
         );
@@ -479,26 +481,39 @@ const TriggerSettings: FC = () => {
         [setTriggerEnabled, refetch, t],
     );
 
-    const handleDelete = useCallback(
-        (triggerId: Id<"triggers">) => {
-            deleteTrigger(
-                { triggerId },
-                {
-                    onError: () => toast.error(t`Failed to delete trigger`),
-                    onSuccess: () => {
-                        toast.success(t`Trigger deleted`);
+    const handleConfirmDelete = useCallback(() => {
+        if (!deletingTrigger) return;
 
-                        if (expandedTriggerId === triggerId) setExpandedTriggerId(null);
+        const triggerId = deletingTrigger._id;
 
-                        if (editingTriggerId === triggerId) setEditingTriggerId(null);
+        deleteTrigger(
+            { triggerId },
+            {
+                onError: () => toast.error(t`Failed to delete trigger`),
+                onSuccess: () => {
+                    toast.success(t`Trigger deleted`);
+                    setDeletingTrigger(null);
 
-                        void refetch();
-                    },
+                    if (expandedTriggerId === triggerId) setExpandedTriggerId(null);
+
+                    if (editingTriggerId === triggerId) setEditingTriggerId(null);
+
+                    void refetch();
                 },
-            );
-        },
-        [deleteTrigger, refetch, expandedTriggerId, editingTriggerId, t],
-    );
+            },
+        );
+    }, [deleteTrigger, deletingTrigger, refetch, expandedTriggerId, editingTriggerId, t]);
+
+    const handleCopyWebhookSecret = useCallback(async () => {
+        if (!newWebhookSecret) return;
+
+        try {
+            await navigator.clipboard.writeText(newWebhookSecret);
+            toast.success(t`Webhook secret copied to clipboard`);
+        } catch {
+            toast.error(t`Could not copy the secret. Select it and copy it manually.`);
+        }
+    }, [newWebhookSecret, t]);
 
     const handleTestRun = useCallback(
         async (triggerId: Id<"triggers">) => {
@@ -578,6 +593,37 @@ const TriggerSettings: FC = () => {
                         onSubmit={handleCreate}
                         title={t`Create Trigger`}
                     />
+                )}
+
+                {newWebhookSecret && (
+                    <Card className="border-amber-500/50">
+                        <CardContent className="space-y-2 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <CardHeading className="font-medium">{t`Webhook secret`}</CardHeading>
+                                    <p className="text-muted-foreground text-sm">
+                                        {t`Copy this secret now and store it with your webhook sender. It will not be shown again.`}
+                                    </p>
+                                </div>
+                                <Button aria-label={t`Dismiss webhook secret`} onClick={() => setNewWebhookSecret(null)} size="sm" variant="ghost">
+                                    <X aria-hidden="true" className="size-4" />
+                                </Button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs select-all">{newWebhookSecret}</code>
+                                <Button
+                                    onClick={() => {
+                                        void handleCopyWebhookSecret();
+                                    }}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Copy aria-hidden="true" className="mr-1.5 size-3" />
+                                    {t`Copy`}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {/* Trigger List */}
@@ -699,7 +745,7 @@ const TriggerSettings: FC = () => {
                                                 <Button
                                                     aria-label={t`Delete trigger`}
                                                     disabled={deleteMutation.isPending}
-                                                    onClick={() => handleDelete(trigger._id)}
+                                                    onClick={() => setDeletingTrigger(trigger)}
                                                     size="sm"
                                                     variant="ghost"
                                                 >
@@ -838,6 +884,16 @@ const TriggerSettings: FC = () => {
                     </CardContent>
                 </Card>
             </HeadingSection>
+
+            <ConfirmDialog
+                confirmLabel={t`Delete`}
+                description={t`The trigger stops running and its execution history is removed. This cannot be undone.`}
+                loading={deleteMutation.isPending}
+                onConfirm={handleConfirmDelete}
+                onOpenChange={(open) => !open && !deleteMutation.isPending && setDeletingTrigger(null)}
+                open={deletingTrigger !== null}
+                title={deletingTrigger ? t`Delete "${deletingTrigger.name}"?` : t`Delete trigger?`}
+            />
         </div>
     );
 };

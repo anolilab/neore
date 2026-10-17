@@ -151,12 +151,7 @@ const OrganizationLogoForm = ({ className, classNames, ...properties }: Organiza
                         }
                     />
 
-                    <DropdownMenuContent
-                        align="end"
-                        onCloseAutoFocus={(e) => {
-                            e.preventDefault();
-                        }}
-                    >
+                    <DropdownMenuContent align="end">
                         <DropdownMenuItem disabled={loading || !hasPermission?.success} onClick={openFileDialog}>
                             <UploadCloudIcon />
                             {t`Upload Logo`}

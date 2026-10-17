@@ -66,6 +66,7 @@ const renderSlideToCanvas = async (htmlContent: string, slideNumber: number, tot
     // Create an offscreen iframe to render the slide at native 1920x1080
     const iframe = document.createElement("iframe");
 
+    iframe.setAttribute("sandbox", "allow-same-origin");
     iframe.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${SLIDE_WIDTH}px;height:${SLIDE_HEIGHT}px;border:none;visibility:hidden;`;
     // `appendChild`, not `append`: the workers-types `Element.append(content, options)`
     // declaration shadows the DOM `ParentNode.append(...nodes)` overload in this project.

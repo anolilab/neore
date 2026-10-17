@@ -64,7 +64,7 @@ const LazyImage = ({ alt, aspectRatioClassName, className, fallback, inView = fa
                     onError={handleError}
                     onLoad={handleLoad}
                     ref={imgRef}
-                    role="presentation"
+                    role={alt === "" ? "presentation" : undefined}
                     src={imgSource}
                 />
             )}

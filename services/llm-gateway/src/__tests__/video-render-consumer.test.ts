@@ -15,9 +15,11 @@ import { VIDEO_RENDER_MESSAGE_VERSION } from "../routes/v1/video-types.js";
 
 const runVideoRenderMock = vi.fn();
 const markRenderFailedMock = vi.fn();
+const deferPendingUsageMock = vi.fn();
 
 vi.mock("../routes/v1/video-render.js", () => {
     return {
+        deferPendingUsage: deferPendingUsageMock,
         markRenderFailed: markRenderFailedMock,
         runVideoRender: runVideoRenderMock,
     };
@@ -81,6 +83,8 @@ beforeEach(() => {
     runVideoRenderMock.mockReset();
     markRenderFailedMock.mockReset();
     markRenderFailedMock.mockResolvedValue(undefined);
+    deferPendingUsageMock.mockReset();
+    deferPendingUsageMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -135,6 +139,7 @@ describe("handleVideoRenderBatch", () => {
         expect(message.retry).toHaveBeenCalledWith({ delaySeconds: 60 });
         expect(message.ack).not.toHaveBeenCalled();
         expect(markRenderFailedMock).not.toHaveBeenCalled();
+        expect(deferPendingUsageMock).not.toHaveBeenCalled();
     });
 
     it("finalises a transient failure when retries are exhausted", async () => {
@@ -155,6 +160,8 @@ describe("handleVideoRenderBatch", () => {
         // out, otherwise pollers wait on the 10-min stall reaper.
         expect(markRenderFailedMock).toHaveBeenCalledTimes(1);
         expect(markRenderFailedMock).toHaveBeenCalledWith(baseEnv, message.body, expect.stringContaining("retries exhausted"));
+        // A charge the retries could not settle goes to the durable sweeper.
+        expect(deferPendingUsageMock).toHaveBeenCalledWith(baseEnv, "job_test_123");
     });
 
     it("acks a terminal (non-retryable) failure without calling markRenderFailed (render core already did)", async () => {
@@ -199,6 +206,7 @@ describe("handleVideoRenderBatch", () => {
         // so we must persist failed state here.
         expect(markRenderFailedMock).toHaveBeenCalledTimes(1);
         expect(markRenderFailedMock).toHaveBeenCalledWith(baseEnv, message.body, expect.stringContaining("Consumer error"));
+        expect(deferPendingUsageMock).toHaveBeenCalledWith(baseEnv, "job_test_123");
     });
 
     it("drops version-mismatch poison messages without running the render", async () => {

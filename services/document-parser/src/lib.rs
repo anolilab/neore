@@ -13,8 +13,8 @@ mod shape;
 
 use futures_util::StreamExt;
 use serde::Serialize;
-use worker::{Context, Env, Method, Request, Response, Result, event};
-use xberg::{ExtractInput, ExtractionConfig};
+use worker::{Context, Env, Method, Request, Response, Result, console_error, event};
+use xberg::{ExtractInput, ExtractionConfig, ExtractionErrorItem, SecurityLimits};
 
 use crate::shape::{
     ErrorBody, ExtractResponse, ExtractedTable, MAX_DOCUMENT_BYTES, body_capacity, declared_length,
@@ -53,6 +53,13 @@ fn config() -> ExtractionConfig {
     ExtractionConfig {
         // The result cache is file-backed; a Worker has no filesystem and no use for it.
         use_cache: false,
+        // xberg's defaults (500 MB archives, 100 MB content) are sized for a server,
+        // not a 128 MB isolate.
+        security_limits: Some(SecurityLimits {
+            max_archive_size: 48 * 1024 * 1024,
+            max_content_size: 32 * 1024 * 1024,
+            ..SecurityLimits::default()
+        }),
         ..ExtractionConfig::default()
     }
 }
@@ -60,15 +67,31 @@ fn config() -> ExtractionConfig {
 /// Why an extraction produced no response body.
 #[derive(Debug)]
 pub enum ExtractFailure {
-    /// xberg returned no document; the details are its per-input errors.
-    Empty(Option<String>),
+    /// xberg returned no document; the item is its first per-input error.
+    Empty(Option<ExtractionErrorItem>),
     Xberg(xberg::XbergError),
 }
 
 impl ExtractFailure {
-    fn details(self) -> Option<String> {
+    /// What the caller sees; xberg's own wording stays in the log.
+    fn message(&self) -> &'static str {
+        let unsupported = match self {
+            Self::Empty(item) => item
+                .as_ref()
+                .is_some_and(|item| item.error_type == "unsupported_format"),
+            Self::Xberg(error) => matches!(error, xberg::XbergError::UnsupportedFormat(_)),
+        };
+
+        if unsupported {
+            "Unsupported format"
+        } else {
+            "Could not parse this document"
+        }
+    }
+
+    fn details(&self) -> Option<String> {
         match self {
-            Self::Empty(details) => details,
+            Self::Empty(item) => item.as_ref().map(|item| format!("{item:?}")),
             Self::Xberg(error) => Some(error.to_string()),
         }
     }
@@ -105,7 +128,7 @@ pub async fn extract_document(
     let result = run_xberg(body, mime_type)
         .await
         .map_err(ExtractFailure::Xberg)?;
-    let first_error = result.errors.first().map(|item| format!("{item:?}"));
+    let first_error = result.errors.into_iter().next();
     let Some(document) = result.results.into_iter().next() else {
         return Err(ExtractFailure::Empty(first_error));
     };
@@ -171,7 +194,13 @@ async fn handle_extract(mut req: Request) -> Result<Response> {
 
     match extract_document(body, mime_type).await {
         Ok(response) => json(200, &response),
-        Err(failure) => error(500, "Extraction failed", failure.details()),
+        Err(failure) => {
+            if let Some(details) = failure.details() {
+                console_error!("extraction failed: {details}");
+            }
+
+            error(500, "Extraction failed", Some(failure.message().to_owned()))
+        }
     }
 }
 
@@ -315,5 +344,15 @@ mod tests {
         .unwrap_err();
 
         assert!(failure.details().is_some());
+        assert_eq!(failure.message(), "Unsupported format");
+    }
+
+    #[test]
+    fn caps_xberg_below_the_isolate_budget() {
+        let limits = config().security_limits.unwrap();
+
+        assert!(limits.max_archive_size < 64 * 1024 * 1024);
+        assert!(limits.max_content_size < 64 * 1024 * 1024);
+        assert!(limits.max_archive_size > MAX_DOCUMENT_BYTES);
     }
 }

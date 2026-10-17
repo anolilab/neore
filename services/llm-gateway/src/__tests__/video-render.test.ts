@@ -53,6 +53,18 @@ vi.mock("../usage/tracker.js", () => {
     };
 });
 
+const { report } = vi.hoisted(() => {
+    return { report: vi.fn() };
+});
+
+vi.mock("../usage/reporter.js", () => {
+    return {
+        UsageReporter: function UsageReporter() {
+            return { report };
+        },
+    };
+});
+
 const { experimental_generateVideo: generateVideo } = await import("ai");
 const { createVideoModel } = await import("../providers/video-factory.js");
 const { markRenderFailed, runVideoRender } = await import("../routes/v1/video-render.js");
@@ -144,6 +156,8 @@ const stubGenerateVideoSuccess = (): void => {
 beforeEach(() => {
     vi.mocked(generateVideo).mockReset();
     vi.mocked(createVideoModel).mockReset();
+    report.mockReset();
+    report.mockResolvedValue(true);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
 });
 
@@ -365,7 +379,7 @@ describe("runVideoRender — successful render", () => {
         expect(cacheKv.getRaw(videoRenderSecretKvKey(message.jobId))).toBeUndefined();
     });
 
-    it("zeroes cost for BYOK renders", async () => {
+    it("prices BYOK renders at the platform cost", async () => {
         const { cacheKv, env } = makeEnv();
         const message = makeMessage({ body: { duration: 8, model: "fal/luma-ray-2", prompt: "hi" }, isByok: true });
 
@@ -376,7 +390,8 @@ describe("runVideoRender — successful render", () => {
 
         if (outcome.kind !== "completed") throw new Error("expected completed");
 
-        expect(outcome.costMicrodollars).toBe(0);
+        // 8s × 50_000 µ$/s = 400_000 µ$, same as a platform-keyed render.
+        expect(outcome.costMicrodollars).toBe(400_000);
     });
 
     it("fires a completed webhook when callback_url is set", async () => {
@@ -499,5 +514,98 @@ describe("runVideoRender — error classification", () => {
         if (outcome.kind !== "failed") throw new Error("unreachable");
 
         expect(outcome.retryable).toBe(false);
+    });
+});
+
+describe("runVideoRender — billing", () => {
+    it("keeps an unaccepted charge on the completed job and retries only the charge on redelivery", async () => {
+        const { cacheKv, env, rateLimitKv } = makeEnv();
+        const message = makeMessage({ body: { duration: 4, model: "fal/luma-ray-2", prompt: "hi" } });
+
+        await seedSecret(cacheKv, message.jobId);
+        stubGenerateVideoSuccess();
+        report.mockResolvedValueOnce(false);
+
+        const first = await runVideoRender(message, env);
+
+        expect(first).toMatchObject({ kind: "failed", retryable: true });
+
+        const pending = (await rateLimitKv.get(`video_job:${message.jobId}`, "json")) as VideoJobState;
+
+        expect(pending.status).toBe("completed");
+        expect(pending.usagePending).toMatchObject({ costMicrodollars: 200_000, requestId: message.requestId, userId: message.userId });
+
+        const second = await runVideoRender(message, env);
+
+        expect(second).toEqual({ kind: "skipped", reason: "already-completed" });
+        expect(vi.mocked(generateVideo)).toHaveBeenCalledOnce();
+        expect(report).toHaveBeenCalledTimes(2);
+        expect(report.mock.calls[1]![0]).toEqual(report.mock.calls[0]![0]);
+
+        const settled = (await rateLimitKv.get(`video_job:${message.jobId}`, "json")) as VideoJobState;
+
+        expect(settled.status).toBe("completed");
+        expect(settled.usagePending).toBeUndefined();
+    });
+
+    it("charges the provider cost when the render succeeded but saving it failed", async () => {
+        const { bucket, cacheKv, env, rateLimitKv } = makeEnv();
+        const message = makeMessage({ body: { duration: 4, model: "fal/luma-ray-2", prompt: "hi" } });
+
+        await seedSecret(cacheKv, message.jobId);
+        stubGenerateVideoSuccess();
+        vi.spyOn(bucket, "put").mockRejectedValue(new Error("R2 write failed"));
+
+        const outcome = await runVideoRender(message, env);
+
+        expect(outcome).toEqual({ errorMessage: "R2 write failed", kind: "failed", retryable: false });
+        expect(report).toHaveBeenCalledOnce();
+        expect(report.mock.calls[0]![0]).toMatchObject({ costMicrodollars: 200_000, requestId: message.requestId });
+
+        const stored = (await rateLimitKv.get(`video_job:${message.jobId}`, "json")) as VideoJobState;
+
+        expect(stored.status).toBe("failed");
+        expect(stored.errorMessage).toBe("R2 write failed");
+        expect(stored.usagePending).toBeUndefined();
+    });
+
+    it("charges the provider cost when the stall reaper failed the job before the failure was saved", async () => {
+        const { bucket, cacheKv, env, rateLimitKv } = makeEnv();
+        const message = makeMessage({ body: { duration: 4, model: "fal/luma-ray-2", prompt: "hi" } });
+
+        await seedSecret(cacheKv, message.jobId);
+        stubGenerateVideoSuccess();
+        vi.spyOn(bucket, "put").mockImplementation(async () => {
+            const reaped = (await rateLimitKv.get(`video_job:${message.jobId}`, "json")) as VideoJobState;
+
+            await rateLimitKv.put(`video_job:${message.jobId}`, JSON.stringify({ ...reaped, errorMessage: "stalled", status: "failed" }));
+
+            throw new Error("R2 write failed");
+        });
+
+        const outcome = await runVideoRender(message, env);
+
+        expect(outcome).toEqual({ errorMessage: "R2 write failed", kind: "failed", retryable: false });
+        expect(report).toHaveBeenCalledOnce();
+        expect(report.mock.calls[0]![0]).toMatchObject({ costMicrodollars: 200_000, requestId: message.requestId });
+
+        const stored = (await rateLimitKv.get(`video_job:${message.jobId}`, "json")) as VideoJobState;
+
+        expect(stored.status).toBe("failed");
+        expect(stored.errorMessage).toBe("stalled");
+        expect(stored.usagePending).toBeUndefined();
+    });
+
+    it("does not charge when the provider call failed", async () => {
+        const { cacheKv, env } = makeEnv();
+        const message = makeMessage();
+
+        await seedSecret(cacheKv, message.jobId);
+        vi.mocked(createVideoModel).mockResolvedValue({} as unknown as Awaited<ReturnType<typeof createVideoModel>>);
+        vi.mocked(generateVideo).mockRejectedValue(new Error("prompt failed safety review"));
+
+        await runVideoRender(message, env);
+
+        expect(report).not.toHaveBeenCalled();
     });
 });

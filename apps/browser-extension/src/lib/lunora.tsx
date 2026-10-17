@@ -40,7 +40,15 @@ export function LunoraWithAuthProvider({ children }: { children: ReactNode }) {
 
             lunora.setAuthToken(token);
 
-            const expiresAt = token ? tokenExpiresAt(token) : undefined;
+            if (token === null) {
+                timer = setTimeout(() => {
+                    void refresh(true);
+                }, MIN_REFRESH_DELAY_MS);
+
+                return;
+            }
+
+            const expiresAt = tokenExpiresAt(token);
 
             if (expiresAt !== undefined) {
                 timer = setTimeout(

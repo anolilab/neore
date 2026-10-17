@@ -27,6 +27,7 @@ describe("deriveImageModels", () => {
         const expected = MODEL_REGISTRY.filter(
             (m) =>
                 m.mode === "image" &&
+                m.enabled !== false &&
                 m.gatewayKey !== undefined &&
                 m.costPerImageMicrodollars !== undefined &&
                 (["bfl", "fal", "openai"] as ReadonlyArray<string>).includes(m.provider),
@@ -91,7 +92,7 @@ describe("deriveVideoModels", () => {
 
     it("only includes video models with a gatewayKey and costPerSecondMicrodollars", () => {
         const expected = MODEL_REGISTRY.filter(
-            (m) => m.mode === "video" && m.gatewayKey !== undefined && m.costPerSecondMicrodollars !== undefined && m.provider === "fal",
+            (m) => m.mode === "video" && m.enabled !== false && m.gatewayKey !== undefined && m.costPerSecondMicrodollars !== undefined && m.provider === "fal",
         );
 
         expect(Object.keys(video)).toHaveLength(expected.length);

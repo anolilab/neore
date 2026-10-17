@@ -679,99 +679,6 @@
         "x-lunora-function-kind": "mutation"
       }
     },
-    "/_lunora/rpc#admin_gateway_analytics:createGatewayKeyAction": {
-      "post": {
-        "description": "Invoke the `action` `admin_gateway_analytics:createGatewayKeyAction` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "admin_gateway_analytics:createGatewayKeyAction",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "expiresAt": {
-                        "type": "string"
-                      },
-                      "maxBudgetUsd": {
-                        "type": "number"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "orgId": {
-                        "type": "string"
-                      },
-                      "rpmLimit": {
-                        "type": "number"
-                      },
-                      "tier": {
-                        "anyOf": [
-                          {
-                            "const": "free",
-                            "type": "string"
-                          },
-                          {
-                            "const": "pro",
-                            "type": "string"
-                          },
-                          {
-                            "const": "enterprise",
-                            "type": "string"
-                          }
-                        ]
-                      },
-                      "tpmLimit": {
-                        "type": "number"
-                      },
-                      "userId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "userId"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "admin_gateway_analytics:createGatewayKeyAction",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful response."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "action: admin_gateway_analytics:createGatewayKeyAction",
-        "tags": [
-          "admin"
-        ],
-        "x-lunora-function-kind": "action"
-      }
-    },
     "/_lunora/rpc#admin_gateway_analytics:getGatewayAnalytics": {
       "post": {
         "description": "Invoke the `action` `admin_gateway_analytics:getGatewayAnalytics` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -832,134 +739,6 @@
           }
         },
         "summary": "action: admin_gateway_analytics:getGatewayAnalytics",
-        "tags": [
-          "admin"
-        ],
-        "x-lunora-function-kind": "action"
-      }
-    },
-    "/_lunora/rpc#admin_gateway_analytics:listGatewayKeysAction": {
-      "post": {
-        "description": "Invoke the `action` `admin_gateway_analytics:listGatewayKeysAction` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "admin_gateway_analytics:listGatewayKeysAction",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "userId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "userId"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "admin_gateway_analytics:listGatewayKeysAction",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful response."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "action: admin_gateway_analytics:listGatewayKeysAction",
-        "tags": [
-          "admin"
-        ],
-        "x-lunora-function-kind": "action"
-      }
-    },
-    "/_lunora/rpc#admin_gateway_analytics:revokeGatewayKeyAction": {
-      "post": {
-        "description": "Invoke the `action` `admin_gateway_analytics:revokeGatewayKeyAction` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "admin_gateway_analytics:revokeGatewayKeyAction",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "args": {
-                    "properties": {
-                      "keyId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "keyId"
-                    ],
-                    "type": "object"
-                  },
-                  "functionPath": {
-                    "const": "admin_gateway_analytics:revokeGatewayKeyAction",
-                    "type": "string"
-                  },
-                  "shardKey": {
-                    "description": "Optional shard key; omitted routes to the default shard.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "functionPath"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "revoked": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "revoked"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful response."
-          },
-          "default": {
-            "$ref": "#/components/responses/LunoraError"
-          }
-        },
-        "summary": "action: admin_gateway_analytics:revokeGatewayKeyAction",
         "tags": [
           "admin"
         ],
@@ -23072,6 +22851,76 @@
           }
         },
         "summary": "query: file:getChatFileExtraction",
+        "tags": [
+          "file"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#file:getChatFileImageUrl": {
+      "post": {
+        "description": "Invoke the `query` `file:getChatFileImageUrl` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "file:getChatFileImageUrl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "fileId": {
+                        "description": "Id<\"chatFiles\">",
+                        "type": "string",
+                        "x-lunora-table": "chatFiles"
+                      }
+                    },
+                    "required": [
+                      "fileId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "file:getChatFileImageUrl",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: file:getChatFileImageUrl",
         "tags": [
           "file"
         ],

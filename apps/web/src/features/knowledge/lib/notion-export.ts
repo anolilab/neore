@@ -79,6 +79,10 @@ export const listArchiveEntries = async (data: ArrayBuffer, loadZip: LoadZip): P
             const path = `${prefix}${file.name}`;
 
             if (depth === 0 && path.toLowerCase().endsWith(".zip")) {
+                if (entrySize(file) > MAX_DOCUMENT_BYTES * 20) {
+                    continue;
+                }
+
                 const nested = await loadZip(await file.async("arraybuffer"));
 
                 entries.push(...(await read(nested, "", depth + 1)));
@@ -119,7 +123,7 @@ export const notionDocuments = (entries: ReadonlyArray<ArchiveEntry>): { documen
         const name = relativePath.split("/").at(-1)!;
         const mimeType = documentMimeType(name);
 
-        if (!mimeType || entry.size > MAX_DOCUMENT_BYTES) {
+        if (!mimeType || entry.size === 0 || entry.size > MAX_DOCUMENT_BYTES) {
             skipped += 1;
             continue;
         }

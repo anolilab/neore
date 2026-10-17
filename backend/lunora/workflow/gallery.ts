@@ -1,5 +1,6 @@
 import type { Infer } from "lunorash/server";
 import { signOwnedUrlFieldsForDisplay } from "../lib/stored-url-fields";
+import { signWorkflowImages } from "./images";
 import { LunoraError } from "lunorash/server";
 // ── Internal Mutations ───────────────────────────────────────────────────────
 import { v } from "lunorash/server";
@@ -177,7 +178,11 @@ export const readPublicWorkflow = internalQuery
             // The shared view: storage references in node data get fresh signed
             // URLs — only for storage the AUTHOR owns. The viewer is anonymous,
             // and the graph is the author's to fill with any string.
-            workflowContent: await signOwnedUrlFieldsForDisplay(context, project.userId, project.workflowContent),
+            workflowContent: await signWorkflowImages(
+                context,
+                project.userId,
+                await signOwnedUrlFieldsForDisplay(context, project.userId, project.workflowContent),
+            ),
         };
     });
 

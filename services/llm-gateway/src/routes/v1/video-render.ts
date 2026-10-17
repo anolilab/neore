@@ -17,7 +17,11 @@ import { experimental_generateVideo } from "ai";
 
 import type { AppEnv } from "../../env.js";
 import type { RequestTelemetry } from "../../lib/otel/index.js";
+import { validateWebhookUrl } from "../../lib/webhook-delivery.js";
 import { createVideoModel } from "../../providers/video-factory.js";
+import { deferUsageReport } from "../../usage/pending.js";
+import type { UsageReport } from "../../usage/reporter.js";
+import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
 import type { VideoRenderMessage } from "./video-types.js";
 import { videoRenderSecretKvKey } from "./video-types.js";
@@ -44,6 +48,8 @@ export interface VideoJobState {
     r2Key?: string;
     startedAt?: number;
     status: JobStatus;
+    /** A charge the backend has not accepted yet; a redelivery of the render message retries it. */
+    usagePending?: UsageReport;
     userId: string;
 }
 
@@ -96,6 +102,14 @@ interface RenderWebhookPayload {
 }
 
 export const fireWebhook = async (callbackUrl: string, jobId: string, status: JobStatus, payload: RenderWebhookPayload): Promise<void> => {
+    const urlError = validateWebhookUrl(callbackUrl);
+
+    if (urlError) {
+        console.warn(`[video] callback ${callbackUrl} rejected: ${urlError}`);
+
+        return;
+    }
+
     try {
         const body = {
             created_at: new Date().toISOString(),
@@ -110,6 +124,7 @@ export const fireWebhook = async (callbackUrl: string, jobId: string, status: Jo
                 "X-OpenRouter-Idempotency-Key": `${jobId}-${status}`,
             },
             method: "POST",
+            redirect: "manual",
             signal: AbortSignal.timeout(10_000),
         });
 
@@ -136,18 +151,59 @@ export type RenderOutcome =
     | { kind: "skipped"; reason: "already-completed" }
     | { errorMessage: string; kind: "failed"; retryable: boolean };
 
+const USAGE_NOT_ACCEPTED: RenderOutcome = { errorMessage: "Usage report not accepted by the backend", kind: "failed", retryable: true };
+
+/** Report a job's pending charge and clear it. `false` while the backend has not accepted it. */
+const settlePendingUsage = async (env: AppEnv, job: VideoJobState): Promise<boolean> => {
+    if (!job.usagePending) {
+        return true;
+    }
+
+    if (!(await new UsageReporter(env).report(job.usagePending))) {
+        return false;
+    }
+
+    await putJob(env.RATE_LIMIT_KV, { ...job, usagePending: undefined }).catch(() => {});
+
+    return true;
+};
+
+/** Hand a charge the queue's retries could not settle to the usage sweeper. */
+export const deferPendingUsage = async (env: AppEnv, jobId: string): Promise<void> => {
+    const job = await getJob(env.RATE_LIMIT_KV, jobId);
+
+    if (job?.usagePending) {
+        await deferUsageReport(env.USAGE_DB, job.usagePending);
+    }
+};
+
 /**
  * Persist terminal failure for a job: write `failed` to KV + D1 and fire the
  * webhook (if a callback URL was registered). Idempotent — calling twice on
  * an already-terminal job is a no-op, so it's safe to invoke from both the
  * render core (terminal exceptions) and the consumer (transient retries
- * exhausted) without coordinating between them.
+ * exhausted) without coordinating between them. A provider cost passed for a
+ * job that is already `failed` is still stored on it, and that job is returned
+ * to settle.
  */
-export const markRenderFailed = async (env: AppEnv, message: VideoRenderMessage, errorMessage: string): Promise<void> => {
+export const markRenderFailed = async (
+    env: AppEnv,
+    message: VideoRenderMessage,
+    errorMessage: string,
+    usagePending?: UsageReport,
+): Promise<VideoJobState | undefined> => {
     const existing = await getJob(env.RATE_LIMIT_KV, message.jobId);
 
+    if (usagePending && existing?.status === "failed") {
+        const owedJob: VideoJobState = { ...existing, usagePending };
+
+        await putJob(env.RATE_LIMIT_KV, owedJob).catch(() => {});
+
+        return owedJob;
+    }
+
     if (existing?.status === "completed" || existing?.status === "failed") {
-        return;
+        return undefined;
     }
 
     const failedJob: VideoJobState = {
@@ -164,6 +220,7 @@ export const markRenderFailed = async (env: AppEnv, message: VideoRenderMessage,
         provider: message.modelInfo.provider,
         startedAt: existing?.startedAt,
         status: "failed",
+        usagePending,
         userId: message.userId,
     };
 
@@ -188,6 +245,8 @@ export const markRenderFailed = async (env: AppEnv, message: VideoRenderMessage,
             polling_url: buildPollingUrl(message.origin, message.jobId),
         });
     }
+
+    return failedJob;
 };
 
 /**
@@ -205,13 +264,9 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
     // was force-failed by the stall reaper), don't redo work.
     const existing = await getJob(env.RATE_LIMIT_KV, jobId);
 
-    if (existing?.status === "completed") {
-        return { kind: "skipped", reason: "already-completed" };
-    }
-
-    if (existing?.status === "failed") {
-        // Already terminally failed (e.g. via stall reaper). Don't resurrect.
-        return { kind: "skipped", reason: "already-completed" };
+    // Only a charge still pending from a prior attempt is retried, never the provider call.
+    if (existing?.status === "completed" || existing?.status === "failed") {
+        return (await settlePendingUsage(env, existing)) ? { kind: "skipped", reason: "already-completed" } : USAGE_NOT_ACCEPTED;
     }
 
     // Pull the resolved provider API key from KV (producer stashed it there
@@ -253,6 +308,8 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
     // Once the provider has been called, a retry would start a second, billed
     // job. Errors after that point (including persisting the result) are terminal.
     let isProviderCalled = false;
+    // Set once the provider has returned a result: from then on its cost is owed.
+    let usage: UsageReport | undefined;
 
     try {
         const model = await createVideoModel(modelInfo.provider, modelInfo.modelApiId, apiKey);
@@ -273,15 +330,27 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
         const latencyMs = Date.now() - startTime;
         const { video } = result;
         const r2Key = `videos/${userId}/${jobId}.mp4`;
+        const durationSeconds = body.duration ?? 5;
+        const costMicrodollars = Math.round(durationSeconds * modelInfo.costPerSecondMicrodollars);
+
+        if (costMicrodollars > 0) {
+            usage = {
+                billingMode: "platform",
+                completionTokens: 0,
+                costMicrodollars,
+                modelId: body.model,
+                orgId,
+                promptTokens: 0,
+                requestId,
+                userId,
+            };
+        }
 
         // Upload bytes to R2 (uint8Array, NOT base64 — keep memory bounded)
         await env.VIDEO_BUCKET.put(r2Key, video.uint8Array, {
             customMetadata: { jobId, modelId: body.model, userId },
             httpMetadata: { contentType: video.mediaType },
         });
-
-        const durationSeconds = body.duration ?? 5;
-        const costMicrodollars = isByok ? 0 : Math.round(durationSeconds * modelInfo.costPerSecondMicrodollars);
 
         const completedJob: VideoJobState = {
             ...inProgressJob,
@@ -291,6 +360,7 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
             mimeType: video.mediaType,
             r2Key,
             status: "completed",
+            usagePending: usage,
         };
 
         await putJob(env.RATE_LIMIT_KV, completedJob);
@@ -342,6 +412,10 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
         // instead of waiting for its TTL to expire.
         await env.CACHE_KV.delete(videoRenderSecretKvKey(jobId)).catch(() => {});
 
+        if (!(await settlePendingUsage(env, completedJob))) {
+            return USAGE_NOT_ACCEPTED;
+        }
+
         return { costMicrodollars, kind: "completed", latencyMs };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -358,7 +432,11 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
         // failure when the retry budget runs out (see `markRenderFailed`
         // call in queue/video-render-consumer.ts).
         if (!isRetryable) {
-            await markRenderFailed(env, message, errorMessage);
+            const failedJob = await markRenderFailed(env, message, errorMessage, usage);
+
+            if (failedJob && !(await settlePendingUsage(env, failedJob))) {
+                return USAGE_NOT_ACCEPTED;
+            }
         }
 
         return { errorMessage, kind: "failed", retryable: isRetryable };

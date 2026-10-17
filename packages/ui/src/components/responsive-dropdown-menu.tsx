@@ -116,7 +116,7 @@ const DropdownMenuTrigger = ({ children, className, render, ...rest }: React.Com
  * and a DrawerContent bottom sheet on mobile. Positioning props are ignored
  * on mobile.
  */
-const DropdownMenuContent = ({ align, alignOffset, children, className, onCloseAutoFocus, side, sideOffset, ...props }: DropdownMenuContentProps) => {
+const DropdownMenuContent = ({ align, alignOffset, children, className, side, sideOffset, ...props }: DropdownMenuContentProps) => {
     const { t } = useLingui();
     const isMobile = React.use(IsMobileContext);
 
@@ -132,15 +132,7 @@ const DropdownMenuContent = ({ align, alignOffset, children, className, onCloseA
     }
 
     return (
-        <BaseDropdownMenuContent
-            align={align}
-            alignOffset={alignOffset}
-            className={className}
-            onCloseAutoFocus={onCloseAutoFocus}
-            side={side}
-            sideOffset={sideOffset}
-            {...props}
-        >
+        <BaseDropdownMenuContent align={align} alignOffset={alignOffset} className={className} side={side} sideOffset={sideOffset} {...props}>
             {children}
         </BaseDropdownMenuContent>
     );
@@ -194,6 +186,7 @@ const DropdownMenuItem = ({
                 data-variant={variant}
                 disabled={disabled}
                 onClick={onClick}
+                role="menuitem"
                 type="button"
                 {...props}
             >
@@ -466,6 +459,7 @@ const DropdownMenuSubTrigger = ({
     children,
     className,
     inset,
+    onClick,
     ...props
 }: React.ComponentProps<"button"> & {
     children?: React.ReactNode;
@@ -478,6 +472,7 @@ const DropdownMenuSubTrigger = ({
     if (isMobile) {
         return (
             <button
+                aria-expanded={expanded}
                 className={cn(
                     "focus:bg-accent focus:text-accent-foreground data-open:bg-accent data-open:text-accent-foreground active:bg-accent flex min-h-8 w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm/relaxed outline-hidden select-none data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
                     className,
@@ -485,8 +480,13 @@ const DropdownMenuSubTrigger = ({
                 data-inset={inset || undefined}
                 data-open={expanded || undefined}
                 data-slot="dropdown-menu-sub-trigger"
-                onClick={toggle}
+                role="menuitem"
                 type="button"
+                {...props}
+                onClick={(event) => {
+                    onClick?.(event);
+                    toggle();
+                }}
             >
                 {children}
                 <ChevronRightIcon className={cn("ml-auto size-3.5 transition-transform duration-150", expanded && "rotate-90")} />

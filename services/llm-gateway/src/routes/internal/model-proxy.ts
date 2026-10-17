@@ -295,15 +295,28 @@ modelProxyRouter.openapi(
             let ttftMs: number | undefined;
             const execContext = c.executionCtx;
 
+            const reader = streamResult.stream.getReader();
+            let isCancelled = false;
+
             const stream = new ReadableStream({
+                async cancel(reason) {
+                    isCancelled = true;
+                    await reader.cancel(reason);
+                },
                 async start(controller) {
                     const encoder = new TextEncoder();
-                    const reader = streamResult.stream.getReader();
+                    const send = (text: string): void => {
+                        if (!isCancelled) {
+                            controller.enqueue(encoder.encode(text));
+                        }
+                    };
 
                     let lastUsage: { cachedTokens: number; completionTokens: number; promptTokens: number; reasoningTokens: number } | undefined;
                     let lastFinishReason: string | undefined;
 
                     try {
+                        let isErrored = false;
+
                         while (true) {
                             const { done, value } = await reader.read();
 
@@ -313,8 +326,10 @@ modelProxyRouter.openapi(
                                 ttftMs = Date.now() - startTime;
                             }
 
-                            // Track usage from finish chunk
-                            if (value.type === "finish") {
+                            if (value.type === "error") {
+                                isErrored = true;
+                            } else if (value.type === "finish") {
+                                // Track usage from finish chunk
                                 const { usage } = value;
 
                                 lastUsage = {
@@ -329,10 +344,11 @@ modelProxyRouter.openapi(
                             // Serialize the stream part (handle Uint8Array in file parts)
                             const serialized = serializeForWire(value);
 
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify(serialized)}\n\n`));
+                            send(`data: ${JSON.stringify(serialized)}\n\n`);
                         }
 
-                        // Record usage after stream completes
+                        // Record usage even when the client cancelled: the provider already produced these tokens.
+                        // A cancelled stream is not a successful one, so it does not count toward health.
                         const latencyMs = Date.now() - startTime;
                         const tokens = lastUsage ?? { cachedTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 };
 
@@ -347,7 +363,7 @@ modelProxyRouter.openapi(
                             type: "gateway-metadata",
                         };
 
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(metaChunk)}\n\n`));
+                        send(`data: ${JSON.stringify(metaChunk)}\n\n`);
 
                         execContext.waitUntil(
                             Promise.allSettled([
@@ -370,7 +386,8 @@ modelProxyRouter.openapi(
                                     },
                                     c.var.telemetry,
                                 ),
-                                policy.recordHealth.success(latencyMs),
+                                ...(isCancelled || isErrored ? [] : [policy.recordHealth.success(latencyMs)]),
+                                ...(isErrored && !isCancelled ? [policy.recordHealth.failure()] : []),
                                 usageReporter.report({
                                     billingMode,
                                     byokFeeRate,
@@ -390,11 +407,15 @@ modelProxyRouter.openapi(
                             type: "error",
                         };
 
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
+                        send(`data: ${JSON.stringify(errorChunk)}\n\n`);
 
-                        execContext.waitUntil(policy.recordHealth.failure());
+                        if (!isCancelled) {
+                            execContext.waitUntil(policy.recordHealth.failure());
+                        }
                     } finally {
-                        controller.close();
+                        if (!isCancelled) {
+                            controller.close();
+                        }
                     }
                 },
             });

@@ -34,7 +34,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     const { t } = useLingui();
     const navigate = useNavigate();
     const { deleteThreadMetadata } = useThreadActions();
-    const { clearOptimisticPin, clearOptimisticStatus, setOptimisticPin, setOptimisticStatus } = useOptimisticActions();
+    const { clearOptimisticPin, clearOptimisticStatus, removeOptimisticDeletion, setOptimisticPin, setOptimisticStatus } = useOptimisticActions();
     const crpc = useCRPC();
 
     const lunora = useLunora();
@@ -48,14 +48,18 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
         // Thread ids reach these handlers as plain strings (component props and
         // `BranchNode` fields) but always come from thread documents, so the brand is
         // re-applied at the mutation/query boundary.
-        async (threadId: string) => {
-            try {
-                await undoDeleteThreadMutation({ threadId: threadId as Id<"threads"> });
-            } catch {
-                // Undo is best-effort: the row may already be gone.
-            }
+        async (deletedIds: string[]) => {
+            // Each deleted row is restored on its own, including branches deleted with their parent.
+            // Undo is best-effort: a row that is already gone stays hidden.
+            const results = await Promise.allSettled(deletedIds.map((id) => undoDeleteThreadMutation({ threadId: id as Id<"threads"> })));
+
+            deletedIds.forEach((id, index) => {
+                if (results[index]?.status === "fulfilled") {
+                    removeOptimisticDeletion(id);
+                }
+            });
         },
-        [undoDeleteThreadMutation],
+        [removeOptimisticDeletion, undoDeleteThreadMutation],
     );
 
     const handleDownloadThread = useCallback(
@@ -115,13 +119,19 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
 
     const handleDeleteThread = useCallback(
         (threadId: string) => {
-            deleteBranch(threadId);
+            deleteBranch(threadId)
+                .then((deletedIds) => {
+                    showSuccess(
+                        <>
+                            {t`Thread deleted.`} <button onClick={() => handleUndoDeleteThread(deletedIds)} type="button">{t`Undo`}</button>
+                        </>,
+                    );
 
-            showSuccess(
-                <>
-                    {t`Thread deleted.`} <button onClick={() => handleUndoDeleteThread(threadId)} type="button">{t`Undo`}</button>
-                </>,
-            );
+                    return undefined;
+                })
+                .catch(() => {
+                    showError(t`Failed to delete threads`);
+                });
         },
         [deleteBranch, handleUndoDeleteThread, t],
     );
