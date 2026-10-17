@@ -296,7 +296,7 @@ const ModelsSettings: FC = () => {
             const newOverrides: Record<string, boolean> = {};
 
             models.forEach((model) => {
-                if (model.enabled) {
+                if (currentEnabledState[model.id] === true) {
                     newOverrides[model.id] = false;
                 }
             });

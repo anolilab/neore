@@ -55,7 +55,7 @@ const ChangelogEntryView: FC<ChangelogEntryViewProps> = ({ entry, isUnread, onVi
                 {isHttpsUrl(entry.url) && (
                     <a
                         aria-label={t`Open full changelog`}
-                        className="text-muted-foreground hover:text-foreground mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
                         href={entry.url}
                         onClick={(e) => {
                             e.stopPropagation();

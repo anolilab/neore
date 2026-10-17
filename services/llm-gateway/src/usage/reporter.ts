@@ -122,7 +122,7 @@ export class UsageReporter {
             }
 
             if (!isRetryable) {
-                return true;
+                return false;
             }
 
             if (attempt < this.maxAttempts) {
