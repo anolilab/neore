@@ -345,7 +345,8 @@ const notifyTaskRound = async (
     await notifyQuietly(ctx, {
         dedupeKey: `task:${run._id}`,
         emailOutcome: Boolean(detail),
-        link: "/tasks",
+        // The run's own chat when it produced one: the email then opens the result, not the list.
+        link: run.threadId ? `/chat/${run.threadId}` : "/tasks",
         outcome,
         title: task.title,
         type: "task",

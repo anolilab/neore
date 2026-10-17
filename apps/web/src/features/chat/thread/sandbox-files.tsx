@@ -95,6 +95,15 @@ const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | unde
 
 const PPTX_FETCH_TIMEOUT_MS = 30_000;
 
+/** The unmount abort, plus a deadline where the browser can combine the two. */
+const withDeadline = (abort: AbortSignal, ms: number): AbortSignal => {
+    if (typeof AbortSignal.any !== "function" || typeof AbortSignal.timeout !== "function") {
+        return abort;
+    }
+
+    return AbortSignal.any([abort, AbortSignal.timeout(ms)]);
+};
+
 const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
     const { t } = useLingui();
     const [state, setState] = useState<{ blob?: Blob; failed?: boolean }>({});
@@ -104,8 +113,7 @@ const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
 
         // A deadline as well as the unmount abort: a stalled signed URL must not hold the preview forever.
         // AbortSignal.any is missing on older browsers; there the unmount abort alone still applies.
-        const deadline = AbortSignal.timeout(PPTX_FETCH_TIMEOUT_MS);
-        const signal = typeof AbortSignal.any === "function" ? AbortSignal.any([controller.signal, deadline]) : controller.signal;
+        const signal = withDeadline(controller.signal, PPTX_FETCH_TIMEOUT_MS);
 
         fetch(url, { signal })
             .then((response) => {
