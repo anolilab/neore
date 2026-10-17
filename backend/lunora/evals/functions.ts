@@ -909,7 +909,8 @@ const comparisonKey = (target: Infer<typeof vEvalTarget>): string => {
     }
 
     if (target.kind === "knowledge") {
-        return JSON.stringify(["knowledge", target.fileIds, target.model ?? null]);
+        // A set of files: the same files in another order are the same target.
+        return JSON.stringify(["knowledge", [...target.fileIds].toSorted((left, right) => left.localeCompare(right)), target.model ?? null]);
     }
 
     return JSON.stringify(["model", target.model, target.systemPrompt ?? null]);

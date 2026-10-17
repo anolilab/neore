@@ -97,12 +97,12 @@ export const notify = async (ctx: MutationCtx, input: NotificationInput): Promis
 
     const notificationId = await ctx.db.insert("notifications", { ...row, createdAt: Date.now() });
 
-    // Side effects are best-effort: the inbox row is already written, and a failed
-    // push lookup or mail schedule must not make the caller report it as missing.
-    try {
-        // Decided here, on the shard that wrote the row, so a notification handed to
-        // the recipient's shard is mailed exactly like one written in place.
-        if (shouldEmailOutcome({ emailOutcome: input.emailOutcome, outcome: input.outcome })) {
+    // Side effects are best-effort, each on its own: the inbox row is already written,
+    // and a failed mail schedule must neither hide the row nor skip the push.
+    // Decided here, on the shard that wrote the row, so a notification handed to the
+    // recipient's shard is mailed exactly like one written in place.
+    if (shouldEmailOutcome({ emailOutcome: input.emailOutcome, outcome: input.outcome })) {
+        try {
             const settings = await ctx.db.userSettings.findFirst({ where: { userId: row.userId } });
 
             if (settings?.taskEmailEnabled === true) {
@@ -112,17 +112,21 @@ export const notify = async (ctx: MutationCtx, input: NotificationInput): Promis
                     userId: row.userId,
                 });
             }
+        } catch (error) {
+            console.warn("[notifications] Failed to schedule the outcome email:", error);
         }
+    }
 
-        if (isPushConfigured()) {
+    if (isPushConfigured()) {
+        try {
             const [device] = await ctx.push.list({ limit: 1, userId: row.userId });
 
             if (device) {
                 await ctx.scheduler.runAfter(0, internal.notifications.push.sendPushForNotification, { notificationId, userId: row.userId });
             }
+        } catch (error) {
+            console.warn("[notifications] Failed to schedule the push notification:", error);
         }
-    } catch (error) {
-        console.warn("[notifications] Failed to finish a notification after it was written:", error);
     }
 
     return notificationId;

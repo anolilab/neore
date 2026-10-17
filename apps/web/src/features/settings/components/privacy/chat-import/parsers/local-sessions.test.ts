@@ -58,6 +58,21 @@ const codexRollout = [
 ];
 
 describe("Claude Code parser", () => {
+    it("keeps the turns after a compaction boundary, which has an empty parentUuid", () => {
+        const base = { isSidechain: false, sessionId: "s1", timestamp: "2026-10-01T10:00:00Z" };
+        const events = [
+            { ...base, message: { content: "first question", role: "user" }, parentUuid: null, type: "user", uuid: "u1" },
+            { ...base, message: { content: "first answer", role: "assistant" }, parentUuid: "u1", type: "assistant", uuid: "a1" },
+            { ...base, logicalParentUuid: "a1", parentUuid: "", subtype: "compact_boundary", type: "system", uuid: "b1" },
+            { ...base, message: { content: "after compaction", role: "user" }, parentUuid: "b1", type: "user", uuid: "u2" },
+            { ...base, message: { content: "answer after", role: "assistant" }, parentUuid: "u2", type: "assistant", uuid: "a2" },
+        ];
+
+        const [conversation] = parseExportFile(events, "claude-code").conversations;
+
+        expect(conversation?.messages.map((message) => message.content)).toEqual(["first question", "first answer", "after compaction", "answer after"]);
+    });
+
     it("is detected and round-trips a session", () => {
         const result = parseExportFile(claudeCodeSession);
 

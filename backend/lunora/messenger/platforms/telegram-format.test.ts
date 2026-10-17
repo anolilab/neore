@@ -61,3 +61,25 @@ describe("splitLossless", () => {
         }
     });
 });
+
+describe("links and code in Telegram output", () => {
+    it("keeps emphasis markers inside a link URL out of the markup", () => {
+        const chunk = formatTelegramMessage("[x](https://example.test/?q=**a**)")[0];
+
+        expect(chunk?.html).toBe('<a href="https://example.test/?q=**a**">x</a>');
+    });
+
+    it("keeps a balanced parenthesis in a link URL", () => {
+        const chunk = formatTelegramMessage("[article](https://en.wikipedia.org/wiki/Function_(mathematics))")[0];
+
+        expect(chunk?.html).toBe('<a href="https://en.wikipedia.org/wiki/Function_(mathematics)">article</a>');
+    });
+
+    it("never cuts an inline code span when splitting a long line", () => {
+        const line = `${"word ".repeat(30)}\`code span with spaces\` ${"tail ".repeat(20)}`;
+
+        for (const piece of splitLossless(line, 40)) {
+            expect(piece.split("`").length % 2).toBe(1);
+        }
+    });
+});

@@ -43,9 +43,12 @@ const activeBranch = (events: Record<string, unknown>[]): Record<string, unknown
 
     const onBranch = new Set<string>();
 
-    for (let node: Record<string, unknown> | undefined = leaf; node && typeof node.uuid === "string" && !onBranch.has(node.uuid); ) {
+    for (let node: Record<string, unknown> | undefined = leaf; node && typeof node.uuid === "string" && !onBranch.has(node.uuid);) {
         onBranch.add(node.uuid);
-        node = typeof node.parentUuid === "string" ? byUuid.get(node.parentUuid) : undefined;
+        // A compaction boundary has an empty parentUuid; its old link lives on as logicalParentUuid.
+        const parent = typeof node.parentUuid === "string" && node.parentUuid !== "" ? node.parentUuid : node.logicalParentUuid;
+
+        node = typeof parent === "string" ? byUuid.get(parent) : undefined;
     }
 
     return events.filter((event) => typeof event.uuid !== "string" || onBranch.has(event.uuid));
@@ -62,7 +65,6 @@ const parseClaudeCode = (data: unknown): NormalizedConversation[] => {
     const events = data.map((raw) => asRecord(raw)).filter((event): event is Record<string, unknown> => event !== undefined);
 
     for (const event of activeBranch(events)) {
-
         if (event.type === "summary" && typeof event.summary === "string") {
             title ??= event.summary;
 

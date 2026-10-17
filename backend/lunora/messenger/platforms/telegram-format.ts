@@ -1,5 +1,8 @@
 export const TELEGRAM_MESSAGE_LIMIT = 4096;
 
+/** True when every inline-code backtick before this point has its closing one. */
+const hasClosedCode = (text: string): boolean => text.split("`").length % 2 === 1;
+
 /**
  * Splits `line` into pieces of at most `size` characters without dropping any
  * character: a cut at a space keeps that space at the start of the next piece,
@@ -12,6 +15,11 @@ export const splitLossless = (line: string, size: number): string[] => {
 
     while (rest.length > size) {
         let cut = rest.lastIndexOf(" ", size);
+
+        // Never cut inside an inline code span: step back to an earlier space outside one.
+        while (cut > 0 && !hasClosedCode(rest.slice(0, cut))) {
+            cut = rest.lastIndexOf(" ", cut - 1);
+        }
 
         if (cut <= 0) {
             cut = size;
@@ -47,60 +55,71 @@ const HTTP_URL_START = /^https?:\/\//;
 const WHITESPACE = /\s/;
 
 /**
- * Turns `[label](https://…)` into `render(label, url)`. The URL may contain
- * balanced parentheses (`…/Function_(mathematics)`); anything else is left as text.
+ * A `[label](https://…)` starting at `open`, or undefined. The URL may contain
+ * balanced parentheses (`…/Function_(mathematics)`).
  */
-const linkify = (text: string, render: (label: string, url: string) => string): string => {
-    let out = "";
-    let index = 0;
+const parseLink = (text: string, open: number): { end: number; label: string; url: string } | undefined => {
+    const close = text.indexOf("](", open);
 
-    for (let open = text.indexOf("["); open !== -1; open = text.indexOf("[", index)) {
-        const close = text.indexOf("](", open);
-        const label = close === -1 ? "" : text.slice(open + 1, close);
-        const urlStart = close + 2;
-        const isLink = close !== -1 && !label.includes("]") && !label.includes("\n") && HTTP_URL_START.test(text.slice(urlStart, urlStart + 8));
-
-        if (!isLink) {
-            out += text.slice(index, open + 1);
-            index = open + 1;
-
-            continue;
-        }
-
-        let depth = 0;
-        let end = -1;
-
-        for (let at = urlStart; at < text.length && end === -1; at += 1) {
-            const char = text.charAt(at);
-
-            if (WHITESPACE.test(char)) {
-                break;
-            }
-
-            if (char === "(") {
-                depth += 1;
-            } else if (char === ")") {
-                if (depth === 0) {
-                    end = at;
-                } else {
-                    depth -= 1;
-                }
-            }
-        }
-
-        if (end === -1) {
-            out += text.slice(index, open + 1);
-            index = open + 1;
-
-            continue;
-        }
-
-        out += text.slice(index, open) + render(label, text.slice(urlStart, end));
-        index = end + 1;
+    if (close === -1) {
+        return undefined;
     }
 
-    return out + text.slice(index);
+    const label = text.slice(open + 1, close);
+    const urlStart = close + 2;
+
+    if (label.includes("]") || label.includes("\n") || !HTTP_URL_START.test(text.slice(urlStart, urlStart + 8))) {
+        return undefined;
+    }
+
+    let depth = 0;
+
+    for (let at = urlStart; at < text.length; at += 1) {
+        const char = text.charAt(at);
+
+        if (WHITESPACE.test(char)) {
+            return undefined;
+        }
+
+        if (char === "(") {
+            depth += 1;
+        } else if (char === ")") {
+            if (depth === 0) {
+                return { end: at + 1, label, url: text.slice(urlStart, at) };
+            }
+
+            depth -= 1;
+        }
+    }
+
+    return undefined;
 };
+
+/**
+ * Walks `text`, rendering links with `onLink` and everything between them with
+ * `onText`. Link URLs never reach `onText`, so emphasis cannot rewrite them.
+ */
+const linkify = (text: string, onText: (plain: string) => string, onLink: (label: string, url: string) => string): string => {
+    let out = "";
+    let index = 0;
+    let open = text.indexOf("[");
+
+    while (open !== -1) {
+        const link = parseLink(text, open);
+
+        if (link) {
+            out += onText(text.slice(index, open)) + onLink(link.label, link.url);
+            index = link.end;
+            open = text.indexOf("[", index);
+        } else {
+            open = text.indexOf("[", open + 1);
+        }
+    }
+
+    return out + onText(text.slice(index));
+};
+
+const emphasis = (text: string): string => text.replaceAll(BOLD, "<b>$1</b>").replaceAll(ITALIC, "<i>$1</i>");
 
 const inline = (text: string): string =>
     text
@@ -110,9 +129,7 @@ const inline = (text: string): string =>
                 return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
             }
 
-            return linkify(escapeHtml(part), (label, url) => `<a href="${url.replaceAll('"', "&quot;")}">${label}</a>`)
-                .replaceAll(BOLD, "<b>$1</b>")
-                .replaceAll(ITALIC, "<i>$1</i>");
+            return linkify(escapeHtml(part), emphasis, (label, url) => `<a href="${url.replaceAll('"', "&quot;")}">${emphasis(label)}</a>`);
         })
         .join("");
 
