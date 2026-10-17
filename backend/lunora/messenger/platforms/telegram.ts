@@ -12,6 +12,7 @@ import type { DownloadedMedia, InboundAttachment, MediaSendResult, OutboundFile 
 import { fetchMedia, MediaDownloadError, MESSENGER_MEDIA_MAX_BYTES, toBlob } from "../lib/media";
 import type { InboundMessage } from "../lib/types";
 import { inboundKind, splitMessage } from "../lib/types";
+import { formatTelegramMessage, TELEGRAM_MESSAGE_LIMIT } from "./telegram-format";
 
 const TELEGRAM_API = "https://api.telegram.org";
 const TELEGRAM_HOSTS = ["api.telegram.org"];
@@ -212,23 +213,32 @@ export const sendTelegramMedia = async (botToken: string, chatId: string, file: 
 };
 
 /**
- * Send a text message to a Telegram chat via the Bot API.
+ * Send a text message to a Telegram chat via the Bot API, as HTML. A chunk
+ * Telegram rejects (400, bad entities) is resent as plain text.
  */
 export const sendTelegramMessage = async (botToken: string, chatId: number | string, text: string): Promise<boolean> => {
-    // Telegram messages max 4096 chars; split if needed
-    const chunks = splitMessage(text, 4096);
-
-    for (const chunk of chunks) {
-        const response = await fetchWithDeadline(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            body: JSON.stringify({
-                chat_id: chatId,
-                parse_mode: "Markdown",
-                text: chunk,
-            }),
+    const post = async (body: Record<string, unknown>) =>
+        await fetchWithDeadline(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            body: JSON.stringify({ chat_id: chatId, ...body }),
             headers: { "Content-Type": "application/json" },
             method: "POST",
             timeoutMs: FETCH_TIMEOUT_SHORT_MS,
         });
+
+    for (const chunk of formatTelegramMessage(text)) {
+        let response = await post({ parse_mode: "HTML", text: chunk.html });
+
+        if (response.status === 400) {
+            await response.body?.cancel();
+
+            for (const plain of splitMessage(chunk.source, TELEGRAM_MESSAGE_LIMIT)) {
+                response = await post({ text: plain });
+
+                if (!response.ok) {
+                    break;
+                }
+            }
+        }
 
         if (!response.ok) {
             const errorBody = await response.text();
@@ -237,6 +247,8 @@ export const sendTelegramMessage = async (botToken: string, chatId: number | str
 
             return false;
         }
+
+        await response.body?.cancel();
     }
 
     return true;
