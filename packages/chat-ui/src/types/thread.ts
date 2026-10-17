@@ -1,6 +1,7 @@
 export interface Thread {
     _creationTime: number;
     _id: string;
+    createdAt?: number;
     mode?: "image" | "text" | "video";
     model?: string;
     organizationId?: null | string;

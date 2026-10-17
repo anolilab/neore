@@ -351,6 +351,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         await pinFollowingRowParent(context, threadId, order);
 
         const insertedId = await context.db.insert("messages", {
+            createdAt: Date.now(),
             ...messageDocument,
             // Only the first row inserted; the rest follow it implicitly.
             ...(!insertedAny && branchParentId !== undefined && { parentMessageId: branchParentId }),
@@ -694,6 +695,7 @@ export const cloneMessageBatch = internalMutation
 
                     await ctx.db.insert("messages", {
                         ...omit(m as unknown as Doc<"messages">, ["_id", "_creationTime", "threadId", "order", "embeddingId", "parentMessageId"]),
+                        createdAt: m.createdAt ?? m._creationTime,
                         embeddingId,
                         order: orderOffset + m.order,
                         threadId: args.targetThreadId,

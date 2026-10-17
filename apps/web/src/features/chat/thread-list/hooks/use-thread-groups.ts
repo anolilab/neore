@@ -202,7 +202,7 @@ const useThreadGroups = (
                 branchType: "branch",
                 category: thread.category,
                 children,
-                createdAt: thread._creationTime,
+                createdAt: thread.createdAt ?? thread._creationTime,
                 depth,
                 expiresAt: thread.expiresAt,
                 isPinned: optimisticPin === undefined ? pinnedThreadsSet.has(threadId) : optimisticPin,

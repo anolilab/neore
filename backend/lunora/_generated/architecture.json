@@ -15547,25 +15547,25 @@
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 369,
+      "line": 370,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 420,
+      "line": 421,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 430,
+      "line": 431,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 436,
+      "line": 437,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
@@ -15703,7 +15703,7 @@
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1376,
+      "line": 1381,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {

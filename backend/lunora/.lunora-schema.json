@@ -7047,6 +7047,12 @@
           "optional": true,
           "unique": false
         },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "embeddingId": {
           "kind": "string",
           "nullable": false,
@@ -8272,6 +8278,12 @@
           "optional": false,
           "unique": false
         },
+        "claimedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -8316,6 +8328,13 @@
               "optional": false,
               "unique": false,
               "literal": "\"pending\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"sending\""
             },
             {
               "kind": "literal",
@@ -13969,6 +13988,12 @@
           "optional": true,
           "unique": false
         },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdBy": {
           "kind": "string",
           "nullable": false,
@@ -14343,6 +14368,15 @@
             "userId",
             "status",
             "deleted"
+          ],
+          "unique": false
+        },
+        "by_user_and_status_createdAt": {
+          "fields": [
+            "userId",
+            "status",
+            "deleted",
+            "createdAt"
           ],
           "unique": false
         },

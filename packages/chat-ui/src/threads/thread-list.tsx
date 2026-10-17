@@ -88,7 +88,7 @@ const ThreadList = ({
     }
 
     for (const thread of threads) {
-        const group = getDateGroup(thread._creationTime);
+        const group = getDateGroup(thread.createdAt ?? thread._creationTime);
 
         grouped.get(group)!.push(thread);
     }

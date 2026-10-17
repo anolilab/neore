@@ -578,6 +578,7 @@ export const vMessageDocFields = {
     _id: v.string(),
     // Context on how it was generated
     agentName: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
     embeddingId: v.optional(v.string()),
     error: v.optional(v.string()),
     fileIds: v.optional(v.array(v.string())),
@@ -670,6 +671,7 @@ export const vThreadDocFields = {
     // Written only by `agent/branches.ts` (the switcher, regenerate, edit), so
     // deliberately not a create field.
     activeLeafMessageId: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.
     groupChat: v.optional(vGroupChat),
