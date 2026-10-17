@@ -32,6 +32,29 @@ const OWNER = "user-owner";
 const OUTSIDE_SCOPE = 650;
 
 describe("latestResumableThread", () => {
+    it("scopes to the organization even when another workspace holds the newest thread", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const { mine, personal } = await harness.run(async (context: any) => {
+                const base = { model: "m", status: "active", userId: OWNER };
+
+                await context.db.insert("threads", { ...base, organizationId: "org-other", title: "other", updatedAt: 30 });
+
+                return {
+                    mine: await context.db.insert("threads", { ...base, organizationId: "org-1", title: "org", updatedAt: 20 }),
+                    personal: await context.db.insert("threads", { ...base, title: "personal", updatedAt: 10 }),
+                };
+            });
+            const as = harness.withIdentity({ userId: OWNER });
+
+            expect(await as.query(latestResumableThread as never, { organizationId: "org-1" } as never)).toBe(mine);
+            expect(await as.query(latestResumableThread as never, { organizationId: null } as never)).toBe(personal);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("finds a thread more than 500 threads down, past other workspaces", async () => {
         const harness = lunoraTest(schema as never);
 
