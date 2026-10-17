@@ -761,12 +761,12 @@ export interface InternalApiTypes {
             sendPushForNotification: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
         };
         task_email: {
-            claimOutcomeEmail: FunctionReference<"mutation", { id: Id<"outcomeEmails"> }, boolean>;
+            claimOutcomeEmail: FunctionReference<"mutation", { id: Id<"outcomeEmails"> }, number | null>;
             dispatchOutcomeEmails: FunctionReference<"mutation", {}, null>;
             listPendingOutcomeEmails: FunctionReference<"query", {}, Array<{ id: Id<"outcomeEmails">; link: string; title: string; userId: string }>>;
             loadRecipientEmail: FunctionReference<"query", { userId: string }, string | null>;
             sendPendingOutcomeEmails: FunctionReference<"action", {}, null>;
-            settleOutcomeEmail: FunctionReference<"mutation", { id: Id<"outcomeEmails">; result: "sent" | "skipped" | "failed" }, null>;
+            settleOutcomeEmail: FunctionReference<"mutation", { claimedAt: number; id: Id<"outcomeEmails">; result: "sent" | "skipped" | "failed" }, null>;
         };
     };
     pages: {

@@ -101,18 +101,21 @@ export const listPendingOutcomeEmails = internalQuery
  */
 export const claimOutcomeEmail = internalMutation
     .input({ id: v.id("outcomeEmails") })
-    .output(v.boolean())
+    .output(v.union(v.number(), v.null()))
     .mutation(async ({ args: { id }, ctx }) => {
         const row = await ctx.db.get(id);
         const abandoned = row?.status === "sending" && (row.claimedAt ?? 0) < Date.now() - OUTCOME_CLAIM_RECOVERY_MS;
 
         if (!row || (row.status !== "pending" && !abandoned)) {
-            return false;
+            return null;
         }
 
-        await ctx.db.patch(id, { claimedAt: Date.now(), status: "sending" });
+        // The claim time is the token: only the run that holds this claim may settle the row.
+        const claimedAt = Date.now();
 
-        return true;
+        await ctx.db.patch(id, { claimedAt, status: "sending" });
+
+        return claimedAt;
     });
 
 /**
@@ -121,12 +124,17 @@ export const claimOutcomeEmail = internalMutation
  * pending until the cap, then marks it `failed`.
  */
 export const settleOutcomeEmail = internalMutation
-    .input({ id: v.id("outcomeEmails"), result: v.union(v.literal("sent"), v.literal("skipped"), v.literal("failed")) })
+    .input({
+        claimedAt: v.number(),
+        id: v.id("outcomeEmails"),
+        result: v.union(v.literal("sent"), v.literal("skipped"), v.literal("failed")),
+    })
     .output(v.null())
-    .mutation(async ({ args: { id, result }, ctx }) => {
+    .mutation(async ({ args: { claimedAt, id, result }, ctx }) => {
         const row = await ctx.db.get(id);
 
-        if (!row || (row.status !== "sending" && row.status !== "pending")) {
+        // A run whose claim was reclaimed by a later run must not change the row the later run owns.
+        if (!row || row.claimedAt !== claimedAt || (row.status !== "sending" && row.status !== "pending")) {
             return null;
         }
 
@@ -190,7 +198,9 @@ export const sendPendingOutcomeEmails = internalAction
 
         for (const { id, link, title, userId } of pending) {
             // Another run may have taken this row since it was listed.
-            if (!(await ctx.runMutation(internal.notifications.task_email.claimOutcomeEmail, { id }))) {
+            const claimedAt = await ctx.runMutation(internal.notifications.task_email.claimOutcomeEmail, { id });
+
+            if (claimedAt === null) {
                 continue;
             }
 
@@ -214,7 +224,7 @@ export const sendPendingOutcomeEmails = internalAction
                 result = "failed";
             }
 
-            await ctx.runMutation(internal.notifications.task_email.settleOutcomeEmail, { id, result });
+            await ctx.runMutation(internal.notifications.task_email.settleOutcomeEmail, { claimedAt, id, result });
         }
 
         return null;

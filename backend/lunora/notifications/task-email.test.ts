@@ -150,8 +150,8 @@ describe("sweep", () => {
 
         const claim = async () => await harness.run(async (ctx: any) => await claimOutcomeEmail.handler(ctx, { id: row._id }));
 
-        expect(await claim()).toBe(true);
-        expect(await claim()).toBe(false);
+        expect(await claim()).not.toBeNull();
+        expect(await claim()).toBeNull();
     });
 
     it("keeps the row pending with attempts incremented when the mailer fails, then gives up at the cap", async () => {

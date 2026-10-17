@@ -86,6 +86,14 @@ const ChatPage = () => {
             return;
         }
 
+        // The user has started on the blank chat (focus is in its composer): a redirect would discard that draft.
+        const focused = document.activeElement;
+        const typing = focused instanceof HTMLElement && (focused.isContentEditable || focused.tagName === "TEXTAREA" || focused.tagName === "INPUT");
+
+        if (typing) {
+            return;
+        }
+
         if (latestThreadId) {
             void navigate({ params: { threadId: latestThreadId }, replace: true, search: { initialMessage: undefined }, to: "/chat/$threadId" });
         }

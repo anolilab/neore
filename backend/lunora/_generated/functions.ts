@@ -9107,13 +9107,13 @@ export interface Caller {
             unsubscribePush: (args: { endpoint: string }) => Promise<null>;
         };
         task_email: {
-            claimOutcomeEmail: (args: { id: Id<"outcomeEmails"> }) => Promise<boolean>;
+            claimOutcomeEmail: (args: { id: Id<"outcomeEmails"> }) => Promise<number | null>;
             dispatchOutcomeEmails: (args?: {}) => Promise<null>;
             listPendingOutcomeEmails: (args?: {}) => Promise<Array<{ id: Id<"outcomeEmails">; link: string; title: string; userId: string }>>;
             loadRecipientEmail: (args: { userId: string }) => Promise<string | null>;
             sendPendingOutcomeEmails: (args?: {}) => Promise<null>;
             setTaskEmailEnabled: (args: { enabled: boolean }) => Promise<null>;
-            settleOutcomeEmail: (args: { id: Id<"outcomeEmails">; result: "sent" | "skipped" | "failed" }) => Promise<null>;
+            settleOutcomeEmail: (args: { claimedAt: number; id: Id<"outcomeEmails">; result: "sent" | "skipped" | "failed" }) => Promise<null>;
         };
     };
     pages: {
