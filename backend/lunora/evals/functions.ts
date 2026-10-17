@@ -181,6 +181,8 @@ const vModelComparison = v.object({
             ),
         }),
     ),
+    /** Targets with a completed run that are not shown, beyond the column limit. */
+    omittedTargets: v.number(),
     runs: v.array(vRunRow),
 });
 
@@ -951,7 +953,8 @@ export const compareModels = authQuery
             }
         }
 
-        const runs = [...newestPerTarget.values()].slice(0, MAX_COMPARED_MODELS);
+        const allRuns = [...newestPerTarget.values()];
+        const runs = allRuns.slice(0, MAX_COMPARED_MODELS);
         const [cases, ...resultSets] = await Promise.all([loadCases(ctx, dataset._id), ...runs.map((run) => loadRunResults(ctx, run._id))]);
         const outcomes = resultSets.map((results) => new Map(results.map((result) => [result.caseId as string, result])));
 
@@ -986,6 +989,7 @@ export const compareModels = authQuery
                     }),
                 };
             }),
+            omittedTargets: allRuns.length - runs.length,
             runs: runs.map((run, index) => toRunRow({ ...run, summary: summarize(resultSets[index] ?? [], run.caseIds.length) })),
         };
     });

@@ -1,5 +1,4 @@
-"use client";
-
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Badge } from "@neore/ui/components/badge";
@@ -10,6 +9,8 @@ import { Lock } from "lucide-react";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { formatCost, formatPercent } from "../lib/evals-format";
+
+("use client");
 
 interface ModelComparisonProps {
     datasetId: Id<"evalDatasets">;
@@ -91,6 +92,11 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
 
     return (
         <div className="space-y-4">
+            {data.omittedTargets > 0 && (
+                <p className="text-muted-foreground text-sm" role="status">
+                    {plural(data.omittedTargets, { one: "# more target is not shown.", other: "# more targets are not shown." })}
+                </p>
+            )}
             <div className="overflow-x-auto">
                 <Table>
                     <TableCaption className="sr-only">{t`Totals per model`}</TableCaption>
