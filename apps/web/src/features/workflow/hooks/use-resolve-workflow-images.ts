@@ -18,42 +18,29 @@ const withResolvedUrl = (nodes: WorkflowNode[], imageFileId: string, url: string
     });
 
 /**
- * Gives every file-backed image node a display URL. The node keeps only its `imageFileId`
- * (see `stripResolvedImageUrl`), so the URL is fetched when the canvas shows the node and is
- * written to the store without marking the workflow dirty: it is not part of the saved content.
+ * Gives a file-backed image node a display URL when it has none (after an undo, a restore, or a
+ * node copied without one). Each URL is fetched fresh: a signed URL expires, so none is cached.
+ * The URL goes into the store without marking the workflow dirty: it is not saved content.
  */
 export const useResolveWorkflowImages = (): void => {
     const lunora = useLunora();
     const nodes = useWorkflowStore((state) => state.nodes);
-    const requested = useRef(new Map<string, string | undefined>());
+    const inFlight = useRef(new Set<string>());
 
     useEffect(() => {
         for (const node of nodes) {
             const { imageFileId, imageUrl } = node.data as { imageFileId?: string; imageUrl?: string };
 
-            if (!imageFileId || imageUrl) {
+            if (!imageFileId || imageUrl || inFlight.current.has(imageFileId)) {
                 continue;
             }
 
-            if (requested.current.has(imageFileId)) {
-                const cached = requested.current.get(imageFileId);
-
-                if (cached) {
-                    useWorkflowStore.setState((state) => {
-                        return { nodes: withResolvedUrl(state.nodes, imageFileId, cached) };
-                    });
-                }
-
-                continue;
-            }
-
-            requested.current.set(imageFileId, undefined);
+            inFlight.current.add(imageFileId);
 
             void lunora
                 .query(api.file.getChatFileImageUrl, { fileId: imageFileId as Id<"chatFiles"> })
                 .then((url) => {
                     if (url) {
-                        requested.current.set(imageFileId, url);
                         useWorkflowStore.setState((state) => {
                             return { nodes: withResolvedUrl(state.nodes, imageFileId, url) };
                         });
@@ -61,8 +48,10 @@ export const useResolveWorkflowImages = (): void => {
 
                     return undefined;
                 })
-                .catch(() => {
-                    requested.current.delete(imageFileId);
+                // The node stays without a picture; the next change to the graph retries it.
+                .catch(() => undefined)
+                .finally(() => {
+                    inFlight.current.delete(imageFileId);
                 });
         }
     }, [lunora, nodes]);

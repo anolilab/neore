@@ -343,6 +343,10 @@ modelProxyRouter.openapi(
                             send(`data: ${JSON.stringify(serialized)}\n\n`);
                         }
 
+                        if (isCancelled) {
+                            return;
+                        }
+
                         // Record usage after stream completes
                         const latencyMs = Date.now() - startTime;
                         const tokens = lastUsage ?? { cachedTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 };

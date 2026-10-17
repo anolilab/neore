@@ -27,7 +27,8 @@ const ImageNodeComponent = (props: NodeProps<Node<ImageNodeData>>) => {
     };
 
     const handleImageUrlChange = (imageUrl: string) => {
-        updateNode(id, { imageUrl });
+        // A typed URL replaces any stored file, or the stored file would come back on load.
+        updateNode(id, { imageFileId: undefined, imageUrl });
     };
 
     const handlePromptChange = (prompt: string) => {

@@ -1,4 +1,4 @@
-import type { WorkflowNode, WorkflowNodeData } from "../types";
+import type { WorkflowContent, WorkflowNode, WorkflowNodeData } from "../types";
 
 /**
  * A file-backed image is saved as its reference only: the display URL it resolves to
@@ -12,4 +12,9 @@ export const stripResolvedImageUrl = (node: WorkflowNode): WorkflowNode => {
     }
 
     return { ...node, data: { ...node.data, imageUrl: undefined } as WorkflowNodeData };
+};
+
+/** The content as it is saved: no resolved image URL in any node. */
+export const withoutResolvedImageUrls = (content: WorkflowContent): WorkflowContent => {
+    return { ...content, nodes: content.nodes.map((node) => stripResolvedImageUrl(node)) };
 };
