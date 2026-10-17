@@ -153,11 +153,12 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
     const finishOnboarding = useCallback(
         (prompt?: string) => {
             setShowSuccess(true);
-            onComplete();
-            void next();
 
             // Brief success state before navigating
             setTimeout(() => {
+                onComplete();
+                void next();
+
                 if (prompt) {
                     navigateToChatWithPrompt(prompt);
                 } else {
@@ -219,6 +220,10 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                 }
                 case "ArrowRight":
                 case "Enter": {
+                    if (event.key === "Enter" && event.target !== event.currentTarget) {
+                        break;
+                    }
+
                     if (!isLastStep || event.key === "Enter") {
                         event.preventDefault();
                         void handleNext();

@@ -5,6 +5,7 @@ import { Badge } from "@neore/ui/components/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@neore/ui/components/sheet";
 import cn from "@neore/ui/utils/cn";
 import { formatDate } from "@neore/ui/utils/locale-format";
+import DOMPurify from "dompurify";
 import { ExternalLink, Sparkles } from "lucide-react";
 import type { FC } from "react";
 
@@ -13,6 +14,8 @@ import useChangelogStore from "@/features/changelog/stores/changelog-store";
 import type { ChangelogEntry } from "@/features/changelog/types";
 
 const DATE_OPTIONS: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+
+const isHttpsUrl = (url: string | null): url is string => url?.startsWith("https://") === true;
 
 interface ChangelogEntryViewProps {
     entry: ChangelogEntry;
@@ -29,7 +32,9 @@ const ChangelogEntryView: FC<ChangelogEntryViewProps> = ({ entry, isUnread, onVi
             className={cn("group flex flex-col gap-3 border-b p-4 transition-colors last:border-b-0", isUnread ? "bg-primary/[0.03]" : "hover:bg-muted/40")}
             onClick={handleClick}
         >
-            {entry.featuredImage && <img alt={entry.title} className="h-36 w-full rounded-md object-cover" loading="lazy" src={entry.featuredImage} />}
+            {isHttpsUrl(entry.featuredImage) && (
+                <img alt={entry.title} className="h-36 w-full rounded-md object-cover" loading="lazy" src={entry.featuredImage} />
+            )}
 
             <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-1.5">
@@ -47,27 +52,29 @@ const ChangelogEntryView: FC<ChangelogEntryViewProps> = ({ entry, isUnread, onVi
                     </time>
                 </div>
 
-                <a
-                    aria-label={t`Open full changelog`}
-                    className="text-muted-foreground hover:text-foreground mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                    href={entry.url}
-                    onClick={(e) => e.stopPropagation()}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                >
-                    <ExternalLink className="size-3.5" />
-                </a>
+                {isHttpsUrl(entry.url) && (
+                    <a
+                        aria-label={t`Open full changelog`}
+                        className="text-muted-foreground hover:text-foreground mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                        href={entry.url}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleClick();
+                        }}
+                        onFocus={handleClick}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                    >
+                        <ExternalLink className="size-3.5" />
+                    </a>
+                )}
             </div>
 
-            {/*
-             * HTML content is authored and served by Featurebase (our own account).
-             * It is not user-generated input and is not rendered during SSR
-             * (component is lazy-loaded in __root.tsx behind a Suspense boundary).
-             */}
+            {/* Featurebase HTML, sanitised before it reaches the DOM. */}
             <div
                 className="prose prose-xs dark:prose-invert prose-p:my-1 prose-headings:font-medium prose-headings:text-foreground max-w-none text-xs leading-relaxed [&_img]:my-2 [&_img]:rounded-md"
                 // eslint-disable-next-line react/no-danger
-                dangerouslySetInnerHTML={{ __html: entry.content }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content) }}
             />
         </article>
     );

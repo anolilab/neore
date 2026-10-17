@@ -19,11 +19,13 @@ import type { ReferenceSelection } from "@/features/chat/components/reference-pi
  * Falls back to immediate execution in SSR environments.
  */
 const createBatcher = <T>() => {
-    let pending: T | null = null;
+    let pending: T;
+    let hasPending = false;
     let isScheduled = false;
 
     return (callback: (value: T) => void, value: T) => {
         pending = value;
+        hasPending = true;
 
         if (globalThis.window === undefined) {
             callback(value);
@@ -36,9 +38,9 @@ const createBatcher = <T>() => {
             requestAnimationFrame(() => {
                 isScheduled = false;
 
-                if (pending !== null) {
+                if (hasPending) {
+                    hasPending = false;
                     callback(pending);
-                    pending = null;
                 }
             });
         }

@@ -31,6 +31,11 @@ const CanvasCodemirrorEditor: FC<CanvasCodemirrorEditorProps> = memo(({ classNam
     const [langExtension, setLangExtension] = useState<Extension | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
     const latestContentRef = useRef(content);
+    const onSaveRef = useRef(onSave);
+
+    useEffect(() => {
+        onSaveRef.current = onSave;
+    });
 
     // Load language extension dynamically
     useEffect(() => {
@@ -53,12 +58,15 @@ const CanvasCodemirrorEditor: FC<CanvasCodemirrorEditorProps> = memo(({ classNam
         };
     }, [language]);
 
-    // Clean up debounce on unmount
+    // Flush a pending save on unmount
     useEffect(
         () => () => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
+            if (!debounceRef.current) {
+                return;
             }
+
+            clearTimeout(debounceRef.current);
+            onSaveRef.current?.(latestContentRef.current);
         },
         [],
     );
@@ -76,6 +84,7 @@ const CanvasCodemirrorEditor: FC<CanvasCodemirrorEditorProps> = memo(({ classNam
             }
 
             debounceRef.current = setTimeout(() => {
+                debounceRef.current = null;
                 onSave(value);
             }, AUTOSAVE_DEBOUNCE_MS);
         },

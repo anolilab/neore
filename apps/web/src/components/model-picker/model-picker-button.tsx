@@ -93,7 +93,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
     const [open, setOpen] = useState(false);
     const defaultPlaceholder = t`Select model...`;
     const { isAnonymous } = useIsAnonymous();
-    const gatewayModels = useFeatureFlaggedModels();
+    const gatewayModels = useFeatureFlaggedModels({ applyUserOverrides: true });
     // Custom endpoints only when the picker opens, or when the current pick is
     // one (its label comes from that list) — not on every first paint.
     const customModels = useCustomModels(includeCustomModels && (open || Boolean(modelId?.startsWith("custom:"))));

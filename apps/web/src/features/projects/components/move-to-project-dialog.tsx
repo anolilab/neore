@@ -8,6 +8,7 @@ import { Icon } from "@neore/ui/components/icon-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { X } from "lucide-react";
 import type { FC } from "react";
+import { toast } from "sonner";
 
 import { useMoveThreadToProject, useProjects } from "../hooks/use-projects";
 
@@ -34,7 +35,7 @@ const MoveToProjectDialog: FC<MoveToProjectDialogProps> = ({ currentProjectId, o
 
             onClose();
         } catch {
-            // Error handled silently
+            toast.error(t`Failed to move thread`);
         }
     };
 

@@ -91,8 +91,13 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
             });
             const inviteLink = `${globalThis.location.origin}/invite/${result.inviteToken}`;
 
-            await navigator.clipboard.writeText(inviteLink);
-            toast.success(t`Invite link copied to clipboard!`);
+            try {
+                await navigator.clipboard.writeText(inviteLink);
+                toast.success(t`Invite link copied to clipboard!`);
+            } catch {
+                toast.info(t`Could not copy automatically. Invite link: ${inviteLink}`);
+            }
+
             setInviteEmail("");
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t`Failed to create invite`);
@@ -152,8 +157,12 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
 
         const publicLink = `${globalThis.location.origin}/thread/${threadAccess.publicAccessToken}`;
 
-        await navigator.clipboard.writeText(publicLink);
-        toast.success(t`Public link copied to clipboard!`);
+        try {
+            await navigator.clipboard.writeText(publicLink);
+            toast.success(t`Public link copied to clipboard!`);
+        } catch {
+            toast.info(t`Could not copy automatically. Public link: ${publicLink}`);
+        }
     }, [threadAccess, t]);
 
     if (!canShare) {

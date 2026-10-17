@@ -116,7 +116,7 @@ const BanUserDialog = ({ isBanned, onOpenChange, onSuccess, open, userId, userNa
                     <div className="grid gap-2">
                         <Label htmlFor="duration">{t`Duration`}</Label>
                         <Select onValueChange={(value) => value && setDuration(value)} value={duration}>
-                            <SelectTrigger>
+                            <SelectTrigger id="duration">
                                 <SelectValue placeholder={t`Select duration`} />
                             </SelectTrigger>
                             <SelectContent>

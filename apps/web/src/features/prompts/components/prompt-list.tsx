@@ -70,6 +70,9 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
     // Fetch tags using action (with caching)
     const { mutateAsync: getPromptTags } = useMutation(useLunoraActionOptions(api.prompts.functions.getPromptTags));
     const [allTags, setAllTags] = useState<string[] | undefined>(undefined);
+    // Bumped after every write so the effect below refetches the list, count and tags.
+    const [reloadKey, setReloadKey] = useState(0);
+    const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
     // Load prompts, prompt count, and tags on mount and when sortBy changes
     useEffect(() => {
@@ -94,7 +97,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
         return () => {
             isCancelled = true;
         };
-    }, [getPrompts, getPromptCount, getPromptTags, sortBy]);
+    }, [getPrompts, getPromptCount, getPromptTags, sortBy, reloadKey]);
 
     // Mutations
     const { mutateAsync: createPrompt } = useMutation(crpc.prompts.functions.createPrompt.mutationOptions());
@@ -215,6 +218,8 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                     });
                     toast.success(t`Prompt created successfully`);
                 }
+
+                reload();
             } catch (error: any) {
                 // Check for prompt limit error
                 if (error?.data?.code === "PROMPT_LIMIT_REACHED" || error?.message?.includes("PROMPT_LIMIT_REACHED")) {
@@ -226,7 +231,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                 throw error;
             }
         },
-        [createPrompt, updatePrompt, t, upgradeToast],
+        [createPrompt, updatePrompt, reload, t, upgradeToast],
     );
 
     const handleDelete = useCallback(
@@ -234,11 +239,12 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
             try {
                 await deletePrompt({ promptId: promptId as Id<"prompts"> });
                 toast.success(t`Prompt deleted`);
+                reload();
             } catch {
                 toast.error(t`Failed to delete prompt`);
             }
         },
-        [deletePrompt, t],
+        [deletePrompt, reload, t],
     );
 
     const handleDeleteMany = useCallback(
@@ -254,9 +260,11 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                 setSelectionMode(false);
             } catch {
                 toast.error(t`Failed to delete some prompts`);
+            } finally {
+                reload();
             }
         },
-        [deletePrompt, t],
+        [deletePrompt, reload, t],
     );
 
     const handleSelectPrompt = useCallback(
@@ -321,12 +329,13 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                 }
 
                 toast.success(isFavorite ? t`Added to favorites` : t`Removed from favorites`);
+                reload();
             } catch {
                 // Optimistic update will be automatically reverted on error
                 toast.error(t`Failed to update favorite`);
             }
         },
-        [prompts, toggleFavorite, t, setOptimisticPrompts],
+        [prompts, toggleFavorite, reload, t, setOptimisticPrompts],
     );
 
     const handleOptimize = useCallback((prompt: Doc<"prompts">) => {
@@ -343,7 +352,9 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
 
     const handleHistoryClose = useCallback(() => {
         setHistoryPrompt(null);
-    }, []);
+        // The dialog can restore a version; pick that up.
+        reload();
+    }, [reload]);
 
     const handleOptimized = useCallback(
         async (optimizedContent: string) => {
@@ -364,8 +375,10 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
             } catch {
                 throw new Error("Failed to update prompt");
             }
+
+            reload();
         },
-        [optimizingPrompt, updatePrompt],
+        [optimizingPrompt, updatePrompt, reload],
     );
 
     const handleUsePrompt = useCallback(

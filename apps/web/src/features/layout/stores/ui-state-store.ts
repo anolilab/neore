@@ -348,7 +348,6 @@ export const useUIStateStore = create<UIStateStore>()(
                     fonts: state.fonts,
                     keyboardShortcuts: state.keyboardShortcuts,
                     layout: state.layout,
-                    modals: state.modals,
                     preferences: state.preferences,
                     rightSidebarWidth: state.rightSidebarWidth,
                     search: state.search,

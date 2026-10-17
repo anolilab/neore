@@ -15,8 +15,10 @@ import { useMutation } from "@tanstack/react-query";
 import type { IconName } from "lucide-react/dynamic";
 import { DynamicIcon } from "lucide-react/dynamic";
 import { useEffect, useEffectEvent } from "react";
+import { toast } from "sonner";
 import * as z from "zod";
 
+import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import ProjectKnowledgeCollections from "@/features/knowledge/components/project-knowledge-collections";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
@@ -84,46 +86,50 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     const form = useAppForm({
         defaultValues: getDefaultValues(editingProject),
         onSubmit: async ({ value }) => {
-            if (editingProject) {
-                // `patch` fields are `v.optional(...)` nested inside a `v.object`, which
-                // codegen emits as required keys with an `| undefined` value — every key
-                // (including `organizationId`, which this dialog never edits) must be present.
-                const patch = {
-                    color: value.color || undefined, // Explicitly undefined when empty to clear it
-                    context: value.context.trim() || undefined,
-                    defaultEnabledFeatures: value.defaultEnabledFeatures.length > 0 ? value.defaultEnabledFeatures : undefined,
-                    defaultModel: value.defaultModel || undefined,
-                    defaultReasoningEffort: value.defaultReasoningEffort,
-                    description: value.description.trim() || undefined,
-                    icon: value.icon || undefined, // Explicitly undefined when empty to remove
-                    organizationId: undefined,
-                    title: value.title.trim() || undefined,
-                };
+            try {
+                if (editingProject) {
+                    // `patch` fields are `v.optional(...)` nested inside a `v.object`, which
+                    // codegen emits as required keys with an `| undefined` value — every key
+                    // (including `organizationId`, which this dialog never edits) must be present.
+                    const patch = {
+                        color: value.color ?? "", // "" clears the colour on the backend
+                        context: value.context.trim() || undefined,
+                        defaultEnabledFeatures: value.defaultEnabledFeatures.length > 0 ? value.defaultEnabledFeatures : undefined,
+                        defaultModel: value.defaultModel || undefined,
+                        defaultReasoningEffort: value.defaultReasoningEffort,
+                        description: value.description.trim() || undefined,
+                        icon: value.icon ?? "", // "" removes the icon on the backend
+                        organizationId: undefined,
+                        title: value.title.trim() || undefined,
+                    };
 
-                await updateProject({
-                    patch,
-                    // The dialog receives `_id` as a plain `string` from the thread-list
-                    // store; it is always an id the backend returned for a `projects` row.
-                    projectId: editingProject._id as Id<"projects">,
-                });
-            } else {
-                const projectData = {
-                    color: value.color,
-                    context: value.context.trim() || undefined,
-                    defaultEnabledFeatures: value.defaultEnabledFeatures.length > 0 ? value.defaultEnabledFeatures : undefined,
-                    defaultModel: value.defaultModel,
-                    defaultReasoningEffort: value.defaultReasoningEffort,
-                    description: value.description.trim() || undefined,
-                    icon: value.icon,
-                    title: value.title.trim(),
-                };
+                    await updateProject({
+                        patch,
+                        // The dialog receives `_id` as a plain `string` from the thread-list
+                        // store; it is always an id the backend returned for a `projects` row.
+                        projectId: editingProject._id as Id<"projects">,
+                    });
+                } else {
+                    const projectData = {
+                        color: value.color,
+                        context: value.context.trim() || undefined,
+                        defaultEnabledFeatures: value.defaultEnabledFeatures.length > 0 ? value.defaultEnabledFeatures : undefined,
+                        defaultModel: value.defaultModel,
+                        defaultReasoningEffort: value.defaultReasoningEffort,
+                        description: value.description.trim() || undefined,
+                        icon: value.icon,
+                        title: value.title.trim(),
+                    };
 
-                await createProject(projectData);
+                    await createProject(projectData);
+                }
+
+                form.reset(getDefaultValues(undefined));
+
+                onClose();
+            } catch (error) {
+                toast.error(getLocalizedError({ error, t }));
             }
-
-            form.reset(getDefaultValues(undefined));
-
-            onClose();
         },
         validators: {
             onChange: ({ value }) => {

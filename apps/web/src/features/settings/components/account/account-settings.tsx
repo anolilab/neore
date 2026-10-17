@@ -118,10 +118,16 @@ const AccountSettings: FC = () => {
     const browserTimezone = getBrowserTimezone();
 
     const handleUpdateSetting = useCallback(
-        async (key: string, value: unknown) => {
-            await updateUserSettings.mutateAsync({ [key]: value });
+        (key: string, value: unknown, successMessage: string) => {
+            updateUserSettings.mutate(
+                { [key]: value },
+                {
+                    onError: () => toast.error(t`Failed to save settings`),
+                    onSuccess: () => toast.success(successMessage),
+                },
+            );
         },
-        [updateUserSettings],
+        [updateUserSettings, t],
     );
 
     return (
@@ -272,8 +278,7 @@ const AccountSettings: FC = () => {
                         <p className="text-muted-foreground text-sm">{t`Default language for AI responses in new threads (BCP 47 code).`}</p>
                         <Select
                             onValueChange={(value) => {
-                                handleUpdateSetting("language", value);
-                                toast.success(t`Default language updated`);
+                                handleUpdateSetting("language", value, t`Default language updated`);
                             }}
                             value={currentLanguage}
                         >
@@ -298,8 +303,7 @@ const AccountSettings: FC = () => {
                         <p className="text-muted-foreground text-sm">{t`Default dictation language for new threads (BCP 47 code).`}</p>
                         <Select
                             onValueChange={(value) => {
-                                handleUpdateSetting("dictationLanguage", value);
-                                toast.success(t`Dictation language updated`);
+                                handleUpdateSetting("dictationLanguage", value, t`Dictation language updated`);
                             }}
                             value={currentDictationLanguage}
                         >
@@ -329,8 +333,7 @@ const AccountSettings: FC = () => {
                                 const value = e.target.value.trim();
 
                                 if (value !== currentLocation) {
-                                    handleUpdateSetting("location", value || undefined);
-                                    toast.success(t`Location updated`);
+                                    handleUpdateSetting("location", value || undefined, t`Location updated`);
                                 }
                             }}
                             onKeyDown={(e) => {
@@ -353,8 +356,7 @@ const AccountSettings: FC = () => {
                         <p className="text-muted-foreground text-sm">{t`Your timezone (IANA timezone identifier).`}</p>
                         <Select
                             onValueChange={(value) => {
-                                handleUpdateSetting("timezone", value);
-                                toast.success(t`Timezone updated`);
+                                handleUpdateSetting("timezone", value, t`Timezone updated`);
                             }}
                             value={currentTimezone || browserTimezone}
                         >
@@ -386,8 +388,11 @@ const AccountSettings: FC = () => {
                             checked={isEnableFollowupSuggestions}
                             id="enable-followup-suggestions"
                             onCheckedChange={(checked) => {
-                                handleUpdateSetting("enableFollowupSuggestions", checked);
-                                toast.success(checked ? t`Follow-up suggestions enabled` : t`Follow-up suggestions disabled`);
+                                handleUpdateSetting(
+                                    "enableFollowupSuggestions",
+                                    checked,
+                                    checked ? t`Follow-up suggestions enabled` : t`Follow-up suggestions disabled`,
+                                );
                             }}
                         />
                     </div>
@@ -402,8 +407,11 @@ const AccountSettings: FC = () => {
                             checked={isAutoReadReplies}
                             id="auto-read-replies"
                             onCheckedChange={(checked) => {
-                                handleUpdateSetting("autoReadReplies", checked);
-                                toast.success(checked ? t`Replies will be read aloud` : t`Replies will no longer be read aloud`);
+                                handleUpdateSetting(
+                                    "autoReadReplies",
+                                    checked,
+                                    checked ? t`Replies will be read aloud` : t`Replies will no longer be read aloud`,
+                                );
                             }}
                         />
                     </div>
@@ -421,8 +429,7 @@ const AccountSettings: FC = () => {
                                         return;
                                     }
 
-                                    handleUpdateSetting("voiceModeVoice", value);
-                                    toast.success(t`Hands-free voice updated`);
+                                    handleUpdateSetting("voiceModeVoice", value, t`Hands-free voice updated`);
                                 }}
                                 value={currentSpeechVoice}
                             >
@@ -455,8 +462,7 @@ const AccountSettings: FC = () => {
                             checked={isComposerAutocompleteEnabled}
                             id="composer-autocomplete"
                             onCheckedChange={(checked) => {
-                                handleUpdateSetting("composerAutocompleteEnabled", checked);
-                                toast.success(checked ? t`Autocomplete enabled` : t`Autocomplete disabled`);
+                                handleUpdateSetting("composerAutocompleteEnabled", checked, checked ? t`Autocomplete enabled` : t`Autocomplete disabled`);
                             }}
                         />
                     </div>

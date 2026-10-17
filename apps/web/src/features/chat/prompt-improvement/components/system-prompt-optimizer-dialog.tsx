@@ -405,7 +405,7 @@ const SystemPromptOptimizerDialog: FC<SystemPromptOptimizerDialogProps> = ({ ini
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
             <SystemPromptOptimizerDialogBody
                 initialPrompt={initialPrompt}
-                key={`${String(open)}|${initialPrompt}`}
+                key={String(open)}
                 modelId={modelId}
                 onApply={onApply}
                 onOpenChange={onOpenChange}

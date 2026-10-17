@@ -258,9 +258,13 @@ const KeyboardShortcutsSettings: FC = () => {
                                 <Button onClick={handleReset} type="button" variant="outline">
                                     {t`Reset to Defaults`}
                                 </Button>
-                                <Button disabled={form.state.isSubmitting} type="submit">
-                                    {form.state.isSubmitting ? t`Saving...` : t`Save Shortcuts`}
-                                </Button>
+                                <form.Subscribe selector={(state) => state.isSubmitting}>
+                                    {(isSubmitting) => (
+                                        <Button disabled={isSubmitting} type="submit">
+                                            {isSubmitting ? t`Saving...` : t`Save Shortcuts`}
+                                        </Button>
+                                    )}
+                                </form.Subscribe>
                             </div>
                         </CardFooter>
                     </form>

@@ -51,10 +51,19 @@ const OllamaModelManager: FC<OllamaModelManagerProps> = ({ baseUrl, onSyncPicker
     const version = useQuery({
         queryFn: async () => (await detectOllama(baseUrl)) ?? null,
         queryKey: ["local-models", "ollama-version", baseUrl],
+        refetchOnWindowFocus: false,
         retry: false,
+        staleTime: 30_000,
     });
     const isOllama = Boolean(version.data);
-    const models = useQuery({ enabled: isOllama, queryFn: async () => await listOllamaModels(baseUrl), queryKey, retry: false });
+    const models = useQuery({
+        enabled: isOllama,
+        queryFn: async () => await listOllamaModels(baseUrl),
+        queryKey,
+        refetchOnWindowFocus: false,
+        retry: false,
+        staleTime: 30_000,
+    });
 
     // A pull left running when the panel closes would keep downloading unseen.
     useEffect(() => () => pullAbortRef.current?.abort(), []);

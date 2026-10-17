@@ -70,7 +70,11 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
     const { mutateAsync: getPromptCount } = useMutation(useLunoraActionOptions(api.prompts.functions.getPromptCount));
     const [promptCount, setPromptCount] = useState<{ canCreate: boolean; count: number; isPremium: boolean; limit: number | null } | undefined>(undefined);
 
-    // Load prompts and prompt count on mount
+    // Bumped after every write so the effect below refetches the list and count.
+    const [reloadKey, setReloadKey] = useState(0);
+    const reload = useCallback(() => setReloadKey((key) => key + 1), []);
+
+    // Load prompts and prompt count on mount and after every write
     useEffect(() => {
         let isCancelled = false;
 
@@ -92,7 +96,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
         return () => {
             isCancelled = true;
         };
-    }, [getPrompts, getPromptCount]);
+    }, [getPrompts, getPromptCount, reloadKey]);
 
     // Query resolved variables (includes user defaults + thread overrides).
     // `threadId` is the `/chat/$threadId` route param, passed down as a plain string.
@@ -281,22 +285,24 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
             await deletePrompt({ promptId: promptToDelete._id });
             toast.success(t`Prompt deleted`);
             setPromptToDelete(null);
+            reload();
         } catch {
             toast.error(t`Failed to delete prompt`);
         } finally {
             setIsDeleting(false);
         }
-    }, [deletePrompt, promptToDelete, t]);
+    }, [deletePrompt, promptToDelete, reload, t]);
 
     const handleToggleFavorite = useCallback(
         async (promptId: Id<"prompts">) => {
             try {
                 await toggleFavorite({ promptId });
+                reload();
             } catch {
                 toast.error(t`Failed to update favorite status`);
             }
         },
-        [toggleFavorite, t],
+        [toggleFavorite, reload, t],
     );
 
     // Filter prompts based on search query
@@ -428,6 +434,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                 }
 
                 setEditingPrompt(null);
+                reload();
             } catch (error: any) {
                 // Check for prompt limit error
                 if (error?.data?.code === "PROMPT_LIMIT_REACHED" || error?.message?.includes("PROMPT_LIMIT_REACHED")) {
@@ -439,7 +446,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                 throw new Error("Failed to save prompt", { cause: error });
             }
         },
-        [createPrompt, updatePrompt, t, upgradeToast],
+        [createPrompt, updatePrompt, reload, t, upgradeToast],
     );
 
     // Loading state

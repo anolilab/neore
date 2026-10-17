@@ -177,6 +177,7 @@ const PresentationSlideCard = ({
                                 width: `${SLIDE_WIDTH}px`,
                                 willChange: "transform",
                             }}
+                            tabIndex={-1}
                             title={t`Slide ${slideNumber}: ${slideTitle}`}
                         />
                     </div>

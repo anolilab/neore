@@ -249,7 +249,7 @@ export const authToast = {
             action: {
                 label: localized(msg`Sign In Again`),
                 onClick: () => {
-                    globalThis.location.assign("/auth/signin");
+                    globalThis.location.assign("/auth/sign-in");
                 },
             },
         }),
@@ -260,7 +260,7 @@ export const authToast = {
                 label: localized(msg`Sign In`),
                 onClick: () => {
                     // Navigate to sign in page
-                    globalThis.location.assign("/auth/signin");
+                    globalThis.location.assign("/auth/sign-in");
                 },
             },
         }),

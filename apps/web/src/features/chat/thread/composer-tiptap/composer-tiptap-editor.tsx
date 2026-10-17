@@ -297,7 +297,11 @@ const ComposerTiptapEditor = ({
             container.classList.add("placeholder-changing");
             const timer = setTimeout(() => {
                 placeholderRef.current = placeholder;
-                editor.view.dispatch(editor.state.tr);
+
+                if (editor.isEmpty) {
+                    editor.view.dispatch(editor.state.tr);
+                }
+
                 container.classList.remove("placeholder-changing");
             }, 180);
 
@@ -305,7 +309,10 @@ const ComposerTiptapEditor = ({
         }
 
         placeholderRef.current = placeholder;
-        editor.view.dispatch(editor.state.tr);
+
+        if (editor.isEmpty) {
+            editor.view.dispatch(editor.state.tr);
+        }
 
         return undefined;
     }, [placeholder, editor]);

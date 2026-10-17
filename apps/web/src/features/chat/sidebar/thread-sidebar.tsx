@@ -101,8 +101,8 @@ const ThreadSummary: FC<{ threadId?: string }> = ({ threadId }) => {
     const handleOptimizedSystemPrompt = async (optimized: string) => {
         const trimmed = optimized.trim();
 
-        setCustomSystemPrompt(trimmed);
         await updateThread({ customSystemPrompt: trimmed || undefined });
+        setCustomSystemPrompt(trimmed);
     };
 
     useEffect(
@@ -113,6 +113,17 @@ const ThreadSummary: FC<{ threadId?: string }> = ({ threadId }) => {
         },
         [],
     );
+
+    // The server row can change under the same threadId (a new chat's first message creates it).
+    // Skip while an edit is still waiting to be saved, or the echo would overwrite it.
+    useEffect(() => {
+        if (promptTimeoutRef.current) {
+            return;
+        }
+
+        setStatelessMode(effectiveStatelessMode ?? false);
+        setCustomSystemPrompt(effectiveCustomSystemPrompt ?? "");
+    }, [effectiveStatelessMode, effectiveCustomSystemPrompt]);
 
     const handleGenerateSummary = () => {
         if (threadId && isTextModel) {

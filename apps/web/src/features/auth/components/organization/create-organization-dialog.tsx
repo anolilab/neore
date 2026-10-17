@@ -234,12 +234,7 @@ const CreateOrganizationDialog = ({ className: _className, classNames, onOpenCha
                                                     }
                                                 />
 
-                                                <DropdownMenuContent
-                                                    align="start"
-                                                    onCloseAutoFocus={(e) => {
-                                                        e.preventDefault();
-                                                    }}
-                                                >
+                                                <DropdownMenuContent align="start">
                                                     <DropdownMenuItem disabled={uploadingLogo} onClick={openFileDialog}>
                                                         <UploadCloudIcon />
                                                         {t`Upload Logo`}

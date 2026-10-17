@@ -49,7 +49,6 @@ const LOCALE_DISPLAY_NAMES: Record<string, string> = {
 const DROPDOWN_CONTENT_PROPS = {
     align: "end" as const,
     className: "w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg",
-    onCloseAutoFocus: (e: Event) => e.preventDefault(),
     side: "right" as const,
     sideOffset: 4,
 };

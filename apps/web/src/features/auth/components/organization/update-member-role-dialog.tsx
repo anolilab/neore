@@ -99,12 +99,7 @@ const UpdateMemberRoleDialog = ({ classNames, member, onOpenChange, ...propertie
 
     return (
         <Dialog onOpenChange={onOpenChange} {...properties}>
-            <DialogContent
-                className={classNames?.dialog?.content}
-                onOpenAutoFocus={(e) => {
-                    e.preventDefault();
-                }}
-            >
+            <DialogContent className={classNames?.dialog?.content}>
                 <DialogHeader className={classNames?.dialog?.header}>
                     <DialogTitle className={cn("text-lg md:text-xl", classNames?.title)}>{t`Update Role`}</DialogTitle>
 

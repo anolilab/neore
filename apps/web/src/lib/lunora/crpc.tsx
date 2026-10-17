@@ -123,6 +123,7 @@ export type ApiPath = PathsOf<ApiTypes, "">;
 const NEVER_LIVE: ReadonlySet<string> = new Set<ApiPath>([
     "admin_cleanup:previewCleanup",
     "auth_admin:checkUserAdminStatus",
+    "auth_admin:getAllUsers",
     "auth_admin:getDashboardStats",
     "auth_admin:isCurrentUserAdmin",
     "auth_admin:isImpersonating",

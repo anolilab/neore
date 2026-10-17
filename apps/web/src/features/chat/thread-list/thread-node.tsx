@@ -41,7 +41,6 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
-import usePreloadThread from "@/features/chat/core/hooks/use-preload-thread";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
@@ -217,7 +216,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const router = useRouter();
     const location = useLocation();
     const queryClient = useQueryClient();
-    const preloadThread = usePreloadThread();
     const { mutateAsync: convertToPermanent } = useMutation(crpc.chat.functions.convertTemporaryToPermanent.mutationOptions());
     const [isConverting, setIsConverting] = useState(false);
     const [showMoveToProjectDialog, setShowMoveToProjectDialog] = useState(false);
@@ -304,9 +302,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 return;
             }
 
-            // Preload into Lunora cache (for useQuery/usePaginatedQuery hooks)
-            preloadThread(node.threadId);
-
             // Preload route (for TanStack Router route cache)
             router
                 .preloadRoute({
@@ -340,7 +335,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 }),
             );
         }, 150);
-    }, [isActive, isSelectionMode, node.threadId, preloadThread, router, queryClient, lunoraClient, crpc]);
+    }, [isActive, isSelectionMode, node.threadId, router, queryClient, lunoraClient, crpc]);
 
     // Cleanup timeout on unmount
     useEffect(
@@ -404,6 +399,10 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 }, 100);
             }}
             onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) {
+                    return;
+                }
+
                 if (!(e.key === "Enter" || e.key === " ") || isSelectionMode) {
                     return;
                 }
@@ -856,6 +855,10 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         }
                     }}
                     onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) {
+                            return;
+                        }
+
                         if (!(e.key === "Enter" || e.key === " ")) {
                             return;
                         }

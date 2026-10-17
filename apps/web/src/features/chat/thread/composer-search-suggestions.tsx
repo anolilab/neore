@@ -69,12 +69,11 @@ const ComposerSearchSuggestions: FC = () => {
                 className="flex flex-wrap gap-1.5 px-3 pb-2"
                 exit={{ opacity: 0, y: 4 }}
                 initial={{ opacity: 0, y: 4 }}
-                role="listbox"
+                role="group"
                 transition={{ duration: 0.15 }}
             >
                 {suggestions.map((suggestion) => (
                     <button
-                        aria-selected={false}
                         className={cn(
                             "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
                             "border-border/50 bg-muted/30 text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -82,7 +81,6 @@ const ComposerSearchSuggestions: FC = () => {
                         )}
                         key={suggestion.text}
                         onClick={() => handleSuggestionClick(suggestion)}
-                        role="option"
                         type="button"
                     >
                         {suggestion.type === "operator" && (

@@ -102,6 +102,7 @@ export function useChat(threadId: string | null, onThreadCreated: (threadId: str
             body: JSON.stringify(body),
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             method: "POST",
+            signal: AbortSignal.timeout(30_000),
         });
 
         // A token can be revoked before its `exp`; fetch a fresh one once.

@@ -451,12 +451,7 @@ const SignUpForm = ({
                                                 }
                                             />
 
-                                            <DropdownMenuContent
-                                                align="start"
-                                                onCloseAutoFocus={(e) => {
-                                                    e.preventDefault();
-                                                }}
-                                            >
+                                            <DropdownMenuContent align="start">
                                                 <DropdownMenuItem disabled={uploadingAvatar} onClick={openFileDialog}>
                                                     <UploadCloudIcon />
                                                     {t`Upload Avatar`}

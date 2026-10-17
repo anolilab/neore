@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 
 import type { BranchNode } from "../types";
 
@@ -48,7 +48,7 @@ const useThreadListKeyboard = ({
     setShowSearch,
     updateThread,
 }: UseThreadListKeyboardProps) => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
         // Don't handle shortcuts if user is typing in an input
         // Check if user is composing text (IME) or if event is already handled
         if (event.isComposing || event.defaultPrevented) {
@@ -189,11 +189,14 @@ const useThreadListKeyboard = ({
                 break;
             }
             case "Escape": {
-                event.preventDefault();
-
                 if (isSelectionMode) {
+                    event.preventDefault();
                     onExitSelectionMode();
                 } else {
+                    if (isKeyboardNavigating) {
+                        event.preventDefault();
+                    }
+
                     handleKeyboardEscape();
                     setShowKeyboardHelp(false);
                 }
@@ -244,7 +247,7 @@ const useThreadListKeyboard = ({
                 break;
             }
         }
-    };
+    });
 
     // Add keyboard event listeners
     useEffect(() => {
@@ -253,7 +256,7 @@ const useThreadListKeyboard = ({
         return () => {
             document.removeEventListener("keydown", handleKeyDown);
         };
-    }, [handleKeyDown]);
+    }, []);
 };
 
 export default useThreadListKeyboard;

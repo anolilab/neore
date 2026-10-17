@@ -98,7 +98,7 @@ const SlideIframe = React.memo(
                     <iframe
                         className="rounded-xl border-0"
                         key={`slide-${slide.slideNumber}`}
-                        sandbox="allow-scripts allow-modals"
+                        sandbox="allow-scripts"
                         srcDoc={slideHtml}
                         style={{
                             backfaceVisibility: "hidden",
@@ -171,6 +171,12 @@ const FullScreenPresentationViewer = ({
     }, [currentSlide]);
 
     const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
+        const { target } = e;
+
+        if (isEditDialogOpen || (target instanceof HTMLElement && (target.matches("input, textarea") || target.isContentEditable))) {
+            return;
+        }
+
         const handledKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Home", "End", "Escape"];
 
         if (handledKeys.includes(e.key)) {

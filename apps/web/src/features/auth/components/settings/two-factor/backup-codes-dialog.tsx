@@ -48,12 +48,7 @@ const BackupCodesDialog = ({ backupCodes, classNames, onOpenChange, ...propertie
 
     return (
         <Dialog onOpenChange={onOpenChange} {...properties}>
-            <DialogContent
-                className={cn("max-w-md", classNames?.dialog?.content)}
-                onOpenAutoFocus={(e) => {
-                    e.preventDefault();
-                }}
-            >
+            <DialogContent className={cn("max-w-md", classNames?.dialog?.content)}>
                 <DialogHeader className={classNames?.dialog?.header}>
                     <DialogTitle className={cn("text-lg md:text-xl", classNames?.title)}>{t`Backup Codes`}</DialogTitle>
 

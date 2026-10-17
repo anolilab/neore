@@ -69,7 +69,7 @@ const ErrorContent: FC<{
 
     if (isAuth) {
         primaryAction = (
-            <Button className="w-full" onClick={() => globalThis.location.assign("/auth/signin")}>
+            <Button className="w-full" onClick={() => globalThis.location.assign("/auth/sign-in")}>
                 {t`Sign In`}
             </Button>
         );

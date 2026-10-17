@@ -17,7 +17,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 
 import env from "@/lib/env";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useCRPC, useLunora } from "@/lib/lunora/crpc";
 
 import type { ComparisonBranch } from "../../thread/comparison-view";
 import type { PendingAttachment } from "../stores/chat-ui-store";
@@ -27,6 +27,9 @@ import { useModelStore } from "../stores/model-store";
 
 /** Chat stream endpoint — all requests go through the LLM Gateway */
 const CHAT_STREAM_URL = `${env.VITE_LLM_GATEWAY_URL}/v1/chat`;
+
+// The bearer is read at send time (the client's, which is renewed), not the route-load prop.
+const bearerHeader = (bearer: string | null | undefined): Record<string, string> => (bearer ? { Authorization: `Bearer ${bearer}` } : {});
 
 export interface ComparisonState {
     /** Child threads for each model */
@@ -63,6 +66,7 @@ interface UseComparisonChatReturn {
 const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOptions): UseComparisonChatReturn => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const lunora = useLunora();
     const navigate = useNavigate();
 
     // Model store state
@@ -105,6 +109,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
 
             try {
                 const pendingSettings = getPendingSettings();
+                const authHeader = bearerHeader(lunora.getAuthToken() ?? jwtToken);
 
                 // Create parent comparison thread if it doesn't exist
                 let comparisonParentId = parentThread;
@@ -162,7 +167,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                             }),
                             headers: {
                                 "Content-Type": "application/json",
-                                ...(jwtToken && { Authorization: `Bearer ${jwtToken}` }),
+                                ...authHeader,
                             },
                             method: "POST",
                         }),
@@ -215,7 +220,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                 setIsLoading(false);
             }
         },
-        [parentThread, jwtToken, getPendingSettings, createThreadMutation, createRelationshipMutation, navigate, t],
+        [parentThread, jwtToken, lunora, getPendingSettings, createThreadMutation, createRelationshipMutation, navigate, t],
     );
 
     /**
@@ -231,6 +236,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
 
             try {
                 const pendingSettings = getPendingSettings();
+                const authHeader = bearerHeader(lunora.getAuthToken() ?? jwtToken);
 
                 const fileIds = attachments?.flatMap((a) => (a.status === "complete" && typeof a.fileId === "string" && a.fileId.length > 0 ? [a.fileId] : []));
 
@@ -250,7 +256,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                             }),
                             headers: {
                                 "Content-Type": "application/json",
-                                ...(jwtToken && { Authorization: `Bearer ${jwtToken}` }),
+                                ...authHeader,
                             },
                             method: "POST",
                         });
@@ -266,7 +272,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                 setIsLoading(false);
             }
         },
-        [jwtToken, getPendingSettings],
+        [jwtToken, lunora, getPendingSettings],
     );
 
     // isComparisonThread is a derived const from parentThread + branches, so no extra dep needed.

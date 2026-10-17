@@ -6,6 +6,11 @@ import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store"
 // No-op handler for SSR - keyboard shortcuts only work on client
 const noopHandler = (_action: keyof KeyboardShortcuts, _event: KeyboardEvent): void => {};
 
+const focusableItems = (): HTMLElement[] =>
+    [...document.querySelectorAll<HTMLElement>('[tabindex="0"], button, input, textarea, select, a')].filter(
+        (element) => !element.matches(":disabled") && !element.closest('[aria-hidden="true"], [hidden]') && element.getClientRects().length > 0,
+    );
+
 const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event: KeyboardEvent) => void) => {
     const navigate = useNavigate({ from: "/chat/$threadId" as "/chat/$threadId" | "/dashboard" });
 
@@ -44,9 +49,9 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                 }
                 case "firstItem": {
                     // Navigate to first item
-                    const items = [...document.querySelectorAll('[tabindex="0"], button, input, a')];
+                    const items = focusableItems();
 
-                    (items[0] as HTMLElement)?.focus();
+                    items[0]?.focus();
                     break;
                 }
                 case "focusSearch":
@@ -77,9 +82,9 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                 }
                 case "lastItem": {
                     // Navigate to last item
-                    const items = [...document.querySelectorAll('[tabindex="0"], button, input, a')];
+                    const items = focusableItems();
 
-                    (items.at(-1) as HTMLElement)?.focus();
+                    items.at(-1)?.focus();
                     break;
                 }
                 case "newChat": {
@@ -96,22 +101,22 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                 case "nextItem": {
                     // Navigate to next item (implementation depends on current context)
                     const focusedElement = document.activeElement;
-                    const items = [...document.querySelectorAll('[tabindex="0"], button, input, a')];
-                    const currentIndex = items.indexOf(focusedElement as Element);
+                    const items = focusableItems();
+                    const currentIndex = items.indexOf(focusedElement as HTMLElement);
                     const nextIndex = (currentIndex + 1) % items.length;
 
-                    (items[nextIndex] as HTMLElement)?.focus();
+                    items[nextIndex]?.focus();
                     break;
                 }
 
                 case "prevItem": {
                     // Navigate to previous item
                     const focusedElement = document.activeElement;
-                    const items = [...document.querySelectorAll('[tabindex="0"], button, input, a')];
-                    const currentIndex = items.indexOf(focusedElement as Element);
+                    const items = focusableItems();
+                    const currentIndex = items.indexOf(focusedElement as HTMLElement);
                     const previousIndex = (currentIndex <= 0 ? items.length : currentIndex) - 1;
 
-                    (items[previousIndex] as HTMLElement)?.focus();
+                    items[previousIndex]?.focus();
                     break;
                 }
                 // sidebarLeft and sidebarRight are handled by TanStackSidebarProvider
