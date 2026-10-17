@@ -51,6 +51,8 @@ export interface TelegramChunk {
 
 /** A piece of a block. `joinWith`: what sits between it and the text before it, when they share a chunk. */
 interface Piece extends TelegramChunk {
+    /** A code piece that continues the block's previous piece: in one chunk they share a single `<pre>`. */
+    continuesCode?: boolean;
     joinWith: string;
 }
 
@@ -64,6 +66,9 @@ interface Block {
     info?: string;
     lines: string[];
 }
+
+const PRE_OPEN = "<pre>";
+const PRE_CLOSE = "</pre>";
 
 const escapeHtml = (text: string): string => text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
@@ -310,6 +315,10 @@ const splitBlock = (block: Block, limit: number): Piece[] => {
     if (first && last && block.code) {
         first.source = openFence(block) + first.source;
         last.source += closeFence(block);
+
+        for (const piece of pieces.slice(1)) {
+            piece.continuesCode = true;
+        }
     }
 
     return pieces;
@@ -327,9 +336,14 @@ export const formatTelegramMessage = (markdown: string, limit: number = TELEGRAM
 
     for (const piece of pieces) {
         const separator = piece.joinWith;
+        // The previous piece is the block's own, so a continuation shares its code box instead of opening another.
+        const sharesPre = piece.continuesCode === true && current?.html.endsWith(PRE_CLOSE) === true;
+        const html = sharesPre ? `${(current as TelegramChunk).html.slice(0, -PRE_CLOSE.length)}${separator}${piece.html.slice(PRE_OPEN.length)}` : undefined;
 
-        if (current && current.html.length + separator.length + piece.html.length <= limit) {
+        if (current && html === undefined && current.html.length + separator.length + piece.html.length <= limit) {
             current = { html: `${current.html}${separator}${piece.html}`, source: `${current.source}${separator}${piece.source}` };
+        } else if (current && html !== undefined && html.length <= limit) {
+            current = { html, source: `${current.source}${separator}${piece.source}` };
         } else {
             if (current) {
                 chunks.push(current);
