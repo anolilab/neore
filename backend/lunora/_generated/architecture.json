@@ -10446,6 +10446,12 @@
       "name": "file.getChatFileExtraction"
     },
     {
+      "detail": "query",
+      "id": "function:file:getChatFileImageUrl",
+      "kind": "function",
+      "name": "file.getChatFileImageUrl"
+    },
+    {
       "detail": "action",
       "id": "function:file:purgeStagedChatUploads",
       "kind": "function",

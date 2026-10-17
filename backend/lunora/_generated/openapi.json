@@ -23078,6 +23078,76 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#file:getChatFileImageUrl": {
+      "post": {
+        "description": "Invoke the `query` `file:getChatFileImageUrl` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "file:getChatFileImageUrl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "fileId": {
+                        "description": "Id<\"chatFiles\">",
+                        "type": "string",
+                        "x-lunora-table": "chatFiles"
+                      }
+                    },
+                    "required": [
+                      "fileId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "file:getChatFileImageUrl",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: file:getChatFileImageUrl",
+        "tags": [
+          "file"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#gdpr_functions:cancelStuckExport": {
       "post": {
         "description": "Invoke the `mutation` `gdpr_functions:cancelStuckExport` over the Lunora RPC envelope (POST /_lunora/rpc).",

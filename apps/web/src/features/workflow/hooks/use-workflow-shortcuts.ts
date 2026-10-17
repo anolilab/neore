@@ -20,7 +20,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useReactFlow } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 
-import { useHistoryStore } from "../stores/history-store";
+import { redoWorkflow, undoWorkflow } from "../stores/history-store";
 import { useWorkflowStore } from "../stores/workflow-store";
 import { autoLayout } from "../utils/auto-layout";
 
@@ -192,7 +192,7 @@ export function useWorkflowShortcuts({ onRun, onSave, onShowNodeSearch, onShowSh
                         if (isEditing) return;
 
                         event.preventDefault();
-                        useHistoryStore.getState().redo();
+                        redoWorkflow();
 
                         return;
                     }
@@ -202,9 +202,9 @@ export function useWorkflowShortcuts({ onRun, onSave, onShowNodeSearch, onShowSh
                         event.preventDefault();
 
                         if (event.shiftKey) {
-                            useHistoryStore.getState().redo();
+                            redoWorkflow();
                         } else {
-                            useHistoryStore.getState().undo();
+                            undoWorkflow();
                         }
 
                         return;

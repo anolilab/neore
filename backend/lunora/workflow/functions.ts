@@ -1,6 +1,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { ownedStorageRefsInUrlFields, signOwnedUrlFieldsForDisplay } from "../lib/stored-url-fields";
+import { signWorkflowImages } from "./images";
 import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
@@ -35,7 +36,14 @@ export const getWorkflow = authQuery
             return null;
         }
 
-        return { ...project, workflowContent: await signOwnedUrlFieldsForDisplay(context, project.userId, project.workflowContent) };
+        return {
+            ...project,
+            workflowContent: await signWorkflowImages(
+                context,
+                project.userId,
+                await signOwnedUrlFieldsForDisplay(context, project.userId, project.workflowContent),
+            ),
+        };
     });
 
 // List all workflow projects for a user

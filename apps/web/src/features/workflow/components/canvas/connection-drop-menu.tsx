@@ -98,13 +98,19 @@ export interface ConnectionDropMenuProps {
 }
 
 const ConnectionDropMenu = ({ onClose, onSelect, position, sourceNodeType }: ConnectionDropMenuProps) => {
-    const { i18n } = useLingui();
+    const { i18n, t } = useLingui();
     const menuRef = useRef<HTMLDivElement>(null);
 
     // Context-aware: show relevant nodes first, then the rest
     const suggestedNodes = sourceNodeType ? (CONTEXT_SUGGESTIONS[sourceNodeType] ?? []) : [];
     const suggestedNodeSet = new Set(suggestedNodes);
-    const nodeList = { rest: ALL_NODES.filter((t) => !suggestedNodeSet.has(t)), suggested: suggestedNodes };
+    const nodeList = { rest: ALL_NODES.filter((type) => !suggestedNodeSet.has(type)), suggested: suggestedNodes };
+
+    // Focus the first option on open. Separate from the listeners below so a new
+    // onClose identity from the parent does not pull focus back to the first button.
+    useEffect(() => {
+        menuRef.current?.querySelector("button")?.focus();
+    }, []);
 
     // Close on click outside or Escape
     useEffect(() => {
@@ -154,9 +160,10 @@ const ConnectionDropMenu = ({ onClose, onSelect, position, sourceNodeType }: Con
 
     return (
         <div
+            aria-label={t`Create & connect node`}
             className="bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 fixed z-50 w-[280px] rounded-lg border p-2 shadow-lg"
             ref={menuRef}
-            role="menu"
+            role="group"
             style={{ left: position.x, top: position.y }}
         >
             {/* Suggested nodes */}

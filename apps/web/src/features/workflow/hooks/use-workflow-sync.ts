@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
+import { withoutHistory } from "../stores/history-store";
 import { useWorkflowStore } from "../stores/workflow-store";
 import type { WorkflowContent } from "../types";
 
@@ -164,7 +165,7 @@ const useWorkflowSync = (projectId: string | undefined) => {
         }
 
         // Apply remote content to local store
-        loadContent(remoteContent);
+        withoutHistory(() => loadContent(remoteContent));
         lastSavedFingerprintRef.current = remoteFingerprint;
         lastSavedJsonRef.current = JSON.stringify(remoteContent);
     }, [workflow?.workflowContent, isDirty, loadContent]);

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
 import type { WorkflowContent } from "../types";
+import { useWorkflowStore } from "./workflow-store";
 
 export const MAX_HISTORY_ENTRIES = 50;
 
@@ -158,6 +159,129 @@ export const useHistoryStore = create<HistoryState>()(
         };
     }),
 );
+
+export const HISTORY_DEBOUNCE_MS = 500;
+
+const recorder: {
+    baseline?: { content: WorkflowContent; key: string };
+    isApplyingExternal: boolean;
+    timer?: ReturnType<typeof setTimeout>;
+} = { isApplyingExternal: false };
+
+const currentGraph = (): { content: WorkflowContent; key: string } => {
+    const { edges, nodes } = useWorkflowStore.getState().getContent();
+    const content = { edges, nodes };
+
+    return { content, key: JSON.stringify(content) };
+};
+
+const cancelPendingCommit = (): void => {
+    clearTimeout(recorder.timer);
+    recorder.timer = undefined;
+};
+
+const commit = (): void => {
+    recorder.timer = undefined;
+
+    if (useWorkflowStore.getState().nodes.some((node) => node.dragging)) {
+        recorder.timer = setTimeout(commit, HISTORY_DEBOUNCE_MS);
+
+        return;
+    }
+
+    const next = currentGraph();
+
+    if (next.key === recorder.baseline?.key) {
+        return;
+    }
+
+    const { entries, pushEntry } = useHistoryStore.getState();
+
+    if (entries.length === 0 && recorder.baseline) {
+        pushEntry(recorder.baseline.content);
+    }
+
+    pushEntry(next.content);
+    recorder.baseline = next;
+};
+
+const flushPendingCommit = (): void => {
+    if (recorder.timer === undefined) {
+        return;
+    }
+
+    cancelPendingCommit();
+    commit();
+};
+
+/** Runs a store write that must not become an undo step: loads, remote applies, and history restores. */
+export const withoutHistory = (apply: () => void): void => {
+    cancelPendingCommit();
+    recorder.isApplyingExternal = true;
+
+    try {
+        apply();
+    } finally {
+        recorder.isApplyingExternal = false;
+        recorder.baseline = currentGraph();
+    }
+};
+
+const applyEntry = (entry: HistoryEntry | null | undefined): void => {
+    try {
+        if (entry) {
+            withoutHistory(() => useWorkflowStore.getState().applySnapshot(entry.content));
+        }
+    } finally {
+        useHistoryStore.getState().setNavigating(false);
+    }
+};
+
+export const undoWorkflow = (): void => {
+    flushPendingCommit();
+    applyEntry(useHistoryStore.getState().undo());
+};
+
+export const redoWorkflow = (): void => {
+    flushPendingCommit();
+    applyEntry(useHistoryStore.getState().redo());
+};
+
+export const restoreWorkflowEntry = (id: string): void => {
+    flushPendingCommit();
+    applyEntry(useHistoryStore.getState().restoreEntry(id));
+};
+
+/** Records local graph edits as undo steps until the returned function is called. */
+export const startHistoryRecording = (): (() => void) => {
+    const resetHistory = (): void => {
+        cancelPendingCommit();
+        useHistoryStore.getState().clearHistory();
+        recorder.baseline = currentGraph();
+    };
+
+    resetHistory();
+
+    const stopGraph = useWorkflowStore.subscribe(
+        (state) => [state.nodes, state.edges] as const,
+        () => {
+            if (recorder.isApplyingExternal) {
+                return;
+            }
+
+            clearTimeout(recorder.timer);
+            recorder.timer = setTimeout(commit, HISTORY_DEBOUNCE_MS);
+        },
+        { equalityFn: (a, b) => a[0] === b[0] && a[1] === b[1] },
+    );
+    const stopProject = useWorkflowStore.subscribe((state) => state.projectId, resetHistory);
+
+    return () => {
+        stopGraph();
+        stopProject();
+        cancelPendingCommit();
+    };
+};
 
 // Selector hooks
 export const useHistoryEntries = () => useHistoryStore((state) => state.entries);

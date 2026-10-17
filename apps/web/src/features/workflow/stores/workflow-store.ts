@@ -6,10 +6,16 @@ import { subscribeWithSelector } from "zustand/middleware";
 
 import type { NodeExecutionStatus, WorkflowContent, WorkflowEdge, WorkflowExecutionState, WorkflowNode, WorkflowNodeData, WorkflowNodeType } from "../types";
 import NODE_CONFIGS from "../types";
+import { stripResolvedImageUrl } from "../utils/resolved-image";
+
+const isPersistedChange = (changes: ReadonlyArray<{ type: string }>): boolean =>
+    changes.some((change) => change.type !== "select" && change.type !== "dimensions");
 
 interface WorkflowState {
     // Actions - Node CRUD
     addNode: (type: WorkflowNodeType, position: { x: number; y: number }, data?: Partial<WorkflowNodeData>) => string;
+    /** Restores a history snapshot as a local edit, so it autosaves. */
+    applySnapshot: (content: Pick<WorkflowContent, "edges" | "nodes">) => void;
 
     // Interaction mode
     canvasMode: "select" | "pan";
@@ -116,6 +122,7 @@ export const useWorkflowStore = create<WorkflowState>()(
 
                 return id;
             },
+            applySnapshot: ({ edges, nodes }) => set({ edges, isDirty: true, nodes }),
             canvasMode: "select",
             copiedEdges: [],
             copiedNodes: [],
@@ -209,10 +216,14 @@ export const useWorkflowStore = create<WorkflowState>()(
             execution: initialExecutionState,
 
             getContent: () => {
+                const { edges, nodes, viewport } = get();
+
                 return {
-                    edges: get().edges,
-                    nodes: get().nodes,
-                    viewport: get().viewport,
+                    edges: edges.map(({ selected: _selected, ...edge }) => edge),
+                    nodes: nodes.map(({ dragging: _dragging, measured: _measured, selected: _selected, ...node }) =>
+                        stripResolvedImageUrl(node as WorkflowNode),
+                    ),
+                    viewport,
                 };
             },
             groupNodes: (nodeIds, label) => {
@@ -311,7 +322,7 @@ export const useWorkflowStore = create<WorkflowState>()(
             onEdgesChange: (changes) => {
                 set({
                     edges: applyEdgeChanges(changes, get().edges),
-                    isDirty: true,
+                    isDirty: get().isDirty || isPersistedChange(changes),
                 });
             },
 
@@ -322,7 +333,7 @@ export const useWorkflowStore = create<WorkflowState>()(
                 const existingIds = new Set(newNodes.map((n) => n.id));
                 const clean = newNodes.filter((n) => !n.parentId || existingIds.has(n.parentId));
 
-                set({ isDirty: true, nodes: clean });
+                set({ isDirty: get().isDirty || isPersistedChange(changes), nodes: clean });
             },
 
             pasteNodes: (position) => {

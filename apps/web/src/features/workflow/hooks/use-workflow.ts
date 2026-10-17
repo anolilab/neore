@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import env from "@/lib/env";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
+import { withoutHistory } from "../stores/history-store";
 import { useWorkflowStore } from "../stores/workflow-store";
 import type { WorkflowContent } from "../types";
 
@@ -30,17 +31,21 @@ export const useWorkflow = (projectId: string | undefined) => {
         crpc.workflow.functions.getWorkflow.queryOptions(shouldQuery && projectId ? { projectId: projectId as Id<"projects"> } : skipToken),
     );
 
-    // Load workflow content into store when data changes
+    const loadedProjectIdRef = useRef<string | undefined>(undefined);
+
+    // Load once per project: later live updates (including the echo of our own
+    // save) are merged by useWorkflowSync, which respects the dirty guard.
     useEffect(() => {
-        if (!(workflow && projectId)) {
+        if (!(workflow && projectId) || loadedProjectIdRef.current === projectId) {
             return;
         }
 
+        loadedProjectIdRef.current = projectId;
         setProjectId(projectId);
         // `workflowContent` is a JSON blob column: codegen types `node.data` as
         // `unknown` and widens the node/edge type unions to `string`. It is only ever
         // written by this editor via `getContent()`, so it really is a `WorkflowContent`.
-        loadContent((workflow.workflowContent ?? null) as WorkflowContent | null);
+        withoutHistory(() => loadContent((workflow.workflowContent ?? null) as WorkflowContent | null));
     }, [workflow, projectId, loadContent, setProjectId]);
 
     return {
