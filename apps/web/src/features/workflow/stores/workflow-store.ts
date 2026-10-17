@@ -8,8 +8,9 @@ import type { NodeExecutionStatus, WorkflowContent, WorkflowEdge, WorkflowExecut
 import NODE_CONFIGS from "../types";
 import { stripResolvedImageUrl } from "../utils/resolved-image";
 
-const isPersistedChange = (changes: ReadonlyArray<{ type: string }>): boolean =>
-    changes.some((change) => change.type !== "select" && change.type !== "dimensions");
+// A dimension change is a measurement unless the user is resizing: only resizes carry `resizing`.
+const isPersistedChange = (changes: ReadonlyArray<{ resizing?: boolean; type: string }>): boolean =>
+    changes.some((change) => (change.type === "dimensions" ? change.resizing !== undefined : change.type !== "select"));
 
 interface WorkflowState {
     // Actions - Node CRUD
