@@ -174,7 +174,8 @@ export const MUSIC_RENDER_MAX_RESUMES = 5;
  * Persist terminal failure for a job. Idempotent — no-ops on rows that are
  * already `completed`/`failed`, so it's safe to invoke from both the render
  * core (terminal exceptions) and the consumer (transient retries exhausted)
- * without coordinating between them.
+ * without coordinating between them. A provider cost passed for a job that is
+ * already `failed` is still stored on it, and that job is returned to settle.
  */
 export const markRenderFailed = async (
     env: AppEnv,
@@ -183,6 +184,14 @@ export const markRenderFailed = async (
     usagePending?: UsageReport,
 ): Promise<MusicJobState | undefined> => {
     const existing = await getJob(env.RATE_LIMIT_KV, message.jobId);
+
+    if (usagePending && existing?.status === "failed") {
+        const owedJob: MusicJobState = { ...existing, usagePending };
+
+        await putJob(env.RATE_LIMIT_KV, owedJob).catch(() => {});
+
+        return owedJob;
+    }
 
     if (existing?.status === "completed" || existing?.status === "failed") {
         return undefined;

@@ -875,6 +875,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 return;
             }
 
+            const { attachedReferences } = useChatUIStore.getState();
+
             try {
                 // For new threads: send all pending settings
                 // For existing threads: only send settings that have changed from cached values
@@ -934,8 +936,6 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     // is the "1, 2, 3..." badge the user sees in the composer strip,
                     // and downstream tools forward this order to providers that
                     // support multi-ref (FAL Nano-Banana et al.).
-                    const { attachedReferences } = useChatUIStore.getState();
-
                     if (attachedReferences.length > 0) {
                         requestBody.referenceImages = attachedReferences.map((ref) => ref.url);
                     }
@@ -1125,10 +1125,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     model,
                 });
 
-                // The composer was cleared before the request; hand the text back unless a new draft is there.
-                if (!useChatUIStore.getState().composerText) {
-                    useChatUIStore.getState().setComposerText(text);
-                }
+                // The composer was cleared before the request; hand the draft back unless a new one is there.
+                useChatUIStore.getState().restoreComposer({ attachedReferences, composerAttachments: attachments ?? [], composerText: text });
 
                 handleError(error_);
 

@@ -172,7 +172,9 @@ const settlePendingUsage = async (env: AppEnv, job: VideoJobState): Promise<bool
  * webhook (if a callback URL was registered). Idempotent — calling twice on
  * an already-terminal job is a no-op, so it's safe to invoke from both the
  * render core (terminal exceptions) and the consumer (transient retries
- * exhausted) without coordinating between them.
+ * exhausted) without coordinating between them. A provider cost passed for a
+ * job that is already `failed` is still stored on it, and that job is returned
+ * to settle.
  */
 export const markRenderFailed = async (
     env: AppEnv,
@@ -181,6 +183,14 @@ export const markRenderFailed = async (
     usagePending?: UsageReport,
 ): Promise<VideoJobState | undefined> => {
     const existing = await getJob(env.RATE_LIMIT_KV, message.jobId);
+
+    if (usagePending && existing?.status === "failed") {
+        const owedJob: VideoJobState = { ...existing, usagePending };
+
+        await putJob(env.RATE_LIMIT_KV, owedJob).catch(() => {});
+
+        return owedJob;
+    }
 
     if (existing?.status === "completed" || existing?.status === "failed") {
         return undefined;

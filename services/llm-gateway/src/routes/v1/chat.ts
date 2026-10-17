@@ -18,6 +18,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
 
 import type { HonoEnv } from "../../env.js";
+import { isProductionEnv } from "../../env.js";
 import { canonicalPathAndQuery } from "../../lib/canonical-query.js";
 import { chatInputValidationMiddleware } from "../../middleware/input-validation.js";
 import { parseTierOverride, TIER_OVERRIDE_HEADER } from "../../routing/tier-override.js";
@@ -227,7 +228,7 @@ const resolvePublicGatewayOrigin = (c: Context<HonoEnv>): string | null => {
     }
 
     // Allow Host-header fallback ONLY in non-production for local dev / preview.
-    if (c.env.NODE_ENV !== "production") {
+    if (!isProductionEnv(c.env)) {
         try {
             return new URL(c.req.url).origin;
         } catch {

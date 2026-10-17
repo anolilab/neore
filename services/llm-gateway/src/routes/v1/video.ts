@@ -25,6 +25,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 
 import type { HonoEnv } from "../../env.js";
+import { isProductionEnv } from "../../env.js";
 import { GatewayError, toSafeErrorPayload, toSafeValidationPayload } from "../../lib/errors.js";
 import { bearerAuth } from "../../middleware/auth.js";
 import { expensiveEndpointRateLimit } from "../../middleware/rate-limit.js";
@@ -55,7 +56,7 @@ export const resolveCanonicalOrigin = (env: HonoEnv["Bindings"], requestUrl: str
         return configured;
     }
 
-    if (env.NODE_ENV === "production") {
+    if (isProductionEnv(env)) {
         console.error("[gateway:media] PUBLIC_GATEWAY_URL is not configured in production — cannot advertise polling URLs");
 
         throw new Error("Gateway not configured");

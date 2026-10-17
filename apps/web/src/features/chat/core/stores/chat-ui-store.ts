@@ -120,6 +120,8 @@ interface ChatUIStore {
     removeEditAttachment: (id: string) => void;
     // Reset
     reset: () => void;
+    /** Puts a failed send back into the composer, unless a new draft was started meanwhile. */
+    restoreComposer: (draft: { attachedReferences: ReferenceSelection[]; composerAttachments: PendingAttachment[]; composerText: string }) => void;
     setActiveDocumentId: (documentId: string | null) => void;
     // Right sidebar tab actions
     setActiveRightSidebarTab: (tab: string) => void;
@@ -300,6 +302,16 @@ export const useChatUIStore = create<ChatUIStore>()(
                 // Reset
                 reset: () => {
                     set(initialState);
+                },
+
+                restoreComposer: (draft) => {
+                    const { attachedReferences, composerAttachments, composerText } = get();
+
+                    if (composerText || composerAttachments.length > 0 || attachedReferences.length > 0) {
+                        return;
+                    }
+
+                    set(draft);
                 },
 
                 setActiveDocumentId: (documentId) => {

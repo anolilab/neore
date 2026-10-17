@@ -569,6 +569,33 @@ describe("runVideoRender — billing", () => {
         expect(stored.usagePending).toBeUndefined();
     });
 
+    it("charges the provider cost when the stall reaper failed the job before the failure was saved", async () => {
+        const { bucket, cacheKv, env, rateLimitKv } = makeEnv();
+        const message = makeMessage({ body: { duration: 4, model: "fal/luma-ray-2", prompt: "hi" } });
+
+        await seedSecret(cacheKv, message.jobId);
+        stubGenerateVideoSuccess();
+        vi.spyOn(bucket, "put").mockImplementation(async () => {
+            const reaped = (await rateLimitKv.get(`video_job:${message.jobId}`, "json")) as VideoJobState;
+
+            await rateLimitKv.put(`video_job:${message.jobId}`, JSON.stringify({ ...reaped, errorMessage: "stalled", status: "failed" }));
+
+            throw new Error("R2 write failed");
+        });
+
+        const outcome = await runVideoRender(message, env);
+
+        expect(outcome).toEqual({ errorMessage: "R2 write failed", kind: "failed", retryable: false });
+        expect(report).toHaveBeenCalledOnce();
+        expect(report.mock.calls[0]![0]).toMatchObject({ costMicrodollars: 200_000, requestId: message.requestId });
+
+        const stored = (await rateLimitKv.get(`video_job:${message.jobId}`, "json")) as VideoJobState;
+
+        expect(stored.status).toBe("failed");
+        expect(stored.errorMessage).toBe("stalled");
+        expect(stored.usagePending).toBeUndefined();
+    });
+
     it("does not charge when the provider call failed", async () => {
         const { cacheKv, env } = makeEnv();
         const message = makeMessage();

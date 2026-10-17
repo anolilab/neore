@@ -186,3 +186,6 @@ export interface HonoEnv {
     Bindings: AppEnv;
     Variables: AppVariables;
 }
+
+/** True when either `NODE_ENV` or `ENVIRONMENT` says production. */
+export const isProductionEnv = (env: Pick<AppEnv, "ENVIRONMENT" | "NODE_ENV">): boolean => env.NODE_ENV === "production" || env.ENVIRONMENT === "production";
