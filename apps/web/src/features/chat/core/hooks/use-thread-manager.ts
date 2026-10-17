@@ -209,8 +209,8 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
 
                 if (threadDocument) {
                     metadata = {
-                        createdAt: new Date(threadDocument._creationTime),
-                        lastActivity: new Date(threadDocument._creationTime),
+                        createdAt: new Date(threadDocument.createdAt ?? threadDocument._creationTime),
+                        lastActivity: new Date(threadDocument.createdAt ?? threadDocument._creationTime),
                         parentThreadId: threadDocument.parentThreadIds?.[0],
                         status: threadDocument.status === "active" ? "active" : "archived",
                         title: threadDocument.title || t`Untitled Thread`,

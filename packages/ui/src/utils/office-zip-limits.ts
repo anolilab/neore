@@ -17,8 +17,15 @@ const CENTRAL_ENTRY_MIN_LENGTH = 46;
 const MAX_ZIP_COMMENT = 0xff_ff;
 const ZIP64_MARKER = 0xff_ff_ff_ff;
 
+export interface OfficeZipLimits {
+    maxBytes: number;
+    maxEntries: number;
+}
+
+const DEFAULT_LIMITS: OfficeZipLimits = { maxBytes: OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES, maxEntries: OFFICE_ZIP_MAX_ENTRIES };
+
 /** Throws when the archive is malformed, has too many entries, or would expand past the cap. */
-export const assertOfficeZipWithinLimits = (buffer: ArrayBuffer): void => {
+export const assertOfficeZipWithinLimits = (buffer: ArrayBuffer, limits: OfficeZipLimits = DEFAULT_LIMITS): void => {
     const view = new DataView(buffer);
     const lowest = Math.max(0, buffer.byteLength - EOCD_MIN_LENGTH - MAX_ZIP_COMMENT);
     let eocd = buffer.byteLength - EOCD_MIN_LENGTH;
@@ -35,7 +42,7 @@ export const assertOfficeZipWithinLimits = (buffer: ArrayBuffer): void => {
     const directoryOffset = view.getUint32(eocd + 16, true);
 
     // 0xFFFF / 0xFFFFFFFF mean ZIP64, which no office file this app previews needs.
-    if (entryCount > OFFICE_ZIP_MAX_ENTRIES || directoryOffset === ZIP64_MARKER) {
+    if (entryCount > limits.maxEntries || directoryOffset === ZIP64_MARKER) {
         throw new Error("Archive has too many entries");
     }
 
@@ -51,7 +58,7 @@ export const assertOfficeZipWithinLimits = (buffer: ArrayBuffer): void => {
 
         total += size;
 
-        if (size === ZIP64_MARKER || total > OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES) {
+        if (size === ZIP64_MARKER || total > limits.maxBytes) {
             throw new Error("Archive expands too large");
         }
 

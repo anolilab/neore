@@ -1273,6 +1273,9 @@ export const schema = defineSchema({
 
     messages: defineTable({
         agentName: v.optional(v.string()),
+        // Display time in ms (an imported message keeps its source time). Never an ordering
+        // key: rows are ordered by (order, stepOrder). Unset on rows from before this column.
+        createdAt: v.optional(v.number()),
         embeddingId: v.optional(v.string()),
         error: v.optional(v.string()),
         fileIds: v.optional(v.array(v.id("chatFiles"))),
@@ -2461,6 +2464,9 @@ export const schema = defineSchema({
         // path. The displayed path descends from here by latest child.
         activeLeafMessageId: v.optional(v.string()),
         category: v.optional(v.string()),
+        // Creation time in ms, the sidebar's sort key. `_creationTime` is system-set and
+        // cannot carry an imported chat's source time; unset on rows from before this column.
+        createdAt: v.optional(v.number()),
         createdBy: v.optional(v.string()),
         customSystemPrompt: v.optional(v.string()),
         deleted: v.optional(v.boolean()),
@@ -2505,6 +2511,8 @@ export const schema = defineSchema({
         // nor seen twice.
         .index("by_userId", ["userId"])
         .index("by_user_and_status", ["userId", "status", "deleted"])
+        // The sidebar page: newest created first.
+        .index("by_user_and_status_createdAt", ["userId", "status", "deleted", "createdAt"])
         .index("by_user_and_pinned", ["userId", "pinnedAt"])
         .index("by_publicAccessToken", ["publicAccessToken"])
         .index("by_user_and_pinned_deleted", ["userId", "deleted", "pinnedAt"])

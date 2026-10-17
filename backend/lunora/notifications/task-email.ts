@@ -199,7 +199,10 @@ export const sendPendingOutcomeEmails = internalAction
             try {
                 const to = await ctx.runQuery(internal.notifications.task_email.loadRecipientEmail, { userId });
 
-                if (to && SITE_URL) {
+                // A configuration gap is not a skip: the row stays owed and is retried once the site URL is set.
+                if (to && !SITE_URL) {
+                    result = "failed";
+                } else if (to && SITE_URL) {
                     const { default: TaskOutcomeEmail } = await import("../email/templates/task-outcome");
                     const subject = `${title.replaceAll(/\s+/g, " ")} has finished`;
 

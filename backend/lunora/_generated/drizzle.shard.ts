@@ -752,6 +752,7 @@ export const messages = sqliteTable("messages", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     agentName: text("agentName"),
+    createdAt: real("createdAt"),
     embeddingId: text("embeddingId"),
     error: text("error"),
     fileIds: text("fileIds", { mode: "json" }).$type<Array<Id<"chatFiles">>>(),
@@ -1318,6 +1319,7 @@ export const threads = sqliteTable("threads", {
     _creationTime: integer("_creationTime").notNull(),
     activeLeafMessageId: text("activeLeafMessageId"),
     category: text("category"),
+    createdAt: real("createdAt"),
     createdBy: text("createdBy"),
     customSystemPrompt: text("customSystemPrompt"),
     deleted: integer("deleted", { mode: "boolean" }),
@@ -1362,6 +1364,7 @@ export const threads = sqliteTable("threads", {
     by_user_and_pinned_deleted: index("by_user_and_pinned_deleted").on(t.userId, t.deleted, t.pinnedAt),
     by_publicAccessToken: index("by_publicAccessToken").on(t.publicAccessToken),
     by_user_and_pinned: index("by_user_and_pinned").on(t.userId, t.pinnedAt),
+    by_user_and_status_createdAt: index("by_user_and_status_createdAt").on(t.userId, t.status, t.deleted, t.createdAt),
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status, t.deleted),
     by_userId: index("by_userId").on(t.userId),
 }));

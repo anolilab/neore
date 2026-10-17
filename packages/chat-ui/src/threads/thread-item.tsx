@@ -44,7 +44,7 @@ const ThreadItem = ({ isSelected = false, onArchive, onDelete, onPin, onSelect, 
     const [isHovered, setIsHovered] = useState(false);
 
     const title = thread.title || t`New Chat`;
-    const relativeTime = formatTimeAgo(thread._creationTime, i18n.locale);
+    const relativeTime = formatTimeAgo(thread.createdAt ?? thread._creationTime, i18n.locale);
     const isPinned = thread.pinnedAt !== undefined;
     const source = thread.source && thread.source !== null ? thread.source : undefined;
 

@@ -1,7 +1,10 @@
 import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 
-import { assertOfficeZipWithinLimits, OFFICE_ZIP_MAX_ENTRIES, OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES } from "./office-zip-limits";
+import { assertOfficeZipWithinLimits } from "./office-zip-limits";
+
+// Small caps, so the tests build small archives: the same check, a fraction of the time on CI.
+const SMALL = { maxBytes: 1000, maxEntries: 3 };
 
 const buildZip = async (files: Record<string, string>): Promise<ArrayBuffer> => {
     const zip = new JSZip();
@@ -21,26 +24,26 @@ describe(assertOfficeZipWithinLimits, () => {
     });
 
     it("rejects an archive that expands past the cap although it is tiny compressed", async () => {
-        const buffer = await buildZip({ "big.xml": "a".repeat(OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES + 1) });
+        const buffer = await buildZip({ "big.xml": "a".repeat(SMALL.maxBytes + 1) });
 
-        expect(buffer.byteLength).toBeLessThan(1024 * 1024);
-        expect(() => assertOfficeZipWithinLimits(buffer)).toThrow("expands too large");
+        expect(buffer.byteLength).toBeLessThan(SMALL.maxBytes);
+        expect(() => assertOfficeZipWithinLimits(buffer, SMALL)).toThrow("expands too large");
     });
 
     it("sums sizes across entries", async () => {
-        const half = "a".repeat(OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES / 2 + 1);
+        const half = "a".repeat(SMALL.maxBytes / 2 + 1);
 
         const buffer = await buildZip({ "a.xml": half, "b.xml": half });
 
-        expect(() => assertOfficeZipWithinLimits(buffer)).toThrow("expands too large");
+        expect(() => assertOfficeZipWithinLimits(buffer, SMALL)).toThrow("expands too large");
     });
 
     it("rejects too many entries", async () => {
-        const files = Object.fromEntries(Array.from({ length: OFFICE_ZIP_MAX_ENTRIES + 1 }, (_, index) => [`f${index}.xml`, ""]));
+        const files = Object.fromEntries(Array.from({ length: SMALL.maxEntries + 1 }, (_, index) => [`f${index}.xml`, ""]));
 
         const buffer = await buildZip(files);
 
-        expect(() => assertOfficeZipWithinLimits(buffer)).toThrow("too many entries");
+        expect(() => assertOfficeZipWithinLimits(buffer, SMALL)).toThrow("too many entries");
     });
 
     it("rejects data that is not a ZIP archive", () => {

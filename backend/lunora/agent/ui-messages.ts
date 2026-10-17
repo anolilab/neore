@@ -315,7 +315,7 @@ const createSystemUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataType
     };
 
     return {
-        _creationTime: message._creationTime,
+        _creationTime: message.createdAt ?? message._creationTime,
         agentName: message.agentName,
         id: message._id,
         key: `${message.threadId}-${message.order}-${message.stepOrder}`,
@@ -386,7 +386,7 @@ const createUserUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataTypes 
     }
 
     return {
-        _creationTime: message._creationTime,
+        _creationTime: message.createdAt ?? message._creationTime,
         id: message._id,
         key: `${message.threadId}-${message.order}-${message.stepOrder}`,
         metadata: message.metadata,
@@ -422,7 +422,7 @@ const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataT
 
     // Use first message for special fields
     const common = {
-        _creationTime: firstMessage._creationTime,
+        _creationTime: firstMessage.createdAt ?? firstMessage._creationTime,
         agentName: firstMessage.agentName,
         id: firstMessage._id,
         key: `${firstMessage.threadId}-${firstMessage.order}-${firstMessage.stepOrder}`,

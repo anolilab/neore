@@ -858,6 +858,7 @@ export interface Doc_messages {
     _id: Id<"messages">;
     _creationTime: number;
     agentName?: string;
+    createdAt?: number;
     embeddingId?: string;
     error?: string;
     fileIds?: Array<Id<"chatFiles">>;
@@ -1604,6 +1605,7 @@ export interface Doc_threads {
     _creationTime: number;
     activeLeafMessageId?: string;
     category?: string;
+    createdAt?: number;
     createdBy?: string;
     customSystemPrompt?: string;
     deleted?: boolean;
@@ -2225,7 +2227,7 @@ export interface IndexNamesByTable {
     threadKnowledge: "by_knowledgeFileId" | "by_threadId";
     threadPins: "by_user_and_thread" | "by_thread";
     threadRelationships: "by_userId" | "by_parent_and_thread" | "by_thread";
-    threads: "by_user_and_organization_and_updatedAt" | "by_user_and_updatedAt" | "by_user_and_order" | "by_userId_externalThreadId" | "by_user_and_team" | "by_user_and_organization" | "by_projectId" | "by_user_and_pinned_deleted" | "by_publicAccessToken" | "by_user_and_pinned" | "by_user_and_status" | "by_userId";
+    threads: "by_user_and_organization_and_updatedAt" | "by_user_and_updatedAt" | "by_user_and_order" | "by_userId_externalThreadId" | "by_user_and_team" | "by_user_and_organization" | "by_projectId" | "by_user_and_pinned_deleted" | "by_publicAccessToken" | "by_user_and_pinned" | "by_user_and_status_createdAt" | "by_user_and_status" | "by_userId";
     threadTags: "by_user_and_order";
     threadVariables: "by_user" | "by_thread";
     toolApprovalRuns: "by_userId_status_createdAt" | "by_status_resolvedAt" | "by_status_createdAt" | "by_threadId" | "by_approvalId";
@@ -3512,6 +3514,7 @@ export interface Insert_messages {
     _id?: Id<"messages">;
     _creationTime?: number;
     agentName?: string;
+    createdAt?: number;
     embeddingId?: string;
     error?: string;
     fileIds?: Array<Id<"chatFiles">>;
@@ -4258,6 +4261,7 @@ export interface Insert_threads {
     _creationTime?: number;
     activeLeafMessageId?: string;
     category?: string;
+    createdAt?: number;
     createdBy?: string;
     customSystemPrompt?: string;
     deleted?: boolean;

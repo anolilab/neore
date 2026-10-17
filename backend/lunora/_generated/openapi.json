@@ -11834,6 +11834,9 @@
                       "activeLeafMessageId": {
                         "type": "string"
                       },
+                      "createdAt": {
+                        "type": "number"
+                      },
                       "groupChat": {
                         "properties": {
                           "debateRounds": {
@@ -11953,16 +11956,13 @@
                             "type": "string"
                           }
                         ]
-                      },
-                      "createdAt": {
-                        "type": "number"
                       }
                     },
                     "required": [
                       "_creationTime",
                       "_id",
-                      "status",
-                      "createdAt"
+                      "createdAt",
+                      "status"
                     ],
                     "type": "object"
                   },
@@ -12322,6 +12322,9 @@
                       },
                       "_id": {
                         "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "number"
                       },
                       "createdBy": {
                         "type": "string"
@@ -12771,6 +12774,9 @@
                       },
                       "_id": {
                         "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "number"
                       },
                       "createdBy": {
                         "type": "string"

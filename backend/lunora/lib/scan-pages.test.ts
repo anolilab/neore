@@ -19,7 +19,7 @@ const source = (total: number, size: number) => {
 
 describe("scanPages", () => {
     it("reaches a row far past any fixed count and stops there", async () => {
-        const { fetchPage, fetched } = source(1000, 50);
+        const { fetched, fetchPage } = source(1000, 50);
 
         await scanPages(fetchPage, (item) => item === 700);
 
@@ -40,7 +40,7 @@ describe("scanPages", () => {
     });
 
     it("stops at the page budget", async () => {
-        const { fetchPage, fetched } = source(1000, 10);
+        const { fetched, fetchPage } = source(1000, 10);
 
         await scanPages(fetchPage, () => false, 3);
 
