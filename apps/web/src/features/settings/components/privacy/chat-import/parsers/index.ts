@@ -67,8 +67,8 @@ const detectProvider = (data: unknown): ImportProvider => {
         }
 
         // Local transcripts: JSONL events, matched on any of the first few records
-        // (the leading ones can be bookkeeping lines)
-        const head = data.slice(0, 20);
+        // (the leading ones can be bookkeeping lines, e.g. snapshots of a resumed session)
+        const head = data.slice(0, 200);
 
         if (head.some((record) => isClaudeCodeRecord(record))) {
             return "claude-code";

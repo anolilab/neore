@@ -13,6 +13,11 @@ import { pickResumeThreadId } from "@/features/chat/core/utils/resume-thread";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+// Module scope, so it outlives this component's mounts for one page load. Only the
+// first /chat visit resumes; "New chat" and the other in-app paths land here later
+// and must get a blank chat. Effects never run during SSR, so it is never shared.
+let resumeAttemptedThisLoad = false;
+
 const ChatPage = () => {
     const route = "/(chat)/chat/";
     const context = useRouteContext({ from: route });
@@ -54,9 +59,11 @@ const ChatPage = () => {
     }, [hasInitialMessage]);
 
     useEffect(() => {
-        if (!resumeLastChat || !listData) {
+        if (!resumeLastChat || !listData || resumeAttemptedThisLoad) {
             return;
         }
+
+        resumeAttemptedThisLoad = true;
 
         const branchIds = new Set(listData.relationships.map((relationship) => relationship.threadId));
         const threadId = pickResumeThreadId(listData.threads.page, branchIds);

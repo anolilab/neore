@@ -60,12 +60,8 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
                         {data.runs.map((run, index) => (
                             <TableRow key={run._id}>
                                 <TableHead scope="row">{names[index]}</TableHead>
-                                <TableCell className="text-right tabular-nums">
-                                    {data.cases.filter((entry) => entry.results[index]?.passed === true).length}
-                                </TableCell>
-                                <TableCell className="text-right tabular-nums">
-                                    {data.cases.filter((entry) => entry.results[index]?.passed === false).length}
-                                </TableCell>
+                                <TableCell className="text-right tabular-nums">{run.summary?.passed ?? 0}</TableCell>
+                                <TableCell className="text-right tabular-nums">{(run.summary?.scored ?? 0) - (run.summary?.passed ?? 0)}</TableCell>
                                 <TableCell className="text-right tabular-nums">{formatPercent(run.summary?.passRate)}</TableCell>
                                 <TableCell className="text-right tabular-nums">{formatCost(run.costMicrodollars)}</TableCell>
                             </TableRow>

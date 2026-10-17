@@ -6,7 +6,7 @@
  * `tool_use`, `tool_result`). Only text is kept; sidechain (sub-agent) and
  * meta events are skipped.
  */
-import { asRecord, buildSession, parseTimestamp } from "./local-session";
+import { asRecord, buildSession, messageFromTexts, parseTimestamp } from "./local-session";
 import type { NormalizedConversation, NormalizedMessage } from "./types";
 
 const HARNESS_PREFIXES = ["<command-name>", "<command-message>", "<local-command-", "<system-reminder>", "Caveat: The messages below"];
@@ -64,13 +64,11 @@ const parseClaudeCode = (data: unknown): NormalizedConversation[] => {
             }
         }
 
-        const text = texts.join("\n\n").trim();
+        const message = messageFromTexts(texts, event.type, parseTimestamp(event.timestamp), HARNESS_PREFIXES);
 
-        if (!text || HARNESS_PREFIXES.some((prefix) => text.startsWith(prefix))) {
-            continue;
+        if (message) {
+            messages.push(message);
         }
-
-        messages.push({ content: text, createdAt: parseTimestamp(event.timestamp), role: event.type });
     }
 
     const session = buildSession(messages, dropped, title);

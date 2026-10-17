@@ -127,16 +127,20 @@ const DataImport: FC = () => {
                 const extracted = await Promise.all(files.map((file) => extractJsonFromFile(file)));
                 const jsonDataArray = extracted.flat();
 
-                // Merge all parsed conversations
-                let allConversations: NormalizedConversation[] = [];
-                let detectedProvider: ImportProvider | undefined;
+                // Each file is detected on its own: a shared hint would parse a second
+                // format with the first one's parser and drop its sessions silently.
+                const results = jsonDataArray.map((jsonData) => parseExportFile(jsonData));
+                const providers = new Set(results.map((result) => result.provider));
+                const allConversations = results.flatMap((result) => result.conversations);
 
-                for (const jsonData of jsonDataArray) {
-                    const result = parseExportFile(jsonData, detectedProvider);
+                // One import job carries one provider, so a mixed selection cannot run.
+                if (providers.size > 1) {
+                    setState({ message: t`Import one kind of export at a time.`, step: "error" });
 
-                    detectedProvider = result.provider;
-                    allConversations = [...allConversations, ...result.conversations];
+                    return;
                 }
+
+                const [detectedProvider] = providers;
 
                 if (!detectedProvider || allConversations.length === 0) {
                     setState({ message: t`No conversations found in the file.`, step: "error" });

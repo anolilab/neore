@@ -106,6 +106,7 @@ const splitBlock = (block: Block, limit: number): TelegramChunk[] => {
 
         if (renderBlock(block, [line]).html.length > limit) {
             // ponytail: an over-long line is cut by source length, not rendered length; a piece Telegram still rejects falls back to plain text
+            // Escaping and tags can multiply the length of a line by up to about six, so the source piece is a sixth of the limit.
             for (const part of splitMessage(line, Math.floor(limit / 6))) {
                 pieces.push(renderBlock(block, [part]));
             }

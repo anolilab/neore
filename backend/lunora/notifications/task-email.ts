@@ -19,7 +19,7 @@ import { SITE_URL } from "../env";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, rateLimit } from "../lib/crpc";
 import type { NotificationInput } from "./notify";
-import { notify } from "./notify";
+import { notifyQuietly } from "./notify";
 
 /** The settings toggle. */
 export const setTaskEmailEnabled = authMutation
@@ -43,28 +43,43 @@ export const setTaskEmailEnabled = authMutation
     });
 
 /**
- * Writes the inbox entry (never failing the caller) and, for a successful run
- * that `hasResult`, queues the opted-in email.
+ * Only a NEW notification for a successful run that produced a result is mailed,
+ * and only to users who opted in.
+ */
+export const shouldEmailOutcome = (input: {
+    hasResult: boolean;
+    notificationId: Id<"notifications"> | null;
+    outcome: "failure" | "success" | undefined;
+    taskEmailEnabled: boolean | undefined;
+}): boolean => input.notificationId !== null && input.hasResult && input.outcome === "success" && input.taskEmailEnabled === true;
+
+/**
+ * Writes the inbox entry (never failing the caller), then mails the outcome when
+ * {@link shouldEmailOutcome} says so. `hasResult` is the caller's own meaning of
+ * "this run produced something to read": a summary for a task, a thread for a trigger.
  */
 export const notifyOutcome = async (ctx: MutationCtx, input: NotificationInput, hasResult: boolean): Promise<void> => {
+    const notificationId = await notifyQuietly(ctx, input);
+
+    if (!notificationId) {
+        return;
+    }
+
+    const settings = await ctx.db.userSettings.findFirst({ where: { userId: input.userId } });
+
+    if (!shouldEmailOutcome({ hasResult, notificationId, outcome: input.outcome, taskEmailEnabled: settings?.taskEmailEnabled })) {
+        return;
+    }
+
+    // The inbox entry is already written: a failed mail must not fail the run it reports on.
     try {
-        const notificationId = await notify(ctx, input);
-
-        if (!notificationId || !hasResult || input.outcome !== "success" || !input.link) {
-            return;
-        }
-
-        const settings = await ctx.db.userSettings.findFirst({ where: { userId: input.userId } });
-
-        if (settings?.taskEmailEnabled === true) {
-            await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendTaskOutcomeEmail, {
-                link: input.link,
-                title: input.title,
-                userId: input.userId,
-            });
-        }
+        await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendTaskOutcomeEmail, {
+            link: input.link ?? "/",
+            title: input.title,
+            userId: input.userId,
+        });
     } catch (error) {
-        console.warn(`[notifications] Failed to write a ${input.type} notification:`, error);
+        console.warn("[notifications] Failed to schedule the outcome email:", error);
     }
 };
 

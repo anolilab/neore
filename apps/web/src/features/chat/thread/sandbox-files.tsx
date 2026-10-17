@@ -2,7 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { SandboxOutputFile, SandboxOutputs, SkippedSandboxFile } from "@neore/chat-ui/types";
-import { formatFileSize } from "@neore/ui/components/file-renderers/file-type-utilities";
+import { formatFileSize, isDocx, isPdf } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { DownloadIcon, EyeIcon, FileArchiveIcon, FileAudioIcon, FileIcon, FileImageIcon, FileSpreadsheetIcon, FileTextIcon, FileVideoIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -74,11 +74,11 @@ type OfficeKind = "docx" | "pdf" | "pptx" | "xlsx";
 const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | undefined => {
     const extension = name.split(".").pop()?.toLowerCase();
 
-    if (mediaType === "application/pdf" || extension === "pdf") {
+    if (isPdf(mediaType, name)) {
         return "pdf";
     }
 
-    if (mediaType.includes("wordprocessingml") || extension === "docx") {
+    if (isDocx(mediaType, name)) {
         return "docx";
     }
 
@@ -94,20 +94,40 @@ const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | unde
 };
 
 const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
-    const [data, setData] = useState<Blob>();
+    const { t } = useLingui();
+    const [state, setState] = useState<{ blob?: Blob; failed?: boolean }>({});
 
     useEffect(() => {
         const controller = new AbortController();
 
         fetch(url, { signal: controller.signal })
-            .then(async (response) => response.blob())
-            .then(setData)
-            .catch(() => undefined);
+            .then((response) => {
+                // An expired signed URL answers 403 with a plain-text body; that is not a deck.
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                return response.blob();
+            })
+            .then((blob) => setState({ blob }))
+            .catch(() => {
+                if (!controller.signal.aborted) {
+                    setState({ failed: true });
+                }
+            });
 
         return () => controller.abort();
     }, [url]);
 
-    return data ? <PptxPreview data={data} fileName={name} /> : null;
+    if (state.failed) {
+        return (
+            <p className="text-muted-foreground p-3 text-sm" role="status">
+                {t`This preview could not be loaded.`}
+            </p>
+        );
+    }
+
+    return state.blob ? <PptxPreview data={state.blob} fileName={name} /> : null;
 };
 
 const OfficePreview: FC<{ file: SandboxOutputFile; kind: OfficeKind }> = ({ file, kind }) => (

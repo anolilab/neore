@@ -9,7 +9,7 @@
  * `turn_context` and `session_meta` records. Context the CLI injects as user
  * messages (environment and instruction blocks) is skipped.
  */
-import { asRecord, buildSession, parseTimestamp } from "./local-session";
+import { asRecord, buildSession, messageFromTexts, parseTimestamp } from "./local-session";
 import type { NormalizedConversation, NormalizedMessage } from "./types";
 
 const RECORD_TYPES = new Set(["event_msg", "response_item", "session_meta", "turn_context"]);
@@ -48,17 +48,14 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
             continue;
         }
 
-        const text = payload.content
+        const texts = payload.content
             .map((block) => asRecord(block))
-            .flatMap((block) => (block && (block.type === "input_text" || block.type === "output_text") && typeof block.text === "string" ? [block.text] : []))
-            .join("\n\n")
-            .trim();
+            .flatMap((block) => (block && (block.type === "input_text" || block.type === "output_text") && typeof block.text === "string" ? [block.text] : []));
+        const message = messageFromTexts(texts, payload.role, parseTimestamp(record.timestamp), INJECTED_PREFIXES);
 
-        if (!text || INJECTED_PREFIXES.some((prefix) => text.startsWith(prefix))) {
-            continue;
+        if (message) {
+            messages.push(message);
         }
-
-        messages.push({ content: text, createdAt: parseTimestamp(record.timestamp), role: payload.role });
     }
 
     const session = buildSession(messages, dropped);

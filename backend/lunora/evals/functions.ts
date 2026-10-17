@@ -607,6 +607,12 @@ export const updateCase = authMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const evalCase = await requireOwnedCase(ctx, args.caseId, ctx.user.userId);
+
+        // A frozen case is a regression check: unfreeze it before changing what it checks.
+        if (evalCase.frozen) {
+            throw new LunoraError("BAD_REQUEST", "Unfreeze this case before editing it");
+        }
+
         const draft = requireDraft(args);
 
         await patchById(ctx.db, evalCase._id, {
@@ -886,6 +892,23 @@ export const compareRuns = authQuery
     });
 
 /** The newest finished run of each distinct model on a dataset, with every case's outcome per run. */
+/**
+ * Two runs share a column only when they ran the same thing: the same skill,
+ * model and prompt, or the same knowledge files. A bare model name would merge a
+ * model run with a skill run that happens to use that model.
+ */
+const comparisonKey = (target: Infer<typeof vEvalTarget>): string => {
+    if (target.kind === "skill") {
+        return `skill:${target.skillId}:${target.model ?? ""}`;
+    }
+
+    if (target.kind === "knowledge") {
+        return `knowledge:${target.fileIds.join(",")}:${target.model ?? ""}`;
+    }
+
+    return `model:${target.model}:${target.systemPrompt ?? ""}`;
+};
+
 export const compareModels = authQuery
     .input({ datasetId: v.id("evalDatasets") })
     .output(v.from(vModelComparison))
@@ -897,17 +920,17 @@ export const compareModels = authQuery
             .withIndex("by_dataset_and_createdAt", (q) => q.eq("datasetId", dataset._id))
             .order("desc")
             .take(MAX_RUNS_LISTED);
-        const newestPerModel = new Map<string, Doc<"evalRuns">>();
+        const newestPerTarget = new Map<string, Doc<"evalRuns">>();
 
         for (const run of recent) {
-            const key = run.target.model ?? run.target.kind;
+            const key = comparisonKey(run.target);
 
-            if (run.userId === userId && (run.status === "completed" || run.status === "cost_capped") && !newestPerModel.has(key)) {
-                newestPerModel.set(key, run);
+            if (run.userId === userId && (run.status === "completed" || run.status === "cost_capped") && !newestPerTarget.has(key)) {
+                newestPerTarget.set(key, run);
             }
         }
 
-        const runs = [...newestPerModel.values()].slice(0, MAX_COMPARED_MODELS);
+        const runs = [...newestPerTarget.values()].slice(0, MAX_COMPARED_MODELS);
         const [cases, ...resultSets] = await Promise.all([loadCases(ctx, dataset._id), ...runs.map((run) => loadRunResults(ctx, run._id))]);
         const outcomes = resultSets.map((results) => new Map(results.map((result) => [result.caseId as string, result])));
 

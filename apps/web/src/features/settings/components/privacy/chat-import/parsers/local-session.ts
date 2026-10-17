@@ -27,6 +27,26 @@ const titleFrom = (text: string): string => {
 };
 
 /** Merge consecutive same-role messages: one turn is often written as several records. */
+/**
+ * One message from the text blocks of a record. A record whose joined text is
+ * empty or starts with an injected prefix (harness or environment boilerplate,
+ * not something the user said) yields nothing.
+ */
+export const messageFromTexts = (
+    texts: string[],
+    role: NormalizedMessage["role"],
+    createdAt: number | undefined,
+    injectedPrefixes: readonly string[],
+): NormalizedMessage | null => {
+    const content = texts.join("\n\n").trim();
+
+    if (!content || injectedPrefixes.some((prefix) => content.startsWith(prefix))) {
+        return null;
+    }
+
+    return { content, createdAt, role };
+};
+
 export const buildSession = (messages: NormalizedMessage[], droppedToolItems: number, title?: string): NormalizedConversation | null => {
     const merged: NormalizedMessage[] = [];
 

@@ -108,11 +108,13 @@ export const notify = async (ctx: MutationCtx, input: NotificationInput): Promis
     return notificationId;
 };
 
-/** For writers that must not fail on a notification: logs and swallows. */
-export const notifyQuietly = async (ctx: MutationCtx, input: NotificationInput): Promise<void> => {
+/** For writers that must not fail on a notification: logs and swallows. Returns the id, or `null`. */
+export const notifyQuietly = async (ctx: MutationCtx, input: NotificationInput): Promise<Id<"notifications"> | null> => {
     try {
-        await notify(ctx, input);
+        return await notify(ctx, input);
     } catch (error) {
         console.warn(`[notifications] Failed to write a ${input.type} notification:`, error);
+
+        return null;
     }
 };

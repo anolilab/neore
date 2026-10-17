@@ -23,6 +23,41 @@ import { getCurrentPushSubscription, getPushSupport, subscribeBrowser, unsubscri
  * account holds that subscription — a browser subscribed under another account
  * (or dropped server-side) reads off, and turning it on registers it here.
  */
+type SettingMutation = {
+    isPending: boolean;
+    mutate: (variables: { enabled: boolean }, options: { onError: () => void; onSuccess: () => void }) => void;
+};
+
+/**
+ * A saved on/off setting that flips at once. A failed save rolls it back and says
+ * so; a saved one confirms with a toast.
+ */
+const useOptimisticSetting = (
+    saved: boolean | undefined,
+    mutation: SettingMutation,
+    messages: { error: string; off: string; on: string },
+): { checked: boolean; disabled: boolean; onCheckedChange: (checked: boolean) => void } => {
+    const [pending, setPending] = useState<boolean | undefined>(undefined);
+
+    return {
+        checked: pending ?? saved === true,
+        disabled: mutation.isPending,
+        onCheckedChange: (checked) => {
+            setPending(checked);
+            mutation.mutate(
+                { enabled: checked },
+                {
+                    onError: () => {
+                        setPending(!checked);
+                        toast.error(messages.error);
+                    },
+                    onSuccess: () => toast.success(checked ? messages.on : messages.off),
+                },
+            );
+        },
+    };
+};
+
 const NotificationSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -57,12 +92,18 @@ const NotificationSettings: FC = () => {
     const setDailyBrief = useMutation(crpc.notifications.daily_brief.setDailyBriefEnabled.mutationOptions());
 
     const setTaskEmail = useMutation(crpc.notifications.task_email.setTaskEmailEnabled.mutationOptions());
-    const [taskEmail, setTaskEmailState] = useState<boolean | undefined>(undefined);
-    const taskEmailEnabled = taskEmail ?? userSettings.data?.taskEmailEnabled === true;
+    const taskEmail = useOptimisticSetting(userSettings.data?.taskEmailEnabled, setTaskEmail, {
+        error: t`Could not save the email setting.`,
+        off: t`Task emails turned off`,
+        on: t`Task emails turned on`,
+    });
 
     const pushAvailable = Boolean(config?.publicKey) && support === "supported";
-    const [dailyBrief, setDailyBriefState] = useState<boolean | undefined>(undefined);
-    const dailyBriefEnabled = dailyBrief ?? userSettings.data?.dailyBriefEnabled === true;
+    const dailyBrief = useOptimisticSetting(userSettings.data?.dailyBriefEnabled, setDailyBrief, {
+        error: t`Could not save the Daily Brief setting.`,
+        off: t`Daily Brief turned off`,
+        on: t`Daily Brief turned on`,
+    });
 
     const togglePush = async (checked: boolean): Promise<void> => {
         setBusy(true);
@@ -181,22 +222,10 @@ const NotificationSettings: FC = () => {
                     </div>
                     <Switch
                         aria-describedby="daily-brief-hint"
-                        checked={dailyBriefEnabled}
-                        disabled={setDailyBrief.isPending}
+                        checked={dailyBrief.checked}
+                        disabled={dailyBrief.disabled}
                         id="daily-brief"
-                        onCheckedChange={(checked) => {
-                            setDailyBriefState(checked);
-                            setDailyBrief.mutate(
-                                { enabled: checked },
-                                {
-                                    onError: () => {
-                                        setDailyBriefState(!checked);
-                                        toast.error(t`Could not save the Daily Brief setting.`);
-                                    },
-                                    onSuccess: () => toast.success(checked ? t`Daily Brief turned on` : t`Daily Brief turned off`),
-                                },
-                            );
-                        }}
+                        onCheckedChange={dailyBrief.onCheckedChange}
                     />
                 </div>
                 <div className="flex items-center justify-between gap-4">
@@ -210,22 +239,10 @@ const NotificationSettings: FC = () => {
                     </div>
                     <Switch
                         aria-describedby="task-email-hint"
-                        checked={taskEmailEnabled}
-                        disabled={setTaskEmail.isPending}
+                        checked={taskEmail.checked}
+                        disabled={taskEmail.disabled}
                         id="task-email"
-                        onCheckedChange={(checked) => {
-                            setTaskEmailState(checked);
-                            setTaskEmail.mutate(
-                                { enabled: checked },
-                                {
-                                    onError: () => {
-                                        setTaskEmailState(!checked);
-                                        toast.error(t`Could not save the email setting.`);
-                                    },
-                                    onSuccess: () => toast.success(checked ? t`Task emails turned on` : t`Task emails turned off`),
-                                },
-                            );
-                        }}
+                        onCheckedChange={taskEmail.onCheckedChange}
                     />
                 </div>
             </CardContent>
