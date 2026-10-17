@@ -93,6 +93,8 @@ const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | unde
     return undefined;
 };
 
+const PPTX_FETCH_TIMEOUT_MS = 30_000;
+
 const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
     const { t } = useLingui();
     const [state, setState] = useState<{ blob?: Blob; failed?: boolean }>({});
@@ -100,7 +102,10 @@ const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
     useEffect(() => {
         const controller = new AbortController();
 
-        fetch(url, { signal: controller.signal })
+        // A deadline as well as the unmount abort: a stalled signed URL must not hold the preview forever.
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(PPTX_FETCH_TIMEOUT_MS)]);
+
+        fetch(url, { signal })
             .then((response) => {
                 // An expired signed URL answers 403 with a plain-text body; that is not a deck.
                 if (!response.ok) {

@@ -235,12 +235,17 @@ export const sendTelegramMessage = async (botToken: string, chatId: number | str
             for (const plain of splitLossless(chunk.source, TELEGRAM_MESSAGE_LIMIT)) {
                 const sent = await post({ text: plain });
 
-                await sent.body?.cancel();
-
                 if (!sent.ok) {
-                    break;
+                    console.error(`Telegram sendMessage plain-text retry failed: ${sent.status} ${await sent.text()}`);
+
+                    return false;
                 }
+
+                await sent.body?.cancel();
             }
+
+            // The chunk went out as plain text; the rejected HTML response is already consumed.
+            continue;
         }
 
         if (!response.ok) {
