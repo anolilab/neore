@@ -41,9 +41,9 @@ export interface TelegramChunk {
     source: string;
 }
 
-/** A piece of a block. `sameBlock`: it continues the block before it, so it joins with one newline. */
+/** A piece of a block. `joinWith`: what sits between it and the text before it, when they share a chunk. */
 interface Piece extends TelegramChunk {
-    sameBlock: boolean;
+    joinWith: string;
 }
 
 interface Block {
@@ -222,16 +222,27 @@ const splitBlock = (block: Block, limit: number): Piece[] => {
     const whole = renderBlock(block, block.lines);
 
     if (whole.html.length <= limit) {
-        return [{ ...whole, sameBlock: false }];
+        return [{ ...whole, joinWith: "\n\n" }];
     }
 
-    const pieces: TelegramChunk[] = [];
+    const pieces: Piece[] = [];
     let current: string[] = [];
+    // A block starts after a blank line; a line within the block follows a newline.
+    let joinWith = "\n\n";
+
+    const flush = () => {
+        if (current.length === 0) {
+            return;
+        }
+
+        pieces.push({ ...renderBlock(block, current), joinWith });
+        current = [];
+        joinWith = "\n";
+    };
 
     for (const line of block.lines) {
         if (current.length > 0 && renderBlock(block, [...current, line]).html.length > limit) {
-            pieces.push(renderBlock(block, current));
-            current = [];
+            flush();
         }
 
         if (renderBlock(block, [line]).html.length > limit) {
@@ -240,21 +251,19 @@ const splitBlock = (block: Block, limit: number): Piece[] => {
             // Inside a fenced block a backtick is literal text, not a code delimiter.
             const parts = splitLossless(line, Math.floor(limit / 6), !block.code);
 
-            for (const part of parts) {
-                pieces.push(renderBlock(block, [part]));
-            }
+            parts.forEach((part, index) => {
+                // The parts of one line are the same line: they join with nothing.
+                pieces.push({ ...renderBlock(block, [part]), joinWith: index === 0 ? joinWith : "" });
+            });
+            joinWith = "\n";
         } else {
             current.push(line);
         }
     }
 
-    if (current.length > 0) {
-        pieces.push(renderBlock(block, current));
-    }
+    flush();
 
-    return pieces.map((piece, index) => {
-        return { ...piece, sameBlock: index > 0 };
-    });
+    return pieces;
 };
 
 /**
@@ -268,8 +277,10 @@ export const formatTelegramMessage = (markdown: string, limit: number = TELEGRAM
     const pieces = toBlocks(markdown).flatMap((block) => splitBlock(block, limit));
 
     for (const piece of pieces) {
-        if (current && current.html.length + 2 + piece.html.length <= limit) {
-            current = { html: `${current.html}\n\n${piece.html}`, source: `${current.source}\n\n${piece.source}` };
+        const separator = piece.joinWith;
+
+        if (current && current.html.length + separator.length + piece.html.length <= limit) {
+            current = { html: `${current.html}${separator}${piece.html}`, source: `${current.source}${separator}${piece.source}` };
         } else {
             if (current) {
                 chunks.push(current);

@@ -122,3 +122,19 @@ describe("nested fences", () => {
         expect(chunk?.html.endsWith("</pre>")).toBe(true);
     });
 });
+
+describe("one oversized line", () => {
+    it("keeps the cut parts on one line, with no blank line inside it", () => {
+        const line = Array.from({ length: 800 }, (_, index) => `word${index}`).join(" ");
+        const chunks = formatTelegramMessage(line, 400);
+
+        expect(chunks.length).toBeGreaterThan(1);
+
+        for (const chunk of chunks) {
+            expect(chunk.html).not.toContain("\n\n");
+            expect(chunk.source).not.toContain("\n\n");
+        }
+
+        expect(chunks.map((chunk) => chunk.source).join("")).toBe(line);
+    });
+});

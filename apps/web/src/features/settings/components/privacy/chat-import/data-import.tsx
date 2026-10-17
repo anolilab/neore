@@ -49,6 +49,14 @@ const importErrorMessage = (error: unknown, i18n: I18n, fallback: string): strin
     return error instanceof Error && error.message ? error.message : fallback;
 };
 
+const describeError = (error: unknown): string => {
+    if (error instanceof ChatImportError) {
+        return error.message;
+    }
+
+    return error instanceof Error ? error.message : String(error);
+};
+
 const DataImport: FC = () => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
@@ -128,13 +136,30 @@ const DataImport: FC = () => {
             setState({ step: "parsing" });
 
             try {
-                const extracted = await Promise.all(files.map((file) => extractJsonFromFile(file)));
-                const jsonDataArray = extracted.flat();
+                const extracted = await Promise.all(
+                    files.map(async (file) => {
+                        return { name: file.name, records: await extractJsonFromFile(file) };
+                    }),
+                );
+                const jsonDataArray = extracted.flatMap(({ name, records }) =>
+                    records.map((jsonData) => {
+                        return { jsonData, name };
+                    }),
+                );
 
                 // Each file is detected on its own: a shared hint would parse a second
                 // format with the first one's parser and drop its sessions silently.
                 // An empty file in an archive (`[]`, `{}`) carries nothing to import and must not block the rest.
-                const results = jsonDataArray.filter((jsonData) => !isEmptyExport(jsonData)).map((jsonData) => parseExportFile(jsonData));
+                const results = jsonDataArray
+                    .filter(({ jsonData }) => !isEmptyExport(jsonData))
+                    .map(({ jsonData, name }) => {
+                        try {
+                            return parseExportFile(jsonData);
+                        } catch (error) {
+                            // Name the file the failure came from; a ZIP's entries are reported under the archive.
+                            throw new Error(`${name}: ${describeError(error)}`, { cause: error });
+                        }
+                    });
                 const providers = new Set(results.map((result) => result.provider));
 
                 // One import job carries one provider, so a mixed selection cannot run.
