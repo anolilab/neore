@@ -11,6 +11,7 @@ import schema from "../schema";
 import { notify } from "./notify";
 import {
     dispatchOutcomeEmails,
+    claimOutcomeEmail,
     listPendingOutcomeEmails,
     loadRecipientEmail,
     OUTCOME_EMAIL_MAX_ATTEMPTS,
@@ -46,6 +47,7 @@ const run = async <R>(procedure: unknown, args: Record<string, unknown> = {}): P
     await harness.run(async (ctx: any) => await (procedure as Handler<R>).handler(ctx, args));
 
 const handlers = new Map<unknown, unknown>([
+    [internal.notifications.task_email.claimOutcomeEmail, claimOutcomeEmail],
     [internal.notifications.task_email.listPendingOutcomeEmails, listPendingOutcomeEmails],
     [internal.notifications.task_email.loadRecipientEmail, loadRecipientEmail],
     [internal.notifications.task_email.settleOutcomeEmail, settleOutcomeEmail],
@@ -77,7 +79,9 @@ const firstOutbox = async () => {
 };
 
 const seedUser = async (taskEmailEnabled = true) => {
-    USER = await harness.run(async (ctx: any) => await ctx.db.insert("user", { createdAt: 1, email: "a@example.com", emailVerified: true, name: "A", updatedAt: 1 }));
+    USER = await harness.run(
+        async (ctx: any) => await ctx.db.insert("user", { createdAt: 1, email: "a@example.com", emailVerified: true, name: "A", updatedAt: 1 }),
+    );
 
     await harness.run(async (ctx: any) => {
         await ctx.db.insert("userSettings", { taskEmailEnabled, userId: USER });
@@ -137,6 +141,17 @@ describe("sweep", () => {
         expect(queueEmail).toHaveBeenCalledTimes(1);
         expect(queueEmail).toHaveBeenCalledWith(expect.objectContaining({ to: "a@example.com" }));
         expect(await firstOutbox()).toMatchObject({ status: "sent" });
+    });
+
+    it("lets only one run claim a row, so overlapping runs cannot both send it", async () => {
+        await seedUser();
+        await write();
+        const [row] = await outbox();
+
+        const claim = async () => await harness.run(async (ctx: any) => await claimOutcomeEmail.handler(ctx, { id: row._id }));
+
+        expect(await claim()).toBe(true);
+        expect(await claim()).toBe(false);
     });
 
     it("keeps the row pending with attempts incremented when the mailer fails, then gives up at the cap", async () => {

@@ -1054,6 +1054,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "notifications_push:sendPushForNotification": lunora_notifications_push_126.sendPushForNotification as unknown as RegisteredLunoraFunction,
     "notifications_push:subscribePush": lunora_notifications_push_126.subscribePush as unknown as RegisteredLunoraFunction,
     "notifications_push:unsubscribePush": lunora_notifications_push_126.unsubscribePush as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:claimOutcomeEmail": lunora_notifications_task_email_127.claimOutcomeEmail as unknown as RegisteredLunoraFunction,
     "notifications_task_email:dispatchOutcomeEmails": lunora_notifications_task_email_127.dispatchOutcomeEmails as unknown as RegisteredLunoraFunction,
     "notifications_task_email:listPendingOutcomeEmails": lunora_notifications_task_email_127.listPendingOutcomeEmails as unknown as RegisteredLunoraFunction,
     "notifications_task_email:loadRecipientEmail": lunora_notifications_task_email_127.loadRecipientEmail as unknown as RegisteredLunoraFunction,
@@ -6652,6 +6653,12 @@ if (typeof source["notificationId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "notificationId": source["notificationId"], "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_notifications_task_email_127.claimOutcomeEmail.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["id"] !== "string") return DEFER;
+return { "id": source["id"] };
+});
 installCompiledValidatorMap(lunora_notifications_task_email_127.loadRecipientEmail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8581,7 +8588,7 @@ export interface Caller {
         tools: {
             browser_node: {
                 closeBrowserSession: (args: { sessionId: Id<"browserSessions"> }) => Promise<void>;
-                executeBrowserAction: (args: { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }) => Promise<unknown>;
+                executeBrowserAction: (args: { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }) => Promise<import("@neore/service-sdk/browser-renderer").BrowserActionResponse>;
             };
             code_execution_node: {
                 default: (args: { code: string; threadId?: Id<"threads">; timeoutMs?: number; userId?: string }) => Promise<{ files: import("../chat/tools/sandbox-outputs.js").SandboxOutputFile[]; skippedFiles: import("../chat/tools/sandbox-outputs.js").SkippedOutputFile[]; error: string | undefined; results: { type: "text"; value: string; }[]; stderr: string; stdout: string; } | { error: string; results: { type: "error"; value: string; }[]; stderr: string; stdout: string; } | { error: string | undefined; results: { format?: string; type: "text" | "image" | "error"; value: string; }[]; stderr: string; stdout: string; }>;
@@ -9106,6 +9113,7 @@ export interface Caller {
             unsubscribePush: (args: { endpoint: string }) => Promise<null>;
         };
         task_email: {
+            claimOutcomeEmail: (args: { id: Id<"outcomeEmails"> }) => Promise<boolean>;
             dispatchOutcomeEmails: (args?: {}) => Promise<null>;
             listPendingOutcomeEmails: (args?: {}) => Promise<Array<{ id: Id<"outcomeEmails">; link: string; title: string; userId: string }>>;
             loadRecipientEmail: (args: { userId: string }) => Promise<string | null>;
@@ -10660,6 +10668,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             unsubscribePush: (args) => callRegistered(context, "notifications_push:unsubscribePush", args),
         },
         task_email: {
+            claimOutcomeEmail: (args) => callRegistered(context, "notifications_task_email:claimOutcomeEmail", args),
             dispatchOutcomeEmails: (args) => callRegistered(context, "notifications_task_email:dispatchOutcomeEmails", args),
             listPendingOutcomeEmails: (args) => callRegistered(context, "notifications_task_email:listPendingOutcomeEmails", args),
             loadRecipientEmail: (args) => callRegistered(context, "notifications_task_email:loadRecipientEmail", args),

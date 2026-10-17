@@ -4651,6 +4651,11 @@
       "to": "function:notifications_push:loadPushNotification"
     },
     {
+      "from": "function:notifications_task_email:claimOutcomeEmail",
+      "kind": "write",
+      "to": "table:outcomeEmails"
+    },
+    {
       "from": "function:notifications_task_email:dispatchOutcomeEmails",
       "kind": "schedule",
       "to": "function:notifications_task_email:sendPendingOutcomeEmails"
@@ -4659,6 +4664,11 @@
       "from": "function:notifications_task_email:dispatchOutcomeEmails",
       "kind": "write",
       "to": "table:outcomeEmails"
+    },
+    {
+      "from": "function:notifications_task_email:sendPendingOutcomeEmails",
+      "kind": "call",
+      "to": "function:notifications_task_email:claimOutcomeEmail"
     },
     {
       "from": "function:notifications_task_email:sendPendingOutcomeEmails",
@@ -12017,6 +12027,13 @@
       "id": "function:notifications_push:unsubscribePush",
       "kind": "function",
       "name": "notifications.push.unsubscribePush",
+      "module": "notifications"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:notifications_task_email:claimOutcomeEmail",
+      "kind": "function",
+      "name": "notifications.task_email.claimOutcomeEmail",
       "module": "notifications"
     },
     {

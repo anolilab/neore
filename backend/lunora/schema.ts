@@ -1452,11 +1452,13 @@ export const schema = defineSchema({
     // sweep. Sent rows are pruned after 7 days; failed ones (attempt cap) likewise.
     outcomeEmails: defineTable({
         attempts: v.number(),
+        /** When a send run took the row. A claim older than the recovery window is abandoned. */
+        claimedAt: v.optional(v.number()),
         createdAt: v.number(),
         link: v.string(),
         notificationId: v.id("notifications"),
         sentAt: v.optional(v.number()),
-        status: v.union(v.literal("pending"), v.literal("sent"), v.literal("failed")),
+        status: v.union(v.literal("pending"), v.literal("sending"), v.literal("sent"), v.literal("failed")),
         title: v.string(),
         userId: v.string(),
     })

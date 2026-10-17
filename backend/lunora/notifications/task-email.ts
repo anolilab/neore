@@ -17,6 +17,7 @@ import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { patchById } from "../lib/patch";
 
 /** Pending rows one send run takes; the rest wait for the next sweep. */
 const SEND_BATCH = 20;
@@ -73,15 +74,44 @@ export const loadRecipientEmail = internalQuery
         return user.email || null;
     });
 
+/** A claim this old belongs to a run that died; its row is sent again by the next run. */
+const OUTCOME_CLAIM_RECOVERY_MS = 10 * 60 * 1000;
+
 export const listPendingOutcomeEmails = internalQuery
     .input({})
     .output(v.array(v.object({ id: v.id("outcomeEmails"), link: v.string(), title: v.string(), userId: v.string() })))
     .query(async ({ ctx }) => {
-        const { page } = await ctx.db.outcomeEmails.findMany({ limit: SEND_BATCH, orderBy: [{ createdAt: "asc" }], where: { status: "pending" } });
+        const cutoff = Date.now() - OUTCOME_CLAIM_RECOVERY_MS;
+        const { page: pending } = await ctx.db.outcomeEmails.findMany({ limit: SEND_BATCH, orderBy: [{ createdAt: "asc" }], where: { status: "pending" } });
+        const { page: abandoned } = await ctx.db.outcomeEmails.findMany({
+            limit: SEND_BATCH,
+            orderBy: [{ createdAt: "asc" }],
+            where: { claimedAt: { lt: cutoff }, status: "sending" },
+        });
 
-        return page.map(({ _id, link, title, userId }) => {
+        return [...pending, ...abandoned].slice(0, SEND_BATCH).map(({ _id, link, title, userId }) => {
             return { id: _id, link, title, userId };
         });
+    });
+
+/**
+ * Takes a row for one send run. Two runs that list the same row cannot both send it: the second
+ * finds it already `sending` and skips. Returns false when the row is not available.
+ */
+export const claimOutcomeEmail = internalMutation
+    .input({ id: v.id("outcomeEmails") })
+    .output(v.boolean())
+    .mutation(async ({ args: { id }, ctx }) => {
+        const row = await ctx.db.get(id);
+        const abandoned = row?.status === "sending" && (row.claimedAt ?? 0) < Date.now() - OUTCOME_CLAIM_RECOVERY_MS;
+
+        if (!row || (row.status !== "pending" && !abandoned)) {
+            return false;
+        }
+
+        await ctx.db.patch(id, { claimedAt: Date.now(), status: "sending" });
+
+        return true;
     });
 
 /**
@@ -95,14 +125,14 @@ export const settleOutcomeEmail = internalMutation
     .mutation(async ({ args: { id, result }, ctx }) => {
         const row = await ctx.db.get(id);
 
-        if (!row || row.status !== "pending") {
+        if (!row || (row.status !== "sending" && row.status !== "pending")) {
             return null;
         }
 
         if (result === "skipped") {
             await ctx.db.delete(id);
         } else if (result === "sent") {
-            await ctx.db.patch(id, { sentAt: Date.now(), status: "sent" });
+            await patchById(ctx.db, id, { claimedAt: undefined, sentAt: Date.now(), status: "sent" });
         } else {
             const attempts = row.attempts + 1;
             const gaveUp = attempts >= OUTCOME_EMAIL_MAX_ATTEMPTS;
@@ -111,7 +141,7 @@ export const settleOutcomeEmail = internalMutation
                 console.warn(`[notifications] Giving up on the outcome email for ${row.notificationId as string} after ${attempts} attempts`);
             }
 
-            await ctx.db.patch(id, { attempts, status: gaveUp ? "failed" : "pending" });
+            await patchById(ctx.db, id, { attempts, claimedAt: undefined, status: gaveUp ? "failed" : "pending" });
         }
 
         return null;
@@ -153,6 +183,11 @@ export const sendPendingOutcomeEmails = internalAction
         const pending = await ctx.runQuery(internal.notifications.task_email.listPendingOutcomeEmails, {});
 
         for (const { id, link, title, userId } of pending) {
+            // Another run may have taken this row since it was listed.
+            if (!(await ctx.runMutation(internal.notifications.task_email.claimOutcomeEmail, { id }))) {
+                continue;
+            }
+
             let result: "failed" | "sent" | "skipped" = "skipped";
 
             try {

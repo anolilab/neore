@@ -361,7 +361,7 @@ export interface InternalApiTypes {
         tools: {
             browser_node: {
                 closeBrowserSession: FunctionReference<"action", { sessionId: Id<"browserSessions"> }, void>;
-                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, unknown>;
+                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, import("@neore/service-sdk/browser-renderer").BrowserActionResponse>;
             };
             code_execution_node: {
                 default: FunctionReference<"action", { code: string; threadId?: Id<"threads">; timeoutMs?: number; userId?: string }, { files: import("../chat/tools/sandbox-outputs.js").SandboxOutputFile[]; skippedFiles: import("../chat/tools/sandbox-outputs.js").SkippedOutputFile[]; error: string | undefined; results: { type: "text"; value: string; }[]; stderr: string; stdout: string; } | { error: string; results: { type: "error"; value: string; }[]; stderr: string; stdout: string; } | { error: string | undefined; results: { format?: string; type: "text" | "image" | "error"; value: string; }[]; stderr: string; stdout: string; }>;
@@ -761,6 +761,7 @@ export interface InternalApiTypes {
             sendPushForNotification: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
         };
         task_email: {
+            claimOutcomeEmail: FunctionReference<"mutation", { id: Id<"outcomeEmails"> }, boolean>;
             dispatchOutcomeEmails: FunctionReference<"mutation", {}, null>;
             listPendingOutcomeEmails: FunctionReference<"query", {}, Array<{ id: Id<"outcomeEmails">; link: string; title: string; userId: string }>>;
             loadRecipientEmail: FunctionReference<"query", { userId: string }, string | null>;
@@ -1706,6 +1707,7 @@ export const internal: InternalApiTypes = {
             sendPushForNotification: { __lunoraRef: "notifications_push:sendPushForNotification" },
         },
         task_email: {
+            claimOutcomeEmail: { __lunoraRef: "notifications_task_email:claimOutcomeEmail" },
             dispatchOutcomeEmails: { __lunoraRef: "notifications_task_email:dispatchOutcomeEmails" },
             listPendingOutcomeEmails: { __lunoraRef: "notifications_task_email:listPendingOutcomeEmails" },
             loadRecipientEmail: { __lunoraRef: "notifications_task_email:loadRecipientEmail" },
