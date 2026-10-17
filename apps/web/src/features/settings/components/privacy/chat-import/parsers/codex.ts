@@ -33,16 +33,20 @@ const eventRole = (type: unknown): NormalizedMessage["role"] | undefined => {
     return type === "agent_message" ? "assistant" : undefined;
 };
 
-/** The text of a `response_item` message: its `input_text` and `output_text` blocks, joined. */
-const responseText = (payload: Record<string, unknown>): string => {
+/**
+ * The text blocks of a `response_item` message, minus the injected context blocks: a user message
+ * may carry an environment block before the real prompt, and only the prompt is the user's.
+ */
+const keptTexts = (payload: Record<string, unknown>): string[] => {
     const content = Array.isArray(payload.content) ? payload.content : [];
 
     return content
         .map((block) => asRecord(block))
         .flatMap((block) => (block && (block.type === "input_text" || block.type === "output_text") && typeof block.text === "string" ? [block.text] : []))
-        .join("\n\n")
-        .trim();
+        .filter((text) => INJECTED_PREFIXES.every((prefix) => !text.trimStart().startsWith(prefix)));
 };
+
+const responseText = (payload: Record<string, unknown>): string => keptTexts(payload).join("\n\n").trim();
 
 const parseCodex = (data: unknown): NormalizedConversation[] => {
     if (!Array.isArray(data)) {
@@ -104,10 +108,7 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
             continue;
         }
 
-        const texts = payload.content
-            .map((block) => asRecord(block))
-            .flatMap((block) => (block && (block.type === "input_text" || block.type === "output_text") && typeof block.text === "string" ? [block.text] : []));
-        const message = messageFromTexts(texts, payload.role, parseTimestamp(record.timestamp), INJECTED_PREFIXES);
+        const message = messageFromTexts(keptTexts(payload), payload.role, parseTimestamp(record.timestamp), INJECTED_PREFIXES);
 
         if (message) {
             messages.push(message);

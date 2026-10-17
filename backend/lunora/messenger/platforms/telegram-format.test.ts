@@ -112,3 +112,13 @@ describe("long replies keep their line breaks", () => {
         }
     });
 });
+
+describe("nested fences", () => {
+    it("keeps a shorter fence inside a longer code block as code", () => {
+        const [chunk] = formatTelegramMessage("````\n```\nnested\n```\nstill code\n````");
+
+        expect(chunk?.html).toContain("still code");
+        expect(chunk?.html.startsWith("<pre>")).toBe(true);
+        expect(chunk?.html.endsWith("</pre>")).toBe(true);
+    });
+});

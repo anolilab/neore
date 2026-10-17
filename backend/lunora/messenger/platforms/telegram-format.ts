@@ -153,18 +153,26 @@ const renderLine = (line: string): string => {
 };
 
 /** Blocks are fenced code (kept whole) and runs of lines between blank lines. */
-/** A closing fence is a line of backticks and nothing else; a code line that starts with backticks is not one. */
-const isClosingFence = (line: string): boolean => {
+/**
+ * A closing fence is a line of backticks and nothing else, at least as long as the opening
+ * fence: a shorter run inside a longer block is code, not the end of it.
+ */
+const isClosingFence = (line: string, openLength: number): boolean => {
     const trimmed = line.trim();
 
-    return trimmed.length >= 3 && [...trimmed].every((char) => char === "`");
+    return trimmed.length >= openLength && [...trimmed].every((char) => char === "`");
 };
+
+const LEADING_BACKTICKS = /^`+/;
+
+const fenceLength = (line: string): number => line.trimStart().length - line.trimStart().replace(LEADING_BACKTICKS, "").length;
 
 const toBlocks = (markdown: string): Block[] => {
     const blocks: Block[] = [];
     let current: string[] = [];
     let fence: string[] | undefined;
     let fenceInfo = "";
+    let openLength = 3;
 
     const flush = () => {
         if (current.length === 0) {
@@ -177,7 +185,7 @@ const toBlocks = (markdown: string): Block[] => {
 
     for (const line of markdown.split("\n")) {
         if (fence) {
-            if (isClosingFence(line)) {
+            if (isClosingFence(line, openLength)) {
                 blocks.push({ code: true, info: fenceInfo, lines: fence });
                 fence = undefined;
             } else {
@@ -186,7 +194,8 @@ const toBlocks = (markdown: string): Block[] => {
         } else if (line.trimStart().startsWith("```")) {
             flush();
             fence = [];
-            fenceInfo = line.trimStart().slice(3).trim();
+            openLength = Math.max(3, fenceLength(line));
+            fenceInfo = line.trimStart().slice(openLength).trim();
         } else if (line.trim() === "") {
             flush();
         } else {

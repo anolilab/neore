@@ -171,3 +171,29 @@ describe("Codex prompts beside unrelated response items", () => {
         expect(conversation?.messages[0]?.content).toContain("A different prompt");
     });
 });
+
+describe("Codex user messages with injected context", () => {
+    it("keeps the prompt that follows an environment block", () => {
+        const rollout = [
+            {
+                payload: {
+                    content: [
+                        { text: "<environment_context>\n  <cwd>/work</cwd>\n</environment_context>", type: "input_text" },
+                        { text: "Refactor the parser", type: "input_text" },
+                    ],
+                    role: "user",
+                    type: "message",
+                },
+                type: "response_item",
+            },
+            {
+                payload: { content: [{ text: "Done.", type: "output_text" }], role: "assistant", type: "message" },
+                type: "response_item",
+            },
+        ];
+
+        const [conversation] = parseExportFile(rollout, "codex").conversations;
+
+        expect(conversation?.messages[0]?.content).toBe("Refactor the parser");
+    });
+});

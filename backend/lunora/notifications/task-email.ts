@@ -95,13 +95,13 @@ export const sendTaskOutcomeEmail = internalAction
             return null;
         }
 
-        const to = await ctx.runQuery(internal.notifications.task_email.loadRecipientEmail, { userId });
-
-        if (!to || !SITE_URL) {
-            return null;
-        }
-
         try {
+            const to = await ctx.runQuery(internal.notifications.task_email.loadRecipientEmail, { userId });
+
+            if (!to || !SITE_URL) {
+                return null;
+            }
+
             const { default: TaskOutcomeEmail } = await import("../email/templates/task-outcome");
             const subject = `${title.replaceAll(/\s+/g, " ")} has finished`;
 
