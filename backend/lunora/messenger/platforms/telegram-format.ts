@@ -14,6 +14,9 @@ export const splitLossless = (line: string, size: number, inlineCode = true): st
     let rest = line;
 
     while (rest.length > size) {
+        // Never cut between the halves of a surrogate pair (an emoji): that would corrupt both.
+        // A code point above 0xFFFF starting just before the cut is a surrogate pair the cut would split.
+        const surrogateSafe = (at: number) => (at > 0 && (rest.codePointAt(at - 1) ?? 0) > 0xff_ff ? at - 1 : at);
         let cut = rest.lastIndexOf(" ", size);
 
         // Never cut inside an inline code span: step back to an earlier space outside one.
@@ -24,7 +27,7 @@ export const splitLossless = (line: string, size: number, inlineCode = true): st
         // No safe cut exists (a code span longer than the piece): cut at the limit. The
         // characters stay exactly as written; only that chunk's code formatting can be lost.
         if (cut <= 0) {
-            cut = size;
+            cut = surrogateSafe(size);
         }
 
         pieces.push(rest.slice(0, cut));

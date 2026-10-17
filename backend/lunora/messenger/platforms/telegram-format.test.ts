@@ -138,3 +138,16 @@ describe("one oversized line", () => {
         expect(chunks.map((chunk) => chunk.source).join("")).toBe(line);
     });
 });
+
+describe("emoji in a cut line", () => {
+    it("never cuts between the halves of an emoji", () => {
+        const line = `${"&".repeat(681)}😀${"&".repeat(200)}`;
+        const pieces = splitLossless(line, 682);
+
+        expect(pieces.join("")).toBe(line);
+
+        for (const piece of pieces) {
+            expect(piece.isWellFormed()).toBe(true);
+        }
+    });
+});

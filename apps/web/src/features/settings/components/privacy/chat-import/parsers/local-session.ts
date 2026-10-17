@@ -56,6 +56,10 @@ export const buildSession = (messages: NormalizedMessage[], droppedToolItems: nu
 
         if (last?.role === message.role) {
             last.content = `${last.content}\n\n${message.content}`;
+            // The merged message is as recent as its latest record: the conversation's last activity.
+            const times = [last.createdAt, message.createdAt].filter((time): time is number => time !== undefined);
+
+            last.createdAt = times.length > 0 ? Math.max(...times) : undefined;
         } else {
             merged.push({ ...message });
         }

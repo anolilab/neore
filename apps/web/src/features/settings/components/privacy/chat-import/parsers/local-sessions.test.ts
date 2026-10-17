@@ -197,3 +197,17 @@ describe("Codex user messages with injected context", () => {
         expect(conversation?.messages[0]?.content).toBe("Refactor the parser");
     });
 });
+
+describe("merged transcript records", () => {
+    it("keeps the latest record's time for a message merged from several records", () => {
+        const events = [
+            { message: { content: "first", role: "user" }, sessionId: "s", timestamp: "2026-10-01T10:00:00Z", type: "user", uuid: "a" },
+            { message: { content: "second", role: "user" }, sessionId: "s", timestamp: "2026-10-05T10:00:00Z", type: "user", uuid: "b", parentUuid: "a" },
+        ];
+
+        const [conversation] = parseExportFile(events, "claude-code").conversations;
+
+        expect(conversation?.messages).toHaveLength(1);
+        expect(conversation?.messages[0]?.createdAt).toBe(Date.parse("2026-10-05T10:00:00Z"));
+    });
+});
