@@ -83,6 +83,8 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
     // same role and text exists, so a prompt with no copy is never lost.
     // Each response-item message can account for one legacy copy of the same role and text, in order.
     const responseCopies = new Map<string, number>();
+    // The timestamps of the legacy copies, in order, so a response item that has none takes its copy's.
+    const legacyTimes = new Map<string, number[]>();
 
     for (const raw of data) {
         const record = asRecord(raw);
@@ -96,6 +98,16 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
                 const key = `${payload.role}\n${text}`;
 
                 responseCopies.set(key, (responseCopies.get(key) ?? 0) + 1);
+            }
+        } else if (record?.type === "event_msg" && payload) {
+            const role = eventRole(payload.type);
+            const text = typeof payload.message === "string" ? payload.message.trim() : "";
+            const time = parseTimestamp(record.timestamp);
+
+            if (role && text && time !== undefined) {
+                const key = `${role}\n${text}`;
+
+                legacyTimes.set(key, [...(legacyTimes.get(key) ?? []), time]);
             }
         }
     }
@@ -133,7 +145,9 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
             continue;
         }
 
-        const message = messageFromTexts(keptTexts(payload), payload.role, parseTimestamp(record.timestamp), INJECTED_BLOCKS);
+        // A copy of a legacy turn keeps the time its legacy record recorded when it has none of its own.
+        const copyTime = legacyTimes.get(`${payload.role}\n${responseText(payload)}`)?.shift();
+        const message = messageFromTexts(keptTexts(payload), payload.role, parseTimestamp(record.timestamp) ?? copyTime, INJECTED_BLOCKS);
 
         if (message) {
             messages.push(message);

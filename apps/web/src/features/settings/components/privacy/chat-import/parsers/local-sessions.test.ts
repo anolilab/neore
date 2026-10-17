@@ -228,6 +228,24 @@ describe("Codex legacy prompts with a later copy", () => {
     });
 });
 
+describe("Codex legacy copies keep their timestamps and turn order", () => {
+    it("gives the kept prompt its legacy time, and leaves the turns in their order", () => {
+        const rollout = [
+            { payload: { message: "First", type: "user_message" }, timestamp: "2026-10-01T10:00:00Z", type: "event_msg" },
+            { payload: { content: [{ text: "First", type: "input_text" }], role: "user", type: "message" }, type: "response_item" },
+            { payload: { content: [{ text: "Reply one.", type: "output_text" }], role: "assistant", type: "message" }, type: "response_item" },
+            { payload: { message: "Second", type: "user_message" }, timestamp: "2026-10-01T10:05:00Z", type: "event_msg" },
+            { payload: { content: [{ text: "Second", type: "input_text" }], role: "user", type: "message" }, type: "response_item" },
+        ];
+
+        const [conversation] = parseExportFile(rollout, "codex").conversations;
+
+        expect(conversation?.messages.map((message) => message.content)).toEqual(["First", "Reply one.", "Second"]);
+        expect(conversation?.messages[0]?.createdAt).toBe(Date.parse("2026-10-01T10:00:00Z"));
+        expect(conversation?.messages[2]?.createdAt).toBe(Date.parse("2026-10-01T10:05:00Z"));
+    });
+});
+
 describe("injected blocks match only when they are complete", () => {
     it("keeps a prompt that starts with an injected marker but is not wrapped in it", () => {
         const rollout = [
