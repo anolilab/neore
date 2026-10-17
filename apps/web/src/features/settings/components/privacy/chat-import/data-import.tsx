@@ -145,7 +145,12 @@ const DataImport: FC = () => {
             try {
                 const extracted = await Promise.all(
                     files.map(async (file) => {
-                        return { name: file.name, records: await extractJsonFromFile(file) };
+                        try {
+                            return { name: file.name, records: await extractJsonFromFile(file) };
+                        } catch (error) {
+                            // A damaged file is named, so the message says which upload to fix.
+                            throw new Error(`${file.name}: ${describeError(error, i18n)}`, { cause: error });
+                        }
                     }),
                 );
                 const jsonDataArray = extracted.flatMap(({ name, records }) =>

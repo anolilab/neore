@@ -514,7 +514,7 @@ export const deleteDataset = authMutation
         const cases = await loadCases(ctx, dataset._id);
 
         if (cases.some((evalCase) => evalCase.frozen === true)) {
-            throw new LunoraError("BAD_REQUEST", "Unfreeze this dataset's frozen cases before deleting the dataset");
+            throw new LunoraError("CONFLICT", "Unfreeze this dataset's frozen cases before deleting the dataset");
         }
 
         await ctx.db.delete(dataset._id);
@@ -631,7 +631,7 @@ export const updateCase = authMutation
 
         // A frozen case is a regression check: unfreeze it before changing what it checks.
         if (evalCase.frozen) {
-            throw new LunoraError("BAD_REQUEST", "Unfreeze this case before editing it");
+            throw new LunoraError("CONFLICT", "Unfreeze this case before editing it");
         }
 
         const draft = requireDraft(args);
