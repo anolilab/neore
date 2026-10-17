@@ -440,7 +440,7 @@ streamRouter.openapi(
                         // plain `for-await` covers the remaining stream.
                         const remainingChunks = { [Symbol.asyncIterator]: () => sseIterator };
 
-                        let sawError = false;
+                        let isErrored = false;
 
                         for await (const chunk of remainingChunks) {
                             if (ttftMs === undefined) {
@@ -448,7 +448,7 @@ streamRouter.openapi(
                             }
 
                             if (chunk.includes('"type":"error"')) {
-                                sawError = true;
+                                isErrored = true;
                             }
 
                             send(chunk);
@@ -513,8 +513,8 @@ streamRouter.openapi(
                                     },
                                     c.var.telemetry,
                                 ),
-                                ...(isCancelled || sawError ? [] : [healthService.recordSuccess(body.provider, body.modelApiId, latencyMs)]),
-                                ...(sawError && !isCancelled ? [healthService.recordFailure(body.provider, body.modelApiId)] : []),
+                                ...(isCancelled || isErrored ? [] : [healthService.recordSuccess(body.provider, body.modelApiId, latencyMs)]),
+                                ...(isErrored && !isCancelled ? [healthService.recordFailure(body.provider, body.modelApiId)] : []),
                                 usageReporter.report({
                                     billingMode,
                                     byokFeeRate,
