@@ -1556,6 +1556,20 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"claude-code\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"codex\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"gemini\""
             }
           ]
