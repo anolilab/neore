@@ -42,8 +42,10 @@ const ChatPage = () => {
     const resumeLastChat =
         BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage && resumeScopeReady;
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
+        // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
         crpc.chat.resume.latestResumableThread.queryOptions(
-            resumeLastChat ? { organizationId: activeOrganization?.id ?? null, teamId: activeTeamId } : skipToken,
+            resumeLastChat && !resumeState.consumed ? { organizationId: activeOrganization?.id ?? null, teamId: activeTeamId } : skipToken,
+            { live: false },
         ),
     );
 

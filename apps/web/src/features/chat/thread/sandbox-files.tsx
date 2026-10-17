@@ -5,7 +5,7 @@ import type { SandboxOutputFile, SandboxOutputs, SkippedSandboxFile } from "@neo
 import { formatFileSize, isDocx, isPdf } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { DownloadIcon, EyeIcon, FileArchiveIcon, FileAudioIcon, FileIcon, FileImageIcon, FileSpreadsheetIcon, FileTextIcon, FileVideoIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useState } from "react";
 
 const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer"));
 const DocxPreview = lazy(() => import("@neore/ui/components/file-renderers/docx-preview"));
@@ -145,16 +145,49 @@ const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
     return state.blob ? <PptxPreview data={state.blob} fileName={name} /> : null;
 };
 
-const OfficePreview: FC<{ file: SandboxOutputFile; kind: OfficeKind }> = ({ file, kind }) => (
-    <div className="border-border mt-2 max-h-[32rem] overflow-auto rounded-lg border">
-        <Suspense fallback={null}>
-            {kind === "pdf" && <PdfViewer filename={file.name} url={file.url} />}
-            {kind === "docx" && <DocxPreview filename={file.name} url={file.url} />}
-            {kind === "pptx" && <PptxFromUrl name={file.name} url={file.url} />}
-            {kind === "xlsx" && <XlsxRenderer fileName={file.name} source={file.url} />}
-        </Suspense>
-    </div>
-);
+/**
+ * Catches a failed preview here, so one file's viewer cannot replace the whole chat view. Suspense
+ * catches neither a rejected lazy import nor an error thrown while rendering.
+ */
+class PreviewBoundary extends Component<{ children: ReactNode; fallback: string }, { failed: boolean }> {
+    static getDerivedStateFromError(): { failed: boolean } {
+        return { failed: true };
+    }
+
+    override state = { failed: false };
+
+    override render() {
+        const { children, fallback } = this.props;
+        const { failed } = this.state;
+
+        if (failed) {
+            return (
+                <p className="text-muted-foreground p-3 text-sm" role="status">
+                    {fallback}
+                </p>
+            );
+        }
+
+        return children;
+    }
+}
+
+const OfficePreview: FC<{ file: SandboxOutputFile; kind: OfficeKind }> = ({ file, kind }) => {
+    const { t } = useLingui();
+
+    return (
+        <div className="border-border mt-2 max-h-[32rem] overflow-auto rounded-lg border">
+            <PreviewBoundary fallback={t`This preview could not be loaded.`}>
+                <Suspense fallback={null}>
+                    {kind === "pdf" && <PdfViewer filename={file.name} url={file.url} />}
+                    {kind === "docx" && <DocxPreview filename={file.name} url={file.url} />}
+                    {kind === "pptx" && <PptxFromUrl name={file.name} url={file.url} />}
+                    {kind === "xlsx" && <XlsxRenderer fileName={file.name} source={file.url} />}
+                </Suspense>
+            </PreviewBoundary>
+        </div>
+    );
+};
 
 const SandboxFileChip: FC<{ file: SandboxOutputFile }> = ({ file }) => {
     const { t } = useLingui();
