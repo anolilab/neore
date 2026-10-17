@@ -50,6 +50,8 @@ interface Piece extends TelegramChunk {
 }
 
 interface Block {
+    /** Blank lines before this block in the reply. */
+    blanks: number;
     code: boolean;
     /** The language tag on a fenced block's opening line, kept for the plain-text retry. */
     info?: string;
@@ -173,23 +175,27 @@ const fenceLength = (line: string): number => line.trimStart().length - line.tri
 const toBlocks = (markdown: string): Block[] => {
     const blocks: Block[] = [];
     let current: string[] = [];
+    let currentBlanks = 0;
     let fence: string[] | undefined;
     let fenceInfo = "";
+    let fenceBlanks = 0;
     let openLength = 3;
+    // Blank lines seen since the last block: they are the gap before the next one.
+    let blanks = 0;
 
     const flush = () => {
         if (current.length === 0) {
             return;
         }
 
-        blocks.push({ code: false, lines: current });
+        blocks.push({ blanks: currentBlanks, code: false, lines: current });
         current = [];
     };
 
     for (const line of markdown.split("\n")) {
         if (fence) {
             if (isClosingFence(line, openLength)) {
-                blocks.push({ code: true, info: fenceInfo, lines: fence });
+                blocks.push({ blanks: fenceBlanks, code: true, info: fenceInfo, lines: fence });
                 fence = undefined;
             } else {
                 fence.push(line);
@@ -197,17 +203,25 @@ const toBlocks = (markdown: string): Block[] => {
         } else if (line.trimStart().startsWith("```")) {
             flush();
             fence = [];
+            fenceBlanks = blanks;
+            blanks = 0;
             openLength = Math.max(3, fenceLength(line));
             fenceInfo = line.trimStart().slice(openLength).trim();
         } else if (line.trim() === "") {
             flush();
+            blanks += 1;
         } else {
+            if (current.length === 0) {
+                currentBlanks = blanks;
+                blanks = 0;
+            }
+
             current.push(line);
         }
     }
 
     if (fence) {
-        blocks.push({ code: true, info: fenceInfo, lines: fence });
+        blocks.push({ blanks: fenceBlanks, code: true, info: fenceInfo, lines: fence });
     }
 
     flush();
@@ -221,17 +235,20 @@ const renderBlock = (block: Block, lines: string[]): TelegramChunk =>
         : { html: lines.map((line) => renderLine(line)).join("\n"), source: lines.join("\n") };
 
 /** Pieces of one block, each rendering to at most `limit` characters. */
+/** The join before a block: its blank lines, and at least one blank line between blocks. */
+const blankGap = (block: Block): string => "\n".repeat(Math.max(1, block.blanks) + 1);
+
 const splitBlock = (block: Block, limit: number): Piece[] => {
     const whole = renderBlock(block, block.lines);
 
     if (whole.html.length <= limit) {
-        return [{ ...whole, joinWith: "\n\n" }];
+        return [{ ...whole, joinWith: blankGap(block) }];
     }
 
     const pieces: Piece[] = [];
     let current: string[] = [];
-    // A block starts after a blank line; a line within the block follows a newline.
-    let joinWith = "\n\n";
+    // A block starts after its blank lines; a line within the block follows a newline.
+    let joinWith = blankGap(block);
 
     const flush = () => {
         if (current.length === 0) {

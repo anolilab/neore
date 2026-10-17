@@ -346,8 +346,9 @@ const notifyTaskRound = async (
     await notifyQuietly(ctx, {
         dedupeKey: `task:${run._id}`,
         emailOutcome: Boolean(detail),
-        // The run's own chat when it produced one: the email then opens the result, not the list.
-        link: threadId ? `/chat/${threadId}` : "/tasks",
+        // A finished run opens its chat, where the result is. A run that needs review or failed is
+        // acted on from the tasks board, where its review controls are, so that link stays.
+        link: outcome === "success" && threadId ? `/chat/${threadId}` : "/tasks",
         outcome,
         title: task.title,
         type: "task",

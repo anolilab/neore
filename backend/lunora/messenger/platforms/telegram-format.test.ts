@@ -151,3 +151,11 @@ describe("emoji in a cut line", () => {
         }
     });
 });
+
+describe("blank lines between blocks", () => {
+    it("keeps the number of blank lines a reply has between two paragraphs", () => {
+        const [chunk] = formatTelegramMessage("first\n\n\nsecond");
+
+        expect(chunk?.html).toBe("first\n\n\nsecond");
+    });
+});

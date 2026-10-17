@@ -236,6 +236,8 @@ export const sendTelegramMessage = async (botToken: string, chatId: number | str
         const response = await post({ parse_mode: "HTML", text: chunk.html });
 
         if (response.status === 400) {
+            // Telegram rejected the formatting; the same text goes out as plain text below.
+            console.warn(`Telegram rejected the HTML for a chunk (${response.status}); sending it as plain text.`);
             await response.body?.cancel();
 
             // Lossless: the plain retry must carry the reply exactly, spaces at a cut included.

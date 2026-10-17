@@ -96,7 +96,9 @@ const parseClaudeCode = (data: unknown): NormalizedConversation[] => {
             }
         }
 
-        const message = messageFromTexts(texts, event.type, parseTimestamp(event.timestamp), HARNESS_PREFIXES);
+        // A harness block (a reminder, a command echo) is not the user's words; the prompt beside it is.
+        const kept = texts.filter((text) => HARNESS_PREFIXES.every((prefix) => !text.trimStart().startsWith(prefix)));
+        const message = messageFromTexts(kept, event.type, parseTimestamp(event.timestamp), HARNESS_PREFIXES);
 
         if (message) {
             messages.push(message);

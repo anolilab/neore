@@ -49,9 +49,9 @@ const importErrorMessage = (error: unknown, i18n: I18n, fallback: string): strin
     return error instanceof Error && error.message ? error.message : fallback;
 };
 
-const describeError = (error: unknown): string => {
+const describeError = (error: unknown, i18n: I18n): string => {
     if (error instanceof ChatImportError) {
-        return error.message;
+        return i18n._(error.descriptor);
     }
 
     return error instanceof Error ? error.message : String(error);
@@ -157,7 +157,7 @@ const DataImport: FC = () => {
                             return parseExportFile(jsonData);
                         } catch (error) {
                             // Name the file the failure came from; a ZIP's entries are reported under the archive.
-                            throw new Error(`${name}: ${describeError(error)}`, { cause: error });
+                            throw new Error(`${name}: ${describeError(error, i18n)}`, { cause: error });
                         }
                     });
                 const providers = new Set(results.map((result) => result.provider));
