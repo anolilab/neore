@@ -251,3 +251,14 @@ describe("a cut line's middle", () => {
         expect(chunks.every((chunk) => !chunk.html.includes("<b># "))).toBe(true);
     });
 });
+
+describe("malformed links", () => {
+    it("formats a reply full of unmatched brackets without scanning each one to the end", () => {
+        const text = `${"[".repeat(3000)}](https://${"a".repeat(3000)}`;
+        const started = Date.now();
+
+        formatTelegramMessage(text);
+
+        expect(Date.now() - started).toBeLessThan(2000);
+    });
+});

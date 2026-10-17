@@ -84,12 +84,22 @@ const WHITESPACE = /\s/;
  * A `[label](https://…)` starting at `open`, or undefined. The URL may contain
  * balanced parentheses (`…/Function_(mathematics)`).
  */
-const parseLink = (text: string, open: number): { end: number; label: string; url: string } | undefined => {
-    const close = text.indexOf("](", open);
+/**
+ * Bounds on what a link can span. Without them, every stray `[` in a long reply scans to the end of
+ * the reply for its `](`, and that makes formatting quadratic in the reply length.
+ */
+const MAX_LINK_LABEL = 500;
+const MAX_LINK_URL = 2048;
 
-    if (close === -1) {
+const parseLink = (text: string, open: number): { end: number; label: string; url: string } | undefined => {
+    const search = text.slice(open, open + MAX_LINK_LABEL + 2);
+    const found = search.indexOf("](");
+
+    if (found === -1) {
         return undefined;
     }
+
+    const close = open + found;
 
     const label = text.slice(open + 1, close);
     const urlStart = close + 2;
@@ -100,7 +110,7 @@ const parseLink = (text: string, open: number): { end: number; label: string; ur
 
     let depth = 0;
 
-    for (let at = urlStart; at < text.length; at += 1) {
+    for (let at = urlStart; at < text.length && at - urlStart <= MAX_LINK_URL; at += 1) {
         const char = text.charAt(at);
 
         if (WHITESPACE.test(char)) {
