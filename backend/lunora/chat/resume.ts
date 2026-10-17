@@ -44,7 +44,9 @@ export const latestResumableThread = liteAuthQuery
 
             // `deleted` is unset on ordinary inserts, and unset means live (as in the thread list).
             for (const thread of threads.page) {
-                if (thread.deleted || thread.status !== "active" || thread.isTemporary) {
+                // Archived is the only status that is not live: a thread streaming a reply or one whose last run
+                // failed is still the user's latest chat.
+                if (thread.deleted || thread.status === "archived" || thread.isTemporary) {
                     continue;
                 }
 

@@ -95,43 +95,44 @@ const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | unde
 
 const PPTX_FETCH_TIMEOUT_MS = 30_000;
 
-/** The unmount abort, plus a deadline where the browser can combine the two. */
-const withDeadline = (abort: AbortSignal, ms: number): AbortSignal => {
-    if (typeof AbortSignal.any !== "function" || typeof AbortSignal.timeout !== "function") {
-        return abort;
-    }
-
-    return AbortSignal.any([abort, AbortSignal.timeout(ms)]);
-};
-
 const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
     const { t } = useLingui();
     const [state, setState] = useState<{ blob?: Blob; failed?: boolean }>({});
 
     useEffect(() => {
         const controller = new AbortController();
+        let unmounted = false;
 
         // A deadline as well as the unmount abort: a stalled signed URL must not hold the preview forever.
-        // AbortSignal.any is missing on older browsers; there the unmount abort alone still applies.
-        const signal = withDeadline(controller.signal, PPTX_FETCH_TIMEOUT_MS);
+        const deadline = setTimeout(() => controller.abort(), PPTX_FETCH_TIMEOUT_MS);
 
-        fetch(url, { signal })
-            .then((response) => {
+        const load = async () => {
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+
                 // An expired signed URL answers 403 with a plain-text body; that is not a deck.
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
 
-                return response.blob();
-            })
-            .then((blob) => setState({ blob }))
-            .catch(() => {
-                if (!controller.signal.aborted) {
+                setState({ blob: await response.blob() });
+            } catch {
+                // A timeout shows the failure; an unmount shows nothing.
+                if (!unmounted) {
                     setState({ failed: true });
                 }
-            });
+            } finally {
+                clearTimeout(deadline);
+            }
+        };
 
-        return () => controller.abort();
+        void load();
+
+        return () => {
+            unmounted = true;
+            clearTimeout(deadline);
+            controller.abort();
+        };
     }, [url]);
 
     if (state.failed) {
