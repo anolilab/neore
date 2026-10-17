@@ -343,11 +343,8 @@ modelProxyRouter.openapi(
                             send(`data: ${JSON.stringify(serialized)}\n\n`);
                         }
 
-                        if (isCancelled) {
-                            return;
-                        }
-
-                        // Record usage after stream completes
+                        // Record usage even when the client cancelled: the provider already produced these tokens.
+                        // A cancelled stream is not a successful one, so it does not count toward health.
                         const latencyMs = Date.now() - startTime;
                         const tokens = lastUsage ?? { cachedTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 };
 
@@ -385,7 +382,7 @@ modelProxyRouter.openapi(
                                     },
                                     c.var.telemetry,
                                 ),
-                                policy.recordHealth.success(latencyMs),
+                                ...(isCancelled ? [] : [policy.recordHealth.success(latencyMs)]),
                                 usageReporter.report({
                                     billingMode,
                                     byokFeeRate,
