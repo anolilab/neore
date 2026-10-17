@@ -30,12 +30,8 @@ const CanvasCodemirrorEditor: FC<CanvasCodemirrorEditorProps> = memo(({ classNam
     const isDark = resolvedTheme === "dark";
     const [langExtension, setLangExtension] = useState<Extension | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
-    const latestContentRef = useRef(content);
-    const onSaveRef = useRef(onSave);
-
-    useEffect(() => {
-        onSaveRef.current = onSave;
-    });
+    // The save travels with its edit: a flush after a document switch must not reach another document.
+    const pendingRef = useRef<{ content: string; save: (content: string) => void } | null>(null);
 
     // Load language extension dynamically
     useEffect(() => {
@@ -61,20 +57,21 @@ const CanvasCodemirrorEditor: FC<CanvasCodemirrorEditorProps> = memo(({ classNam
     // Flush a pending save on unmount
     useEffect(
         () => () => {
-            if (!debounceRef.current) {
+            const pending = pendingRef.current;
+
+            if (!pending) {
                 return;
             }
 
-            clearTimeout(debounceRef.current);
-            onSaveRef.current?.(latestContentRef.current);
+            clearTimeout(debounceRef.current ?? undefined);
+            pendingRef.current = null;
+            pending.save(pending.content);
         },
         [],
     );
 
     const handleChange = useCallback(
         (value: string) => {
-            latestContentRef.current = value;
-
             if (!onSave) {
                 return;
             }
@@ -83,8 +80,10 @@ const CanvasCodemirrorEditor: FC<CanvasCodemirrorEditorProps> = memo(({ classNam
                 clearTimeout(debounceRef.current);
             }
 
+            pendingRef.current = { content: value, save: onSave };
             debounceRef.current = setTimeout(() => {
                 debounceRef.current = null;
+                pendingRef.current = null;
                 onSave(value);
             }, AUTOSAVE_DEBOUNCE_MS);
         },

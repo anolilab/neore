@@ -216,7 +216,8 @@ const flushPendingCommit = (): void => {
 
 /** Runs a store write that must not become an undo step: loads, remote applies, and history restores. */
 export const withoutHistory = (apply: () => void): void => {
-    cancelPendingCommit();
+    // A local edit still inside the debounce window becomes its own step before the external write.
+    flushPendingCommit();
     recorder.isApplyingExternal = true;
 
     try {

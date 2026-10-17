@@ -193,16 +193,25 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
         // Server deletion runs in background
         const deletedIds = [threadId, ...childBranches];
 
-        Promise.all([
-            ...childBranches.map((childId) => deleteThreadMutation({ threadId: childId as Id<"threads"> })),
-            deleteThreadMutation({ threadId: threadId as Id<"threads"> }),
-        ]).catch((error) => {
-            providerLogger.error("[ThreadManager] Failed to delete thread(s)", { error, threadId });
+        // Each row settles on its own: a row whose delete failed reappears, one that was deleted stays hidden.
+        const targets = [...childBranches, threadId];
 
-            for (const id of deletedIds) {
-                removeOptimisticDeletion(id);
-            }
-        });
+        Promise.allSettled(targets.map((id) => deleteThreadMutation({ threadId: id as Id<"threads"> })))
+            .then((results) => {
+                targets.forEach((id, index) => {
+                    const result = results[index];
+
+                    if (result?.status === "rejected") {
+                        providerLogger.error("[ThreadManager] Failed to delete thread", { error: result.reason, threadId: id });
+                        removeOptimisticDeletion(id);
+                    }
+                });
+
+                return undefined;
+            })
+            .catch((error) => {
+                providerLogger.error("[ThreadManager] Failed to settle thread deletes", { error });
+            });
 
         return deletedIds;
     };
