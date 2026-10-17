@@ -50,6 +50,7 @@
         "@tanstack/react-table": "catalog:tanstack",
         "@tanstack/react-virtual": "catalog:tanstack",
         "@tanstack/store": "catalog:tanstack",
+        "katex": "catalog:syntax",
         "@tiptap/core": "catalog:tiptap",
         "@tiptap/extension-character-count": "catalog:tiptap",
         "@tiptap/extension-code-block-lowlight": "catalog:tiptap",
