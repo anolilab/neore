@@ -2779,6 +2779,8 @@ export const schema = defineSchema({
         nickname: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
         profession: v.optional(v.string()),
+        // Opt-in: opening /chat lands on the most recent thread. Absent = off.
+        resumeLastChat: v.optional(v.boolean()),
         sendBehavior: v.optional(v.string()),
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),
