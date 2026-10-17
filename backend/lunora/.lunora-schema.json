@@ -15827,6 +15827,12 @@
           "optional": true,
           "unique": false
         },
+        "taskEmailEnabled": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "temporaryChatRetentionHours": {
           "kind": "number",
           "nullable": false,

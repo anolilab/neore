@@ -56,6 +56,10 @@ const NotificationSettings: FC = () => {
     const unsubscribe = useMutation(crpc.notifications.push.unsubscribePush.mutationOptions(refresh));
     const setDailyBrief = useMutation(crpc.notifications.daily_brief.setDailyBriefEnabled.mutationOptions());
 
+    const setTaskEmail = useMutation(crpc.notifications.task_email.setTaskEmailEnabled.mutationOptions());
+    const [taskEmail, setTaskEmailState] = useState<boolean | undefined>(undefined);
+    const taskEmailEnabled = taskEmail ?? userSettings.data?.taskEmailEnabled === true;
+
     const pushAvailable = Boolean(config?.publicKey) && support === "supported";
     const [dailyBrief, setDailyBriefState] = useState<boolean | undefined>(undefined);
     const dailyBriefEnabled = dailyBrief ?? userSettings.data?.dailyBriefEnabled === true;
@@ -190,6 +194,35 @@ const NotificationSettings: FC = () => {
                                         toast.error(t`Could not save the Daily Brief setting.`);
                                     },
                                     onSuccess: () => toast.success(checked ? t`Daily Brief turned on` : t`Daily Brief turned off`),
+                                },
+                            );
+                        }}
+                    />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                        <Label className="text-base font-medium" htmlFor="task-email">
+                            {t`Email when a task finishes`}
+                        </Label>
+                        <p className="text-muted-foreground text-sm" id="task-email-hint">
+                            {t`Get an email with a link to the result when a task or trigger run finishes with one.`}
+                        </p>
+                    </div>
+                    <Switch
+                        aria-describedby="task-email-hint"
+                        checked={taskEmailEnabled}
+                        disabled={setTaskEmail.isPending}
+                        id="task-email"
+                        onCheckedChange={(checked) => {
+                            setTaskEmailState(checked);
+                            setTaskEmail.mutate(
+                                { enabled: checked },
+                                {
+                                    onError: () => {
+                                        setTaskEmailState(!checked);
+                                        toast.error(t`Could not save the email setting.`);
+                                    },
+                                    onSuccess: () => toast.success(checked ? t`Task emails turned on` : t`Task emails turned off`),
                                 },
                             );
                         }}

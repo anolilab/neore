@@ -2780,6 +2780,8 @@ export const schema = defineSchema({
         onboardingCompleted: v.optional(v.boolean()),
         profession: v.optional(v.string()),
         sendBehavior: v.optional(v.string()),
+        // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
+        taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),
         timezone: v.optional(v.string()),
         userId: v.string(),
