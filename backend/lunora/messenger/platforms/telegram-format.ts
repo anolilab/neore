@@ -57,6 +57,8 @@ interface Piece extends TelegramChunk {
 interface Block {
     /** Blank lines before this block in the reply. */
     blanks: number;
+    /** False for a fence the reply never closed: the plain source must not gain a closing fence. */
+    closed?: boolean;
     code: boolean;
     /** The language tag on a fenced block's opening line, kept for the plain-text retry. */
     info?: string;
@@ -200,7 +202,7 @@ const toBlocks = (markdown: string): Block[] => {
     for (const line of markdown.split("\n")) {
         if (fence) {
             if (isClosingFence(line, openLength)) {
-                blocks.push({ blanks: fenceBlanks, code: true, info: fenceInfo, lines: fence });
+                blocks.push({ blanks: fenceBlanks, closed: true, code: true, info: fenceInfo, lines: fence });
                 fence = undefined;
             } else {
                 fence.push(line);
@@ -234,14 +236,24 @@ const toBlocks = (markdown: string): Block[] => {
     return blocks;
 };
 
+const openFence = (block: Block): string => `\`\`\`${block.info ?? ""}\n`;
+const closeFence = (block: Block): string => (block.closed ? "\n```" : "");
+
 const renderBlock = (block: Block, lines: string[]): TelegramChunk =>
     block.code
-        ? { html: `<pre>${escapeHtml(lines.join("\n"))}</pre>`, source: `\`\`\`${block.info ?? ""}\n${lines.join("\n")}\n\`\`\`` }
+        ? { html: `<pre>${escapeHtml(lines.join("\n"))}</pre>`, source: `${openFence(block)}${lines.join("\n")}${closeFence(block)}` }
         : { html: lines.map((line) => renderLine(line)).join("\n"), source: lines.join("\n") };
 
 /** Pieces of one block, each rendering to at most `limit` characters. */
 /** The join before a block: its blank lines, and at least one blank line between blocks. */
 const blankGap = (block: Block): string => "\n".repeat(Math.max(1, block.blanks) + 1);
+
+/** A part of a split block: for code the plain source is the bare code, fenced once by `splitBlock`. */
+const renderPart = (block: Block, lines: string[]): TelegramChunk => {
+    const rendered = renderBlock(block, lines);
+
+    return block.code ? { ...rendered, source: lines.join("\n") } : rendered;
+};
 
 const splitBlock = (block: Block, limit: number): Piece[] => {
     const whole = renderBlock(block, block.lines);
@@ -260,7 +272,7 @@ const splitBlock = (block: Block, limit: number): Piece[] => {
             return;
         }
 
-        pieces.push({ ...renderBlock(block, current), joinWith });
+        pieces.push({ ...renderPart(block, current), joinWith });
         current = [];
         joinWith = "\n";
     };
@@ -279,7 +291,7 @@ const splitBlock = (block: Block, limit: number): Piece[] => {
             parts.forEach((part, index) => {
                 // Only the first part starts the line, so only it can read as a heading or bullet;
                 // the rest are the middle of the line. The parts of one line join with nothing.
-                const rendered = index === 0 || block.code ? renderBlock(block, [part]) : { html: inline(part), source: part };
+                const rendered = index === 0 || block.code ? renderPart(block, [part]) : { html: inline(part), source: part };
 
                 pieces.push({ ...rendered, joinWith: index === 0 ? joinWith : "" });
             });
@@ -290,6 +302,15 @@ const splitBlock = (block: Block, limit: number): Piece[] => {
     }
 
     flush();
+
+    // The fence belongs to the block, not to each part: open it on the first, close it on the last.
+    const first = pieces[0];
+    const last = pieces.at(-1);
+
+    if (first && last && block.code) {
+        first.source = openFence(block) + first.source;
+        last.source += closeFence(block);
+    }
 
     return pieces;
 };
