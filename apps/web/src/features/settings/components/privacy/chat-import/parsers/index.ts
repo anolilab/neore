@@ -28,14 +28,6 @@ export class ChatImportError extends Error {
     }
 }
 
-/**
- * Detect the provider from the JSON structure.
- *
- * Heuristics:
- * - ChatGPT: Array of objects with `mapping` field (tree-based messages)
- * - Claude: Array of objects with `chat_messages` field and `sender` = "human"
- * - Gemini: Object/array with `messages` field and role = "USER"/"MODEL".
- */
 /** Files that ship inside a ChatGPT export archive but hold no conversations. */
 const NON_CONVERSATION_EXPORT_FILES = new Set([
     "account.json",
@@ -47,6 +39,14 @@ const NON_CONVERSATION_EXPORT_FILES = new Set([
     "users.json",
 ]);
 
+/**
+ * Detect the provider from the JSON structure.
+ *
+ * Heuristics:
+ * - ChatGPT: Array of objects with `mapping` field (tree-based messages)
+ * - Claude: Array of objects with `chat_messages` field and `sender` = "human"
+ * - Gemini: Object/array with `messages` field and role = "USER"/"MODEL".
+ */
 const detectProvider = (data: unknown): ImportProvider => {
     if (Array.isArray(data) && data.length > 0) {
         const first = data[0];
@@ -149,10 +149,6 @@ export const parseExportFile = (data: unknown, provider?: ImportProvider): Parse
     return { conversations, provider: detectedProvider };
 };
 
-/**
- * Extract JSON from a file. Handles both direct JSON files
- * and JSON files within ZIP archives.
- */
 /** One JSON record per non-empty line; any damaged line stops the import (see the error). */
 const parseJsonLines = (text: string): unknown[] => {
     const records: unknown[] = [];
@@ -176,6 +172,10 @@ const parseJsonLines = (text: string): unknown[] => {
     return records;
 };
 
+/**
+ * Extract JSON from a file. Handles both direct JSON files
+ * and JSON files within ZIP archives.
+ */
 export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
     const fileName = file.name.toLowerCase();
 

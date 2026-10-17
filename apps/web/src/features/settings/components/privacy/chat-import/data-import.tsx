@@ -19,7 +19,6 @@ import { uploadFile } from "@/lib/upload/upload-file";
 import { ChatImportError, extractJsonFromFile, parseExportFile } from "./parsers";
 import type { ImportProvider, NormalizedConversation } from "./parsers/types";
 
-/** An export with nothing in it: an empty array or object. */
 /** An export with nothing in it. An object file arrives wrapped once more, so `[{}]` counts too. */
 const isEmptyExport = (value: unknown): boolean => {
     const unwrapped = Array.isArray(value) && value.length === 1 ? (value[0] as unknown) : value;

@@ -912,7 +912,6 @@ export const compareRuns = authQuery
         };
     });
 
-/** The newest finished run of each distinct model on a dataset, with every case's outcome per run. */
 /**
  * Two runs share a column only when they ran the same thing: the same skill,
  * model and prompt, or the same knowledge files. A bare model name would merge a
@@ -932,6 +931,7 @@ const comparisonKey = (target: Infer<typeof vEvalTarget>): string => {
     return JSON.stringify(["model", target.model, target.systemPrompt ?? null]);
 };
 
+/** The newest finished run of each distinct model on a dataset, with every case's outcome per run. */
 export const compareModels = authQuery
     .input({ datasetId: v.id("evalDatasets") })
     .output(v.from(vModelComparison))

@@ -326,10 +326,6 @@ const vRoundOutcome = v.union(
 );
 
 /**
- * Finishes a claimed round and decides what happens next: done (and unblock
- * dependents), another repair round, a human review, or failed on an error.
- */
-/**
  * The inbox entry for a round that ended: done (success), failed, or waiting
  * for review (a failure the user decides on). Deduped per run, since a queue
  * redelivery can reach `completeRound` twice — its status check stops the
@@ -357,6 +353,10 @@ const notifyTaskRound = async (
     });
 };
 
+/**
+ * Finishes a claimed round and decides what happens next: done (and unblock
+ * dependents), another repair round, a human review, or failed on an error.
+ */
 export const completeRound = internalMutation
     .input({
         outcome: vRoundOutcome,
