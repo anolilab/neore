@@ -12,6 +12,7 @@ import {
 import { Input } from "@ui/components/input";
 import cn from "@ui/utils/cn";
 import { formatDate } from "@ui/utils/locale-format";
+import { assertOfficeZipWithinLimits } from "@ui/utils/office-zip-limits";
 import { ChevronDownIcon, FileSpreadsheetIcon, FilterIcon, SearchIcon } from "lucide-react";
 import * as React from "react";
 
@@ -265,7 +266,9 @@ const parseXlsFormat = async (arrayBuffer: ArrayBuffer, locale: string, columnFa
     return { sheetNames, sheets };
 };
 
-const resolveArrayBuffer = async (source: File | ArrayBuffer | string): Promise<ArrayBuffer> => {
+const XLSX_FETCH_TIMEOUT_MS = 30_000;
+
+const resolveArrayBuffer = async (source: File | ArrayBuffer | string, signal: AbortSignal): Promise<ArrayBuffer> => {
     if (source instanceof ArrayBuffer) {
         return source;
     }
@@ -275,7 +278,7 @@ const resolveArrayBuffer = async (source: File | ArrayBuffer | string): Promise<
     }
 
     // string URL
-    const response = await fetch(source);
+    const response = await fetch(source, { signal });
 
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
 
@@ -297,7 +300,11 @@ const XlsxRenderer = ({ className, fileName, labels, source }: XlsxRendererProps
     const [parsed, setParsed] = React.useState<ParsedWorkbook>(EMPTY_WORKBOOK);
 
     React.useEffect(() => {
+        const controller = new AbortController();
         let cancelled = false;
+
+        // A deadline as well as the unmount abort: a stalled URL must not hold the preview forever.
+        const deadline = setTimeout(() => controller.abort(), XLSX_FETCH_TIMEOUT_MS);
 
         const load = async () => {
             try {
@@ -308,7 +315,7 @@ const XlsxRenderer = ({ className, fileName, labels, source }: XlsxRendererProps
                 setSortConfig({ column: "", direction: null });
                 setSheetIndex(0);
 
-                const arrayBuffer = await resolveArrayBuffer(source);
+                const arrayBuffer = await resolveArrayBuffer(source, controller.signal);
 
                 if (!arrayBuffer || arrayBuffer.byteLength === 0) {
                     throw new Error("Empty file received");
@@ -319,6 +326,8 @@ const XlsxRenderer = ({ className, fileName, labels, source }: XlsxRendererProps
                 let result: ParsedWorkbook;
 
                 if (format === "xlsx") {
+                    assertOfficeZipWithinLimits(arrayBuffer);
+
                     const file =
                         source instanceof File
                             ? source
@@ -349,6 +358,8 @@ const XlsxRenderer = ({ className, fileName, labels, source }: XlsxRendererProps
                     setParsed(EMPTY_WORKBOOK);
                     setIsLoading(false);
                 }
+            } finally {
+                clearTimeout(deadline);
             }
         };
 
@@ -356,6 +367,8 @@ const XlsxRenderer = ({ className, fileName, labels, source }: XlsxRendererProps
 
         return () => {
             cancelled = true;
+            clearTimeout(deadline);
+            controller.abort();
         };
     }, [source, fileName, columnFallback, i18n.locale, t]);
 
