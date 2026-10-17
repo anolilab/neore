@@ -171,7 +171,14 @@ const vModelComparison = v.object({
             caseId: v.id("evalCases"),
             frozen: v.boolean(),
             input: v.string(),
-            results: v.array(v.object({ passed: v.union(v.boolean(), v.null()), runId: v.id("evalRuns"), score: v.union(v.number(), v.null()) })),
+            results: v.array(
+                v.object({
+                    passed: v.union(v.boolean(), v.null()),
+                    runId: v.id("evalRuns"),
+                    score: v.union(v.number(), v.null()),
+                    status: v.union(vEvalResultStatus, v.null()),
+                }),
+            ),
         }),
     ),
     runs: v.array(vRunRow),
@@ -950,7 +957,7 @@ export const compareModels = authQuery
                     results: runs.map((run, index) => {
                         const result = outcomes[index]?.get(evalCase._id as string);
 
-                        return { passed: result?.passed ?? null, runId: run._id, score: result?.score ?? null };
+                        return { passed: result?.passed ?? null, runId: run._id, score: result?.score ?? null, status: result?.status ?? null };
                     }),
                 };
             }),

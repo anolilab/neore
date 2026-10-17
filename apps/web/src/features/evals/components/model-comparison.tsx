@@ -66,12 +66,16 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
 
     // Two runs can share a model; a number keeps their columns apart.
     const names = uniqueNames(data.runs.map((run) => run.label ?? run.target.model ?? run.target.kind));
-    const outcome = (passed: boolean | null) => {
-        if (passed === null) {
+    const outcome = (result: { passed: boolean | null; status: string | null }) => {
+        if (result.status === "error") {
+            return t`Error`;
+        }
+
+        if (result.passed === null) {
             return "—";
         }
 
-        return passed ? t`Pass` : t`Fail`;
+        return result.passed ? t`Pass` : t`Fail`;
     };
 
     return (
@@ -126,8 +130,8 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
                                 </TableCell>
                                 {entry.results.map((result) => (
                                     <TableCell className="text-right" key={result.runId}>
-                                        <Badge variant={result.passed === false ? "destructive" : "secondary"}>
-                                            {outcome(result.passed)} {result.score === null ? "" : formatPercent(result.score)}
+                                        <Badge variant={result.passed === false || result.status === "error" ? "destructive" : "secondary"}>
+                                            {outcome(result)} {result.score === null ? "" : formatPercent(result.score)}
                                         </Badge>
                                     </TableCell>
                                 ))}
