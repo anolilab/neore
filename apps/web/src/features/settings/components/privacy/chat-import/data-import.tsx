@@ -41,7 +41,7 @@ const PROVIDER_LABELS: Record<ImportProvider, string> = {
 type ImportState =
     | { step: "idle" }
     | { step: "parsing" }
-    | { conversations: NormalizedConversation[]; provider: ImportProvider; step: "preview" }
+    | { conversations: NormalizedConversation[]; provider: ImportProvider; skipped: string[]; step: "preview" }
     | { provider: ImportProvider; step: "uploading" }
     | { jobId: string; provider: ImportProvider; step: "importing" }
     | { failed: number; imported: number; provider: ImportProvider; step: "done" }
@@ -162,16 +162,27 @@ const DataImport: FC = () => {
                 // Each file is detected on its own: a shared hint would parse a second
                 // format with the first one's parser and drop its sessions silently.
                 // An empty file in an archive (`[]`, `{}`) carries nothing to import and must not block the rest.
-                const results = jsonDataArray
-                    .filter(({ jsonData }) => !isEmptyExport(jsonData))
-                    .map(({ jsonData, name }) => {
-                        try {
-                            return parseExportFile(jsonData);
-                        } catch (error) {
-                            // Name the file the failure came from; a ZIP's entries are reported under the archive.
-                            throw new Error(`${name}: ${describeError(error, i18n)}`, { cause: error });
-                        }
-                    });
+                // A file that is not a recognised export is skipped and named in the preview. Only when nothing
+                // in the selection parses does the import fail, with the first file's reason.
+                const results: ReturnType<typeof parseExportFile>[] = [];
+                const skipped: string[] = [];
+                let firstFailure: Error | undefined;
+
+                const candidates = jsonDataArray.filter(({ jsonData: value }) => !isEmptyExport(value));
+
+                for (const { jsonData, name } of candidates) {
+                    try {
+                        results.push(parseExportFile(jsonData));
+                    } catch (error) {
+                        skipped.push(name);
+                        firstFailure ??= new Error(`${name}: ${describeError(error, i18n)}`, { cause: error });
+                    }
+                }
+
+                if (results.length === 0 && firstFailure) {
+                    throw firstFailure;
+                }
+
                 const providers = new Set(results.map((result) => result.provider));
 
                 // One import job carries one provider, so a mixed selection cannot run.
@@ -193,6 +204,7 @@ const DataImport: FC = () => {
                 setState({
                     conversations: allConversations,
                     provider: detectedProvider,
+                    skipped: [...new Set(skipped)],
                     step: "preview",
                 });
             } catch (error: unknown) {
@@ -284,6 +296,11 @@ const DataImport: FC = () => {
                         <div className="bg-muted rounded-lg p-4 text-sm">
                             <p className="font-medium">{t`Detected: ${PROVIDER_LABELS[state.provider]}`}</p>
                             <p className="text-muted-foreground mt-1">{t`${state.conversations.length} conversations found`}</p>
+                            {state.skipped.length > 0 && (
+                                <p className="text-muted-foreground mt-1" role="status">
+                                    {t`Skipped files that are not chat exports: ${state.skipped.join(", ")}`}
+                                </p>
+                            )}
                             {state.conversations.length > 0 && (
                                 <div className="text-muted-foreground mt-2 max-h-32 space-y-1 overflow-y-auto">
                                     {state.conversations.slice(0, 10).map((c, i) => (
