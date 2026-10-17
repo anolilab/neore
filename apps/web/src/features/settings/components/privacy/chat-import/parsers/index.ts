@@ -7,6 +7,8 @@ import { msg } from "@lingui/core/macro";
 
 import parseChatGPT from "./chatgpt";
 import parseClaude from "./claude";
+import parseClaudeCode, { isClaudeCodeRecord } from "./claude-code";
+import parseCodex, { isCodexRecord } from "./codex";
 import parseGemini from "./gemini";
 import type { ImportProvider, NormalizedConversation, ParseResult } from "./types";
 
@@ -63,6 +65,18 @@ const detectProvider = (data: unknown): ImportProvider => {
                 }
             }
         }
+
+        // Local transcripts: JSONL events, matched on any of the first few records
+        // (the leading ones can be bookkeeping lines)
+        const head = data.slice(0, 20);
+
+        if (head.some((record) => isClaudeCodeRecord(record))) {
+            return "claude-code";
+        }
+
+        if (head.some((record) => isCodexRecord(record))) {
+            return "codex";
+        }
     }
 
     // Single conversation object
@@ -109,6 +123,14 @@ export const parseExportFile = (data: unknown, provider?: ImportProvider): Parse
             conversations = parseClaude(data);
             break;
         }
+        case "claude-code": {
+            conversations = parseClaudeCode(data);
+            break;
+        }
+        case "codex": {
+            conversations = parseCodex(data);
+            break;
+        }
         case "gemini": {
             conversations = parseGemini(data);
             break;
@@ -133,6 +155,26 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
         const parsed = JSON.parse(text);
 
         return Array.isArray(parsed) ? [parsed] : [[parsed]];
+    }
+
+    if (fileName.endsWith(".jsonl")) {
+        const records: unknown[] = [];
+
+        const text = await file.text();
+
+        for (const line of text.split("\n")) {
+            if (!line.trim()) {
+                continue;
+            }
+
+            try {
+                records.push(JSON.parse(line));
+            } catch {
+                // Skip a truncated or corrupt line
+            }
+        }
+
+        return [records];
     }
 
     if (fileName.endsWith(".zip")) {
@@ -175,5 +217,5 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
         return jsonFiles;
     }
 
-    throw new ChatImportError(msg`Unsupported file format. Please upload a .json or .zip file.`);
+    throw new ChatImportError(msg`Unsupported file format. Please upload a .json, .jsonl or .zip file.`);
 };

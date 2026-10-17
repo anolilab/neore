@@ -22,6 +22,8 @@ import type { ImportProvider, NormalizedConversation } from "./parsers/types";
 const PROVIDER_LABELS: Record<ImportProvider, string> = {
     chatgpt: "ChatGPT",
     claude: "Claude",
+    "claude-code": "Claude Code",
+    codex: "Codex CLI",
     gemini: "Google Gemini",
 };
 
@@ -110,9 +112,9 @@ const DataImport: FC = () => {
     const handleFileSelect = useCallback(
         async (event: React.ChangeEvent<HTMLInputElement>) => {
             const input = event.target;
-            const file = input.files?.[0];
+            const files = [...(input.files ?? [])];
 
-            if (!file) {
+            if (files.length === 0) {
                 return;
             }
 
@@ -122,7 +124,8 @@ const DataImport: FC = () => {
             setState({ step: "parsing" });
 
             try {
-                const jsonDataArray = await extractJsonFromFile(file);
+                const extracted = await Promise.all(files.map((file) => extractJsonFromFile(file)));
+                const jsonDataArray = extracted.flat();
 
                 // Merge all parsed conversations
                 let allConversations: NormalizedConversation[] = [];
@@ -207,12 +210,12 @@ const DataImport: FC = () => {
 
     return (
         <SettingsCard
-            description={t`Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file.`}
+            description={t`Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files.`}
             title={t`Import Conversations`}
         >
             <CardContent className="space-y-4">
                 {/* Hidden file input */}
-                <input accept=".json,.zip" className="hidden" onChange={handleFileSelect} ref={fileInputRef} type="file" />
+                <input accept=".json,.jsonl,.zip" className="hidden" multiple onChange={handleFileSelect} ref={fileInputRef} type="file" />
 
                 {/* Idle state */}
                 {state.step === "idle" && (
