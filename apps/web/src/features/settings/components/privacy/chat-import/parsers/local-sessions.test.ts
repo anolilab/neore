@@ -132,10 +132,9 @@ describe("extractJsonFromFile", () => {
         await expect(extractJsonFromFile(new File([text], "rollout.jsonl"))).rejects.toThrow("Line 2");
     });
 
-    it("tolerates a truncated final line, as a transcript still being written can end with one", async () => {
-        const text = `${JSON.stringify(codexRollout[0])}\n${JSON.stringify(codexRollout[2])}\n{"partial`;
-        const [records] = await extractJsonFromFile(new File([text], "rollout.jsonl"));
+    it("stops on a truncated final line too, rather than dropping it", async () => {
+        const text = `${JSON.stringify(codexRollout[0])}\n{"partial`;
 
-        expect(records).toHaveLength(2);
+        await expect(extractJsonFromFile(new File([text], "rollout.jsonl"))).rejects.toThrow("Line 2");
     });
 });

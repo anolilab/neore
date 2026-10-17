@@ -83,11 +83,11 @@ describe("links and code in Telegram output", () => {
         }
     });
 
-    it("splits a code span longer than a piece into closed, reopened pieces", () => {
+    it("cuts a code span longer than a piece without adding characters", () => {
         const line = `\`${"x".repeat(120)}\``;
         const pieces = splitLossless(line, 40);
 
         expect(pieces.every((piece) => piece.length <= 40)).toBe(true);
-        expect(pieces.every((piece) => piece.split("`").length % 2 === 1)).toBe(true);
+        expect(pieces.join("")).toBe(line);
     });
 });

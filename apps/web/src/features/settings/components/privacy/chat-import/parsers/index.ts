@@ -176,15 +176,12 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
             })
             .filter(({ line }) => line.trim());
 
-        for (const [index, { line, number }] of lines.entries()) {
+        for (const { line, number } of lines) {
             try {
                 records.push(JSON.parse(line));
             } catch {
-                // A transcript still being written can end in a partial line; any other bad line is a damaged turn.
-                if (index === lines.length - 1) {
-                    break;
-                }
-
+                // Any damaged line stops the import: a turn cannot be dropped silently, and a
+                // partial last line is indistinguishable from a complete but corrupt one.
                 throw new ChatImportError(msg`Line ${number} of this transcript is not valid JSON, so the import was stopped.`);
             }
         }

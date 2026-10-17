@@ -3182,6 +3182,11 @@
     },
     {
       "from": "function:evals_functions:deleteDataset",
+      "kind": "read",
+      "to": "table:evalCases"
+    },
+    {
+      "from": "function:evals_functions:deleteDataset",
       "kind": "schedule",
       "to": "function:evals_functions:purgeDataset"
     },

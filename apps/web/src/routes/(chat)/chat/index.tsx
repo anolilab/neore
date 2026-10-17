@@ -14,7 +14,9 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 // Module scope, so it outlives this component's mounts: a page load resumes once.
 // Effects never run during SSR, so it is never shared between requests.
-const resumeState = { consumed: false };
+// `firstKey` is the navigation that first showed the chat index on this page load. Only
+// that visit may resume: a later New chat (a new navigation) must open a blank chat.
+const resumeState: { consumed: boolean; firstKey: string | undefined } = { consumed: false, firstKey: undefined };
 
 const ChatPage = () => {
     const route = "/(chat)/chat/";
@@ -32,9 +34,6 @@ const ChatPage = () => {
     const crpc = useCRPC();
     const { data: userSettings } = useUserSettings();
     const resumeLastChat = BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage;
-    // The location this screen mounted on. Any navigation since then (New chat, a
-    // sidebar link) cancels a resume that was still waiting for its data.
-    const mountLocationKey = useRef(navigationKey);
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(crpc.chat.resume.latestResumableThread.queryOptions(resumeLastChat ? {} : skipToken));
 
     const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
@@ -60,13 +59,17 @@ const ChatPage = () => {
     }, [hasInitialMessage]);
 
     useEffect(() => {
+        resumeState.firstKey ??= navigationKey;
+    }, [navigationKey]);
+
+    useEffect(() => {
         if (!resumeLastChat || !latestResolved || resumeState.consumed) {
             return;
         }
 
         resumeState.consumed = true;
 
-        if (navigationKey !== mountLocationKey.current) {
+        if (navigationKey !== resumeState.firstKey) {
             return;
         }
 

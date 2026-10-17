@@ -21,16 +21,9 @@ export const splitLossless = (line: string, size: number, inlineCode = true): st
             cut = rest.lastIndexOf(" ", cut - 1);
         }
 
+        // No safe cut exists (a code span longer than the piece): cut at the limit. The
+        // characters stay exactly as written; only that chunk's code formatting can be lost.
         if (cut <= 0) {
-            // No space outside a code span fits: close the span at the end of this piece
-            // and reopen it at the start of the next, so both still render as code.
-            if (inlineCode && !hasClosedCode(rest.slice(0, size))) {
-                pieces.push(`${rest.slice(0, size - 1)}\``);
-                rest = `\`${rest.slice(size - 1)}`;
-
-                continue;
-            }
-
             cut = size;
         }
 

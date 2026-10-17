@@ -19,6 +19,10 @@ import { uploadFile } from "@/lib/upload/upload-file";
 import { ChatImportError, extractJsonFromFile, parseExportFile } from "./parsers";
 import type { ImportProvider, NormalizedConversation } from "./parsers/types";
 
+/** An export with nothing in it: an empty array or object. */
+const isEmptyExport = (value: unknown): boolean =>
+    (Array.isArray(value) && value.length === 0) || (typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === 0);
+
 const PROVIDER_LABELS: Record<ImportProvider, string> = {
     chatgpt: "ChatGPT",
     claude: "Claude",
@@ -129,7 +133,8 @@ const DataImport: FC = () => {
 
                 // Each file is detected on its own: a shared hint would parse a second
                 // format with the first one's parser and drop its sessions silently.
-                const results = jsonDataArray.map((jsonData) => parseExportFile(jsonData));
+                // An empty file in an archive (`[]`, `{}`) carries nothing to import and must not block the rest.
+                const results = jsonDataArray.filter((jsonData) => !isEmptyExport(jsonData)).map((jsonData) => parseExportFile(jsonData));
                 const providers = new Set(results.map((result) => result.provider));
 
                 // One import job carries one provider, so a mixed selection cannot run.

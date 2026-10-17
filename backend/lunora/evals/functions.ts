@@ -508,6 +508,13 @@ export const deleteDataset = authMutation
     .mutation(async ({ args, ctx }) => {
         const dataset = await requireOwnedDataset(ctx, args.datasetId, ctx.user.userId);
 
+        // Purging deletes every case, so a regression check must be unfrozen first.
+        const cases = await loadCases(ctx, dataset._id);
+
+        if (cases.some((evalCase) => evalCase.frozen === true)) {
+            throw new LunoraError("BAD_REQUEST", "Unfreeze this dataset's frozen cases before deleting the dataset");
+        }
+
         await ctx.db.delete(dataset._id);
         await ctx.scheduler.runAfter(0, internal.evals.functions.purgeDataset, { datasetId: dataset._id, userId: dataset.userId });
 

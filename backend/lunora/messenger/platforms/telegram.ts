@@ -226,16 +226,18 @@ export const sendTelegramMessage = async (botToken: string, chatId: number | str
         });
 
     for (const chunk of formatTelegramMessage(text)) {
-        let response = await post({ parse_mode: "HTML", text: chunk.html });
+        const response = await post({ parse_mode: "HTML", text: chunk.html });
 
         if (response.status === 400) {
             await response.body?.cancel();
 
             // Lossless: the plain retry must carry the reply exactly, spaces at a cut included.
             for (const plain of splitLossless(chunk.source, TELEGRAM_MESSAGE_LIMIT)) {
-                response = await post({ text: plain });
+                const sent = await post({ text: plain });
 
-                if (!response.ok) {
+                await sent.body?.cancel();
+
+                if (!sent.ok) {
                     break;
                 }
             }
