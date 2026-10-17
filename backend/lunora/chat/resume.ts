@@ -8,33 +8,53 @@
  */
 import { v } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
 import { liteAuthQuery } from "../lib/crpc";
 
-/** How many recent threads to test; each costs one branch lookup. */
-const RESUME_SCAN_LIMIT = 20;
+/** Threads read per page, and the most threads a resume will look through. */
+const PAGE_SIZE = 50;
+
+/** The fields a resume reads from each thread, and the page cursor. */
+interface ScanPage {
+    continueCursor: string | null;
+    isDone: boolean;
+    page: { _id: Id<"threads">; deleted?: boolean; isTemporary?: boolean; status: string }[];
+}
+const MAX_THREADS_SCANNED = 500;
 
 export const latestResumableThread = liteAuthQuery
     .input({})
     .output(v.union(v.string(), v.null()))
-    .query(async ({ ctx }) => {
+    .query(async ({ ctx }): Promise<string | null> => {
         const { userId } = ctx.user;
-        const { page } = await ctx.db.threads.findMany({
-            limit: RESUME_SCAN_LIMIT,
-            orderBy: [{ updatedAt: "desc" }],
-            where: { userId },
-        });
+        let cursor: string | null = null;
 
-        // `deleted` is unset on ordinary inserts, and unset means live (as in the thread list).
-        for (const thread of page) {
-            if (thread.deleted || thread.status === "archived" || thread.isTemporary) {
-                continue;
+        for (let scanned = 0; scanned < MAX_THREADS_SCANNED; scanned += PAGE_SIZE) {
+            const threads: ScanPage = await ctx.db.threads.findMany({
+                cursor,
+                limit: PAGE_SIZE,
+                orderBy: [{ updatedAt: "desc" }],
+                where: { userId },
+            });
+
+            // `deleted` is unset on ordinary inserts, and unset means live (as in the thread list).
+            for (const thread of threads.page) {
+                if (thread.deleted || thread.status === "archived" || thread.isTemporary) {
+                    continue;
+                }
+
+                const branch = await ctx.db.threadRelationships.findFirst({ where: { threadId: thread._id } });
+
+                if (!branch) {
+                    return thread._id as string;
+                }
             }
 
-            const branch = await ctx.db.threadRelationships.findFirst({ where: { threadId: thread._id } });
-
-            if (!branch) {
-                return thread._id as string;
+            if (threads.isDone || !threads.continueCursor) {
+                break;
             }
+
+            cursor = threads.continueCursor;
         }
 
         return null;

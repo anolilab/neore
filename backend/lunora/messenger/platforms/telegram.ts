@@ -11,8 +11,8 @@ import { timingSafeEqual } from "../../lib/crypto";
 import type { DownloadedMedia, InboundAttachment, MediaSendResult, OutboundFile } from "../lib/media";
 import { fetchMedia, MediaDownloadError, MESSENGER_MEDIA_MAX_BYTES, toBlob } from "../lib/media";
 import type { InboundMessage } from "../lib/types";
-import { inboundKind, splitMessage } from "../lib/types";
-import { formatTelegramMessage, TELEGRAM_MESSAGE_LIMIT } from "./telegram-format";
+import { inboundKind } from "../lib/types";
+import { formatTelegramMessage, splitLossless, TELEGRAM_MESSAGE_LIMIT } from "./telegram-format";
 
 const TELEGRAM_API = "https://api.telegram.org";
 const TELEGRAM_HOSTS = ["api.telegram.org"];
@@ -231,7 +231,8 @@ export const sendTelegramMessage = async (botToken: string, chatId: number | str
         if (response.status === 400) {
             await response.body?.cancel();
 
-            for (const plain of splitMessage(chunk.source, TELEGRAM_MESSAGE_LIMIT)) {
+            // Lossless: the plain retry must carry the reply exactly, spaces at a cut included.
+            for (const plain of splitLossless(chunk.source, TELEGRAM_MESSAGE_LIMIT)) {
                 response = await post({ text: plain });
 
                 if (!response.ok) {

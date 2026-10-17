@@ -948,14 +948,32 @@ export const compareModels = authQuery
         const [cases, ...resultSets] = await Promise.all([loadCases(ctx, dataset._id), ...runs.map((run) => loadRunResults(ctx, run._id))]);
         const outcomes = resultSets.map((results) => new Map(results.map((result) => [result.caseId as string, result])));
 
+        // The rows are every case any compared run scored, so a deleted case keeps its
+        // past outcomes. A result stores the input it ran with; the newest run's copy is
+        // shown, and a case that still exists keeps its current order and frozen flag.
+        const current = new Map(cases.map((evalCase) => [evalCase._id as string, evalCase]));
+        const inputs = new Map<string, string>();
+
+        for (const results of resultSets) {
+            for (const result of results) {
+                if (!inputs.has(result.caseId as string)) {
+                    inputs.set(result.caseId as string, result.input);
+                }
+            }
+        }
+
+        const caseIds = [...new Set([...cases.map((evalCase) => evalCase._id as string), ...inputs.keys()])];
+
         return {
-            cases: cases.map((evalCase) => {
+            cases: caseIds.map((caseId) => {
+                const evalCase = current.get(caseId);
+
                 return {
-                    caseId: evalCase._id,
-                    frozen: evalCase.frozen ?? false,
-                    input: evalCase.input,
+                    caseId: caseId as Id<"evalCases">,
+                    frozen: evalCase?.frozen ?? false,
+                    input: evalCase?.input ?? inputs.get(caseId) ?? "",
                     results: runs.map((run, index) => {
-                        const result = outcomes[index]?.get(evalCase._id as string);
+                        const result = outcomes[index]?.get(caseId);
 
                         return { passed: result?.passed ?? null, runId: run._id, score: result?.score ?? null, status: result?.status ?? null };
                     }),
