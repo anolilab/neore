@@ -54,7 +54,7 @@ import { MAX_LENGTH } from "../lib/validators";
 /** Runs listed per dataset, newest first. */
 const MAX_RUNS_LISTED = 50;
 
-const MAX_COMPARED_MODELS = 6;
+const MAX_COMPARED_MODELS = 12;
 /** Runs read per page while looking for each target's newest finished run. */
 const COMPARISON_PAGE_SIZE = 100;
 
