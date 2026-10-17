@@ -9,6 +9,7 @@ import RouteErrorBoundary from "@/components/error-boundaries/route-error-bounda
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -86,10 +87,13 @@ const ChatPage = () => {
             return;
         }
 
-        // The composer autofocuses on a blank chat, so focus alone is not typing: a redirect would only discard a
-        // draft that has text in it.
+        // The composer's stored draft (text or attachments) survives a blur, so it is read from the store, not focus. Focus
+        // alone is not typing: the composer autofocuses on a blank chat.
+        const { composerAttachments, composerText } = useChatUIStore.getState();
         const focused = document.activeElement;
         const hasDraft =
+            composerText.trim() !== "" ||
+            composerAttachments.length > 0 ||
             ((focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement) && focused.value.trim() !== "") ||
             (focused instanceof HTMLElement && focused.isContentEditable && (focused.textContent ?? "").trim() !== "");
 
