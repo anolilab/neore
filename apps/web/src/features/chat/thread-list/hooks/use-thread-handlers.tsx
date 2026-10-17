@@ -48,16 +48,16 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
         // Thread ids reach these handlers as plain strings (component props and
         // `BranchNode` fields) but always come from thread documents, so the brand is
         // re-applied at the mutation/query boundary.
-        async (threadId: string, deletedIds: string[]) => {
-            for (const id of deletedIds) {
-                removeOptimisticDeletion(id);
-            }
+        async (deletedIds: string[]) => {
+            // Each deleted row is restored on its own, including branches deleted with their parent.
+            // Undo is best-effort: a row that is already gone stays hidden.
+            const results = await Promise.allSettled(deletedIds.map((id) => undoDeleteThreadMutation({ threadId: id as Id<"threads"> })));
 
-            try {
-                await undoDeleteThreadMutation({ threadId: threadId as Id<"threads"> });
-            } catch {
-                // Undo is best-effort: the row may already be gone.
-            }
+            deletedIds.forEach((id, index) => {
+                if (results[index]?.status === "fulfilled") {
+                    removeOptimisticDeletion(id);
+                }
+            });
         },
         [removeOptimisticDeletion, undoDeleteThreadMutation],
     );
@@ -123,7 +123,7 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                 .then((deletedIds) => {
                     showSuccess(
                         <>
-                            {t`Thread deleted.`} <button onClick={() => handleUndoDeleteThread(threadId, deletedIds)} type="button">{t`Undo`}</button>
+                            {t`Thread deleted.`} <button onClick={() => handleUndoDeleteThread(deletedIds)} type="button">{t`Undo`}</button>
                         </>,
                     );
 

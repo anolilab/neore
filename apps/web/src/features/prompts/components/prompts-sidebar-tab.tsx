@@ -370,6 +370,13 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
         };
     }, [promptGroups, currentPage]);
 
+    // A delete can shrink the list below the page being shown.
+    useEffect(() => {
+        if (currentPage > paginatedGroups.totalPages) {
+            setCurrentPage(paginatedGroups.totalPages);
+        }
+    }, [currentPage, paginatedGroups.totalPages]);
+
     // Reset to page 1 when search changes
     const handleSearchChange = useCallback((query: string) => {
         setSearchQuery(query);
