@@ -142,7 +142,12 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
                         {data.cases.map((entry) => (
                             <TableRow key={entry.caseId}>
                                 <TableCell className="max-w-md truncate" title={entry.input}>
-                                    {entry.frozen && <Lock aria-label={t`Frozen`} className="mr-1 inline size-3" />}
+                                    {entry.frozen && (
+                                        <>
+                                            <Lock aria-hidden className="mr-1 inline size-3" />
+                                            <span className="sr-only">{t`Frozen`}</span>
+                                        </>
+                                    )}
                                     {entry.input}
                                 </TableCell>
                                 {entry.results.map((result) => (
