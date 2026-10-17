@@ -148,6 +148,9 @@ const forwardToBackend = async (
     const targetUrl = `${lunoraUrl}${backendPath}`;
     const sigHeaders = await signRequest("POST", targetUrl, bodyBytes.buffer as ArrayBuffer, signingSecret);
 
+    // The deadline covers the wait for headers only: a streamed reply may run far longer.
+    const headersAbort = new AbortController();
+    const headersTimer = setTimeout(() => headersAbort.abort(), 30_000);
     const backendResponse = await fetch(targetUrl, {
         body: rawBody,
         headers: {
@@ -157,8 +160,8 @@ const forwardToBackend = async (
             ...extraHeaders,
         },
         method: "POST",
-        signal: AbortSignal.timeout(30_000),
-    });
+        signal: headersAbort.signal,
+    }).finally(() => clearTimeout(headersTimer));
 
     if (!backendResponse.ok) {
         const errorBody = await backendResponse.text();

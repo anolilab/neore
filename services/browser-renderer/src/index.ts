@@ -251,15 +251,17 @@ const PAGE_TIMEOUT = 30_000;
 /** Max time to wait for navigation (ms) */
 const NAV_TIMEOUT = 60_000;
 
-const routedPages = new WeakSet<WeakKey>();
+const routedContexts = new WeakSet<WeakKey>();
 
-/** Every request the page makes (clicks, redirects, subresources) passes the same SSRF check. */
+/** Every request any page in the context makes (clicks, redirects, subresources, popups) passes the same SSRF check. */
 const guardPage = async (page: import("@cloudflare/playwright").Page) => {
-    if (routedPages.has(page)) return;
+    const context = page.context();
 
-    routedPages.add(page);
+    if (routedContexts.has(context)) return;
 
-    await page.route("**/*", async (route) => {
+    routedContexts.add(context);
+
+    await context.route("**/*", async (route) => {
         if (validateUrl(route.request().url()) === null) {
             await route.continue();
         } else {
