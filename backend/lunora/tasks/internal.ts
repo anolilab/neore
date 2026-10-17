@@ -326,10 +326,6 @@ const vRoundOutcome = v.union(
 );
 
 /**
- * Finishes a claimed round and decides what happens next: done (and unblock
- * dependents), another repair round, a human review, or failed on an error.
- */
-/**
  * The inbox entry for a round that ended: done (success), failed, or waiting
  * for review (a failure the user decides on). Deduped per run, since a queue
  * redelivery can reach `completeRound` twice — its status check stops the
@@ -341,17 +337,26 @@ const notifyTaskRound = async (
     run: Doc<"taskRuns">,
     outcome: "failure" | "success",
     detail: string | undefined,
-): Promise<void> =>
+    threadId: string | undefined,
+): Promise<void> => {
     await notifyQuietly(ctx, {
         dedupeKey: `task:${run._id}`,
-        link: "/tasks",
+        emailOutcome: Boolean(detail),
+        // A finished run opens its chat, where the result is. A run that needs review or failed is
+        // acted on from the tasks board, where its review controls are, so that link stays.
+        link: outcome === "success" && threadId ? `/chat/${threadId}` : "/tasks",
         outcome,
         title: task.title,
         type: "task",
         userId: task.userId,
         ...(detail && { body: detail }),
     });
+};
 
+/**
+ * Finishes a claimed round and decides what happens next: done (and unblock
+ * dependents), another repair round, a human review, or failed on an error.
+ */
 export const completeRound = internalMutation
     .input({
         outcome: vRoundOutcome,
@@ -386,7 +391,7 @@ export const completeRound = internalMutation
 
             await ctx.db.patch(run._id, { ...runResult, error, status: "error" });
             await patchById(ctx.db, task._id, { activeCycle: undefined, lastError: error, lastRunThreadId, status: "failed", updatedAt: now });
-            await notifyTaskRound(ctx, task, run, "failure", error);
+            await notifyTaskRound(ctx, task, run, "failure", error, args.threadId ?? run.threadId);
 
             return "failed";
         }
@@ -428,7 +433,7 @@ export const completeRound = internalMutation
                 status: "needs_review",
                 updatedAt: now,
             });
-            await notifyTaskRound(ctx, task, run, "failure", summarise(finalAnswer));
+            await notifyTaskRound(ctx, task, run, "failure", summarise(finalAnswer), args.threadId ?? run.threadId);
 
             return "needs_review";
         }
@@ -445,7 +450,7 @@ export const completeRound = internalMutation
             updatedAt: now,
         });
         await promoteDependents(ctx, done, now);
-        await notifyTaskRound(ctx, task, run, "success", summarise(finalAnswer));
+        await notifyTaskRound(ctx, task, run, "success", summarise(finalAnswer), args.threadId ?? run.threadId);
 
         return "done";
     });

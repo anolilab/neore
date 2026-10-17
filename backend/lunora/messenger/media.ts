@@ -242,11 +242,11 @@ export const sendReplyMedia = async (
     options: {
         delivery: Delivery;
         keys: Record<string, string>;
-        sendText: (text: string) => Promise<"sent" | "window_closed">;
+        sendText: (text: string) => Promise<"not_sent" | "sent" | "window_closed">;
         threadId: string;
         userId: string;
     },
-): Promise<"sent" | "window_closed"> => {
+): Promise<"not_sent" | "sent" | "window_closed"> => {
     const { delivery, keys, sendText, threadId, userId } = options;
     const files = await context.runQuery(internal.messenger.functions.listReplyMedia, { threadId: threadId as Id<"threads">, userId });
 
@@ -267,7 +267,7 @@ export const sendReplyMedia = async (
             continue;
         }
 
-        let result: "sent" | "unsupported" | "window_closed";
+        let result: "not_sent" | "sent" | "unsupported" | "window_closed";
 
         try {
             result = await sendPlatformMedia(delivery, outbound, keys);
@@ -280,8 +280,9 @@ export const sendReplyMedia = async (
             result = await sendText(fileLinkText(outbound));
         }
 
-        if (result === "window_closed") {
-            return "window_closed";
+        // A reply that did not go out stops the rest, as a closed window does.
+        if (result === "window_closed" || result === "not_sent") {
+            return result;
         }
     }
 

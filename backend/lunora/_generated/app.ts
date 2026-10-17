@@ -625,6 +625,7 @@ class AppBuilder<Env extends object> {
             ["notifications", { mode: { field: "userId", kind: "shardBy" } }],
             ["oauthStates", { mode: { field: "userId", kind: "shardBy" } }],
             ["organization", { mode: { kind: "global" } }],
+            ["outcomeEmails", { mode: { field: "userId", kind: "shardBy" } }],
             ["pageAccess", { mode: { kind: "global" } }],
             ["pageComments", { mode: { field: "userId", kind: "shardBy" } }],
             ["pageFavorites", { mode: { field: "userId", kind: "shardBy" } }],

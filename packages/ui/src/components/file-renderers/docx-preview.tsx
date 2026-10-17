@@ -13,6 +13,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import cn from "@ui/utils/cn";
+import { assertOfficeZipWithinLimits } from "@ui/utils/office-zip-limits";
 import DOMPurify from "dompurify";
 import { Download, FileText } from "lucide-react";
 import type { FC } from "react";
@@ -24,6 +25,8 @@ export interface DocxPreviewProps {
     url: string;
 }
 
+const DOCX_FETCH_TIMEOUT_MS = 30_000;
+
 const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) => {
     const { t } = useLingui();
     const [html, setHtml] = useState<string | null>(null);
@@ -31,11 +34,15 @@ const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) =>
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        const controller = new AbortController();
         let cancelled = false;
+
+        // A deadline as well as the unmount abort: a stalled URL must not hold the preview forever.
+        const deadline = setTimeout(() => controller.abort(), DOCX_FETCH_TIMEOUT_MS);
 
         const loadDocx = async (): Promise<void> => {
             try {
-                const [response, mammoth] = await Promise.all([fetch(url), import("mammoth")]);
+                const [response, mammoth] = await Promise.all([fetch(url, { signal: controller.signal }), import("mammoth")]);
 
                 if (cancelled) {
                     return;
@@ -54,6 +61,8 @@ const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) =>
                     return;
                 }
 
+                await assertOfficeZipWithinLimits(arrayBuffer);
+
                 const result = await mammoth.convertToHtml({ arrayBuffer });
 
                 if (cancelled) {
@@ -67,6 +76,8 @@ const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) =>
                     setError(true);
                     setIsLoading(false);
                 }
+            } finally {
+                clearTimeout(deadline);
             }
         };
 
@@ -74,6 +85,8 @@ const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) =>
 
         return () => {
             cancelled = true;
+            clearTimeout(deadline);
+            controller.abort();
         };
     }, [url]);
 

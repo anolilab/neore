@@ -362,7 +362,7 @@ export const schema = defineSchema({
         failedConversations: v.optional(v.number()),
         importedConversations: v.number(),
         progress: v.optional(v.number()),
-        provider: v.union(v.literal("chatgpt"), v.literal("gemini"), v.literal("claude")),
+        provider: v.union(v.literal("chatgpt"), v.literal("gemini"), v.literal("claude"), v.literal("claude-code"), v.literal("codex")),
         r2Key: v.optional(v.string()),
         status: v.union(v.literal("pending"), v.literal("processing"), v.literal("completed"), v.literal("failed")),
         totalConversations: v.number(),
@@ -785,6 +785,8 @@ export const schema = defineSchema({
         expectedAnswer: v.optional(v.string()),
         // Knowledge file NAMES the answer should be retrieved from (RAG datasets).
         expectedSources: v.array(v.string()),
+        // A frozen case is a known-bad one kept as a regression check; `deleteCase` refuses it.
+        frozen: v.optional(v.boolean()),
         input: v.string(),
         rubric: v.optional(v.string()),
         source: v.union(v.literal("manual"), v.literal("import"), v.literal("chat")),
@@ -1271,6 +1273,9 @@ export const schema = defineSchema({
 
     messages: defineTable({
         agentName: v.optional(v.string()),
+        // Display time in ms (an imported message keeps its source time). Never an ordering
+        // key: rows are ordered by (order, stepOrder). Unset on rows from before this column.
+        createdAt: v.optional(v.number()),
         embeddingId: v.optional(v.string()),
         error: v.optional(v.string()),
         fileIds: v.optional(v.array(v.id("chatFiles"))),
@@ -1411,7 +1416,6 @@ export const schema = defineSchema({
         .index("by_state", ["state"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
-
     organization: defineTable({
         allowedModels: v.optional(v.array(v.string())),
         baseTier: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise"))),
@@ -1445,6 +1449,26 @@ export const schema = defineSchema({
         .index("name", ["name"])
         .index("slug", ["slug"])
         .triggers((t) => auditTriggersFor(t, "organization", AUDIT_TABLES["organization"]!)),
+
+    // The outbox for opt-in task-outcome mail (`notifications/task-email.ts`): written
+    // in `notify()`'s own transaction, one row per inbox row, sent by the housekeeping
+    // sweep. Sent rows are pruned after 7 days; failed ones (attempt cap) likewise.
+    outcomeEmails: defineTable({
+        attempts: v.number(),
+        /** When a send run took the row. A claim older than the recovery window is abandoned. */
+        claimedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        link: v.string(),
+        notificationId: v.id("notifications"),
+        sentAt: v.optional(v.number()),
+        status: v.union(v.literal("pending"), v.literal("sending"), v.literal("sent"), v.literal("failed")),
+        title: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_status_createdAt", ["status", "createdAt"])
+        .index("by_notificationId", ["notificationId"])
+        .index("by_userId", ["userId"]),
 
     // Pages workspace (`pages/`). A grant: `userId` is the GRANTEE, `ownerId`
     // the page owner — so a grantee's "shared with me" list is one index read.
@@ -2440,6 +2464,9 @@ export const schema = defineSchema({
         // path. The displayed path descends from here by latest child.
         activeLeafMessageId: v.optional(v.string()),
         category: v.optional(v.string()),
+        // Creation time in ms, the sidebar's sort key. `_creationTime` is system-set and
+        // cannot carry an imported chat's source time; unset on rows from before this column.
+        createdAt: v.optional(v.number()),
         createdBy: v.optional(v.string()),
         customSystemPrompt: v.optional(v.string()),
         deleted: v.optional(v.boolean()),
@@ -2484,6 +2511,8 @@ export const schema = defineSchema({
         // nor seen twice.
         .index("by_userId", ["userId"])
         .index("by_user_and_status", ["userId", "status", "deleted"])
+        // The sidebar page: newest created first.
+        .index("by_user_and_status_createdAt", ["userId", "status", "deleted", "createdAt"])
         .index("by_user_and_pinned", ["userId", "pinnedAt"])
         .index("by_publicAccessToken", ["publicAccessToken"])
         .index("by_user_and_pinned_deleted", ["userId", "deleted", "pinnedAt"])
@@ -2494,6 +2523,7 @@ export const schema = defineSchema({
         .index("by_user_and_order", ["userId", "order"])
         // Home's "recent threads" and the Daily Brief's "threads touched since".
         .index("by_user_and_updatedAt", ["userId", "updatedAt"])
+        .index("by_user_and_organization_and_updatedAt", ["userId", "organizationId", "updatedAt"])
         .searchIndex("title", { field: "title", filterFields: ["userId"] })
         .searchIndex("summary", { field: "summary", filterFields: ["userId"] })
         .relations((r) => {
@@ -2779,7 +2809,11 @@ export const schema = defineSchema({
         nickname: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
         profession: v.optional(v.string()),
+        // Opt-in: opening /chat lands on the most recent thread. Absent = off.
+        resumeLastChat: v.optional(v.boolean()),
         sendBehavior: v.optional(v.string()),
+        // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
+        taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),
         timezone: v.optional(v.string()),
         userId: v.string(),

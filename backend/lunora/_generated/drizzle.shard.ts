@@ -99,7 +99,7 @@ export const chatImportJobs = sqliteTable("chatImportJobs", {
     failedConversations: real("failedConversations"),
     importedConversations: real("importedConversations").notNull(),
     progress: real("progress"),
-    provider: text("provider", { mode: "json" }).$type<"chatgpt" | "gemini" | "claude">().notNull(),
+    provider: text("provider", { mode: "json" }).$type<"chatgpt" | "gemini" | "claude" | "claude-code" | "codex">().notNull(),
     r2Key: text("r2Key"),
     status: text("status", { mode: "json" }).$type<"pending" | "processing" | "completed" | "failed">().notNull(),
     totalConversations: real("totalConversations").notNull(),
@@ -369,6 +369,7 @@ export const evalCases = sqliteTable("evalCases", {
     datasetId: text("datasetId").references((): AnySQLiteColumn => evalDatasets._id).notNull(),
     expectedAnswer: text("expectedAnswer"),
     expectedSources: text("expectedSources", { mode: "json" }).$type<Array<string>>().notNull(),
+    frozen: integer("frozen", { mode: "boolean" }),
     input: text("input").notNull(),
     rubric: text("rubric"),
     source: text("source", { mode: "json" }).$type<"manual" | "import" | "chat">().notNull(),
@@ -751,6 +752,7 @@ export const messages = sqliteTable("messages", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     agentName: text("agentName"),
+    createdAt: real("createdAt"),
     embeddingId: text("embeddingId"),
     error: text("error"),
     fileIds: text("fileIds", { mode: "json" }).$type<Array<Id<"chatFiles">>>(),
@@ -827,6 +829,7 @@ export const notifications = sqliteTable("notifications", {
     _creationTime: integer("_creationTime").notNull(),
     body: text("body"),
     dedupeKey: text("dedupeKey"),
+    emailOutcome: integer("emailOutcome", { mode: "boolean" }),
     link: text("link"),
     outcome: text("outcome", { mode: "json" }).$type<"success" | "failure">(),
     title: text("title").notNull(),
@@ -855,6 +858,24 @@ export const oauthStates = sqliteTable("oauthStates", {
     by_userId: index("by_userId").on(t.userId),
     by_expiresAt: index("by_expiresAt").on(t.expiresAt),
     by_state: index("by_state").on(t.state),
+}));
+
+export const outcomeEmails = sqliteTable("outcomeEmails", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    attempts: real("attempts").notNull(),
+    claimedAt: real("claimedAt"),
+    createdAt: real("createdAt").notNull(),
+    link: text("link").notNull(),
+    notificationId: text("notificationId").references((): AnySQLiteColumn => notifications._id).notNull(),
+    sentAt: real("sentAt"),
+    status: text("status", { mode: "json" }).$type<"pending" | "sending" | "sent" | "failed">().notNull(),
+    title: text("title").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_notificationId: index("by_notificationId").on(t.notificationId),
+    by_status_createdAt: index("by_status_createdAt").on(t.status, t.createdAt),
 }));
 
 export const pageComments = sqliteTable("pageComments", {
@@ -1298,6 +1319,7 @@ export const threads = sqliteTable("threads", {
     _creationTime: integer("_creationTime").notNull(),
     activeLeafMessageId: text("activeLeafMessageId"),
     category: text("category"),
+    createdAt: real("createdAt"),
     createdBy: text("createdBy"),
     customSystemPrompt: text("customSystemPrompt"),
     deleted: integer("deleted", { mode: "boolean" }),
@@ -1332,6 +1354,7 @@ export const threads = sqliteTable("threads", {
     updatedAt: real("updatedAt"),
     userId: text("userId"),
 }, (t) => ({
+    by_user_and_organization_and_updatedAt: index("by_user_and_organization_and_updatedAt").on(t.userId, t.organizationId, t.updatedAt),
     by_user_and_updatedAt: index("by_user_and_updatedAt").on(t.userId, t.updatedAt),
     by_user_and_order: index("by_user_and_order").on(t.userId, t.order),
     by_userId_externalThreadId: index("by_userId_externalThreadId").on(t.userId, t.externalThreadId),
@@ -1341,6 +1364,7 @@ export const threads = sqliteTable("threads", {
     by_user_and_pinned_deleted: index("by_user_and_pinned_deleted").on(t.userId, t.deleted, t.pinnedAt),
     by_publicAccessToken: index("by_publicAccessToken").on(t.publicAccessToken),
     by_user_and_pinned: index("by_user_and_pinned").on(t.userId, t.pinnedAt),
+    by_user_and_status_createdAt: index("by_user_and_status_createdAt").on(t.userId, t.status, t.deleted, t.createdAt),
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status, t.deleted),
     by_userId: index("by_userId").on(t.userId),
 }));
@@ -1535,7 +1559,9 @@ export const userSettings = sqliteTable("userSettings", {
     nickname: text("nickname"),
     onboardingCompleted: integer("onboardingCompleted", { mode: "boolean" }),
     profession: text("profession"),
+    resumeLastChat: integer("resumeLastChat", { mode: "boolean" }),
     sendBehavior: text("sendBehavior"),
+    taskEmailEnabled: integer("taskEmailEnabled", { mode: "boolean" }),
     temporaryChatRetentionHours: real("temporaryChatRetentionHours"),
     timezone: text("timezone"),
     userId: text("userId").notNull(),

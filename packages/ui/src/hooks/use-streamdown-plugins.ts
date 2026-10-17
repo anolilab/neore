@@ -33,7 +33,9 @@ export const loadHeavyStreamdownPlugins = (): Promise<PluginConfig> => {
         return Promise.resolve(heavy.cached);
     }
 
-    heavy.loading ??= Promise.all([import("@streamdown/mermaid"), import("@streamdown/math")])
+    // The mhchem contrib registers `\ce` and `\pu` on the shared KaTeX instance as
+    // a side effect of import, so it has to load before any formula renders.
+    heavy.loading ??= Promise.all([import("@streamdown/mermaid"), import("@streamdown/math"), import("katex/contrib/mhchem")])
         .then(([mermaidModule, mathModule]) => {
             heavy.cached = { ...BASIC_STREAMDOWN_PLUGINS, math: mathModule.math, mermaid: mermaidModule.mermaid };
 

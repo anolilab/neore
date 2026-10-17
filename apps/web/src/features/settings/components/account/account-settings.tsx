@@ -82,6 +82,7 @@ const AccountSettings: FC = () => {
     const currentSpeechVoice = userSettings?.voiceModeVoice ?? DEFAULT_SPEECH_VOICE ?? null;
     // OPT-IN: absent is off — every suggestion sends the draft to a model.
     const isComposerAutocompleteEnabled = userSettings?.composerAutocompleteEnabled === true;
+    const isResumeLastChat = userSettings?.resumeLastChat === true;
 
     // Common timezones
     const commonTimezones = useMemo(
@@ -456,6 +457,27 @@ const AccountSettings: FC = () => {
                             onCheckedChange={(checked) => {
                                 handleUpdateSetting("composerAutocompleteEnabled", checked);
                                 toast.success(checked ? t`Autocomplete enabled` : t`Autocomplete disabled`);
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="resume-last-chat">
+                                {t`Resume your latest chat`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="resume-last-chat-description">
+                                {t`Opening the assistant without a conversation takes you to your most recent one instead of a blank chat.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby="resume-last-chat-description"
+                            checked={isResumeLastChat}
+                            id="resume-last-chat"
+                            onCheckedChange={(checked) => {
+                                // The confirmation waits for the save: a failed save must not read as saved.
+                                void handleUpdateSetting("resumeLastChat", checked)
+                                    .then(() => toast.success(checked ? t`Resuming your latest chat` : t`Opening a blank chat`))
+                                    .catch(() => toast.error(t`Could not save this setting.`));
                             }}
                         />
                     </div>

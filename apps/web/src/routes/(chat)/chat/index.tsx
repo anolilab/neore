@@ -1,12 +1,24 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
-import { createFileRoute, useLocation, useRouteContext } from "@tanstack/react-router";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { createFileRoute, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { useCRPC } from "@/lib/lunora/crpc";
+
+// Module scope, so it outlives this component's mounts: a page load resumes once.
+// Effects never run during SSR, so it is never shared between requests.
+// `firstKey` is the navigation that first showed the chat index on this page load. Only
+// that visit may resume: a later New chat (a new navigation) must open a blank chat.
+const resumeState: { consumed: boolean; firstKey: string | undefined } = { consumed: false, firstKey: undefined };
 
 const ChatPage = () => {
     const route = "/(chat)/chat/";
@@ -15,9 +27,28 @@ const ChatPage = () => {
     const redirectReason = Route.useSearch({ select: ({ redirectReason: selected }) => selected });
     const hasInitialMessage = Route.useSearch({ select: ({ initialMessage }) => initialMessage });
     const location = useLocation();
+    // TanStack keys each history entry; a new navigation gets a new key.
+    const navigationKey = location.state.__TSR_key;
     const { t } = useLingui();
     const shownNotificationRef = useRef<string | undefined>(undefined);
     const initialMessageReadRef = useRef(false);
+    const navigate = useNavigate();
+    const crpc = useCRPC();
+    const { data: userSettings } = useUserSettings();
+    const { hooks } = useAuth();
+    const { data: activeOrganization, isPending: isOrgPending } = hooks.useActiveOrganization();
+    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
+    const activeTeamId = (sessionData?.session as { activeTeamId?: string | null } | undefined)?.activeTeamId ?? undefined;
+    const resumeScopeReady = !isOrgPending && !isSessionPending;
+    const resumeLastChat =
+        BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage && resumeScopeReady;
+    const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
+        // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
+        crpc.chat.resume.latestResumableThread.queryOptions(
+            resumeLastChat && !resumeState.consumed ? { organizationId: activeOrganization?.id ?? null, teamId: activeTeamId } : skipToken,
+            { live: false },
+        ),
+    );
 
     const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
 
@@ -40,6 +71,40 @@ const ChatPage = () => {
         initialMessageReadRef.current = true;
         setInitialMessage(message);
     }, [hasInitialMessage]);
+
+    useEffect(() => {
+        resumeState.firstKey ??= navigationKey;
+    }, [navigationKey]);
+
+    useEffect(() => {
+        if (!resumeLastChat || !latestResolved || resumeState.consumed) {
+            return;
+        }
+
+        resumeState.consumed = true;
+
+        if (navigationKey !== resumeState.firstKey) {
+            return;
+        }
+
+        // The composer's stored draft (text or attachments) survives a blur, so it is read from the store, not focus. Focus
+        // alone is not typing: the composer autofocuses on a blank chat.
+        const { composerAttachments, composerText } = useChatUIStore.getState();
+        const focused = document.activeElement;
+        const hasDraft =
+            composerText.trim() !== "" ||
+            composerAttachments.length > 0 ||
+            ((focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement) && focused.value.trim() !== "") ||
+            (focused instanceof HTMLElement && focused.isContentEditable && (focused.textContent ?? "").trim() !== "");
+
+        if (hasDraft) {
+            return;
+        }
+
+        if (latestThreadId) {
+            void navigate({ params: { threadId: latestThreadId }, replace: true, search: { initialMessage: undefined }, to: "/chat/$threadId" });
+        }
+    }, [latestResolved, latestThreadId, navigationKey, navigate, resumeLastChat]);
 
     useEffect(() => {
         if (!redirectReason || shownNotificationRef.current === redirectReason) {

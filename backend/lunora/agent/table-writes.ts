@@ -41,7 +41,8 @@ export type MessagePatch = Partial<
 export type TemporaryThreadPatch = Partial<Pick<Doc<"temporaryThreads">, "skillDraft">>;
 
 /** A thread created outside the chat start path (group chats, local models, messenger, imports). */
-export const insertThread = async (db: Database, row: NewRow<"threads">): Promise<Id<"threads">> => await db.insert("threads", row);
+export const insertThread = async (db: Database, row: NewRow<"threads">): Promise<Id<"threads">> =>
+    await db.insert("threads", { ...row, createdAt: row.createdAt ?? Date.now() });
 
 export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch): Promise<void> => {
     await db.patch(threadId, withoutUndefined(fields));
@@ -52,7 +53,8 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
  * (no branch parent, no leaf advance, no embedding) — what messenger and the
  * chat import have always done. Prefer `addMessagesHandler` for anything new.
  */
-export const insertMessageRow = async (db: Database, row: NewRow<"messages">): Promise<Id<"messages">> => await db.insert("messages", row);
+export const insertMessageRow = async (db: Database, row: NewRow<"messages">): Promise<Id<"messages">> =>
+    await db.insert("messages", { ...row, createdAt: row.createdAt ?? Date.now() });
 
 export const patchMessage = async (db: Database, messageId: Id<"messages">, fields: MessagePatch): Promise<void> => {
     await db.patch(messageId, withoutUndefined(fields));

@@ -1044,6 +1044,7 @@ export const getThreadsWithTemporaryFilter = internalQuery
                 v.object({
                     _creationTime: v.number(),
                     _id: v.string(),
+                    createdAt: v.optional(v.number()),
                     createdBy: v.optional(v.string()),
                     customSystemPrompt: v.optional(v.string()),
                     deleted: v.optional(v.boolean()),
@@ -1963,6 +1964,7 @@ export const getPinnedThreads = authQuery
             v.object({
                 _creationTime: v.number(),
                 _id: v.string(),
+                createdAt: v.optional(v.number()),
                 createdBy: v.optional(v.string()),
                 customSystemPrompt: v.optional(v.string()),
                 deleted: v.optional(v.boolean()),
@@ -2036,6 +2038,7 @@ export const getThreadOrders = authQuery
             v.object({
                 _creationTime: v.number(),
                 _id: v.string(),
+                createdAt: v.optional(v.number()),
                 createdBy: v.optional(v.string()),
                 customSystemPrompt: v.optional(v.string()),
                 deleted: v.optional(v.boolean()),

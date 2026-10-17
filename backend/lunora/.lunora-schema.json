@@ -1549,7 +1549,21 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"claude-code\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"claude\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"codex\""
             },
             {
               "kind": "literal",
@@ -3766,6 +3780,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "frozen": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "input": {
           "kind": "string",
@@ -7027,6 +7047,12 @@
           "optional": true,
           "unique": false
         },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "embeddingId": {
           "kind": "string",
           "nullable": false,
@@ -7672,6 +7698,12 @@
           "optional": true,
           "unique": false
         },
+        "emailOutcome": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "link": {
           "kind": "string",
           "nullable": false,
@@ -8236,6 +8268,120 @@
       "memory": false,
       "relations": {},
       "shardMode": "global:d1"
+    },
+    "outcomeEmails": {
+      "commitOrdered": false,
+      "fields": {
+        "attempts": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "claimedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "link": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "notificationId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "notifications"
+        },
+        "sentAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "status": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"failed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"pending\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"sending\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"sent\""
+            }
+          ]
+        },
+        "title": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_notificationId": {
+          "fields": [
+            "notificationId"
+          ],
+          "unique": false
+        },
+        "by_status_createdAt": {
+          "fields": [
+            "status",
+            "createdAt"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
     },
     "pageAccess": {
       "commitOrdered": false,
@@ -13842,6 +13988,12 @@
           "optional": true,
           "unique": false
         },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdBy": {
           "kind": "string",
           "nullable": false,
@@ -14196,6 +14348,14 @@
           ],
           "unique": false
         },
+        "by_user_and_organization_and_updatedAt": {
+          "fields": [
+            "userId",
+            "organizationId",
+            "updatedAt"
+          ],
+          "unique": false
+        },
         "by_user_and_pinned": {
           "fields": [
             "userId",
@@ -14216,6 +14376,15 @@
             "userId",
             "status",
             "deleted"
+          ],
+          "unique": false
+        },
+        "by_user_and_status_createdAt": {
+          "fields": [
+            "userId",
+            "status",
+            "deleted",
+            "createdAt"
           ],
           "unique": false
         },
@@ -15821,8 +15990,20 @@
           "optional": true,
           "unique": false
         },
+        "resumeLastChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "sendBehavior": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "taskEmailEnabled": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false

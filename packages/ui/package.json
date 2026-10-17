@@ -103,6 +103,7 @@
         "input-otp": "catalog:ui",
         "jsonfile": "catalog:utils",
         "jszip": "catalog:utils",
+        "katex": "catalog:syntax",
         "lowlight": "catalog:tiptap",
         "lucide-react": "catalog:icons",
         "mammoth": "catalog:file-renderers",

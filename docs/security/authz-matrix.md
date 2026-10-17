@@ -266,6 +266,7 @@ for a schema table that is neither policed nor listed:
 | `chat_import_functions.startImportJob` | mutation | authMutation + RL | chatImportJobs | key rebuilt under the CALLER's staging prefix from `uploadId` (`uploads/<userId>/<uploadId>`) — never caller-chosen | **fixed** (high) — any r2Key was read and then deleted; later a `files` row the caller owned, now ownership by construction (`lib/upload-route.ts`) |
 | `chat_composite.getThreadListData` | query | liteAuthQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_composite.getThreadWithData` | query | liteAuthQuery | threads | thread access (owner/grant) | ok |
+| `chat_resume.latestResumableThread` | query | liteAuthQuery | — | caller-scoped (ctx.user), reads only the caller's own threads | ok |
 | `chat_custom_providers.deleteCustomProvider` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_custom_providers.listCustomProviders` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_custom_providers.probeCustomProvider` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
@@ -390,6 +391,7 @@ for a schema table that is neither policed nor listed:
 | `devices_functions.revokeDevice` | mutation | authMutation + RL | devices, deviceCalls | row.userId == caller | ok — new; deletes the row and its secret, expires open calls |
 | `devices_functions.updateDeviceManifest` | mutation | authMutation + RL | devices | row.userId == caller; HMAC of the device's secret over the manifest | ok — new; fresh, monotonic `issuedAt`, tools re-validated |
 | `evals_functions.cancelRun` | mutation | authMutation + RL | evalRuns | owner helper | ok |
+| `evals_functions.compareModels` | query | authQuery | evalDatasets, evalRuns | owner helper; row.userId == caller | ok |
 | `evals_functions.compareRuns` | query | authQuery | evalRuns | owner helper | ok |
 | `evals_functions.createCase` | mutation | authMutation + RL | evalCases, evalDatasets | owner helper | ok |
 | `evals_functions.createDataset` | mutation | authMutation + RL | evalDatasets | owner helper | ok |
@@ -401,6 +403,7 @@ for a schema table that is neither policed nor listed:
 | `evals_functions.importCases` | mutation | authMutation + RL | evalCases, evalDatasets | owner helper | ok |
 | `evals_functions.listDatasets` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `evals_functions.listRuns` | query | authQuery | evalDatasets | owner helper; row.userId == caller | ok |
+| `evals_functions.setCaseFrozen` | mutation | authMutation + RL | evalCases | owner helper | ok |
 | `evals_functions.startRun` | mutation | authMutation + RL | evalDatasets, evalRuns, knowledgeFiles, skills | owner helper | ok |
 | `evals_functions.updateCase` | mutation | authMutation + RL | evalCases | owner helper | ok |
 | `evals_functions.updateDataset` | mutation | authMutation + RL | evalDatasets | owner helper | ok |
@@ -456,6 +459,7 @@ for a schema table that is neither policed nor listed:
 | `messenger_functions.updateConnectionReplyTools` | mutation | authMutation + RL | messengerConnections | row.userId == caller | ok — new; owner-only, rate-limited; groups normalised to a fixed list (`messenger/lib/reply-tools.ts`) |
 | `messenger_functions.updateConnectionStatus` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `notifications_daily_brief.setDailyBriefEnabled` | mutation | authMutation + RL | userSettings, dailyBriefState | caller-scoped (ctx.user) | ok — new |
+| `notifications_task_email.setTaskEmailEnabled` | mutation | authMutation + RL | userSettings | caller-scoped (ctx.user) | ok — new |
 | `notifications_functions.getNotificationInbox` | query | authQuery | notifications | caller-scoped (ctx.user) | ok — new |
 | `notifications_functions.markAllNotificationsRead` | mutation | authMutation + RL | notifications | caller-scoped (ctx.user) | ok — new |
 | `notifications_functions.markNotificationRead` | mutation | authMutation + RL | notifications | row.userId == caller | ok — new; another user's id is a silent no-op |

@@ -23,6 +23,48 @@ import { getCurrentPushSubscription, getPushSupport, subscribeBrowser, unsubscri
  * account holds that subscription — a browser subscribed under another account
  * (or dropped server-side) reads off, and turning it on registers it here.
  */
+type SettingMutation = {
+    isPending: boolean;
+    mutate: (variables: { enabled: boolean }, options: { onError: () => void; onSuccess: () => void }) => void;
+};
+
+/**
+ * A saved on/off setting that flips at once. A failed save rolls it back and says
+ * so; a saved one confirms with a toast.
+ */
+const useOptimisticSetting = (
+    saved: boolean | undefined,
+    mutation: SettingMutation,
+    messages: { error: string; off: string; on: string },
+): { checked: boolean; disabled: boolean; onCheckedChange: (checked: boolean) => void } => {
+    const [pending, setPending] = useState<boolean | undefined>(undefined);
+
+    // Once the saved value catches up with the switch, the local value is no longer needed.
+    useEffect(() => {
+        if (pending !== undefined && saved === pending) {
+            setPending(undefined);
+        }
+    }, [pending, saved]);
+
+    return {
+        checked: pending ?? saved === true,
+        disabled: mutation.isPending,
+        onCheckedChange: (checked) => {
+            setPending(checked);
+            mutation.mutate(
+                { enabled: checked },
+                {
+                    onError: () => {
+                        setPending(undefined);
+                        toast.error(messages.error);
+                    },
+                    onSuccess: () => toast.success(checked ? messages.on : messages.off),
+                },
+            );
+        },
+    };
+};
+
 const NotificationSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -56,9 +98,19 @@ const NotificationSettings: FC = () => {
     const unsubscribe = useMutation(crpc.notifications.push.unsubscribePush.mutationOptions(refresh));
     const setDailyBrief = useMutation(crpc.notifications.daily_brief.setDailyBriefEnabled.mutationOptions());
 
+    const setTaskEmail = useMutation(crpc.notifications.task_email.setTaskEmailEnabled.mutationOptions());
+    const taskEmail = useOptimisticSetting(userSettings.data?.taskEmailEnabled, setTaskEmail, {
+        error: t`Could not save the email setting.`,
+        off: t`Task emails turned off`,
+        on: t`Task emails turned on`,
+    });
+
     const pushAvailable = Boolean(config?.publicKey) && support === "supported";
-    const [dailyBrief, setDailyBriefState] = useState<boolean | undefined>(undefined);
-    const dailyBriefEnabled = dailyBrief ?? userSettings.data?.dailyBriefEnabled === true;
+    const dailyBrief = useOptimisticSetting(userSettings.data?.dailyBriefEnabled, setDailyBrief, {
+        error: t`Could not save the Daily Brief setting.`,
+        off: t`Daily Brief turned off`,
+        on: t`Daily Brief turned on`,
+    });
 
     const togglePush = async (checked: boolean): Promise<void> => {
         setBusy(true);
@@ -177,22 +229,27 @@ const NotificationSettings: FC = () => {
                     </div>
                     <Switch
                         aria-describedby="daily-brief-hint"
-                        checked={dailyBriefEnabled}
-                        disabled={setDailyBrief.isPending}
+                        checked={dailyBrief.checked}
+                        disabled={dailyBrief.disabled}
                         id="daily-brief"
-                        onCheckedChange={(checked) => {
-                            setDailyBriefState(checked);
-                            setDailyBrief.mutate(
-                                { enabled: checked },
-                                {
-                                    onError: () => {
-                                        setDailyBriefState(!checked);
-                                        toast.error(t`Could not save the Daily Brief setting.`);
-                                    },
-                                    onSuccess: () => toast.success(checked ? t`Daily Brief turned on` : t`Daily Brief turned off`),
-                                },
-                            );
-                        }}
+                        onCheckedChange={dailyBrief.onCheckedChange}
+                    />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                        <Label className="text-base font-medium" htmlFor="task-email">
+                            {t`Email when a task finishes`}
+                        </Label>
+                        <p className="text-muted-foreground text-sm" id="task-email-hint">
+                            {t`Get an email with a link to the result when a task or trigger run finishes with one.`}
+                        </p>
+                    </div>
+                    <Switch
+                        aria-describedby="task-email-hint"
+                        checked={taskEmail.checked}
+                        disabled={taskEmail.disabled}
+                        id="task-email"
+                        onCheckedChange={taskEmail.onCheckedChange}
                     />
                 </div>
             </CardContent>

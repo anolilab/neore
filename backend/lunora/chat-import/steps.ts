@@ -128,6 +128,21 @@ export const processImportFile = internalAction
         return { failed: totalFailed, imported: totalImported };
     });
 
+/** A source time as a stored one: missing, not positive, or in the future falls back to the import time. */
+const trustedTime = (time: number | undefined, now: number): number => (typeof time === "number" && time > 0 && time <= now ? time : now);
+
+/**
+ * The latest source time of a conversation, as a stored activity time. A timestamp that is
+ * missing, not positive, or in the future is not trusted; the import time stands in for it.
+ */
+const lastActivityOf = (conv: { createdAt?: number; messages: { createdAt?: number }[] }, now: number): number => {
+    const times = [conv.createdAt, ...conv.messages.map((message) => message.createdAt)].filter(
+        (time): time is number => typeof time === "number" && time > 0 && time <= now,
+    );
+
+    return times.length > 0 ? Math.max(...times) : now;
+};
+
 // ---------------------------------------------------------------------------
 // processConversationBatch — mutation that creates threads + messages
 // ---------------------------------------------------------------------------
@@ -163,10 +178,16 @@ export const processConversationBatch = internalMutation
 
                 // `db.insert` resolves to the branded id itself, not a row.
                 const threadId: Id<"threads"> = await insertThread(context.db, {
+                    // The sidebar sorts by this, so imported history lands where it was created.
+                    createdAt: trustedTime(conv.createdAt, context.now),
                     createdBy: `import:${args.provider}`,
                     status: "active",
                     title: conv.title || "Imported conversation",
-                    updatedAt: context.now,
+                    // Resume, Home's recent threads and the Daily Brief read updatedAt: the source's
+                    // latest activity, so a long chat that was active recently is not ranked by its
+                    // start date. The sidebar sorts by createdAt above. (_creationTime is system-set
+                    // and cannot be written.)
+                    updatedAt: lastActivityOf(conv, context.now),
                     userId: args.userId,
                 });
 
@@ -178,6 +199,7 @@ export const processConversationBatch = internalMutation
                     }
 
                     await insertMessageRow(context.db, {
+                        createdAt: trustedTime(message.createdAt, context.now),
                         message: {
                             content: message.content,
                             role: message.role,

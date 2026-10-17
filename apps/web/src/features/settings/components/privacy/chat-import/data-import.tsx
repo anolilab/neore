@@ -2,6 +2,7 @@
 
 import type { I18n } from "@lingui/core";
 import { Plural, useLingui } from "@lingui/react/macro";
+import { chatAttachmentLimit } from "@neore/backend/document-limits";
 import { Button } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
 import { Progress, ProgressValue } from "@neore/ui/components/progress";
@@ -19,16 +20,35 @@ import { uploadFile } from "@/lib/upload/upload-file";
 import { ChatImportError, extractJsonFromFile, parseExportFile } from "./parsers";
 import type { ImportProvider, NormalizedConversation } from "./parsers/types";
 
+/** An export with nothing in it. An object file arrives wrapped once more, so `[{}]` counts too. */
+const isEmptyExport = (value: unknown): boolean => {
+    const unwrapped = Array.isArray(value) && value.length === 1 ? (value[0] as unknown) : value;
+
+    return (
+        (Array.isArray(unwrapped) && unwrapped.length === 0) ||
+        (typeof unwrapped === "object" && unwrapped !== null && !Array.isArray(unwrapped) && Object.keys(unwrapped).length === 0)
+    );
+};
+
 const PROVIDER_LABELS: Record<ImportProvider, string> = {
     chatgpt: "ChatGPT",
     claude: "Claude",
+    "claude-code": "Claude Code",
+    codex: "Codex CLI",
     gemini: "Google Gemini",
 };
+
+/** The normalised conversations as the one JSON file the import uploads. */
+const importPayload = (conversations: NormalizedConversation[]): File => new File([JSON.stringify(conversations)], "import.json", { type: "application/json" });
+
+/** The upload route refuses a larger file with a generic error, so a selection is checked before it is previewed. */
+const isTooLargeToUpload = (conversations: NormalizedConversation[]): boolean =>
+    importPayload(conversations).size > chatAttachmentLimit("application/json").maxBytes;
 
 type ImportState =
     | { step: "idle" }
     | { step: "parsing" }
-    | { conversations: NormalizedConversation[]; provider: ImportProvider; step: "preview" }
+    | { conversations: NormalizedConversation[]; provider: ImportProvider; skipped: string[]; step: "preview" }
     | { provider: ImportProvider; step: "uploading" }
     | { jobId: string; provider: ImportProvider; step: "importing" }
     | { failed: number; imported: number; provider: ImportProvider; step: "done" }
@@ -41,6 +61,14 @@ const importErrorMessage = (error: unknown, i18n: I18n, fallback: string): strin
     }
 
     return error instanceof Error && error.message ? error.message : fallback;
+};
+
+const describeError = (error: unknown, i18n: I18n): string => {
+    if (error instanceof ChatImportError) {
+        return i18n._(error.descriptor);
+    }
+
+    return error instanceof Error ? error.message : String(error);
 };
 
 const DataImport: FC = () => {
@@ -110,9 +138,9 @@ const DataImport: FC = () => {
     const handleFileSelect = useCallback(
         async (event: React.ChangeEvent<HTMLInputElement>) => {
             const input = event.target;
-            const file = input.files?.[0];
+            const files = [...(input.files ?? [])];
 
-            if (!file) {
+            if (files.length === 0) {
                 return;
             }
 
@@ -122,18 +150,70 @@ const DataImport: FC = () => {
             setState({ step: "parsing" });
 
             try {
-                const jsonDataArray = await extractJsonFromFile(file);
+                // A file that cannot be read is skipped like an unrecognised one, so the valid files in the same selection still import.
+                const damaged: string[] = [];
+                const extracted = await Promise.allSettled(
+                    files.map(async (file) => {
+                        return {
+                            name: file.name,
+                            records: await extractJsonFromFile(file, (member) => {
+                                damaged.push(`${file.name} › ${member}`);
+                            }),
+                        };
+                    }),
+                );
+                const results: ReturnType<typeof parseExportFile>[] = [];
+                const skipped: string[] = [...damaged];
+                let firstFailure: Error | undefined;
+                const jsonDataArray: { jsonData: unknown; name: string }[] = [];
 
-                // Merge all parsed conversations
-                let allConversations: NormalizedConversation[] = [];
-                let detectedProvider: ImportProvider | undefined;
+                extracted.forEach((outcome, index) => {
+                    if (outcome.status === "rejected") {
+                        // A damaged file is named, so the message says which upload to fix.
+                        const { name } = files[index] as File;
 
-                for (const jsonData of jsonDataArray) {
-                    const result = parseExportFile(jsonData, detectedProvider);
+                        skipped.push(name);
+                        firstFailure ??= new Error(`${name}: ${describeError(outcome.reason, i18n)}`, { cause: outcome.reason });
 
-                    detectedProvider = result.provider;
-                    allConversations = [...allConversations, ...result.conversations];
+                        return;
+                    }
+
+                    for (const jsonData of outcome.value.records) {
+                        jsonDataArray.push({ jsonData, name: outcome.value.name });
+                    }
+                });
+
+                // Each file is detected on its own: a shared hint would parse a second
+                // format with the first one's parser and drop its sessions silently.
+                // An empty file in an archive (`[]`, `{}`) carries nothing to import and must not block the rest.
+                // A file that is not a recognised export is skipped and named in the preview. Only when nothing
+                // in the selection parses does the import fail, with the first file's reason.
+                const candidates = jsonDataArray.filter(({ jsonData: value }) => !isEmptyExport(value));
+
+                for (const { jsonData, name } of candidates) {
+                    try {
+                        results.push(parseExportFile(jsonData));
+                    } catch (error) {
+                        skipped.push(name);
+                        firstFailure ??= new Error(`${name}: ${describeError(error, i18n)}`, { cause: error });
+                    }
                 }
+
+                if (results.length === 0 && firstFailure) {
+                    throw firstFailure;
+                }
+
+                const providers = new Set(results.map((result) => result.provider));
+
+                // One import job carries one provider, so a mixed selection cannot run.
+                if (providers.size > 1) {
+                    setState({ message: t`Import one kind of export at a time.`, step: "error" });
+
+                    return;
+                }
+
+                const [detectedProvider] = providers;
+                const allConversations = results.flatMap((result) => result.conversations);
 
                 if (!detectedProvider || allConversations.length === 0) {
                     setState({ message: t`No conversations found in the file.`, step: "error" });
@@ -141,9 +221,16 @@ const DataImport: FC = () => {
                     return;
                 }
 
+                if (isTooLargeToUpload(allConversations)) {
+                    setState({ message: t`This selection is too large to import at once. Import fewer files at a time.`, step: "error" });
+
+                    return;
+                }
+
                 setState({
                     conversations: allConversations,
                     provider: detectedProvider,
+                    skipped: [...new Set(skipped)],
                     step: "preview",
                 });
             } catch (error: unknown) {
@@ -159,13 +246,14 @@ const DataImport: FC = () => {
         }
 
         const { conversations, provider } = state;
+        const payload = importPayload(conversations);
 
         setState({ provider, step: "uploading" });
 
         try {
             // 1. Send the normalized conversations JSON to the upload route. An
             // upload nobody starts a job for is reaped by the backend.
-            const uploadId = await uploadFile(new File([JSON.stringify(conversations)], "import.json", { type: "application/json" }), {
+            const uploadId = await uploadFile(payload, {
                 contentType: "application/json",
             });
 
@@ -207,12 +295,12 @@ const DataImport: FC = () => {
 
     return (
         <SettingsCard
-            description={t`Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file.`}
+            description={t`Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files.`}
             title={t`Import Conversations`}
         >
             <CardContent className="space-y-4">
                 {/* Hidden file input */}
-                <input accept=".json,.zip" className="hidden" onChange={handleFileSelect} ref={fileInputRef} type="file" />
+                <input accept=".json,.jsonl,.zip" className="hidden" multiple onChange={handleFileSelect} ref={fileInputRef} type="file" />
 
                 {/* Idle state */}
                 {state.step === "idle" && (
@@ -235,6 +323,11 @@ const DataImport: FC = () => {
                         <div className="bg-muted rounded-lg p-4 text-sm">
                             <p className="font-medium">{t`Detected: ${PROVIDER_LABELS[state.provider]}`}</p>
                             <p className="text-muted-foreground mt-1">{t`${state.conversations.length} conversations found`}</p>
+                            {state.skipped.length > 0 && (
+                                <p className="text-muted-foreground mt-1" role="status">
+                                    {t`Skipped files that are not chat exports: ${state.skipped.join(", ")}`}
+                                </p>
+                            )}
                             {state.conversations.length > 0 && (
                                 <div className="text-muted-foreground mt-2 max-h-32 space-y-1 overflow-y-auto">
                                     {state.conversations.slice(0, 10).map((c, i) => (

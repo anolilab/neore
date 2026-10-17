@@ -97,22 +97,65 @@ export const notify = async (ctx: MutationCtx, input: NotificationInput): Promis
 
     const notificationId = await ctx.db.insert("notifications", { ...row, createdAt: Date.now() });
 
-    if (isPushConfigured()) {
-        const [device] = await ctx.push.list({ limit: 1, userId: row.userId });
+    // The mail is an outbox row in this same write, so it exists exactly when the inbox
+    // row does; the housekeeping sweep sends it (`task-email.ts`). Decided here, on the
+    // shard that wrote the row, so a notification handed to the recipient's shard is
+    // mailed like one written in place.
+    if (shouldEmailOutcome({ emailOutcome: input.emailOutcome, outcome: input.outcome })) {
+        const settings = await ctx.db.userSettings.findFirst({ where: { userId: row.userId } });
 
-        if (device) {
-            await ctx.scheduler.runAfter(0, internal.notifications.push.sendPushForNotification, { notificationId, userId: row.userId });
+        if (settings?.taskEmailEnabled === true) {
+            await ctx.db.insert("outcomeEmails", {
+                attempts: 0,
+                createdAt: Date.now(),
+                link: row.link ?? "/",
+                notificationId,
+                status: "pending",
+                title: row.title,
+                userId: row.userId,
+            });
+
+            // Send now rather than wait for the next housekeeping sweep, which can be a day away on a
+            // quiet shard. The row is already durable: if this nudge fails, the sweep still sends it.
+            try {
+                await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendPendingOutcomeEmails, {});
+            } catch (error) {
+                console.warn("[notifications] Failed to schedule the outcome email send:", error);
+            }
+        }
+    }
+
+    // Push is best-effort: the rows are already written, and a failed schedule must not undo them.
+
+    if (isPushConfigured()) {
+        try {
+            const [device] = await ctx.push.list({ limit: 1, userId: row.userId });
+
+            if (device) {
+                await ctx.scheduler.runAfter(0, internal.notifications.push.sendPushForNotification, { notificationId, userId: row.userId });
+            }
+        } catch (error) {
+            console.warn("[notifications] Failed to schedule the push notification:", error);
         }
     }
 
     return notificationId;
 };
 
-/** For writers that must not fail on a notification: logs and swallows. */
-export const notifyQuietly = async (ctx: MutationCtx, input: NotificationInput): Promise<void> => {
+/**
+ * Only a successful run that produced a result is mailed (the caller says so with
+ * `emailOutcome`), and only a NEW row gets here: a duplicate returns before the insert.
+ */
+export const shouldEmailOutcome = (input: { emailOutcome?: boolean; outcome?: "failure" | "success" }): boolean =>
+    input.emailOutcome === true && input.outcome === "success";
+
+/** For writers that must not fail on a notification: logs and swallows. Returns the id, or `null`. */
+export const notifyQuietly = async (ctx: MutationCtx, input: NotificationInput): Promise<Id<"notifications"> | null> => {
     try {
-        await notify(ctx, input);
+        return await notify(ctx, input);
     } catch (error) {
         console.warn(`[notifications] Failed to write a ${input.type} notification:`, error);
+
+        return null;
     }
 };

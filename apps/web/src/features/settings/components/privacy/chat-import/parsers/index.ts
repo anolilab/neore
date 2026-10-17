@@ -7,6 +7,8 @@ import { msg } from "@lingui/core/macro";
 
 import parseChatGPT from "./chatgpt";
 import parseClaude from "./claude";
+import parseClaudeCode, { isClaudeCodeRecord } from "./claude-code";
+import parseCodex, { isCodexRecord } from "./codex";
 import parseGemini from "./gemini";
 import type { ImportProvider, NormalizedConversation, ParseResult } from "./types";
 
@@ -26,6 +28,17 @@ export class ChatImportError extends Error {
     }
 }
 
+/** Files that ship inside a ChatGPT export archive but hold no conversations. */
+const NON_CONVERSATION_EXPORT_FILES = new Set([
+    "account.json",
+    "message_feedback.json",
+    "model_comparisons.json",
+    "projects.json",
+    "shared_conversations.json",
+    "user.json",
+    "users.json",
+]);
+
 /**
  * Detect the provider from the JSON structure.
  *
@@ -34,9 +47,6 @@ export class ChatImportError extends Error {
  * - Claude: Array of objects with `chat_messages` field and `sender` = "human"
  * - Gemini: Object/array with `messages` field and role = "USER"/"MODEL".
  */
-/** Files that ship inside a ChatGPT export archive but hold no conversations. */
-const NON_CONVERSATION_EXPORT_FILES = new Set(["account.json", "message_feedback.json", "model_comparisons.json", "shared_conversations.json", "user.json"]);
-
 const detectProvider = (data: unknown): ImportProvider => {
     if (Array.isArray(data) && data.length > 0) {
         const first = data[0];
@@ -62,6 +72,16 @@ const detectProvider = (data: unknown): ImportProvider => {
                     return "gemini";
                 }
             }
+        }
+
+        // Local transcripts: JSONL events. Matched on any record: a resumed session can open with
+        // a long run of bookkeeping lines, and the check is a cheap property test per record.
+        if (data.some((record) => isClaudeCodeRecord(record))) {
+            return "claude-code";
+        }
+
+        if (data.some((record) => isCodexRecord(record))) {
+            return "codex";
         }
     }
 
@@ -109,6 +129,14 @@ export const parseExportFile = (data: unknown, provider?: ImportProvider): Parse
             conversations = parseClaude(data);
             break;
         }
+        case "claude-code": {
+            conversations = parseClaudeCode(data);
+            break;
+        }
+        case "codex": {
+            conversations = parseCodex(data);
+            break;
+        }
         case "gemini": {
             conversations = parseGemini(data);
             break;
@@ -121,11 +149,39 @@ export const parseExportFile = (data: unknown, provider?: ImportProvider): Parse
     return { conversations, provider: detectedProvider };
 };
 
+/** One JSON record per non-empty line; any damaged line stops the import (see the error). */
+const parseJsonLines = (text: string): unknown[] => {
+    const records: unknown[] = [];
+    const lines = text
+        .split("\n")
+        .map((line, index) => {
+            return { line, number: index + 1 };
+        })
+        .filter(({ line }) => line.trim());
+
+    for (const { line, number } of lines) {
+        try {
+            records.push(JSON.parse(line));
+        } catch {
+            // Any damaged line stops the import: a turn cannot be dropped silently, and a
+            // partial last line is indistinguishable from a complete but corrupt one.
+            throw new ChatImportError(msg`Line ${number} of this transcript is not valid JSON, so the import was stopped.`);
+        }
+    }
+
+    return records;
+};
+
 /**
  * Extract JSON from a file. Handles both direct JSON files
  * and JSON files within ZIP archives.
  */
-export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
+
+/**
+ * `onDamaged` receives the name of an archive member that cannot be read. The other members still import;
+ * without it a damaged member fails the file, as a damaged file does.
+ */
+export const extractJsonFromFile = async (file: File, onDamaged?: (member: string) => void): Promise<unknown[]> => {
     const fileName = file.name.toLowerCase();
 
     if (fileName.endsWith(".json")) {
@@ -133,6 +189,10 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
         const parsed = JSON.parse(text);
 
         return Array.isArray(parsed) ? [parsed] : [[parsed]];
+    }
+
+    if (fileName.endsWith(".jsonl")) {
+        return [parseJsonLines(await file.text())];
     }
 
     if (fileName.endsWith(".zip")) {
@@ -147,7 +207,9 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
                 continue;
             }
 
-            if (!path.toLowerCase().endsWith(".json")) {
+            const lowerPath = path.toLowerCase();
+
+            if (!lowerPath.endsWith(".json") && !lowerPath.endsWith(".jsonl")) {
                 continue;
             }
 
@@ -160,20 +222,23 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
 
             try {
                 const text = await zipEntry.async("text");
-                const parsed = JSON.parse(text);
 
-                jsonFiles.push(parsed);
-            } catch {
-                // Skip unparseable JSON files
+                // A transcript is one array of records, as when it is selected directly.
+                jsonFiles.push(lowerPath.endsWith(".jsonl") ? parseJsonLines(text) : JSON.parse(text));
+            } catch (error) {
+                // One damaged member must not cost the archive's other transcripts; it is reported by name.
+                if (!onDamaged) {
+                    throw error;
+                }
+
+                onDamaged(path);
             }
         }
 
-        if (jsonFiles.length === 0) {
-            throw new ChatImportError(msg`No valid JSON conversation files found in the ZIP archive.`);
-        }
-
+        // An archive with no conversation files yields nothing; the selection's other files still import,
+        // and a selection with nothing to import reports "No conversations found".
         return jsonFiles;
     }
 
-    throw new ChatImportError(msg`Unsupported file format. Please upload a .json or .zip file.`);
+    throw new ChatImportError(msg`Unsupported file format. Please upload a .json, .jsonl or .zip file.`);
 };

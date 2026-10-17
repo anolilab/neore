@@ -19,7 +19,7 @@ type Database = MutationCtx["db"];
 export type AiUserPreferencesPatch = Partial<Pick<Doc<"aiUserPreferences">, "browserSettings" | "customAIProviders" | "toolPermissions">>;
 
 /** The `userSettings` columns other modules set. */
-export type UserSettingsPatch = Partial<Pick<Doc<"userSettings">, "dailyBriefEnabled">>;
+export type UserSettingsPatch = Partial<Pick<Doc<"userSettings">, "dailyBriefEnabled" | "taskEmailEnabled">>;
 
 /** Patch the user's `aiUserPreferences` row, or create it when `existing` is `null`. */
 export const saveAiUserPreferences = async (

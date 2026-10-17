@@ -11,7 +11,8 @@ import { timingSafeEqual } from "../../lib/crypto";
 import type { DownloadedMedia, InboundAttachment, MediaSendResult, OutboundFile } from "../lib/media";
 import { fetchMedia, MediaDownloadError, MESSENGER_MEDIA_MAX_BYTES, toBlob } from "../lib/media";
 import type { InboundMessage } from "../lib/types";
-import { inboundKind, splitMessage } from "../lib/types";
+import { inboundKind } from "../lib/types";
+import { formatTelegramMessage, splitLossless, TELEGRAM_MESSAGE_LIMIT } from "./telegram-format";
 
 const TELEGRAM_API = "https://api.telegram.org";
 const TELEGRAM_HOSTS = ["api.telegram.org"];
@@ -212,23 +213,49 @@ export const sendTelegramMedia = async (botToken: string, chatId: string, file: 
 };
 
 /**
- * Send a text message to a Telegram chat via the Bot API.
+ * Send a text message to a Telegram chat via the Bot API, as HTML. A chunk
+ * Telegram rejects (400, bad entities) is resent as plain text.
  */
 export const sendTelegramMessage = async (botToken: string, chatId: number | string, text: string): Promise<boolean> => {
-    // Telegram messages max 4096 chars; split if needed
-    const chunks = splitMessage(text, 4096);
-
-    for (const chunk of chunks) {
-        const response = await fetchWithDeadline(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            body: JSON.stringify({
-                chat_id: chatId,
-                parse_mode: "Markdown",
-                text: chunk,
-            }),
+    const post = async (body: Record<string, unknown>) =>
+        await fetchWithDeadline(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            body: JSON.stringify({ chat_id: chatId, ...body }),
             headers: { "Content-Type": "application/json" },
             method: "POST",
             timeoutMs: FETCH_TIMEOUT_SHORT_MS,
         });
+
+    const chunks = formatTelegramMessage(text);
+
+    // An empty reply has nothing to send, so it is not a delivery.
+    if (chunks.length === 0) {
+        return false;
+    }
+
+    for (const chunk of chunks) {
+        const response = await post({ parse_mode: "HTML", text: chunk.html });
+
+        if (response.status === 400) {
+            // Telegram rejected the formatting; the same text goes out as plain text below.
+            console.warn(`Telegram rejected the HTML for a chunk (${response.status}); sending it as plain text.`);
+            await response.body?.cancel();
+
+            // Lossless: the plain retry must carry the reply exactly, spaces at a cut included.
+            for (const plain of splitLossless(chunk.source, TELEGRAM_MESSAGE_LIMIT)) {
+                const sent = await post({ text: plain });
+
+                if (!sent.ok) {
+                    console.error(`Telegram sendMessage plain-text retry failed: ${sent.status} ${await sent.text()}`);
+
+                    return false;
+                }
+
+                await sent.body?.cancel();
+            }
+
+            // The chunk went out as plain text; the rejected HTML response is already consumed.
+            continue;
+        }
 
         if (!response.ok) {
             const errorBody = await response.text();
@@ -237,6 +264,8 @@ export const sendTelegramMessage = async (botToken: string, chatId: number | str
 
             return false;
         }
+
+        await response.body?.cancel();
     }
 
     return true;

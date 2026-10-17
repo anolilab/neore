@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 import "unfonts.css";
+// Imported for its boot-time read of the URL: see BOOTED_ON_CHAT_INDEX.
+import "@/features/chat/core/utils/resume-boot";
 
 import type { ConsentManagerOptions } from "@c15t/react";
 import { ConsentManagerProvider } from "@c15t/react";

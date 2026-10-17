@@ -539,6 +539,7 @@ export const updateExecution = internalMutation
             if (trigger) {
                 await notifyQuietly(ctx, {
                     dedupeKey: `trigger:${executionId}`,
+                    emailOutcome: Boolean(threadId),
                     link: threadId ? `/chat/${threadId}` : "/dashboard/settings/chat/triggers",
                     outcome: status === "completed" ? "success" : "failure",
                     title: trigger.name,

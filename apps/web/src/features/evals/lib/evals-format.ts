@@ -23,6 +23,8 @@ export type EvalSummary = EvalRunDetail["summary"];
 
 export type EvalComparison = ReturnOf<ApiTypes["evals"]["functions"]["compareRuns"]>;
 
+export type EvalModelComparison = ReturnOf<ApiTypes["evals"]["functions"]["compareModels"]>;
+
 export type EvalCheckKind = EvalCase["checks"][number]["kind"];
 
 export type EvalTarget = EvalRun["target"];

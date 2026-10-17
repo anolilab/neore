@@ -17,6 +17,7 @@
  * Code-split: Import lazily to avoid including JSZip in the main bundle.
  */
 import { Plural, useLingui } from "@lingui/react/macro";
+import { assertOfficeZipWithinLimits } from "@ui/utils/office-zip-limits";
 import { ChevronLeftIcon, ChevronRightIcon, FileIcon } from "lucide-react";
 import type { FC } from "react";
 import { memo, useCallback, useEffect, useState } from "react";
@@ -51,6 +52,9 @@ const parsePptxSlides = async (data: ArrayBuffer | Blob): Promise<SlideContent[]
     const { default: JSZip } = await import("jszip");
 
     const arrayBuffer = data instanceof Blob ? await data.arrayBuffer() : data;
+
+    await assertOfficeZipWithinLimits(arrayBuffer);
+
     const zip = await JSZip.loadAsync(arrayBuffer);
 
     const slides: SlideContent[] = [];

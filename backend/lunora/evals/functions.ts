@@ -48,10 +48,15 @@ import {
     vJudgeVerdict,
     vRetrievalMetrics,
 } from "./validators";
+import { scanPages, type ScanPage } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
 
 /** Runs listed per dataset, newest first. */
 const MAX_RUNS_LISTED = 50;
+
+const MAX_COMPARED_MODELS = 12;
+/** Runs read per page while looking for each target's newest finished run. */
+const COMPARISON_PAGE_SIZE = 100;
 
 /** Knowledge files one run may be restricted to. */
 const MAX_TARGET_FILES = 50;
@@ -80,6 +85,7 @@ const vCaseRow = v.object({
     createdAt: v.number(),
     expectedAnswer: v.union(v.string(), v.null()),
     expectedSources: v.array(v.string()),
+    frozen: v.boolean(),
     input: v.string(),
     rubric: v.union(v.string(), v.null()),
     source: v.union(v.literal("manual"), v.literal("import"), v.literal("chat")),
@@ -155,6 +161,29 @@ const vComparison = v.object({
     improved: v.number(),
     regressed: v.number(),
     unchanged: v.number(),
+});
+
+const vModelComparison = v.object({
+    cases: v.array(
+        v.object({
+            caseId: v.id("evalCases"),
+            frozen: v.boolean(),
+            input: v.string(),
+            results: v.array(
+                v.object({
+                    passed: v.union(v.boolean(), v.null()),
+                    runId: v.id("evalRuns"),
+                    score: v.union(v.number(), v.null()),
+                    status: v.union(vEvalResultStatus, v.null()),
+                }),
+            ),
+        }),
+    ),
+    /** Targets with a completed run that are not shown, beyond the column limit. */
+    omittedTargets: v.number(),
+    runs: v.array(vRunRow),
+    /** True when the newest runs were scanned and older ones were not: the matrix may miss models. */
+    scanTruncated: v.boolean(),
 });
 
 const vDatasetList = v.array(vDatasetRow);
@@ -398,6 +427,7 @@ export const getDataset = authQuery
                     createdAt: evalCase.createdAt,
                     expectedAnswer: evalCase.expectedAnswer ?? null,
                     expectedSources: evalCase.expectedSources,
+                    frozen: evalCase.frozen ?? false,
                     input: evalCase.input,
                     rubric: evalCase.rubric ?? null,
                     source: evalCase.source,
@@ -479,6 +509,13 @@ export const deleteDataset = authMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const dataset = await requireOwnedDataset(ctx, args.datasetId, ctx.user.userId);
+
+        // Purging deletes every case, so a regression check must be unfrozen first.
+        const cases = await loadCases(ctx, dataset._id);
+
+        if (cases.some((evalCase) => evalCase.frozen === true)) {
+            throw new LunoraError("CONFLICT", "Unfreeze this dataset's frozen cases before deleting the dataset");
+        }
 
         await ctx.db.delete(dataset._id);
         await ctx.scheduler.runAfter(0, internal.evals.functions.purgeDataset, { datasetId: dataset._id, userId: dataset.userId });
@@ -591,6 +628,12 @@ export const updateCase = authMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const evalCase = await requireOwnedCase(ctx, args.caseId, ctx.user.userId);
+
+        // A frozen case is a regression check: unfreeze it before changing what it checks.
+        if (evalCase.frozen) {
+            throw new LunoraError("CONFLICT", "Unfreeze this case before editing it");
+        }
+
         const draft = requireDraft(args);
 
         await patchById(ctx.db, evalCase._id, {
@@ -613,6 +656,25 @@ export const updateCase = authMutation
         return null;
     });
 
+export const setCaseFrozen = authMutation
+    .use(rateLimit("evals/update"))
+    .input({ caseId: v.id("evalCases"), frozen: v.boolean() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const evalCase = await requireOwnedCase(ctx, args.caseId, ctx.user.userId);
+
+        // A deleted dataset's cases are being purged: freezing one now would protect a row the purge then removes.
+        if (args.frozen && !(await ctx.db.get(evalCase.datasetId))) {
+            throw new LunoraError("NOT_FOUND", "Dataset not found");
+        }
+
+        await patchById(ctx.db, evalCase._id, { frozen: args.frozen, updatedAt: ctx.now });
+
+        ctx.log.event("evals.set_case_frozen", { frozen: args.frozen });
+
+        return null;
+    });
+
 /** Deletes a case. Past runs keep their results; a run in flight records it as skipped. */
 export const deleteCase = authMutation
     .use(rateLimit("evals/delete"))
@@ -620,6 +682,10 @@ export const deleteCase = authMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const evalCase = await requireOwnedCase(ctx, args.caseId, ctx.user.userId);
+
+        if (evalCase.frozen) {
+            throw new LunoraError("CONFLICT", "This case is frozen; unfreeze it before deleting");
+        }
 
         await ctx.db.delete(evalCase._id);
 
@@ -848,5 +914,99 @@ export const compareRuns = authQuery
             improved: comparison.improved,
             regressed: comparison.regressed,
             unchanged: comparison.unchanged,
+        };
+    });
+
+/**
+ * Two runs share a column only when they ran the same thing: the same skill,
+ * model and prompt, or the same knowledge files. A bare model name would merge a
+ * model run with a skill run that happens to use that model.
+ */
+const comparisonKey = (target: Infer<typeof vEvalTarget>): string => {
+    // JSON, not a delimiter: a model id or prompt may itself contain any separator.
+    if (target.kind === "skill") {
+        return JSON.stringify(["skill", target.skillId, target.model ?? null]);
+    }
+
+    if (target.kind === "knowledge") {
+        // A set of files: the same files in another order are the same target.
+        return JSON.stringify(["knowledge", [...target.fileIds].toSorted((left, right) => left.localeCompare(right)), target.model ?? null]);
+    }
+
+    return JSON.stringify(["model", target.model, target.systemPrompt ?? null]);
+};
+
+/** The newest finished run of each distinct model on a dataset, with every case's outcome per run. */
+export const compareModels = authQuery
+    .input({ datasetId: v.id("evalDatasets") })
+    .output(v.from(vModelComparison))
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const dataset = await requireOwnedDataset(ctx, args.datasetId, userId);
+        const newestPerTarget = new Map<string, Doc<"evalRuns">>();
+
+        // Newest first, so the first finished run seen per target is its newest. The walk has no
+        // fixed run count (a target's last run may sit under hundreds of newer ones); only
+        // `scanPages`' page budget bounds it. It does not stop at MAX_COMPARED_MODELS targets
+        // because `omittedTargets` counts the rest.
+        const scanTruncated = await scanPages(
+            async (cursor) =>
+                (await ctx.db
+                    .query("evalRuns")
+                    .withIndex("by_dataset_and_createdAt", (q) => q.eq("datasetId", dataset._id))
+                    .order("desc")
+                    .paginate({ cursor, numItems: COMPARISON_PAGE_SIZE })) as ScanPage<Doc<"evalRuns">>,
+            (run) => {
+                const key = comparisonKey(run.target);
+
+                if (run.userId === userId && (run.status === "completed" || run.status === "cost_capped") && !newestPerTarget.has(key)) {
+                    newestPerTarget.set(key, run);
+                }
+
+                return false;
+            },
+        );
+
+        const allRuns = [...newestPerTarget.values()];
+        const runs = allRuns.slice(0, MAX_COMPARED_MODELS);
+        const [cases, ...resultSets] = await Promise.all([loadCases(ctx, dataset._id), ...runs.map((run) => loadRunResults(ctx, run._id))]);
+        const outcomes = resultSets.map((results) => new Map(results.map((result) => [result.caseId as string, result])));
+
+        // The rows are every case any compared run scored, so a deleted case keeps its
+        // past outcomes. A result stores the input it ran with; the newest run's copy is
+        // shown, and a case that still exists keeps its current order and frozen flag.
+        const current = new Map(cases.map((evalCase) => [evalCase._id as string, evalCase]));
+        const inputs = new Map<string, string>();
+
+        for (const results of resultSets) {
+            for (const result of results) {
+                // A skipped result can carry an empty input: the newest real copy is the one shown.
+                if (result.input && !inputs.has(result.caseId as string)) {
+                    inputs.set(result.caseId as string, result.input);
+                }
+            }
+        }
+
+        const caseIds = [...new Set([...cases.map((evalCase) => evalCase._id as string), ...inputs.keys()])];
+
+        return {
+            cases: caseIds.map((caseId) => {
+                const evalCase = current.get(caseId);
+
+                return {
+                    caseId: caseId as Id<"evalCases">,
+                    frozen: evalCase?.frozen ?? false,
+                    // The input a run was scored against is the one shown; the current text is only a fallback.
+                    input: inputs.get(caseId) ?? evalCase?.input ?? "",
+                    results: runs.map((run, index) => {
+                        const result = outcomes[index]?.get(caseId);
+
+                        return { passed: result?.passed ?? null, runId: run._id, score: result?.score ?? null, status: result?.status ?? null };
+                    }),
+                };
+            }),
+            omittedTargets: allRuns.length - runs.length,
+            runs: runs.map((run, index) => toRunRow({ ...run, summary: summarize(resultSets[index] ?? [], run.caseIds.length) })),
+            scanTruncated,
         };
     });

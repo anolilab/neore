@@ -2,9 +2,23 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { SandboxOutputFile, SandboxOutputs, SkippedSandboxFile } from "@neore/chat-ui/types";
-import { formatFileSize } from "@neore/ui/components/file-renderers/file-type-utilities";
-import { DownloadIcon, FileArchiveIcon, FileAudioIcon, FileIcon, FileImageIcon, FileSpreadsheetIcon, FileTextIcon, FileVideoIcon } from "lucide-react";
+import { formatFileSize, isDocx, isPdf } from "@neore/ui/components/file-renderers/file-type-utilities";
+import { DownloadIcon, EyeIcon, FileArchiveIcon, FileAudioIcon, FileIcon, FileImageIcon, FileSpreadsheetIcon, FileTextIcon, FileVideoIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, useState } from "react";
+
+const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer"));
+const DocxPreview = lazy(() => import("@neore/ui/components/file-renderers/docx-preview"));
+const PptxPreview = lazy(() =>
+    import("@neore/ui/components/file-renderers/pptx-preview").then((m) => {
+        return { default: m.PptxPreview };
+    }),
+);
+const XlsxRenderer = lazy(() =>
+    import("@neore/ui/components/spreadsheet/xlsx-renderer").then((m) => {
+        return { default: m.XlsxRenderer };
+    }),
+);
 
 /**
  * Files a code-execution or shell run saved to its output directory. Each
@@ -55,10 +69,151 @@ const fileIcon = (mediaType: string): ReactNode => {
     return <FileIcon aria-hidden className={ICON_CLASS} />;
 };
 
+type OfficeKind = "docx" | "pdf" | "pptx" | "xlsx";
+
+const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | undefined => {
+    const extension = name.split(".").pop()?.toLowerCase();
+
+    if (isPdf(mediaType, name)) {
+        return "pdf";
+    }
+
+    if (isDocx(mediaType, name)) {
+        return "docx";
+    }
+
+    if (mediaType.includes("presentationml") || extension === "pptx") {
+        return "pptx";
+    }
+
+    if (mediaType.includes("spreadsheetml") || extension === "xlsx") {
+        return "xlsx";
+    }
+
+    return undefined;
+};
+
+const PPTX_FETCH_TIMEOUT_MS = 30_000;
+
+/** Announced to assistive technology while a preview is still loading. */
+const PreviewLoading: FC = () => {
+    const { t } = useLingui();
+
+    return (
+        <p className="text-muted-foreground p-3 text-sm" role="status">
+            {t`Loading preview…`}
+        </p>
+    );
+};
+
+const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
+    const { t } = useLingui();
+    // The result carries the URL it belongs to: a deck from an earlier file is never shown for this one.
+    const [result, setResult] = useState<{ blob?: Blob; failed?: boolean; url?: string }>({});
+    const state = result.url === url ? result : {};
+
+    useEffect(() => {
+        const controller = new AbortController();
+        let unmounted = false;
+
+        // A deadline as well as the unmount abort: a stalled signed URL must not hold the preview forever.
+        const deadline = setTimeout(() => controller.abort(), PPTX_FETCH_TIMEOUT_MS);
+
+        const load = async () => {
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+
+                // An expired signed URL answers 403 with a plain-text body; that is not a deck.
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const blob = await response.blob();
+
+                // A load superseded by a newer URL, or by unmount, must not write over the current one.
+                if (!unmounted) {
+                    setResult({ blob, url });
+                }
+            } catch {
+                // A timeout shows the failure; an unmount shows nothing.
+                if (!unmounted) {
+                    setResult({ failed: true, url });
+                }
+            } finally {
+                clearTimeout(deadline);
+            }
+        };
+
+        void load();
+
+        return () => {
+            unmounted = true;
+            clearTimeout(deadline);
+            controller.abort();
+        };
+    }, [url]);
+
+    if (state.failed) {
+        return (
+            <p className="text-muted-foreground p-3 text-sm" role="status">
+                {t`This preview could not be loaded.`}
+            </p>
+        );
+    }
+
+    return state.blob ? <PptxPreview data={state.blob} fileName={name} /> : <PreviewLoading />;
+};
+
+/**
+ * Catches a failed preview here, so one file's viewer cannot replace the whole chat view. Suspense
+ * catches neither a rejected lazy import nor an error thrown while rendering.
+ */
+class PreviewBoundary extends Component<{ children: ReactNode; fallback: string }, { failed: boolean }> {
+    static getDerivedStateFromError(): { failed: boolean } {
+        return { failed: true };
+    }
+
+    override state = { failed: false };
+
+    override render() {
+        const { children, fallback } = this.props;
+        const { failed } = this.state;
+
+        if (failed) {
+            return (
+                <p className="text-muted-foreground p-3 text-sm" role="status">
+                    {fallback}
+                </p>
+            );
+        }
+
+        return children;
+    }
+}
+
+const OfficePreview: FC<{ file: SandboxOutputFile; kind: OfficeKind }> = ({ file, kind }) => {
+    const { t } = useLingui();
+
+    return (
+        <div className="border-border mt-2 max-h-[32rem] overflow-auto rounded-lg border">
+            <PreviewBoundary fallback={t`This preview could not be loaded.`}>
+                <Suspense fallback={<PreviewLoading />}>
+                    {kind === "pdf" && <PdfViewer filename={file.name} url={file.url} />}
+                    {kind === "docx" && <DocxPreview filename={file.name} url={file.url} />}
+                    {kind === "pptx" && <PptxFromUrl name={file.name} url={file.url} />}
+                    {kind === "xlsx" && <XlsxRenderer fileName={file.name} source={file.url} />}
+                </Suspense>
+            </PreviewBoundary>
+        </div>
+    );
+};
+
 const SandboxFileChip: FC<{ file: SandboxOutputFile }> = ({ file }) => {
     const { t } = useLingui();
     const { name } = file;
     const size = formatFileSize(file.size);
+    const [isPreviewing, setIsPreviewing] = useState(false);
+    const kind = officeKindOf(file);
     const body = (
         <>
             {fileIcon(file.mediaType)}
@@ -79,18 +234,32 @@ const SandboxFileChip: FC<{ file: SandboxOutputFile }> = ({ file }) => {
     }
 
     return (
-        <li className="max-w-full">
-            <a
-                aria-label={t`Download ${name} (${size})`}
-                className="border-border hover:bg-muted flex max-w-full items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
-                download={file.name}
-                href={file.url}
-                rel="noopener noreferrer"
-                target="_blank"
-            >
-                {body}
-                <DownloadIcon aria-hidden className="text-muted-foreground size-3.5 shrink-0" />
-            </a>
+        <li className={isPreviewing ? "w-full" : "max-w-full"}>
+            <div className="flex max-w-full items-center gap-1">
+                <a
+                    aria-label={t`Download ${name} (${size})`}
+                    className="border-border hover:bg-muted flex max-w-full items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                    download={file.name}
+                    href={file.url}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                >
+                    {body}
+                    <DownloadIcon aria-hidden className="text-muted-foreground size-3.5 shrink-0" />
+                </a>
+                {kind && (
+                    <button
+                        aria-expanded={isPreviewing}
+                        aria-label={t`Preview ${name}`}
+                        className="border-border hover:bg-muted rounded-lg border p-2 transition-colors"
+                        onClick={() => setIsPreviewing((previous) => !previous)}
+                        type="button"
+                    >
+                        <EyeIcon aria-hidden className="size-4" />
+                    </button>
+                )}
+            </div>
+            {kind && isPreviewing && <OfficePreview file={file} kind={kind} />}
         </li>
     );
 };

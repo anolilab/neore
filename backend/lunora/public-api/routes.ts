@@ -212,6 +212,8 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
 const toThread = (thread: {
     _creationTime: number;
     _id: string;
+    // The source's creation time for an imported chat; unset on threads from before it was stored.
+    createdAt?: number;
     isPublic?: boolean;
     model?: string;
     pinnedAt?: number;
@@ -221,7 +223,7 @@ const toThread = (thread: {
     updatedAt?: number;
 }) => {
     return {
-        createdAt: thread._creationTime,
+        createdAt: thread.createdAt ?? thread._creationTime,
         id: thread._id,
         isPublic: thread.isPublic === true,
         model: nullable(thread.model),

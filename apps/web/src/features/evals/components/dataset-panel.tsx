@@ -9,9 +9,9 @@ import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import { formatDateTime } from "@neore/ui/utils/locale-format";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { FileUp, GitCompare, Pencil, Play, Plus, Trash2 } from "lucide-react";
-import { useId, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FileUp, GitCompare, Lock, LockOpen, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -20,6 +20,7 @@ import type { EvalCase, EvalDataset, EvalRun } from "../lib/evals-format";
 import { formatCost, formatPercent, formToCasePayload, orderForComparison } from "../lib/evals-format";
 import CaseFormDialog from "./case-form-dialog";
 import ImportCasesDialog from "./import-cases-dialog";
+import ModelComparison from "./model-comparison";
 import RunComparison from "./run-comparison";
 import RunDetail from "./run-detail";
 import RunDialog from "./run-dialog";
@@ -47,8 +48,9 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
     const createCase = useMutation(crpc.evals.functions.createCase.mutationOptions());
     const updateCase = useMutation(crpc.evals.functions.updateCase.mutationOptions());
     const deleteCase = useMutation(crpc.evals.functions.deleteCase.mutationOptions());
+    const setCaseFrozen = useMutation(crpc.evals.functions.setCaseFrozen.mutationOptions());
 
-    const [tab, setTab] = useState<"cases" | "runs">("cases");
+    const [tab, setTab] = useState<"cases" | "models" | "runs">("cases");
     const [caseDialog, setCaseDialog] = useState<{ editing: EvalCase | null; open: boolean }>({ editing: null, open: false });
     const [pendingCaseDelete, setPendingCaseDelete] = useState<EvalCase | null>(null);
     const [importOpen, setImportOpen] = useState(false);
@@ -57,6 +59,15 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
     const [compareIds, setCompareIds] = useState<Id<"evalRuns">[]>([]);
 
     const cases = detail?.cases ?? [];
+    const queryClient = useQueryClient();
+
+    // The comparison is not live, so it is refetched when a run's status or a case changes. Progress writes
+    // (the next case index, costs) leave both untouched, so they do not re-run the aggregate.
+    const comparisonState = `${runs.map((run) => `${run._id}:${run.status}`).join("|")}#${cases.map((evalCase) => `${evalCase._id}:${String(evalCase.frozen)}`).join("|")}`;
+
+    useEffect(() => {
+        void queryClient.invalidateQueries({ queryKey: crpc.evals.functions.compareModels.queryKey({ datasetId: dataset._id }) });
+    }, [comparisonState, crpc, dataset._id, queryClient]);
     const comparePair = orderForComparison(runs.filter((run) => compareIds.includes(run._id)));
 
     const confirmCaseDelete = async () => {
@@ -114,10 +125,11 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
                 </div>
             </header>
 
-            <Tabs onValueChange={(value) => setTab(value === "runs" ? "runs" : "cases")} value={tab}>
+            <Tabs onValueChange={(value) => setTab(value === "runs" || value === "models" ? value : "cases")} value={tab}>
                 <TabsList aria-label={t`Dataset views`}>
                     <TabsTrigger value="cases">{t`Cases (${String(cases.length)})`}</TabsTrigger>
                     <TabsTrigger value="runs">{t`Runs (${String(runs.length)})`}</TabsTrigger>
+                    <TabsTrigger value="models">{t`Models`}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent className="pt-4" value="cases">
@@ -133,7 +145,7 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
                                         <TableHead>{t`Expected answer`}</TableHead>
                                         {rag && <TableHead>{t`Expected sources`}</TableHead>}
                                         <TableHead className="text-right">{t`Checks`}</TableHead>
-                                        <TableHead className="w-24">
+                                        <TableHead className="w-32">
                                             <span className="sr-only">{t`Actions`}</span>
                                         </TableHead>
                                     </TableRow>
@@ -157,6 +169,7 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
                                                 <div className="flex justify-end gap-1">
                                                     <Button
                                                         aria-label={t`Edit case ${String(index + 1)}`}
+                                                        disabled={evalCase.frozen}
                                                         onClick={() => setCaseDialog({ editing: evalCase, open: true })}
                                                         size="icon"
                                                         variant="ghost"
@@ -164,7 +177,23 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
                                                         <Pencil aria-hidden />
                                                     </Button>
                                                     <Button
+                                                        aria-label={
+                                                            evalCase.frozen ? t`Unfreeze case ${String(index + 1)}` : t`Freeze case ${String(index + 1)}`
+                                                        }
+                                                        aria-pressed={evalCase.frozen}
+                                                        onClick={() =>
+                                                            setCaseFrozen
+                                                                .mutateAsync({ caseId: evalCase._id, frozen: !evalCase.frozen })
+                                                                .catch(() => toast.error(t`Failed to update the case`))
+                                                        }
+                                                        size="icon"
+                                                        variant="ghost"
+                                                    >
+                                                        {evalCase.frozen ? <Lock aria-hidden /> : <LockOpen aria-hidden />}
+                                                    </Button>
+                                                    <Button
                                                         aria-label={t`Delete case ${String(index + 1)}`}
+                                                        disabled={evalCase.frozen}
                                                         onClick={() => setPendingCaseDelete(evalCase)}
                                                         size="icon"
                                                         variant="ghost"
@@ -253,6 +282,10 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
 
                     {runView.kind === "run" && <RunDetail key={runView.runId} onDeleted={() => setRunView({ kind: "none" })} rag={rag} runId={runView.runId} />}
                     {runView.kind === "compare" && comparePair && <RunComparison {...comparePair} rag={rag} />}
+                </TabsContent>
+
+                <TabsContent className="pt-4" value="models">
+                    <ModelComparison datasetId={dataset._id} />
                 </TabsContent>
             </Tabs>
 

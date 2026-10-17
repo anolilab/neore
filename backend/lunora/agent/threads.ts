@@ -180,6 +180,7 @@ export const createThread = internalMutation
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
         const insertedId = await ctx.db.insert("threads", {
+            createdAt: Date.now(),
             ...args,
             status: "active",
         });
@@ -861,11 +862,15 @@ export const getThreadListDataBatchHandler = async (
     // are the old index walks spelled out. None depends on another, so all five
     // run at once. `chat/read-cost.test.ts` pins the statement and row counts.
     const [threadsResult, temporaryThreadRecords, pinnedThreadsRaw, ordered, relationships] = await Promise.all([
-        // 1. The page (`by_user_and_status`, descending).
+        // 1. The page (`by_user_and_status_createdAt`, descending): newest CREATED first, so an
+        //    imported chat sits where its source was created. Rows from before `createdAt`
+        //    existed have it unset, which SQLite sorts below every value: they follow the
+        //    stamped rows, newest `_creationTime` first. The client sorts the loaded rows by
+        //    `createdAt ?? _creationTime`, so only a page boundary can show the mix out of order.
         context.db.threads.findMany({
             cursor: paginationOptions.cursor,
             limit: paginationOptions.numItems,
-            orderBy: [{ status: "desc" }, { deleted: "desc" }, { _creationTime: "desc" }],
+            orderBy: [{ status: "desc" }, { deleted: "desc" }, { createdAt: "desc" }, { _creationTime: "desc" }],
             where: { userId },
         }),
         // 2. Live temporary threads (`by_userId_expiresAt`).
