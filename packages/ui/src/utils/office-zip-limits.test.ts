@@ -54,7 +54,7 @@ describe(assertOfficeZipWithinLimits, () => {
     });
 
     it("reads the real end record when the archive comment contains its signature", async () => {
-        const buffer = await buildZip({ "a.xml": "<a/>" }, "PK\u0005\u0006 not a record, just comment text");
+        const buffer = await buildZip({ "a.xml": "<a/>" }, "PK\u{5}\u{6} not a record, just comment text");
 
         await expect(assertOfficeZipWithinLimits(buffer, SMALL)).resolves.toBeUndefined();
     });

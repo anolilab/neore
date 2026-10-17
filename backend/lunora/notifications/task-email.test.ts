@@ -191,6 +191,7 @@ describe("sweep", () => {
 
     it("schedules another run when a full batch leaves rows waiting", async () => {
         await seedUser();
+
         for (let index = 0; index < SEND_BATCH + 1; index += 1) {
             await write({ dedupeKey: `k${String(index)}` });
         }

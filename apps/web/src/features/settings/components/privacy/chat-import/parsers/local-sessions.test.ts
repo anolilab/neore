@@ -311,7 +311,7 @@ describe("Claude Code slash-command echoes", () => {
 
 describe("archives with a damaged member", () => {
     it("keeps the other transcripts and reports the damaged one by name", async () => {
-        const JSZip = (await import("jszip")).default;
+        const { default: JSZip } = await import("jszip");
         const zip = new JSZip();
 
         zip.file("good.json", JSON.stringify([{ mapping: {}, title: "Kept" }]));
@@ -319,7 +319,9 @@ describe("archives with a damaged member", () => {
 
         const file = new File([await zip.generateAsync({ type: "arraybuffer" })], "export.zip");
         const damaged: string[] = [];
-        const records = await extractJsonFromFile(file, (member) => damaged.push(member));
+        const records = await extractJsonFromFile(file, (member) => {
+            damaged.push(member);
+        });
 
         expect(damaged).toEqual(["damaged.jsonl"]);
         expect(records).toHaveLength(1);
