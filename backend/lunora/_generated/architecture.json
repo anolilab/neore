@@ -4691,6 +4691,11 @@
       "to": "function:notifications_task_email:settleOutcomeEmail"
     },
     {
+      "from": "function:notifications_task_email:sendPendingOutcomeEmails",
+      "kind": "schedule",
+      "to": "function:notifications_task_email:sendPendingOutcomeEmails"
+    },
+    {
       "from": "function:notifications_task_email:settleOutcomeEmail",
       "kind": "write",
       "to": "table:outcomeEmails"
@@ -18187,91 +18192,91 @@
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 280,
+      "line": 282,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 399,
+      "line": 401,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 417,
+      "line": 419,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 437,
+      "line": 439,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 452,
+      "line": 454,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 531,
+      "line": 533,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 549,
+      "line": 551,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 571,
+      "line": 573,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 572,
+      "line": 574,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 608,
+      "line": 610,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 627,
+      "line": 629,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 628,
+      "line": 630,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 648,
+      "line": 650,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 692,
+      "line": 694,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {
       "file": "public-api/routes",
       "kind": "call",
-      "line": 707,
+      "line": 709,
       "reason": "\"ROUTES\" is not a registered function"
     },
     {

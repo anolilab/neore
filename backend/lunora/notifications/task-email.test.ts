@@ -17,6 +17,7 @@ import {
     loadRecipientEmail,
     OUTCOME_EMAIL_MAX_ATTEMPTS,
     OUTCOME_EMAIL_RETENTION_MS,
+    SEND_BATCH,
     sendPendingOutcomeEmails,
     settleOutcomeEmail,
 } from "./task-email";
@@ -55,10 +56,13 @@ const handlers = new Map<unknown, unknown>([
     [internal.notifications.task_email.settleOutcomeEmail, settleOutcomeEmail],
 ]);
 
-const runSend = async (): Promise<void> => {
+const runSend = async (): Promise<ReturnType<typeof vi.fn>> => {
     const route = async (ref: unknown, args: Record<string, unknown>) => await run(handlers.get(ref), args);
+    const runAfter = vi.fn(async () => {});
 
-    await (sendPendingOutcomeEmails as unknown as Handler<null>).handler({ runMutation: route, runQuery: route }, {});
+    await (sendPendingOutcomeEmails as unknown as Handler<null>).handler({ runMutation: route, runQuery: route, scheduler: { runAfter } }, {});
+
+    return runAfter;
 };
 
 const outbox = async () =>
@@ -183,6 +187,18 @@ describe("sweep", () => {
         }
 
         expect(await firstOutbox()).toMatchObject({ attempts: OUTCOME_EMAIL_MAX_ATTEMPTS, status: "failed" });
+    });
+
+    it("schedules another run when a full batch leaves rows waiting", async () => {
+        await seedUser();
+        for (let index = 0; index < SEND_BATCH + 1; index += 1) {
+            await write({ dedupeKey: `k${String(index)}` });
+        }
+
+        const runAfter = await runSend();
+
+        expect(queueEmail).toHaveBeenCalledTimes(SEND_BATCH);
+        expect(runAfter).toHaveBeenCalledTimes(1);
     });
 
     it("drops the row without mailing when the setting was turned off", async () => {

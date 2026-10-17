@@ -753,7 +753,7 @@ export interface InternalApiTypes {
             pruneOldNotifications: FunctionReference<"mutation", {}, null>;
         };
         gdpr: {
-            collectNotificationsForExport: FunctionReference<"query", { userId: string }, { notifications: Array<unknown>; pushSubscriptions: Array<unknown> }>;
+            collectNotificationsForExport: FunctionReference<"query", { userId: string }, { notifications: Array<unknown>; outcomeEmails: Array<unknown>; pushSubscriptions: Array<unknown> }>;
             deleteUserNotifications: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
         push: {

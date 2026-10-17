@@ -176,7 +176,12 @@ const parseJsonLines = (text: string): unknown[] => {
  * Extract JSON from a file. Handles both direct JSON files
  * and JSON files within ZIP archives.
  */
-export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
+
+/**
+ * `onDamaged` receives the name of an archive member that cannot be read. The other members still import;
+ * without it a damaged member fails the file, as a damaged file does.
+ */
+export const extractJsonFromFile = async (file: File, onDamaged?: (member: string) => void): Promise<unknown[]> => {
     const fileName = file.name.toLowerCase();
 
     if (fileName.endsWith(".json")) {
@@ -221,10 +226,12 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
                 // A transcript is one array of records, as when it is selected directly.
                 jsonFiles.push(lowerPath.endsWith(".jsonl") ? parseJsonLines(text) : JSON.parse(text));
             } catch (error) {
-                // A damaged transcript is an error, not a file to skip.
-                if (error instanceof ChatImportError) {
+                // One damaged member must not cost the archive's other transcripts; it is reported by name.
+                if (!onDamaged) {
                     throw error;
                 }
+
+                onDamaged(path);
             }
         }
 

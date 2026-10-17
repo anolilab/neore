@@ -9103,7 +9103,7 @@ export interface Caller {
             pruneOldNotifications: (args?: {}) => Promise<null>;
         };
         gdpr: {
-            collectNotificationsForExport: (args: { userId: string }) => Promise<{ notifications: Array<unknown>; pushSubscriptions: Array<unknown> }>;
+            collectNotificationsForExport: (args: { userId: string }) => Promise<{ notifications: Array<unknown>; outcomeEmails: Array<unknown>; pushSubscriptions: Array<unknown> }>;
             deleteUserNotifications: (args: { userId: string }) => Promise<{ hasMore: boolean }>;
         };
         push: {

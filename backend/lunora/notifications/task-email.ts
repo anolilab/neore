@@ -21,7 +21,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { patchById } from "../lib/patch";
 
 /** Pending rows one send run takes; the rest wait for the next sweep. */
-const SEND_BATCH = 20;
+export const SEND_BATCH = 20;
 
 /** A row that failed this many times is given up on. */
 export const OUTCOME_EMAIL_MAX_ATTEMPTS = 5;
@@ -202,6 +202,28 @@ export const dispatchOutcomeEmails = internalMutation
         return null;
     });
 
+const SETTLE_ATTEMPTS = 3;
+
+/**
+ * The mail is already queued by the time its row is settled. A settle that fails is retried, because a row
+ * left `sending` past the recovery window is queued again.
+ */
+const settleWithRetry = async (settle: () => Promise<unknown>): Promise<void> => {
+    for (let attempt = 1; attempt <= SETTLE_ATTEMPTS; attempt += 1) {
+        try {
+            await settle();
+
+            return;
+        } catch (error) {
+            if (attempt === SETTLE_ATTEMPTS) {
+                console.error("[notifications] Could not record the outcome email as settled:", error);
+
+                return;
+            }
+        }
+    }
+};
+
 /** Sends the shard's pending outbox rows. The mailer is only ever reached from here. */
 export const sendPendingOutcomeEmails = internalAction
     .input({})
@@ -242,7 +264,13 @@ export const sendPendingOutcomeEmails = internalAction
                 result = "failed";
             }
 
-            await ctx.runMutation(internal.notifications.task_email.settleOutcomeEmail, { claimedAt, id, result });
+            await settleWithRetry(async () => await ctx.runMutation(internal.notifications.task_email.settleOutcomeEmail, { claimedAt, id, result }));
+        }
+
+        // One batch is at most SEND_BATCH rows; a full batch means more may be waiting, so run again rather than
+        // leave them for the next idle sweep.
+        if (pending.length === SEND_BATCH) {
+            await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendPendingOutcomeEmails, {});
         }
 
         return null;

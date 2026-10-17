@@ -2,6 +2,7 @@
 
 import type { I18n } from "@lingui/core";
 import { Plural, useLingui } from "@lingui/react/macro";
+import { chatAttachmentLimit } from "@neore/backend/document-limits";
 import { Button } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
 import { Progress, ProgressValue } from "@neore/ui/components/progress";
@@ -143,13 +144,19 @@ const DataImport: FC = () => {
 
             try {
                 // A file that cannot be read is skipped like an unrecognised one, so the valid files in the same selection still import.
+                const damaged: string[] = [];
                 const extracted = await Promise.allSettled(
                     files.map(async (file) => {
-                        return { name: file.name, records: await extractJsonFromFile(file) };
+                        return {
+                            name: file.name,
+                            records: await extractJsonFromFile(file, (member) => {
+                                damaged.push(`${file.name} › ${member}`);
+                            }),
+                        };
                     }),
                 );
                 const results: ReturnType<typeof parseExportFile>[] = [];
-                const skipped: string[] = [];
+                const skipped: string[] = [...damaged];
                 let firstFailure: Error | undefined;
                 const jsonDataArray: { jsonData: unknown; name: string }[] = [];
 
@@ -226,13 +233,21 @@ const DataImport: FC = () => {
         }
 
         const { conversations, provider } = state;
+        const payload = new File([JSON.stringify(conversations)], "import.json", { type: "application/json" });
+
+        // The upload route refuses a larger file with a generic error, so say what to do before sending it.
+        if (payload.size > chatAttachmentLimit(payload.type).maxBytes) {
+            setState({ message: t`This selection is too large to import at once. Import fewer files at a time.`, step: "error" });
+
+            return;
+        }
 
         setState({ provider, step: "uploading" });
 
         try {
             // 1. Send the normalized conversations JSON to the upload route. An
             // upload nobody starts a job for is reaped by the backend.
-            const uploadId = await uploadFile(new File([JSON.stringify(conversations)], "import.json", { type: "application/json" }), {
+            const uploadId = await uploadFile(payload, {
                 contentType: "application/json",
             });
 
