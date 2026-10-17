@@ -268,7 +268,7 @@ export interface ApiTypes {
             };
         };
         resume: {
-            latestResumableThread: FunctionReference<"query", {}, string | null>;
+            latestResumableThread: FunctionReference<"query", { organizationId: string | null; teamId?: string }, string | null>;
         };
         sharing: {
             acceptThreadInvite: FunctionReference<"mutation", { inviteToken: string }, { ownerId: string; permission: "read" | "write" | "admin"; threadId: string }>;

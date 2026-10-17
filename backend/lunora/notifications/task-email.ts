@@ -43,16 +43,25 @@ export const loadRecipientEmail = internalQuery
     .input({ userId: v.string() })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { userId }, ctx }) => {
+        // Checked again here: the setting or the account may have changed after the mail was scheduled.
+        if (await isAccountDeletionUnderway(ctx, userId)) {
+            return null;
+        }
+
         const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
 
-        // Checked again here: the user may have turned the setting off after the mail was scheduled.
         if (settings?.taskEmailEnabled !== true) {
             return null;
         }
 
         const user = await ctx.db.user.findFirst({ where: { _id: userId as Id<"user"> } });
 
-        return user?.email || null;
+        // Only a verified address: sign-up does not verify it, so an unverified one may belong to someone else.
+        if (!user?.emailVerified) {
+            return null;
+        }
+
+        return user.email || null;
     });
 
 export const sendTaskOutcomeEmail = internalAction

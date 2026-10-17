@@ -91,3 +91,11 @@ describe("links and code in Telegram output", () => {
         expect(pieces.join("")).toBe(line);
     });
 });
+
+describe("fenced code in Telegram output", () => {
+    it("keeps the language tag on the plain-text source", () => {
+        const chunk = formatTelegramMessage("```ts\nconst a = 1;\n```")[0];
+
+        expect(chunk?.source.startsWith("```ts\n")).toBe(true);
+    });
+});

@@ -10,6 +10,7 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { liteAuthQuery } from "../lib/crpc";
+import { MAX_LENGTH } from "../lib/validators";
 
 /** Threads read per page, and the most threads a resume will look through. */
 const PAGE_SIZE = 50;
@@ -18,14 +19,18 @@ const PAGE_SIZE = 50;
 interface ScanPage {
     continueCursor: string | null;
     isDone: boolean;
-    page: { _id: Id<"threads">; deleted?: boolean; isTemporary?: boolean; status: string }[];
+    page: { _id: Id<"threads">; deleted?: boolean; isTemporary?: boolean; organizationId?: string; status: string; teamId?: string }[];
 }
 const MAX_THREADS_SCANNED = 500;
 
 export const latestResumableThread = liteAuthQuery
-    .input({})
+    .input({
+        // Same scope as the sidebar: null is the personal space; teamId is set only when a team is active.
+        organizationId: v.union(v.string().max(MAX_LENGTH.id), v.null()),
+        teamId: v.optional(v.string().max(MAX_LENGTH.id)),
+    })
     .output(v.union(v.string(), v.null()))
-    .query(async ({ ctx }): Promise<string | null> => {
+    .query(async ({ args, ctx }): Promise<string | null> => {
         const { userId } = ctx.user;
         let cursor: string | null = null;
 
@@ -40,6 +45,10 @@ export const latestResumableThread = liteAuthQuery
             // `deleted` is unset on ordinary inserts, and unset means live (as in the thread list).
             for (const thread of threads.page) {
                 if (thread.deleted || thread.status === "archived" || thread.isTemporary) {
+                    continue;
+                }
+
+                if ((thread.organizationId ?? null) !== args.organizationId || (args.teamId !== undefined && thread.teamId !== args.teamId)) {
                     continue;
                 }
 

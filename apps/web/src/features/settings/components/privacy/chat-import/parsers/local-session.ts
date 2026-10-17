@@ -68,7 +68,7 @@ export const buildSession = (messages: NormalizedMessage[], droppedToolItems: nu
     const lastAssistant = merged.findLast((message) => message.role === "assistant");
 
     if (lastAssistant && droppedToolItems > 0) {
-        lastAssistant.content += `\n\n---\n_${droppedToolItems} tool calls and results were not included in this import._`;
+        lastAssistant.content += `\n\n---\n_${droppedToolItems} tool calls, results and reasoning blocks were not included in this import._`;
     }
 
     const firstUser = merged.find((message) => message.role === "user");

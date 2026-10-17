@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import Assistant from "@/features/chat/assistant";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
@@ -33,8 +34,18 @@ const ChatPage = () => {
     const navigate = useNavigate();
     const crpc = useCRPC();
     const { data: userSettings } = useUserSettings();
-    const resumeLastChat = BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage;
-    const { data: latestThreadId, isSuccess: latestResolved } = useQuery(crpc.chat.resume.latestResumableThread.queryOptions(resumeLastChat ? {} : skipToken));
+    const { hooks } = useAuth();
+    const { data: activeOrganization, isPending: isOrgPending } = hooks.useActiveOrganization();
+    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
+    const activeTeamId = (sessionData?.session as { activeTeamId?: string | null } | undefined)?.activeTeamId ?? undefined;
+    const resumeScopeReady = !isOrgPending && !isSessionPending;
+    const resumeLastChat =
+        BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage && resumeScopeReady;
+    const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
+        crpc.chat.resume.latestResumableThread.queryOptions(
+            resumeLastChat ? { organizationId: activeOrganization?.id ?? null, teamId: activeTeamId } : skipToken,
+        ),
+    );
 
     const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
 

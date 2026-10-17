@@ -41,22 +41,27 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
     const messages: NormalizedMessage[] = [];
     let dropped = 0;
 
-    // Current rollouts repeat every turn as a `response_item` message; older ones
-    // carry turns only as `event_msg` user/agent messages. Use one source, never both.
-    const hasResponseMessages = data.some((raw) => {
-        const payload = asRecord(asRecord(raw)?.payload);
-
-        return asRecord(raw)?.type === "response_item" && payload?.type === "message";
-    });
+    // Current rollouts repeat each turn as a `response_item` message; older ones carry turns only as
+    // `event_msg` messages. Per role: take the `event_msg` copy only where no `response_item` one exists.
+    const responseRoles = new Set<string>();
 
     for (const raw of data) {
         const record = asRecord(raw);
         const payload = asRecord(record?.payload);
 
-        if (record?.type === "event_msg" && !hasResponseMessages && payload) {
+        if (record?.type === "response_item" && payload?.type === "message" && typeof payload.role === "string") {
+            responseRoles.add(payload.role);
+        }
+    }
+
+    for (const raw of data) {
+        const record = asRecord(raw);
+        const payload = asRecord(record?.payload);
+
+        if (record?.type === "event_msg" && payload) {
             const role = eventRole(payload.type);
             const message =
-                role && typeof payload.message === "string"
+                role && !responseRoles.has(role) && typeof payload.message === "string"
                     ? messageFromTexts([payload.message], role, parseTimestamp(record.timestamp), INJECTED_PREFIXES)
                     : null;
 
@@ -71,7 +76,7 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
             continue;
         }
 
-        if (typeof payload.type === "string" && TOOL_PAYLOAD_TYPES.has(payload.type)) {
+        if (typeof payload.type === "string" && (TOOL_PAYLOAD_TYPES.has(payload.type) || payload.type === "reasoning")) {
             dropped += 1;
 
             continue;

@@ -86,7 +86,7 @@ describe("Claude Code parser", () => {
         expect(conversation?.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
         expect(conversation?.messages[0]?.content).toBe("Fix the build");
         expect(conversation?.messages[1]?.content).toContain("Looking.\n\nDone.");
-        expect(conversation?.messages[1]?.content).toContain("2 tool calls and results were not included");
+        expect(conversation?.messages[1]?.content).toContain("3 tool calls, results and reasoning blocks were not included");
         expect(JSON.stringify(conversation)).not.toContain("sub-agent chatter");
     });
 
@@ -109,7 +109,7 @@ describe("Codex parser", () => {
         expect(conversation?.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
         expect(conversation?.messages[0]?.content).toBe("List files");
         expect(conversation?.messages[1]?.content).toContain("Two files.");
-        expect(conversation?.messages[1]?.content).toContain("2 tool calls and results were not included");
+        expect(conversation?.messages[1]?.content).toContain("2 tool calls, results and reasoning blocks were not included");
     });
 });
 
@@ -136,5 +136,23 @@ describe("extractJsonFromFile", () => {
         const text = `${JSON.stringify(codexRollout[0])}\n{"partial`;
 
         await expect(extractJsonFromFile(new File([text], "rollout.jsonl"))).rejects.toThrow("Line 2");
+    });
+});
+
+describe("Codex rollouts mixing both turn formats", () => {
+    it("keeps a legacy user prompt when the assistant turns are response items", () => {
+        const rollout = [
+            { payload: { message: "Summarise the logs", type: "user_message" }, timestamp: "2026-10-01T10:00:00Z", type: "event_msg" },
+            {
+                payload: { content: [{ text: "Here is the summary.", type: "output_text" }], role: "assistant", type: "message" },
+                timestamp: "2026-10-01T10:00:05Z",
+                type: "response_item",
+            },
+        ];
+
+        const [conversation] = parseExportFile(rollout, "codex").conversations;
+
+        expect(conversation?.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
+        expect(conversation?.messages[0]?.content).toBe("Summarise the logs");
     });
 });

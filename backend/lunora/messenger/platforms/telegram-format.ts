@@ -43,6 +43,8 @@ export interface TelegramChunk {
 
 interface Block {
     code: boolean;
+    /** The language tag on a fenced block's opening line, kept for the plain-text retry. */
+    info?: string;
     lines: string[];
 }
 
@@ -150,6 +152,7 @@ const toBlocks = (markdown: string): Block[] => {
     const blocks: Block[] = [];
     let current: string[] = [];
     let fence: string[] | undefined;
+    let fenceInfo = "";
 
     const flush = () => {
         if (current.length === 0) {
@@ -163,7 +166,7 @@ const toBlocks = (markdown: string): Block[] => {
     for (const line of markdown.split("\n")) {
         if (fence) {
             if (line.trimStart().startsWith("```")) {
-                blocks.push({ code: true, lines: fence });
+                blocks.push({ code: true, info: fenceInfo, lines: fence });
                 fence = undefined;
             } else {
                 fence.push(line);
@@ -171,6 +174,7 @@ const toBlocks = (markdown: string): Block[] => {
         } else if (line.trimStart().startsWith("```")) {
             flush();
             fence = [];
+            fenceInfo = line.trimStart().slice(3).trim();
         } else if (line.trim() === "") {
             flush();
         } else {
@@ -179,7 +183,7 @@ const toBlocks = (markdown: string): Block[] => {
     }
 
     if (fence) {
-        blocks.push({ code: true, lines: fence });
+        blocks.push({ code: true, info: fenceInfo, lines: fence });
     }
 
     flush();
@@ -189,7 +193,7 @@ const toBlocks = (markdown: string): Block[] => {
 
 const renderBlock = (block: Block, lines: string[]): TelegramChunk =>
     block.code
-        ? { html: `<pre>${escapeHtml(lines.join("\n"))}</pre>`, source: `\`\`\`\n${lines.join("\n")}\n\`\`\`` }
+        ? { html: `<pre>${escapeHtml(lines.join("\n"))}</pre>`, source: `\`\`\`${block.info ?? ""}\n${lines.join("\n")}\n\`\`\`` }
         : { html: lines.map((line) => renderLine(line)).join("\n"), source: lines.join("\n") };
 
 /** Pieces of one block, each rendering to at most `limit` characters. */

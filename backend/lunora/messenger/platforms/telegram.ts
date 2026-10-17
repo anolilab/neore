@@ -225,7 +225,14 @@ export const sendTelegramMessage = async (botToken: string, chatId: number | str
             timeoutMs: FETCH_TIMEOUT_SHORT_MS,
         });
 
-    for (const chunk of formatTelegramMessage(text)) {
+    const chunks = formatTelegramMessage(text);
+
+    // An empty reply has nothing to send, so it is not a delivery.
+    if (chunks.length === 0) {
+        return false;
+    }
+
+    for (const chunk of chunks) {
         const response = await post({ parse_mode: "HTML", text: chunk.html });
 
         if (response.status === 400) {

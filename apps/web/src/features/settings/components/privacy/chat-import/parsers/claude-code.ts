@@ -91,7 +91,7 @@ const parseClaudeCode = (data: unknown): NormalizedConversation[] => {
 
             if (item?.type === "text" && typeof item.text === "string") {
                 texts.push(item.text);
-            } else if (item?.type === "tool_use" || item?.type === "tool_result") {
+            } else if (item?.type === "tool_use" || item?.type === "tool_result" || item?.type === "thinking") {
                 dropped += 1;
             }
         }

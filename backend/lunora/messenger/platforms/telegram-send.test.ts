@@ -31,3 +31,12 @@ describe("sendTelegramMessage", () => {
         await expect(sendTelegramMessage("token", 1, "plain text")).resolves.toBe(false);
     });
 });
+
+describe("sendTelegramMessage with an empty reply", () => {
+    it("reports nothing sent when there is nothing to send", async () => {
+        fetchWithDeadline.mockReset();
+
+        await expect(sendTelegramMessage("token", 1, "   ")).resolves.toBe(false);
+        expect(fetchWithDeadline).not.toHaveBeenCalled();
+    });
+});

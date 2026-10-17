@@ -16181,8 +16181,24 @@
                 "additionalProperties": false,
                 "properties": {
                   "args": {
-                    "properties": {},
-                    "required": [],
+                    "properties": {
+                      "organizationId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "teamId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "organizationId"
+                    ],
                     "type": "object"
                   },
                   "functionPath": {

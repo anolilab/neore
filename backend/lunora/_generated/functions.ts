@@ -8509,7 +8509,7 @@ export interface Caller {
             };
         };
         resume: {
-            latestResumableThread: (args?: {}) => Promise<string | null>;
+            latestResumableThread: (args: { organizationId: string | null; teamId?: string }) => Promise<string | null>;
         };
         sharing: {
             acceptThreadInvite: (args: { inviteToken: string }) => Promise<{ ownerId: string; permission: "read" | "write" | "admin"; threadId: string }>;
