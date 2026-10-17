@@ -67,6 +67,7 @@ const useWorkflowSync = (projectId: string | undefined) => {
     const lastSavedJsonRef = useRef<string | null>(null);
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isSavingRef = useRef(false);
+    const scheduleSaveRef = useRef<() => void>(() => undefined);
 
     const shouldQuery = isAuthenticated && !authLoading && !!projectId;
 
@@ -119,7 +120,16 @@ const useWorkflowSync = (projectId: string | undefined) => {
                 });
                 lastSavedFingerprintRef.current = fingerprint;
                 lastSavedJsonRef.current = contentJson;
-                setDirty(false);
+
+                // An edit made while the request was in flight (an undo, say) is not saved yet.
+                if (JSON.stringify(getContent()) === contentJson) {
+                    setDirty(false);
+                } else {
+                    isSavingRef.current = false;
+                    scheduleSaveRef.current();
+
+                    return;
+                }
             } catch (error) {
                 console.error("Failed to save workflow:", error);
                 // Keep dirty state so user knows save failed
@@ -128,6 +138,10 @@ const useWorkflowSync = (projectId: string | undefined) => {
             isSavingRef.current = false;
         }, SYNC_DEBOUNCE_MS);
     }, [projectId, getContent, setDirty]);
+
+    useEffect(() => {
+        scheduleSaveRef.current = debouncedSave;
+    });
 
     // Auto-save when local state is dirty
     useEffect(() => {
