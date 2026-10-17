@@ -966,7 +966,8 @@ export const compareModels = authQuery
 
         for (const results of resultSets) {
             for (const result of results) {
-                if (!inputs.has(result.caseId as string)) {
+                // A skipped result can carry an empty input: the newest real copy is the one shown.
+                if (result.input && !inputs.has(result.caseId as string)) {
                     inputs.set(result.caseId as string, result.input);
                 }
             }
