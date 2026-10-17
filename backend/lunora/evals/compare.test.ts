@@ -45,11 +45,32 @@ describe("compareModels", () => {
                     updatedAt: 1,
                     userId: USER,
                 });
-                const base = { caseIds: [], costCapMicrodollars: 1, costMicrodollars: 0, datasetId: dataset, datasetKind: "agent", judgeEnabled: true, nextIndex: 0, userId: USER };
-                const old = await context.db.insert("evalRuns", { ...base, createdAt: 1, status: "completed", target: { kind: "model", model: "old-model" }, updatedAt: 1 });
+                const base = {
+                    caseIds: [],
+                    costCapMicrodollars: 1,
+                    costMicrodollars: 0,
+                    datasetId: dataset,
+                    datasetKind: "agent",
+                    judgeEnabled: true,
+                    nextIndex: 0,
+                    userId: USER,
+                };
+                const old = await context.db.insert("evalRuns", {
+                    ...base,
+                    createdAt: 1,
+                    status: "completed",
+                    target: { kind: "model", model: "old-model" },
+                    updatedAt: 1,
+                });
 
                 for (let index = 0; index < 550; index += 1) {
-                    await context.db.insert("evalRuns", { ...base, createdAt: 100 + index, status: "completed", target: { kind: "model", model: "new-model" }, updatedAt: 1 });
+                    await context.db.insert("evalRuns", {
+                        ...base,
+                        createdAt: 100 + index,
+                        status: "completed",
+                        target: { kind: "model", model: "new-model" },
+                        updatedAt: 1,
+                    });
                 }
 
                 return { datasetId: dataset, oldRunId: old };
