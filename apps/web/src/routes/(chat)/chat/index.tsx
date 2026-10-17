@@ -86,11 +86,14 @@ const ChatPage = () => {
             return;
         }
 
-        // The user has started on the blank chat (focus is in its composer): a redirect would discard that draft.
+        // The composer autofocuses on a blank chat, so focus alone is not typing: a redirect would only discard a
+        // draft that has text in it.
         const focused = document.activeElement;
-        const typing = focused instanceof HTMLElement && (focused.isContentEditable || focused.tagName === "TEXTAREA" || focused.tagName === "INPUT");
+        const hasDraft =
+            ((focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement) && focused.value.trim() !== "") ||
+            (focused instanceof HTMLElement && focused.isContentEditable && (focused.textContent ?? "").trim() !== "");
 
-        if (typing) {
+        if (hasDraft) {
             return;
         }
 
