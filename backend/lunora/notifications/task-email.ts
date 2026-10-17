@@ -71,9 +71,12 @@ export const loadRecipientEmail = internalQuery
 
 /** Claims a notification's email. A redelivered action finds it claimed and sends nothing. */
 export const claimOutcomeEmail = internalMutation
-    .input({ notificationId: v.string().max(200) })
+    .input({ notificationId: v.string().max(200), userId: v.string().max(200) })
     .output(v.boolean())
-    .mutation(async ({ args: { notificationId }, ctx }) => await claimOnce(ctx, OUTCOME_EMAIL_SCOPE, notificationId, OUTCOME_EMAIL_CLAIM_TTL_MS));
+    // The owner is recorded, so account deletion clears the claim with the rest of the user's rows.
+    .mutation(
+        async ({ args: { notificationId, userId }, ctx }) => await claimOnce(ctx, OUTCOME_EMAIL_SCOPE, notificationId, OUTCOME_EMAIL_CLAIM_TTL_MS, userId),
+    );
 
 /** Gives the claim back when the send failed, so a redelivered action can try again. */
 export const releaseOutcomeEmail = internalMutation
@@ -89,7 +92,7 @@ export const sendTaskOutcomeEmail = internalAction
     .input({ link: v.string().max(500), notificationId: v.string().max(200), title: v.string().max(200), userId: v.string().max(200) })
     .output(v.null())
     .action(async ({ args: { link, notificationId, title, userId }, ctx }) => {
-        const claimed = await ctx.runMutation(internal.notifications.task_email.claimOutcomeEmail, { notificationId });
+        const claimed = await ctx.runMutation(internal.notifications.task_email.claimOutcomeEmail, { notificationId, userId });
 
         if (!claimed) {
             return null;

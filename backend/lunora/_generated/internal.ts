@@ -761,7 +761,7 @@ export interface InternalApiTypes {
             sendPushForNotification: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
         };
         task_email: {
-            claimOutcomeEmail: FunctionReference<"mutation", { notificationId: string }, boolean>;
+            claimOutcomeEmail: FunctionReference<"mutation", { notificationId: string; userId: string }, boolean>;
             loadRecipientEmail: FunctionReference<"query", { userId: string }, string | null>;
             releaseOutcomeEmail: FunctionReference<"mutation", { notificationId: string }, null>;
             sendTaskOutcomeEmail: FunctionReference<"action", { link: string; notificationId: string; title: string; userId: string }, null>;

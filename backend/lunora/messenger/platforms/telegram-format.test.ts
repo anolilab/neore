@@ -159,3 +159,14 @@ describe("blank lines between blocks", () => {
         expect(chunk?.html).toBe("first\n\n\nsecond");
     });
 });
+
+describe("a cut line's middle", () => {
+    it("does not read a piece's leading '#' as a heading", () => {
+        const line = `${"word ".repeat(40)}# not a heading ${"word ".repeat(40)}`;
+        const chunks = formatTelegramMessage(line, 120);
+        const text = chunks.map((chunk) => chunk.source).join("");
+
+        expect(text).toContain("# not a heading");
+        expect(chunks.every((chunk) => !chunk.html.includes("<b># "))).toBe(true);
+    });
+});

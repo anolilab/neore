@@ -981,7 +981,8 @@ export const compareModels = authQuery
                 return {
                     caseId: caseId as Id<"evalCases">,
                     frozen: evalCase?.frozen ?? false,
-                    input: evalCase?.input ?? inputs.get(caseId) ?? "",
+                    // The input a run was scored against is the one shown; the current text is only a fallback.
+                    input: inputs.get(caseId) ?? evalCase?.input ?? "",
                     results: runs.map((run, index) => {
                         const result = outcomes[index]?.get(caseId);
 

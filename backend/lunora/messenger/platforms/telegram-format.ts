@@ -272,8 +272,11 @@ const splitBlock = (block: Block, limit: number): Piece[] => {
             const parts = splitLossless(line, Math.floor(limit / 6), !block.code);
 
             parts.forEach((part, index) => {
-                // The parts of one line are the same line: they join with nothing.
-                pieces.push({ ...renderBlock(block, [part]), joinWith: index === 0 ? joinWith : "" });
+                // Only the first part starts the line, so only it can read as a heading or bullet;
+                // the rest are the middle of the line. The parts of one line join with nothing.
+                const rendered = index === 0 || block.code ? renderBlock(block, [part]) : { html: inline(part), source: part };
+
+                pieces.push({ ...rendered, joinWith: index === 0 ? joinWith : "" });
             });
             joinWith = "\n";
         } else {

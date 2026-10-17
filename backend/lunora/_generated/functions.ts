@@ -6656,7 +6656,9 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["notificationId"] !== "string") return DEFER;
 if (source["notificationId"].length > 200) return DEFER;
-return { "notificationId": source["notificationId"] };
+if (typeof source["userId"] !== "string") return DEFER;
+if (source["userId"].length > 200) return DEFER;
+return { "notificationId": source["notificationId"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_notifications_task_email_127.loadRecipientEmail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9132,7 +9134,7 @@ export interface Caller {
             unsubscribePush: (args: { endpoint: string }) => Promise<null>;
         };
         task_email: {
-            claimOutcomeEmail: (args: { notificationId: string }) => Promise<boolean>;
+            claimOutcomeEmail: (args: { notificationId: string; userId: string }) => Promise<boolean>;
             loadRecipientEmail: (args: { userId: string }) => Promise<string | null>;
             releaseOutcomeEmail: (args: { notificationId: string }) => Promise<null>;
             sendTaskOutcomeEmail: (args: { link: string; notificationId: string; title: string; userId: string }) => Promise<null>;
