@@ -103,7 +103,9 @@ const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
         const controller = new AbortController();
 
         // A deadline as well as the unmount abort: a stalled signed URL must not hold the preview forever.
-        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(PPTX_FETCH_TIMEOUT_MS)]);
+        // AbortSignal.any is missing on older browsers; there the unmount abort alone still applies.
+        const deadline = AbortSignal.timeout(PPTX_FETCH_TIMEOUT_MS);
+        const signal = typeof AbortSignal.any === "function" ? AbortSignal.any([controller.signal, deadline]) : controller.signal;
 
         fetch(url, { signal })
             .then((response) => {

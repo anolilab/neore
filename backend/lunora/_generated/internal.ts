@@ -763,6 +763,7 @@ export interface InternalApiTypes {
         task_email: {
             claimOutcomeEmail: FunctionReference<"mutation", { notificationId: string }, boolean>;
             loadRecipientEmail: FunctionReference<"query", { userId: string }, string | null>;
+            releaseOutcomeEmail: FunctionReference<"mutation", { notificationId: string }, null>;
             sendTaskOutcomeEmail: FunctionReference<"action", { link: string; notificationId: string; title: string; userId: string }, null>;
         };
     };
@@ -1706,6 +1707,7 @@ export const internal: InternalApiTypes = {
         task_email: {
             claimOutcomeEmail: { __lunoraRef: "notifications_task_email:claimOutcomeEmail" },
             loadRecipientEmail: { __lunoraRef: "notifications_task_email:loadRecipientEmail" },
+            releaseOutcomeEmail: { __lunoraRef: "notifications_task_email:releaseOutcomeEmail" },
             sendTaskOutcomeEmail: { __lunoraRef: "notifications_task_email:sendTaskOutcomeEmail" },
         },
     },

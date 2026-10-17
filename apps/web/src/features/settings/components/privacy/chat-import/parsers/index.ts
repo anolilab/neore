@@ -74,15 +74,13 @@ const detectProvider = (data: unknown): ImportProvider => {
             }
         }
 
-        // Local transcripts: JSONL events, matched on any of the first few records
-        // (the leading ones can be bookkeeping lines, e.g. snapshots of a resumed session)
-        const head = data.slice(0, 200);
-
-        if (head.some((record) => isClaudeCodeRecord(record))) {
+        // Local transcripts: JSONL events. Matched on any record: a resumed session can open with
+        // a long run of bookkeeping lines, and the check is a cheap property test per record.
+        if (data.some((record) => isClaudeCodeRecord(record))) {
             return "claude-code";
         }
 
-        if (head.some((record) => isCodexRecord(record))) {
+        if (data.some((record) => isCodexRecord(record))) {
             return "codex";
         }
     }

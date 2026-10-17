@@ -17,7 +17,7 @@ import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, rateLimit } from "../lib/crpc";
-import { claimOnce } from "../lib/claim-once";
+import { claimOnce, releaseClaim } from "../lib/claim-once";
 
 const OUTCOME_EMAIL_SCOPE = "outcome-email";
 /** Well past any redelivery window of the jobs queue. */
@@ -75,6 +75,16 @@ export const claimOutcomeEmail = internalMutation
     .output(v.boolean())
     .mutation(async ({ args: { notificationId }, ctx }) => await claimOnce(ctx, OUTCOME_EMAIL_SCOPE, notificationId, OUTCOME_EMAIL_CLAIM_TTL_MS));
 
+/** Gives the claim back when the send failed, so a redelivered action can try again. */
+export const releaseOutcomeEmail = internalMutation
+    .input({ notificationId: v.string().max(200) })
+    .output(v.null())
+    .mutation(async ({ args: { notificationId }, ctx }) => {
+        await releaseClaim(ctx, OUTCOME_EMAIL_SCOPE, notificationId);
+
+        return null;
+    });
+
 export const sendTaskOutcomeEmail = internalAction
     .input({ link: v.string().max(500), notificationId: v.string().max(200), title: v.string().max(200), userId: v.string().max(200) })
     .output(v.null())
@@ -91,10 +101,17 @@ export const sendTaskOutcomeEmail = internalAction
             return null;
         }
 
-        const { default: TaskOutcomeEmail } = await import("../email/templates/task-outcome");
-        const subject = `${title.replaceAll(/\s+/g, " ")} has finished`;
+        try {
+            const { default: TaskOutcomeEmail } = await import("../email/templates/task-outcome");
+            const subject = `${title.replaceAll(/\s+/g, " ")} has finished`;
 
-        await queueEmail({ react: TaskOutcomeEmail({ title, url: new URL(link, SITE_URL).href }), subject, to });
+            await queueEmail({ react: TaskOutcomeEmail({ title, url: new URL(link, SITE_URL).href }), subject, to });
+        } catch (error) {
+            // Not sent: give the claim back so the redelivered action can send it.
+            await ctx.runMutation(internal.notifications.task_email.releaseOutcomeEmail, { notificationId });
+
+            throw error;
+        }
 
         return null;
     });

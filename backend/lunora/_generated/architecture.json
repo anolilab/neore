@@ -4656,6 +4656,11 @@
       "to": "function:notifications_task_email:loadRecipientEmail"
     },
     {
+      "from": "function:notifications_task_email:sendTaskOutcomeEmail",
+      "kind": "call",
+      "to": "function:notifications_task_email:releaseOutcomeEmail"
+    },
+    {
       "from": "function:pages_agent:proposePageEdit",
       "kind": "call",
       "to": "function:pages_agent:getPageForAgent"
@@ -12006,6 +12011,13 @@
       "id": "function:notifications_task_email:loadRecipientEmail",
       "kind": "function",
       "name": "notifications.task_email.loadRecipientEmail",
+      "module": "notifications"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:notifications_task_email:releaseOutcomeEmail",
+      "kind": "function",
+      "name": "notifications.task_email.releaseOutcomeEmail",
       "module": "notifications"
     },
     {
