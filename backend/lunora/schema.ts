@@ -785,6 +785,8 @@ export const schema = defineSchema({
         expectedAnswer: v.optional(v.string()),
         // Knowledge file NAMES the answer should be retrieved from (RAG datasets).
         expectedSources: v.array(v.string()),
+        // A frozen case is a known-bad one kept as a regression check; `deleteCase` refuses it.
+        frozen: v.optional(v.boolean()),
         input: v.string(),
         rubric: v.optional(v.string()),
         source: v.union(v.literal("manual"), v.literal("import"), v.literal("chat")),

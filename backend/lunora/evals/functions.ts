@@ -53,6 +53,8 @@ import { MAX_LENGTH } from "../lib/validators";
 /** Runs listed per dataset, newest first. */
 const MAX_RUNS_LISTED = 50;
 
+const MAX_COMPARED_MODELS = 6;
+
 /** Knowledge files one run may be restricted to. */
 const MAX_TARGET_FILES = 50;
 
@@ -80,6 +82,7 @@ const vCaseRow = v.object({
     createdAt: v.number(),
     expectedAnswer: v.union(v.string(), v.null()),
     expectedSources: v.array(v.string()),
+    frozen: v.boolean(),
     input: v.string(),
     rubric: v.union(v.string(), v.null()),
     source: v.union(v.literal("manual"), v.literal("import"), v.literal("chat")),
@@ -155,6 +158,18 @@ const vComparison = v.object({
     improved: v.number(),
     regressed: v.number(),
     unchanged: v.number(),
+});
+
+const vModelComparison = v.object({
+    cases: v.array(
+        v.object({
+            caseId: v.id("evalCases"),
+            frozen: v.boolean(),
+            input: v.string(),
+            results: v.array(v.object({ passed: v.union(v.boolean(), v.null()), runId: v.id("evalRuns"), score: v.union(v.number(), v.null()) })),
+        }),
+    ),
+    runs: v.array(vRunRow),
 });
 
 const vDatasetList = v.array(vDatasetRow);
@@ -398,6 +413,7 @@ export const getDataset = authQuery
                     createdAt: evalCase.createdAt,
                     expectedAnswer: evalCase.expectedAnswer ?? null,
                     expectedSources: evalCase.expectedSources,
+                    frozen: evalCase.frozen ?? false,
                     input: evalCase.input,
                     rubric: evalCase.rubric ?? null,
                     source: evalCase.source,
@@ -613,6 +629,20 @@ export const updateCase = authMutation
         return null;
     });
 
+export const setCaseFrozen = authMutation
+    .use(rateLimit("evals/update"))
+    .input({ caseId: v.id("evalCases"), frozen: v.boolean() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const evalCase = await requireOwnedCase(ctx, args.caseId, ctx.user.userId);
+
+        await patchById(ctx.db, evalCase._id, { frozen: args.frozen, updatedAt: ctx.now });
+
+        ctx.log.event("evals.set_case_frozen", { frozen: args.frozen });
+
+        return null;
+    });
+
 /** Deletes a case. Past runs keep their results; a run in flight records it as skipped. */
 export const deleteCase = authMutation
     .use(rateLimit("evals/delete"))
@@ -620,6 +650,10 @@ export const deleteCase = authMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const evalCase = await requireOwnedCase(ctx, args.caseId, ctx.user.userId);
+
+        if (evalCase.frozen) {
+            throw new LunoraError("CONFLICT", "This case is frozen; unfreeze it before deleting");
+        }
 
         await ctx.db.delete(evalCase._id);
 
@@ -848,5 +882,48 @@ export const compareRuns = authQuery
             improved: comparison.improved,
             regressed: comparison.regressed,
             unchanged: comparison.unchanged,
+        };
+    });
+
+/** The newest finished run of each distinct model on a dataset, with every case's outcome per run. */
+export const compareModels = authQuery
+    .input({ datasetId: v.id("evalDatasets") })
+    .output(v.from(vModelComparison))
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const dataset = await requireOwnedDataset(ctx, args.datasetId, userId);
+        const recent = await ctx.db
+            .query("evalRuns")
+            .withIndex("by_dataset_and_createdAt", (q) => q.eq("datasetId", dataset._id))
+            .order("desc")
+            .take(MAX_RUNS_LISTED);
+        const newestPerModel = new Map<string, Doc<"evalRuns">>();
+
+        for (const run of recent) {
+            const key = run.target.model ?? run.target.kind;
+
+            if (run.userId === userId && (run.status === "completed" || run.status === "cost_capped") && !newestPerModel.has(key)) {
+                newestPerModel.set(key, run);
+            }
+        }
+
+        const runs = [...newestPerModel.values()].slice(0, MAX_COMPARED_MODELS);
+        const [cases, ...resultSets] = await Promise.all([loadCases(ctx, dataset._id), ...runs.map((run) => loadRunResults(ctx, run._id))]);
+        const outcomes = resultSets.map((results) => new Map(results.map((result) => [result.caseId as string, result])));
+
+        return {
+            cases: cases.map((evalCase) => {
+                return {
+                    caseId: evalCase._id,
+                    frozen: evalCase.frozen ?? false,
+                    input: evalCase.input,
+                    results: runs.map((run, index) => {
+                        const result = outcomes[index]?.get(evalCase._id as string);
+
+                        return { passed: result?.passed ?? null, runId: run._id, score: result?.score ?? null };
+                    }),
+                };
+            }),
+            runs: runs.map((run, index) => toRunRow({ ...run, summary: summarize(resultSets[index] ?? [], run.caseIds.length) })),
         };
     });
