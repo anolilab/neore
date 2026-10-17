@@ -140,7 +140,7 @@ export const settleOutcomeEmail = internalMutation
     .input({
         claimedAt: v.number(),
         id: v.id("outcomeEmails"),
-        result: v.union(v.literal("sent"), v.literal("skipped"), v.literal("failed")),
+        result: v.union(v.literal("sent"), v.literal("skipped"), v.literal("failed"), v.literal("deferred")),
     })
     .output(v.null())
     .mutation(async ({ args: { claimedAt, id, result }, ctx }) => {
@@ -151,19 +151,33 @@ export const settleOutcomeEmail = internalMutation
             return null;
         }
 
-        if (result === "skipped") {
-            await ctx.db.delete(id);
-        } else if (result === "sent") {
-            await patchById(ctx.db, id, { claimedAt: undefined, sentAt: Date.now(), status: "sent" });
-        } else {
-            const attempts = row.attempts + 1;
-            const gaveUp = attempts >= OUTCOME_EMAIL_MAX_ATTEMPTS;
-
-            if (gaveUp) {
-                console.warn(`[notifications] Giving up on the outcome email for ${row.notificationId as string} after ${attempts} attempts`);
+        switch (result) {
+            case "deferred": {
+                // Not an attempt: the row waits for its configuration, and no attempt is used up while it does.
+                await patchById(ctx.db, id, { claimedAt: undefined, status: "pending" });
+                break;
             }
 
-            await patchById(ctx.db, id, { attempts, claimedAt: undefined, status: gaveUp ? "failed" : "pending" });
+            case "failed": {
+                const attempts = row.attempts + 1;
+                const gaveUp = attempts >= OUTCOME_EMAIL_MAX_ATTEMPTS;
+
+                if (gaveUp) {
+                    console.warn(`[notifications] Giving up on the outcome email for ${row.notificationId as string} after ${attempts} attempts`);
+                }
+
+                await patchById(ctx.db, id, { attempts, claimedAt: undefined, status: gaveUp ? "failed" : "pending" });
+                break;
+            }
+
+            case "sent": {
+                await patchById(ctx.db, id, { claimedAt: undefined, sentAt: Date.now(), status: "sent" });
+                break;
+            }
+
+            default: {
+                await ctx.db.delete(id);
+            }
         }
 
         return null;
@@ -230,6 +244,7 @@ export const sendPendingOutcomeEmails = internalAction
     .output(v.null())
     .action(async ({ ctx }) => {
         const pending = await ctx.runQuery(internal.notifications.task_email.listPendingOutcomeEmails, {});
+        let progressed = 0;
 
         for (const { id, link, title, userId } of pending) {
             // Another run may have taken this row since it was listed.
@@ -239,14 +254,14 @@ export const sendPendingOutcomeEmails = internalAction
                 continue;
             }
 
-            let result: "failed" | "sent" | "skipped" = "skipped";
+            let result: "deferred" | "failed" | "sent" | "skipped" = "skipped";
 
             try {
                 const to = await ctx.runQuery(internal.notifications.task_email.loadRecipientEmail, { userId });
 
                 // A configuration gap is not a skip: the row stays owed and is retried once the site URL is set.
                 if (to && !SITE_URL) {
-                    result = "failed";
+                    result = "deferred";
                 } else if (to && SITE_URL) {
                     // Narrows the window in which a reclaimed row could be mailed twice to this check and the queue call.
                     if (!(await ctx.runQuery(internal.notifications.task_email.holdsOutcomeEmailClaim, { claimedAt, id }))) {
@@ -265,11 +280,16 @@ export const sendPendingOutcomeEmails = internalAction
             }
 
             await settleWithRetry(async () => await ctx.runMutation(internal.notifications.task_email.settleOutcomeEmail, { claimedAt, id, result }));
+
+            if (result === "sent" || result === "skipped") {
+                progressed += 1;
+            }
         }
 
-        // One batch is at most SEND_BATCH rows; a full batch means more may be waiting, so run again rather than
-        // leave them for the next idle sweep.
-        if (pending.length === SEND_BATCH) {
+        // One batch is at most SEND_BATCH rows. A full batch means more may be waiting, so run again rather than leave
+        // them for the next idle sweep, but only after rows went out or were dropped: a batch of failures would
+        // otherwise be retried back to back and use up its attempts.
+        if (progressed > 0 && pending.length === SEND_BATCH) {
             await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendPendingOutcomeEmails, {});
         }
 

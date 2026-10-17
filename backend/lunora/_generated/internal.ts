@@ -767,7 +767,7 @@ export interface InternalApiTypes {
             listPendingOutcomeEmails: FunctionReference<"query", {}, Array<{ id: Id<"outcomeEmails">; link: string; title: string; userId: string }>>;
             loadRecipientEmail: FunctionReference<"query", { userId: string }, string | null>;
             sendPendingOutcomeEmails: FunctionReference<"action", {}, null>;
-            settleOutcomeEmail: FunctionReference<"mutation", { claimedAt: number; id: Id<"outcomeEmails">; result: "sent" | "skipped" | "failed" }, null>;
+            settleOutcomeEmail: FunctionReference<"mutation", { claimedAt: number; id: Id<"outcomeEmails">; result: "sent" | "skipped" | "failed" | "deferred" }, null>;
         };
     };
     pages: {

@@ -9122,7 +9122,7 @@ export interface Caller {
             loadRecipientEmail: (args: { userId: string }) => Promise<string | null>;
             sendPendingOutcomeEmails: (args?: {}) => Promise<null>;
             setTaskEmailEnabled: (args: { enabled: boolean }) => Promise<null>;
-            settleOutcomeEmail: (args: { claimedAt: number; id: Id<"outcomeEmails">; result: "sent" | "skipped" | "failed" }) => Promise<null>;
+            settleOutcomeEmail: (args: { claimedAt: number; id: Id<"outcomeEmails">; result: "sent" | "skipped" | "failed" | "deferred" }) => Promise<null>;
         };
     };
     pages: {

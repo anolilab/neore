@@ -30,8 +30,17 @@ vi.mock("../email/mailer", () => {
     return { queueEmail };
 });
 
+const { env } = vi.hoisted(() => {
+    return { env: { SITE_URL: "https://app.example" as string | undefined } };
+});
+
 vi.mock("../env", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("../env")>()), SITE_URL: "https://app.example" };
+    return {
+        ...(await importOriginal<typeof import("../env")>()),
+        get SITE_URL() {
+            return env.SITE_URL;
+        },
+    };
 });
 
 vi.mock("../email/templates/task-outcome", () => {
@@ -170,6 +179,21 @@ describe("sweep", () => {
 
         expect(await holds(claimedAt as number)).toBe(true);
         expect(await holds((claimedAt as number) - 1)).toBe(false);
+    });
+
+    it("leaves the row pending without using an attempt while the site URL is not set", async () => {
+        await seedUser();
+        await write();
+        env.SITE_URL = undefined;
+
+        try {
+            await runSend();
+        } finally {
+            env.SITE_URL = "https://app.example";
+        }
+
+        expect(queueEmail).not.toHaveBeenCalled();
+        expect(await firstOutbox()).toMatchObject({ attempts: 0, status: "pending" });
     });
 
     it("keeps the row pending with attempts incremented when the mailer fails, then gives up at the cap", async () => {

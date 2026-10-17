@@ -12,7 +12,7 @@
  * messages (environment and instruction blocks) is skipped.
  */
 import type { InjectedBlock } from "./local-session";
-import { asRecord, buildSession, isInjectedText, messageFromTexts, parseTimestamp } from "./local-session";
+import { asRecord, buildSession, isInjectedText, messageFromTexts, parseTimestamp, withoutInjectedBlocks } from "./local-session";
 import type { NormalizedConversation, NormalizedMessage } from "./types";
 
 const RECORD_TYPES = new Set(["event_msg", "response_item", "session_meta", "turn_context"]);
@@ -49,7 +49,8 @@ const keptTexts = (payload: Record<string, unknown>): string[] => {
     return content
         .map((block) => asRecord(block))
         .flatMap((block) => (block && (block.type === "input_text" || block.type === "output_text") && typeof block.text === "string" ? [block.text] : []))
-        .filter((text) => !isInjectedText(text, INJECTED_BLOCKS));
+        .map((text) => withoutInjectedBlocks(text, INJECTED_BLOCKS))
+        .filter((text) => text.length > 0 && !isInjectedText(text, INJECTED_BLOCKS));
 };
 
 const responseText = (payload: Record<string, unknown>): string => keptTexts(payload).join("\n\n").trim();

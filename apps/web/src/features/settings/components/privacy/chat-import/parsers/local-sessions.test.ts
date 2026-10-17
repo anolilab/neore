@@ -246,6 +246,29 @@ describe("Codex legacy copies keep their timestamps and turn order", () => {
     });
 });
 
+describe("Codex context blocks sharing a text with the prompt", () => {
+    it("drops the closed context block and keeps the prompt that follows it", () => {
+        const rollout = [
+            {
+                payload: {
+                    content: [{ text: "<environment_context>\n  <cwd>/secret/path</cwd>\n</environment_context>\nRefactor the parser", type: "input_text" }],
+                    role: "user",
+                    type: "message",
+                },
+                type: "response_item",
+            },
+            {
+                payload: { content: [{ text: "Done.", type: "output_text" }], role: "assistant", type: "message" },
+                type: "response_item",
+            },
+        ];
+
+        const [conversation] = parseExportFile(rollout, "codex").conversations;
+
+        expect(conversation?.messages.map((message) => message.content)).toEqual(["Refactor the parser", "Done."]);
+    });
+});
+
 describe("injected blocks match only when they are complete", () => {
     it("keeps a prompt that starts with an injected marker but is not wrapped in it", () => {
         const rollout = [

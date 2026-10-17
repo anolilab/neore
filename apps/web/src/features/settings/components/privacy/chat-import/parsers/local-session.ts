@@ -42,6 +42,30 @@ export const isInjectedText = (text: string, blocks: ReadonlyArray<InjectedBlock
 };
 
 /**
+ * The text after the closed injected blocks at its start, so a prompt that follows a context block is kept.
+ * A block that never closes is left in place: it cannot be told apart from the user's own words.
+ */
+export const withoutInjectedBlocks = (text: string, blocks: ReadonlyArray<InjectedBlock>): string => {
+    let rest = text.trim();
+    let stripped = true;
+
+    while (stripped) {
+        stripped = false;
+
+        for (const block of blocks) {
+            const end = block.close === undefined || !rest.startsWith(block.open) ? -1 : rest.indexOf(block.close);
+
+            if (end !== -1 && block.close !== undefined) {
+                rest = rest.slice(end + block.close.length).trim();
+                stripped = true;
+            }
+        }
+    }
+
+    return rest;
+};
+
+/**
  * One message from the text blocks of a record. A record whose joined text is
  * empty or is an injected block (harness or environment boilerplate, not
  * something the user said) yields nothing.
