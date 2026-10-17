@@ -81,7 +81,7 @@ let ts = `/**
 /**
  * Model mode — determines how the model is invoked and what UI is shown.
  */
-export type ModelMode = "text" | "image" | "video" | "speech-to-text" | "text-to-speech";
+export type ModelMode = "text" | "image" | "video" | "music" | "speech-to-text" | "text-to-speech";
 
 /**
  * Gateway model definition — used for routing, UI catalog, and /v1/models endpoint.

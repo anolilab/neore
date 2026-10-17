@@ -16,6 +16,7 @@ import type { VideoNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { toBaseOption } from "../../utils/model-options";
 import BaseNode from "./base-node";
+import { VideoFramesSection } from "./video-frames-section";
 
 const ASPECT_RATIOS: { label: MessageDescriptor; value: string }[] = [
     { label: msg`16:9 (Landscape)`, value: "16:9" },
@@ -234,6 +235,8 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                         </Select>
                     </div>
                 </div>
+
+                <VideoFramesSection frameFileIds={data.frameFileIds} nodeId={id} pickedTime={data.pickedTime} />
             </div>
         </BaseNode>
     );

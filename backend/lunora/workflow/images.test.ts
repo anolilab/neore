@@ -52,6 +52,18 @@ describe("workflowImageFileIds", () => {
         expect(workflowImageFileIds(undefined)).toStrictEqual([]);
         expect(workflowImageFileIds({ nodes: "nope" })).toStrictEqual([]);
     });
+
+    it("includes the frames a video node captured, skipping unset ones", () => {
+        const captured = {
+            nodes: [
+                { data: { frameFileIds: { end: "e", picked: undefined, start: "s" } } },
+                { data: { frameFileIds: { start: "s" }, imageFileId: "a" } },
+                { data: { frameFileIds: "nope" } },
+            ],
+        };
+
+        expect(workflowImageFileIds(captured)).toStrictEqual(["e", "s", "a"]);
+    });
 });
 
 describe("countedWorkflowImageIds", () => {

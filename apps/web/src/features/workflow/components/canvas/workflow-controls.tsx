@@ -25,9 +25,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { alignSelectedNodes, applyAutoLayout, distributeSelectedNodes } from "../../hooks/use-workflow-shortcuts";
+import { alignSelectedNodes, applyAutoLayout, arrangeSelectedNodes, distributeSelectedNodes } from "../../hooks/use-workflow-shortcuts";
+import { useWorkflowTransfer } from "../../hooks/use-workflow-transfer";
 import { useWorkflowStore } from "../../stores/workflow-store";
-import type { WorkflowContent } from "../../types";
+import { layoutSelection } from "../../utils/auto-layout";
 import type { ValidationError } from "../../utils/validate-workflow";
 import { detectCycles, validateNodes } from "../../utils/validate-workflow";
 import PromptToWorkflowDialog from "../prompt-to-workflow-dialog";
@@ -73,53 +74,27 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
     const groupNodes = useWorkflowStore((state) => state.groupNodes);
     const deleteNode = useWorkflowStore((state) => state.deleteNode);
     const duplicateNode = useWorkflowStore((state) => state.duplicateNode);
-    const loadContent = useWorkflowStore((state) => state.loadContent);
-    const getContent = useWorkflowStore((state) => state.getContent);
     const importFileRef = useRef<HTMLInputElement>(null);
     const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
     const selectNode = useWorkflowStore((state) => state.selectNode);
+    const { exportWorkflow, importWorkflow, isTransferring } = useWorkflowTransfer();
 
-    // F8: Export workflow as JSON
-    const handleExport = useCallback(() => {
-        const content = getContent();
-        const json = JSON.stringify(content, null, 2);
-        const blob = new Blob([json], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+    const handleImportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const input = e.target;
+        const file = input.files?.[0];
 
-        a.href = url;
-        a.download = "workflow.json";
-        a.click();
-        URL.revokeObjectURL(url);
-    }, [getContent]);
+        if (!file) return;
 
-    // F8: Import workflow from JSON
-    const handleImport = useCallback(
-        async (e: React.ChangeEvent<HTMLInputElement>) => {
-            const input = e.target;
-            const file = input.files?.[0];
-
-            if (!file) return;
-
-            // Reset the input first so re-picking the same file fires onChange again.
-            input.value = "";
-
-            try {
-                const content = JSON.parse(await file.text()) as WorkflowContent;
-
-                if (content.nodes && content.edges) {
-                    loadContent(content);
-                }
-            } catch {
-                // Invalid JSON — silently ignore
-            }
-        },
-        [loadContent],
-    );
+        // Reset the input first so re-picking the same file fires onChange again.
+        input.value = "";
+        void importWorkflow(file);
+    };
 
     // Use a count (primitive) so this selector never returns a new reference and
     // only triggers a re-render when the actual count changes.
     const selectedNonGroupCount = useWorkflowStore((state) => state.nodes.filter((n) => n.selected && n.type !== "group").length);
+    // Align, distribute and arrange move only what layoutSelection returns (no groups, no grouped children).
+    const layoutCount = useWorkflowStore((state) => layoutSelection(state.nodes).length);
     const hasMultipleSelected = selectedNonGroupCount >= 2;
     const hasSelected = selectedNonGroupCount >= 1;
 
@@ -328,32 +303,46 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                 <PromptToWorkflowDialog />
 
                 {/* Export / Import */}
-                <input accept=".json" className="hidden" onChange={handleImport} ref={importFileRef} type="file" />
+                <input accept=".json,.zip,application/zip" className="hidden" onChange={handleImportChange} ref={importFileRef} type="file" />
                 <Tooltip>
                     <TooltipTrigger
                         render={
-                            <Button className="size-8" onClick={() => importFileRef.current?.click()} size="icon" variant="ghost">
+                            <Button
+                                aria-label={t`Import workflow`}
+                                className="size-8"
+                                disabled={isTransferring}
+                                onClick={() => importFileRef.current?.click()}
+                                size="icon"
+                                variant="ghost"
+                            >
                                 <Upload aria-hidden="true" className="size-4" />
                             </Button>
                         }
                     />
                     <TooltipContent>
                         <p>
-                            <Trans>Import workflow (JSON)</Trans>
+                            <Trans>Import workflow (ZIP or JSON)</Trans>
                         </p>
                     </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger
                         render={
-                            <Button className="size-8" onClick={handleExport} size="icon" variant="ghost">
+                            <Button
+                                aria-label={t`Export workflow`}
+                                className="size-8"
+                                disabled={isTransferring}
+                                onClick={exportWorkflow}
+                                size="icon"
+                                variant="ghost"
+                            >
                                 <Download aria-hidden="true" className="size-4" />
                             </Button>
                         }
                     />
                     <TooltipContent>
                         <p>
-                            <Trans>Export workflow (JSON)</Trans>
+                            <Trans>Export workflow (ZIP)</Trans>
                         </p>
                     </TooltipContent>
                 </Tooltip>
@@ -471,40 +460,44 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                                     </TooltipContent>
                                 </Tooltip>
 
-                                {/* Align horizontal */}
-                                <Tooltip>
-                                    <TooltipTrigger
-                                        render={
-                                            <Button className="size-8" onClick={() => alignSelectedNodes("horizontal")} size="icon" variant="ghost">
-                                                <AlignHorizontalDistributeCenter className="size-4" />
-                                            </Button>
-                                        }
-                                    />
-                                    <TooltipContent>
-                                        <p>
-                                            <Trans>Align horizontally (H)</Trans>
-                                        </p>
-                                    </TooltipContent>
-                                </Tooltip>
+                                {layoutCount >= 2 && (
+                                    <>
+                                        {/* Align horizontal */}
+                                        <Tooltip>
+                                            <TooltipTrigger
+                                                render={
+                                                    <Button className="size-8" onClick={() => alignSelectedNodes("horizontal")} size="icon" variant="ghost">
+                                                        <AlignHorizontalDistributeCenter className="size-4" />
+                                                    </Button>
+                                                }
+                                            />
+                                            <TooltipContent>
+                                                <p>
+                                                    <Trans>Align horizontally (H)</Trans>
+                                                </p>
+                                            </TooltipContent>
+                                        </Tooltip>
 
-                                {/* Align vertical */}
-                                <Tooltip>
-                                    <TooltipTrigger
-                                        render={
-                                            <Button className="size-8" onClick={() => alignSelectedNodes("vertical")} size="icon" variant="ghost">
-                                                <AlignVerticalDistributeCenter className="size-4" />
-                                            </Button>
-                                        }
-                                    />
-                                    <TooltipContent>
-                                        <p>
-                                            <Trans>Align vertically (V)</Trans>
-                                        </p>
-                                    </TooltipContent>
-                                </Tooltip>
+                                        {/* Align vertical */}
+                                        <Tooltip>
+                                            <TooltipTrigger
+                                                render={
+                                                    <Button className="size-8" onClick={() => alignSelectedNodes("vertical")} size="icon" variant="ghost">
+                                                        <AlignVerticalDistributeCenter className="size-4" />
+                                                    </Button>
+                                                }
+                                            />
+                                            <TooltipContent>
+                                                <p>
+                                                    <Trans>Align vertically (V)</Trans>
+                                                </p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </>
+                                )}
 
                                 {/* Distribute */}
-                                {selectedNonGroupCount >= 3 && (
+                                {layoutCount >= 3 && (
                                     <Tooltip>
                                         <TooltipTrigger
                                             render={
@@ -516,6 +509,30 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                                         <TooltipContent>
                                             <p>
                                                 <Trans>Distribute evenly (D)</Trans>
+                                            </p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
+
+                                {/* Arrange in a grid */}
+                                {layoutCount >= 2 && (
+                                    <Tooltip>
+                                        <TooltipTrigger
+                                            render={
+                                                <Button
+                                                    aria-label={t`Arrange selection in a grid`}
+                                                    className="size-8"
+                                                    onClick={() => arrangeSelectedNodes()}
+                                                    size="icon"
+                                                    variant="ghost"
+                                                >
+                                                    <LayoutGrid aria-hidden="true" className="size-4" />
+                                                </Button>
+                                            }
+                                        />
+                                        <TooltipContent>
+                                            <p>
+                                                <Trans>Arrange selection in a grid (G)</Trans>
                                             </p>
                                         </TooltipContent>
                                     </Tooltip>

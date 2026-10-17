@@ -1,7 +1,7 @@
 /**
  * Build the FAL input fragment for the supplied reference image URLs.
  *
- * Mirrors `backend/lunora/chat/lib/reference-image-mapping.ts` — the FAL endpoints
+ * Mirrors `backend/lunora/chat/lib/fal-reference-mapping.ts` — the FAL endpoints
  * accept `image_url: string` (single-ref) and additionally `image_urls: string[]`
  * for multi-ref-capable models (Nano-Banana, FLUX Redux). Single-ref-only
  * endpoints ignore extras, so we conservatively send both fields when the cap

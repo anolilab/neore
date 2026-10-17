@@ -17,12 +17,12 @@ import { insertChatFileAccess } from "../agent/table-writes";
 import { displayUrlExpiresInSeconds } from "../lib/storage-ref";
 
 interface ImageNode {
-    data?: { imageFileId?: unknown; imageUrl?: unknown };
+    data?: { frameFileIds?: unknown; imageFileId?: unknown; imageUrl?: unknown };
 }
 
 type Database = Pick<QueryCtx, "db">["db"];
 
-/** The distinct `imageFileId` values on a workflow's nodes. */
+/** The distinct stored-file ids on a workflow's nodes: image files and the frames a video node captured. */
 export const workflowImageFileIds = (content: unknown): Id<"chatFiles">[] => {
     const nodes = (content as { nodes?: unknown } | null | undefined)?.nodes;
 
@@ -30,9 +30,13 @@ export const workflowImageFileIds = (content: unknown): Id<"chatFiles">[] => {
         return [];
     }
 
-    return [
-        ...new Set((nodes as ImageNode[]).map((node) => node?.data?.imageFileId).filter((id): id is string => typeof id === "string")),
-    ] as Id<"chatFiles">[];
+    const ids = (nodes as ImageNode[]).flatMap((node) => {
+        const frames = node?.data?.frameFileIds;
+
+        return [node?.data?.imageFileId, ...(typeof frames === "object" && frames !== null ? Object.values(frames) : [])];
+    });
+
+    return [...new Set(ids.filter((id): id is string => typeof id === "string"))] as Id<"chatFiles">[];
 };
 
 /** The existing chat files among `fileIds` that `ownerId` holds a grant for: two reads. */

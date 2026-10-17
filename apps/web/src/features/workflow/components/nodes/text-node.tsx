@@ -1,7 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
-import { Textarea } from "@ui/components/textarea";
 import type { TiptapEditorRef } from "@ui/components/tiptap-editor";
 import { TiptapEditorMinimal } from "@ui/components/tiptap-editor";
 import type { Node, NodeProps } from "@xyflow/react";
@@ -11,6 +10,7 @@ import { memo, useRef } from "react";
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { TextNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
+import MentionPromptField from "../mention-prompt-field";
 import BaseNode from "./base-node";
 
 const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
@@ -55,11 +55,11 @@ const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
                     </Select>
                 </div>
 
-                <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-content`}>
-                        {data.mode === "input" ? <Trans>Text Content</Trans> : <Trans>Template</Trans>}
-                    </Label>
-                    {data.mode === "input" ? (
+                {data.mode === "input" ? (
+                    <div className="space-y-1.5">
+                        <Label className="text-muted-foreground text-xs">
+                            <Trans>Text Content</Trans>
+                        </Label>
                         <div className="nodrag">
                             <TiptapEditorMinimal
                                 className="min-h-[80px] text-sm"
@@ -70,17 +70,18 @@ const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
                                 ref={editorRef}
                             />
                         </div>
-                    ) : (
-                        <Textarea
-                            className="nodrag min-h-[80px] resize-none font-mono text-sm"
-                            id={`${id}-content`}
-                            onChange={(e) => updateNode(id, { template: e.target.value })}
-                            placeholder={t`Use ${templateVariable} for variables from connected nodes...`}
-                            rows={3}
-                            value={data.template ?? data.content ?? ""}
-                        />
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <MentionPromptField
+                        height="96px"
+                        hint={<Trans>Type @ to insert the output of a connected text node</Trans>}
+                        label={<Trans>Template</Trans>}
+                        nodeId={id}
+                        onChange={(value) => updateNode(id, { template: value })}
+                        placeholder={t`Use ${templateVariable} for variables from connected nodes...`}
+                        value={data.template ?? data.content ?? ""}
+                    />
+                )}
             </div>
         </BaseNode>
     );

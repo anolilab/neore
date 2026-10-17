@@ -14,6 +14,7 @@ import type { ImageToVideoNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { toBaseOption } from "../../utils/model-options";
 import BaseNode from "./base-node";
+import { VideoFramesSection } from "./video-frames-section";
 
 const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
     const { data, id } = props;
@@ -169,6 +170,8 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
                 <div className="text-muted-foreground bg-muted/50 rounded p-2 text-xs">
                     <Trans>Connect an image node as input</Trans>
                 </div>
+
+                <VideoFramesSection frameFileIds={data.frameFileIds} nodeId={id} pickedTime={data.pickedTime} />
             </div>
         </BaseNode>
     );

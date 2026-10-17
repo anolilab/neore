@@ -2679,6 +2679,53 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         tier: "frontier",
     },
     {
+        // The gateway forwards `size` unrestricted and fal always runs at high quality, so price the largest
+        // documented tier (fal pricing table: $0.401 at 3840x2160). Smaller sizes are over-billed, not under-billed.
+        costPerImageMicrodollars: 401_000,
+        desc: "OpenAI's GPT Image 2 text-to-image model",
+        displayProvider: "OpenAI",
+        enabled: true,
+        gatewayKey: "fal/gpt-image-2",
+        id: "fal/gpt-image-2",
+        listed: true,
+        mode: "image",
+        modelApiId: "openai/gpt-image-2",
+        name: "GPT Image 2",
+        provider: "fal",
+        slug: "gpt-image-2",
+        tier: "frontier",
+    },
+    {
+        // Default image_size is auto_2K, which lands in the $0.135 tier (fal pricing: up to 2048x2048).
+        costPerImageMicrodollars: 135_000,
+        desc: "ByteDance's Seedream 5.0 Pro text-to-image model, up to 2K output",
+        displayProvider: "ByteDance",
+        enabled: true,
+        gatewayKey: "fal/seedream-5-pro",
+        id: "fal/seedream-5-pro",
+        listed: true,
+        mode: "image",
+        modelApiId: "bytedance/seedream/v5/pro/text-to-image",
+        name: "Seedream 5.0 Pro",
+        provider: "fal",
+        slug: "seedream-5-pro",
+        tier: "frontier",
+    },
+    {
+        // Token-priced on fal (no per-image price), so no gatewayKey or cost: the gateway catalog cannot list it.
+        desc: "Speed tier of Nano Banana 2 for fast text-to-image generation",
+        displayProvider: "Google",
+        enabled: true,
+        id: "fal/nano-banana-2-lite",
+        listed: true,
+        mode: "image",
+        modelApiId: "google/nano-banana-2-lite",
+        name: "Nano Banana 2 Lite",
+        provider: "fal",
+        slug: "nano-banana-2-lite",
+        tier: "fast",
+    },
+    {
         aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "2:3", "3:2"],
         avgLatencyMs: 5000,
         costPerImageMicrodollars: 40_000,
@@ -2840,9 +2887,12 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         filterCapabilities: ["image_to_video"],
         id: "fal-ai/bytedance/seedance-2.0/reference-to-video",
         isPremium: true,
+        maxReferenceAudios: 3,
+        maxReferenceImages: 4,
+        maxReferenceVideos: 3,
         maxVideoDuration: 10,
         mode: "video",
-        modelApiId: "fal-ai/bytedance/seedance-2.0/reference-to-video",
+        modelApiId: "bytedance/seedance-2.0/reference-to-video",
         provider: "fal",
         supportedFps: [24, 30],
         supportsImageToVideo: true,
@@ -2852,11 +2902,42 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         enabled: true,
         filterCapabilities: ["image_to_video"],
         id: "fal-ai/bytedance/seedance-2.0/fast/reference-to-video",
+        maxReferenceAudios: 3,
+        maxReferenceImages: 4,
+        maxReferenceVideos: 3,
         maxVideoDuration: 10,
         mode: "video",
-        modelApiId: "fal-ai/bytedance/seedance-2.0/fast/reference-to-video",
+        modelApiId: "bytedance/seedance-2.0/fast/reference-to-video",
         provider: "fal",
         supportedFps: [24, 30],
+        supportsImageToVideo: true,
+    },
+    {
+        aspectRatios: ["16:9", "9:16"],
+        desc: "Google's Gemini Omni Flash 1.1 reference-to-video, guided by images and short reference videos",
+        displayProvider: "Google",
+        enabled: true,
+        filterCapabilities: ["text_to_video", "image_to_video"],
+        id: "fal/gemini-omni-flash-1-1-reference",
+        maxReferenceImages: 4,
+        maxReferenceVideos: 3,
+        maxVideoDuration: 10,
+        mode: "video",
+        modelApiId: "google/gemini-omni-flash/v1.1/reference-to-video",
+        provider: "fal",
+        supportsImageToVideo: true,
+        supportsTextToVideo: true,
+    },
+    {
+        desc: "xAI's Grok Imagine 1.5 image-to-video model",
+        displayProvider: "xAI",
+        enabled: true,
+        filterCapabilities: ["image_to_video"],
+        id: "fal/grok-imagine-video-1-5",
+        maxVideoDuration: 15,
+        mode: "video",
+        modelApiId: "xai/grok-imagine-video/v1.5/image-to-video",
+        provider: "fal",
         supportsImageToVideo: true,
     },
     {
@@ -5409,6 +5490,17 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         tier: "medium",
     },
 ];
+
+/**
+ * The most reference media any registry model takes, per kind. Every site that caps a reference
+ * list (the backend actions, the gateway request schema, the workflow nodes) reads these, so a
+ * new model with a larger cap moves them all at once.
+ */
+export const REFERENCE_MEDIA_CAPS = {
+    audios: Math.max(0, ...MODEL_REGISTRY.map((model) => model.maxReferenceAudios ?? 0)),
+    images: Math.max(0, ...MODEL_REGISTRY.map((model) => model.maxReferenceImages ?? 0)),
+    videos: Math.max(0, ...MODEL_REGISTRY.map((model) => model.maxReferenceVideos ?? 0)),
+} as const;
 
 // ── Public API ────────────────────────────────────────────────────────────────
 

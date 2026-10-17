@@ -40,6 +40,7 @@ const SHORTCUT_GROUPS: { label: MessageDescriptor; shortcuts: Shortcut[] }[] = [
             { description: msg`Paste`, keys: `${modifierKey}+V` },
             { description: msg`Select all`, keys: `${modifierKey}+A` },
             { description: msg`Delete selected`, keys: "Delete / Backspace" },
+            { description: msg`Cut the edges a line crosses`, keys: isMac ? "\u{2325} / Ctrl + drag" : "Alt / Ctrl + drag" },
         ],
     },
     {
@@ -49,6 +50,7 @@ const SHORTCUT_GROUPS: { label: MessageDescriptor; shortcuts: Shortcut[] }[] = [
             { description: msg`Align horizontally`, keys: "H" },
             { description: msg`Align vertically`, keys: "V" },
             { description: msg`Distribute evenly`, keys: "D" },
+            { description: msg`Arrange selection in a grid`, keys: "G" },
             { description: msg`Fit view`, keys: "F" },
             { description: msg`Auto-layout`, keys: "L" },
         ],

@@ -24,3 +24,4 @@ export {
 export type { PresenceUser } from "./use-workflow-presence";
 export { default as useWorkflowPresence } from "./use-workflow-presence";
 export { default as useWorkflowSync } from "./use-workflow-sync";
+export { useWorkflowTransfer } from "./use-workflow-transfer";

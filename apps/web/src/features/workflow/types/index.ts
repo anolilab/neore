@@ -1,5 +1,6 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
+import type { FrameKind } from "@neore/backend/workflow/mentions";
 import type { Edge, Node, Viewport } from "@xyflow/react";
 
 // Node type identifiers
@@ -149,14 +150,25 @@ export interface ParallelCompareNodeData extends BaseNodeData {
     showLabels?: boolean; // Show model names on results
 }
 
+/** A frame of a video node's clip, exposed as the source handle `frame-<kind>`. The backend owns the type. */
+export type { FrameKind } from "@neore/backend/workflow/mentions";
+
+/**
+ * Frames captured from a video node's output, as `chatFiles` ids (a PNG each). The
+ * backend reads these when a frame handle is wired into another node.
+ */
+export type VideoFrameFileIds = Partial<Record<FrameKind, string>>;
+
 // Video node - generate videos from text/image
 export interface VideoNodeData extends BaseNodeData {
     aspectRatio?: string; // 16:9, 9:16, 1:1, etc.
     duration?: number; // 1-10 seconds
     fps?: number; // Frames per second (24, 30, 60)
+    frameFileIds?: VideoFrameFileIds; // Captured start/end/picked frames
     mode: "text-to-video" | "image-to-video";
     model?: string; // fal:mochi-v1, fal:minimax-video, fal:kling-video
     motionStrength?: number; // 0-1, how much motion in the video
+    pickedTime?: number; // Seconds into the clip for the picked frame
     prompt?: string;
 }
 
@@ -164,9 +176,11 @@ export interface VideoNodeData extends BaseNodeData {
 export interface ImageToVideoNodeData extends BaseNodeData {
     duration?: number; // 1-10 seconds
     fps?: number; // Frames per second
+    frameFileIds?: VideoFrameFileIds; // Captured start/end/picked frames
     loop?: boolean; // Whether to create seamless loop
     model?: string; // fal:kling-image-to-video, fal:runway-gen3
     motionStrength?: number; // 0-1, intensity of motion
+    pickedTime?: number; // Seconds into the clip for the picked frame
     prompt?: string; // Motion prompt - describe the animation
 }
 

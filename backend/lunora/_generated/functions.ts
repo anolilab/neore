@@ -3445,56 +3445,6 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_chat_functions_46.generateImageToVideo.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["duration"] !== undefined) {
-if (typeof source["duration"] !== "number" || !Number.isFinite(source["duration"])) return DEFER;
-__val1 = source["duration"];
-__has1 = true;
-}
-let __has2 = false;
-let __val2;
-if (source["fps"] !== undefined) {
-if (typeof source["fps"] !== "number" || !Number.isFinite(source["fps"])) return DEFER;
-__val2 = source["fps"];
-__has2 = true;
-}
-if (typeof source["imageUrl"] !== "string") return DEFER;
-let __has3 = false;
-let __val3;
-if (source["loop"] !== undefined) {
-if (typeof source["loop"] !== "boolean") return DEFER;
-__val3 = source["loop"];
-__has3 = true;
-}
-let __has4 = false;
-let __val4;
-if (source["model"] !== undefined) {
-if (typeof source["model"] !== "string") return DEFER;
-__val4 = source["model"];
-__has4 = true;
-}
-let __has5 = false;
-let __val5;
-if (source["motionStrength"] !== undefined) {
-if (typeof source["motionStrength"] !== "number" || !Number.isFinite(source["motionStrength"])) return DEFER;
-__val5 = source["motionStrength"];
-__has5 = true;
-}
-let __has6 = false;
-let __val6;
-if (source["prompt"] !== undefined) {
-if (typeof source["prompt"] !== "string") return DEFER;
-__val6 = source["prompt"];
-__has6 = true;
-}
-if (typeof source["threadId"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { ...(__has1 ? { "duration": __val1 } : {}), ...(__has2 ? { "fps": __val2 } : {}), "imageUrl": source["imageUrl"], ...(__has3 ? { "loop": __val3 } : {}), ...(__has4 ? { "model": __val4 } : {}), ...(__has5 ? { "motionStrength": __val5 } : {}), ...(__has6 ? { "prompt": __val6 } : {}), "threadId": source["threadId"], "userId": source["userId"] };
-});
 installCompiledValidatorMap(lunora_chat_functions_46.generateImg2Img.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8410,7 +8360,7 @@ export interface Caller {
             generateControlNet: (args: { controlType: string; endPercent?: number; imageUrl: string; model?: string; preprocessor?: string; prompt?: string; startPercent?: number; strength?: number; threadId: string; userId: string }) => Promise<{ controlType: string; imageUrl: string; mimeType: string; model: string }>;
             generateFollowupSuggestionsForThread: (args: { threadId: string; userId: string }) => Promise<void>;
             generateImage: (args: { cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; imageSize: string; jobId?: string; model: string; negativePrompt?: string; numImages?: number; prompt: string; promptMessageId?: Id<"messages">; referenceImages?: Array<string>; seed?: number; threadId: string; userId: string }) => Promise<{ assets: Array<{ imageSize: string; imageUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
-            generateImageToVideo: (args: { duration?: number; fps?: number; imageUrl: string; loop?: boolean; model?: string; motionStrength?: number; prompt?: string; threadId: string; userId: string }) => Promise<{ mimeType: string; model: string; videoUrl: string }>;
+            generateImageToVideo: (args: { duration?: number; fps?: number; imageUrl: string; loop?: boolean; model?: string; motionStrength?: number; prompt?: string; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; threadId: string; userId: string }) => Promise<{ fileId: string; mimeType: string; model: string; videoUrl: string }>;
             generateImg2Img: (args: { imageUrl: string; model?: string; negativePrompt?: string; prompt?: string; strength?: number; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string }>;
             generateInpaint: (args: { imageUrl: string; maskUrl: string; model?: string; negativePrompt?: string; prompt: string; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string }>;
             generateMusic: (args: { duration?: number; model: string; negativePrompt?: string; prompt: string; threadId: string; userId: string }) => Promise<{ assets: Array<{ audioUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
@@ -8421,7 +8371,7 @@ export interface Caller {
             generateSummary: (args: { threadId: Id<"threads"> }) => Promise<{ success: boolean }>;
             generateTranscription: (args: { audioUrl: string; language?: string; model?: string; threadId: string; userId: string }) => Promise<{ chunks: Array<{ text: string; timestamp: Array<number> }>; model: string; text: string }>;
             generateUpscale: (args: { enhanceDetails?: boolean; enhanceFace?: boolean; imageUrl: string; model?: string; scale?: number; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string; scale: number }>;
-            generateVideo: (args: { aspectRatio?: string; cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; duration?: number; jobId?: string; model: string; prompt: string; promptMessageId?: Id<"messages">; startFrameUrl?: string; threadId: string; userId: string }) => Promise<{ assets: Array<{ mimeType: string; videoUrl: string }>; modelId: string; prompt: string }>;
+            generateVideo: (args: { aspectRatio?: string; cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; duration?: number; jobId?: string; model: string; prompt: string; promptMessageId?: Id<"messages">; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; startFrameUrl?: string; threadId: string; userId: string }) => Promise<{ assets: Array<{ mimeType: string; videoUrl: string }>; modelId: string; prompt: string }>;
             getAllThreadRelationships: (args?: {}) => Promise<{ _creationTime: number; _id: Id<"threadRelationships">; branchPoint?: number; branchType?: "branch" | "continuation" | "comparison" | "subagent"; createdAt: number; parentThreadId: Id<"threads">; threadId: Id<"threads">; }[]>;
             getAnonymousMessageLimit: (args: { now: number }) => Promise<{ limit: number; remaining: number } | null>;
             getBrowserActions: (args: { sessionId: string }) => Promise<Array<{ _id: Id<"browserActions">; action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; durationMs?: number; errorMessage?: string; success: boolean; target?: string; timestamp: number; value?: string }>>;

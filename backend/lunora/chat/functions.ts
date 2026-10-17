@@ -11,7 +11,7 @@ import {
     DEFAULT_USER_PROMPT_OPTIMIZATION_MODEL,
 } from "@neore/ai/constants";
 import type { ImageSize, ModelDefinition } from "@neore/ai/models";
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { MODEL_LOOKUP, REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { getFollowupSuggestionsPrompt, getThreadTitlePrompt } from "@neore/ai/prompts";
 import { buildCinemaPrompt } from "@neore/ai/prompts/cinema";
 import {
@@ -71,9 +71,9 @@ import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
-import { buildFalReferenceImageInput } from "./lib/reference-image-mapping";
+import { buildFalReferenceImageInput, buildFalReferenceVideoInput } from "./lib/fal-reference-mapping";
 import { getAgentForUser, validateThreadAccess, validateThreadAccessWithData } from "./lib/thread-helpers";
-import { FETCH_TIMEOUT_LONG_MS, fetchWithDeadline } from "../lib/fetch-timeout";
+import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 
 const DATA_URL_BASE64_RE = /^data:[^;]+;base64,/;
@@ -86,10 +86,6 @@ const MAX_CHARACTERS_PER_SUGGESTION = 80;
 // These values are tuned aggressively for worst-case scenarios
 // Note: Better UX achieved by fetching fewer messages quickly, then loading more on demand
 const MAX_MESSAGES_PER_PAGE = 20; // Conservative page size
-
-// Cap mirrors the picker UI (`z.array(z.url()).max(4)` on the AI tool and the
-// gateway). Highest per-model cap in MODEL_REGISTRY is 4 today.
-const MAX_REFERENCE_IMAGES = 4;
 
 /**
  * Extracts plain data from generateText Output API result, stripping any $schema metadata.
@@ -322,7 +318,7 @@ const extractImagesFromOpenRouterResponse = (assistantContent: unknown): { mimeT
     return images;
 };
 
-const createBlobFromImage = (imageData: Uint8Array, mimeType: string): Blob => {
+const bytesToBlob = (imageData: Uint8Array, mimeType: string): Blob => {
     const buffer = new ArrayBuffer(imageData.byteLength);
 
     new Uint8Array(buffer).set(imageData);
@@ -3703,8 +3699,8 @@ export const generateImage = internalAction
             // `Array<string>`; tighten here so a malformed payload errors at the
             // boundary instead of inside FAL.
             if (referenceImages !== undefined) {
-                if (referenceImages.length > MAX_REFERENCE_IMAGES) {
-                    throw new LunoraError("BAD_REQUEST", `referenceImages exceeds the cap of ${MAX_REFERENCE_IMAGES}`);
+                if (referenceImages.length > REFERENCE_MEDIA_CAPS.images) {
+                    throw new LunoraError("BAD_REQUEST", `referenceImages exceeds the cap of ${REFERENCE_MEDIA_CAPS.images}`);
                 }
 
                 for (const url of referenceImages) {
@@ -3864,7 +3860,7 @@ export const generateImage = internalAction
                 const storedImages = await Promise.all(
                     images.map(async (image) => {
                         const mimeType = image.mimeType || "image/png";
-                        const blob = createBlobFromImage(image.uint8Array, mimeType);
+                        const blob = bytesToBlob(image.uint8Array, mimeType);
                         const { file, filePart } = await storeFile(context, blob, { threadId, userId });
 
                         return { file, filePart, mimeType };
@@ -4012,7 +4008,7 @@ export const generateAudio = internalAction
 
             // GeneratedAudioFile has mediaType (from GeneratedFile) and format properties
             const mimeType = result.audio.mediaType || `audio/${result.audio.format || "mpeg"}`;
-            const blob = createBlobFromImage(result.audio.uint8Array, mimeType);
+            const blob = bytesToBlob(result.audio.uint8Array, mimeType);
             const { file, filePart } = await storeFile(context, blob, { threadId, userId });
 
             // Serialize warnings
@@ -4090,6 +4086,12 @@ export const generateVideo = internalAction
         prompt: v.string(),
         /** The prompt this is a reply to. Set by `/chat/media`, so a regenerate becomes a sibling reply (`agent/branch-tree.ts`). */
         promptMessageId: v.optional(v.id("messages")),
+        referenceAudioUrls: v.optional(
+            v.array(v.string().max(MAX_LENGTH.url)).check((value) => value.length <= REFERENCE_MEDIA_CAPS.audios, { message: "Too many reference files" }),
+        ),
+        referenceVideoUrls: v.optional(
+            v.array(v.string().max(MAX_LENGTH.url)).check((value) => value.length <= REFERENCE_MEDIA_CAPS.videos, { message: "Too many reference files" }),
+        ),
         startFrameUrl: v.optional(v.string()),
         threadId: v.string(),
         userId: v.string(),
@@ -4107,7 +4109,23 @@ export const generateVideo = internalAction
         }),
     )
     .action(
-        async ({ args: { aspectRatio, cinemaSettings, duration, jobId, model, prompt, promptMessageId, startFrameUrl, threadId, userId }, ctx: context }) => {
+        async ({
+            args: {
+                aspectRatio,
+                cinemaSettings,
+                duration,
+                jobId,
+                model,
+                prompt,
+                promptMessageId,
+                referenceAudioUrls,
+                referenceVideoUrls,
+                startFrameUrl,
+                threadId,
+                userId,
+            },
+            ctx: context,
+        }) => {
             const modelDefinition = MODEL_LOOKUP.get(model);
 
             if (!modelDefinition || modelDefinition.mode !== "video") {
@@ -4156,12 +4174,12 @@ export const generateVideo = internalAction
                     const endpoint = modelDefinition.modelApiId ?? model;
                     const falInput: FalRequestInput = {
                         prompt: enhancedPrompt,
+                        ...buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl }),
                     };
 
-                    if (startFrameUrl) {
-                        falInput.image_url = startFrameUrl;
-                    } else if (modelDefinition.supportsImageToVideo && !modelDefinition.supportsTextToVideo) {
-                        throw new LunoraError("BAD_REQUEST", `Model ${model} requires a startFrameUrl (image-to-video only).`);
+                    // The start frame, or a reference image the endpoint takes, satisfies an image-only endpoint.
+                    if (modelDefinition.supportsImageToVideo && !modelDefinition.supportsTextToVideo && !falInput.image_url && !falInput.image_urls) {
+                        throw new LunoraError("BAD_REQUEST", `Model ${model} requires a startFrameUrl or reference image (image-to-video only).`);
                     }
 
                     if (aspectRatio && aspectRatio !== "auto") {
@@ -4263,7 +4281,7 @@ export const generateVideo = internalAction
                 }
 
                 const mimeType = videoData.mimeType || "video/mp4";
-                const blob = createBlobFromImage(videoData.uint8Array, mimeType);
+                const blob = bytesToBlob(videoData.uint8Array, mimeType);
                 const { file, filePart } = await storeFile(context, blob, { threadId, userId });
 
                 // Serialize warnings
@@ -4500,7 +4518,7 @@ export const generateMusic = internalAction
             }
 
             const audio = await runFalMusicGeneration(endpoint, inputs, falApiKey);
-            const blob = createBlobFromImage(audio.bytes, audio.mimeType);
+            const blob = bytesToBlob(audio.bytes, audio.mimeType);
             const { file, filePart } = await storeFile(context, blob, { threadId, userId });
 
             await agent.saveMessage(context, {
@@ -5466,63 +5484,82 @@ export const generateImageToVideo = internalAction
         model: v.optional(v.string()),
         motionStrength: v.optional(v.number()),
         prompt: v.optional(v.string()),
+        referenceAudioUrls: v.optional(
+            v.array(v.string().max(MAX_LENGTH.url)).check((value) => value.length <= REFERENCE_MEDIA_CAPS.audios, { message: "Too many reference files" }),
+        ),
+        referenceVideoUrls: v.optional(
+            v.array(v.string().max(MAX_LENGTH.url)).check((value) => value.length <= REFERENCE_MEDIA_CAPS.videos, { message: "Too many reference files" }),
+        ),
         threadId: v.string(),
         userId: v.string(),
     })
     .output(
         v.object({
+            /** The stored clip (`chatFiles`): a downstream node reads it from our storage, not the provider URL. */
+            fileId: v.string(),
             mimeType: v.string(),
             model: v.string(),
             videoUrl: v.string(),
         }),
     )
-    .action(async ({ args: { duration, fps, imageUrl, loop, model, motionStrength, prompt, threadId: _threadId, userId: _userId }, ctx: _context }) => {
-        const falApiKey = process.env.FAL_API_KEY;
+    .action(
+        async ({
+            args: { duration, fps, imageUrl, loop, model, motionStrength, prompt, referenceAudioUrls, referenceVideoUrls, threadId, userId },
+            ctx: context,
+        }) => {
+            const falApiKey = process.env.FAL_API_KEY;
 
-        if (!falApiKey) {
-            throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
-        }
+            if (!falApiKey) {
+                throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
+            }
 
-        const endpoint = model ?? "fal-ai/kling-video/v2.1/standard/image-to-video";
+            // Registry ids are not FAL endpoints for every model: the reference mapping is keyed by `modelApiId`.
+            const modelDefinition = model ? MODEL_LOOKUP.get(model) : undefined;
+            const endpoint = modelDefinition?.modelApiId ?? model ?? "fal-ai/kling-video/v2.1/standard/image-to-video";
 
-        chatLogger.debug("[cvx][img2video] Starting image-to-video", { duration, endpoint });
+            chatLogger.debug("[cvx][img2video] Starting image-to-video", { duration, endpoint });
 
-        const input: FalRequestInput = {
-            image_url: imageUrl,
-        };
+            const input: FalRequestInput = buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl: imageUrl });
 
-        if (prompt) {
-            input.prompt = prompt;
-        }
+            if (prompt) {
+                input.prompt = prompt;
+            }
 
-        if (duration) {
-            input.duration = duration;
-        }
+            if (duration) {
+                input.duration = duration;
+            }
 
-        if (motionStrength !== undefined) {
-            input.motion_strength = motionStrength;
-        }
+            if (motionStrength !== undefined) {
+                input.motion_strength = motionStrength;
+            }
 
-        if (fps) {
-            input.fps = fps;
-        }
+            if (fps) {
+                input.fps = fps;
+            }
 
-        if (loop !== undefined) {
-            input.loop = loop;
-        }
+            if (loop !== undefined) {
+                input.loop = loop;
+            }
 
-        const result = await callFalApi<{ video: { content_type?: string; url: string } }>(endpoint, input, falApiKey);
+            const result = await callFalApi<Parameters<typeof resolveFalVideoUrl>[0]>(endpoint, input, falApiKey);
+            const resolvedVideo = resolveFalVideoUrl(result);
 
-        if (!result.video) {
-            throw new LunoraError("BAD_REQUEST", "No video generated from image");
-        }
+            if (!resolvedVideo) {
+                throw new LunoraError("BAD_REQUEST", "No video generated from image");
+            }
 
-        return {
-            mimeType: result.video.content_type ?? "video/mp4",
-            model: endpoint,
-            videoUrl: result.video.url,
-        };
-    });
+            const videoResponse = await fetchOk(resolvedVideo.url, { errorPrefix: "Failed to download generated video", timeoutMs: FETCH_TIMEOUT_LONG_MS });
+            const mimeType = resolvedVideo.contentType;
+            const { file } = await storeFile(context, bytesToBlob(new Uint8Array(await videoResponse.arrayBuffer()), mimeType), { threadId, userId });
+
+            return {
+                fileId: file.fileId,
+                mimeType,
+                model: endpoint,
+                videoUrl: file.url,
+            };
+        },
+    );
 
 export const generateControlNet = internalAction
     .input({

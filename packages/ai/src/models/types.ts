@@ -198,8 +198,12 @@ export interface ModelDefinition {
     /** Music — longest clip the model can produce, in seconds. */
     maxMusicDurationSeconds?: number;
     maxReasoningEffort?: number;
+    /** Max number of reference audio clips (0/undefined = none) */
+    maxReferenceAudios?: number;
     /** Max number of reference images */
     maxReferenceImages?: number;
+    /** Max number of reference videos (0/undefined = none) */
+    maxReferenceVideos?: number;
     maxResolution?: string;
     maxRetries?: number;
     maxSteps?: number;

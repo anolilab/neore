@@ -12,6 +12,7 @@ import { useWorkflowStore } from "../../stores/workflow-store";
 import type { AINodeData, CodeNodeData, ImageNodeData, TextNodeData, WorkflowNodeData, WorkflowNodeType } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { getModelLabel } from "../../utils/model-options";
+import { videoUrlOfOutput } from "../../utils/video-frame";
 
 const modelLabel = (m: string | undefined, models: GatewayModel[]) => (m ? getModelLabel(m, models) : undefined);
 
@@ -41,7 +42,9 @@ const resolveContent = (nodeType: WorkflowNodeType, data: WorkflowNodeData, exec
 
         if (typeof out.image_url === "string") return { kind: "image", src: out.image_url };
 
-        if (typeof out.videoUrl === "string") return { kind: "video", src: out.videoUrl };
+        const videoUrl = videoUrlOfOutput(out);
+
+        if (videoUrl) return { kind: "video", src: videoUrl };
 
         if (typeof out.text === "string") return { kind: "text", value: out.text };
     }
