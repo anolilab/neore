@@ -663,6 +663,11 @@ export const setCaseFrozen = authMutation
     .mutation(async ({ args, ctx }) => {
         const evalCase = await requireOwnedCase(ctx, args.caseId, ctx.user.userId);
 
+        // A deleted dataset's cases are being purged: freezing one now would protect a row the purge then removes.
+        if (args.frozen && !(await ctx.db.get(evalCase.datasetId))) {
+            throw new LunoraError("NOT_FOUND", "Dataset not found");
+        }
+
         await patchById(ctx.db, evalCase._id, { frozen: args.frozen, updatedAt: ctx.now });
 
         ctx.log.event("evals.set_case_frozen", { frozen: args.frozen });
