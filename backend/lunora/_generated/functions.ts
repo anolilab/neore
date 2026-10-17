@@ -1054,6 +1054,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "notifications_push:sendPushForNotification": lunora_notifications_push_126.sendPushForNotification as unknown as RegisteredLunoraFunction,
     "notifications_push:subscribePush": lunora_notifications_push_126.subscribePush as unknown as RegisteredLunoraFunction,
     "notifications_push:unsubscribePush": lunora_notifications_push_126.unsubscribePush as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:claimOutcomeEmail": lunora_notifications_task_email_127.claimOutcomeEmail as unknown as RegisteredLunoraFunction,
     "notifications_task_email:loadRecipientEmail": lunora_notifications_task_email_127.loadRecipientEmail as unknown as RegisteredLunoraFunction,
     "notifications_task_email:sendTaskOutcomeEmail": lunora_notifications_task_email_127.sendTaskOutcomeEmail as unknown as RegisteredLunoraFunction,
     "notifications_task_email:setTaskEmailEnabled": lunora_notifications_task_email_127.setTaskEmailEnabled as unknown as RegisteredLunoraFunction,
@@ -6649,6 +6650,13 @@ if (typeof source["notificationId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "notificationId": source["notificationId"], "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_notifications_task_email_127.claimOutcomeEmail.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["notificationId"] !== "string") return DEFER;
+if (source["notificationId"].length > 200) return DEFER;
+return { "notificationId": source["notificationId"] };
+});
 installCompiledValidatorMap(lunora_notifications_task_email_127.loadRecipientEmail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -6660,11 +6668,13 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["link"] !== "string") return DEFER;
 if (source["link"].length > 500) return DEFER;
+if (typeof source["notificationId"] !== "string") return DEFER;
+if (source["notificationId"].length > 200) return DEFER;
 if (typeof source["title"] !== "string") return DEFER;
 if (source["title"].length > 200) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 if (source["userId"].length > 200) return DEFER;
-return { "link": source["link"], "title": source["title"], "userId": source["userId"] };
+return { "link": source["link"], "notificationId": source["notificationId"], "title": source["title"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_notifications_task_email_127.setTaskEmailEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9114,8 +9124,9 @@ export interface Caller {
             unsubscribePush: (args: { endpoint: string }) => Promise<null>;
         };
         task_email: {
+            claimOutcomeEmail: (args: { notificationId: string }) => Promise<boolean>;
             loadRecipientEmail: (args: { userId: string }) => Promise<string | null>;
-            sendTaskOutcomeEmail: (args: { link: string; title: string; userId: string }) => Promise<null>;
+            sendTaskOutcomeEmail: (args: { link: string; notificationId: string; title: string; userId: string }) => Promise<null>;
             setTaskEmailEnabled: (args: { enabled: boolean }) => Promise<null>;
         };
     };
@@ -10665,6 +10676,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             unsubscribePush: (args) => callRegistered(context, "notifications_push:unsubscribePush", args),
         },
         task_email: {
+            claimOutcomeEmail: (args) => callRegistered(context, "notifications_task_email:claimOutcomeEmail", args),
             loadRecipientEmail: (args) => callRegistered(context, "notifications_task_email:loadRecipientEmail", args),
             sendTaskOutcomeEmail: (args) => callRegistered(context, "notifications_task_email:sendTaskOutcomeEmail", args),
             setTaskEmailEnabled: (args) => callRegistered(context, "notifications_task_email:setTaskEmailEnabled", args),

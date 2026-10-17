@@ -41,6 +41,11 @@ export interface TelegramChunk {
     source: string;
 }
 
+/** A piece of a block. `sameBlock`: it continues the block before it, so it joins with one newline. */
+interface Piece extends TelegramChunk {
+    sameBlock: boolean;
+}
+
 interface Block {
     code: boolean;
     /** The language tag on a fenced block's opening line, kept for the plain-text retry. */
@@ -197,11 +202,11 @@ const renderBlock = (block: Block, lines: string[]): TelegramChunk =>
         : { html: lines.map((line) => renderLine(line)).join("\n"), source: lines.join("\n") };
 
 /** Pieces of one block, each rendering to at most `limit` characters. */
-const splitBlock = (block: Block, limit: number): TelegramChunk[] => {
+const splitBlock = (block: Block, limit: number): Piece[] => {
     const whole = renderBlock(block, block.lines);
 
     if (whole.html.length <= limit) {
-        return [whole];
+        return [{ ...whole, sameBlock: false }];
     }
 
     const pieces: TelegramChunk[] = [];
@@ -231,7 +236,9 @@ const splitBlock = (block: Block, limit: number): TelegramChunk[] => {
         pieces.push(renderBlock(block, current));
     }
 
-    return pieces;
+    return pieces.map((piece, index) => {
+        return { ...piece, sameBlock: index > 0 };
+    });
 };
 
 /**

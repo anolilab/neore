@@ -11,12 +11,17 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
-import { internalAction, internalQuery } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { saveUserSettings } from "../auth/lib/preference-writes";
 import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { claimOnce } from "../lib/claim-once";
+
+const OUTCOME_EMAIL_SCOPE = "outcome-email";
+/** Well past any redelivery window of the jobs queue. */
+const OUTCOME_EMAIL_CLAIM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** The settings toggle. */
 export const setTaskEmailEnabled = authMutation
@@ -64,10 +69,22 @@ export const loadRecipientEmail = internalQuery
         return user.email || null;
     });
 
+/** Claims a notification's email. A redelivered action finds it claimed and sends nothing. */
+export const claimOutcomeEmail = internalMutation
+    .input({ notificationId: v.string().max(200) })
+    .output(v.boolean())
+    .mutation(async ({ args: { notificationId }, ctx }) => await claimOnce(ctx, OUTCOME_EMAIL_SCOPE, notificationId, OUTCOME_EMAIL_CLAIM_TTL_MS));
+
 export const sendTaskOutcomeEmail = internalAction
-    .input({ link: v.string().max(500), title: v.string().max(200), userId: v.string().max(200) })
+    .input({ link: v.string().max(500), notificationId: v.string().max(200), title: v.string().max(200), userId: v.string().max(200) })
     .output(v.null())
-    .action(async ({ args: { link, title, userId }, ctx }) => {
+    .action(async ({ args: { link, notificationId, title, userId }, ctx }) => {
+        const claimed = await ctx.runMutation(internal.notifications.task_email.claimOutcomeEmail, { notificationId });
+
+        if (!claimed) {
+            return null;
+        }
+
         const to = await ctx.runQuery(internal.notifications.task_email.loadRecipientEmail, { userId });
 
         if (!to || !SITE_URL) {

@@ -61,8 +61,13 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
         const record = asRecord(raw);
         const payload = asRecord(record?.payload);
 
-        if (record?.type === "response_item" && payload?.type === "message" && typeof payload.role === "string") {
-            responseTexts.add(`${payload.role}\n${responseText(payload)}`);
+        if (record?.type === "response_item" && payload?.type === "message" && (payload.role === "user" || payload.role === "assistant")) {
+            const text = responseText(payload);
+
+            // Injected context is not kept, so it cannot stand in for the prompt it would have shadowed.
+            if (messageFromTexts([text], payload.role, undefined, INJECTED_PREFIXES)) {
+                responseTexts.add(`${payload.role}\n${text}`);
+            }
         }
     }
 

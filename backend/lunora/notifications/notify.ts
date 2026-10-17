@@ -108,6 +108,7 @@ export const notify = async (ctx: MutationCtx, input: NotificationInput): Promis
             if (settings?.taskEmailEnabled === true) {
                 await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendTaskOutcomeEmail, {
                     link: row.link ?? "/",
+                    notificationId: notificationId as string,
                     title: row.title,
                     userId: row.userId,
                 });

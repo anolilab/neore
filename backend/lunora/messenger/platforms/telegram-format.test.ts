@@ -99,3 +99,16 @@ describe("fenced code in Telegram output", () => {
         expect(chunk?.source.startsWith("```ts\n")).toBe(true);
     });
 });
+
+describe("long replies keep their line breaks", () => {
+    it("joins the pieces of one paragraph with a single newline", () => {
+        const paragraph = Array.from({ length: 60 }, (_, index) => `line number ${index}`).join("\n");
+        const chunks = formatTelegramMessage(paragraph, 300);
+
+        expect(chunks.length).toBeGreaterThan(1);
+
+        for (const chunk of chunks) {
+            expect(chunk.html).not.toContain("\n\n");
+        }
+    });
+});
