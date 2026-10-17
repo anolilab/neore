@@ -202,7 +202,7 @@ export interface Doc_chatImportJobs {
     failedConversations?: number;
     importedConversations: number;
     progress?: number;
-    provider: "chatgpt" | "gemini" | "claude";
+    provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex";
     r2Key?: string;
     status: "pending" | "processing" | "completed" | "failed";
     totalConversations: number;
@@ -491,6 +491,7 @@ export interface Doc_evalCases {
     datasetId: Id<"evalDatasets">;
     expectedAnswer?: string;
     expectedSources: Array<string>;
+    frozen?: boolean;
     input: string;
     rubric?: string;
     source: "manual" | "import" | "chat";
@@ -1814,7 +1815,9 @@ export interface Doc_userSettings {
     nickname?: string;
     onboardingCompleted?: boolean;
     profession?: string;
+    resumeLastChat?: boolean;
     sendBehavior?: string;
+    taskEmailEnabled?: boolean;
     temporaryChatRetentionHours?: number;
     timezone?: string;
     userId: string;
@@ -2833,7 +2836,7 @@ export interface Insert_chatImportJobs {
     failedConversations?: number;
     importedConversations: number;
     progress?: number;
-    provider: "chatgpt" | "gemini" | "claude";
+    provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex";
     r2Key?: string;
     status: "pending" | "processing" | "completed" | "failed";
     totalConversations: number;
@@ -3122,6 +3125,7 @@ export interface Insert_evalCases {
     datasetId: Id<"evalDatasets">;
     expectedAnswer?: string;
     expectedSources: Array<string>;
+    frozen?: boolean;
     input: string;
     rubric?: string;
     source: "manual" | "import" | "chat";
@@ -4445,7 +4449,9 @@ export interface Insert_userSettings {
     nickname?: string;
     onboardingCompleted?: boolean;
     profession?: string;
+    resumeLastChat?: boolean;
     sendBehavior?: string;
+    taskEmailEnabled?: boolean;
     temporaryChatRetentionHours?: number;
     timezone?: string;
     userId: string;

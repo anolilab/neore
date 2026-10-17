@@ -3141,6 +3141,16 @@
       "to": "function:tasks_internal:resolveTaskSkill"
     },
     {
+      "from": "function:evals_functions:compareModels",
+      "kind": "read",
+      "to": "table:evalCases"
+    },
+    {
+      "from": "function:evals_functions:compareModels",
+      "kind": "read",
+      "to": "table:evalRuns"
+    },
+    {
       "from": "function:evals_functions:createCase",
       "kind": "write",
       "to": "table:evalCases"
@@ -4629,6 +4639,11 @@
       "from": "function:notifications_push:sendPushForNotification",
       "kind": "call",
       "to": "function:notifications_push:loadPushNotification"
+    },
+    {
+      "from": "function:notifications_task_email:sendTaskOutcomeEmail",
+      "kind": "call",
+      "to": "function:notifications_task_email:loadRecipientEmail"
     },
     {
       "from": "function:pages_agent:proposePageEdit",
@@ -10197,6 +10212,13 @@
     },
     {
       "detail": "query",
+      "id": "function:evals_functions:compareModels",
+      "kind": "function",
+      "name": "evals.functions.compareModels",
+      "module": "evals"
+    },
+    {
+      "detail": "query",
       "id": "function:evals_functions:compareRuns",
       "kind": "function",
       "name": "evals.functions.compareRuns",
@@ -10277,6 +10299,13 @@
       "id": "function:evals_functions:purgeDataset",
       "kind": "function",
       "name": "evals.functions.purgeDataset",
+      "module": "evals"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:evals_functions:setCaseFrozen",
+      "kind": "function",
+      "name": "evals.functions.setCaseFrozen",
       "module": "evals"
     },
     {
@@ -11946,6 +11975,27 @@
       "id": "function:notifications_push:unsubscribePush",
       "kind": "function",
       "name": "notifications.push.unsubscribePush",
+      "module": "notifications"
+    },
+    {
+      "detail": "query",
+      "id": "function:notifications_task_email:loadRecipientEmail",
+      "kind": "function",
+      "name": "notifications.task_email.loadRecipientEmail",
+      "module": "notifications"
+    },
+    {
+      "detail": "action",
+      "id": "function:notifications_task_email:sendTaskOutcomeEmail",
+      "kind": "function",
+      "name": "notifications.task_email.sendTaskOutcomeEmail",
+      "module": "notifications"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:notifications_task_email:setTaskEmailEnabled",
+      "kind": "function",
+      "name": "notifications.task_email.setTaskEmailEnabled",
       "module": "notifications"
     },
     {
@@ -17890,6 +17940,12 @@
       "kind": "schedule",
       "line": 104,
       "reason": "\"notify\" is not a registered function"
+    },
+    {
+      "file": "notifications/task-email",
+      "kind": "schedule",
+      "line": 60,
+      "reason": "\"notifyOutcome\" is not a registered function"
     },
     {
       "file": "pages/functions",

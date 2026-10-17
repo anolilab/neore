@@ -760,6 +760,10 @@ export interface InternalApiTypes {
             loadPushNotification: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { body?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
             sendPushForNotification: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
         };
+        task_email: {
+            loadRecipientEmail: FunctionReference<"query", { userId: string }, string | null>;
+            sendTaskOutcomeEmail: FunctionReference<"action", { link: string; title: string; userId: string }, null>;
+        };
     };
     pages: {
         agent: {
@@ -1697,6 +1701,10 @@ export const internal: InternalApiTypes = {
         push: {
             loadPushNotification: { __lunoraRef: "notifications_push:loadPushNotification" },
             sendPushForNotification: { __lunoraRef: "notifications_push:sendPushForNotification" },
+        },
+        task_email: {
+            loadRecipientEmail: { __lunoraRef: "notifications_task_email:loadRecipientEmail" },
+            sendTaskOutcomeEmail: { __lunoraRef: "notifications_task_email:sendTaskOutcomeEmail" },
         },
     },
     pages: {

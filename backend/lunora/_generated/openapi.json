@@ -6295,6 +6295,9 @@
                       "profession": {
                         "type": "string"
                       },
+                      "resumeLastChat": {
+                        "type": "boolean"
+                      },
                       "sendBehavior": {
                         "anyOf": [
                           {
@@ -6310,6 +6313,9 @@
                             "type": "string"
                           }
                         ]
+                      },
+                      "taskEmailEnabled": {
+                        "type": "boolean"
                       },
                       "temporaryChatRetentionHours": {
                         "type": "number"
@@ -9421,6 +9427,14 @@
                           },
                           {
                             "const": "claude",
+                            "type": "string"
+                          },
+                          {
+                            "const": "claude-code",
+                            "type": "string"
+                          },
+                          {
+                            "const": "codex",
                             "type": "string"
                           }
                         ]
@@ -21573,6 +21587,67 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#evals_functions:compareModels": {
+      "post": {
+        "description": "Invoke the `query` `evals_functions:compareModels` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "evals_functions:compareModels",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "datasetId": {
+                        "description": "Id<\"evalDatasets\">",
+                        "type": "string",
+                        "x-lunora-table": "evalDatasets"
+                      }
+                    },
+                    "required": [
+                      "datasetId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "evals_functions:compareModels",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: evals_functions:compareModels",
+        "tags": [
+          "evals"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#evals_functions:compareRuns": {
       "post": {
         "description": "Invoke the `query` `evals_functions:compareRuns` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -22350,6 +22425,73 @@
           "evals"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#evals_functions:setCaseFrozen": {
+      "post": {
+        "description": "Invoke the `mutation` `evals_functions:setCaseFrozen` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "evals_functions:setCaseFrozen",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "caseId": {
+                        "description": "Id<\"evalCases\">",
+                        "type": "string",
+                        "x-lunora-table": "evalCases"
+                      },
+                      "frozen": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "caseId",
+                      "frozen"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "evals_functions:setCaseFrozen",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: evals_functions:setCaseFrozen",
+        "tags": [
+          "evals"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#evals_functions:startRun": {
@@ -27759,6 +27901,67 @@
           }
         },
         "summary": "mutation: notifications_push:unsubscribePush",
+        "tags": [
+          "notifications"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#notifications_task_email:setTaskEmailEnabled": {
+      "post": {
+        "description": "Invoke the `mutation` `notifications_task_email:setTaskEmailEnabled` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "notifications_task_email:setTaskEmailEnabled",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "enabled"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "notifications_task_email:setTaskEmailEnabled",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: notifications_task_email:setTaskEmailEnabled",
         "tags": [
           "notifications"
         ],
