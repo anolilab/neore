@@ -481,9 +481,7 @@ const AccountSettings: FC = () => {
                             id="resume-last-chat"
                             onCheckedChange={(checked) => {
                                 // The confirmation waits for the save: a failed save must not read as saved.
-                                void handleUpdateSetting("resumeLastChat", checked)
-                                    .then(() => toast.success(checked ? t`Resuming your latest chat` : t`Opening a blank chat`))
-                                    .catch(() => toast.error(t`Could not save this setting.`));
+                                handleUpdateSetting("resumeLastChat", checked, checked ? t`Resuming your latest chat` : t`Opening a blank chat`);
                             }}
                         />
                     </div>

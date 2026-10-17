@@ -21,7 +21,7 @@ msgstr " · モデル: {modelFilter}"
 #. placeholder {0}: processedData.length
 #. placeholder {1}: visibleHeaders.length
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:224
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:516
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:529
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}、{1, plural, other {# 列}}"
 
@@ -30,7 +30,7 @@ msgid ", unread"
 msgstr "、未読"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:246
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:339
 msgid "...and {0} more"
 msgstr "…他 {0} 件"
 
@@ -81,7 +81,7 @@ msgstr "現在の Azure OpenAI API には \"v1\" を指定します。2024-10-21
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "（{0} / {MAX_PARTICIPANTS}、最低 {MIN_PARTICIPANTS}）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:279
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 件失敗）"
 
@@ -206,7 +206,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 人のメンバー}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:242
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, other {# 件のメッセージ}}"
 
@@ -215,6 +215,11 @@ msgstr "{0, plural, other {# 件のメッセージ}}"
 #: src/features/settings/components/chat/native-providers-settings.tsx:414
 msgid "{0, plural, one {# model} other {# models}}"
 msgstr "{0, plural, other {# 個のモデル}}"
+
+#. placeholder {0}: data.omittedTargets
+#: src/features/evals/components/model-comparison.tsx:102
+msgid "{0, plural, one {# more target is not shown.} other {# more targets are not shown.}}"
+msgstr ""
 
 #. placeholder {0}: workflow.nodeCount
 #. placeholder {0}: workflow.workflowContent?.nodes?.length ?? 0
@@ -251,7 +256,7 @@ msgid "{0, plural, one {# skill} other {# skills}}"
 msgstr "{0, plural, other {# 個のスキル}}"
 
 #. placeholder {0}: slides.length
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:262
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:266
 msgid "{0, plural, one {# slide} other {# slides}}"
 msgstr "{0, plural, other {# 枚のスライド}}"
 
@@ -295,7 +300,7 @@ msgstr "{0, plural, other {さらに # 件の動画を表示}}"
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
 #: src/routes/(chat)/chat/$threadId.tsx:81
-#: src/routes/(chat)/chat/index.tsx:88
+#: src/routes/(chat)/chat/index.tsx:153
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, other {未対応のクエリパラメーター}}：{1}"
 
@@ -366,18 +371,18 @@ msgid "{0} chunks"
 msgstr "{0} チャンク"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:293
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
 msgid "{0} conversations failed to import"
 msgstr "{0} 件の会話をインポートできませんでした"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
 msgid "{0} conversations found"
 msgstr "{0} 件の会話が見つかりました"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:292
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
 msgid "{0} conversations imported from {1}"
 msgstr "{1} から {0} 件の会話をインポートしました"
 
@@ -478,7 +483,7 @@ msgstr "{1} 件中 {0} 件のケースが完了"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:277
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:370
 msgid "{0} of {1} conversations imported"
 msgstr "{1} 件中 {0} 件の会話をインポートしました"
 
@@ -1023,7 +1028,7 @@ msgid "#1 on OpenRouter by token usage"
 msgstr "トークン使用量で OpenRouter 第 1 位"
 
 #. placeholder {0}: promptGroups.favorites.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:842
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:849
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {お気に入り # 件}}"
 
@@ -1049,7 +1054,7 @@ msgstr "現在より +{0} 文字"
 msgid "+{0} more expired sessions"
 msgstr "+ 他 {0} 件の期限切れセッション"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:140
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:144
 msgid "+{moreLines} more lines"
 msgstr "+ さらに {moreLines} 行"
 
@@ -1374,7 +1379,7 @@ msgstr "回答待ちの質問があります"
 msgid "A regular expression the answer must match"
 msgstr "回答が一致すべき正規表現"
 
-#: src/features/notifications/components/notification-settings.tsx:175
+#: src/features/notifications/components/notification-settings.tsx:227
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "毎朝、完了したこと、実行中のこと、対応が必要なことを短くまとめます。1日の利用量にカウントされます。"
 
@@ -1534,7 +1539,7 @@ msgid "Action Log"
 msgstr "アクションログ"
 
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:284
-#: src/features/evals/components/dataset-panel.tsx:137
+#: src/features/evals/components/dataset-panel.tsx:149
 msgid "Actions"
 msgstr "操作"
 
@@ -1682,7 +1687,7 @@ msgid "Add budget alert"
 msgstr "予算アラートを追加"
 
 #: src/features/evals/components/case-form-dialog.tsx:71
-#: src/features/evals/components/dataset-panel.tsx:108
+#: src/features/evals/components/dataset-panel.tsx:119
 msgid "Add case"
 msgstr "ケースを追加"
 
@@ -1849,7 +1854,7 @@ msgstr "お気に入りに追加"
 
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:810
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:817
 msgid "Add to Favorites"
 msgstr "お気に入りに追加"
 
@@ -1960,7 +1965,7 @@ msgstr "管理者のみ"
 msgid "advanced"
 msgstr "高度"
 
-#: src/features/settings/components/account/account-settings.tsx:593
+#: src/features/settings/components/account/account-settings.tsx:613
 msgid "Advanced"
 msgstr "詳細設定"
 
@@ -2018,7 +2023,7 @@ msgstr "高度なマルチモーダル分析機能"
 msgid "Advanced multimodal reasoning"
 msgstr "高度なマルチモーダル推論"
 
-#: src/features/settings/components/account/account-settings.tsx:593
+#: src/features/settings/components/account/account-settings.tsx:613
 msgid "Advanced options for power users."
 msgstr "上級ユーザー向けの詳細オプションです。"
 
@@ -2038,15 +2043,15 @@ msgstr "ネイティブ 4K 出力に対応した高度な推論型 Kling 動画�
 msgid "Advanced reasoning with improved output quality"
 msgstr "出力品質を向上させた高度な推論"
 
-#: src/features/settings/components/account/account-settings.tsx:598
+#: src/features/settings/components/account/account-settings.tsx:618
 msgid "Advanced User Mode"
 msgstr "上級ユーザーモード"
 
-#: src/features/settings/components/account/account-settings.tsx:607
+#: src/features/settings/components/account/account-settings.tsx:627
 msgid "Advanced user mode disabled"
 msgstr "上級ユーザーモードを無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:607
+#: src/features/settings/components/account/account-settings.tsx:627
 msgid "Advanced user mode enabled"
 msgstr "上級ユーザーモードを有効にしました"
 
@@ -2154,7 +2159,7 @@ msgid "After outside content"
 msgstr "外部コンテンツ参照後"
 
 #: src/components/settings/settings-modal.tsx:263
-#: src/features/evals/components/dataset-panel.tsx:91
+#: src/features/evals/components/dataset-panel.tsx:102
 #: src/features/layout/lib/dashboard-page-names.ts:14
 #: src/features/tasks/components/task-form-dialog.tsx:299
 msgid "Agent"
@@ -2532,7 +2537,7 @@ msgid "All Organization"
 msgstr "組織全体"
 
 #: src/features/prompts/components/prompt-list.tsx:464
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:721
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:728
 msgid "All Prompts"
 msgstr "すべてのプロンプト"
 
@@ -2639,7 +2644,7 @@ msgstr "アンバー"
 msgid "Amount"
 msgstr "金額"
 
-#: src/features/settings/components/account/account-settings.tsx:100
+#: src/features/settings/components/account/account-settings.tsx:101
 msgid "Amsterdam"
 msgstr "アムステルダム"
 
@@ -2725,15 +2730,15 @@ msgstr "AI で静止画像をアニメーション化"
 msgid "animation"
 msgstr "アニメーション"
 
-#: src/features/settings/components/account/account-settings.tsx:527
+#: src/features/settings/components/account/account-settings.tsx:547
 msgid "Animations"
 msgstr "アニメーション"
 
-#: src/features/settings/components/account/account-settings.tsx:536
+#: src/features/settings/components/account/account-settings.tsx:556
 msgid "Animations disabled"
 msgstr "アニメーションを無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:536
+#: src/features/settings/components/account/account-settings.tsx:556
 msgid "Animations enabled"
 msgstr "アニメーションを有効にしました"
 
@@ -2930,7 +2935,7 @@ msgstr "Meta アプリの「App settings > Basic」にある App Secret（X-Hub-
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
 #: src/features/projects/components/project-form-dialog.tsx:232
-#: src/features/settings/components/account/account-settings.tsx:171
+#: src/features/settings/components/account/account-settings.tsx:172
 msgid "Appearance"
 msgstr "外観"
 
@@ -3264,7 +3269,7 @@ msgstr "試行"
 msgid "Attempts: {0}"
 msgstr "試行回数：{0}"
 
-#: src/features/settings/components/account/account-settings.tsx:111
+#: src/features/settings/components/account/account-settings.tsx:112
 msgid "Auckland"
 msgstr "オークランド"
 
@@ -3343,15 +3348,15 @@ msgstr "自動メディア補強"
 msgid "Auto pricing"
 msgstr "自動料金設定"
 
-#: src/features/settings/components/account/account-settings.tsx:543
+#: src/features/settings/components/account/account-settings.tsx:563
 msgid "Auto Save"
 msgstr "自動保存"
 
-#: src/features/settings/components/account/account-settings.tsx:552
+#: src/features/settings/components/account/account-settings.tsx:572
 msgid "Auto save disabled"
 msgstr "自動保存を無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:552
+#: src/features/settings/components/account/account-settings.tsx:572
 msgid "Auto save enabled"
 msgstr "自動保存を有効にしました"
 
@@ -3376,7 +3381,7 @@ msgstr "自動レイアウト"
 msgid "Auto-layout (L)"
 msgstr "自動レイアウト（L）"
 
-#: src/features/settings/components/account/account-settings.tsx:401
+#: src/features/settings/components/account/account-settings.tsx:402
 msgid "Auto-read replies"
 msgstr "返信を自動で読み上げ"
 
@@ -3388,15 +3393,15 @@ msgstr "自動保存"
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "自動：確認なしで実行します。確認：承認/拒否を待って一時停止します。オフ：アシスタントはこのツールを認識しません。自動化（トリガー、メッセンジャーボット、ワークフロー）では確認ができないため、「確認」のツールは使用できません。MCP ツールは、サーバーが読み取り専用と指定しない限り、既定で「確認」になります。"
 
-#: src/features/settings/components/account/account-settings.tsx:464
+#: src/features/settings/components/account/account-settings.tsx:465
 msgid "Autocomplete disabled"
 msgstr "オートコンプリートを無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:464
+#: src/features/settings/components/account/account-settings.tsx:465
 msgid "Autocomplete enabled"
 msgstr "オートコンプリートを有効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:453
+#: src/features/settings/components/account/account-settings.tsx:454
 msgid "Autocomplete while typing"
 msgstr "入力中のオートコンプリート"
 
@@ -3437,7 +3442,7 @@ msgstr "検索モードの使用時に、テキストの応答と一緒に関連
 msgid "Automatically run cleanup based on configuration"
 msgstr "設定に基づいてクリーンアップを自動実行"
 
-#: src/features/settings/components/account/account-settings.tsx:545
+#: src/features/settings/components/account/account-settings.tsx:565
 msgid "Automatically save your work."
 msgstr "作業内容を自動的に保存します。"
 
@@ -3458,7 +3463,7 @@ msgstr "利用可能"
 msgid "Available on Neore — free to start, no credit card required."
 msgstr "Neore で利用可能 — 無料で始められ、クレジットカードは不要です。"
 
-#: src/features/chat/thread/sandbox-files.tsx:74
+#: src/features/chat/thread/sandbox-files.tsx:229
 msgid "Available once the reply is saved"
 msgstr "返信の保存後に利用できます"
 
@@ -3681,7 +3686,7 @@ msgstr "変更前"
 msgid "beginner"
 msgstr "初級"
 
-#: src/features/settings/components/account/account-settings.tsx:244
+#: src/features/settings/components/account/account-settings.tsx:245
 msgid "Behavior"
 msgstr "動作"
 
@@ -3713,7 +3718,7 @@ msgstr "ベンガル語"
 msgid "Bengali (Bangladesh)"
 msgstr "ベンガル語（バングラデシュ）"
 
-#: src/features/settings/components/account/account-settings.tsx:97
+#: src/features/settings/components/account/account-settings.tsx:98
 msgid "Berlin"
 msgstr "ベルリン"
 
@@ -4432,7 +4437,7 @@ msgstr "カナダ"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:254
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:347
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4455,7 +4460,7 @@ msgstr "ディープワークをキャンセル"
 msgid "Cancel Export"
 msgstr "エクスポートをキャンセル"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:282
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:375
 msgid "Cancel Import"
 msgstr "インポートをキャンセル"
 
@@ -4559,12 +4564,12 @@ msgid "Cases"
 msgstr "ケース"
 
 #. placeholder {0}: String(cases.length)
-#: src/features/evals/components/dataset-panel.tsx:119
+#: src/features/evals/components/dataset-panel.tsx:130
 msgid "Cases ({0})"
 msgstr "ケース（{0}）"
 
 #. placeholder {0}: dataset.name
-#: src/features/evals/components/dataset-panel.tsx:129
+#: src/features/evals/components/dataset-panel.tsx:141
 msgid "Cases in {0}"
 msgstr "{0} のケース"
 
@@ -4605,7 +4610,7 @@ msgstr "{circuitBreakerUntil} まで CB"
 msgid "Center"
 msgstr "中央"
 
-#: src/features/settings/components/account/account-settings.tsx:90
+#: src/features/settings/components/account/account-settings.tsx:91
 msgid "Central Time (US & Canada)"
 msgstr "中部標準時（米国およびカナダ）"
 
@@ -4720,7 +4725,7 @@ msgstr "チャット"
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:28
 #: src/features/chat/thread/composer-search-mode.tsx:48
 #: src/features/layout/lib/dashboard-page-names.ts:19
-#: src/features/settings/components/account/account-settings.tsx:377
+#: src/features/settings/components/account/account-settings.tsx:378
 msgid "Chat"
 msgstr "チャット"
 
@@ -4825,7 +4830,7 @@ msgid "Checking..."
 msgstr "確認しています..."
 
 #: src/features/evals/components/case-fields.tsx:150
-#: src/features/evals/components/dataset-panel.tsx:135
+#: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
 msgid "Checks"
 msgstr "チェック"
@@ -4892,11 +4897,11 @@ msgstr "既定のテキストモデルを選択"
 msgid "Choose default video models"
 msgstr "既定の動画モデルを選択"
 
-#: src/features/notifications/components/notification-settings.tsx:147
+#: src/features/notifications/components/notification-settings.tsx:199
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "完了した作業や対応が必要なことを Neore がどう知らせるかを選びます。"
 
-#: src/features/settings/components/account/account-settings.tsx:250
+#: src/features/settings/components/account/account-settings.tsx:251
 msgid "Choose how to send messages in the chat."
 msgstr "チャットでのメッセージの送信方法を選択します。"
 
@@ -5130,7 +5135,7 @@ msgstr "「{selector}」をクリック"
 msgid "Click ★ on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの ★ をクリックすると、ここに追加されます。"
 
-#: src/features/settings/components/account/account-settings.tsx:264
+#: src/features/settings/components/account/account-settings.tsx:265
 msgid "Click button to send"
 msgstr "ボタンをクリックして送信"
 
@@ -5270,11 +5275,11 @@ msgstr "コード実行とサンドボックスのファイル"
 msgid "Code execution failed"
 msgstr "コードの実行に失敗しました"
 
-#: src/features/settings/components/account/account-settings.tsx:198
+#: src/features/settings/components/account/account-settings.tsx:199
 msgid "Code Font"
 msgstr "コードフォント"
 
-#: src/features/settings/components/account/account-settings.tsx:203
+#: src/features/settings/components/account/account-settings.tsx:204
 msgid "Code font updated"
 msgstr "コードフォントを更新しました"
 
@@ -5462,12 +5467,12 @@ msgstr "カラー化"
 msgid "Colour days by"
 msgstr "日の色分け基準"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:287
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:290
 msgid "Column {index}"
 msgstr "列 {index}"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:242
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:559
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:572
 msgid "Columns"
 msgstr "列"
 
@@ -5573,12 +5578,12 @@ msgstr "Arcee の効率的な小型モデルを必要とするコンパクトな
 msgid "Company"
 msgstr "会社情報"
 
-#: src/features/evals/components/dataset-panel.tsx:193
-#: src/features/evals/components/dataset-panel.tsx:202
+#: src/features/evals/components/dataset-panel.tsx:222
+#: src/features/evals/components/dataset-panel.tsx:231
 msgid "Compare"
 msgstr "比較"
 
-#: src/features/evals/components/dataset-panel.tsx:221
+#: src/features/evals/components/dataset-panel.tsx:250
 msgid "Compare {name}"
 msgstr "{name} を比較"
 
@@ -5775,7 +5780,7 @@ msgstr "条件分岐"
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "タスク実行を強化する高度な AI エージェントモジュールを設定"
 
-#: src/features/settings/components/account/account-settings.tsx:377
+#: src/features/settings/components/account/account-settings.tsx:378
 msgid "Configure chat behavior and preferences."
 msgstr "チャットの動作と設定を構成します。"
 
@@ -5783,11 +5788,11 @@ msgstr "チャットの動作と設定を構成します。"
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "このプロジェクトで作成する新しいチャットの既定のモデル、推論レベル、機能を設定します。"
 
-#: src/features/settings/components/account/account-settings.tsx:244
+#: src/features/settings/components/account/account-settings.tsx:245
 msgid "Configure how the application behaves."
 msgstr "アプリケーションの動作を設定します。"
 
-#: src/features/settings/components/account/account-settings.tsx:271
+#: src/features/settings/components/account/account-settings.tsx:272
 msgid "Configure language preferences and location settings."
 msgstr "言語設定と地域設定を構成します。"
 
@@ -5812,7 +5817,7 @@ msgstr "請求先の連絡先と利用可能な AI モデルを設定します"
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "匿名ユーザーのクリーンアップのしきい値とバッチ上限を設定します"
 
-#: src/features/settings/components/account/account-settings.tsx:522
+#: src/features/settings/components/account/account-settings.tsx:542
 msgid "Configure UI preferences and display options."
 msgstr "UI の設定と表示オプションを構成します。"
 
@@ -6102,7 +6107,7 @@ msgstr "一貫したスタイルとキャラクターの忠実度"
 msgid "Consistent, reliable output quality"
 msgstr "一貫した信頼性の高い出力品質"
 
-#: src/features/settings/components/account/account-settings.tsx:213
+#: src/features/settings/components/account/account-settings.tsx:214
 msgid "Consolas"
 msgstr "Consolas"
 
@@ -6257,7 +6262,7 @@ msgstr "AI プロバイダーのデータ取り扱いと保持ポリシーを管
 msgid "Control depth of field with aperture setting"
 msgstr "絞り設定で被写界深度を調整します"
 
-#: src/features/settings/components/account/account-settings.tsx:134
+#: src/features/settings/components/account/account-settings.tsx:135
 msgid "Control how your personal information is displayed in the UI."
 msgstr "UI での個人情報の表示方法を管理します。"
 
@@ -6455,8 +6460,8 @@ msgstr ""
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:60
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:650
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:783
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:657
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:790
 msgid "Copy to clipboard"
 msgstr "クリップボードにコピー"
 
@@ -6483,8 +6488,9 @@ msgid "Corner radius"
 msgstr "角の半径"
 
 #: src/features/chat/thread/message-cost-badge.tsx:70
-#: src/features/evals/components/dataset-panel.tsx:209
+#: src/features/evals/components/dataset-panel.tsx:238
 #: src/features/evals/components/eval-summary-stats.tsx:31
+#: src/features/evals/components/model-comparison.tsx:115
 #: src/features/evals/components/run-comparison.tsx:131
 #: src/features/evals/components/run-detail.tsx:226
 #: src/features/settings/components/chat/usage-settings.tsx:319
@@ -6544,7 +6550,7 @@ msgstr "コスタリカ"
 msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
 
-#: src/features/chat/thread/sandbox-files.tsx:125
+#: src/features/chat/thread/sandbox-files.tsx:294
 msgid "could not be saved"
 msgstr "保存できませんでした"
 
@@ -6552,7 +6558,7 @@ msgstr "保存できませんでした"
 msgid "Could not cancel the run."
 msgstr "実行をキャンセルできませんでした。"
 
-#: src/features/notifications/components/notification-settings.tsx:117
+#: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "プッシュ通知を変更できませんでした。もう一度お試しください。"
 
@@ -6593,7 +6599,7 @@ msgstr "コメントを削除できませんでした"
 msgid "Could not delete the page"
 msgstr "ページを削除できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:91
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:111
 msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
 msgstr "チャットのプロバイダーを検出できませんでした。ChatGPT、Gemini、Claude の有効なエクスポートファイルをアップロードしたか確認してください。"
 
@@ -6649,7 +6655,7 @@ msgstr "コメントを投稿できませんでした"
 msgid "Could not prepare the new chat. Copy the messages instead."
 msgstr "新しいチャットを準備できませんでした。代わりにメッセージをコピーしてください。"
 
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:98
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:111
 msgid "Could not preview · Click to download"
 msgstr "プレビューできません · クリックしてダウンロード"
 
@@ -6683,9 +6689,13 @@ msgstr "ページの名前を変更できませんでした"
 msgid "Could not restore this version"
 msgstr "このバージョンを復元できませんでした"
 
-#: src/features/notifications/components/notification-settings.tsx:190
+#: src/features/notifications/components/notification-settings.tsx:110
 msgid "Could not save the Daily Brief setting."
 msgstr "Daily Brief の設定を保存できませんでした。"
+
+#: src/features/notifications/components/notification-settings.tsx:103
+msgid "Could not save the email setting."
+msgstr ""
 
 #: src/features/pages/components/page-view.tsx:160
 #: src/features/pages/components/page-view.tsx:248
@@ -6735,7 +6745,7 @@ msgid "Covers the majority of everyday video use cases"
 msgstr "日常的な動画用途の大部分をカバー"
 
 #: src/features/knowledge/components/collection-dialog.tsx:100
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:557
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:564
 #: src/features/prompts/components/variable-insertion.tsx:69
 msgid "Create"
 msgstr "作成"
@@ -7265,7 +7275,7 @@ msgstr "カスタマイズして再生成"
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "よく使う操作のキーボードショートカットをカスタマイズします。「記録」をクリックして、使いたいキーの組み合わせを押してください。"
 
-#: src/features/settings/components/account/account-settings.tsx:171
+#: src/features/settings/components/account/account-settings.tsx:172
 msgid "Customize the appearance of the application."
 msgstr "アプリケーションの外観をカスタマイズします。"
 
@@ -7309,17 +7319,17 @@ msgstr "チェコ語（チェコ共和国）"
 msgid "Czech Republic"
 msgstr "チェコ共和国"
 
-#: src/features/notifications/components/notification-settings.tsx:172
+#: src/features/notifications/components/notification-settings.tsx:224
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:50
 msgid "Daily Brief"
 msgstr "Daily Brief"
 
-#: src/features/notifications/components/notification-settings.tsx:192
+#: src/features/notifications/components/notification-settings.tsx:111
 msgid "Daily Brief turned off"
 msgstr "Daily Brief をオフにしました"
 
 #: src/features/home/components/home-page.tsx:229
-#: src/features/notifications/components/notification-settings.tsx:192
+#: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "Daily Brief をオンにしました"
 
@@ -7414,7 +7424,7 @@ msgstr "データの概要"
 msgid "Dataset"
 msgstr "データセット"
 
-#: src/features/evals/components/dataset-panel.tsx:118
+#: src/features/evals/components/dataset-panel.tsx:129
 msgid "Dataset views"
 msgstr "データセットの表示"
 
@@ -7546,7 +7556,7 @@ msgstr "既定"
 msgid "Default agent"
 msgstr "既定のエージェント"
 
-#: src/features/settings/components/account/account-settings.tsx:275
+#: src/features/settings/components/account/account-settings.tsx:276
 msgid "Default AI Response Language"
 msgstr "AI の既定の応答言語"
 
@@ -7558,19 +7568,19 @@ msgstr "既定の AI 設定"
 msgid "Default branch"
 msgstr "既定のブランチ"
 
-#: src/features/settings/components/account/account-settings.tsx:300
+#: src/features/settings/components/account/account-settings.tsx:301
 msgid "Default Dictation Language"
 msgstr "既定の音声入力言語"
 
-#: src/features/settings/components/account/account-settings.tsx:302
+#: src/features/settings/components/account/account-settings.tsx:303
 msgid "Default dictation language for new threads (BCP 47 code)."
 msgstr "新しいスレッドの既定の音声入力言語（BCP 47 コード）。"
 
-#: src/features/settings/components/account/account-settings.tsx:277
+#: src/features/settings/components/account/account-settings.tsx:278
 msgid "Default language for AI responses in new threads (BCP 47 code)."
 msgstr "新しいスレッドでの AI の既定の応答言語（BCP 47 コード）。"
 
-#: src/features/settings/components/account/account-settings.tsx:280
+#: src/features/settings/components/account/account-settings.tsx:281
 msgid "Default language updated"
 msgstr "既定の言語を更新しました"
 
@@ -7673,15 +7683,15 @@ msgstr "AI ソフトウェアエンジニアの Devin にタスクを委任"
 #: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
 #: src/features/chat/thread-list/group-header.tsx:149
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:164
-#: src/features/evals/components/dataset-panel.tsx:289
+#: src/features/evals/components/dataset-panel.tsx:322
 #: src/features/evals/components/evals-page.tsx:163
 #: src/features/local-models/components/ollama-model-manager.tsx:335
 #: src/features/pages/components/page-tree-item.tsx:174
 #: src/features/pages/components/pages-sidebar.tsx:292
 #: src/features/prompts/components/prompt-item.tsx:222
 #: src/features/prompts/components/prompt-list-view.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:689
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:822
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:696
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:829
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:889
 #: src/features/skills/components/skill-list.tsx:290
@@ -7760,7 +7770,7 @@ msgid "Delete Avatar"
 msgstr "アバターを削除"
 
 #. placeholder {0}: String(index + 1)
-#: src/features/evals/components/dataset-panel.tsx:167
+#: src/features/evals/components/dataset-panel.tsx:195
 msgid "Delete case {0}"
 msgstr "ケース {0} を削除"
 
@@ -7768,7 +7778,7 @@ msgstr "ケース {0} を削除"
 msgid "Delete collection"
 msgstr "コレクションを削除"
 
-#: src/features/evals/components/dataset-panel.tsx:99
+#: src/features/evals/components/dataset-panel.tsx:110
 msgid "Delete dataset"
 msgstr "データセットを削除"
 
@@ -7837,7 +7847,7 @@ msgstr "プロジェクトを削除"
 
 #: src/features/prompts/components/prompt-item.tsx:302
 #: src/features/prompts/components/prompt-list-view.tsx:316
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:902
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:909
 msgid "Delete Prompt"
 msgstr "プロンプトを削除"
 
@@ -7898,7 +7908,7 @@ msgstr "タスク「{deleteTitle}」を削除しますか？"
 msgid "Delete Team"
 msgstr "チームを削除"
 
-#: src/features/evals/components/dataset-panel.tsx:295
+#: src/features/evals/components/dataset-panel.tsx:328
 msgid "Delete this case?"
 msgstr "このケースを削除しますか？"
 
@@ -8182,7 +8192,7 @@ msgid "Details for case {0}"
 msgstr "ケース {0} の詳細"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:236
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:324
 msgid "Detected: {0}"
 msgstr "検出：{0}"
 
@@ -8268,7 +8278,7 @@ msgstr "図のテーマを更新しました"
 msgid "Diamond"
 msgstr "ひし形"
 
-#: src/features/settings/components/account/account-settings.tsx:305
+#: src/features/settings/components/account/account-settings.tsx:306
 msgid "Dictation language updated"
 msgstr "音声入力の言語を更新しました"
 
@@ -8308,7 +8318,7 @@ msgstr "すべて無効化"
 msgid "Disable deep work mode"
 msgstr "ディープワークモードを無効にする"
 
-#: src/features/settings/components/account/account-settings.tsx:155
+#: src/features/settings/components/account/account-settings.tsx:156
 msgid "Disable External Link Warning"
 msgstr "外部リンクの警告を無効化"
 
@@ -8411,7 +8421,7 @@ msgstr "結果にモデル名を表示"
 msgid "Display results"
 msgstr "結果を表示"
 
-#: src/features/settings/components/account/account-settings.tsx:561
+#: src/features/settings/components/account/account-settings.tsx:581
 msgid "Display timestamps on messages."
 msgstr "メッセージにタイムスタンプを表示します。"
 
@@ -8464,8 +8474,8 @@ msgstr "行を追加しますか？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
 #: ../../packages/chat-ui/src/chat/message-content.tsx:269
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:97
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:111
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:110
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:124
 msgid "Document"
 msgstr "ドキュメント"
 
@@ -8540,7 +8550,7 @@ msgstr "ダウンロード"
 msgid "Download {displayName}"
 msgstr "{displayName} をダウンロード"
 
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:127
 msgid "Download {filename}"
 msgstr "{filename} をダウンロード"
 
@@ -8548,7 +8558,7 @@ msgstr "{filename} をダウンロード"
 msgid "Download {fileName}"
 msgstr "{fileName} をダウンロード"
 
-#: src/features/chat/thread/sandbox-files.tsx:84
+#: src/features/chat/thread/sandbox-files.tsx:240
 msgid "Download {name} ({size})"
 msgstr "{name} をダウンロード（{size}）"
 
@@ -8573,7 +8583,7 @@ msgstr "XLSX としてダウンロード"
 msgid "Download content"
 msgstr "コンテンツをダウンロード"
 
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:127
 msgid "Download document"
 msgstr "ドキュメントをダウンロード"
 
@@ -8710,7 +8720,7 @@ msgstr "ドライラン（プレビューのみ — 削除は行いません）"
 msgid "Dry run complete"
 msgstr "ドライランが完了しました"
 
-#: src/features/settings/components/account/account-settings.tsx:107
+#: src/features/settings/components/account/account-settings.tsx:108
 msgid "Dubai"
 msgstr "ドバイ"
 
@@ -8861,7 +8871,7 @@ msgstr "Alibaba の今後のモデル機能をいち早く利用"
 msgid "Early adopters who want to experiment with Google's next-generation Flash capabilities"
 msgstr "Google の次世代 Flash の機能を試したいアーリーアダプター"
 
-#: src/features/settings/components/account/account-settings.tsx:89
+#: src/features/settings/components/account/account-settings.tsx:90
 msgid "Eastern Time (US & Canada)"
 msgstr "東部標準時（米国およびカナダ）"
 
@@ -8905,8 +8915,8 @@ msgstr "エッジに沿った生成"
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:206
 #: src/features/prompts/components/prompt-list-view.tsx:218
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:668
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:801
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:675
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:808
 #: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
@@ -8930,7 +8940,7 @@ msgid "Edit case"
 msgstr "ケースを編集"
 
 #. placeholder {0}: String(index + 1)
-#: src/features/evals/components/dataset-panel.tsx:159
+#: src/features/evals/components/dataset-panel.tsx:171
 msgid "Edit case {0}"
 msgstr "ケース {0} を編集"
 
@@ -8948,7 +8958,7 @@ msgid "Edit current slide"
 msgstr "現在のスライドを編集"
 
 #: src/features/evals/components/dataset-form-dialog.tsx:66
-#: src/features/evals/components/dataset-panel.tsx:96
+#: src/features/evals/components/dataset-panel.tsx:107
 msgid "Edit dataset"
 msgstr "データセットを編集"
 
@@ -9269,6 +9279,10 @@ msgstr "確認メールを送信しました"
 msgid "Email Verified:"
 msgstr "メール認証済み："
 
+#: src/features/notifications/components/notification-settings.tsx:241
+msgid "Email when a task finishes"
+msgstr ""
+
 #: src/features/settings/components/privacy/data-access.tsx:33
 #: src/features/settings/components/privacy/dpo-contact.tsx:22
 msgid "Email:"
@@ -9294,7 +9308,7 @@ msgstr "2FA を有効化"
 msgid "Enable a skill first — only enabled skills can be evaluated."
 msgstr "まずスキルを有効にしてください。評価できるのは有効なスキルのみです。"
 
-#: src/features/settings/components/account/account-settings.tsx:600
+#: src/features/settings/components/account/account-settings.tsx:620
 msgid "Enable advanced features and options."
 msgstr "高度な機能とオプションを有効にします。"
 
@@ -9303,7 +9317,7 @@ msgstr "高度な機能とオプションを有効にします。"
 msgid "Enable All"
 msgstr "すべて有効化"
 
-#: src/features/settings/components/account/account-settings.tsx:529
+#: src/features/settings/components/account/account-settings.tsx:549
 msgid "Enable animations and transitions in the UI."
 msgstr "UI のアニメーションとトランジションを有効にします。"
 
@@ -9331,7 +9345,7 @@ msgstr "ディープワークモードを有効にする"
 msgid "Enable Deep Work mode for complex multi-step tasks. The AI will iterate up to 25 times to complete your request."
 msgstr "複雑な多段階タスク向けにディープワークモードを有効にしましょう。AI はリクエストを完了するまで最大 25 回反復します。"
 
-#: src/features/settings/components/account/account-settings.tsx:382
+#: src/features/settings/components/account/account-settings.tsx:383
 msgid "Enable Follow-up Suggestions"
 msgstr "フォローアップの提案を有効化"
 
@@ -9682,7 +9696,7 @@ msgstr "氏名または表示名を入力"
 msgid "Enter your information to create an account"
 msgstr "アカウントを作成するには情報を入力してください"
 
-#: src/features/settings/components/account/account-settings.tsx:347
+#: src/features/settings/components/account/account-settings.tsx:348
 msgid "Enter your location"
 msgstr "所在地を入力"
 
@@ -9784,6 +9798,7 @@ msgid "Err%"
 msgstr "エラー率"
 
 #: ../../packages/ui/src/components/form/form-error.tsx:39
+#: src/features/evals/components/model-comparison.tsx:83
 #: src/features/evals/components/run-detail.tsx:32
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:56
 #: src/features/settings/connectors/connector-card.tsx:74
@@ -9829,10 +9844,11 @@ msgid "Error:"
 msgstr "エラー:"
 
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:92
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:241
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:245
 msgid "Error: {error}"
 msgstr "エラー: {error}"
 
+#: src/features/evals/components/model-comparison.tsx:113
 #: src/routes/admin/gateway/index.tsx:98
 msgid "Errors"
 msgstr "エラー"
@@ -10167,7 +10183,7 @@ msgid "Expansive field of view"
 msgstr "広大な視野"
 
 #: src/features/evals/components/case-fields.tsx:87
-#: src/features/evals/components/dataset-panel.tsx:133
+#: src/features/evals/components/dataset-panel.tsx:145
 msgid "Expected answer"
 msgstr "期待される回答"
 
@@ -10175,7 +10191,7 @@ msgstr "期待される回答"
 msgid "Expected source documents"
 msgstr "期待されるソースドキュメント"
 
-#: src/features/evals/components/dataset-panel.tsx:134
+#: src/features/evals/components/dataset-panel.tsx:146
 msgid "Expected sources"
 msgstr "期待されるソース"
 
@@ -10369,11 +10385,11 @@ msgstr "最大の Qwen モデルでの拡張思考モード"
 msgid "Extended thinking on Anthropic's most capable Opus"
 msgstr "Anthropic で最も高性能な Opus での拡張思考"
 
-#: src/features/settings/components/account/account-settings.tsx:164
+#: src/features/settings/components/account/account-settings.tsx:165
 msgid "External link warnings disabled"
 msgstr "外部リンクの警告を無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:164
+#: src/features/settings/components/account/account-settings.tsx:165
 msgid "External link warnings enabled"
 msgstr "外部リンクの警告を有効にしました"
 
@@ -10441,6 +10457,7 @@ msgstr "ファクトチェック"
 msgid "Fact check: Does sugar cause hyperactivity in children?"
 msgstr "ファクトチェック：砂糖は子どもの多動を引き起こしますか？"
 
+#: src/features/evals/components/model-comparison.tsx:90
 #: src/features/evals/components/run-detail.tsx:39
 msgid "Fail"
 msgstr "不合格"
@@ -10453,6 +10470,7 @@ msgstr "不合格"
 #: src/features/chat/thread-list/thread-node.tsx:469
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/devices/components/devices-settings.tsx:135
+#: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:132
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:41
@@ -10643,7 +10661,7 @@ msgstr "一部のプロンプトを削除できませんでした"
 msgid "Failed to delete tag"
 msgstr "タグを削除できませんでした"
 
-#: src/features/evals/components/dataset-panel.tsx:71
+#: src/features/evals/components/dataset-panel.tsx:82
 msgid "Failed to delete the case"
 msgstr "ケースを削除できませんでした"
 
@@ -10793,8 +10811,8 @@ msgstr "画像を読み込めませんでした"
 msgid "Failed to load skills"
 msgstr "スキルを読み込めませんでした"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:348
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:469
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:357
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:482
 msgid "Failed to load spreadsheet"
 msgstr "スプレッドシートを読み込めませんでした"
 
@@ -10825,11 +10843,11 @@ msgstr "スレッドを移動できませんでした"
 msgid "Failed to optimize prompt"
 msgstr "プロンプトを最適化できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:150
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
 msgid "Failed to parse file"
 msgstr "ファイルを解析できませんでした"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:209
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:213
 msgid "Failed to parse PPTX"
 msgstr "PPTX を解析できませんでした"
 
@@ -10958,7 +10976,7 @@ msgid "Failed to save preset"
 msgstr "プリセットを保存できませんでした"
 
 #: src/features/prompts/components/prompt-list.tsx:228
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:443
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:450
 msgid "Failed to save prompt"
 msgstr "プロンプトを保存できませんでした"
 
@@ -10970,7 +10988,7 @@ msgstr "プロバイダーを保存できませんでした"
 msgid "Failed to save rating"
 msgstr "評価を保存できませんでした"
 
-#: src/features/settings/components/account/account-settings.tsx:124
+#: src/features/settings/components/account/account-settings.tsx:125
 #: src/features/settings/components/personalization/personalization-settings.tsx:94
 msgid "Failed to save settings"
 msgstr "設定を保存できませんでした"
@@ -11009,7 +11027,7 @@ msgstr "確認メールを送信できませんでした"
 msgid "Failed to start impersonation"
 msgstr "なりすましを開始できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:184
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:272
 msgid "Failed to start import"
 msgstr "インポートを開始できませんでした"
 
@@ -11135,6 +11153,10 @@ msgstr "スキルを更新できませんでした"
 #: src/features/chat/tags/thread-tags-menu.tsx:53
 msgid "Failed to update tags"
 msgstr "タグを更新できませんでした"
+
+#: src/features/evals/components/dataset-panel.tsx:187
+msgid "Failed to update the case"
+msgstr ""
 
 #: src/features/chat/sharing/thread-share-button.tsx:146
 msgid "Failed to update thread visibility"
@@ -11515,7 +11537,7 @@ msgstr "お気に入りのページ"
 
 #: src/features/pages/components/pages-sidebar.tsx:205
 #: src/features/prompts/components/prompt-list.tsx:440
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:588
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:595
 msgid "Favorites"
 msgstr "お気に入り"
 
@@ -11795,7 +11817,7 @@ msgstr "フィンランド語"
 msgid "Finnish (Finland)"
 msgstr "フィンランド語（フィンランド）"
 
-#: src/features/settings/components/account/account-settings.tsx:211
+#: src/features/settings/components/account/account-settings.tsx:212
 msgid "Fira Code"
 msgstr "Fira Code"
 
@@ -11901,11 +11923,11 @@ msgstr "焦点距離"
 msgid "Follow these steps to connect your {platform} account."
 msgstr "次の手順に従って {platform} アカウントを接続してください。"
 
-#: src/features/settings/components/account/account-settings.tsx:393
+#: src/features/settings/components/account/account-settings.tsx:394
 msgid "Follow-up suggestions disabled"
 msgstr "フォローアップの提案を無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:393
+#: src/features/settings/components/account/account-settings.tsx:394
 msgid "Follow-up suggestions enabled"
 msgstr "フォローアップの提案を有効にしました"
 
@@ -12044,9 +12066,9 @@ msgstr "無料"
 
 #: src/features/prompts/components/prompt-list.tsx:160
 #: src/features/prompts/components/prompt-list.tsx:226
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:441
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:485
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:546
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:448
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:492
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:553
 msgid "Free accounts are limited to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "無料アカウントのプロンプトは 3 個までです。Pro にアップグレードすると無制限に使えます。"
 
@@ -12056,7 +12078,7 @@ msgid "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skill
 msgstr "無料アカウントのスキルは 5 個までです。Pro にアップグレードすると無制限に使えます。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:42
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:532
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:539
 msgid "Free accounts can create up to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "無料アカウントで作成できるプロンプトは 3 個までです。Pro にアップグレードすると無制限に作成できます。"
 
@@ -12075,6 +12097,11 @@ msgstr "まずは無料プランから。成長に合わせてスケールでき
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:597
 msgid "Freehand Draw"
 msgstr "フリーハンド描画"
+
+#. placeholder {0}: String(index + 1)
+#: src/features/evals/components/dataset-panel.tsx:181
+msgid "Freeze case {0}"
+msgstr ""
 
 #: src/features/chat/core/utils/language-utilities.ts:178
 #: src/features/chat/core/utils/language-utilities.ts:262
@@ -12281,6 +12308,10 @@ msgstr "BFL によるフロンティアティアの品質"
 #: src/features/canvas/canvas-panel.tsx:183
 msgid "Frosted Glass"
 msgstr "すりガラス"
+
+#: src/features/evals/components/model-comparison.tsx:153
+msgid "Frozen"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:264
 msgid "Full 1080p high-definition video output"
@@ -12618,13 +12649,17 @@ msgstr "ドイツ"
 msgid "Get a short summary here every morning."
 msgstr "毎朝ここに短いまとめが届きます。"
 
-#: src/features/notifications/components/notification-settings.tsx:141
+#: src/features/notifications/components/notification-settings.tsx:193
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 msgstr "タスクが完了したときや承認が必要なときに、アプリを閉じていてもシステム通知を受け取れます。"
 
 #: src/features/marketing/components/navbar-menu.tsx:200
 msgid "Get Access"
 msgstr "アクセスする"
+
+#: src/features/notifications/components/notification-settings.tsx:244
+msgid "Get an email with a link to the result when a task or trigger run finishes with one."
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:438
 #: src/features/marketing/components/gateway-landing-page.tsx:704
@@ -13193,7 +13228,7 @@ msgstr "ハンズフリーモードをオフにしました"
 msgid "Hands-free mode stopped: {0}"
 msgstr "ハンズフリーモードを停止しました：{0}"
 
-#: src/features/settings/components/account/account-settings.tsx:420
+#: src/features/settings/components/account/account-settings.tsx:421
 msgid "Hands-free voice"
 msgstr "ハンズフリーの音声"
 
@@ -13201,7 +13236,7 @@ msgstr "ハンズフリーの音声"
 msgid "Hands-free voice mode — talk, and replies are read aloud"
 msgstr "ハンズフリー音声モード — 話しかけると返信が読み上げられます"
 
-#: src/features/settings/components/account/account-settings.tsx:431
+#: src/features/settings/components/account/account-settings.tsx:432
 msgid "Hands-free voice updated"
 msgstr "ハンズフリーの音声を更新しました"
 
@@ -13291,7 +13326,7 @@ msgstr "出力を非表示"
 msgid "Hide password"
 msgstr "パスワードを非表示"
 
-#: src/features/settings/components/account/account-settings.tsx:139
+#: src/features/settings/components/account/account-settings.tsx:140
 msgid "Hide Personal Information"
 msgstr "個人情報を非表示"
 
@@ -13303,7 +13338,7 @@ msgstr "実行履歴を非表示"
 msgid "Hide translation"
 msgstr "翻訳を非表示"
 
-#: src/features/settings/components/account/account-settings.tsx:141
+#: src/features/settings/components/account/account-settings.tsx:142
 msgid "Hides your name and email from the UI."
 msgstr "UI から名前とメールアドレスを非表示にします。"
 
@@ -13514,7 +13549,7 @@ msgid "Honduras"
 msgstr "ホンジュラス"
 
 #: src/features/chat/core/utils/language-utilities.ts:358
-#: src/features/settings/components/account/account-settings.tsx:105
+#: src/features/settings/components/account/account-settings.tsx:106
 msgid "Hong Kong"
 msgstr "香港"
 
@@ -13555,7 +13590,7 @@ msgstr "スマートルーティングはどのように機能しますか？"
 msgid "How is Neore different from ChatGPT?"
 msgstr "Neore は ChatGPT と何が違いますか？"
 
-#: src/features/settings/components/account/account-settings.tsx:473
+#: src/features/settings/components/account/account-settings.tsx:493
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "一時チャットが自動削除されるまでの保持期間です。既定：24 時間。"
 
@@ -13866,18 +13901,18 @@ msgstr "なりすまし終了"
 msgid "Impersonation Stopped"
 msgstr "なりすましを終了"
 
-#: src/features/evals/components/dataset-panel.tsx:104
+#: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
 #: src/features/skills/components/skill-import-dialog.tsx:161
 #: src/features/skills/components/skill-list.tsx:331
 msgid "Import"
 msgstr "インポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:252
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
 msgid "Import All"
 msgstr "すべてインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:195
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:283
 msgid "Import cancelled"
 msgstr "インポートをキャンセルしました"
 
@@ -13885,30 +13920,38 @@ msgstr "インポートをキャンセルしました"
 msgid "Import cases"
 msgstr "ケースをインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:291
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:384
 msgid "Import complete!"
 msgstr "インポートが完了しました！"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:211
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
 msgid "Import Conversations"
 msgstr "会話をインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
-msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
-msgstr "ChatGPT、Google Gemini、Claude から会話をインポートします。エクスポートした JSON または ZIP ファイルをアップロードしてください。"
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:298
+msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+msgstr ""
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:104
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:305
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
+#~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
+#~ msgstr "ChatGPT、Google Gemini、Claude から会話をインポートします。エクスポートした JSON または ZIP ファイルをアップロードしてください。"
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:132
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:398
 msgid "Import failed"
 msgstr "インポートに失敗しました"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:296
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
 msgid "Import More"
 msgstr "さらにインポート"
 
 #: src/features/knowledge/components/knowledge-import-actions.tsx:69
 msgid "Import Notion export (.zip)"
 msgstr "Notion のエクスポートをインポート（.zip）"
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
+msgid "Import one kind of export at a time."
+msgstr ""
 
 #: src/features/skills/components/skill-import-dialog.tsx:99
 msgid "Import skill"
@@ -13949,7 +13992,7 @@ msgid "Imported skill \"{0}\""
 msgstr "スキル「{0}」をインポートしました"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:269
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
 msgid "Importing from {0}..."
 msgstr "{0} からインポートしています..."
 
@@ -14145,7 +14188,8 @@ msgstr "インペインティング"
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
 #: src/features/devices/components/device-tool-call.tsx:89
 #: src/features/evals/components/case-fields.tsx:69
-#: src/features/evals/components/dataset-panel.tsx:132
+#: src/features/evals/components/dataset-panel.tsx:144
+#: src/features/evals/components/model-comparison.tsx:138
 #: src/features/evals/components/run-comparison.tsx:146
 #: src/features/evals/components/run-detail.tsx:222
 msgid "Input"
@@ -14282,7 +14326,7 @@ msgstr "生成前に考えるインテリジェントな動画モデル"
 msgid "Intensity"
 msgstr "強度"
 
-#: src/features/settings/components/account/account-settings.tsx:188
+#: src/features/settings/components/account/account-settings.tsx:189
 msgid "Inter"
 msgstr "Inter"
 
@@ -14322,7 +14366,7 @@ msgstr "パスワードが無効です"
 msgid "Invalid password. Please try again."
 msgstr "パスワードが無効です。もう一度お試しください。"
 
-#: src/routes/(chat)/chat/index.tsx:51
+#: src/routes/(chat)/chat/index.tsx:116
 msgid "Invalid thread ID"
 msgstr "無効なスレッド ID です"
 
@@ -14566,7 +14610,7 @@ msgstr "ジャワ語"
 msgid "Javanese (Indonesia)"
 msgstr "ジャワ語（インドネシア）"
 
-#: src/features/settings/components/account/account-settings.tsx:214
+#: src/features/settings/components/account/account-settings.tsx:215
 msgid "JetBrains Mono"
 msgstr "JetBrains Mono"
 
@@ -14850,7 +14894,7 @@ msgstr "横長 (ワイドスクリーン)"
 msgid "Language"
 msgstr "言語"
 
-#: src/features/settings/components/account/account-settings.tsx:271
+#: src/features/settings/components/account/account-settings.tsx:272
 msgid "Language & Localization"
 msgstr "言語と地域"
 
@@ -14908,7 +14952,7 @@ msgstr "最新のエラー"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:317
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:410
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "前回のインポート：{2} に {1} から {0} 件の会話"
 
@@ -15167,7 +15211,7 @@ msgstr "左"
 msgid "Left organization successfully"
 msgstr "組織から退出しました"
 
-#: src/features/settings/components/account/account-settings.tsx:236
+#: src/features/settings/components/account/account-settings.tsx:237
 msgid "Left to Right (LTR)"
 msgstr "左から右（LTR）"
 
@@ -15252,6 +15296,10 @@ msgstr "線"
 #: src/features/evals/components/import-cases-dialog.tsx:104
 msgid "Line {0}: {1}"
 msgstr "{0} 行目：{1}"
+
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:168
+msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
+msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:171
 msgid "LINE Channel Access Token"
@@ -15399,6 +15447,7 @@ msgstr "読み込み中"
 msgid "Loading canvas editor..."
 msgstr "キャンバスエディターを読み込んでいます..."
 
+#: src/features/evals/components/model-comparison.tsx:70
 #: src/features/evals/components/run-comparison.tsx:45
 #: src/features/pages/components/page-agent-dialog.tsx:112
 #: src/features/pages/components/page-version-panel.tsx:101
@@ -15421,7 +15470,7 @@ msgstr "デバイスを読み込んでいます..."
 msgid "Loading document..."
 msgstr "ドキュメントを読み込んでいます..."
 
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:129
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:142
 msgid "Loading document…"
 msgstr ""
 
@@ -15480,7 +15529,7 @@ msgstr "ページを読み込んでいます…"
 msgid "Loading presentation..."
 msgstr "プレゼンテーションを読み込んでいます..."
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:233
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:237
 msgid "Loading presentation…"
 msgstr "プレゼンテーションを読み込んでいます…"
 
@@ -15495,6 +15544,11 @@ msgstr "プリセットを読み込み中…"
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:891
 msgid "Loading preview..."
 msgstr "プレビューを読み込んでいます..."
+
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:168
+#: src/features/chat/thread/sandbox-files.tsx:104
+msgid "Loading preview…"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:144
 msgid "Loading run…"
@@ -15520,7 +15574,7 @@ msgstr "スキルの詳細を読み込んでいます…"
 msgid "Loading skills…"
 msgstr "スキルを読み込んでいます…"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:455
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:468
 msgid "Loading spreadsheet…"
 msgstr "スプレッドシートを読み込んでいます…"
 
@@ -15592,11 +15646,11 @@ msgstr "ローカルリクエストに失敗しました。"
 msgid "localhost or 127.0.0.1 only. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 msgstr "localhost または 127.0.0.1 のみ。Ollama：{OLLAMA_DEFAULT_BASE_URL} · LM Studio：{LM_STUDIO_DEFAULT_BASE_URL}"
 
-#: src/features/settings/components/account/account-settings.tsx:325
+#: src/features/settings/components/account/account-settings.tsx:326
 msgid "Location"
 msgstr "所在地"
 
-#: src/features/settings/components/account/account-settings.tsx:335
+#: src/features/settings/components/account/account-settings.tsx:336
 msgid "Location updated"
 msgstr "所在地を更新しました"
 
@@ -15646,7 +15700,7 @@ msgstr "ロゴ"
 msgid "logos"
 msgstr "ロゴ"
 
-#: src/features/settings/components/account/account-settings.tsx:95
+#: src/features/settings/components/account/account-settings.tsx:96
 msgid "London"
 msgstr "ロンドン"
 
@@ -15787,7 +15841,7 @@ msgstr "マクロ"
 msgid "Macro telephoto, tight framing"
 msgstr "マクロ望遠、タイトなフレーミング"
 
-#: src/features/settings/components/account/account-settings.tsx:99
+#: src/features/settings/components/account/account-settings.tsx:100
 msgid "Madrid"
 msgstr "マドリード"
 
@@ -15799,11 +15853,11 @@ msgstr "マジックリンク"
 msgid "Magic link email sent"
 msgstr "マジックリンクのメールを送信しました"
 
-#: src/features/settings/components/account/account-settings.tsx:175
+#: src/features/settings/components/account/account-settings.tsx:176
 msgid "Main Font"
 msgstr "メインフォント"
 
-#: src/features/settings/components/account/account-settings.tsx:180
+#: src/features/settings/components/account/account-settings.tsx:181
 msgid "Main font updated"
 msgstr "メインフォントを更新しました"
 
@@ -16223,7 +16277,7 @@ msgstr "やや低"
 msgid "Medium-quality video generation with Alibaba's latest Wan improvements for general-purpose use"
 msgstr "Alibaba の最新 Wan の改良による汎用ミディアム品質の動画生成"
 
-#: src/features/settings/components/account/account-settings.tsx:110
+#: src/features/settings/components/account/account-settings.tsx:111
 msgid "Melbourne"
 msgstr "メルボルン"
 
@@ -16611,6 +16665,7 @@ msgstr "モード"
 msgid "Mode:"
 msgstr "モード:"
 
+#: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/usage-settings.tsx:316
@@ -16700,6 +16755,7 @@ msgstr "モデル: OpenAI Whisper"
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:262
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
+#: src/features/evals/components/dataset-panel.tsx:132
 #: src/features/layout/lib/dashboard-page-names.ts:30
 #: src/features/marketing/components/landing-footer.tsx:111
 #: src/features/marketing/components/landing-footer.tsx:157
@@ -16793,8 +16849,8 @@ msgstr "モンゴル語"
 msgid "Mongolian (Mongolia)"
 msgstr "モンゴル語（モンゴル）"
 
-#: src/features/settings/components/account/account-settings.tsx:191
-#: src/features/settings/components/account/account-settings.tsx:212
+#: src/features/settings/components/account/account-settings.tsx:192
+#: src/features/settings/components/account/account-settings.tsx:213
 msgid "Mono"
 msgstr "等幅"
 
@@ -16916,7 +16972,7 @@ msgstr "モーションプロンプト"
 msgid "Motion: {motionPercent}%"
 msgstr "モーション: {motionPercent}%"
 
-#: src/features/settings/components/account/account-settings.tsx:91
+#: src/features/settings/components/account/account-settings.tsx:92
 msgid "Mountain Time (US & Canada)"
 msgstr "山岳部標準時（米国およびカナダ）"
 
@@ -17067,7 +17123,7 @@ msgstr "画像とテキストの理解に Z.AI のビジョン対応 GLM モデ�
 msgid "Multimodal tasks where MiniMax's M2 delivers reliable vision and text understanding"
 msgstr "MiniMax の M2 が信頼性の高いビジョンとテキスト理解を発揮するマルチモーダルタスク"
 
-#: src/features/settings/components/account/account-settings.tsx:108
+#: src/features/settings/components/account/account-settings.tsx:109
 msgid "Mumbai, Kolkata"
 msgstr "ムンバイ、コルカタ"
 
@@ -17325,7 +17381,7 @@ msgstr "Neore は間違えることがあります。重要な情報は確認し
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:531
+#: src/routes/__root.tsx:533
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat はモダンな AI チャットアプリケーションです。最新の AI モデルとチャットし、会話を整理して、生産性を高めましょう。"
 
@@ -17569,7 +17625,7 @@ msgstr "ニュースレターのヒーロー画像"
 #: ../../packages/ui/src/components/ai-elements/inline-citation.tsx:153
 #: ../../packages/ui/src/components/pagination.tsx:52
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:337
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:643
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:656
 #: src/features/onboarding/components/onboarding-dialog.tsx:417
 msgid "Next"
 msgstr "次へ"
@@ -17595,12 +17651,12 @@ msgstr "次のオプション"
 msgid "Next output mode"
 msgstr "次の出力モード"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:92
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:121
 msgid "Next page"
 msgstr "次のページ"
 
 #: ../../packages/ui/src/components/carousel.tsx:171
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:279
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:283
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:392
 msgid "Next slide"
 msgstr "次のスライド"
@@ -17714,7 +17770,7 @@ msgstr "予算アラートが設定されていません。"
 msgid "No camera selected"
 msgstr "カメラが選択されていません"
 
-#: src/features/evals/components/dataset-panel.tsx:125
+#: src/features/evals/components/dataset-panel.tsx:137
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "まだケースがありません。手動で追加するか、CSV または JSONL ファイルをインポートするか、チャットのターンを「評価ケースとして保存」で保存してください。"
 
@@ -17762,7 +17818,7 @@ msgstr "コンテンツなし"
 msgid "No content to display"
 msgstr "表示するコンテンツがありません"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:139
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:219
 msgid "No conversations found in the file."
 msgstr "ファイル内に会話が見つかりませんでした。"
 
@@ -17788,8 +17844,8 @@ msgid "No data"
 msgstr "データなし"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:194
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:469
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:495
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:482
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:508
 msgid "No Data"
 msgstr "データなし"
 
@@ -18006,7 +18062,7 @@ msgstr "利用可能なプロジェクトがありません。先にプロジェ
 msgid "No prompt"
 msgstr "プロンプトなし"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:563
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:570
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "「{searchQuery}」に一致するプロンプトは見つかりませんでした"
 
@@ -18015,8 +18071,8 @@ msgid "No prompts found matching your search."
 msgstr "検索に一致するプロンプトは見つかりませんでした。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:28
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:527
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:563
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:534
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:570
 msgid "No prompts yet"
 msgstr "プロンプトはまだありません"
 
@@ -18078,7 +18134,7 @@ msgstr "“{searchTerm}” の結果が見つかりません"
 msgid "No results found."
 msgstr "結果が見つかりません。"
 
-#: src/features/evals/components/dataset-panel.tsx:186
+#: src/features/evals/components/dataset-panel.tsx:215
 msgid "No runs yet. Start one to score every case."
 msgstr "実行はまだありません。実行を開始してすべてのケースを採点しましょう。"
 
@@ -18086,7 +18142,7 @@ msgstr "実行はまだありません。実行を開始してすべてのケー
 msgid "No sessions found"
 msgstr "セッションが見つかりません"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:338
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:347
 msgid "No sheets found in spreadsheet"
 msgstr "スプレッドシートにシートが見つかりません"
 
@@ -18114,7 +18170,7 @@ msgstr "プレビューするスライドのコンテンツがありません"
 msgid "No slides found"
 msgstr "スライドが見つかりません"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:249
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:253
 msgid "No slides found in this presentation."
 msgstr "このプレゼンテーションにスライドが見つかりません。"
 
@@ -18152,11 +18208,11 @@ msgstr "利用可能なチームがありません"
 msgid "No templates available for this category yet."
 msgstr "このカテゴリにはまだテンプレートがありません。"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:143
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:147
 msgid "No text content"
 msgstr "テキストコンテンツなし"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:171
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:175
 msgid "No text content on this slide"
 msgstr "このスライドにはテキストコンテンツがありません"
 
@@ -18214,8 +18270,8 @@ msgid "No users found matching \"{search}\""
 msgstr "「{search}」に一致するユーザーは見つかりませんでした"
 
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:172
-msgid "No valid JSON conversation files found in the ZIP archive."
-msgstr "ZIP アーカイブ内に有効な JSON 会話ファイルが見つかりません。"
+#~ msgid "No valid JSON conversation files found in the ZIP archive."
+#~ msgstr "ZIP アーカイブ内に有効な JSON 会話ファイルが見つかりません。"
 
 #: src/features/prompts/components/thread-variables-config.tsx:248
 msgid "No variables configured. Add variables to customize prompt content for this thread."
@@ -18330,7 +18386,7 @@ msgstr "ノルウェー語（ノルウェー）"
 msgid "Not approved"
 msgstr "承認されませんでした"
 
-#: src/features/chat/thread/sandbox-files.tsx:144
+#: src/features/chat/thread/sandbox-files.tsx:313
 msgid "Not attached:"
 msgstr "添付されなかったファイル："
 
@@ -18417,15 +18473,15 @@ msgstr "通知ワークフロー、チャネル、受信者の設定"
 #: src/features/home/components/home-page.tsx:208
 #: src/features/notifications/components/notification-bell.tsx:63
 #: src/features/notifications/components/notification-bell.tsx:93
-#: src/features/notifications/components/notification-settings.tsx:147
+#: src/features/notifications/components/notification-settings.tsx:199
 msgid "Notifications"
 msgstr "通知"
 
-#: src/features/notifications/components/notification-settings.tsx:93
+#: src/features/notifications/components/notification-settings.tsx:145
 msgid "Notifications are blocked for this site in your browser."
 msgstr "このサイトの通知はブラウザーでブロックされています。"
 
-#: src/features/notifications/components/notification-settings.tsx:134
+#: src/features/notifications/components/notification-settings.tsx:186
 msgid "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 msgstr "このサイトの通知はブラウザーでブロックされています。オンにするにはサイトの設定で許可してください。"
 
@@ -18715,6 +18771,10 @@ msgstr "最初の {MAX_DOCUMENTS_PER_IMPORT} 件のドキュメントのみイ�
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:122
 msgid "Only the most recent days of this period are included."
 msgstr "この期間の直近の日のみが含まれます。"
+
+#: src/features/evals/components/model-comparison.tsx:97
+msgid "Only the newest runs were scanned, so an older model may be missing."
+msgstr ""
 
 #: src/features/skills/components/skill-form-dialog.tsx:461
 msgid "Only the owner can change who sees this skill."
@@ -19159,6 +19219,10 @@ msgstr "OpenAI の最小の LLM"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "最高速を実現する OpenAI の最小モデル"
 
+#: src/features/settings/components/account/account-settings.tsx:484
+msgid "Opening a blank chat"
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:156
 msgid "Opening a pull request — progress is in the log"
 msgstr "プルリクエストを作成しています — 進捗はログで確認できます"
@@ -19166,6 +19230,10 @@ msgstr "プルリクエストを作成しています — 進捗はログで確�
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:233
 msgid "Opening pull request…"
 msgstr "プルリクエストを作成しています…"
+
+#: src/features/settings/components/account/account-settings.tsx:475
+msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
+msgstr ""
 
 #: src/features/pages/components/page-invite-accept.tsx:54
 msgid "Opening the shared page…"
@@ -19437,6 +19505,10 @@ msgstr "その他の動画モデル"
 msgid "Our privacy policy explains how we collect, use, and protect your personal data in accordance with GDPR and other applicable data protection laws."
 msgstr "プライバシーポリシーでは、GDPR およびその他の適用されるデータ保護法に従って、個人データをどのように収集、使用、保護するかを説明しています。"
 
+#: src/features/evals/components/model-comparison.tsx:135
+msgid "Outcome of every case per model"
+msgstr ""
+
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
 #: src/features/workflow/types/index.ts:552
 #: src/features/workflow/types/index.ts:556
@@ -19456,7 +19528,7 @@ msgstr "出力"
 msgid "Output {outputNumber}: {label}"
 msgstr "出力 {outputNumber}: {label}"
 
-#: src/features/chat/thread/sandbox-files.tsx:136
+#: src/features/chat/thread/sandbox-files.tsx:305
 msgid "Output files"
 msgstr "出力ファイル"
 
@@ -19516,7 +19588,7 @@ msgstr "自分の内容で上書き"
 msgid "Owner"
 msgstr "オーナー"
 
-#: src/features/settings/components/account/account-settings.tsx:92
+#: src/features/settings/components/account/account-settings.tsx:93
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋標準時（米国およびカナダ）"
 
@@ -19525,7 +19597,7 @@ msgid "page"
 msgstr "ページ"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:236
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:552
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:565
 msgid "Page {currentPage} of {totalPages}"
 msgstr "{currentPage} / {totalPages} ページ"
 
@@ -19615,11 +19687,11 @@ msgstr "並列"
 msgid "Parallel Compare"
 msgstr "並列比較"
 
-#: src/features/settings/components/account/account-settings.tsx:96
+#: src/features/settings/components/account/account-settings.tsx:97
 msgid "Paris"
 msgstr "パリ"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:230
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:318
 msgid "Parsing file..."
 msgstr "ファイルを解析しています..."
 
@@ -19642,12 +19714,14 @@ msgstr "参加者が順番に、1 メッセージにつき 1 件ずつ返信し�
 msgid "Pashto"
 msgstr "パシュトー語"
 
+#: src/features/evals/components/model-comparison.tsx:90
 #: src/features/evals/components/run-detail.tsx:39
 msgid "Pass"
 msgstr "合格"
 
-#: src/features/evals/components/dataset-panel.tsx:207
+#: src/features/evals/components/dataset-panel.tsx:236
 #: src/features/evals/components/eval-summary-stats.tsx:17
+#: src/features/evals/components/model-comparison.tsx:114
 #: src/features/evals/components/run-comparison.tsx:61
 msgid "Pass rate"
 msgstr "合格率"
@@ -19661,6 +19735,7 @@ msgstr "パッセージ {0}（[{position}] として引用）"
 msgid "passed"
 msgstr "合格"
 
+#: src/features/evals/components/model-comparison.tsx:111
 #: src/features/tasks/components/task-detail-dialog.tsx:135
 msgid "Passed"
 msgstr "合格"
@@ -19735,7 +19810,7 @@ msgstr "パスワードが一致しません"
 msgid "Past cleanup runs and their results"
 msgstr "過去のクリーンアップの実行とその結果"
 
-#: src/features/evals/components/dataset-panel.tsx:290
+#: src/features/evals/components/dataset-panel.tsx:323
 msgid "Past runs keep their results for this case."
 msgstr "過去の実行では、このケースの結果が保持されます。"
 
@@ -19926,11 +20001,11 @@ msgstr "個人"
 msgid "Personal Account"
 msgstr "個人アカウント"
 
-#: src/features/settings/components/account/account-settings.tsx:148
+#: src/features/settings/components/account/account-settings.tsx:149
 msgid "Personal information is now hidden"
 msgstr "個人情報を非表示にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:148
+#: src/features/settings/components/account/account-settings.tsx:149
 msgid "Personal information is now visible"
 msgstr "個人情報を表示しました"
 
@@ -20095,7 +20170,7 @@ msgstr "プラットフォーム"
 msgid "Play"
 msgstr "再生"
 
-#: src/features/settings/components/account/account-settings.tsx:577
+#: src/features/settings/components/account/account-settings.tsx:597
 msgid "Play sound effects for UI interactions."
 msgstr "UI 操作時に効果音を再生します。"
 
@@ -20128,10 +20203,10 @@ msgid "Please log in to configure variables"
 msgstr "変数を設定するにはサインインしてください"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:35
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:479
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:528
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:540
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:564
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:486
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:535
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:547
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:571
 msgid "Please log in to create prompts"
 msgstr "プロンプトを作成するにはサインインしてください"
 
@@ -20401,7 +20476,7 @@ msgid "Preprocessor"
 msgstr "プリプロセッサ"
 
 #: ../../packages/chat-ui/src/chat/presentation-artifact.tsx:47
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:260
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:264
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:82
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:265
 msgid "Presentation"
@@ -20447,7 +20522,7 @@ msgstr "プリセット"
 msgid "Press ? for keyboard shortcuts"
 msgstr "? キーでキーボードショートカットを表示"
 
-#: src/features/settings/components/account/account-settings.tsx:262
+#: src/features/settings/components/account/account-settings.tsx:263
 msgid "Press Enter to send"
 msgstr "Enter キーで送信"
 
@@ -20459,7 +20534,7 @@ msgstr "Enter で送信、Shift+Enter で改行"
 msgid "Press keys..."
 msgstr "キーを押してください..."
 
-#: src/features/settings/components/account/account-settings.tsx:263
+#: src/features/settings/components/account/account-settings.tsx:264
 msgid "Press Shift+Enter to send"
 msgstr "Shift+Enter キーで送信"
 
@@ -20483,6 +20558,10 @@ msgstr "プレビュー"
 #: src/features/workflow/components/nodes/image-node.tsx:76
 msgid "Preview"
 msgstr "プレビュー"
+
+#: src/features/chat/thread/sandbox-files.tsx:253
+msgid "Preview {name}"
+msgstr ""
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:204
 msgid "Preview & Execute"
@@ -20531,7 +20610,7 @@ msgstr "プレビュー：{label}"
 #: ../../packages/ui/src/components/ai-elements/inline-citation.tsx:134
 #: ../../packages/ui/src/components/pagination.tsx:42
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:302
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:614
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:627
 msgid "Previous"
 msgstr "前へ"
 
@@ -20560,12 +20639,12 @@ msgstr "前のオプション"
 msgid "Previous output mode"
 msgstr "前の出力モード"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:78
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:107
 msgid "Previous page"
 msgstr "前のページ"
 
 #: ../../packages/ui/src/components/carousel.tsx:147
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:267
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:271
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:358
 msgid "Previous slide"
 msgstr "前のスライド"
@@ -20613,7 +20692,7 @@ msgstr "優先サポート"
 #: src/features/marketing/components/gateway-footer.tsx:139
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
-#: src/features/settings/components/account/account-settings.tsx:134
+#: src/features/settings/components/account/account-settings.tsx:135
 #: src/features/settings/components/chat/model-filter-settings.tsx:343
 msgid "Privacy"
 msgstr "プライバシー"
@@ -20803,7 +20882,7 @@ msgstr "説明的なテキストプロンプトから多用途で高品質な画
 msgid "Profile Information"
 msgstr "プロフィール情報"
 
-#: src/features/evals/components/dataset-panel.tsx:206
+#: src/features/evals/components/dataset-panel.tsx:235
 msgid "Progress"
 msgstr "進捗"
 
@@ -20865,7 +20944,7 @@ msgstr "プロンプトキャッシュ管理"
 msgid "Prompt copied to clipboard"
 msgstr "プロンプトをクリップボードにコピーしました"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:433
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:440
 msgid "Prompt created"
 msgstr "プロンプトを作成しました"
 
@@ -20910,7 +20989,7 @@ msgstr "すべてのモデルで実行するプロンプト..."
 msgid "Prompt Tokens"
 msgstr "プロンプトトークン"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:420
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:427
 msgid "Prompt updated"
 msgstr "プロンプトを更新しました"
 
@@ -20929,7 +21008,7 @@ msgstr "プロンプト変数"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:305
 #: src/features/prompts/components/prompt-header.tsx:10
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:468
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:475
 msgid "Prompts"
 msgstr "プロンプト"
 
@@ -21091,23 +21170,23 @@ msgstr "複雑なソフトウェアエンジニアリングタスク専用設計
 msgid "Purpose-optimized for code generation and debugging"
 msgstr "コード生成とデバッグに特化して最適化"
 
-#: src/features/notifications/components/notification-settings.tsx:94
+#: src/features/notifications/components/notification-settings.tsx:146
 msgid "Push notifications are not available here."
 msgstr "ここではプッシュ通知を利用できません。"
 
-#: src/features/notifications/components/notification-settings.tsx:129
+#: src/features/notifications/components/notification-settings.tsx:181
 msgid "Push notifications are not configured on this server."
 msgstr "このサーバーではプッシュ通知が設定されていません。"
 
-#: src/features/notifications/components/notification-settings.tsx:114
+#: src/features/notifications/components/notification-settings.tsx:166
 msgid "Push notifications are off for this browser"
 msgstr "このブラウザーのプッシュ通知はオフです"
 
-#: src/features/notifications/components/notification-settings.tsx:105
+#: src/features/notifications/components/notification-settings.tsx:157
 msgid "Push notifications are on for this browser"
 msgstr "このブラウザーのプッシュ通知はオンです"
 
-#: src/features/notifications/components/notification-settings.tsx:152
+#: src/features/notifications/components/notification-settings.tsx:204
 msgid "Push notifications on this browser"
 msgstr "このブラウザーでのプッシュ通知"
 
@@ -21237,7 +21316,7 @@ msgstr "ランダム"
 msgid "Random seed"
 msgstr "ランダムシード"
 
-#: src/features/settings/components/account/account-settings.tsx:517
+#: src/features/settings/components/account/account-settings.tsx:537
 msgid "Range: 1 hour to 7 days (168 hours)"
 msgstr "範囲：1 時間〜7 日（168 時間）"
 
@@ -21290,7 +21369,7 @@ msgstr "読み取りと書き込み"
 msgid "Read aloud"
 msgstr "読み上げ"
 
-#: src/features/settings/components/account/account-settings.tsx:403
+#: src/features/settings/components/account/account-settings.tsx:404
 msgid "Read every assistant reply aloud when it finishes, using your browser's voice."
 msgstr "アシスタントの返信が完了するたびに、ブラウザーの音声で読み上げます。"
 
@@ -21958,7 +22037,7 @@ msgstr "お気に入りから削除"
 
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:677
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:684
 msgid "Remove from Favorites"
 msgstr "お気に入りから削除"
 
@@ -22107,11 +22186,11 @@ msgstr "返信で検索や画像生成などができます。費用はあなた
 msgid "Replies use the free reply token when the answer is quick, and fall back to a push message (which counts against your LINE quota) when it is not."
 msgstr "すぐに回答できる場合は無料のリプライトークンを使い、そうでない場合はプッシュメッセージ（LINE の送信数上限にカウントされます）で返信します。"
 
-#: src/features/settings/components/account/account-settings.tsx:412
+#: src/features/settings/components/account/account-settings.tsx:413
 msgid "Replies will be read aloud"
 msgstr "返信が読み上げられます"
 
-#: src/features/settings/components/account/account-settings.tsx:412
+#: src/features/settings/components/account/account-settings.tsx:413
 msgid "Replies will no longer be read aloud"
 msgstr "返信は読み上げられなくなります"
 
@@ -22357,8 +22436,16 @@ msgstr "結果"
 msgid "Resume"
 msgstr "再開"
 
-#: src/features/settings/components/account/account-settings.tsx:485
-#: src/features/settings/components/account/account-settings.tsx:510
+#: src/features/settings/components/account/account-settings.tsx:472
+msgid "Resume your latest chat"
+msgstr ""
+
+#: src/features/settings/components/account/account-settings.tsx:484
+msgid "Resuming your latest chat"
+msgstr ""
+
+#: src/features/settings/components/account/account-settings.tsx:505
+#: src/features/settings/components/account/account-settings.tsx:530
 msgid "Retention period updated to {hours} hours"
 msgstr "保持期間を {hours} 時間に更新しました"
 
@@ -22366,7 +22453,7 @@ msgstr "保持期間を {hours} 時間に更新しました"
 msgid "retried after review"
 msgstr "レビュー後に再試行"
 
-#: src/features/evals/components/dataset-panel.tsx:91
+#: src/features/evals/components/dataset-panel.tsx:102
 msgid "Retrieval"
 msgstr "検索"
 
@@ -22514,11 +22601,11 @@ msgstr "RIFF (WAV/AVI/WebP)"
 msgid "Right"
 msgstr "右"
 
-#: src/features/settings/components/account/account-settings.tsx:237
+#: src/features/settings/components/account/account-settings.tsx:238
 msgid "Right to Left (RTL)"
 msgstr "右から左（RTL）"
 
-#: src/features/settings/components/account/account-settings.tsx:192
+#: src/features/settings/components/account/account-settings.tsx:193
 msgid "Roboto Slab"
 msgstr "Roboto Slab"
 
@@ -22558,7 +22645,7 @@ msgstr "ルーマニア語"
 msgid "Romanian (Romania)"
 msgstr "ルーマニア語（ルーマニア）"
 
-#: src/features/settings/components/account/account-settings.tsx:98
+#: src/features/settings/components/account/account-settings.tsx:99
 msgid "Rome"
 msgstr "ローマ"
 
@@ -22624,8 +22711,8 @@ msgstr "ルーブリック"
 msgid "Rule name is required"
 msgstr "ルール名は必須です"
 
-#: src/features/evals/components/dataset-panel.tsx:112
-#: src/features/evals/components/dataset-panel.tsx:204
+#: src/features/evals/components/dataset-panel.tsx:123
+#: src/features/evals/components/dataset-panel.tsx:233
 #: src/features/tasks/components/task-card.tsx:100
 #: src/features/workflow/components/canvas/workflow-controls.tsx:585
 msgid "Run"
@@ -22686,6 +22773,10 @@ msgstr "ワークフローを実行して出力を生成してください"
 msgid "Run these in PowerShell."
 msgstr "PowerShell で次のコマンドを実行してください。"
 
+#: src/features/evals/components/model-comparison.tsx:76
+msgid "Run this dataset against at least two models to compare them."
+msgstr ""
+
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:29
 msgid "Run workflow"
 msgstr "ワークフローを実行"
@@ -22724,7 +22815,7 @@ msgid "Running..."
 msgstr "実行しています..."
 
 #. placeholder {0}: String(runs.length)
-#: src/features/evals/components/dataset-panel.tsx:120
+#: src/features/evals/components/dataset-panel.tsx:131
 msgid "Runs ({0})"
 msgstr "実行（{0}）"
 
@@ -22733,7 +22824,7 @@ msgid "Runs in a cloud sandbox for up to 20 minutes on your own {keyProvider} AP
 msgstr "ご自身の {keyProvider} API キー（設定 → API キー）を使い、クラウドのサンドボックスで最大 20 分間実行されます。非公開の GitHub リポジトリには GitHub コネクタが必要です。"
 
 #. placeholder {0}: dataset.name
-#: src/features/evals/components/dataset-panel.tsx:198
+#: src/features/evals/components/dataset-panel.tsx:227
 msgid "Runs of {0}"
 msgstr "{0} の実行"
 
@@ -23001,7 +23092,7 @@ msgstr "スケジュールされたジョブ"
 msgid "Scheduler"
 msgstr "スケジューラー"
 
-#: src/features/evals/components/dataset-panel.tsx:208
+#: src/features/evals/components/dataset-panel.tsx:237
 #: src/features/evals/components/run-detail.tsx:224
 msgid "Score"
 msgstr "スコア"
@@ -23078,7 +23169,7 @@ msgid "Search connectors..."
 msgstr "コネクタを検索..."
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:269
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:582
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:595
 msgid "Search data..."
 msgstr "データを検索..."
 
@@ -23162,7 +23253,7 @@ msgid "Search pages"
 msgstr "ページを検索"
 
 #: src/features/prompts/components/prompt-list.tsx:512
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:507
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:514
 msgid "Search prompts..."
 msgstr "プロンプトを検索..."
 
@@ -23333,7 +23424,7 @@ msgstr "プレビューするバージョンを選択"
 msgid "Select a version to see changes"
 msgstr "変更を表示するバージョンを選択"
 
-#: src/features/settings/components/account/account-settings.tsx:436
+#: src/features/settings/components/account/account-settings.tsx:437
 msgid "Select a voice"
 msgstr "音声を選択"
 
@@ -23365,7 +23456,7 @@ msgstr "チームを管理する組織を選択してください"
 msgid "Select as reference"
 msgstr "参照として選択"
 
-#: src/features/settings/components/account/account-settings.tsx:310
+#: src/features/settings/components/account/account-settings.tsx:311
 msgid "Select dictation language"
 msgstr "音声入力の言語を選択"
 
@@ -23373,7 +23464,7 @@ msgstr "音声入力の言語を選択"
 msgid "Select duration"
 msgstr "期間を選択"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:224
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:312
 msgid "Select File"
 msgstr "ファイルを選択"
 
@@ -23385,7 +23476,7 @@ msgstr "アップロードするファイルを選択"
 msgid "Select image as reference"
 msgstr "画像を参照として選択"
 
-#: src/features/settings/components/account/account-settings.tsx:285
+#: src/features/settings/components/account/account-settings.tsx:286
 msgid "Select language"
 msgstr "言語を選択"
 
@@ -23539,7 +23630,7 @@ msgstr "回答を送信"
 msgid "Send Backward"
 msgstr "背面へ移動"
 
-#: src/features/settings/components/account/account-settings.tsx:254
+#: src/features/settings/components/account/account-settings.tsx:255
 msgid "Send behavior updated"
 msgstr "送信方法を更新しました"
 
@@ -23558,7 +23649,7 @@ msgstr "マジックリンクを送信"
 msgid "Send message"
 msgstr "メッセージを送信"
 
-#: src/features/settings/components/account/account-settings.tsx:248
+#: src/features/settings/components/account/account-settings.tsx:249
 msgid "Send Message Behavior"
 msgstr "メッセージの送信方法"
 
@@ -23614,7 +23705,7 @@ msgstr "セルビア語"
 msgid "Serbian (Serbia)"
 msgstr "セルビア語（セルビア）"
 
-#: src/features/settings/components/account/account-settings.tsx:190
+#: src/features/settings/components/account/account-settings.tsx:191
 msgid "Serif"
 msgstr "セリフ"
 
@@ -23679,7 +23770,7 @@ msgstr "パスワードを設定"
 msgid "Set the focal length in millimeters"
 msgstr "焦点距離をミリメートルで設定します"
 
-#: src/features/settings/components/account/account-settings.tsx:224
+#: src/features/settings/components/account/account-settings.tsx:225
 msgid "Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian."
 msgstr "アプリケーションのテキストの方向を設定します。RTL はアラビア語、ヘブライ語、ペルシア語などの言語で使われます。"
 
@@ -23726,7 +23817,7 @@ msgstr "複数のスキルが 1 つの会話で回答します。@ でメンシ�
 msgid "Shallow, cinematic separation"
 msgstr "浅い被写界深度、シネマティックな分離"
 
-#: src/features/settings/components/account/account-settings.tsx:104
+#: src/features/settings/components/account/account-settings.tsx:105
 msgid "Shanghai"
 msgstr "上海"
 
@@ -23808,7 +23899,7 @@ msgstr "シャープなディテール"
 msgid "Sharpen"
 msgstr "シャープ"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:531
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:544
 msgid "Sheet 1"
 msgstr "シート 1"
 
@@ -23853,7 +23944,7 @@ msgstr "添付コンテンツを表示"
 msgid "Show follow-up suggestions"
 msgstr "フォローアップの提案を表示"
 
-#: src/features/settings/components/account/account-settings.tsx:384
+#: src/features/settings/components/account/account-settings.tsx:385
 msgid "Show follow-up suggestions after assistant messages."
 msgstr "アシスタントのメッセージの後にフォローアップの提案を表示します。"
 
@@ -23911,7 +24002,7 @@ msgstr "この目標のタスクを表示"
 msgid "Show this help"
 msgstr "このヘルプを表示"
 
-#: src/features/settings/components/account/account-settings.tsx:559
+#: src/features/settings/components/account/account-settings.tsx:579
 msgid "Show Timestamps"
 msgstr "タイムスタンプを表示"
 
@@ -23924,7 +24015,7 @@ msgid "Show what it will send"
 msgstr "送信内容を表示"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:245
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:562
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:575
 msgid "Show/Hide Columns"
 msgstr "列の表示/非表示"
 
@@ -23940,12 +24031,12 @@ msgstr "{0} 人のユーザーを表示中。さらにユーザーがいます�
 #. placeholder {0}: Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, promptGroups.all.length)
 #. placeholder {1}: Math.min(currentPage * ITEMS_PER_PAGE, promptGroups.all.length)
 #. placeholder {2}: promptGroups.all.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:839
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:846
 msgid "Showing {0}-{1} of {2} prompts"
 msgstr "{2} 件中 {0}〜{1} 件のプロンプトを表示中"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:297
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:610
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:623
 msgid "Showing {firstShown} to {lastShown} of {totalRows} rows"
 msgstr "{totalRows} 行中 {firstShown}〜{lastShown} 行を表示"
 
@@ -24118,7 +24209,7 @@ msgstr "簡潔にする"
 msgid "since replaced"
 msgstr "置き換え済み"
 
-#: src/features/settings/components/account/account-settings.tsx:106
+#: src/features/settings/components/account/account-settings.tsx:107
 msgid "Singapore"
 msgstr "シンガポール"
 
@@ -24141,7 +24232,7 @@ msgstr "シンハラ語（スリランカ）"
 msgid "Size"
 msgstr "サイズ"
 
-#: src/features/chat/thread/sandbox-files.tsx:117
+#: src/features/chat/thread/sandbox-files.tsx:286
 msgid "size limit reached"
 msgstr "サイズ上限に達しました"
 
@@ -24225,11 +24316,11 @@ msgstr "CLIP レイヤーをスキップ (0 = なし、1〜2 = よりスタイ�
 msgid "Skip questions"
 msgstr "質問をスキップ"
 
-#: src/features/settings/components/account/account-settings.tsx:157
+#: src/features/settings/components/account/account-settings.tsx:158
 msgid "Skip the warning dialog when clicking external links."
 msgstr "外部リンクをクリックしたときの警告ダイアログを表示しません。"
 
-#: src/routes/__root.tsx:408
+#: src/routes/__root.tsx:410
 msgid "Skip to content"
 msgstr "コンテンツへスキップ"
 
@@ -24240,6 +24331,11 @@ msgstr "ツアーをスキップ"
 #: src/features/evals/components/run-detail.tsx:36
 msgid "Skipped"
 msgstr "スキップ済み"
+
+#. placeholder {0}: state.skipped.join(", ")
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:328
+msgid "Skipped files that are not chat exports: {0}"
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:144
 #: src/features/marketing/components/landing-page.tsx:362
@@ -24262,7 +24358,7 @@ msgstr "Slack のスレッドは保持されます。Slack スレッド内の返
 msgid "Slide {currentSlide} of {totalSlides}"
 msgstr "スライド {currentSlide} / {totalSlides}"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:131
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:135
 msgid "Slide {slideNumber}"
 msgstr "スライド {slideNumber}"
 
@@ -24463,15 +24559,15 @@ msgstr "2M トークンのコンテキストで SOTA のコスト効率"
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "Replicate 経由のベクターアートとタイポグラフィ対応の SOTA"
 
-#: src/features/settings/components/account/account-settings.tsx:575
+#: src/features/settings/components/account/account-settings.tsx:595
 msgid "Sound Effects"
 msgstr "効果音"
 
-#: src/features/settings/components/account/account-settings.tsx:584
+#: src/features/settings/components/account/account-settings.tsx:604
 msgid "Sound effects disabled"
 msgstr "効果音を無効にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:584
+#: src/features/settings/components/account/account-settings.tsx:604
 msgid "Sound effects enabled"
 msgstr "効果音を有効にしました"
 
@@ -24494,7 +24590,7 @@ msgstr "ソース {position}：{0}、パッセージ {1}"
 msgid "Source chat"
 msgstr "元のチャット"
 
-#: src/features/settings/components/account/account-settings.tsx:215
+#: src/features/settings/components/account/account-settings.tsx:216
 msgid "Source Code Pro"
 msgstr "Source Code Pro"
 
@@ -24676,7 +24772,7 @@ msgstr "Spotify"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:43
 #: ../../packages/ui/src/components/spreadsheet/spreadsheet-thumbnail.tsx:170
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:511
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:524
 msgid "Spreadsheet"
 msgstr "スプレッドシート"
 
@@ -24911,7 +25007,7 @@ msgstr "開始中"
 msgid "Starting {0}…"
 msgstr "{0} を開始しています…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:278
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
 msgid "Starting import..."
 msgstr "インポートを開始しています..."
 
@@ -24956,7 +25052,7 @@ msgstr "ステートレス"
 msgid "Stateless Mode"
 msgstr "ステートレスモード"
 
-#: src/features/evals/components/dataset-panel.tsx:205
+#: src/features/evals/components/dataset-panel.tsx:234
 #: src/features/tasks/components/goal-form-dialog.tsx:135
 #: src/routes/admin/gateway/index.tsx:137
 msgid "Status"
@@ -24991,7 +25087,7 @@ msgstr "ステップ数"
 msgid "Stock and currency information"
 msgstr "株価と為替の情報"
 
-#: src/features/settings/components/account/account-settings.tsx:101
+#: src/features/settings/components/account/account-settings.tsx:102
 msgid "Stockholm"
 msgstr "ストックホルム"
 
@@ -25465,7 +25561,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "成功基準は {CRITERIA_MAX} 文字以内で入力してください"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:100
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:128
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "{0} から {imported} 件の会話をインポートしました"
 
@@ -25490,7 +25586,7 @@ msgstr "回答の候補"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
 
-#: src/features/settings/components/account/account-settings.tsx:456
+#: src/features/settings/components/account/account-settings.tsx:457
 msgid "Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion."
 msgstr "メッセージの続きをグレーの文字で提案します。行末で右矢印キーを押すと確定、Esc で破棄します。提案のために下書きが AI モデルに送信されます。"
 
@@ -25546,7 +25642,7 @@ msgstr "複数ファイルにまたがる優れたコード生成とリファク
 msgid "Superior understanding of complex visual concepts"
 msgstr "複雑な視覚的コンセプトへの優れた理解"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:221
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:309
 msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
 msgstr "対応形式：ChatGPT のエクスポート（conversations.json）、Google Gemini（Takeout ZIP）、Claude.ai のエクスポート。"
 
@@ -25650,7 +25746,7 @@ msgstr "チームビューに切り替えました"
 msgid "Switzerland"
 msgstr "スイス"
 
-#: src/features/settings/components/account/account-settings.tsx:109
+#: src/features/settings/components/account/account-settings.tsx:110
 msgid "Sydney"
 msgstr "シドニー"
 
@@ -25670,7 +25766,7 @@ msgstr "統合役（回答をまとめる）"
 msgid "Synthesizer (weighs both sides)"
 msgstr "統合役（双方を比較検討する）"
 
-#: src/features/settings/components/account/account-settings.tsx:189
+#: src/features/settings/components/account/account-settings.tsx:190
 msgid "System"
 msgstr "システム"
 
@@ -25795,6 +25891,14 @@ msgstr "タスクの詳細、あなたのレビュー、実行履歴。"
 #: src/features/tasks/hooks/use-task-notifications.ts:33
 msgid "Task done: {title}"
 msgstr "タスク完了：{title}"
+
+#: src/features/notifications/components/notification-settings.tsx:104
+msgid "Task emails turned off"
+msgstr ""
+
+#: src/features/notifications/components/notification-settings.tsx:105
+msgid "Task emails turned on"
+msgstr ""
 
 #: src/features/notifications/lib/notification-labels.ts:48
 msgid "Task failed"
@@ -25996,7 +26100,7 @@ msgstr "一時チャット"
 msgid "Temporary chat mode"
 msgstr "一時チャットモード"
 
-#: src/features/settings/components/account/account-settings.tsx:470
+#: src/features/settings/components/account/account-settings.tsx:490
 msgid "Temporary Chat Retention (hours)"
 msgstr "一時チャットの保持期間（時間）"
 
@@ -26099,15 +26203,15 @@ msgstr "テキストの配置"
 msgid "Text Content"
 msgstr "テキストコンテンツ"
 
-#: src/features/settings/components/account/account-settings.tsx:222
+#: src/features/settings/components/account/account-settings.tsx:223
 msgid "Text Direction"
 msgstr "テキストの方向"
 
-#: src/features/settings/components/account/account-settings.tsx:228
+#: src/features/settings/components/account/account-settings.tsx:229
 msgid "Text direction set to LTR"
 msgstr "テキストの方向を LTR に設定しました"
 
-#: src/features/settings/components/account/account-settings.tsx:228
+#: src/features/settings/components/account/account-settings.tsx:229
 msgid "Text direction set to RTL"
 msgstr "テキストの方向を RTL に設定しました"
 
@@ -26258,6 +26362,10 @@ msgstr "チャットエージェントがツールを使ってタスクを処理
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:41
 msgid "The coding agent could not start."
 msgstr "コーディングエージェントを起動できませんでした。"
+
+#: src/features/evals/components/model-comparison.tsx:62
+msgid "The comparison could not be loaded."
+msgstr ""
 
 #: src/routes/dashboard/settings/connectors/callback.tsx:67
 msgid "The connection could not be completed."
@@ -26552,7 +26660,7 @@ msgstr "許可された修正ラウンドを経ても、検証役はこの結果
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "すべての基準を満たした場合のみ、検証役は結果を合格にします。"
 
-#: src/features/settings/components/account/account-settings.tsx:423
+#: src/features/settings/components/account/account-settings.tsx:424
 msgid "The voice hands-free mode reads replies in. A skill with its own voice uses that instead. Spoken replies count against a daily allowance; after it, your browser's voice takes over."
 msgstr "ハンズフリーモードが返信を読み上げる音声です。独自の音声を持つスキルはその音声を使います。読み上げは1日の利用枠にカウントされ、上限を超えるとブラウザーの音声に切り替わります。"
 
@@ -26662,7 +26770,7 @@ msgstr "この操作は元に戻せません。チームメンバーは全員削
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "この操作は元に戻せません。組織と関連するすべてのデータが完全に削除されます。"
 
-#: src/features/notifications/components/notification-settings.tsx:138
+#: src/features/notifications/components/notification-settings.tsx:190
 msgid "This browser cannot receive push notifications here."
 msgstr "このブラウザーではここでプッシュ通知を受信できません。"
 
@@ -26837,6 +26945,12 @@ msgstr "このプレゼンテーションにはまだスライドがありませ
 msgid "This preset will be permanently removed."
 msgstr "このプリセットは完全に削除されます。"
 
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:160
+#: src/features/chat/thread/sandbox-files.tsx:159
+#: src/features/chat/thread/sandbox-files.tsx:199
+msgid "This preview could not be loaded."
+msgstr ""
+
 #: src/features/chat/sidebar/thread-sidebar.tsx:203
 msgid "This prompt will be used for every message alongside the conversation history."
 msgstr "このプロンプトは、会話履歴とともにすべてのメッセージで使用されます。"
@@ -26857,6 +26971,10 @@ msgstr "コンピューターからモデルファイルを削除します。後
 msgid "This run is no longer available."
 msgstr "この実行は利用できなくなりました。"
 
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:225
+msgid "This selection is too large to import at once. Import fewer files at a time."
+msgstr ""
+
 #: src/features/settings/components/chat/mcp-settings.tsx:367
 msgid "This server requires sign-in. Save it, then choose Sign in."
 msgstr "このサーバーにはサインインが必要です。保存してから「サインイン」を選択してください。"
@@ -26865,7 +26983,7 @@ msgstr "このサーバーにはサインインが必要です。保存してか
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "このサーバーのレジストリエントリでは、以下の値が求められます。URL とヘッダーに入力されます。"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:496
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:509
 msgid "This sheet appears to be empty."
 msgstr "このシートは空のようです。"
 
@@ -26885,7 +27003,7 @@ msgstr "このスラッグは既に使用されています"
 msgid "This slug is available"
 msgstr "このスラッグは利用できます"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:475
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:488
 msgid "This spreadsheet appears to be empty or could not be parsed."
 msgstr "このスプレッドシートは空か、解析できませんでした。"
 
@@ -26901,7 +27019,7 @@ msgstr "このタスクはまだ実行されていません。"
 msgid "This thread"
 msgstr "このスレッド"
 
-#: src/routes/(chat)/chat/index.tsx:56
+#: src/routes/(chat)/chat/index.tsx:121
 msgid "This thread has been deleted"
 msgstr "このスレッドは削除されました"
 
@@ -26935,7 +27053,7 @@ msgstr "プロジェクトと関連するすべてのスレッドが完全に削
 #. placeholder {0}: promptToDelete?.name
 #: src/features/prompts/components/prompt-item.tsx:294
 #: src/features/prompts/components/prompt-list-view.tsx:300
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:892
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:899
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
 msgstr "プロンプト「{0}」が完全に削除されます。この操作は元に戻せません。"
 
@@ -26998,7 +27116,7 @@ msgstr "スレッドを公開しました"
 msgid "Thread management"
 msgstr "スレッド管理"
 
-#: src/routes/(chat)/chat/index.tsx:61
+#: src/routes/(chat)/chat/index.tsx:126
 msgid "Thread not found or you don't have access to it"
 msgstr "スレッドが見つからないか、アクセス権がありません"
 
@@ -27046,7 +27164,7 @@ msgstr "しきい値"
 msgid "Threshold must be between 1 and 365 days"
 msgstr "しきい値は 1〜365 日の範囲で指定してください"
 
-#: src/features/evals/components/dataset-panel.tsx:190
+#: src/features/evals/components/dataset-panel.tsx:219
 msgid "Tick two runs to compare them."
 msgstr "比較する 2 つの実行にチェックを入れてください。"
 
@@ -27067,20 +27185,20 @@ msgstr "ティルトシフト"
 msgid "Timeline image"
 msgstr "タイムライン画像"
 
-#: src/features/settings/components/account/account-settings.tsx:568
+#: src/features/settings/components/account/account-settings.tsx:588
 msgid "Timestamps disabled"
 msgstr "タイムスタンプを非表示にしました"
 
-#: src/features/settings/components/account/account-settings.tsx:568
+#: src/features/settings/components/account/account-settings.tsx:588
 msgid "Timestamps enabled"
 msgstr "タイムスタンプを表示しました"
 
-#: src/features/settings/components/account/account-settings.tsx:353
+#: src/features/settings/components/account/account-settings.tsx:354
 #: src/features/settings/components/chat/trigger-settings.tsx:235
 msgid "Timezone"
 msgstr "タイムゾーン"
 
-#: src/features/settings/components/account/account-settings.tsx:358
+#: src/features/settings/components/account/account-settings.tsx:359
 msgid "Timezone updated"
 msgstr "タイムゾーンを更新しました"
 
@@ -27207,15 +27325,15 @@ msgstr "トークン"
 msgid "Tokens used on your own endpoint are not charged as credits. Daily message limits still apply."
 msgstr "独自のエンドポイントで使用したトークンはクレジットとして課金されません。1 日のメッセージ上限は引き続き適用されます。"
 
-#: src/features/settings/components/account/account-settings.tsx:103
+#: src/features/settings/components/account/account-settings.tsx:104
 msgid "Tokyo"
 msgstr "東京"
 
-#: src/features/chat/thread/sandbox-files.tsx:109
+#: src/features/chat/thread/sandbox-files.tsx:278
 msgid "too large"
 msgstr "大きすぎます"
 
-#: src/features/chat/thread/sandbox-files.tsx:113
+#: src/features/chat/thread/sandbox-files.tsx:282
 msgid "too many files"
 msgstr "ファイルが多すぎます"
 
@@ -27302,7 +27420,7 @@ msgstr "複雑なベンチマークでトップクラスの推論"
 msgid "Top-tier text-to-video quality"
 msgstr "トップクラスのテキストから動画の品質"
 
-#: src/features/settings/components/account/account-settings.tsx:93
+#: src/features/settings/components/account/account-settings.tsx:94
 msgid "Toronto"
 msgstr "トロント"
 
@@ -27318,6 +27436,10 @@ msgstr "合計コスト"
 #: src/features/admin/components/admin-dashboard-stats.tsx:125
 msgid "Total Users"
 msgstr "ユーザー総数"
+
+#: src/features/evals/components/model-comparison.tsx:107
+msgid "Totals per model"
+msgstr ""
 
 #: src/features/admin/components/audit-log-card.tsx:131
 msgid "Track all admin actions for accountability"
@@ -27516,7 +27638,7 @@ msgstr "再試行"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:309
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
 msgid "Try Again"
 msgstr "もう一度試す"
 
@@ -27668,7 +27790,7 @@ msgstr "タイポグラフィ"
 msgid "UAE"
 msgstr "アラブ首長国連邦"
 
-#: src/features/settings/components/account/account-settings.tsx:522
+#: src/features/settings/components/account/account-settings.tsx:542
 msgid "UI Preferences"
 msgstr "UI の設定"
 
@@ -27805,6 +27927,11 @@ msgstr "元に戻す"
 msgid "Undo (Ctrl+Z)"
 msgstr "元に戻す (Ctrl+Z)"
 
+#. placeholder {0}: String(index + 1)
+#: src/features/evals/components/dataset-panel.tsx:181
+msgid "Unfreeze case {0}"
+msgstr ""
+
 #: src/features/workflow/components/nodes/group-node.tsx:184
 msgid "Ungroup"
 msgstr "グループ解除"
@@ -27929,10 +28056,14 @@ msgid "Unsaved changes"
 msgstr "未保存の変更"
 
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:178
-msgid "Unsupported file format. Please upload a .json or .zip file."
-msgstr "サポートされていないファイル形式です。.json または .zip ファイルをアップロードしてください。"
+#~ msgid "Unsupported file format. Please upload a .json or .zip file."
+#~ msgstr "サポートされていないファイル形式です。.json または .zip ファイルをアップロードしてください。"
 
-#: src/features/chat/thread/sandbox-files.tsx:121
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:243
+msgid "Unsupported file format. Please upload a .json, .jsonl or .zip file."
+msgstr ""
+
+#: src/features/chat/thread/sandbox-files.tsx:290
 msgid "unsupported type"
 msgstr "未対応の形式"
 
@@ -27959,7 +28090,7 @@ msgstr "無題のチャット"
 
 #: src/components/command-palette.tsx:134
 #: src/components/command-palette.tsx:145
-#: src/features/chat/core/hooks/use-thread-manager.ts:225
+#: src/features/chat/core/hooks/use-thread-manager.ts:234
 msgid "Untitled Thread"
 msgstr "無題のスレッド"
 
@@ -28214,7 +28345,7 @@ msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} をアップロードしています"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:262
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:355
 msgid "Uploading data for import from {0}..."
 msgstr "{0} からのインポート用データをアップロードしています..."
 
@@ -28571,7 +28702,7 @@ msgstr "ウズベキスタン"
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "データ品質を検証し、信頼できる情報源を優先します。リサーチやファクトチェックに不可欠です。"
 
-#: src/features/settings/components/account/account-settings.tsx:94
+#: src/features/settings/components/account/account-settings.tsx:95
 msgid "Vancouver"
 msgstr "バンクーバー"
 
@@ -29956,7 +30087,7 @@ msgid "You've been invited to join an organization"
 msgstr "組織への招待が届いています"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:43
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:533
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:540
 msgid "You've reached the free account limit of 3 prompts. Upgrade to Pro to create more."
 msgstr "無料アカウントのプロンプト上限（3 個）に達しました。さらに作成するには Pro にアップグレードしてください。"
 
@@ -30079,7 +30210,7 @@ msgstr "最新の変更はまだ保存されていません。"
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "ローカルサーバーは応答しましたが、このサイトを拒否しました（CORS）。このサイトのオリジンを許可してください。Ollama の場合は OLLAMA_ORIGINS を設定し、LM Studio の場合は「Enable CORS」をオンにしてから、サーバーを再起動してください。"
 
-#: src/features/settings/components/account/account-settings.tsx:327
+#: src/features/settings/components/account/account-settings.tsx:328
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "所在地（例：「アメリカ、ニューヨーク」「ドイツ、ベルリン」）。"
 
@@ -30147,7 +30278,7 @@ msgstr "自分のタグ"
 msgid "Your Team plans will be cancelled"
 msgstr "Team プランは解約されます"
 
-#: src/features/settings/components/account/account-settings.tsx:355
+#: src/features/settings/components/account/account-settings.tsx:356
 msgid "Your timezone (IANA timezone identifier)."
 msgstr "タイムゾーン（IANA タイムゾーン識別子）。"
 
@@ -30235,7 +30366,7 @@ msgstr "Zhipu AI の最も強力な推論 LLM"
 msgid "ZIP archive"
 msgstr "ZIP アーカイブ"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:114
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:283
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:289
 msgid "Zoom in"
@@ -30250,7 +30381,7 @@ msgstr "拡大"
 msgid "Zoom Lens"
 msgstr "ズームレンズ"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:104
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:249
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:255
 msgid "Zoom out"
@@ -30269,7 +30400,7 @@ msgstr "ズールー語"
 msgid "Zulu (South Africa)"
 msgstr "ズールー語（南アフリカ）"
 
-#: src/features/settings/components/account/account-settings.tsx:102
+#: src/features/settings/components/account/account-settings.tsx:103
 msgid "Zurich"
 msgstr "チューリッヒ"
 

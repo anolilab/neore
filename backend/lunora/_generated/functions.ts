@@ -818,6 +818,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "evals_internal:reapCase": lunora_evals_internal_83.reapCase as unknown as RegisteredLunoraFunction,
     "file:finalizeChatUpload": lunora_file_84.finalizeChatUpload as unknown as RegisteredLunoraFunction,
     "file:getChatFileExtraction": lunora_file_84.getChatFileExtraction as unknown as RegisteredLunoraFunction,
+    "file:getChatFileImageUrl": lunora_file_84.getChatFileImageUrl as unknown as RegisteredLunoraFunction,
     "file:purgeStagedChatUploads": lunora_file_84.purgeStagedChatUploads as unknown as RegisteredLunoraFunction,
     "file:sweepStagedChatUploads": lunora_file_84.sweepStagedChatUploads as unknown as RegisteredLunoraFunction,
     "gdpr_functions:cancelStuckExport": lunora_gdpr_functions_85.cancelStuckExport as unknown as RegisteredLunoraFunction,
@@ -5093,6 +5094,12 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
+installCompiledValidatorMap(lunora_file_84.getChatFileImageUrl.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["fileId"] !== "string") return DEFER;
+return { "fileId": source["fileId"] };
+});
 installCompiledValidatorMap(lunora_file_84.purgeStagedChatUploads.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8775,6 +8782,7 @@ export interface Caller {
     file: {
         finalizeChatUpload: (args: { filename: string; uploadId: string }) => Promise<{ fileId: Id<"chatFiles">; url: string }>;
         getChatFileExtraction: (args: { fileId: Id<"chatFiles"> }) => Promise<null | { status: "pending" | "processing" | "completed" | "failed" | "unsupported" }>;
+        getChatFileImageUrl: (args: { fileId: Id<"chatFiles"> }) => Promise<null | string>;
         purgeStagedChatUploads: (args: { userId: string }) => Promise<{ deleted: number }>;
         sweepStagedChatUploads: (args?: {}) => Promise<null>;
     };
@@ -10328,6 +10336,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
     file: {
         finalizeChatUpload: (args) => callRegistered(context, "file:finalizeChatUpload", args),
         getChatFileExtraction: (args) => callRegistered(context, "file:getChatFileExtraction", args),
+        getChatFileImageUrl: (args) => callRegistered(context, "file:getChatFileImageUrl", args),
         purgeStagedChatUploads: (args) => callRegistered(context, "file:purgeStagedChatUploads", args),
         sweepStagedChatUploads: (args) => callRegistered(context, "file:sweepStagedChatUploads", args),
     },

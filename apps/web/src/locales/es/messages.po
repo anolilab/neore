@@ -21,7 +21,7 @@ msgstr " · modelo: {modelFilter}"
 #. placeholder {0}: processedData.length
 #. placeholder {1}: visibleHeaders.length
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:224
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:516
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:529
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# fila} other {# filas}}, {1, plural, one {# columna} other {# columnas}}"
 
@@ -30,7 +30,7 @@ msgid ", unread"
 msgstr ", sin leer"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:246
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:339
 msgid "...and {0} more"
 msgstr "...y {0} más"
 
@@ -81,7 +81,7 @@ msgstr "\"v1\" para la API actual de Azure OpenAI. Una versión con fecha, como 
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "({0} de {MAX_PARTICIPANTS}, al menos {MIN_PARTICIPANTS})"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:279
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} fallidos)"
 
@@ -206,7 +206,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, one {# miembro} other {# miembros}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:242
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, one {# mensaje} other {# mensajes}}"
 
@@ -215,6 +215,11 @@ msgstr "{0, plural, one {# mensaje} other {# mensajes}}"
 #: src/features/settings/components/chat/native-providers-settings.tsx:414
 msgid "{0, plural, one {# model} other {# models}}"
 msgstr "{0, plural, one {# modelo} other {# modelos}}"
+
+#. placeholder {0}: data.omittedTargets
+#: src/features/evals/components/model-comparison.tsx:102
+msgid "{0, plural, one {# more target is not shown.} other {# more targets are not shown.}}"
+msgstr ""
 
 #. placeholder {0}: workflow.nodeCount
 #. placeholder {0}: workflow.workflowContent?.nodes?.length ?? 0
@@ -251,7 +256,7 @@ msgid "{0, plural, one {# skill} other {# skills}}"
 msgstr "{0, plural, one {# habilidad} other {# habilidades}}"
 
 #. placeholder {0}: slides.length
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:262
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:266
 msgid "{0, plural, one {# slide} other {# slides}}"
 msgstr "{0, plural, one {# diapositiva} other {# diapositivas}}"
 
@@ -295,7 +300,7 @@ msgstr "{0, plural, one {Mostrar # video más} other {Mostrar # videos más}}"
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
 #: src/routes/(chat)/chat/$threadId.tsx:81
-#: src/routes/(chat)/chat/index.tsx:88
+#: src/routes/(chat)/chat/index.tsx:153
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, one {Parámetro de consulta no compatible} other {Parámetros de consulta no compatibles}}: {1}"
 
@@ -366,18 +371,18 @@ msgid "{0} chunks"
 msgstr "{0} fragmentos"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:293
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
 msgid "{0} conversations failed to import"
 msgstr "{0} conversaciones no se pudieron importar"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
 msgid "{0} conversations found"
 msgstr "{0} conversaciones encontradas"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:292
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
 msgid "{0} conversations imported from {1}"
 msgstr "{0} conversaciones importadas desde {1}"
 
@@ -478,7 +483,7 @@ msgstr "{0} de {1} casos terminados"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:277
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:370
 msgid "{0} of {1} conversations imported"
 msgstr "{0} de {1} conversaciones importadas"
 
@@ -1023,7 +1028,7 @@ msgid "#1 on OpenRouter by token usage"
 msgstr "N.º 1 en OpenRouter por uso de tokens"
 
 #. placeholder {0}: promptGroups.favorites.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:842
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:849
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# favorito} other {# favoritos}}"
 
@@ -1049,7 +1054,7 @@ msgstr "+{0} caracteres respecto a la actual"
 msgid "+{0} more expired sessions"
 msgstr "+{0} sesiones caducadas más"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:140
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:144
 msgid "+{moreLines} more lines"
 msgstr "+{moreLines} líneas más"
 
@@ -1374,7 +1379,7 @@ msgstr "Una pregunta te está esperando"
 msgid "A regular expression the answer must match"
 msgstr "Una expresión regular que la respuesta debe cumplir"
 
-#: src/features/notifications/components/notification-settings.tsx:175
+#: src/features/notifications/components/notification-settings.tsx:227
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "Un breve resumen cada mañana de lo que terminó, lo que está en curso y lo que te necesita. Cuenta para tu uso diario."
 
@@ -1534,7 +1539,7 @@ msgid "Action Log"
 msgstr "Registro de acciones"
 
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:284
-#: src/features/evals/components/dataset-panel.tsx:137
+#: src/features/evals/components/dataset-panel.tsx:149
 msgid "Actions"
 msgstr "Acciones"
 
@@ -1682,7 +1687,7 @@ msgid "Add budget alert"
 msgstr "Añadir alerta de presupuesto"
 
 #: src/features/evals/components/case-form-dialog.tsx:71
-#: src/features/evals/components/dataset-panel.tsx:108
+#: src/features/evals/components/dataset-panel.tsx:119
 msgid "Add case"
 msgstr "Añadir caso"
 
@@ -1849,7 +1854,7 @@ msgstr "Añadir a favoritos"
 
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:810
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:817
 msgid "Add to Favorites"
 msgstr "Añadir a favoritos"
 
@@ -1960,7 +1965,7 @@ msgstr "Solo admins"
 msgid "advanced"
 msgstr "avanzado"
 
-#: src/features/settings/components/account/account-settings.tsx:593
+#: src/features/settings/components/account/account-settings.tsx:613
 msgid "Advanced"
 msgstr "Avanzado"
 
@@ -2018,7 +2023,7 @@ msgstr "Capacidades avanzadas de análisis multimodal"
 msgid "Advanced multimodal reasoning"
 msgstr "Razonamiento multimodal avanzado"
 
-#: src/features/settings/components/account/account-settings.tsx:593
+#: src/features/settings/components/account/account-settings.tsx:613
 msgid "Advanced options for power users."
 msgstr "Opciones avanzadas para usuarios expertos."
 
@@ -2038,15 +2043,15 @@ msgstr "Modelo de vídeo Kling con razonamiento avanzado y salida 4K nativa"
 msgid "Advanced reasoning with improved output quality"
 msgstr "Razonamiento avanzado con mejor calidad de salida"
 
-#: src/features/settings/components/account/account-settings.tsx:598
+#: src/features/settings/components/account/account-settings.tsx:618
 msgid "Advanced User Mode"
 msgstr "Modo de usuario avanzado"
 
-#: src/features/settings/components/account/account-settings.tsx:607
+#: src/features/settings/components/account/account-settings.tsx:627
 msgid "Advanced user mode disabled"
 msgstr "Modo de usuario avanzado desactivado"
 
-#: src/features/settings/components/account/account-settings.tsx:607
+#: src/features/settings/components/account/account-settings.tsx:627
 msgid "Advanced user mode enabled"
 msgstr "Modo de usuario avanzado activado"
 
@@ -2154,7 +2159,7 @@ msgid "After outside content"
 msgstr "Tras contenido externo"
 
 #: src/components/settings/settings-modal.tsx:263
-#: src/features/evals/components/dataset-panel.tsx:91
+#: src/features/evals/components/dataset-panel.tsx:102
 #: src/features/layout/lib/dashboard-page-names.ts:14
 #: src/features/tasks/components/task-form-dialog.tsx:299
 msgid "Agent"
@@ -2532,7 +2537,7 @@ msgid "All Organization"
 msgstr "Toda la organización"
 
 #: src/features/prompts/components/prompt-list.tsx:464
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:721
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:728
 msgid "All Prompts"
 msgstr "Todos los prompts"
 
@@ -2639,7 +2644,7 @@ msgstr "Ámbar"
 msgid "Amount"
 msgstr "Cantidad"
 
-#: src/features/settings/components/account/account-settings.tsx:100
+#: src/features/settings/components/account/account-settings.tsx:101
 msgid "Amsterdam"
 msgstr "Ámsterdam"
 
@@ -2725,15 +2730,15 @@ msgstr "Anima imágenes estáticas con IA"
 msgid "animation"
 msgstr "animación"
 
-#: src/features/settings/components/account/account-settings.tsx:527
+#: src/features/settings/components/account/account-settings.tsx:547
 msgid "Animations"
 msgstr "Animaciones"
 
-#: src/features/settings/components/account/account-settings.tsx:536
+#: src/features/settings/components/account/account-settings.tsx:556
 msgid "Animations disabled"
 msgstr "Animaciones desactivadas"
 
-#: src/features/settings/components/account/account-settings.tsx:536
+#: src/features/settings/components/account/account-settings.tsx:556
 msgid "Animations enabled"
 msgstr "Animaciones activadas"
 
@@ -2930,7 +2935,7 @@ msgstr "App Secret de App settings > Basic de tu app de Meta, usado para verific
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
 #: src/features/projects/components/project-form-dialog.tsx:232
-#: src/features/settings/components/account/account-settings.tsx:171
+#: src/features/settings/components/account/account-settings.tsx:172
 msgid "Appearance"
 msgstr "Apariencia"
 
@@ -3264,7 +3269,7 @@ msgstr "Intento"
 msgid "Attempts: {0}"
 msgstr "Intentos: {0}"
 
-#: src/features/settings/components/account/account-settings.tsx:111
+#: src/features/settings/components/account/account-settings.tsx:112
 msgid "Auckland"
 msgstr "Auckland"
 
@@ -3343,15 +3348,15 @@ msgstr "Enriquecimiento multimedia automático"
 msgid "Auto pricing"
 msgstr "Precios automáticos"
 
-#: src/features/settings/components/account/account-settings.tsx:543
+#: src/features/settings/components/account/account-settings.tsx:563
 msgid "Auto Save"
 msgstr "Guardado automático"
 
-#: src/features/settings/components/account/account-settings.tsx:552
+#: src/features/settings/components/account/account-settings.tsx:572
 msgid "Auto save disabled"
 msgstr "Guardado automático desactivado"
 
-#: src/features/settings/components/account/account-settings.tsx:552
+#: src/features/settings/components/account/account-settings.tsx:572
 msgid "Auto save enabled"
 msgstr "Guardado automático activado"
 
@@ -3376,7 +3381,7 @@ msgstr "Disposición automática"
 msgid "Auto-layout (L)"
 msgstr "Disposición automática (L)"
 
-#: src/features/settings/components/account/account-settings.tsx:401
+#: src/features/settings/components/account/account-settings.tsx:402
 msgid "Auto-read replies"
 msgstr "Leer respuestas automáticamente"
 
@@ -3388,15 +3393,15 @@ msgstr "Guardado automático"
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "Auto: se ejecuta sin preguntar. Preguntar: se pausa hasta que apruebes o deniegues. Desactivado: el asistente nunca ve la herramienta. Las automatizaciones (disparadores, bots de mensajería, flujos de trabajo) no pueden preguntar, así que allí las herramientas en \"Preguntar\" no están disponibles. Las herramientas MCP usan Preguntar por defecto, salvo que el servidor las marque como de solo lectura."
 
-#: src/features/settings/components/account/account-settings.tsx:464
+#: src/features/settings/components/account/account-settings.tsx:465
 msgid "Autocomplete disabled"
 msgstr "Autocompletado desactivado"
 
-#: src/features/settings/components/account/account-settings.tsx:464
+#: src/features/settings/components/account/account-settings.tsx:465
 msgid "Autocomplete enabled"
 msgstr "Autocompletado activado"
 
-#: src/features/settings/components/account/account-settings.tsx:453
+#: src/features/settings/components/account/account-settings.tsx:454
 msgid "Autocomplete while typing"
 msgstr "Autocompletar al escribir"
 
@@ -3437,7 +3442,7 @@ msgstr "Incluye automáticamente imágenes y videos relevantes junto a las respu
 msgid "Automatically run cleanup based on configuration"
 msgstr "Ejecutar la limpieza automáticamente según la configuración"
 
-#: src/features/settings/components/account/account-settings.tsx:545
+#: src/features/settings/components/account/account-settings.tsx:565
 msgid "Automatically save your work."
 msgstr "Guarda tu trabajo automáticamente."
 
@@ -3458,7 +3463,7 @@ msgstr "Disponible"
 msgid "Available on Neore — free to start, no credit card required."
 msgstr "Disponible en Neore: empieza gratis, sin tarjeta de crédito."
 
-#: src/features/chat/thread/sandbox-files.tsx:74
+#: src/features/chat/thread/sandbox-files.tsx:229
 msgid "Available once the reply is saved"
 msgstr "Disponible cuando se guarde la respuesta"
 
@@ -3681,7 +3686,7 @@ msgstr "Antes"
 msgid "beginner"
 msgstr "principiante"
 
-#: src/features/settings/components/account/account-settings.tsx:244
+#: src/features/settings/components/account/account-settings.tsx:245
 msgid "Behavior"
 msgstr "Comportamiento"
 
@@ -3713,7 +3718,7 @@ msgstr "Bengalí"
 msgid "Bengali (Bangladesh)"
 msgstr "Bengalí (Bangladés)"
 
-#: src/features/settings/components/account/account-settings.tsx:97
+#: src/features/settings/components/account/account-settings.tsx:98
 msgid "Berlin"
 msgstr "Berlín"
 
@@ -4432,7 +4437,7 @@ msgstr "Canadá"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:254
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:347
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4455,7 +4460,7 @@ msgstr "Cancelar trabajo profundo"
 msgid "Cancel Export"
 msgstr "Cancelar exportación"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:282
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:375
 msgid "Cancel Import"
 msgstr "Cancelar importación"
 
@@ -4559,12 +4564,12 @@ msgid "Cases"
 msgstr "Casos"
 
 #. placeholder {0}: String(cases.length)
-#: src/features/evals/components/dataset-panel.tsx:119
+#: src/features/evals/components/dataset-panel.tsx:130
 msgid "Cases ({0})"
 msgstr "Casos ({0})"
 
 #. placeholder {0}: dataset.name
-#: src/features/evals/components/dataset-panel.tsx:129
+#: src/features/evals/components/dataset-panel.tsx:141
 msgid "Cases in {0}"
 msgstr "Casos en {0}"
 
@@ -4605,7 +4610,7 @@ msgstr "CB hasta {circuitBreakerUntil}"
 msgid "Center"
 msgstr "Centro"
 
-#: src/features/settings/components/account/account-settings.tsx:90
+#: src/features/settings/components/account/account-settings.tsx:91
 msgid "Central Time (US & Canada)"
 msgstr "Hora central (EE. UU. y Canadá)"
 
@@ -4720,7 +4725,7 @@ msgstr "chat"
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:28
 #: src/features/chat/thread/composer-search-mode.tsx:48
 #: src/features/layout/lib/dashboard-page-names.ts:19
-#: src/features/settings/components/account/account-settings.tsx:377
+#: src/features/settings/components/account/account-settings.tsx:378
 msgid "Chat"
 msgstr "Chat"
 
@@ -4825,7 +4830,7 @@ msgid "Checking..."
 msgstr "Comprobando..."
 
 #: src/features/evals/components/case-fields.tsx:150
-#: src/features/evals/components/dataset-panel.tsx:135
+#: src/features/evals/components/dataset-panel.tsx:147
 #: src/features/evals/components/run-detail.tsx:77
 msgid "Checks"
 msgstr "Comprobaciones"
@@ -4892,11 +4897,11 @@ msgstr "Elegir modelos de texto predeterminados"
 msgid "Choose default video models"
 msgstr "Elegir modelos de video predeterminados"
 
-#: src/features/notifications/components/notification-settings.tsx:147
+#: src/features/notifications/components/notification-settings.tsx:199
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "Elige cómo te avisa Neore del trabajo terminado y de lo que te necesita."
 
-#: src/features/settings/components/account/account-settings.tsx:250
+#: src/features/settings/components/account/account-settings.tsx:251
 msgid "Choose how to send messages in the chat."
 msgstr "Elige cómo enviar mensajes en el chat."
 
@@ -5130,7 +5135,7 @@ msgstr "Clic en \"{selector}\""
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Haz clic en ★ en cualquier modelo de Todos los modelos para añadirlo aquí."
 
-#: src/features/settings/components/account/account-settings.tsx:264
+#: src/features/settings/components/account/account-settings.tsx:265
 msgid "Click button to send"
 msgstr "Haz clic en el botón para enviar"
 
@@ -5270,11 +5275,11 @@ msgstr "Ejecución de código y archivos del sandbox"
 msgid "Code execution failed"
 msgstr "La ejecución del código falló"
 
-#: src/features/settings/components/account/account-settings.tsx:198
+#: src/features/settings/components/account/account-settings.tsx:199
 msgid "Code Font"
 msgstr "Fuente del código"
 
-#: src/features/settings/components/account/account-settings.tsx:203
+#: src/features/settings/components/account/account-settings.tsx:204
 msgid "Code font updated"
 msgstr "Fuente del código actualizada"
 
@@ -5462,12 +5467,12 @@ msgstr "Colorear"
 msgid "Colour days by"
 msgstr "Colorear días por"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:287
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:290
 msgid "Column {index}"
 msgstr "Columna {index}"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:242
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:559
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:572
 msgid "Columns"
 msgstr "Columnas"
 
@@ -5573,12 +5578,12 @@ msgstr "Tareas de razonamiento compactas que requieren el eficiente modelo peque
 msgid "Company"
 msgstr "Empresa"
 
-#: src/features/evals/components/dataset-panel.tsx:193
-#: src/features/evals/components/dataset-panel.tsx:202
+#: src/features/evals/components/dataset-panel.tsx:222
+#: src/features/evals/components/dataset-panel.tsx:231
 msgid "Compare"
 msgstr "Comparar"
 
-#: src/features/evals/components/dataset-panel.tsx:221
+#: src/features/evals/components/dataset-panel.tsx:250
 msgid "Compare {name}"
 msgstr "Comparar {name}"
 
@@ -5775,7 +5780,7 @@ msgstr "Ramificación condicional"
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "Configura módulos avanzados del agente de IA para ejecutar mejor las tareas"
 
-#: src/features/settings/components/account/account-settings.tsx:377
+#: src/features/settings/components/account/account-settings.tsx:378
 msgid "Configure chat behavior and preferences."
 msgstr "Configura el comportamiento y las preferencias del chat."
 
@@ -5783,11 +5788,11 @@ msgstr "Configura el comportamiento y las preferencias del chat."
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "Configura el modelo predeterminado, el esfuerzo de razonamiento y las funciones para los chats nuevos creados en este proyecto."
 
-#: src/features/settings/components/account/account-settings.tsx:244
+#: src/features/settings/components/account/account-settings.tsx:245
 msgid "Configure how the application behaves."
 msgstr "Configura cómo se comporta la aplicación."
 
-#: src/features/settings/components/account/account-settings.tsx:271
+#: src/features/settings/components/account/account-settings.tsx:272
 msgid "Configure language preferences and location settings."
 msgstr "Configura las preferencias de idioma y la ubicación."
 
@@ -5812,7 +5817,7 @@ msgstr "Configura el contacto de facturación y los modelos de IA disponibles"
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "Configura los umbrales y los límites de lote para la limpieza de usuarios anónimos"
 
-#: src/features/settings/components/account/account-settings.tsx:522
+#: src/features/settings/components/account/account-settings.tsx:542
 msgid "Configure UI preferences and display options."
 msgstr "Configura las preferencias de interfaz y las opciones de visualización."
 
@@ -6102,7 +6107,7 @@ msgstr "Estilo coherente y fidelidad de los personajes"
 msgid "Consistent, reliable output quality"
 msgstr "Calidad de salida coherente y fiable"
 
-#: src/features/settings/components/account/account-settings.tsx:213
+#: src/features/settings/components/account/account-settings.tsx:214
 msgid "Consolas"
 msgstr "Consolas"
 
@@ -6257,7 +6262,7 @@ msgstr "Controla el manejo y la retención de datos de los proveedores de IA. Ac
 msgid "Control depth of field with aperture setting"
 msgstr "Controla la profundidad de campo con la apertura"
 
-#: src/features/settings/components/account/account-settings.tsx:134
+#: src/features/settings/components/account/account-settings.tsx:135
 msgid "Control how your personal information is displayed in the UI."
 msgstr "Controla cómo se muestra tu información personal en la interfaz."
 
@@ -6455,8 +6460,8 @@ msgstr ""
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:60
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:650
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:783
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:657
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:790
 msgid "Copy to clipboard"
 msgstr "Copiar al portapapeles"
 
@@ -6483,8 +6488,9 @@ msgid "Corner radius"
 msgstr "Radio de las esquinas"
 
 #: src/features/chat/thread/message-cost-badge.tsx:70
-#: src/features/evals/components/dataset-panel.tsx:209
+#: src/features/evals/components/dataset-panel.tsx:238
 #: src/features/evals/components/eval-summary-stats.tsx:31
+#: src/features/evals/components/model-comparison.tsx:115
 #: src/features/evals/components/run-comparison.tsx:131
 #: src/features/evals/components/run-detail.tsx:226
 #: src/features/settings/components/chat/usage-settings.tsx:319
@@ -6544,7 +6550,7 @@ msgstr "Costa Rica"
 msgid "Could not apply the changes"
 msgstr "No se pudieron aplicar los cambios"
 
-#: src/features/chat/thread/sandbox-files.tsx:125
+#: src/features/chat/thread/sandbox-files.tsx:294
 msgid "could not be saved"
 msgstr "no se pudo guardar"
 
@@ -6552,7 +6558,7 @@ msgstr "no se pudo guardar"
 msgid "Could not cancel the run."
 msgstr "No se pudo cancelar la ejecución."
 
-#: src/features/notifications/components/notification-settings.tsx:117
+#: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "No se pudieron cambiar las notificaciones push. Inténtalo de nuevo."
 
@@ -6593,7 +6599,7 @@ msgstr "No se pudo eliminar el comentario"
 msgid "Could not delete the page"
 msgstr "No se pudo eliminar la página"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:91
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:111
 msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
 msgstr "No se pudo detectar el proveedor del chat. Asegúrate de haber subido un archivo de exportación válido de ChatGPT, Gemini o Claude."
 
@@ -6649,7 +6655,7 @@ msgstr "No se pudo publicar el comentario"
 msgid "Could not prepare the new chat. Copy the messages instead."
 msgstr "No se pudo preparar el chat nuevo. Copia los mensajes en su lugar."
 
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:98
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:111
 msgid "Could not preview · Click to download"
 msgstr "No se pudo previsualizar · Haz clic para descargar"
 
@@ -6683,9 +6689,13 @@ msgstr "No se pudo cambiar el nombre de la página"
 msgid "Could not restore this version"
 msgstr "No se pudo restaurar esta versión"
 
-#: src/features/notifications/components/notification-settings.tsx:190
+#: src/features/notifications/components/notification-settings.tsx:110
 msgid "Could not save the Daily Brief setting."
 msgstr "No se pudo guardar el ajuste del Daily Brief."
+
+#: src/features/notifications/components/notification-settings.tsx:103
+msgid "Could not save the email setting."
+msgstr ""
 
 #: src/features/pages/components/page-view.tsx:160
 #: src/features/pages/components/page-view.tsx:248
@@ -6735,7 +6745,7 @@ msgid "Covers the majority of everyday video use cases"
 msgstr "Cubre la mayoría de los casos de uso de video del día a día"
 
 #: src/features/knowledge/components/collection-dialog.tsx:100
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:557
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:564
 #: src/features/prompts/components/variable-insertion.tsx:69
 msgid "Create"
 msgstr "Crear"
@@ -7265,7 +7275,7 @@ msgstr "Personalizar y regenerar"
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "Personaliza los atajos de teclado para acciones comunes. Haz clic en \"Grabar\" y pulsa la combinación de teclas que quieras."
 
-#: src/features/settings/components/account/account-settings.tsx:171
+#: src/features/settings/components/account/account-settings.tsx:172
 msgid "Customize the appearance of the application."
 msgstr "Personaliza la apariencia de la aplicación."
 
@@ -7309,17 +7319,17 @@ msgstr "Checo (República Checa)"
 msgid "Czech Republic"
 msgstr "República Checa"
 
-#: src/features/notifications/components/notification-settings.tsx:172
+#: src/features/notifications/components/notification-settings.tsx:224
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:50
 msgid "Daily Brief"
 msgstr "Daily Brief"
 
-#: src/features/notifications/components/notification-settings.tsx:192
+#: src/features/notifications/components/notification-settings.tsx:111
 msgid "Daily Brief turned off"
 msgstr "Daily Brief desactivado"
 
 #: src/features/home/components/home-page.tsx:229
-#: src/features/notifications/components/notification-settings.tsx:192
+#: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "Daily Brief activado"
 
@@ -7414,7 +7424,7 @@ msgstr "Resumen de datos"
 msgid "Dataset"
 msgstr "Conjunto de datos"
 
-#: src/features/evals/components/dataset-panel.tsx:118
+#: src/features/evals/components/dataset-panel.tsx:129
 msgid "Dataset views"
 msgstr "Vistas del conjunto de datos"
 
@@ -7546,7 +7556,7 @@ msgstr "Predeterminado"
 msgid "Default agent"
 msgstr "Agente predeterminado"
 
-#: src/features/settings/components/account/account-settings.tsx:275
+#: src/features/settings/components/account/account-settings.tsx:276
 msgid "Default AI Response Language"
 msgstr "Idioma predeterminado de las respuestas de IA"
 
@@ -7558,19 +7568,19 @@ msgstr "Ajustes de IA predeterminados"
 msgid "Default branch"
 msgstr "Rama predeterminada"
 
-#: src/features/settings/components/account/account-settings.tsx:300
+#: src/features/settings/components/account/account-settings.tsx:301
 msgid "Default Dictation Language"
 msgstr "Idioma de dictado predeterminado"
 
-#: src/features/settings/components/account/account-settings.tsx:302
+#: src/features/settings/components/account/account-settings.tsx:303
 msgid "Default dictation language for new threads (BCP 47 code)."
 msgstr "Idioma de dictado predeterminado para las conversaciones nuevas (código BCP 47)."
 
-#: src/features/settings/components/account/account-settings.tsx:277
+#: src/features/settings/components/account/account-settings.tsx:278
 msgid "Default language for AI responses in new threads (BCP 47 code)."
 msgstr "Idioma predeterminado de las respuestas de IA en las conversaciones nuevas (código BCP 47)."
 
-#: src/features/settings/components/account/account-settings.tsx:280
+#: src/features/settings/components/account/account-settings.tsx:281
 msgid "Default language updated"
 msgstr "Idioma predeterminado actualizado"
 
@@ -7673,15 +7683,15 @@ msgstr "Delega tareas en Devin, el ingeniero de software con IA"
 #: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
 #: src/features/chat/thread-list/group-header.tsx:149
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:164
-#: src/features/evals/components/dataset-panel.tsx:289
+#: src/features/evals/components/dataset-panel.tsx:322
 #: src/features/evals/components/evals-page.tsx:163
 #: src/features/local-models/components/ollama-model-manager.tsx:335
 #: src/features/pages/components/page-tree-item.tsx:174
 #: src/features/pages/components/pages-sidebar.tsx:292
 #: src/features/prompts/components/prompt-item.tsx:222
 #: src/features/prompts/components/prompt-list-view.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:689
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:822
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:696
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:829
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:889
 #: src/features/skills/components/skill-list.tsx:290
@@ -7760,7 +7770,7 @@ msgid "Delete Avatar"
 msgstr "Eliminar avatar"
 
 #. placeholder {0}: String(index + 1)
-#: src/features/evals/components/dataset-panel.tsx:167
+#: src/features/evals/components/dataset-panel.tsx:195
 msgid "Delete case {0}"
 msgstr "Eliminar caso {0}"
 
@@ -7768,7 +7778,7 @@ msgstr "Eliminar caso {0}"
 msgid "Delete collection"
 msgstr "Eliminar colección"
 
-#: src/features/evals/components/dataset-panel.tsx:99
+#: src/features/evals/components/dataset-panel.tsx:110
 msgid "Delete dataset"
 msgstr "Eliminar conjunto de datos"
 
@@ -7837,7 +7847,7 @@ msgstr "Eliminar proyecto"
 
 #: src/features/prompts/components/prompt-item.tsx:302
 #: src/features/prompts/components/prompt-list-view.tsx:316
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:902
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:909
 msgid "Delete Prompt"
 msgstr "Eliminar prompt"
 
@@ -7898,7 +7908,7 @@ msgstr "¿Eliminar la tarea \"{deleteTitle}\"?"
 msgid "Delete Team"
 msgstr "Eliminar equipo"
 
-#: src/features/evals/components/dataset-panel.tsx:295
+#: src/features/evals/components/dataset-panel.tsx:328
 msgid "Delete this case?"
 msgstr "¿Eliminar este caso?"
 
@@ -8182,7 +8192,7 @@ msgid "Details for case {0}"
 msgstr "Detalles del caso {0}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:236
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:324
 msgid "Detected: {0}"
 msgstr "Detectado: {0}"
 
@@ -8268,7 +8278,7 @@ msgstr "Tema de diagramas actualizado"
 msgid "Diamond"
 msgstr "Rombo"
 
-#: src/features/settings/components/account/account-settings.tsx:305
+#: src/features/settings/components/account/account-settings.tsx:306
 msgid "Dictation language updated"
 msgstr "Idioma de dictado actualizado"
 
@@ -8308,7 +8318,7 @@ msgstr "Desactivar todos"
 msgid "Disable deep work mode"
 msgstr "Desactivar el modo de trabajo profundo"
 
-#: src/features/settings/components/account/account-settings.tsx:155
+#: src/features/settings/components/account/account-settings.tsx:156
 msgid "Disable External Link Warning"
 msgstr "Desactivar aviso de enlaces externos"
 
@@ -8411,7 +8421,7 @@ msgstr "Mostrar los nombres de los modelos en los resultados"
 msgid "Display results"
 msgstr "Mostrar resultados"
 
-#: src/features/settings/components/account/account-settings.tsx:561
+#: src/features/settings/components/account/account-settings.tsx:581
 msgid "Display timestamps on messages."
 msgstr "Muestra la hora en los mensajes."
 
@@ -8464,8 +8474,8 @@ msgstr "¿Quieres añadir más filas?"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
 #: ../../packages/chat-ui/src/chat/message-content.tsx:269
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:97
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:111
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:110
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:124
 msgid "Document"
 msgstr "Documento"
 
@@ -8540,7 +8550,7 @@ msgstr "Descargar"
 msgid "Download {displayName}"
 msgstr "Descargar {displayName}"
 
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:127
 msgid "Download {filename}"
 msgstr "Descargar {filename}"
 
@@ -8548,7 +8558,7 @@ msgstr "Descargar {filename}"
 msgid "Download {fileName}"
 msgstr "Descargar {fileName}"
 
-#: src/features/chat/thread/sandbox-files.tsx:84
+#: src/features/chat/thread/sandbox-files.tsx:240
 msgid "Download {name} ({size})"
 msgstr "Descargar {name} ({size})"
 
@@ -8573,7 +8583,7 @@ msgstr "Descargar como XLSX"
 msgid "Download content"
 msgstr "Descargar contenido"
 
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:127
 msgid "Download document"
 msgstr "Descargar documento"
 
@@ -8710,7 +8720,7 @@ msgstr "Simulación (solo vista previa, sin eliminaciones)"
 msgid "Dry run complete"
 msgstr "Simulación completada"
 
-#: src/features/settings/components/account/account-settings.tsx:107
+#: src/features/settings/components/account/account-settings.tsx:108
 msgid "Dubai"
 msgstr "Dubái"
 
@@ -8861,7 +8871,7 @@ msgstr "Acceso anticipado a las próximas capacidades de los modelos de Alibaba"
 msgid "Early adopters who want to experiment with Google's next-generation Flash capabilities"
 msgstr "Pioneros que quieren experimentar con las capacidades Flash de próxima generación de Google"
 
-#: src/features/settings/components/account/account-settings.tsx:89
+#: src/features/settings/components/account/account-settings.tsx:90
 msgid "Eastern Time (US & Canada)"
 msgstr "Hora del Este (EE. UU. y Canadá)"
 
@@ -8905,8 +8915,8 @@ msgstr "Generación guiada por bordes"
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:206
 #: src/features/prompts/components/prompt-list-view.tsx:218
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:668
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:801
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:675
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:808
 #: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
@@ -8930,7 +8940,7 @@ msgid "Edit case"
 msgstr "Editar caso"
 
 #. placeholder {0}: String(index + 1)
-#: src/features/evals/components/dataset-panel.tsx:159
+#: src/features/evals/components/dataset-panel.tsx:171
 msgid "Edit case {0}"
 msgstr "Editar caso {0}"
 
@@ -8948,7 +8958,7 @@ msgid "Edit current slide"
 msgstr "Editar la diapositiva actual"
 
 #: src/features/evals/components/dataset-form-dialog.tsx:66
-#: src/features/evals/components/dataset-panel.tsx:96
+#: src/features/evals/components/dataset-panel.tsx:107
 msgid "Edit dataset"
 msgstr "Editar conjunto de datos"
 
@@ -9269,6 +9279,10 @@ msgstr "Correo de verificación enviado"
 msgid "Email Verified:"
 msgstr "Correo verificado:"
 
+#: src/features/notifications/components/notification-settings.tsx:241
+msgid "Email when a task finishes"
+msgstr ""
+
 #: src/features/settings/components/privacy/data-access.tsx:33
 #: src/features/settings/components/privacy/dpo-contact.tsx:22
 msgid "Email:"
@@ -9294,7 +9308,7 @@ msgstr "Activar 2FA"
 msgid "Enable a skill first — only enabled skills can be evaluated."
 msgstr "Activa primero una habilidad: solo se pueden evaluar las habilidades activadas."
 
-#: src/features/settings/components/account/account-settings.tsx:600
+#: src/features/settings/components/account/account-settings.tsx:620
 msgid "Enable advanced features and options."
 msgstr "Activa funciones y opciones avanzadas."
 
@@ -9303,7 +9317,7 @@ msgstr "Activa funciones y opciones avanzadas."
 msgid "Enable All"
 msgstr "Activar todos"
 
-#: src/features/settings/components/account/account-settings.tsx:529
+#: src/features/settings/components/account/account-settings.tsx:549
 msgid "Enable animations and transitions in the UI."
 msgstr "Activa animaciones y transiciones en la interfaz."
 
@@ -9331,7 +9345,7 @@ msgstr "Activar el modo de trabajo profundo"
 msgid "Enable Deep Work mode for complex multi-step tasks. The AI will iterate up to 25 times to complete your request."
 msgstr "Activa el modo de trabajo profundo para tareas complejas de varios pasos. La IA iterará hasta 25 veces para completar tu solicitud."
 
-#: src/features/settings/components/account/account-settings.tsx:382
+#: src/features/settings/components/account/account-settings.tsx:383
 msgid "Enable Follow-up Suggestions"
 msgstr "Activar sugerencias de seguimiento"
 
@@ -9682,7 +9696,7 @@ msgstr "Introduce tu nombre completo o el nombre visible"
 msgid "Enter your information to create an account"
 msgstr "Introduce tus datos para crear una cuenta"
 
-#: src/features/settings/components/account/account-settings.tsx:347
+#: src/features/settings/components/account/account-settings.tsx:348
 msgid "Enter your location"
 msgstr "Introduce tu ubicación"
 
@@ -9784,6 +9798,7 @@ msgid "Err%"
 msgstr "% err."
 
 #: ../../packages/ui/src/components/form/form-error.tsx:39
+#: src/features/evals/components/model-comparison.tsx:83
 #: src/features/evals/components/run-detail.tsx:32
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:56
 #: src/features/settings/connectors/connector-card.tsx:74
@@ -9829,10 +9844,11 @@ msgid "Error:"
 msgstr "Error:"
 
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:92
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:241
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:245
 msgid "Error: {error}"
 msgstr "Error: {error}"
 
+#: src/features/evals/components/model-comparison.tsx:113
 #: src/routes/admin/gateway/index.tsx:98
 msgid "Errors"
 msgstr "Errores"
@@ -10167,7 +10183,7 @@ msgid "Expansive field of view"
 msgstr "Campo de visión amplio"
 
 #: src/features/evals/components/case-fields.tsx:87
-#: src/features/evals/components/dataset-panel.tsx:133
+#: src/features/evals/components/dataset-panel.tsx:145
 msgid "Expected answer"
 msgstr "Respuesta esperada"
 
@@ -10175,7 +10191,7 @@ msgstr "Respuesta esperada"
 msgid "Expected source documents"
 msgstr "Documentos fuente esperados"
 
-#: src/features/evals/components/dataset-panel.tsx:134
+#: src/features/evals/components/dataset-panel.tsx:146
 msgid "Expected sources"
 msgstr "Fuentes esperadas"
 
@@ -10369,11 +10385,11 @@ msgstr "Modo de razonamiento extendido en el modelo Qwen más grande"
 msgid "Extended thinking on Anthropic's most capable Opus"
 msgstr "Razonamiento extendido en el Opus más capaz de Anthropic"
 
-#: src/features/settings/components/account/account-settings.tsx:164
+#: src/features/settings/components/account/account-settings.tsx:165
 msgid "External link warnings disabled"
 msgstr "Avisos de enlaces externos desactivados"
 
-#: src/features/settings/components/account/account-settings.tsx:164
+#: src/features/settings/components/account/account-settings.tsx:165
 msgid "External link warnings enabled"
 msgstr "Avisos de enlaces externos activados"
 
@@ -10441,6 +10457,7 @@ msgstr "Verificar datos"
 msgid "Fact check: Does sugar cause hyperactivity in children?"
 msgstr "Verifica: ¿el azúcar causa hiperactividad en los niños?"
 
+#: src/features/evals/components/model-comparison.tsx:90
 #: src/features/evals/components/run-detail.tsx:39
 msgid "Fail"
 msgstr "Fallido"
@@ -10453,6 +10470,7 @@ msgstr "fallido"
 #: src/features/chat/thread-list/thread-node.tsx:469
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/devices/components/devices-settings.tsx:135
+#: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:132
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:41
@@ -10643,7 +10661,7 @@ msgstr "No se pudieron eliminar algunos prompts"
 msgid "Failed to delete tag"
 msgstr "No se pudo eliminar la etiqueta"
 
-#: src/features/evals/components/dataset-panel.tsx:71
+#: src/features/evals/components/dataset-panel.tsx:82
 msgid "Failed to delete the case"
 msgstr "No se pudo eliminar el caso"
 
@@ -10793,8 +10811,8 @@ msgstr "No se pudo cargar la imagen"
 msgid "Failed to load skills"
 msgstr "No se pudieron cargar las habilidades"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:348
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:469
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:357
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:482
 msgid "Failed to load spreadsheet"
 msgstr "No se pudo cargar la hoja de cálculo"
 
@@ -10825,11 +10843,11 @@ msgstr "No se pudo mover la conversación"
 msgid "Failed to optimize prompt"
 msgstr "No se pudo optimizar el prompt"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:150
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
 msgid "Failed to parse file"
 msgstr "No se pudo analizar el archivo"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:209
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:213
 msgid "Failed to parse PPTX"
 msgstr "No se pudo analizar el PPTX"
 
@@ -10958,7 +10976,7 @@ msgid "Failed to save preset"
 msgstr "No se pudo guardar el preajuste"
 
 #: src/features/prompts/components/prompt-list.tsx:228
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:443
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:450
 msgid "Failed to save prompt"
 msgstr "No se pudo guardar el prompt"
 
@@ -10970,7 +10988,7 @@ msgstr "No se pudo guardar el proveedor"
 msgid "Failed to save rating"
 msgstr "No se pudo guardar la valoración"
 
-#: src/features/settings/components/account/account-settings.tsx:124
+#: src/features/settings/components/account/account-settings.tsx:125
 #: src/features/settings/components/personalization/personalization-settings.tsx:94
 msgid "Failed to save settings"
 msgstr "No se pudieron guardar los ajustes"
@@ -11009,7 +11027,7 @@ msgstr "No se pudo enviar el correo de verificación"
 msgid "Failed to start impersonation"
 msgstr "No se pudo iniciar la suplantación"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:184
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:272
 msgid "Failed to start import"
 msgstr "No se pudo iniciar la importación"
 
@@ -11135,6 +11153,10 @@ msgstr "No se pudo actualizar la habilidad"
 #: src/features/chat/tags/thread-tags-menu.tsx:53
 msgid "Failed to update tags"
 msgstr "No se pudieron actualizar las etiquetas"
+
+#: src/features/evals/components/dataset-panel.tsx:187
+msgid "Failed to update the case"
+msgstr ""
 
 #: src/features/chat/sharing/thread-share-button.tsx:146
 msgid "Failed to update thread visibility"
@@ -11515,7 +11537,7 @@ msgstr "Páginas favoritas"
 
 #: src/features/pages/components/pages-sidebar.tsx:205
 #: src/features/prompts/components/prompt-list.tsx:440
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:588
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:595
 msgid "Favorites"
 msgstr "Favoritos"
 
@@ -11795,7 +11817,7 @@ msgstr "Finés"
 msgid "Finnish (Finland)"
 msgstr "Finés (Finlandia)"
 
-#: src/features/settings/components/account/account-settings.tsx:211
+#: src/features/settings/components/account/account-settings.tsx:212
 msgid "Fira Code"
 msgstr "Fira Code"
 
@@ -11901,11 +11923,11 @@ msgstr "Distancia focal"
 msgid "Follow these steps to connect your {platform} account."
 msgstr "Sigue estos pasos para conectar tu cuenta de {platform}."
 
-#: src/features/settings/components/account/account-settings.tsx:393
+#: src/features/settings/components/account/account-settings.tsx:394
 msgid "Follow-up suggestions disabled"
 msgstr "Sugerencias de seguimiento desactivadas"
 
-#: src/features/settings/components/account/account-settings.tsx:393
+#: src/features/settings/components/account/account-settings.tsx:394
 msgid "Follow-up suggestions enabled"
 msgstr "Sugerencias de seguimiento activadas"
 
@@ -12044,9 +12066,9 @@ msgstr "Gratis"
 
 #: src/features/prompts/components/prompt-list.tsx:160
 #: src/features/prompts/components/prompt-list.tsx:226
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:441
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:485
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:546
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:448
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:492
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:553
 msgid "Free accounts are limited to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "Las cuentas gratuitas están limitadas a 3 prompts. Mejora a Pro para tener prompts ilimitados."
 
@@ -12056,7 +12078,7 @@ msgid "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skill
 msgstr "Las cuentas gratuitas están limitadas a 5 habilidades. Mejora a Pro para tener habilidades ilimitadas."
 
 #: src/features/prompts/components/prompt-empty-state.tsx:42
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:532
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:539
 msgid "Free accounts can create up to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "Las cuentas gratuitas pueden crear hasta 3 prompts. Mejora a Pro para tener prompts ilimitados."
 
@@ -12075,6 +12097,11 @@ msgstr "Plan gratuito para empezar. Escala a medida que creces. Los costes de lo
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:597
 msgid "Freehand Draw"
 msgstr "Dibujo a mano alzada"
+
+#. placeholder {0}: String(index + 1)
+#: src/features/evals/components/dataset-panel.tsx:181
+msgid "Freeze case {0}"
+msgstr ""
 
 #: src/features/chat/core/utils/language-utilities.ts:178
 #: src/features/chat/core/utils/language-utilities.ts:262
@@ -12281,6 +12308,10 @@ msgstr "Calidad de vanguardia de BFL"
 #: src/features/canvas/canvas-panel.tsx:183
 msgid "Frosted Glass"
 msgstr "Vidrio esmerilado"
+
+#: src/features/evals/components/model-comparison.tsx:153
+msgid "Frozen"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:264
 msgid "Full 1080p high-definition video output"
@@ -12618,13 +12649,17 @@ msgstr "Alemania"
 msgid "Get a short summary here every morning."
 msgstr "Recibe aquí un breve resumen cada mañana."
 
-#: src/features/notifications/components/notification-settings.tsx:141
+#: src/features/notifications/components/notification-settings.tsx:193
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
 msgstr "Recibe una notificación del sistema cuando termine una tarea o algo necesite tu aprobación, incluso con la app cerrada."
 
 #: src/features/marketing/components/navbar-menu.tsx:200
 msgid "Get Access"
 msgstr "Obtener acceso"
+
+#: src/features/notifications/components/notification-settings.tsx:244
+msgid "Get an email with a link to the result when a task or trigger run finishes with one."
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:438
 #: src/features/marketing/components/gateway-landing-page.tsx:704
@@ -13193,7 +13228,7 @@ msgstr "Modo manos libres desactivado"
 msgid "Hands-free mode stopped: {0}"
 msgstr "Modo manos libres detenido: {0}"
 
-#: src/features/settings/components/account/account-settings.tsx:420
+#: src/features/settings/components/account/account-settings.tsx:421
 msgid "Hands-free voice"
 msgstr "Voz del modo manos libres"
 
@@ -13201,7 +13236,7 @@ msgstr "Voz del modo manos libres"
 msgid "Hands-free voice mode — talk, and replies are read aloud"
 msgstr "Modo de voz manos libres — habla y las respuestas se leen en voz alta"
 
-#: src/features/settings/components/account/account-settings.tsx:431
+#: src/features/settings/components/account/account-settings.tsx:432
 msgid "Hands-free voice updated"
 msgstr "Voz del modo manos libres actualizada"
 
@@ -13291,7 +13326,7 @@ msgstr "Ocultar salida"
 msgid "Hide password"
 msgstr "Ocultar contraseña"
 
-#: src/features/settings/components/account/account-settings.tsx:139
+#: src/features/settings/components/account/account-settings.tsx:140
 msgid "Hide Personal Information"
 msgstr "Ocultar información personal"
 
@@ -13303,7 +13338,7 @@ msgstr "Ocultar historial de ejecuciones"
 msgid "Hide translation"
 msgstr "Ocultar traducción"
 
-#: src/features/settings/components/account/account-settings.tsx:141
+#: src/features/settings/components/account/account-settings.tsx:142
 msgid "Hides your name and email from the UI."
 msgstr "Oculta tu nombre y tu correo de la interfaz."
 
@@ -13514,7 +13549,7 @@ msgid "Honduras"
 msgstr "Honduras"
 
 #: src/features/chat/core/utils/language-utilities.ts:358
-#: src/features/settings/components/account/account-settings.tsx:105
+#: src/features/settings/components/account/account-settings.tsx:106
 msgid "Hong Kong"
 msgstr "Hong Kong"
 
@@ -13555,7 +13590,7 @@ msgstr "¿Cómo funciona el enrutamiento inteligente?"
 msgid "How is Neore different from ChatGPT?"
 msgstr "¿En qué se diferencia Neore de ChatGPT?"
 
-#: src/features/settings/components/account/account-settings.tsx:473
+#: src/features/settings/components/account/account-settings.tsx:493
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "Cuánto tiempo se conservan los chats temporales antes de eliminarse automáticamente. Predeterminado: 24 horas."
 
@@ -13866,18 +13901,18 @@ msgstr "Fin de suplantación"
 msgid "Impersonation Stopped"
 msgstr "Suplantación detenida"
 
-#: src/features/evals/components/dataset-panel.tsx:104
+#: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
 #: src/features/skills/components/skill-import-dialog.tsx:161
 #: src/features/skills/components/skill-list.tsx:331
 msgid "Import"
 msgstr "Importar"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:252
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
 msgid "Import All"
 msgstr "Importar todo"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:195
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:283
 msgid "Import cancelled"
 msgstr "Importación cancelada"
 
@@ -13885,30 +13920,38 @@ msgstr "Importación cancelada"
 msgid "Import cases"
 msgstr "Importar casos"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:291
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:384
 msgid "Import complete!"
 msgstr "¡Importación completada!"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:211
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
 msgid "Import Conversations"
 msgstr "Importar conversaciones"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
-msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
-msgstr "Importa conversaciones desde ChatGPT, Google Gemini o Claude. Sube tu archivo JSON o ZIP exportado."
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:298
+msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+msgstr ""
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:104
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:305
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
+#~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
+#~ msgstr "Importa conversaciones desde ChatGPT, Google Gemini o Claude. Sube tu archivo JSON o ZIP exportado."
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:132
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:398
 msgid "Import failed"
 msgstr "La importación falló"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:296
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
 msgid "Import More"
 msgstr "Importar más"
 
 #: src/features/knowledge/components/knowledge-import-actions.tsx:69
 msgid "Import Notion export (.zip)"
 msgstr "Importar exportación de Notion (.zip)"
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
+msgid "Import one kind of export at a time."
+msgstr ""
 
 #: src/features/skills/components/skill-import-dialog.tsx:99
 msgid "Import skill"
@@ -13949,7 +13992,7 @@ msgid "Imported skill \"{0}\""
 msgstr "Habilidad «{0}» importada"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:269
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
 msgid "Importing from {0}..."
 msgstr "Importando desde {0}..."
 
@@ -14145,7 +14188,8 @@ msgstr "inpainting"
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
 #: src/features/devices/components/device-tool-call.tsx:89
 #: src/features/evals/components/case-fields.tsx:69
-#: src/features/evals/components/dataset-panel.tsx:132
+#: src/features/evals/components/dataset-panel.tsx:144
+#: src/features/evals/components/model-comparison.tsx:138
 #: src/features/evals/components/run-comparison.tsx:146
 #: src/features/evals/components/run-detail.tsx:222
 msgid "Input"
@@ -14282,7 +14326,7 @@ msgstr "Modelo de vídeo inteligente que piensa antes de generar"
 msgid "Intensity"
 msgstr "Intensidad"
 
-#: src/features/settings/components/account/account-settings.tsx:188
+#: src/features/settings/components/account/account-settings.tsx:189
 msgid "Inter"
 msgstr "Inter"
 
@@ -14322,7 +14366,7 @@ msgstr "Contraseña no válida"
 msgid "Invalid password. Please try again."
 msgstr "Contraseña no válida. Inténtalo de nuevo."
 
-#: src/routes/(chat)/chat/index.tsx:51
+#: src/routes/(chat)/chat/index.tsx:116
 msgid "Invalid thread ID"
 msgstr "ID de conversación no válido"
 
@@ -14566,7 +14610,7 @@ msgstr "Javanés"
 msgid "Javanese (Indonesia)"
 msgstr "Javanés (Indonesia)"
 
-#: src/features/settings/components/account/account-settings.tsx:214
+#: src/features/settings/components/account/account-settings.tsx:215
 msgid "JetBrains Mono"
 msgstr "JetBrains Mono"
 
@@ -14850,7 +14894,7 @@ msgstr "Horizontal (panorámico)"
 msgid "Language"
 msgstr "Lenguaje"
 
-#: src/features/settings/components/account/account-settings.tsx:271
+#: src/features/settings/components/account/account-settings.tsx:272
 msgid "Language & Localization"
 msgstr "Idioma y localización"
 
@@ -14908,7 +14952,7 @@ msgstr "Último error"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:317
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:410
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "Última importación: {0} conversaciones desde {1} el {2}"
 
@@ -15167,7 +15211,7 @@ msgstr "Izquierda"
 msgid "Left organization successfully"
 msgstr "Has salido de la organización"
 
-#: src/features/settings/components/account/account-settings.tsx:236
+#: src/features/settings/components/account/account-settings.tsx:237
 msgid "Left to Right (LTR)"
 msgstr "De izquierda a derecha (LTR)"
 
@@ -15252,6 +15296,10 @@ msgstr "Línea"
 #: src/features/evals/components/import-cases-dialog.tsx:104
 msgid "Line {0}: {1}"
 msgstr "Línea {0}: {1}"
+
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:168
+msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
+msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:171
 msgid "LINE Channel Access Token"
@@ -15399,6 +15447,7 @@ msgstr "Cargando"
 msgid "Loading canvas editor..."
 msgstr "Cargando el editor de lienzo..."
 
+#: src/features/evals/components/model-comparison.tsx:70
 #: src/features/evals/components/run-comparison.tsx:45
 #: src/features/pages/components/page-agent-dialog.tsx:112
 #: src/features/pages/components/page-version-panel.tsx:101
@@ -15421,7 +15470,7 @@ msgstr "Cargando dispositivos..."
 msgid "Loading document..."
 msgstr "Cargando documento..."
 
-#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:129
+#: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:142
 msgid "Loading document…"
 msgstr ""
 
@@ -15480,7 +15529,7 @@ msgstr "Cargando página…"
 msgid "Loading presentation..."
 msgstr "Cargando presentación..."
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:233
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:237
 msgid "Loading presentation…"
 msgstr "Cargando presentación…"
 
@@ -15495,6 +15544,11 @@ msgstr "Cargando preajustes…"
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:891
 msgid "Loading preview..."
 msgstr "Cargando vista previa..."
+
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:168
+#: src/features/chat/thread/sandbox-files.tsx:104
+msgid "Loading preview…"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:144
 msgid "Loading run…"
@@ -15520,7 +15574,7 @@ msgstr "Cargando detalles de la habilidad…"
 msgid "Loading skills…"
 msgstr "Cargando habilidades…"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:455
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:468
 msgid "Loading spreadsheet…"
 msgstr "Cargando hoja de cálculo…"
 
@@ -15592,11 +15646,11 @@ msgstr "La solicitud local falló."
 msgid "localhost or 127.0.0.1 only. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 msgstr "Solo localhost o 127.0.0.1. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 
-#: src/features/settings/components/account/account-settings.tsx:325
+#: src/features/settings/components/account/account-settings.tsx:326
 msgid "Location"
 msgstr "Ubicación"
 
-#: src/features/settings/components/account/account-settings.tsx:335
+#: src/features/settings/components/account/account-settings.tsx:336
 msgid "Location updated"
 msgstr "Ubicación actualizada"
 
@@ -15646,7 +15700,7 @@ msgstr "Logo"
 msgid "logos"
 msgstr "logotipos"
 
-#: src/features/settings/components/account/account-settings.tsx:95
+#: src/features/settings/components/account/account-settings.tsx:96
 msgid "London"
 msgstr "Londres"
 
@@ -15787,7 +15841,7 @@ msgstr "Macro"
 msgid "Macro telephoto, tight framing"
 msgstr "Macro teleobjetivo, encuadre cerrado"
 
-#: src/features/settings/components/account/account-settings.tsx:99
+#: src/features/settings/components/account/account-settings.tsx:100
 msgid "Madrid"
 msgstr "Madrid"
 
@@ -15799,11 +15853,11 @@ msgstr "Enlace mágico"
 msgid "Magic link email sent"
 msgstr "Correo con enlace mágico enviado"
 
-#: src/features/settings/components/account/account-settings.tsx:175
+#: src/features/settings/components/account/account-settings.tsx:176
 msgid "Main Font"
 msgstr "Fuente principal"
 
-#: src/features/settings/components/account/account-settings.tsx:180
+#: src/features/settings/components/account/account-settings.tsx:181
 msgid "Main font updated"
 msgstr "Fuente principal actualizada"
 
@@ -16223,7 +16277,7 @@ msgstr "Medio-bajo"
 msgid "Medium-quality video generation with Alibaba's latest Wan improvements for general-purpose use"
 msgstr "Generación de vídeo de calidad media con las últimas mejoras de Wan de Alibaba para uso general"
 
-#: src/features/settings/components/account/account-settings.tsx:110
+#: src/features/settings/components/account/account-settings.tsx:111
 msgid "Melbourne"
 msgstr "Melbourne"
 
@@ -16611,6 +16665,7 @@ msgstr "Modo"
 msgid "Mode:"
 msgstr "Modo:"
 
+#: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/usage-settings.tsx:316
@@ -16700,6 +16755,7 @@ msgstr "Modelo: OpenAI Whisper"
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:262
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
+#: src/features/evals/components/dataset-panel.tsx:132
 #: src/features/layout/lib/dashboard-page-names.ts:30
 #: src/features/marketing/components/landing-footer.tsx:111
 #: src/features/marketing/components/landing-footer.tsx:157
@@ -16793,8 +16849,8 @@ msgstr "Mongol"
 msgid "Mongolian (Mongolia)"
 msgstr "Mongol (Mongolia)"
 
-#: src/features/settings/components/account/account-settings.tsx:191
-#: src/features/settings/components/account/account-settings.tsx:212
+#: src/features/settings/components/account/account-settings.tsx:192
+#: src/features/settings/components/account/account-settings.tsx:213
 msgid "Mono"
 msgstr "Mono"
 
@@ -16916,7 +16972,7 @@ msgstr "Prompt de movimiento"
 msgid "Motion: {motionPercent}%"
 msgstr "Movimiento: {motionPercent}%"
 
-#: src/features/settings/components/account/account-settings.tsx:91
+#: src/features/settings/components/account/account-settings.tsx:92
 msgid "Mountain Time (US & Canada)"
 msgstr "Hora de las Montañas (EE. UU. y Canadá)"
 
@@ -17067,7 +17123,7 @@ msgstr "Tareas multimodales que requieren el modelo GLM con visión de Z.AI para
 msgid "Multimodal tasks where MiniMax's M2 delivers reliable vision and text understanding"
 msgstr "Tareas multimodales en las que M2 de MiniMax ofrece una comprensión fiable de visión y texto"
 
-#: src/features/settings/components/account/account-settings.tsx:108
+#: src/features/settings/components/account/account-settings.tsx:109
 msgid "Mumbai, Kolkata"
 msgstr "Bombay, Calcuta"
 
@@ -17325,7 +17381,7 @@ msgstr "Neore puede cometer errores. Verifica la información importante."
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:531
+#: src/routes/__root.tsx:533
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat es una aplicación moderna de chat con IA. Chatea con los modelos de IA más recientes, organiza tus conversaciones y mantén tu productividad."
 
@@ -17569,7 +17625,7 @@ msgstr "Imagen hero de newsletter"
 #: ../../packages/ui/src/components/ai-elements/inline-citation.tsx:153
 #: ../../packages/ui/src/components/pagination.tsx:52
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:337
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:643
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:656
 #: src/features/onboarding/components/onboarding-dialog.tsx:417
 msgid "Next"
 msgstr "Siguiente"
@@ -17595,12 +17651,12 @@ msgstr "Opción siguiente"
 msgid "Next output mode"
 msgstr "Siguiente modo de salida"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:92
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:121
 msgid "Next page"
 msgstr "Página siguiente"
 
 #: ../../packages/ui/src/components/carousel.tsx:171
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:279
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:283
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:392
 msgid "Next slide"
 msgstr "Diapositiva siguiente"
@@ -17714,7 +17770,7 @@ msgstr "No hay alertas de presupuesto configuradas."
 msgid "No camera selected"
 msgstr "Ninguna cámara seleccionada"
 
-#: src/features/evals/components/dataset-panel.tsx:125
+#: src/features/evals/components/dataset-panel.tsx:137
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "Aún no hay casos. Añade uno a mano, importa un archivo CSV o JSONL, o guarda un turno del chat con \"Guardar como caso de evaluación\"."
 
@@ -17762,7 +17818,7 @@ msgstr "Sin contenido"
 msgid "No content to display"
 msgstr "No hay contenido que mostrar"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:139
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:219
 msgid "No conversations found in the file."
 msgstr "No se encontraron conversaciones en el archivo."
 
@@ -17788,8 +17844,8 @@ msgid "No data"
 msgstr "Sin datos"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:194
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:469
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:495
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:482
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:508
 msgid "No Data"
 msgstr "Sin datos"
 
@@ -18006,7 +18062,7 @@ msgstr "No hay proyectos disponibles. Crea un proyecto primero."
 msgid "No prompt"
 msgstr "Sin prompt"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:563
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:570
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "No se encontraron prompts que coincidan con \"{searchQuery}\""
 
@@ -18015,8 +18071,8 @@ msgid "No prompts found matching your search."
 msgstr "No se encontraron prompts que coincidan con tu búsqueda."
 
 #: src/features/prompts/components/prompt-empty-state.tsx:28
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:527
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:563
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:534
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:570
 msgid "No prompts yet"
 msgstr "Aún no hay prompts"
 
@@ -18078,7 +18134,7 @@ msgstr "No se encontraron resultados para “{searchTerm}”"
 msgid "No results found."
 msgstr "No se encontraron resultados."
 
-#: src/features/evals/components/dataset-panel.tsx:186
+#: src/features/evals/components/dataset-panel.tsx:215
 msgid "No runs yet. Start one to score every case."
 msgstr "Aún no hay ejecuciones. Inicia una para puntuar todos los casos."
 
@@ -18086,7 +18142,7 @@ msgstr "Aún no hay ejecuciones. Inicia una para puntuar todos los casos."
 msgid "No sessions found"
 msgstr "No se encontraron sesiones"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:338
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:347
 msgid "No sheets found in spreadsheet"
 msgstr "No se encontraron hojas en la hoja de cálculo"
 
@@ -18114,7 +18170,7 @@ msgstr "No hay contenido de diapositiva para previsualizar"
 msgid "No slides found"
 msgstr "No se encontraron diapositivas"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:249
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:253
 msgid "No slides found in this presentation."
 msgstr "No se encontraron diapositivas en esta presentación."
 
@@ -18152,11 +18208,11 @@ msgstr "No hay equipos disponibles"
 msgid "No templates available for this category yet."
 msgstr "Todavía no hay plantillas disponibles para esta categoría."
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:143
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:147
 msgid "No text content"
 msgstr "Sin contenido de texto"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:171
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:175
 msgid "No text content on this slide"
 msgstr "Esta diapositiva no tiene contenido de texto"
 
@@ -18214,8 +18270,8 @@ msgid "No users found matching \"{search}\""
 msgstr "No se encontraron usuarios que coincidan con \"{search}\""
 
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:172
-msgid "No valid JSON conversation files found in the ZIP archive."
-msgstr "No se encontraron archivos de conversación JSON válidos en el archivo ZIP."
+#~ msgid "No valid JSON conversation files found in the ZIP archive."
+#~ msgstr "No se encontraron archivos de conversación JSON válidos en el archivo ZIP."
 
 #: src/features/prompts/components/thread-variables-config.tsx:248
 msgid "No variables configured. Add variables to customize prompt content for this thread."
@@ -18330,7 +18386,7 @@ msgstr "Noruego (Noruega)"
 msgid "Not approved"
 msgstr "No aprobado"
 
-#: src/features/chat/thread/sandbox-files.tsx:144
+#: src/features/chat/thread/sandbox-files.tsx:313
 msgid "Not attached:"
 msgstr "No adjuntado:"
 
@@ -18417,15 +18473,15 @@ msgstr "Flujos de notificación, canales y preferencias de los destinatarios"
 #: src/features/home/components/home-page.tsx:208
 #: src/features/notifications/components/notification-bell.tsx:63
 #: src/features/notifications/components/notification-bell.tsx:93
-#: src/features/notifications/components/notification-settings.tsx:147
+#: src/features/notifications/components/notification-settings.tsx:199
 msgid "Notifications"
 msgstr "Notificaciones"
 
-#: src/features/notifications/components/notification-settings.tsx:93
+#: src/features/notifications/components/notification-settings.tsx:145
 msgid "Notifications are blocked for this site in your browser."
 msgstr "Las notificaciones están bloqueadas para este sitio en tu navegador."
 
-#: src/features/notifications/components/notification-settings.tsx:134
+#: src/features/notifications/components/notification-settings.tsx:186
 msgid "Notifications are blocked for this site in your browser. Allow them in the site settings to turn this on."
 msgstr "Las notificaciones están bloqueadas para este sitio en tu navegador. Permítelas en la configuración del sitio para activar esto."
 
@@ -18715,6 +18771,10 @@ msgstr "Solo se importaron los primeros {MAX_DOCUMENTS_PER_IMPORT} documentos."
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:122
 msgid "Only the most recent days of this period are included."
 msgstr "Solo se incluyen los días más recientes de este período."
+
+#: src/features/evals/components/model-comparison.tsx:97
+msgid "Only the newest runs were scanned, so an older model may be missing."
+msgstr ""
 
 #: src/features/skills/components/skill-form-dialog.tsx:461
 msgid "Only the owner can change who sees this skill."
@@ -19159,6 +19219,10 @@ msgstr "El LLM más pequeño de OpenAI"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "El modelo más pequeño de OpenAI para la máxima velocidad"
 
+#: src/features/settings/components/account/account-settings.tsx:484
+msgid "Opening a blank chat"
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:156
 msgid "Opening a pull request — progress is in the log"
 msgstr "Abriendo una pull request: el progreso está en el registro"
@@ -19166,6 +19230,10 @@ msgstr "Abriendo una pull request: el progreso está en el registro"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:233
 msgid "Opening pull request…"
 msgstr "Abriendo pull request…"
+
+#: src/features/settings/components/account/account-settings.tsx:475
+msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
+msgstr ""
 
 #: src/features/pages/components/page-invite-accept.tsx:54
 msgid "Opening the shared page…"
@@ -19437,6 +19505,10 @@ msgstr "Otros modelos de video"
 msgid "Our privacy policy explains how we collect, use, and protect your personal data in accordance with GDPR and other applicable data protection laws."
 msgstr "Nuestra política de privacidad explica cómo recopilamos, usamos y protegemos tus datos personales de acuerdo con el RGPD y otras leyes de protección de datos aplicables."
 
+#: src/features/evals/components/model-comparison.tsx:135
+msgid "Outcome of every case per model"
+msgstr ""
+
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
 #: src/features/workflow/types/index.ts:552
 #: src/features/workflow/types/index.ts:556
@@ -19456,7 +19528,7 @@ msgstr "Salida"
 msgid "Output {outputNumber}: {label}"
 msgstr "Salida {outputNumber}: {label}"
 
-#: src/features/chat/thread/sandbox-files.tsx:136
+#: src/features/chat/thread/sandbox-files.tsx:305
 msgid "Output files"
 msgstr "Archivos de salida"
 
@@ -19516,7 +19588,7 @@ msgstr "Sobrescribir con la mía"
 msgid "Owner"
 msgstr "Propietario"
 
-#: src/features/settings/components/account/account-settings.tsx:92
+#: src/features/settings/components/account/account-settings.tsx:93
 msgid "Pacific Time (US & Canada)"
 msgstr "Hora del Pacífico (EE. UU. y Canadá)"
 
@@ -19525,7 +19597,7 @@ msgid "page"
 msgstr "página"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:236
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:552
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:565
 msgid "Page {currentPage} of {totalPages}"
 msgstr "Página {currentPage} de {totalPages}"
 
@@ -19615,11 +19687,11 @@ msgstr "En paralelo"
 msgid "Parallel Compare"
 msgstr "Comparación en paralelo"
 
-#: src/features/settings/components/account/account-settings.tsx:96
+#: src/features/settings/components/account/account-settings.tsx:97
 msgid "Paris"
 msgstr "París"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:230
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:318
 msgid "Parsing file..."
 msgstr "Analizando archivo..."
 
@@ -19642,12 +19714,14 @@ msgstr "Los participantes se turnan, una respuesta por mensaje."
 msgid "Pashto"
 msgstr "Pastún"
 
+#: src/features/evals/components/model-comparison.tsx:90
 #: src/features/evals/components/run-detail.tsx:39
 msgid "Pass"
 msgstr "Aprobado"
 
-#: src/features/evals/components/dataset-panel.tsx:207
+#: src/features/evals/components/dataset-panel.tsx:236
 #: src/features/evals/components/eval-summary-stats.tsx:17
+#: src/features/evals/components/model-comparison.tsx:114
 #: src/features/evals/components/run-comparison.tsx:61
 msgid "Pass rate"
 msgstr "Tasa de aprobados"
@@ -19661,6 +19735,7 @@ msgstr "Pasaje {0}, citado como [{position}]"
 msgid "passed"
 msgstr "aprobado"
 
+#: src/features/evals/components/model-comparison.tsx:111
 #: src/features/tasks/components/task-detail-dialog.tsx:135
 msgid "Passed"
 msgstr "Superada"
@@ -19735,7 +19810,7 @@ msgstr "Las contraseñas no coinciden"
 msgid "Past cleanup runs and their results"
 msgstr "Ejecuciones de limpieza anteriores y sus resultados"
 
-#: src/features/evals/components/dataset-panel.tsx:290
+#: src/features/evals/components/dataset-panel.tsx:323
 msgid "Past runs keep their results for this case."
 msgstr "Las ejecuciones anteriores conservan sus resultados para este caso."
 
@@ -19926,11 +20001,11 @@ msgstr "Personal"
 msgid "Personal Account"
 msgstr "Cuenta personal"
 
-#: src/features/settings/components/account/account-settings.tsx:148
+#: src/features/settings/components/account/account-settings.tsx:149
 msgid "Personal information is now hidden"
 msgstr "La información personal ahora está oculta"
 
-#: src/features/settings/components/account/account-settings.tsx:148
+#: src/features/settings/components/account/account-settings.tsx:149
 msgid "Personal information is now visible"
 msgstr "La información personal ahora está visible"
 
@@ -20095,7 +20170,7 @@ msgstr "Plataforma"
 msgid "Play"
 msgstr "Reproducir"
 
-#: src/features/settings/components/account/account-settings.tsx:577
+#: src/features/settings/components/account/account-settings.tsx:597
 msgid "Play sound effects for UI interactions."
 msgstr "Reproduce efectos de sonido en las interacciones de la interfaz."
 
@@ -20128,10 +20203,10 @@ msgid "Please log in to configure variables"
 msgstr "Inicia sesión para configurar variables"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:35
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:479
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:528
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:540
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:564
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:486
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:535
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:547
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:571
 msgid "Please log in to create prompts"
 msgstr "Inicia sesión para crear prompts"
 
@@ -20401,7 +20476,7 @@ msgid "Preprocessor"
 msgstr "Preprocesador"
 
 #: ../../packages/chat-ui/src/chat/presentation-artifact.tsx:47
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:260
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:264
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:82
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:265
 msgid "Presentation"
@@ -20447,7 +20522,7 @@ msgstr "Preajustes"
 msgid "Press ? for keyboard shortcuts"
 msgstr "Pulsa ? para ver los atajos de teclado"
 
-#: src/features/settings/components/account/account-settings.tsx:262
+#: src/features/settings/components/account/account-settings.tsx:263
 msgid "Press Enter to send"
 msgstr "Pulsa Enter para enviar"
 
@@ -20459,7 +20534,7 @@ msgstr "Pulsa Enter para enviar y Shift+Enter para una nueva línea"
 msgid "Press keys..."
 msgstr "Pulsa las teclas..."
 
-#: src/features/settings/components/account/account-settings.tsx:263
+#: src/features/settings/components/account/account-settings.tsx:264
 msgid "Press Shift+Enter to send"
 msgstr "Pulsa Shift+Enter para enviar"
 
@@ -20483,6 +20558,10 @@ msgstr "vista previa"
 #: src/features/workflow/components/nodes/image-node.tsx:76
 msgid "Preview"
 msgstr "Vista previa"
+
+#: src/features/chat/thread/sandbox-files.tsx:253
+msgid "Preview {name}"
+msgstr ""
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:204
 msgid "Preview & Execute"
@@ -20531,7 +20610,7 @@ msgstr "Vista previa: {label}"
 #: ../../packages/ui/src/components/ai-elements/inline-citation.tsx:134
 #: ../../packages/ui/src/components/pagination.tsx:42
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:302
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:614
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:627
 msgid "Previous"
 msgstr "Anterior"
 
@@ -20560,12 +20639,12 @@ msgstr "Opción anterior"
 msgid "Previous output mode"
 msgstr "Modo de salida anterior"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:78
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:107
 msgid "Previous page"
 msgstr "Página anterior"
 
 #: ../../packages/ui/src/components/carousel.tsx:147
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:267
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:271
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:358
 msgid "Previous slide"
 msgstr "Diapositiva anterior"
@@ -20613,7 +20692,7 @@ msgstr "Soporte prioritario"
 #: src/features/marketing/components/gateway-footer.tsx:139
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
-#: src/features/settings/components/account/account-settings.tsx:134
+#: src/features/settings/components/account/account-settings.tsx:135
 #: src/features/settings/components/chat/model-filter-settings.tsx:343
 msgid "Privacy"
 msgstr "Privacidad"
@@ -20803,7 +20882,7 @@ msgstr "Profesionales que necesitan crear imágenes versátiles y de alta calida
 msgid "Profile Information"
 msgstr "Información del perfil"
 
-#: src/features/evals/components/dataset-panel.tsx:206
+#: src/features/evals/components/dataset-panel.tsx:235
 msgid "Progress"
 msgstr "Progreso"
 
@@ -20865,7 +20944,7 @@ msgstr "Gestión de la caché de prompts"
 msgid "Prompt copied to clipboard"
 msgstr "Prompt copiado al portapapeles"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:433
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:440
 msgid "Prompt created"
 msgstr "Prompt creado"
 
@@ -20910,7 +20989,7 @@ msgstr "Prompt que se ejecutará en todos los modelos..."
 msgid "Prompt Tokens"
 msgstr "Tokens de prompt"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:420
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:427
 msgid "Prompt updated"
 msgstr "Prompt actualizado"
 
@@ -20929,7 +21008,7 @@ msgstr "Variables del prompt"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:305
 #: src/features/prompts/components/prompt-header.tsx:10
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:468
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:475
 msgid "Prompts"
 msgstr "Prompts"
 
@@ -21091,23 +21170,23 @@ msgstr "Diseñado específicamente para tareas complejas de ingeniería de softw
 msgid "Purpose-optimized for code generation and debugging"
 msgstr "Optimizado para generar y depurar código"
 
-#: src/features/notifications/components/notification-settings.tsx:94
+#: src/features/notifications/components/notification-settings.tsx:146
 msgid "Push notifications are not available here."
 msgstr "Las notificaciones push no están disponibles aquí."
 
-#: src/features/notifications/components/notification-settings.tsx:129
+#: src/features/notifications/components/notification-settings.tsx:181
 msgid "Push notifications are not configured on this server."
 msgstr "Las notificaciones push no están configuradas en este servidor."
 
-#: src/features/notifications/components/notification-settings.tsx:114
+#: src/features/notifications/components/notification-settings.tsx:166
 msgid "Push notifications are off for this browser"
 msgstr "Las notificaciones push están desactivadas en este navegador"
 
-#: src/features/notifications/components/notification-settings.tsx:105
+#: src/features/notifications/components/notification-settings.tsx:157
 msgid "Push notifications are on for this browser"
 msgstr "Las notificaciones push están activadas en este navegador"
 
-#: src/features/notifications/components/notification-settings.tsx:152
+#: src/features/notifications/components/notification-settings.tsx:204
 msgid "Push notifications on this browser"
 msgstr "Notificaciones push en este navegador"
 
@@ -21237,7 +21316,7 @@ msgstr "Aleatoria"
 msgid "Random seed"
 msgstr "Semilla aleatoria"
 
-#: src/features/settings/components/account/account-settings.tsx:517
+#: src/features/settings/components/account/account-settings.tsx:537
 msgid "Range: 1 hour to 7 days (168 hours)"
 msgstr "Rango: de 1 hora a 7 días (168 horas)"
 
@@ -21290,7 +21369,7 @@ msgstr "Lectura y escritura"
 msgid "Read aloud"
 msgstr "Leer en voz alta"
 
-#: src/features/settings/components/account/account-settings.tsx:403
+#: src/features/settings/components/account/account-settings.tsx:404
 msgid "Read every assistant reply aloud when it finishes, using your browser's voice."
 msgstr "Lee en voz alta cada respuesta del asistente al terminar, con la voz de tu navegador."
 
@@ -21958,7 +22037,7 @@ msgstr "Quitar de favoritos"
 
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:677
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:684
 msgid "Remove from Favorites"
 msgstr "Quitar de favoritos"
 
@@ -22107,11 +22186,11 @@ msgstr "Las respuestas pueden buscar, generar imágenes y más, con cargo a tu c
 msgid "Replies use the free reply token when the answer is quick, and fall back to a push message (which counts against your LINE quota) when it is not."
 msgstr "Las respuestas usan el reply token gratuito cuando la respuesta es rápida y, si no, recurren a un mensaje push (que cuenta para tu cuota de LINE)."
 
-#: src/features/settings/components/account/account-settings.tsx:412
+#: src/features/settings/components/account/account-settings.tsx:413
 msgid "Replies will be read aloud"
 msgstr "Las respuestas se leerán en voz alta"
 
-#: src/features/settings/components/account/account-settings.tsx:412
+#: src/features/settings/components/account/account-settings.tsx:413
 msgid "Replies will no longer be read aloud"
 msgstr "Las respuestas ya no se leerán en voz alta"
 
@@ -22357,8 +22436,16 @@ msgstr "Resultado"
 msgid "Resume"
 msgstr "Reanudar"
 
-#: src/features/settings/components/account/account-settings.tsx:485
-#: src/features/settings/components/account/account-settings.tsx:510
+#: src/features/settings/components/account/account-settings.tsx:472
+msgid "Resume your latest chat"
+msgstr ""
+
+#: src/features/settings/components/account/account-settings.tsx:484
+msgid "Resuming your latest chat"
+msgstr ""
+
+#: src/features/settings/components/account/account-settings.tsx:505
+#: src/features/settings/components/account/account-settings.tsx:530
 msgid "Retention period updated to {hours} hours"
 msgstr "Periodo de retención actualizado a {hours} horas"
 
@@ -22366,7 +22453,7 @@ msgstr "Periodo de retención actualizado a {hours} horas"
 msgid "retried after review"
 msgstr "reintentado tras la revisión"
 
-#: src/features/evals/components/dataset-panel.tsx:91
+#: src/features/evals/components/dataset-panel.tsx:102
 msgid "Retrieval"
 msgstr "Recuperación"
 
@@ -22514,11 +22601,11 @@ msgstr "RIFF (WAV/AVI/WebP)"
 msgid "Right"
 msgstr "Derecha"
 
-#: src/features/settings/components/account/account-settings.tsx:237
+#: src/features/settings/components/account/account-settings.tsx:238
 msgid "Right to Left (RTL)"
 msgstr "De derecha a izquierda (RTL)"
 
-#: src/features/settings/components/account/account-settings.tsx:192
+#: src/features/settings/components/account/account-settings.tsx:193
 msgid "Roboto Slab"
 msgstr "Roboto Slab"
 
@@ -22558,7 +22645,7 @@ msgstr "Rumano"
 msgid "Romanian (Romania)"
 msgstr "Rumano (Rumanía)"
 
-#: src/features/settings/components/account/account-settings.tsx:98
+#: src/features/settings/components/account/account-settings.tsx:99
 msgid "Rome"
 msgstr "Roma"
 
@@ -22624,8 +22711,8 @@ msgstr "Rúbrica"
 msgid "Rule name is required"
 msgstr "El nombre de la regla es obligatorio"
 
-#: src/features/evals/components/dataset-panel.tsx:112
-#: src/features/evals/components/dataset-panel.tsx:204
+#: src/features/evals/components/dataset-panel.tsx:123
+#: src/features/evals/components/dataset-panel.tsx:233
 #: src/features/tasks/components/task-card.tsx:100
 #: src/features/workflow/components/canvas/workflow-controls.tsx:585
 msgid "Run"
@@ -22686,6 +22773,10 @@ msgstr "Ejecuta el flujo de trabajo para generar la salida"
 msgid "Run these in PowerShell."
 msgstr "Ejecuta esto en PowerShell."
 
+#: src/features/evals/components/model-comparison.tsx:76
+msgid "Run this dataset against at least two models to compare them."
+msgstr ""
+
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:29
 msgid "Run workflow"
 msgstr "Ejecutar flujo de trabajo"
@@ -22724,7 +22815,7 @@ msgid "Running..."
 msgstr "Ejecutando..."
 
 #. placeholder {0}: String(runs.length)
-#: src/features/evals/components/dataset-panel.tsx:120
+#: src/features/evals/components/dataset-panel.tsx:131
 msgid "Runs ({0})"
 msgstr "Ejecuciones ({0})"
 
@@ -22733,7 +22824,7 @@ msgid "Runs in a cloud sandbox for up to 20 minutes on your own {keyProvider} AP
 msgstr "Se ejecuta en un sandbox en la nube durante un máximo de 20 minutos con tu propia clave de API de {keyProvider} (Configuración → Claves de API). Los repositorios privados de GitHub necesitan el conector de GitHub."
 
 #. placeholder {0}: dataset.name
-#: src/features/evals/components/dataset-panel.tsx:198
+#: src/features/evals/components/dataset-panel.tsx:227
 msgid "Runs of {0}"
 msgstr "Ejecuciones de {0}"
 
@@ -23001,7 +23092,7 @@ msgstr "Trabajo programado"
 msgid "Scheduler"
 msgstr "Scheduler"
 
-#: src/features/evals/components/dataset-panel.tsx:208
+#: src/features/evals/components/dataset-panel.tsx:237
 #: src/features/evals/components/run-detail.tsx:224
 msgid "Score"
 msgstr "Puntuación"
@@ -23078,7 +23169,7 @@ msgid "Search connectors..."
 msgstr "Buscar conectores..."
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:269
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:582
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:595
 msgid "Search data..."
 msgstr "Buscar datos..."
 
@@ -23162,7 +23253,7 @@ msgid "Search pages"
 msgstr "Buscar páginas"
 
 #: src/features/prompts/components/prompt-list.tsx:512
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:507
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:514
 msgid "Search prompts..."
 msgstr "Buscar prompts..."
 
@@ -23333,7 +23424,7 @@ msgstr "Selecciona una versión para previsualizarla"
 msgid "Select a version to see changes"
 msgstr "Selecciona una versión para ver los cambios"
 
-#: src/features/settings/components/account/account-settings.tsx:436
+#: src/features/settings/components/account/account-settings.tsx:437
 msgid "Select a voice"
 msgstr "Selecciona una voz"
 
@@ -23365,7 +23456,7 @@ msgstr "Selecciona una organización para gestionar los equipos"
 msgid "Select as reference"
 msgstr "Seleccionar como referencia"
 
-#: src/features/settings/components/account/account-settings.tsx:310
+#: src/features/settings/components/account/account-settings.tsx:311
 msgid "Select dictation language"
 msgstr "Selecciona el idioma de dictado"
 
@@ -23373,7 +23464,7 @@ msgstr "Selecciona el idioma de dictado"
 msgid "Select duration"
 msgstr "Selecciona la duración"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:224
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:312
 msgid "Select File"
 msgstr "Seleccionar archivo"
 
@@ -23385,7 +23476,7 @@ msgstr "Selecciona archivos para subir"
 msgid "Select image as reference"
 msgstr "Seleccionar la imagen como referencia"
 
-#: src/features/settings/components/account/account-settings.tsx:285
+#: src/features/settings/components/account/account-settings.tsx:286
 msgid "Select language"
 msgstr "Selecciona el idioma"
 
@@ -23539,7 +23630,7 @@ msgstr "Enviar respuesta"
 msgid "Send Backward"
 msgstr "Enviar atrás"
 
-#: src/features/settings/components/account/account-settings.tsx:254
+#: src/features/settings/components/account/account-settings.tsx:255
 msgid "Send behavior updated"
 msgstr "Comportamiento de envío actualizado"
 
@@ -23558,7 +23649,7 @@ msgstr "Enviar enlace mágico"
 msgid "Send message"
 msgstr "Enviar mensaje"
 
-#: src/features/settings/components/account/account-settings.tsx:248
+#: src/features/settings/components/account/account-settings.tsx:249
 msgid "Send Message Behavior"
 msgstr "Comportamiento de envío de mensajes"
 
@@ -23614,7 +23705,7 @@ msgstr "Serbio"
 msgid "Serbian (Serbia)"
 msgstr "Serbio (Serbia)"
 
-#: src/features/settings/components/account/account-settings.tsx:190
+#: src/features/settings/components/account/account-settings.tsx:191
 msgid "Serif"
 msgstr "Serif"
 
@@ -23679,7 +23770,7 @@ msgstr "Establecer contraseña"
 msgid "Set the focal length in millimeters"
 msgstr "Establece la distancia focal en milímetros"
 
-#: src/features/settings/components/account/account-settings.tsx:224
+#: src/features/settings/components/account/account-settings.tsx:225
 msgid "Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian."
 msgstr "Establece la dirección del texto de la aplicación. RTL se usa en idiomas como el árabe, el hebreo y el persa."
 
@@ -23726,7 +23817,7 @@ msgstr "Varias de tus habilidades responden en una misma conversación. Menciona
 msgid "Shallow, cinematic separation"
 msgstr "Poco profundo, separación cinematográfica"
 
-#: src/features/settings/components/account/account-settings.tsx:104
+#: src/features/settings/components/account/account-settings.tsx:105
 msgid "Shanghai"
 msgstr "Shanghái"
 
@@ -23808,7 +23899,7 @@ msgstr "detalle nítido"
 msgid "Sharpen"
 msgstr "Enfocar"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:531
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:544
 msgid "Sheet 1"
 msgstr "Hoja 1"
 
@@ -23853,7 +23944,7 @@ msgstr "Mostrar el contenido adjunto"
 msgid "Show follow-up suggestions"
 msgstr "Mostrar sugerencias de seguimiento"
 
-#: src/features/settings/components/account/account-settings.tsx:384
+#: src/features/settings/components/account/account-settings.tsx:385
 msgid "Show follow-up suggestions after assistant messages."
 msgstr "Muestra sugerencias de seguimiento después de los mensajes del asistente."
 
@@ -23911,7 +24002,7 @@ msgstr "Mostrar las tareas de este objetivo"
 msgid "Show this help"
 msgstr "Mostrar esta ayuda"
 
-#: src/features/settings/components/account/account-settings.tsx:559
+#: src/features/settings/components/account/account-settings.tsx:579
 msgid "Show Timestamps"
 msgstr "Mostrar la hora"
 
@@ -23924,7 +24015,7 @@ msgid "Show what it will send"
 msgstr "Mostrar lo que enviará"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:245
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:562
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:575
 msgid "Show/Hide Columns"
 msgstr "Mostrar/ocultar columnas"
 
@@ -23940,12 +24031,12 @@ msgstr "Mostrando {0} usuarios. Hay más usuarios disponibles."
 #. placeholder {0}: Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, promptGroups.all.length)
 #. placeholder {1}: Math.min(currentPage * ITEMS_PER_PAGE, promptGroups.all.length)
 #. placeholder {2}: promptGroups.all.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:839
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:846
 msgid "Showing {0}-{1} of {2} prompts"
 msgstr "Mostrando {0}-{1} de {2} prompts"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:297
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:610
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:623
 msgid "Showing {firstShown} to {lastShown} of {totalRows} rows"
 msgstr "Mostrando {firstShown} a {lastShown} de {totalRows} filas"
 
@@ -24118,7 +24209,7 @@ msgstr "Simplificar"
 msgid "since replaced"
 msgstr "sustituido desde entonces"
 
-#: src/features/settings/components/account/account-settings.tsx:106
+#: src/features/settings/components/account/account-settings.tsx:107
 msgid "Singapore"
 msgstr "Singapur"
 
@@ -24141,7 +24232,7 @@ msgstr "Cingalés (Sri Lanka)"
 msgid "Size"
 msgstr "Tamaño"
 
-#: src/features/chat/thread/sandbox-files.tsx:117
+#: src/features/chat/thread/sandbox-files.tsx:286
 msgid "size limit reached"
 msgstr "límite de tamaño alcanzado"
 
@@ -24225,11 +24316,11 @@ msgstr "Omitir capas CLIP (0 = ninguna, 1-2 = más estilizado)"
 msgid "Skip questions"
 msgstr "Omitir preguntas"
 
-#: src/features/settings/components/account/account-settings.tsx:157
+#: src/features/settings/components/account/account-settings.tsx:158
 msgid "Skip the warning dialog when clicking external links."
 msgstr "Omite el diálogo de aviso al hacer clic en enlaces externos."
 
-#: src/routes/__root.tsx:408
+#: src/routes/__root.tsx:410
 msgid "Skip to content"
 msgstr "Saltar al contenido"
 
@@ -24240,6 +24331,11 @@ msgstr "Omitir recorrido"
 #: src/features/evals/components/run-detail.tsx:36
 msgid "Skipped"
 msgstr "Omitido"
+
+#. placeholder {0}: state.skipped.join(", ")
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:328
+msgid "Skipped files that are not chat exports: {0}"
+msgstr ""
 
 #: src/features/marketing/components/gateway-landing-page.tsx:144
 #: src/features/marketing/components/landing-page.tsx:362
@@ -24262,7 +24358,7 @@ msgstr "Los hilos de Slack se conservan: las respuestas en un hilo de Slack perm
 msgid "Slide {currentSlide} of {totalSlides}"
 msgstr "Diapositiva {currentSlide} de {totalSlides}"
 
-#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:131
+#: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:135
 msgid "Slide {slideNumber}"
 msgstr "Diapositiva {slideNumber}"
 
@@ -24463,15 +24559,15 @@ msgstr "Relación coste-eficiencia de vanguardia con 2M tokens de contexto"
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "SOTA con arte vectorial y tipografía vía Replicate"
 
-#: src/features/settings/components/account/account-settings.tsx:575
+#: src/features/settings/components/account/account-settings.tsx:595
 msgid "Sound Effects"
 msgstr "Efectos de sonido"
 
-#: src/features/settings/components/account/account-settings.tsx:584
+#: src/features/settings/components/account/account-settings.tsx:604
 msgid "Sound effects disabled"
 msgstr "Efectos de sonido desactivados"
 
-#: src/features/settings/components/account/account-settings.tsx:584
+#: src/features/settings/components/account/account-settings.tsx:604
 msgid "Sound effects enabled"
 msgstr "Efectos de sonido activados"
 
@@ -24494,7 +24590,7 @@ msgstr "Fuente {position}: {0}, pasaje {1}"
 msgid "Source chat"
 msgstr "Chat de origen"
 
-#: src/features/settings/components/account/account-settings.tsx:215
+#: src/features/settings/components/account/account-settings.tsx:216
 msgid "Source Code Pro"
 msgstr "Source Code Pro"
 
@@ -24676,7 +24772,7 @@ msgstr "Spotify"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:43
 #: ../../packages/ui/src/components/spreadsheet/spreadsheet-thumbnail.tsx:170
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:511
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:524
 msgid "Spreadsheet"
 msgstr "Hoja de cálculo"
 
@@ -24911,7 +25007,7 @@ msgstr "Iniciando"
 msgid "Starting {0}…"
 msgstr "Iniciando {0}…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:278
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
 msgid "Starting import..."
 msgstr "Iniciando la importación..."
 
@@ -24956,7 +25052,7 @@ msgstr "Sin estado"
 msgid "Stateless Mode"
 msgstr "Modo sin estado"
 
-#: src/features/evals/components/dataset-panel.tsx:205
+#: src/features/evals/components/dataset-panel.tsx:234
 #: src/features/tasks/components/goal-form-dialog.tsx:135
 #: src/routes/admin/gateway/index.tsx:137
 msgid "Status"
@@ -24991,7 +25087,7 @@ msgstr "Pasos"
 msgid "Stock and currency information"
 msgstr "Información de acciones y divisas"
 
-#: src/features/settings/components/account/account-settings.tsx:101
+#: src/features/settings/components/account/account-settings.tsx:102
 msgid "Stockholm"
 msgstr "Estocolmo"
 
@@ -25465,7 +25561,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "Los criterios de éxito deben tener {CRITERIA_MAX} caracteres o menos"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:100
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:128
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "Se importaron correctamente {imported} conversaciones desde {0}"
 
@@ -25490,7 +25586,7 @@ msgstr "Respuestas sugeridas"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Sugerencia disponible, pulsa Flecha derecha para aceptarla"
 
-#: src/features/settings/components/account/account-settings.tsx:456
+#: src/features/settings/components/account/account-settings.tsx:457
 msgid "Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion."
 msgstr "Sugiere cómo terminar tu mensaje en texto gris; pulsa Flecha derecha al final de la línea para aceptarlo o Esc para descartarlo. Tu borrador se envía a un modelo de IA para generar la sugerencia."
 
@@ -25546,7 +25642,7 @@ msgstr "Generación y refactorización de código en varios archivos superior"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Comprensión superior de conceptos visuales complejos"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:221
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:309
 msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
 msgstr "Formatos compatibles: exportación de ChatGPT (conversations.json), Google Gemini (ZIP de Takeout), exportación de Claude.ai."
 
@@ -25650,7 +25746,7 @@ msgstr "Cambiado a la vista de equipo"
 msgid "Switzerland"
 msgstr "Suiza"
 
-#: src/features/settings/components/account/account-settings.tsx:109
+#: src/features/settings/components/account/account-settings.tsx:110
 msgid "Sydney"
 msgstr "Sídney"
 
@@ -25670,7 +25766,7 @@ msgstr "Sintetizador (combina las respuestas)"
 msgid "Synthesizer (weighs both sides)"
 msgstr "Sintetizador (sopesa ambas partes)"
 
-#: src/features/settings/components/account/account-settings.tsx:189
+#: src/features/settings/components/account/account-settings.tsx:190
 msgid "System"
 msgstr "Sistema"
 
@@ -25795,6 +25891,14 @@ msgstr "Detalles de la tarea, tu revisión y el historial de ejecuciones."
 #: src/features/tasks/hooks/use-task-notifications.ts:33
 msgid "Task done: {title}"
 msgstr "Tarea hecha: {title}"
+
+#: src/features/notifications/components/notification-settings.tsx:104
+msgid "Task emails turned off"
+msgstr ""
+
+#: src/features/notifications/components/notification-settings.tsx:105
+msgid "Task emails turned on"
+msgstr ""
 
 #: src/features/notifications/lib/notification-labels.ts:48
 msgid "Task failed"
@@ -25996,7 +26100,7 @@ msgstr "Chat temporal"
 msgid "Temporary chat mode"
 msgstr "Modo de chat temporal"
 
-#: src/features/settings/components/account/account-settings.tsx:470
+#: src/features/settings/components/account/account-settings.tsx:490
 msgid "Temporary Chat Retention (hours)"
 msgstr "Retención de chats temporales (horas)"
 
@@ -26099,15 +26203,15 @@ msgstr "Alineación del texto"
 msgid "Text Content"
 msgstr "Contenido de texto"
 
-#: src/features/settings/components/account/account-settings.tsx:222
+#: src/features/settings/components/account/account-settings.tsx:223
 msgid "Text Direction"
 msgstr "Dirección del texto"
 
-#: src/features/settings/components/account/account-settings.tsx:228
+#: src/features/settings/components/account/account-settings.tsx:229
 msgid "Text direction set to LTR"
 msgstr "Dirección del texto establecida en LTR"
 
-#: src/features/settings/components/account/account-settings.tsx:228
+#: src/features/settings/components/account/account-settings.tsx:229
 msgid "Text direction set to RTL"
 msgstr "Dirección del texto establecida en RTL"
 
@@ -26258,6 +26362,10 @@ msgstr "El agente de chat trabaja la tarea con sus herramientas y, opcionalmente
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:41
 msgid "The coding agent could not start."
 msgstr "El agente de programación no pudo iniciarse."
+
+#: src/features/evals/components/model-comparison.tsx:62
+msgid "The comparison could not be loaded."
+msgstr ""
 
 #: src/routes/dashboard/settings/connectors/callback.tsx:67
 msgid "The connection could not be completed."
@@ -26552,7 +26660,7 @@ msgstr "El verificador no aprobó este resultado tras las rondas de reparación 
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "El verificador solo aprueba el resultado si se cumplen todos los criterios."
 
-#: src/features/settings/components/account/account-settings.tsx:423
+#: src/features/settings/components/account/account-settings.tsx:424
 msgid "The voice hands-free mode reads replies in. A skill with its own voice uses that instead. Spoken replies count against a daily allowance; after it, your browser's voice takes over."
 msgstr "La voz con la que el modo manos libres lee las respuestas. Una habilidad con voz propia usa la suya. Las respuestas habladas cuentan para un límite diario; después, la voz de tu navegador toma el relevo."
 
@@ -26662,7 +26770,7 @@ msgstr "Esta acción no se puede deshacer. Se quitarán todos los miembros del e
 msgid "This action cannot be undone. This will permanently delete the organization and all associated data."
 msgstr "Esta acción no se puede deshacer. Se eliminarán de forma permanente la organización y todos sus datos asociados."
 
-#: src/features/notifications/components/notification-settings.tsx:138
+#: src/features/notifications/components/notification-settings.tsx:190
 msgid "This browser cannot receive push notifications here."
 msgstr "Este navegador no puede recibir notificaciones push aquí."
 
@@ -26837,6 +26945,12 @@ msgstr "Esta presentación todavía no tiene diapositivas."
 msgid "This preset will be permanently removed."
 msgstr "Este preajuste se eliminará de forma permanente."
 
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:160
+#: src/features/chat/thread/sandbox-files.tsx:159
+#: src/features/chat/thread/sandbox-files.tsx:199
+msgid "This preview could not be loaded."
+msgstr ""
+
 #: src/features/chat/sidebar/thread-sidebar.tsx:203
 msgid "This prompt will be used for every message alongside the conversation history."
 msgstr "Este prompt se usará en cada mensaje junto con el historial de la conversación."
@@ -26857,6 +26971,10 @@ msgstr "Esto elimina los archivos del modelo de tu ordenador. Puedes volver a de
 msgid "This run is no longer available."
 msgstr "Esta ejecución ya no está disponible."
 
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:225
+msgid "This selection is too large to import at once. Import fewer files at a time."
+msgstr ""
+
 #: src/features/settings/components/chat/mcp-settings.tsx:367
 msgid "This server requires sign-in. Save it, then choose Sign in."
 msgstr "Este servidor requiere iniciar sesión. Guárdalo y luego elige Iniciar sesión."
@@ -26865,7 +26983,7 @@ msgstr "Este servidor requiere iniciar sesión. Guárdalo y luego elige Iniciar 
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "La entrada del registro de este servidor pide los valores de abajo. Completan la URL y los encabezados."
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:496
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:509
 msgid "This sheet appears to be empty."
 msgstr "Esta hoja parece estar vacía."
 
@@ -26885,7 +27003,7 @@ msgstr "Este slug ya está en uso"
 msgid "This slug is available"
 msgstr "Este slug está disponible"
 
-#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:475
+#: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:488
 msgid "This spreadsheet appears to be empty or could not be parsed."
 msgstr "Esta hoja de cálculo parece estar vacía o no se pudo analizar."
 
@@ -26901,7 +27019,7 @@ msgstr "Esta tarea aún no se ha ejecutado."
 msgid "This thread"
 msgstr "Esta conversación"
 
-#: src/routes/(chat)/chat/index.tsx:56
+#: src/routes/(chat)/chat/index.tsx:121
 msgid "This thread has been deleted"
 msgstr "Esta conversación se ha eliminado"
 
@@ -26935,7 +27053,7 @@ msgstr "Se eliminarán de forma permanente el proyecto y todas sus conversacione
 #. placeholder {0}: promptToDelete?.name
 #: src/features/prompts/components/prompt-item.tsx:294
 #: src/features/prompts/components/prompt-list-view.tsx:300
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:892
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:899
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
 msgstr "Se eliminará de forma permanente el prompt \"{0}\". Esta acción no se puede deshacer."
 
@@ -26998,7 +27116,7 @@ msgstr "Conversación hecha pública"
 msgid "Thread management"
 msgstr "Gestión de conversaciones"
 
-#: src/routes/(chat)/chat/index.tsx:61
+#: src/routes/(chat)/chat/index.tsx:126
 msgid "Thread not found or you don't have access to it"
 msgstr "No se encontró la conversación o no tienes acceso a ella"
 
@@ -27046,7 +27164,7 @@ msgstr "Umbral"
 msgid "Threshold must be between 1 and 365 days"
 msgstr "El umbral debe estar entre 1 y 365 días"
 
-#: src/features/evals/components/dataset-panel.tsx:190
+#: src/features/evals/components/dataset-panel.tsx:219
 msgid "Tick two runs to compare them."
 msgstr "Marca dos ejecuciones para compararlas."
 
@@ -27067,20 +27185,20 @@ msgstr "Tilt-Shift"
 msgid "Timeline image"
 msgstr "Imagen de línea de tiempo"
 
-#: src/features/settings/components/account/account-settings.tsx:568
+#: src/features/settings/components/account/account-settings.tsx:588
 msgid "Timestamps disabled"
 msgstr "Hora desactivada"
 
-#: src/features/settings/components/account/account-settings.tsx:568
+#: src/features/settings/components/account/account-settings.tsx:588
 msgid "Timestamps enabled"
 msgstr "Hora activada"
 
-#: src/features/settings/components/account/account-settings.tsx:353
+#: src/features/settings/components/account/account-settings.tsx:354
 #: src/features/settings/components/chat/trigger-settings.tsx:235
 msgid "Timezone"
 msgstr "Zona horaria"
 
-#: src/features/settings/components/account/account-settings.tsx:358
+#: src/features/settings/components/account/account-settings.tsx:359
 msgid "Timezone updated"
 msgstr "Zona horaria actualizada"
 
@@ -27207,15 +27325,15 @@ msgstr "Tokens"
 msgid "Tokens used on your own endpoint are not charged as credits. Daily message limits still apply."
 msgstr "Los tokens usados en tu propio endpoint no se cobran como créditos. Los límites diarios de mensajes siguen aplicándose."
 
-#: src/features/settings/components/account/account-settings.tsx:103
+#: src/features/settings/components/account/account-settings.tsx:104
 msgid "Tokyo"
 msgstr "Tokio"
 
-#: src/features/chat/thread/sandbox-files.tsx:109
+#: src/features/chat/thread/sandbox-files.tsx:278
 msgid "too large"
 msgstr "demasiado grande"
 
-#: src/features/chat/thread/sandbox-files.tsx:113
+#: src/features/chat/thread/sandbox-files.tsx:282
 msgid "too many files"
 msgstr "demasiados archivos"
 
@@ -27302,7 +27420,7 @@ msgstr "Razonamiento de primer nivel en benchmarks complejos"
 msgid "Top-tier text-to-video quality"
 msgstr "Calidad de texto a vídeo de primer nivel"
 
-#: src/features/settings/components/account/account-settings.tsx:93
+#: src/features/settings/components/account/account-settings.tsx:94
 msgid "Toronto"
 msgstr "Toronto"
 
@@ -27318,6 +27436,10 @@ msgstr "Coste total"
 #: src/features/admin/components/admin-dashboard-stats.tsx:125
 msgid "Total Users"
 msgstr "Usuarios totales"
+
+#: src/features/evals/components/model-comparison.tsx:107
+msgid "Totals per model"
+msgstr ""
 
 #: src/features/admin/components/audit-log-card.tsx:131
 msgid "Track all admin actions for accountability"
@@ -27516,7 +27638,7 @@ msgstr "Reintentar"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:309
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
 msgid "Try Again"
 msgstr "Intentar de nuevo"
 
@@ -27668,7 +27790,7 @@ msgstr "tipografía"
 msgid "UAE"
 msgstr "EAU"
 
-#: src/features/settings/components/account/account-settings.tsx:522
+#: src/features/settings/components/account/account-settings.tsx:542
 msgid "UI Preferences"
 msgstr "Preferencias de interfaz"
 
@@ -27805,6 +27927,11 @@ msgstr "Deshacer"
 msgid "Undo (Ctrl+Z)"
 msgstr "Deshacer (Ctrl+Z)"
 
+#. placeholder {0}: String(index + 1)
+#: src/features/evals/components/dataset-panel.tsx:181
+msgid "Unfreeze case {0}"
+msgstr ""
+
 #: src/features/workflow/components/nodes/group-node.tsx:184
 msgid "Ungroup"
 msgstr "Desagrupar"
@@ -27929,10 +28056,14 @@ msgid "Unsaved changes"
 msgstr "Cambios sin guardar"
 
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:178
-msgid "Unsupported file format. Please upload a .json or .zip file."
-msgstr "Formato de archivo no compatible. Sube un archivo .json o .zip."
+#~ msgid "Unsupported file format. Please upload a .json or .zip file."
+#~ msgstr "Formato de archivo no compatible. Sube un archivo .json o .zip."
 
-#: src/features/chat/thread/sandbox-files.tsx:121
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:243
+msgid "Unsupported file format. Please upload a .json, .jsonl or .zip file."
+msgstr ""
+
+#: src/features/chat/thread/sandbox-files.tsx:290
 msgid "unsupported type"
 msgstr "tipo no admitido"
 
@@ -27959,7 +28090,7 @@ msgstr "Chat sin título"
 
 #: src/components/command-palette.tsx:134
 #: src/components/command-palette.tsx:145
-#: src/features/chat/core/hooks/use-thread-manager.ts:225
+#: src/features/chat/core/hooks/use-thread-manager.ts:234
 msgid "Untitled Thread"
 msgstr "Conversación sin título"
 
@@ -28214,7 +28345,7 @@ msgid "Uploading {attachmentName}"
 msgstr "Subiendo {attachmentName}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:262
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:355
 msgid "Uploading data for import from {0}..."
 msgstr "Subiendo datos para importar desde {0}..."
 
@@ -28571,7 +28702,7 @@ msgstr "Uzbekistán"
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "Valida la calidad de los datos y prioriza las fuentes fiables. Imprescindible para tareas de investigación y verificación de datos."
 
-#: src/features/settings/components/account/account-settings.tsx:94
+#: src/features/settings/components/account/account-settings.tsx:95
 msgid "Vancouver"
 msgstr "Vancouver"
 
@@ -29956,7 +30087,7 @@ msgid "You've been invited to join an organization"
 msgstr "Te han invitado a unirte a una organización"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:43
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:533
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:540
 msgid "You've reached the free account limit of 3 prompts. Upgrade to Pro to create more."
 msgstr "Has alcanzado el límite de 3 prompts de la cuenta gratuita. Mejora a Pro para crear más."
 
@@ -30079,7 +30210,7 @@ msgstr "Tus últimos cambios aún no se han guardado."
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "Tu servidor local respondió, pero rechazó este sitio (CORS). Permite el origen de este sitio (en Ollama configura OLLAMA_ORIGINS, en LM Studio activa \"Enable CORS\") y reinicia el servidor."
 
-#: src/features/settings/components/account/account-settings.tsx:327
+#: src/features/settings/components/account/account-settings.tsx:328
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Tu ubicación (p. ej., \"Nueva York, EE. UU.\", \"Berlín, Alemania\")."
 
@@ -30147,7 +30278,7 @@ msgstr "Tus etiquetas"
 msgid "Your Team plans will be cancelled"
 msgstr "Tus planes Team se cancelarán"
 
-#: src/features/settings/components/account/account-settings.tsx:355
+#: src/features/settings/components/account/account-settings.tsx:356
 msgid "Your timezone (IANA timezone identifier)."
 msgstr "Tu zona horaria (identificador de zona horaria IANA)."
 
@@ -30235,7 +30366,7 @@ msgstr "El LLM de razonamiento más potente de Zhipu AI"
 msgid "ZIP archive"
 msgstr "Archivo ZIP"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:114
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:283
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:289
 msgid "Zoom in"
@@ -30250,7 +30381,7 @@ msgstr "Acercar"
 msgid "Zoom Lens"
 msgstr "Objetivo zoom"
 
-#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:104
+#: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:249
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:255
 msgid "Zoom out"
@@ -30269,7 +30400,7 @@ msgstr "Zulú"
 msgid "Zulu (South Africa)"
 msgstr "Zulú (Sudáfrica)"
 
-#: src/features/settings/components/account/account-settings.tsx:102
+#: src/features/settings/components/account/account-settings.tsx:103
 msgid "Zurich"
 msgstr "Zúrich"
 
