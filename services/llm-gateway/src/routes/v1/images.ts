@@ -17,6 +17,7 @@ import { bearerAuth } from "../../middleware/auth.js";
 import { expensiveEndpointRateLimit } from "../../middleware/rate-limit.js";
 import { resolveApiKey } from "../../providers/factory.js";
 import { createImageModel, IMAGE_MODELS } from "../../providers/image-factory.js";
+import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
 
 const imagesRouter = new OpenAPIHono<HonoEnv>();
@@ -49,13 +50,12 @@ const generateRequestSchema = z.object({
 // ---------------------------------------------------------------------------
 
 imagesRouter.use("/v1/images/*", bearerAuth);
-imagesRouter.use("/v1/images/*", expensiveEndpointRateLimit({ bucket: "images" }));
 
 // ---------------------------------------------------------------------------
 // POST /v1/images/generations
 // ---------------------------------------------------------------------------
 
-imagesRouter.post("/v1/images/generations", async (c) => {
+imagesRouter.post("/v1/images/generations", expensiveEndpointRateLimit({ bucket: "images" }), async (c) => {
     const requestId = c.get("requestId") ?? crypto.randomUUID();
     const rawBody = await c.req.json();
     const parsed = generateRequestSchema.safeParse(rawBody);
@@ -130,27 +130,44 @@ imagesRouter.post("/v1/images/generations", async (c) => {
         const usageTracker = new UsageTracker(c.env);
 
         c.executionCtx.waitUntil(
-            usageTracker.record(
-                {
-                    apiKeyId,
-                    cachedTokens: 0,
-                    completionTokens: 0,
-                    costMicrodollars,
-                    finishReason: "stop",
-                    isStreaming: false,
-                    latencyMs,
-                    modelApiId: modelInfo.modelApiId,
-                    modelId: body.model,
-                    orgId,
-                    promptTokens: imageCount,
-                    provider: modelInfo.provider,
-                    reasoningTokens: 0,
-                    requestId,
-                    source: "saas_api",
-                    userId,
-                },
-                c.var.telemetry,
-            ),
+            Promise.allSettled([
+                usageTracker.record(
+                    {
+                        apiKeyId,
+                        cachedTokens: 0,
+                        completionTokens: 0,
+                        costMicrodollars,
+                        finishReason: "stop",
+                        isStreaming: false,
+                        latencyMs,
+                        modelApiId: modelInfo.modelApiId,
+                        modelId: body.model,
+                        orgId,
+                        promptTokens: imageCount,
+                        provider: modelInfo.provider,
+                        reasoningTokens: 0,
+                        requestId,
+                        source: "saas_api",
+                        userId,
+                    },
+                    c.var.telemetry,
+                ),
+                ...(costMicrodollars > 0
+                    ? [
+                          new UsageReporter(c.env).report({
+                              // Platform env keys only on this route — never BYOK.
+                              billingMode: "platform",
+                              completionTokens: 0,
+                              costMicrodollars,
+                              modelId: body.model,
+                              orgId,
+                              promptTokens: imageCount,
+                              requestId,
+                              userId,
+                          }),
+                      ]
+                    : []),
+            ]),
         );
 
         // Build OpenAI-compatible response

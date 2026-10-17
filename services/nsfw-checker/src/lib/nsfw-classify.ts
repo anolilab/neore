@@ -95,7 +95,12 @@ export const classifyImage = async (env: AppEnv, imageBytes: Uint8Array): Promis
 
     // Normalize so scores sum to 1.0 (model may return un-normalized values)
     const sum = rawNeutral + rawDrawing + rawSexy + rawHentai + rawPorn;
-    const factor = sum > 0 ? 1 / sum : 1;
+
+    if (Number.isNaN(sum) || sum <= 0) {
+        throw new Error("NSFW model returned no scores");
+    }
+
+    const factor = 1 / sum;
     const neutral = rawNeutral * factor;
     const drawing = rawDrawing * factor;
     const sexy = rawSexy * factor;

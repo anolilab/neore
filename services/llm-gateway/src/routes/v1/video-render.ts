@@ -17,7 +17,9 @@ import { experimental_generateVideo } from "ai";
 
 import type { AppEnv } from "../../env.js";
 import type { RequestTelemetry } from "../../lib/otel/index.js";
+import { validateWebhookUrl } from "../../lib/webhook-delivery.js";
 import { createVideoModel } from "../../providers/video-factory.js";
+import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
 import type { VideoRenderMessage } from "./video-types.js";
 import { videoRenderSecretKvKey } from "./video-types.js";
@@ -96,6 +98,14 @@ interface RenderWebhookPayload {
 }
 
 export const fireWebhook = async (callbackUrl: string, jobId: string, status: JobStatus, payload: RenderWebhookPayload): Promise<void> => {
+    const urlError = validateWebhookUrl(callbackUrl);
+
+    if (urlError) {
+        console.warn(`[video] callback ${callbackUrl} rejected: ${urlError}`);
+
+        return;
+    }
+
     try {
         const body = {
             created_at: new Date().toISOString(),
@@ -110,6 +120,7 @@ export const fireWebhook = async (callbackUrl: string, jobId: string, status: Jo
                 "X-OpenRouter-Idempotency-Key": `${jobId}-${status}`,
             },
             method: "POST",
+            redirect: "manual",
             signal: AbortSignal.timeout(10_000),
         });
 
@@ -281,7 +292,7 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
         });
 
         const durationSeconds = body.duration ?? 5;
-        const costMicrodollars = isByok ? 0 : Math.round(durationSeconds * modelInfo.costPerSecondMicrodollars);
+        const costMicrodollars = Math.round(durationSeconds * modelInfo.costPerSecondMicrodollars);
 
         const completedJob: VideoJobState = {
             ...inProgressJob,
@@ -327,6 +338,19 @@ export const runVideoRender = async (message: VideoRenderMessage, env: AppEnv, t
                 telemetry,
             )
             .catch((error) => console.error("[video] failed to record usage:", error));
+
+        if (costMicrodollars > 0) {
+            await new UsageReporter(env).report({
+                billingMode: "platform",
+                completionTokens: 0,
+                costMicrodollars,
+                modelId: body.model,
+                orgId,
+                promptTokens: 0,
+                requestId,
+                userId,
+            });
+        }
 
         if (body.callback_url) {
             await fireWebhook(body.callback_url, jobId, "completed", {

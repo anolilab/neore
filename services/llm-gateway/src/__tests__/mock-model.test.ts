@@ -76,7 +76,7 @@ describe("mock LLM gate", () => {
         const response = await app.fetch(new Request("http://localhost/health"), env, createMockCtx());
 
         expect(response.status).toBe(500);
-        await expect(response.text()).resolves.toContain("MOCK_LLM");
+        await expect(response.text()).resolves.toContain("Internal Server Error");
     });
 
     it("swaps every provider for the mock and needs no key", async () => {

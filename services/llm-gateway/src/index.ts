@@ -21,7 +21,6 @@ import { healthRouter } from "./routes/health.js";
 import { adminTierPoolsRouter } from "./routes/internal/admin-tier-pools.js";
 import { canaryRouter } from "./routes/internal/canary.js";
 import { generateRouter } from "./routes/internal/generate.js";
-import { keysRouter } from "./routes/internal/keys.js";
 import { modelProxyRouter } from "./routes/internal/model-proxy.js";
 import { notificationRulesRouter } from "./routes/internal/notification-rules.js";
 import { routeRouter } from "./routes/internal/route.js";
@@ -73,7 +72,7 @@ app.onError(async (error, c) => {
     return c.json(
         {
             details: isDevelopment ? error.stack : undefined,
-            error: error.message ?? "Internal Server Error",
+            error: isDevelopment ? (error.message ?? "Internal Server Error") : "Internal Server Error",
         },
         500,
     );
@@ -104,7 +103,6 @@ app.route("/", routeRouter);
 app.route("/", modelProxyRouter);
 app.route("/", speechRouter);
 app.route("/", webhooksRouter);
-app.route("/", keysRouter);
 app.route("/", canaryRouter);
 app.route("/", notificationRulesRouter);
 app.route("/", adminTierPoolsRouter);

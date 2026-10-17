@@ -21,8 +21,10 @@ import type { JSONObject, JSONValue } from "@ai-sdk/provider";
 import type { AppEnv } from "../../env.js";
 import { GatewayError } from "../../lib/errors.js";
 import type { RequestTelemetry } from "../../lib/otel/index.js";
+import { validateWebhookUrl } from "../../lib/webhook-delivery.js";
 import type { FalQueueUrls } from "../../providers/music-factory.js";
 import { MUSIC_MODELS, runFalMusicGeneration } from "../../providers/music-factory.js";
+import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
 import type { MusicRenderMessage } from "./music-types.js";
 import { musicRenderSecretKvKey } from "./music-types.js";
@@ -100,6 +102,14 @@ interface RenderWebhookPayload {
 }
 
 export const fireWebhook = async (callbackUrl: string, jobId: string, status: JobStatus, payload: RenderWebhookPayload): Promise<void> => {
+    const urlError = validateWebhookUrl(callbackUrl);
+
+    if (urlError) {
+        console.warn(`[music] callback ${callbackUrl} rejected: ${urlError}`);
+
+        return;
+    }
+
     try {
         const body = {
             created_at: new Date().toISOString(),
@@ -114,6 +124,7 @@ export const fireWebhook = async (callbackUrl: string, jobId: string, status: Jo
                 "X-OpenRouter-Idempotency-Key": `${jobId}-${status}`,
             },
             method: "POST",
+            redirect: "manual",
             signal: AbortSignal.timeout(10_000),
         });
 
@@ -296,7 +307,7 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
             httpMetadata: { contentType: result.mimeType },
         });
 
-        const costMicrodollars = isByok ? 0 : modelInfo.costPerMusicGenerationMicrodollars;
+        const costMicrodollars = modelInfo.costPerMusicGenerationMicrodollars;
 
         const completedJob: MusicJobState = {
             ...inProgressJob,
@@ -346,6 +357,19 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
                 telemetry,
             )
             .catch((error) => console.error("[music] failed to record usage:", error));
+
+        if (costMicrodollars > 0) {
+            await new UsageReporter(env).report({
+                billingMode: "platform",
+                completionTokens: 0,
+                costMicrodollars,
+                modelId: body.model,
+                orgId,
+                promptTokens: 0,
+                requestId,
+                userId,
+            });
+        }
 
         if (body.callback_url) {
             await fireWebhook(body.callback_url, jobId, "completed", {

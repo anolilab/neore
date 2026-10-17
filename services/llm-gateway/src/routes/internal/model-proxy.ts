@@ -295,10 +295,21 @@ modelProxyRouter.openapi(
             let ttftMs: number | undefined;
             const execContext = c.executionCtx;
 
+            const reader = streamResult.stream.getReader();
+            let isCancelled = false;
+
             const stream = new ReadableStream({
+                async cancel(reason) {
+                    isCancelled = true;
+                    await reader.cancel(reason);
+                },
                 async start(controller) {
                     const encoder = new TextEncoder();
-                    const reader = streamResult.stream.getReader();
+                    const send = (text: string): void => {
+                        if (!isCancelled) {
+                            controller.enqueue(encoder.encode(text));
+                        }
+                    };
 
                     let lastUsage: { cachedTokens: number; completionTokens: number; promptTokens: number; reasoningTokens: number } | undefined;
                     let lastFinishReason: string | undefined;
@@ -329,7 +340,7 @@ modelProxyRouter.openapi(
                             // Serialize the stream part (handle Uint8Array in file parts)
                             const serialized = serializeForWire(value);
 
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify(serialized)}\n\n`));
+                            send(`data: ${JSON.stringify(serialized)}\n\n`);
                         }
 
                         // Record usage after stream completes
@@ -347,7 +358,7 @@ modelProxyRouter.openapi(
                             type: "gateway-metadata",
                         };
 
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(metaChunk)}\n\n`));
+                        send(`data: ${JSON.stringify(metaChunk)}\n\n`);
 
                         execContext.waitUntil(
                             Promise.allSettled([
@@ -390,11 +401,15 @@ modelProxyRouter.openapi(
                             type: "error",
                         };
 
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
+                        send(`data: ${JSON.stringify(errorChunk)}\n\n`);
 
-                        execContext.waitUntil(policy.recordHealth.failure());
+                        if (!isCancelled) {
+                            execContext.waitUntil(policy.recordHealth.failure());
+                        }
                     } finally {
-                        controller.close();
+                        if (!isCancelled) {
+                            controller.close();
+                        }
                     }
                 },
             });

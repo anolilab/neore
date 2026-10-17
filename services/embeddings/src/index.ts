@@ -35,8 +35,10 @@ const ALLOWED_MODEL_IDS = Object.keys(ALLOWED_MODELS);
 
 const embedSchema = z.object({
     model: z.string().optional(), // Override model, must be in ALLOWED_MODELS
-    texts: z.array(z.string()).min(1).max(100),
+    texts: z.array(z.string().max(8000)).min(1).max(100),
 });
+
+const MAX_BODY_BYTES = 1024 * 1024;
 
 // ─── HMAC-SHA256 request signature verification ────────────────────────────────
 // Aligned with document-parser's signing pattern
@@ -82,6 +84,9 @@ const verifyHmac = async (request: Request, secret: string): Promise<boolean> =>
     const timestamp = request.headers.get("X-Timestamp");
 
     if (!signature || !timestamp) return false;
+
+    // Refuse an oversized body before it is buffered for hashing.
+    if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES) return false;
 
     if (!NUMERIC_RE.test(timestamp)) return false;
 
@@ -133,6 +138,10 @@ app.post("/embed", async (c) => {
 
     if (!signingSecret) {
         return c.json({ error: "Server misconfiguration: SIGNING_SECRET not set", success: false }, 500);
+    }
+
+    if (Number(c.req.header("Content-Length") ?? 0) > MAX_BODY_BYTES) {
+        return c.json({ error: "Payload too large", success: false }, 413);
     }
 
     const valid = await verifyHmac(c.req.raw, signingSecret);

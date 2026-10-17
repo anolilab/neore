@@ -314,7 +314,9 @@ streamRouter.openapi(
                 MODEL_MAP.get(body.modelId)?.supportsReasoning,
             );
 
+            const abortController = new AbortController();
             const result = streamText({
+                abortSignal: abortController.signal,
                 messages: cachedMessages as Parameters<typeof streamText>[0]["messages"],
                 model,
                 system: body.system,
@@ -412,14 +414,25 @@ streamRouter.openapi(
             // Capture executionCtx so background work survives after response completes
             const execContext = c.executionCtx;
 
+            let isCancelled = false;
+
             const stream = new ReadableStream({
+                cancel(reason) {
+                    isCancelled = true;
+                    abortController.abort(reason);
+                },
                 async start(controller) {
                     const encoder = new TextEncoder();
+                    const send = (text: string): void => {
+                        if (!isCancelled) {
+                            controller.enqueue(encoder.encode(text));
+                        }
+                    };
 
                     try {
                         // Replay the buffered first chunk from the warm-up peek.
                         if (firstChunk !== undefined) {
-                            controller.enqueue(encoder.encode(firstChunk));
+                            send(firstChunk);
                         }
 
                         // Drain the rest of the iterator. After the peek call,
@@ -432,7 +445,7 @@ streamRouter.openapi(
                                 ttftMs = Date.now() - startTime;
                             }
 
-                            controller.enqueue(encoder.encode(chunk));
+                            send(chunk);
                         }
 
                         // Wait for the result to complete and get final usage
@@ -465,7 +478,7 @@ streamRouter.openapi(
                             },
                         });
 
-                        controller.enqueue(encoder.encode(finishChunk));
+                        send(finishChunk);
 
                         // Record usage via waitUntil so it survives after stream/response ends.
                         // Use allSettled so individual failures don't cause uncaught rejections.
@@ -517,12 +530,15 @@ streamRouter.openapi(
                             type: "error",
                         });
 
-                        controller.enqueue(encoder.encode(errorChunk));
+                        send(errorChunk);
 
-                        // Record failure via waitUntil
-                        execContext.waitUntil(healthService.recordFailure(body.provider, body.modelApiId));
+                        if (!isCancelled) {
+                            execContext.waitUntil(healthService.recordFailure(body.provider, body.modelApiId));
+                        }
                     } finally {
-                        controller.close();
+                        if (!isCancelled) {
+                            controller.close();
+                        }
                     }
                 },
             });

@@ -104,27 +104,44 @@ embeddingsRouter.post("/v1/embeddings", async (c) => {
         const usageTracker = new UsageTracker(c.env);
 
         c.executionCtx.waitUntil(
-            usageTracker.record(
-                {
-                    apiKeyId,
-                    cachedTokens: 0,
-                    completionTokens: 0,
-                    costMicrodollars,
-                    finishReason: "stop",
-                    isStreaming: false,
-                    latencyMs,
-                    modelApiId: modelInfo.modelApiId,
-                    modelId: body.model,
-                    orgId,
-                    promptTokens: totalTokens,
-                    provider: modelInfo.provider,
-                    reasoningTokens: 0,
-                    requestId,
-                    source: "saas_api",
-                    userId,
-                },
-                c.var.telemetry,
-            ),
+            Promise.allSettled([
+                usageTracker.record(
+                    {
+                        apiKeyId,
+                        cachedTokens: 0,
+                        completionTokens: 0,
+                        costMicrodollars,
+                        finishReason: "stop",
+                        isStreaming: false,
+                        latencyMs,
+                        modelApiId: modelInfo.modelApiId,
+                        modelId: body.model,
+                        orgId,
+                        promptTokens: totalTokens,
+                        provider: modelInfo.provider,
+                        reasoningTokens: 0,
+                        requestId,
+                        source: "saas_api",
+                        userId,
+                    },
+                    c.var.telemetry,
+                ),
+                ...(costMicrodollars > 0
+                    ? [
+                          new UsageReporter(c.env).report({
+                              // Platform env keys only on this route — never BYOK.
+                              billingMode: "platform",
+                              completionTokens: 0,
+                              costMicrodollars,
+                              modelId: body.model,
+                              orgId,
+                              promptTokens: totalTokens,
+                              requestId,
+                              userId,
+                          }),
+                      ]
+                    : []),
+            ]),
         );
 
         // Build response in OpenAI format

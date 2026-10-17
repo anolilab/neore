@@ -53,6 +53,8 @@ const classifyRoute = createRoute({
 
 const ALLOWED_MIME_TYPES = new Set(["image/bmp", "image/gif", "image/jpeg", "image/png", "image/webp"]);
 
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 const classifyRouter = new OpenAPIHono<{ Bindings: AppEnv }>();
 
 classifyRouter.openapi(classifyRoute, async (c) => {
@@ -63,14 +65,19 @@ classifyRouter.openapi(classifyRoute, async (c) => {
         return c.json({ error: "Unsupported media type. Accepted: image/jpeg, image/png, image/gif, image/webp, image/bmp." }, 400);
     }
 
+    const declaredLength = Number(c.req.header("Content-Length") ?? 0);
+
+    if (declaredLength > MAX_IMAGE_BYTES) {
+        return c.json({ error: "File too large. Maximum size is 10 MB." }, 413);
+    }
+
     const body = await c.req.arrayBuffer();
 
     if (body.byteLength === 0) {
         return c.json({ error: "Empty request body" }, 400);
     }
 
-    // 10 MB limit
-    if (body.byteLength > 10 * 1024 * 1024) {
+    if (body.byteLength > MAX_IMAGE_BYTES) {
         return c.json({ error: "File too large. Maximum size is 10 MB." }, 413);
     }
 

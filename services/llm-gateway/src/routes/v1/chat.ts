@@ -157,6 +157,7 @@ const forwardToBackend = async (
             ...extraHeaders,
         },
         method: "POST",
+        signal: AbortSignal.timeout(30_000),
     });
 
     if (!backendResponse.ok) {

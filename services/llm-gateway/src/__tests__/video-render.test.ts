@@ -365,7 +365,7 @@ describe("runVideoRender — successful render", () => {
         expect(cacheKv.getRaw(videoRenderSecretKvKey(message.jobId))).toBeUndefined();
     });
 
-    it("zeroes cost for BYOK renders", async () => {
+    it("prices BYOK renders at the platform cost", async () => {
         const { cacheKv, env } = makeEnv();
         const message = makeMessage({ body: { duration: 8, model: "fal/luma-ray-2", prompt: "hi" }, isByok: true });
 
@@ -376,7 +376,8 @@ describe("runVideoRender — successful render", () => {
 
         if (outcome.kind !== "completed") throw new Error("expected completed");
 
-        expect(outcome.costMicrodollars).toBe(0);
+        // 8s × 50_000 µ$/s = 400_000 µ$, same as a platform-keyed render.
+        expect(outcome.costMicrodollars).toBe(400_000);
     });
 
     it("fires a completed webhook when callback_url is set", async () => {
