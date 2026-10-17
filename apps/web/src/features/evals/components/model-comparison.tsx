@@ -92,6 +92,11 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
 
     return (
         <div className="space-y-4">
+            {data.scanTruncated && (
+                <p className="text-muted-foreground text-sm" role="status">
+                    {t`Only the newest runs were scanned, so an older model may be missing.`}
+                </p>
+            )}
             {data.omittedTargets > 0 && (
                 <p className="text-muted-foreground text-sm" role="status">
                     {plural(data.omittedTargets, { one: "# more target is not shown.", other: "# more targets are not shown." })}

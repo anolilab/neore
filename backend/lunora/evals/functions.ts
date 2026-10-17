@@ -182,6 +182,8 @@ const vModelComparison = v.object({
     /** Targets with a completed run that are not shown, beyond the column limit. */
     omittedTargets: v.number(),
     runs: v.array(vRunRow),
+    /** True when the newest runs were scanned and older ones were not: the matrix may miss models. */
+    scanTruncated: v.boolean(),
 });
 
 const vDatasetList = v.array(vDatasetRow);
@@ -942,7 +944,7 @@ export const compareModels = authQuery
         // fixed run count (a target's last run may sit under hundreds of newer ones); only
         // `scanPages`' page budget bounds it. It does not stop at MAX_COMPARED_MODELS targets
         // because `omittedTargets` counts the rest.
-        await scanPages(
+        const scanTruncated = await scanPages(
             async (cursor) =>
                 (await ctx.db
                     .query("evalRuns")
@@ -1000,5 +1002,6 @@ export const compareModels = authQuery
             }),
             omittedTargets: allRuns.length - runs.length,
             runs: runs.map((run, index) => toRunRow({ ...run, summary: summarize(resultSets[index] ?? [], run.caseIds.length) })),
+            scanTruncated,
         };
     });

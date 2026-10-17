@@ -114,6 +114,14 @@ export const notify = async (ctx: MutationCtx, input: NotificationInput): Promis
                 title: row.title,
                 userId: row.userId,
             });
+
+            // Send now rather than wait for the next housekeeping sweep, which can be a day away on a
+            // quiet shard. The row is already durable: if this nudge fails, the sweep still sends it.
+            try {
+                await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendPendingOutcomeEmails, {});
+            } catch (error) {
+                console.warn("[notifications] Failed to schedule the outcome email send:", error);
+            }
         }
     }
 

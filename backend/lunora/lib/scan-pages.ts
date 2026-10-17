@@ -6,6 +6,9 @@
  * pages keeps a worst-case scan to a few thousand rows rather than a user's
  * whole history. A caller that hits it has looked at the newest
  * `maxPages * pageSize` rows and answers from those.
+ *
+ * Returns true when the budget ran out before the rows did, so the caller can say its answer
+ * covers only the newest rows.
  */
 export const SCAN_PAGE_BUDGET = 20;
 
@@ -20,7 +23,7 @@ export const scanPages = async <T>(
     fetchPage: (cursor: string | null) => Promise<ScanPage<T>>,
     visit: (item: T) => Promise<boolean> | boolean,
     maxPages: number = SCAN_PAGE_BUDGET,
-): Promise<void> => {
+): Promise<boolean> => {
     let cursor: string | null = null;
 
     for (let pages = 0; pages < maxPages; pages += 1) {
@@ -28,14 +31,16 @@ export const scanPages = async <T>(
 
         for (const item of result.page) {
             if (await visit(item)) {
-                return;
+                return false;
             }
         }
 
         if (result.isDone || !result.continueCursor) {
-            return;
+            return false;
         }
 
         cursor = result.continueCursor;
     }
+
+    return true;
 };

@@ -967,10 +967,10 @@ export interface Doc_outcomeEmails {
     _id: Id<"outcomeEmails">;
     _creationTime: number;
     attempts: number;
+    claimedAt?: number;
     createdAt: number;
     link: string;
     notificationId: Id<"notifications">;
-    claimedAt?: number;
     sentAt?: number;
     status: "pending" | "sending" | "sent" | "failed";
     title: string;
@@ -3621,10 +3621,10 @@ export interface Insert_outcomeEmails {
     _id?: Id<"outcomeEmails">;
     _creationTime?: number;
     attempts: number;
+    claimedAt?: number;
     createdAt: number;
     link: string;
     notificationId: Id<"notifications">;
-    claimedAt?: number;
     sentAt?: number;
     status: "pending" | "sending" | "sent" | "failed";
     title: string;
