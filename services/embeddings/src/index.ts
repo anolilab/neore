@@ -40,6 +40,33 @@ const embedSchema = z.object({
 
 const MAX_BODY_BYTES = 1024 * 1024;
 
+const readBodyCapped = async (request: Request, maxBytes: number): Promise<Uint8Array | undefined> => {
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+
+    if (request.body) {
+        for await (const chunk of request.body) {
+            total += chunk.byteLength;
+
+            if (total > maxBytes) {
+                return undefined;
+            }
+
+            chunks.push(chunk);
+        }
+    }
+
+    const body = new Uint8Array(total);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+        body.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+
+    return body;
+};
+
 // ─── HMAC-SHA256 request signature verification ────────────────────────────────
 // Aligned with document-parser's signing pattern
 
@@ -48,7 +75,7 @@ const NUMERIC_RE = /^\d+$/;
 
 const REPLAY_WINDOW_MS = 30_000;
 
-const sha256Hex = async (data: ArrayBuffer): Promise<string> => {
+const sha256Hex = async (data: BufferSource): Promise<string> => {
     const hash = await crypto.subtle.digest("SHA-256", data);
 
     return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -79,14 +106,11 @@ const timingSafeEqual = async (secret: string, a: string, b: string): Promise<bo
     return diff === 0;
 };
 
-const verifyHmac = async (request: Request, secret: string): Promise<boolean> => {
+const verifyHmac = async (request: Request, body: Uint8Array, secret: string): Promise<boolean> => {
     const signature = request.headers.get("X-Signature");
     const timestamp = request.headers.get("X-Timestamp");
 
     if (!signature || !timestamp) return false;
-
-    // Refuse an oversized body before it is buffered for hashing.
-    if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES) return false;
 
     if (!NUMERIC_RE.test(timestamp)) return false;
 
@@ -94,7 +118,6 @@ const verifyHmac = async (request: Request, secret: string): Promise<boolean> =>
 
     if (Math.abs(Date.now() - ts) > REPLAY_WINDOW_MS) return false;
 
-    const body = await request.clone().arrayBuffer();
     const bodyHash = await sha256Hex(body);
     const path = new URL(request.url).pathname;
     const message = `${request.method}\n${path}\n${timestamp}\n${bodyHash}`;
@@ -144,7 +167,13 @@ app.post("/embed", async (c) => {
         return c.json({ error: "Payload too large", success: false }, 413);
     }
 
-    const valid = await verifyHmac(c.req.raw, signingSecret);
+    const rawBody = await readBodyCapped(c.req.raw, MAX_BODY_BYTES);
+
+    if (!rawBody) {
+        return c.json({ error: "Payload too large", success: false }, 413);
+    }
+
+    const valid = await verifyHmac(c.req.raw, rawBody, signingSecret);
 
     if (!valid) {
         console.warn(`[embeddings] Auth failed from ${c.req.header("CF-Connecting-IP") ?? "unknown"}`);
@@ -161,7 +190,7 @@ app.post("/embed", async (c) => {
     let body: unknown;
 
     try {
-        body = await c.req.json();
+        body = JSON.parse(new TextDecoder().decode(rawBody));
     } catch {
         return c.json({ error: "Invalid JSON body", success: false }, 400);
     }

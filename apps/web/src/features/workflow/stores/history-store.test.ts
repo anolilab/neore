@@ -115,6 +115,21 @@ describe("workflow history recording", () => {
         expect(useHistoryStore.getState().isNavigating).toBe(false);
     });
 
+    it("records no step for a pan and leaves the viewport alone on undo", () => {
+        useWorkflowStore.getState().setViewport({ x: 120, y: -40, zoom: 1.5 });
+        vi.advanceTimersByTime(HISTORY_DEBOUNCE_MS);
+
+        expect(useHistoryStore.getState().entries).toHaveLength(0);
+
+        useWorkflowStore.getState().updateNode("a", { label: "one" });
+        vi.advanceTimersByTime(HISTORY_DEBOUNCE_MS);
+        useWorkflowStore.getState().setViewport({ x: 300, y: 80, zoom: 0.5 });
+        undoWorkflow();
+
+        expect(useWorkflowStore.getState().nodes[0]?.data.label).toBe("a");
+        expect(useWorkflowStore.getState().viewport).toStrictEqual({ x: 300, y: 80, zoom: 0.5 });
+    });
+
     it("commits a pending edit before undoing it", () => {
         useWorkflowStore.getState().updateNode("a", { label: "typed" });
         undoWorkflow();

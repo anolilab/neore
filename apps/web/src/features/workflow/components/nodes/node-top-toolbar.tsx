@@ -21,7 +21,7 @@ import type { ImageNodeData, WorkflowNodeData, WorkflowNodeType } from "../../ty
 import NODE_CONFIGS from "../../types";
 import type { BaseModelOption } from "../../utils/model-options";
 import { getModelLabel, toBaseOption } from "../../utils/model-options";
-import { storeWorkflowImage } from "../../utils/workflow-image";
+import { isCurrentImageSelection, startImageSelection, storeWorkflowImage } from "../../utils/workflow-image";
 import NodeExpandModal from "./node-expand-modal";
 
 // Inline images travel inside the workflow save, which is capped at 1 MiB per RPC body.
@@ -287,6 +287,9 @@ const NodeTopToolbar = ({ data, nodeId, nodeType, selected = false }: NodeTopToo
         }
 
         const modeUpdate = nodeType === "image" ? { mode: "input" } : {};
+        const token = startImageSelection(nodeId);
+        const { projectId } = useWorkflowStore.getState();
+        const isStillWanted = (): boolean => isCurrentImageSelection(nodeId, token) && useWorkflowStore.getState().projectId === projectId;
 
         if (file.size > MAX_INLINE_IMAGE_BYTES) {
             // Too big to inline in the workflow save: store it in the background and keep the reference.
@@ -294,12 +297,16 @@ const NodeTopToolbar = ({ data, nodeId, nodeType, selected = false }: NodeTopToo
 
             void storeWorkflowImage(lunora, file)
                 .then((imageFileId) => {
-                    updateNode(nodeId, { imageFileId, imageUrl: undefined, ...modeUpdate } as Partial<WorkflowNodeData>);
+                    if (isStillWanted()) {
+                        updateNode(nodeId, { imageFileId, imageUrl: undefined, ...modeUpdate } as Partial<WorkflowNodeData>);
+                    }
 
                     return undefined;
                 })
                 .catch(() => {
-                    showError(t`Image upload failed. Try again.`);
+                    if (isStillWanted()) {
+                        showError(t`Image upload failed. Try again.`);
+                    }
                 });
 
             return;
@@ -309,6 +316,10 @@ const NodeTopToolbar = ({ data, nodeId, nodeType, selected = false }: NodeTopToo
         const reader = new FileReader();
 
         reader.addEventListener("load", () => {
+            if (!isStillWanted()) {
+                return;
+            }
+
             const dataUrl = reader.result as string;
 
             // A small replacement drops the reference to any earlier stored image.

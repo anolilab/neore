@@ -1535,7 +1535,6 @@ msgstr "Registro de ações"
 
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:284
 #: src/features/evals/components/dataset-panel.tsx:137
-#: src/routes/admin/gateway/keys.tsx:358
 msgid "Actions"
 msgstr "Ações"
 
@@ -1561,7 +1560,6 @@ msgstr "ativo"
 #: src/features/settings/components/chat/trigger-settings.tsx:662
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
-#: src/routes/admin/gateway/keys.tsx:54
 msgid "Active"
 msgstr "Ativo"
 
@@ -2711,7 +2709,7 @@ msgstr "analítico"
 msgid "Analytical (deep structure)"
 msgstr "Analítico (estrutura profunda)"
 
-#: src/routes/admin/gateway.tsx:8
+#: src/routes/admin/gateway.tsx:7
 msgid "Analytics"
 msgstr "Análises"
 
@@ -2880,8 +2878,8 @@ msgid "API key"
 msgstr "Chave de API"
 
 #: src/routes/admin/gateway/keys.tsx:162
-msgid "API Key"
-msgstr "Chave de API"
+#~ msgid "API Key"
+#~ msgstr "Chave de API"
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:534
 msgid "API key (optional)"
@@ -2896,7 +2894,6 @@ msgstr "Chave de API criada"
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:50
 #: src/features/layout/lib/dashboard-page-names.ts:15
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
-#: src/routes/admin/gateway.tsx:9
 #: src/routes/admin/route.tsx:55
 msgid "API Keys"
 msgstr "Chaves de API"
@@ -3114,8 +3111,8 @@ msgid "Are you sure you want to remove this member?"
 msgstr "Tem certeza de que quer remover este membro?"
 
 #: src/routes/admin/gateway/keys.tsx:283
-msgid "Are you sure you want to revoke <0>{prefix}…</0>? This cannot be undone. Any requests using this key will immediately return 401 Unauthorized."
-msgstr "Tem certeza de que deseja revogar <0>{prefix}…</0>? Isso não pode ser desfeito. Qualquer requisição que use esta chave passará a retornar 401 Unauthorized imediatamente."
+#~ msgid "Are you sure you want to revoke <0>{prefix}…</0>? This cannot be undone. Any requests using this key will immediately return 401 Unauthorized."
+#~ msgstr "Tem certeza de que deseja revogar <0>{prefix}…</0>? Isso não pode ser desfeito. Qualquer requisição que use esta chave passará a retornar 401 Unauthorized imediatamente."
 
 #: src/features/admin/components/ban-user-dialog.tsx:90
 msgid "Are you sure you want to unban {userName}? They will regain access to the platform."
@@ -3925,7 +3922,7 @@ msgstr "Texto centralizado em negrito"
 msgid "Bolivia"
 msgstr "Bolívia"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:526
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
 msgid "Bookmark node"
 msgstr "Adicionar nó aos favoritos"
 
@@ -4146,8 +4143,8 @@ msgid "Budget Alerts"
 msgstr "Alertas de orçamento"
 
 #: src/routes/admin/gateway/keys.tsx:342
-msgid "Budget Used"
-msgstr "Orçamento usado"
+#~ msgid "Budget Used"
+#~ msgstr "Orçamento usado"
 
 #: src/features/marketing/data/models-data.ts:416
 msgid "Budget-conscious access to Veo 3's audio capabilities at faster speeds and lower cost"
@@ -4446,8 +4443,6 @@ msgstr "Canadá"
 #: src/features/tasks/components/task-form-dialog.tsx:501
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
-#: src/routes/admin/gateway/keys.tsx:240
-#: src/routes/admin/gateway/keys.tsx:293
 #: src/routes/auth/extension.tsx:145
 msgid "Cancel"
 msgstr "Cancelar"
@@ -6389,12 +6384,12 @@ msgid "Copy"
 msgstr "Copiar"
 
 #: src/routes/admin/gateway/keys.tsx:149
-msgid "Copy and store your API key now — it will not be shown again."
-msgstr "Copie e guarde sua chave de API agora — ela não será exibida novamente."
+#~ msgid "Copy and store your API key now — it will not be shown again."
+#~ msgstr "Copie e guarde sua chave de API agora — ela não será exibida novamente."
 
 #: src/routes/admin/gateway/keys.tsx:166
-msgid "Copy API key"
-msgstr "Copiar chave de API"
+#~ msgid "Copy API key"
+#~ msgstr "Copiar chave de API"
 
 #: src/features/chat/header/thread-download-button.tsx:109
 msgid "Copy as Markdown"
@@ -6417,8 +6412,8 @@ msgid "Copy it now — it is not shown again."
 msgstr "Copie agora — ele não será exibido novamente."
 
 #: src/routes/admin/gateway/keys.tsx:375
-msgid "Copy key prefix {keyPrefix}"
-msgstr "Copiar prefixo da chave {keyPrefix}"
+#~ msgid "Copy key prefix {keyPrefix}"
+#~ msgstr "Copiar prefixo da chave {keyPrefix}"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:76
 msgid "Copy message"
@@ -6845,7 +6840,6 @@ msgstr "Crie e gerencie chaves de API para acesso programático à sua conta."
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:46
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:97
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:179
-#: src/routes/admin/gateway/keys.tsx:183
 msgid "Create API Key"
 msgstr "Criar chave de API"
 
@@ -6889,8 +6883,8 @@ msgstr "Criar convite"
 
 #: src/routes/admin/gateway/keys.tsx:137
 #: src/routes/admin/gateway/keys.tsx:245
-msgid "Create Key"
-msgstr "Criar chave"
+#~ msgid "Create Key"
+#~ msgstr "Criar chave"
 
 #: src/features/pages/components/page-share-dialog.tsx:124
 msgid "Create link"
@@ -6991,7 +6985,6 @@ msgstr "Crie seu primeiro fluxo de trabalho para automatizar tarefas de IA visua
 
 #: src/features/prompts/components/prompt-history-dialog.tsx:29
 #: src/features/skills/components/skill-item.tsx:80
-#: src/routes/admin/gateway/keys.tsx:348
 msgid "Created"
 msgstr "Criado"
 
@@ -7018,7 +7011,6 @@ msgstr "Criando..."
 
 #: src/features/chat/group/create-group-chat-button.tsx:150
 #: src/features/chat/group/create-group-chat-button.tsx:243
-#: src/routes/admin/gateway/keys.tsx:245
 msgid "Creating…"
 msgstr "Criando…"
 
@@ -7462,7 +7454,7 @@ msgstr "Depure um erro ou revise meu código..."
 msgid "Decompose the goal into an actionable plan."
 msgstr "Divida o objetivo em um plano prático."
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:402
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:413
 msgid "Decrease number of images"
 msgstr "Diminuir o número de imagens"
 
@@ -8060,7 +8052,7 @@ msgstr "Descreva como a imagem deve ser animada"
 msgid "Describe how to transform the image..."
 msgstr "Descreva como transformar a imagem..."
 
-#: src/features/workflow/components/nodes/image-node.tsx:86
+#: src/features/workflow/components/nodes/image-node.tsx:89
 msgid "Describe the image to generate..."
 msgstr "Descreva a imagem a ser gerada..."
 
@@ -8175,7 +8167,7 @@ msgstr "Designers que criam logos, ícones e ativos de marca em que a precisão 
 msgid "destructive"
 msgstr "destrutiva"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:504
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:515
 msgid "Detach from group"
 msgstr "Desanexar do grupo"
 
@@ -8512,7 +8504,6 @@ msgstr "Não tem uma conta?"
 #: src/features/devices/components/devices-settings.tsx:132
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:44
 #: src/features/tasks/components/task-status.tsx:16
-#: src/routes/admin/gateway/keys.tsx:175
 msgid "Done"
 msgstr "Concluído"
 
@@ -8578,7 +8569,7 @@ msgstr "Baixar como CSV"
 msgid "Download as XLSX"
 msgstr "Baixar como XLSX"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:538
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:549
 msgid "Download content"
 msgstr "Baixar conteúdo"
 
@@ -9752,7 +9743,6 @@ msgstr "corporativo"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:168
 #: src/features/marketing/components/landing-page.tsx:366
-#: src/routes/admin/gateway/keys.tsx:214
 msgid "Enterprise"
 msgstr "Enterprise"
 
@@ -10156,7 +10146,7 @@ msgstr "Expandir área de texto"
 msgid "Expand thinking"
 msgstr "Expandir raciocínio"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:543
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:554
 msgid "Expand to fullscreen"
 msgstr "Expandir para tela cheia"
 
@@ -10218,7 +10208,6 @@ msgstr "expirado"
 #: src/features/chat/thread-list/thread-node.tsx:258
 #: src/features/devices/components/devices-settings.tsx:134
 #: src/features/settings/connectors/connector-card.tsx:75
-#: src/routes/admin/gateway/keys.tsx:55
 msgid "Expired"
 msgstr "Expirado"
 
@@ -10797,8 +10786,8 @@ msgid "Failed to load image"
 msgstr "Falha ao carregar a imagem"
 
 #: src/routes/admin/gateway/keys.tsx:450
-msgid "Failed to load keys. Ensure the LLM Gateway is running."
-msgstr "Falha ao carregar as chaves. Verifique se o LLM Gateway está em execução."
+#~ msgid "Failed to load keys. Ensure the LLM Gateway is running."
+#~ msgstr "Falha ao carregar as chaves. Verifique se o LLM Gateway está em execução."
 
 #: src/features/skills/components/skill-list.tsx:93
 msgid "Failed to load skills"
@@ -11699,8 +11688,8 @@ msgid "Filmmakers creating cinematic videos with a strong focus on visual narrat
 msgstr "Cineastas que criam vídeos cinematográficos com forte foco em narrativa visual e qualidade de storytelling"
 
 #: src/routes/admin/gateway/keys.tsx:444
-msgid "Filter"
-msgstr "Filtrar"
+#~ msgid "Filter"
+#~ msgstr "Filtrar"
 
 #: src/features/admin/components/audit-log-card.tsx:136
 msgid "Filter by action"
@@ -11732,8 +11721,8 @@ msgstr "Filtrar por tipo"
 
 #: src/routes/admin/gateway/keys.tsx:434
 #: src/routes/admin/gateway/keys.tsx:440
-msgid "Filter by User ID"
-msgstr "Filtrar por ID do usuário"
+#~ msgid "Filter by User ID"
+#~ msgstr "Filtrar por ID do usuário"
 
 #: src/features/settings/components/personalization/memory-settings.tsx:183
 msgid "Filter memories by type"
@@ -12050,7 +12039,6 @@ msgstr "França"
 #: src/features/marketing/components/landing-page.tsx:326
 #: src/features/settings/components/chat/models-settings.tsx:37
 #: src/features/settings/components/chat/models-settings.tsx:573
-#: src/routes/admin/gateway/keys.tsx:208
 msgid "Free"
 msgstr "Gratuito"
 
@@ -12359,7 +12347,7 @@ msgstr "Gama"
 msgid "Gateway"
 msgstr "Gateway"
 
-#: src/routes/admin/gateway.tsx:29
+#: src/routes/admin/gateway.tsx:26
 msgid "Gateway sections"
 msgstr "Seções do gateway"
 
@@ -12425,7 +12413,7 @@ msgstr "Geração de vídeo de uso geral com o modelo Wan de última geração d
 #: src/features/chat/sidebar/thread-sidebar.tsx:143
 #: src/features/chat/thread/generation-model-menu.tsx:166
 #: src/features/skills/components/skill-generate-panel.tsx:111
-#: src/features/workflow/components/nodes/image-node.tsx:53
+#: src/features/workflow/components/nodes/image-node.tsx:56
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:153
 msgid "Generate"
 msgstr "Gerar"
@@ -12435,8 +12423,8 @@ msgid "Generate 4 images with different models and compare them side by side"
 msgstr "Gerar 4 imagens com modelos diferentes e compará-las lado a lado"
 
 #: src/routes/admin/gateway/keys.tsx:186
-msgid "Generate a new virtual API key with optional budget and rate limits."
-msgstr "Gere uma nova chave de API virtual com orçamento e limites de taxa opcionais."
+#~ msgid "Generate a new virtual API key with optional budget and rate limits."
+#~ msgstr "Gere uma nova chave de API virtual com orçamento e limites de taxa opcionais."
 
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Generate a storyboard for a short documentary"
@@ -12587,7 +12575,7 @@ msgstr "Gerando…"
 msgid "generation"
 msgstr "geração"
 
-#: src/features/workflow/components/nodes/image-node.tsx:80
+#: src/features/workflow/components/nodes/image-node.tsx:83
 msgid "Generation Prompt"
 msgstr "Prompt de geração"
 
@@ -13796,12 +13784,12 @@ msgstr "Imagem para vídeo"
 msgid "Image Transform"
 msgstr "Transformação de imagem"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:302
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:308
 msgid "Image upload failed. Try again."
 msgstr ""
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:338
-#: src/features/workflow/components/nodes/image-node.tsx:62
+#: src/features/workflow/components/nodes/image-node.tsx:65
 msgid "Image URL"
 msgstr "URL da imagem"
 
@@ -14103,7 +14091,7 @@ msgstr "O modelo de linguagem baseado em difusão da Inception"
 msgid "Includes audio generation"
 msgstr "Inclui geração de áudio"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:411
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:422
 msgid "Increase number of images"
 msgstr "Aumentar o número de imagens"
 
@@ -14167,7 +14155,7 @@ msgstr "Entrada"
 msgid "Input (Rich Text)"
 msgstr "Entrada (rich text)"
 
-#: src/features/workflow/components/nodes/image-node.tsx:50
+#: src/features/workflow/components/nodes/image-node.tsx:53
 msgid "Input (URL)"
 msgstr "Entrada (URL)"
 
@@ -14667,12 +14655,12 @@ msgid "Kenya"
 msgstr "Quênia"
 
 #: src/routes/admin/gateway/keys.tsx:336
-msgid "Key / Name"
-msgstr "Chave / Nome"
+#~ msgid "Key / Name"
+#~ msgstr "Chave / Nome"
 
 #: src/routes/admin/gateway/keys.tsx:146
-msgid "Key Created"
-msgstr "Chave criada"
+#~ msgid "Key Created"
+#~ msgstr "Chave criada"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 msgid "Keyboard shortcuts"
@@ -14950,8 +14938,8 @@ msgid "Last updated <0>{0}</0>"
 msgstr "Atualizado pela última vez em <0>{0}</0>"
 
 #: src/routes/admin/gateway/keys.tsx:351
-msgid "Last Used"
-msgstr "Último uso"
+#~ msgid "Last Used"
+#~ msgstr "Último uso"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:55
 msgid "Last used {date}"
@@ -15377,7 +15365,7 @@ msgstr "LLaMA, Mixtral, Gemma — inferência mais rápida"
 msgid "llm"
 msgstr "llm"
 
-#: src/routes/admin/gateway.tsx:22
+#: src/routes/admin/gateway.tsx:19
 msgid "LLM Gateway"
 msgstr "LLM Gateway"
 
@@ -15617,7 +15605,7 @@ msgstr "Localização atualizada"
 msgid "Lock group"
 msgstr "Bloquear grupo"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:518
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
 msgid "Lock node"
 msgstr "Bloquear nó"
 
@@ -15884,8 +15872,8 @@ msgid "Manage Consent Preferences"
 msgstr "Gerenciar preferências de consentimento"
 
 #: src/routes/admin/gateway/keys.tsx:424
-msgid "Manage gateway API keys with per-key budgets and rate limits"
-msgstr "Gerencie as chaves de API do gateway com orçamentos e limites de taxa por chave"
+#~ msgid "Manage gateway API keys with per-key budgets and rate limits"
+#~ msgstr "Gerencie as chaves de API do gateway com orçamentos e limites de taxa por chave"
 
 #: src/features/auth/components/team/team-cell.tsx:72
 msgid "Manage Members"
@@ -16083,8 +16071,8 @@ msgid "Max {maxFiles} files"
 msgstr "Máx. {maxFiles} arquivos"
 
 #: src/routes/admin/gateway/keys.tsx:223
-msgid "Max Budget (USD)"
-msgstr "Orçamento máximo (USD)"
+#~ msgid "Max Budget (USD)"
+#~ msgstr "Orçamento máximo (USD)"
 
 #: src/features/evals/components/case-fields.tsx:27
 msgid "Max cost ($)"
@@ -16612,7 +16600,7 @@ msgstr "mês"
 msgid "Mobile app icon"
 msgstr "Ícone de app para celular"
 
-#: src/features/workflow/components/nodes/image-node.tsx:42
+#: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:129
 #: src/features/workflow/components/nodes/text-node.tsx:41
 #: src/features/workflow/components/nodes/video-node.tsx:113
@@ -17092,8 +17080,8 @@ msgid "Mute"
 msgstr "Silenciar"
 
 #: src/routes/admin/gateway/keys.tsx:195
-msgid "My API Key"
-msgstr "Minha chave de API"
+#~ msgid "My API Key"
+#~ msgstr "Minha chave de API"
 
 #: src/features/devices/components/devices-settings.tsx:190
 msgid "My Linux computer"
@@ -17142,8 +17130,6 @@ msgstr "Birmanês (Mianmar)"
 #: src/features/skills/components/skill-builder-review.tsx:136
 #: src/features/skills/components/skill-form-dialog.tsx:201
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:107
-#: src/routes/admin/gateway/keys.tsx:156
-#: src/routes/admin/gateway/keys.tsx:193
 msgid "Name"
 msgstr "Nome"
 
@@ -17414,8 +17400,8 @@ msgid "Neutral color, blockbuster look"
 msgstr "Cor neutra, visual de blockbuster"
 
 #: src/routes/admin/gateway/keys.tsx:394
-msgid "Never"
-msgstr "Nunca"
+#~ msgid "Never"
+#~ msgstr "Nunca"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:32
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:56
@@ -17701,8 +17687,8 @@ msgid "No aperture selected"
 msgstr "Nenhuma abertura selecionada"
 
 #: src/routes/admin/gateway/keys.tsx:410
-msgid "No API keys found for this user. Create one to get started."
-msgstr "Nenhuma chave de API encontrada para este usuário. Crie uma para começar."
+#~ msgid "No API keys found for this user. Create one to get started."
+#~ msgstr "Nenhuma chave de API encontrada para este usuário. Crie uma para começar."
 
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:59
 msgid "No API keys found. Create one to get started."
@@ -20494,7 +20480,7 @@ msgstr "preview"
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
 #: src/features/workflow/components/canvas/workflow-controls.tsx:569
-#: src/features/workflow/components/nodes/image-node.tsx:73
+#: src/features/workflow/components/nodes/image-node.tsx:76
 msgid "Preview"
 msgstr "Pré-visualização"
 
@@ -20661,7 +20647,6 @@ msgstr "Privado por padrão"
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:553
-#: src/routes/admin/gateway/keys.tsx:211
 msgid "Pro"
 msgstr "Pro"
 
@@ -21943,7 +21928,7 @@ msgstr "Remover o fundo e extrair o assunto"
 msgid "Remove BG"
 msgstr "Remover fundo"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:526
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
 msgid "Remove bookmark"
 msgstr "Remover favorito"
 
@@ -22480,24 +22465,24 @@ msgid "Revoke All Sessions"
 msgstr "Revogar todas as sessões"
 
 #: src/routes/admin/gateway/keys.tsx:280
-msgid "Revoke API Key"
-msgstr "Revogar chave de API"
+#~ msgid "Revoke API Key"
+#~ msgstr "Revogar chave de API"
 
 #: src/routes/admin/gateway/keys.tsx:298
-msgid "Revoke Key"
-msgstr "Revogar chave"
+#~ msgid "Revoke Key"
+#~ msgstr "Revogar chave"
 
 #: src/routes/admin/gateway/keys.tsx:272
-msgid "Revoke key {prefix}"
-msgstr "Revogar chave {prefix}"
+#~ msgid "Revoke key {prefix}"
+#~ msgstr "Revogar chave {prefix}"
 
 #: src/features/auth/components/settings/security/session-cell.tsx:103
 msgid "Revoke Session"
 msgstr "Revogar sessão"
 
 #: src/routes/admin/gateway/keys.tsx:56
-msgid "Revoked"
-msgstr "Revogada"
+#~ msgid "Revoked"
+#~ msgstr "Revogada"
 
 #. placeholder {0}: result.revokedCount
 #: src/features/admin/components/user-sessions-dialog.tsx:55
@@ -22509,8 +22494,8 @@ msgid "Revoking..."
 msgstr "Revogando..."
 
 #: src/routes/admin/gateway/keys.tsx:298
-msgid "Revoking…"
-msgstr "Revogando…"
+#~ msgid "Revoking…"
+#~ msgstr "Revogando…"
 
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:174
 msgid "Rewrites your system prompt using a structured template (role, rules, workflows). The model treats your input as evidence to optimize, not as a task to execute."
@@ -22628,8 +22613,8 @@ msgstr "Altura da linha"
 
 #: src/routes/admin/gateway/keys.tsx:229
 #: src/routes/admin/gateway/keys.tsx:345
-msgid "RPM Limit"
-msgstr "Limite de RPM"
+#~ msgid "RPM Limit"
+#~ msgstr "Limite de RPM"
 
 #: src/features/evals/components/case-fields.tsx:100
 msgid "Rubric"
@@ -24358,9 +24343,13 @@ msgstr "O roteamento inteligente classifica automaticamente cada consulta por co
 msgid "Smart routing decisions, model usage, and provider health"
 msgstr "Decisões de roteamento inteligente, uso de modelos e saúde dos provedores"
 
+#: src/routes/admin/gateway.tsx:22
+msgid "Smart routing, model usage, and provider health"
+msgstr ""
+
 #: src/routes/admin/gateway.tsx:25
-msgid "Smart routing, model usage, provider health, and virtual API key management"
-msgstr "Roteamento inteligente, uso de modelos, saúde dos provedores e gerenciamento de chaves de API virtuais"
+#~ msgid "Smart routing, model usage, provider health, and virtual API key management"
+#~ msgstr "Roteamento inteligente, uso de modelos, saúde dos provedores e gerenciamento de chaves de API virtuais"
 
 #: src/features/marketing/data/models-data.ts:298
 msgid "Smarter composition over o1"
@@ -24970,7 +24959,6 @@ msgstr "Modo sem estado"
 #: src/features/evals/components/dataset-panel.tsx:205
 #: src/features/tasks/components/goal-form-dialog.tsx:135
 #: src/routes/admin/gateway/index.tsx:137
-#: src/routes/admin/gateway/keys.tsx:354
 msgid "Status"
 msgstr "Status"
 
@@ -27064,8 +27052,8 @@ msgstr "Marque duas execuções para compará-las."
 
 #: src/routes/admin/gateway/keys.tsx:200
 #: src/routes/admin/gateway/keys.tsx:339
-msgid "Tier"
-msgstr "Plano"
+#~ msgid "Tier"
+#~ msgstr "Plano"
 
 #: src/features/canvas/components/design-preset-selector.tsx:48
 msgid "TikTok Video"
@@ -27258,7 +27246,7 @@ msgstr "Chaves de provedores de ferramentas"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:434
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:445
 msgid "Tools"
 msgstr "Ferramentas"
 
@@ -27878,8 +27866,8 @@ msgid "Unknown user"
 msgstr "Usuário desconhecido"
 
 #: src/routes/admin/gateway/keys.tsx:225
-msgid "Unlimited"
-msgstr "Ilimitado"
+#~ msgid "Unlimited"
+#~ msgstr "Ilimitado"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:140
 msgid "Unlimited requests"
@@ -27894,7 +27882,7 @@ msgstr "Desvincular"
 msgid "Unlock group"
 msgstr "Desbloquear grupo"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:518
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
 msgid "Unlock node"
 msgstr "Desbloquear nó"
 
@@ -28195,7 +28183,7 @@ msgstr "Enviar pasta"
 msgid "Upload Image"
 msgstr "Enviar imagem"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:492
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:503
 msgid "Upload image / video"
 msgstr "Enviar imagem / vídeo"
 
@@ -29034,8 +29022,8 @@ msgid "Violet"
 msgstr "Violeta"
 
 #: src/routes/admin/gateway/keys.tsx:421
-msgid "Virtual API Keys"
-msgstr "Chaves de API virtuais"
+#~ msgid "Virtual API Keys"
+#~ msgstr "Chaves de API virtuais"
 
 #: src/features/skills/components/skill-form-dialog.tsx:459
 msgid "Visibility"

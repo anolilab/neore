@@ -443,7 +443,13 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                     },
                                     c.var.telemetry,
                                 ),
-                                hasFailed ? healthService.recordFailure(provider, modelApiId) : healthService.recordSuccess(provider, modelApiId, latencyMs),
+                                ...(isCancelled
+                                    ? []
+                                    : [
+                                          hasFailed
+                                              ? healthService.recordFailure(provider, modelApiId)
+                                              : healthService.recordSuccess(provider, modelApiId, latencyMs),
+                                      ]),
                                 usageReporter.report({
                                     // Platform env keys only on this route — never BYOK.
                                     billingMode: "platform",
@@ -456,7 +462,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                     userId,
                                 }),
                                 // Fire completion webhook (non-blocking)
-                                ...(hasFailed
+                                ...(hasFailed || isCancelled
                                     ? []
                                     : [
                                           deliverEvent(

@@ -165,7 +165,7 @@ Users and organizations can supply their own provider API keys through the Anole
 
 ## Virtual API keys
 
-For SaaS API access, the gateway issues `gk_*` keys via `POST /internal/keys`. The raw key is returned once; subsequent lookups use a SHA-256 hash stored in D1. Keys can have per-user monthly budget limits and per-minute token limits.
+The gateway does not issue `gk_*` keys. There is no key-management endpoint, and `/internal/keys` does not exist.
 
 ## API surface (summary)
 
@@ -244,7 +244,6 @@ All require HMAC auth.
 | `POST /internal/route` | Smart model selection |
 | `POST /internal/model/proxy` | LanguageModelV3 proxy |
 | `POST /internal/webhooks` | Register webhook |
-| `POST /internal/keys` | Create virtual API key |
 | `POST /internal/canary/weights` | Set A/B routing weights |
 | `POST /internal/notification-rules` | Manage budget / usage alert rules |
 | `POST /internal/admin/tier-pools` | Inspect and adjust routing tier pools |

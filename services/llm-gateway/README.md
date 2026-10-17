@@ -25,7 +25,6 @@ Lunora Backend (service binding SERVICE_LLM_GATEWAY → `InternalApi` entrypoint
   └─(binding)─→ /internal/route         Smart model selection
   └─(binding)─→ /internal/model/proxy   LanguageModelV3 proxy (doGenerate/doStream)
   └─(binding)─→ /internal/webhooks      Webhook registration
-  └─(binding)─→ /internal/keys          Virtual API key management
 
 Client (Browser / Extension)
   └─(stream token)─→ /v1/stream      NDJSON chunk relay from persistentChunks
@@ -217,7 +216,7 @@ Healed responses include an `X-Gateway-Healed: true` header and `healed: true` i
 
 ### Virtual API Keys
 
-Keys are provisioned via `POST /internal/keys`. Raw key (`gk_*`) returned once. Subsequent calls use hashed lookup. Keys support per-user budget limits (`monthlyBudgetCents`) and per-minute token limits.
+No `gk_*` keys are issued: the gateway has no key-management endpoint, and `/internal/keys` does not exist.
 
 ## Environment Variables
 
@@ -437,15 +436,6 @@ POST   /internal/webhooks/:id/test  Send test event
 Webhook event types: `completion`, `budget_exceeded`, `guardrail_triggered`, `provider_error`.
 
 Payloads are signed with `X-Gateway-Signature: sha256=<hmac>`.
-
-#### API Key Management
-
-```http
-POST   /internal/keys               Create key (raw returned once)
-GET    /internal/keys?userId=X      List keys (prefix shown, hash masked)
-DELETE /internal/keys/:keyId        Revoke
-PATCH  /internal/keys/:keyId        Update name/budget/limits
-```
 
 #### Canary / A-B Routing
 

@@ -10,6 +10,7 @@ import { memo } from "react";
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { ImageNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
+import { startImageSelection } from "../../utils/workflow-image";
 import BaseNode from "./base-node";
 
 const ImageNodeComponent = (props: NodeProps<Node<ImageNodeData>>) => {
@@ -28,6 +29,7 @@ const ImageNodeComponent = (props: NodeProps<Node<ImageNodeData>>) => {
 
     const handleImageUrlChange = (imageUrl: string) => {
         // A typed URL replaces any stored file, or the stored file would come back on load.
+        startImageSelection(id);
         updateNode(id, { imageFileId: undefined, imageUrl });
     };
 

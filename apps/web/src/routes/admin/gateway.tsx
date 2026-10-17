@@ -2,12 +2,9 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import cn from "@neore/ui/utils/cn";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
-import { Key, LineChart } from "lucide-react";
+import { LineChart } from "lucide-react";
 
-const tabs = [
-    { icon: LineChart, label: msg`Analytics`, to: "/admin/gateway/" },
-    { icon: Key, label: msg`API Keys`, to: "/admin/gateway/keys" },
-] as const;
+const tabs = [{ icon: LineChart, label: msg`Analytics`, to: "/admin/gateway/" }] as const;
 
 const activeLinkClass = "border-primary text-foreground";
 const inactiveLinkClass = "border-transparent text-muted-foreground hover:text-foreground";
@@ -22,7 +19,7 @@ const GatewayLayoutPage = () => {
                     <Trans>LLM Gateway</Trans>
                 </h2>
                 <p className="text-muted-foreground text-sm">
-                    <Trans>Smart routing, model usage, provider health, and virtual API key management</Trans>
+                    <Trans>Smart routing, model usage, and provider health</Trans>
                 </p>
             </div>
 

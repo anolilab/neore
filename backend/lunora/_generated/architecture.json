@@ -6424,30 +6424,9 @@
     },
     {
       "detail": "action",
-      "id": "function:admin_gateway_analytics:createGatewayKeyAction",
-      "kind": "function",
-      "name": "admin.gateway_analytics.createGatewayKeyAction",
-      "module": "admin"
-    },
-    {
-      "detail": "action",
       "id": "function:admin_gateway_analytics:getGatewayAnalytics",
       "kind": "function",
       "name": "admin.gateway_analytics.getGatewayAnalytics",
-      "module": "admin"
-    },
-    {
-      "detail": "action",
-      "id": "function:admin_gateway_analytics:listGatewayKeysAction",
-      "kind": "function",
-      "name": "admin.gateway_analytics.listGatewayKeysAction",
-      "module": "admin"
-    },
-    {
-      "detail": "action",
-      "id": "function:admin_gateway_analytics:revokeGatewayKeyAction",
-      "kind": "function",
-      "name": "admin.gateway_analytics.revokeGatewayKeyAction",
       "module": "admin"
     },
     {

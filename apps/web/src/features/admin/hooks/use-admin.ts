@@ -6,7 +6,7 @@
  */
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
@@ -313,59 +313,5 @@ export const useGatewayAnalytics = (period: "24h" | "7d" = "24h") => {
         refetchInterval: 60_000,
         retry: 1,
         staleTime: 30_000,
-    });
-};
-
-/**
- * List virtual API keys for a user (admin view).
- */
-export const useGatewayKeys = (userId: string) => {
-    const listKeys = useAction(api.admin.gateway_analytics.listGatewayKeysAction);
-
-    return useQuery({
-        enabled: !!userId,
-        queryFn: () => listKeys({ userId }),
-        queryKey: ["admin", "gateway-keys", userId],
-        retry: 1,
-        staleTime: 30_000,
-    });
-};
-
-/**
- * Create a new virtual API key.
- */
-export const useCreateGatewayKey = () => {
-    const createKey = useAction(api.admin.gateway_analytics.createGatewayKeyAction);
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: (params: {
-            expiresAt?: string;
-            maxBudgetUsd?: number;
-            name?: string;
-            orgId?: string;
-            rpmLimit?: number;
-            tier?: "free" | "pro" | "enterprise";
-            tpmLimit?: number;
-            userId: string;
-        }) => createKey(params),
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "gateway-keys"] });
-        },
-    });
-};
-
-/**
- * Revoke a virtual API key.
- */
-export const useRevokeGatewayKey = () => {
-    const revokeKey = useAction(api.admin.gateway_analytics.revokeGatewayKeyAction);
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: (keyId: string) => revokeKey({ keyId }),
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "gateway-keys"] });
-        },
     });
 };

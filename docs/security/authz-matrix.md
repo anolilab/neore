@@ -153,10 +153,7 @@ for a schema table that is neither policed nor listed:
 | `admin_cleanup.listCleanupLogs` | query | adminQuery | cleanupLogs | admin role | ok |
 | `admin_cleanup.previewCleanup` | query | adminQuery | cleanupConfigs | admin role | ok |
 | `admin_cleanup.updateCleanupConfig` | mutation | adminMutation | cleanupConfigs | admin role | ok |
-| `admin_gateway_analytics.createGatewayKeyAction` | action | adminAction | — | admin role | ok |
 | `admin_gateway_analytics.getGatewayAnalytics` | action | adminAction | — | admin role | ok |
-| `admin_gateway_analytics.listGatewayKeysAction` | action | adminAction | — | admin role | ok |
-| `admin_gateway_analytics.revokeGatewayKeyAction` | action | adminAction | — | admin role | ok |
 | `agent_branches.switchBranch` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `agent_document_history.getVersion` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
 | `agent_document_history.listVersions` | query | query | documents | identity (self-resolved); row.userId == caller | ok |

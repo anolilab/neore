@@ -1535,7 +1535,6 @@ msgstr "操作日志"
 
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:284
 #: src/features/evals/components/dataset-panel.tsx:137
-#: src/routes/admin/gateway/keys.tsx:358
 msgid "Actions"
 msgstr "操作"
 
@@ -1561,7 +1560,6 @@ msgstr "活跃"
 #: src/features/settings/components/chat/trigger-settings.tsx:662
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
-#: src/routes/admin/gateway/keys.tsx:54
 msgid "Active"
 msgstr "已启用"
 
@@ -2711,7 +2709,7 @@ msgstr "分析型"
 msgid "Analytical (deep structure)"
 msgstr "分析型（深层结构）"
 
-#: src/routes/admin/gateway.tsx:8
+#: src/routes/admin/gateway.tsx:7
 msgid "Analytics"
 msgstr "分析"
 
@@ -2880,8 +2878,8 @@ msgid "API key"
 msgstr "API 密钥"
 
 #: src/routes/admin/gateway/keys.tsx:162
-msgid "API Key"
-msgstr "API 密钥"
+#~ msgid "API Key"
+#~ msgstr "API 密钥"
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:534
 msgid "API key (optional)"
@@ -2896,7 +2894,6 @@ msgstr "API 密钥已创建"
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:50
 #: src/features/layout/lib/dashboard-page-names.ts:15
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
-#: src/routes/admin/gateway.tsx:9
 #: src/routes/admin/route.tsx:55
 msgid "API Keys"
 msgstr "API 密钥"
@@ -3114,8 +3111,8 @@ msgid "Are you sure you want to remove this member?"
 msgstr "确定要移除此成员吗？"
 
 #: src/routes/admin/gateway/keys.tsx:283
-msgid "Are you sure you want to revoke <0>{prefix}…</0>? This cannot be undone. Any requests using this key will immediately return 401 Unauthorized."
-msgstr "确定要撤销 <0>{prefix}…</0> 吗？此操作无法撤销。使用此密钥的所有请求将立即返回 401 Unauthorized。"
+#~ msgid "Are you sure you want to revoke <0>{prefix}…</0>? This cannot be undone. Any requests using this key will immediately return 401 Unauthorized."
+#~ msgstr "确定要撤销 <0>{prefix}…</0> 吗？此操作无法撤销。使用此密钥的所有请求将立即返回 401 Unauthorized。"
 
 #: src/features/admin/components/ban-user-dialog.tsx:90
 msgid "Are you sure you want to unban {userName}? They will regain access to the platform."
@@ -3925,7 +3922,7 @@ msgstr "居中粗体文字"
 msgid "Bolivia"
 msgstr "玻利维亚"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:526
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
 msgid "Bookmark node"
 msgstr "收藏节点"
 
@@ -4146,8 +4143,8 @@ msgid "Budget Alerts"
 msgstr "预算提醒"
 
 #: src/routes/admin/gateway/keys.tsx:342
-msgid "Budget Used"
-msgstr "已用预算"
+#~ msgid "Budget Used"
+#~ msgstr "已用预算"
 
 #: src/features/marketing/data/models-data.ts:416
 msgid "Budget-conscious access to Veo 3's audio capabilities at faster speeds and lower cost"
@@ -4446,8 +4443,6 @@ msgstr "加拿大"
 #: src/features/tasks/components/task-form-dialog.tsx:501
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
-#: src/routes/admin/gateway/keys.tsx:240
-#: src/routes/admin/gateway/keys.tsx:293
 #: src/routes/auth/extension.tsx:145
 msgid "Cancel"
 msgstr "取消"
@@ -6389,12 +6384,12 @@ msgid "Copy"
 msgstr "复制"
 
 #: src/routes/admin/gateway/keys.tsx:149
-msgid "Copy and store your API key now — it will not be shown again."
-msgstr "请立即复制并保存你的 API 密钥——它不会再次显示。"
+#~ msgid "Copy and store your API key now — it will not be shown again."
+#~ msgstr "请立即复制并保存你的 API 密钥——它不会再次显示。"
 
 #: src/routes/admin/gateway/keys.tsx:166
-msgid "Copy API key"
-msgstr "复制 API 密钥"
+#~ msgid "Copy API key"
+#~ msgstr "复制 API 密钥"
 
 #: src/features/chat/header/thread-download-button.tsx:109
 msgid "Copy as Markdown"
@@ -6417,8 +6412,8 @@ msgid "Copy it now — it is not shown again."
 msgstr "请立即复制——它不会再次显示。"
 
 #: src/routes/admin/gateway/keys.tsx:375
-msgid "Copy key prefix {keyPrefix}"
-msgstr "复制密钥前缀 {keyPrefix}"
+#~ msgid "Copy key prefix {keyPrefix}"
+#~ msgstr "复制密钥前缀 {keyPrefix}"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:76
 msgid "Copy message"
@@ -6845,7 +6840,6 @@ msgstr "创建和管理 API 密钥，以编程方式访问你的账号。"
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:46
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:97
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:179
-#: src/routes/admin/gateway/keys.tsx:183
 msgid "Create API Key"
 msgstr "创建 API 密钥"
 
@@ -6889,8 +6883,8 @@ msgstr "创建邀请"
 
 #: src/routes/admin/gateway/keys.tsx:137
 #: src/routes/admin/gateway/keys.tsx:245
-msgid "Create Key"
-msgstr "创建密钥"
+#~ msgid "Create Key"
+#~ msgstr "创建密钥"
 
 #: src/features/pages/components/page-share-dialog.tsx:124
 msgid "Create link"
@@ -6991,7 +6985,6 @@ msgstr "创建你的第一个工作流，可视化地自动化 AI 任务。"
 
 #: src/features/prompts/components/prompt-history-dialog.tsx:29
 #: src/features/skills/components/skill-item.tsx:80
-#: src/routes/admin/gateway/keys.tsx:348
 msgid "Created"
 msgstr "已创建"
 
@@ -7018,7 +7011,6 @@ msgstr "正在创建..."
 
 #: src/features/chat/group/create-group-chat-button.tsx:150
 #: src/features/chat/group/create-group-chat-button.tsx:243
-#: src/routes/admin/gateway/keys.tsx:245
 msgid "Creating…"
 msgstr "正在创建…"
 
@@ -7462,7 +7454,7 @@ msgstr "调试错误或审查我的代码..."
 msgid "Decompose the goal into an actionable plan."
 msgstr "将目标分解为可执行的计划。"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:402
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:413
 msgid "Decrease number of images"
 msgstr "减少图片数量"
 
@@ -8060,7 +8052,7 @@ msgstr "描述图片应如何动起来"
 msgid "Describe how to transform the image..."
 msgstr "描述如何转换这张图片..."
 
-#: src/features/workflow/components/nodes/image-node.tsx:86
+#: src/features/workflow/components/nodes/image-node.tsx:89
 msgid "Describe the image to generate..."
 msgstr "描述要生成的图片..."
 
@@ -8175,7 +8167,7 @@ msgstr "制作 logo、图标和品牌素材、最注重文字与排版精度的�
 msgid "destructive"
 msgstr "破坏性"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:504
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:515
 msgid "Detach from group"
 msgstr "从分组中分离"
 
@@ -8512,7 +8504,6 @@ msgstr "还没有账号？"
 #: src/features/devices/components/devices-settings.tsx:132
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:44
 #: src/features/tasks/components/task-status.tsx:16
-#: src/routes/admin/gateway/keys.tsx:175
 msgid "Done"
 msgstr "完成"
 
@@ -8578,7 +8569,7 @@ msgstr "下载为 CSV"
 msgid "Download as XLSX"
 msgstr "下载为 XLSX"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:538
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:549
 msgid "Download content"
 msgstr "下载内容"
 
@@ -9752,7 +9743,6 @@ msgstr "企业级"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:168
 #: src/features/marketing/components/landing-page.tsx:366
-#: src/routes/admin/gateway/keys.tsx:214
 msgid "Enterprise"
 msgstr "企业版"
 
@@ -10156,7 +10146,7 @@ msgstr "展开文本框"
 msgid "Expand thinking"
 msgstr "展开思考过程"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:543
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:554
 msgid "Expand to fullscreen"
 msgstr "全屏展开"
 
@@ -10218,7 +10208,6 @@ msgstr "已过期"
 #: src/features/chat/thread-list/thread-node.tsx:258
 #: src/features/devices/components/devices-settings.tsx:134
 #: src/features/settings/connectors/connector-card.tsx:75
-#: src/routes/admin/gateway/keys.tsx:55
 msgid "Expired"
 msgstr "已过期"
 
@@ -10797,8 +10786,8 @@ msgid "Failed to load image"
 msgstr "加载图片失败"
 
 #: src/routes/admin/gateway/keys.tsx:450
-msgid "Failed to load keys. Ensure the LLM Gateway is running."
-msgstr "加载密钥失败。请确保 LLM Gateway 正在运行。"
+#~ msgid "Failed to load keys. Ensure the LLM Gateway is running."
+#~ msgstr "加载密钥失败。请确保 LLM Gateway 正在运行。"
 
 #: src/features/skills/components/skill-list.tsx:93
 msgid "Failed to load skills"
@@ -11699,8 +11688,8 @@ msgid "Filmmakers creating cinematic videos with a strong focus on visual narrat
 msgstr "专注视觉叙事和故事品质、制作电影感视频的电影人"
 
 #: src/routes/admin/gateway/keys.tsx:444
-msgid "Filter"
-msgstr "筛选"
+#~ msgid "Filter"
+#~ msgstr "筛选"
 
 #: src/features/admin/components/audit-log-card.tsx:136
 msgid "Filter by action"
@@ -11732,8 +11721,8 @@ msgstr "按类型筛选"
 
 #: src/routes/admin/gateway/keys.tsx:434
 #: src/routes/admin/gateway/keys.tsx:440
-msgid "Filter by User ID"
-msgstr "按用户 ID 筛选"
+#~ msgid "Filter by User ID"
+#~ msgstr "按用户 ID 筛选"
 
 #: src/features/settings/components/personalization/memory-settings.tsx:183
 msgid "Filter memories by type"
@@ -12050,7 +12039,6 @@ msgstr "法国"
 #: src/features/marketing/components/landing-page.tsx:326
 #: src/features/settings/components/chat/models-settings.tsx:37
 #: src/features/settings/components/chat/models-settings.tsx:573
-#: src/routes/admin/gateway/keys.tsx:208
 msgid "Free"
 msgstr "免费"
 
@@ -12359,7 +12347,7 @@ msgstr "伽马"
 msgid "Gateway"
 msgstr "网关"
 
-#: src/routes/admin/gateway.tsx:29
+#: src/routes/admin/gateway.tsx:26
 msgid "Gateway sections"
 msgstr "网关版块"
 
@@ -12425,7 +12413,7 @@ msgstr "使用阿里巴巴最新一代 Wan 模型的通用视频生成"
 #: src/features/chat/sidebar/thread-sidebar.tsx:143
 #: src/features/chat/thread/generation-model-menu.tsx:166
 #: src/features/skills/components/skill-generate-panel.tsx:111
-#: src/features/workflow/components/nodes/image-node.tsx:53
+#: src/features/workflow/components/nodes/image-node.tsx:56
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:153
 msgid "Generate"
 msgstr "生成"
@@ -12435,8 +12423,8 @@ msgid "Generate 4 images with different models and compare them side by side"
 msgstr "用不同模型生成 4 张图片并并排对比"
 
 #: src/routes/admin/gateway/keys.tsx:186
-msgid "Generate a new virtual API key with optional budget and rate limits."
-msgstr "生成一个新的虚拟 API 密钥，可选设置预算和速率限制。"
+#~ msgid "Generate a new virtual API key with optional budget and rate limits."
+#~ msgstr "生成一个新的虚拟 API 密钥，可选设置预算和速率限制。"
 
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Generate a storyboard for a short documentary"
@@ -12587,7 +12575,7 @@ msgstr "正在生成…"
 msgid "generation"
 msgstr "生成"
 
-#: src/features/workflow/components/nodes/image-node.tsx:80
+#: src/features/workflow/components/nodes/image-node.tsx:83
 msgid "Generation Prompt"
 msgstr "生成提示词"
 
@@ -13796,12 +13784,12 @@ msgstr "图生视频"
 msgid "Image Transform"
 msgstr "图像变换"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:302
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:308
 msgid "Image upload failed. Try again."
 msgstr ""
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:338
-#: src/features/workflow/components/nodes/image-node.tsx:62
+#: src/features/workflow/components/nodes/image-node.tsx:65
 msgid "Image URL"
 msgstr "图片 URL"
 
@@ -14103,7 +14091,7 @@ msgstr "Inception 基于扩散的语言模型"
 msgid "Includes audio generation"
 msgstr "包含音频生成"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:411
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:422
 msgid "Increase number of images"
 msgstr "增加图片数量"
 
@@ -14167,7 +14155,7 @@ msgstr "输入"
 msgid "Input (Rich Text)"
 msgstr "输入（富文本）"
 
-#: src/features/workflow/components/nodes/image-node.tsx:50
+#: src/features/workflow/components/nodes/image-node.tsx:53
 msgid "Input (URL)"
 msgstr "输入（URL）"
 
@@ -14667,12 +14655,12 @@ msgid "Kenya"
 msgstr "肯尼亚"
 
 #: src/routes/admin/gateway/keys.tsx:336
-msgid "Key / Name"
-msgstr "密钥 / 名称"
+#~ msgid "Key / Name"
+#~ msgstr "密钥 / 名称"
 
 #: src/routes/admin/gateway/keys.tsx:146
-msgid "Key Created"
-msgstr "密钥创建时间"
+#~ msgid "Key Created"
+#~ msgstr "密钥创建时间"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 msgid "Keyboard shortcuts"
@@ -14950,8 +14938,8 @@ msgid "Last updated <0>{0}</0>"
 msgstr "最后更新于 <0>{0}</0>"
 
 #: src/routes/admin/gateway/keys.tsx:351
-msgid "Last Used"
-msgstr "上次使用"
+#~ msgid "Last Used"
+#~ msgstr "上次使用"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:55
 msgid "Last used {date}"
@@ -15377,7 +15365,7 @@ msgstr "LLaMA、Mixtral、Gemma——最快推理"
 msgid "llm"
 msgstr "llm"
 
-#: src/routes/admin/gateway.tsx:22
+#: src/routes/admin/gateway.tsx:19
 msgid "LLM Gateway"
 msgstr "LLM Gateway"
 
@@ -15617,7 +15605,7 @@ msgstr "位置已更新"
 msgid "Lock group"
 msgstr "锁定分组"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:518
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
 msgid "Lock node"
 msgstr "锁定节点"
 
@@ -15884,8 +15872,8 @@ msgid "Manage Consent Preferences"
 msgstr "管理同意偏好"
 
 #: src/routes/admin/gateway/keys.tsx:424
-msgid "Manage gateway API keys with per-key budgets and rate limits"
-msgstr "管理网关 API 密钥，支持按密钥设置预算和速率限制"
+#~ msgid "Manage gateway API keys with per-key budgets and rate limits"
+#~ msgstr "管理网关 API 密钥，支持按密钥设置预算和速率限制"
 
 #: src/features/auth/components/team/team-cell.tsx:72
 msgid "Manage Members"
@@ -16083,8 +16071,8 @@ msgid "Max {maxFiles} files"
 msgstr "最多 {maxFiles} 个文件"
 
 #: src/routes/admin/gateway/keys.tsx:223
-msgid "Max Budget (USD)"
-msgstr "最高预算（USD）"
+#~ msgid "Max Budget (USD)"
+#~ msgstr "最高预算（USD）"
 
 #: src/features/evals/components/case-fields.tsx:27
 msgid "Max cost ($)"
@@ -16612,7 +16600,7 @@ msgstr "月"
 msgid "Mobile app icon"
 msgstr "移动应用图标"
 
-#: src/features/workflow/components/nodes/image-node.tsx:42
+#: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:129
 #: src/features/workflow/components/nodes/text-node.tsx:41
 #: src/features/workflow/components/nodes/video-node.tsx:113
@@ -17092,8 +17080,8 @@ msgid "Mute"
 msgstr "静音"
 
 #: src/routes/admin/gateway/keys.tsx:195
-msgid "My API Key"
-msgstr "我的 API 密钥"
+#~ msgid "My API Key"
+#~ msgstr "我的 API 密钥"
 
 #: src/features/devices/components/devices-settings.tsx:190
 msgid "My Linux computer"
@@ -17142,8 +17130,6 @@ msgstr "缅甸语（缅甸）"
 #: src/features/skills/components/skill-builder-review.tsx:136
 #: src/features/skills/components/skill-form-dialog.tsx:201
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:107
-#: src/routes/admin/gateway/keys.tsx:156
-#: src/routes/admin/gateway/keys.tsx:193
 msgid "Name"
 msgstr "名称"
 
@@ -17414,8 +17400,8 @@ msgid "Neutral color, blockbuster look"
 msgstr "中性色彩，大片质感"
 
 #: src/routes/admin/gateway/keys.tsx:394
-msgid "Never"
-msgstr "从不"
+#~ msgid "Never"
+#~ msgstr "从不"
 
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:32
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:56
@@ -17701,8 +17687,8 @@ msgid "No aperture selected"
 msgstr "未选择光圈"
 
 #: src/routes/admin/gateway/keys.tsx:410
-msgid "No API keys found for this user. Create one to get started."
-msgstr "未找到该用户的 API 密钥。创建一个即可开始。"
+#~ msgid "No API keys found for this user. Create one to get started."
+#~ msgstr "未找到该用户的 API 密钥。创建一个即可开始。"
 
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:59
 msgid "No API keys found. Create one to get started."
@@ -20494,7 +20480,7 @@ msgstr "预览版"
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
 #: src/features/workflow/components/canvas/workflow-controls.tsx:569
-#: src/features/workflow/components/nodes/image-node.tsx:73
+#: src/features/workflow/components/nodes/image-node.tsx:76
 msgid "Preview"
 msgstr "预览"
 
@@ -20661,7 +20647,6 @@ msgstr "默认私密"
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:553
-#: src/routes/admin/gateway/keys.tsx:211
 msgid "Pro"
 msgstr "Pro"
 
@@ -21943,7 +21928,7 @@ msgstr "移除背景并提取主体"
 msgid "Remove BG"
 msgstr "去背景"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:526
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
 msgid "Remove bookmark"
 msgstr "移除书签"
 
@@ -22480,24 +22465,24 @@ msgid "Revoke All Sessions"
 msgstr "撤销所有会话"
 
 #: src/routes/admin/gateway/keys.tsx:280
-msgid "Revoke API Key"
-msgstr "吊销 API 密钥"
+#~ msgid "Revoke API Key"
+#~ msgstr "吊销 API 密钥"
 
 #: src/routes/admin/gateway/keys.tsx:298
-msgid "Revoke Key"
-msgstr "吊销密钥"
+#~ msgid "Revoke Key"
+#~ msgstr "吊销密钥"
 
 #: src/routes/admin/gateway/keys.tsx:272
-msgid "Revoke key {prefix}"
-msgstr "吊销密钥 {prefix}"
+#~ msgid "Revoke key {prefix}"
+#~ msgstr "吊销密钥 {prefix}"
 
 #: src/features/auth/components/settings/security/session-cell.tsx:103
 msgid "Revoke Session"
 msgstr "撤销会话"
 
 #: src/routes/admin/gateway/keys.tsx:56
-msgid "Revoked"
-msgstr "已吊销"
+#~ msgid "Revoked"
+#~ msgstr "已吊销"
 
 #. placeholder {0}: result.revokedCount
 #: src/features/admin/components/user-sessions-dialog.tsx:55
@@ -22509,8 +22494,8 @@ msgid "Revoking..."
 msgstr "正在撤销..."
 
 #: src/routes/admin/gateway/keys.tsx:298
-msgid "Revoking…"
-msgstr "正在吊销…"
+#~ msgid "Revoking…"
+#~ msgstr "正在吊销…"
 
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:174
 msgid "Rewrites your system prompt using a structured template (role, rules, workflows). The model treats your input as evidence to optimize, not as a task to execute."
@@ -22628,8 +22613,8 @@ msgstr "行高"
 
 #: src/routes/admin/gateway/keys.tsx:229
 #: src/routes/admin/gateway/keys.tsx:345
-msgid "RPM Limit"
-msgstr "RPM 限制"
+#~ msgid "RPM Limit"
+#~ msgstr "RPM 限制"
 
 #: src/features/evals/components/case-fields.tsx:100
 msgid "Rubric"
@@ -24358,9 +24343,13 @@ msgstr "智能路由会自动按复杂度（简单、标准、复杂、推理）
 msgid "Smart routing decisions, model usage, and provider health"
 msgstr "智能路由决策、模型用量和提供商健康状况"
 
+#: src/routes/admin/gateway.tsx:22
+msgid "Smart routing, model usage, and provider health"
+msgstr ""
+
 #: src/routes/admin/gateway.tsx:25
-msgid "Smart routing, model usage, provider health, and virtual API key management"
-msgstr "智能路由、模型用量、提供商健康状况和虚拟 API 密钥管理"
+#~ msgid "Smart routing, model usage, provider health, and virtual API key management"
+#~ msgstr "智能路由、模型用量、提供商健康状况和虚拟 API 密钥管理"
 
 #: src/features/marketing/data/models-data.ts:298
 msgid "Smarter composition over o1"
@@ -24970,7 +24959,6 @@ msgstr "无状态模式"
 #: src/features/evals/components/dataset-panel.tsx:205
 #: src/features/tasks/components/goal-form-dialog.tsx:135
 #: src/routes/admin/gateway/index.tsx:137
-#: src/routes/admin/gateway/keys.tsx:354
 msgid "Status"
 msgstr "状态"
 
@@ -27064,8 +27052,8 @@ msgstr "勾选两次运行进行比较。"
 
 #: src/routes/admin/gateway/keys.tsx:200
 #: src/routes/admin/gateway/keys.tsx:339
-msgid "Tier"
-msgstr "等级"
+#~ msgid "Tier"
+#~ msgstr "等级"
 
 #: src/features/canvas/components/design-preset-selector.tsx:48
 msgid "TikTok Video"
@@ -27258,7 +27246,7 @@ msgstr "工具提供商密钥"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:434
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:445
 msgid "Tools"
 msgstr "工具"
 
@@ -27878,8 +27866,8 @@ msgid "Unknown user"
 msgstr "未知用户"
 
 #: src/routes/admin/gateway/keys.tsx:225
-msgid "Unlimited"
-msgstr "无限制"
+#~ msgid "Unlimited"
+#~ msgstr "无限制"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:140
 msgid "Unlimited requests"
@@ -27894,7 +27882,7 @@ msgstr "取消关联"
 msgid "Unlock group"
 msgstr "解锁分组"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:518
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
 msgid "Unlock node"
 msgstr "解锁节点"
 
@@ -28195,7 +28183,7 @@ msgstr "上传文件夹"
 msgid "Upload Image"
 msgstr "上传图像"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:492
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:503
 msgid "Upload image / video"
 msgstr "上传图像 / 视频"
 
@@ -29034,8 +29022,8 @@ msgid "Violet"
 msgstr "紫罗兰色"
 
 #: src/routes/admin/gateway/keys.tsx:421
-msgid "Virtual API Keys"
-msgstr "虚拟 API 密钥"
+#~ msgid "Virtual API Keys"
+#~ msgstr "虚拟 API 密钥"
 
 #: src/features/skills/components/skill-form-dialog.tsx:459
 msgid "Visibility"
