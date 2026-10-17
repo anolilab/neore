@@ -142,31 +142,38 @@ const DataImport: FC = () => {
             setState({ step: "parsing" });
 
             try {
-                const extracted = await Promise.all(
+                // A file that cannot be read is skipped like an unrecognised one, so the valid files in the same selection still import.
+                const extracted = await Promise.allSettled(
                     files.map(async (file) => {
-                        try {
-                            return { name: file.name, records: await extractJsonFromFile(file) };
-                        } catch (error) {
-                            // A damaged file is named, so the message says which upload to fix.
-                            throw new Error(`${file.name}: ${describeError(error, i18n)}`, { cause: error });
-                        }
+                        return { name: file.name, records: await extractJsonFromFile(file) };
                     }),
                 );
-                const jsonDataArray = extracted.flatMap(({ name, records }) =>
-                    records.map((jsonData) => {
-                        return { jsonData, name };
-                    }),
-                );
+                const results: ReturnType<typeof parseExportFile>[] = [];
+                const skipped: string[] = [];
+                let firstFailure: Error | undefined;
+                const jsonDataArray: { jsonData: unknown; name: string }[] = [];
+
+                extracted.forEach((outcome, index) => {
+                    if (outcome.status === "rejected") {
+                        // A damaged file is named, so the message says which upload to fix.
+                        const { name } = files[index] as File;
+
+                        skipped.push(name);
+                        firstFailure ??= new Error(`${name}: ${describeError(outcome.reason, i18n)}`, { cause: outcome.reason });
+
+                        return;
+                    }
+
+                    for (const jsonData of outcome.value.records) {
+                        jsonDataArray.push({ jsonData, name: outcome.value.name });
+                    }
+                });
 
                 // Each file is detected on its own: a shared hint would parse a second
                 // format with the first one's parser and drop its sessions silently.
                 // An empty file in an archive (`[]`, `{}`) carries nothing to import and must not block the rest.
                 // A file that is not a recognised export is skipped and named in the preview. Only when nothing
                 // in the selection parses does the import fail, with the first file's reason.
-                const results: ReturnType<typeof parseExportFile>[] = [];
-                const skipped: string[] = [];
-                let firstFailure: Error | undefined;
-
                 const candidates = jsonDataArray.filter(({ jsonData: value }) => !isEmptyExport(value));
 
                 for (const { jsonData, name } of candidates) {

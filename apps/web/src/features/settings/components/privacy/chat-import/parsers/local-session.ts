@@ -29,19 +29,32 @@ const titleFrom = (text: string): string => {
 /** Merge consecutive same-role messages: one turn is often written as several records. */
 
 /**
+ * Boilerplate a harness adds around the user's words. `close` is the closing marker the block
+ * ends with, when it has one: a text must both open AND close the block, so a prompt that merely
+ * starts with the same words is still the user's.
+ */
+export type InjectedBlock = { close?: string; open: string };
+
+export const isInjectedText = (text: string, blocks: ReadonlyArray<InjectedBlock>): boolean => {
+    const trimmed = text.trim();
+
+    return blocks.some(({ close, open }) => trimmed.startsWith(open) && (close === undefined || trimmed.endsWith(close)));
+};
+
+/**
  * One message from the text blocks of a record. A record whose joined text is
- * empty or starts with an injected prefix (harness or environment boilerplate,
- * not something the user said) yields nothing.
+ * empty or is an injected block (harness or environment boilerplate, not
+ * something the user said) yields nothing.
  */
 export const messageFromTexts = (
     texts: string[],
     role: NormalizedMessage["role"],
     createdAt: number | undefined,
-    injectedPrefixes: ReadonlyArray<string>,
+    injectedBlocks: ReadonlyArray<InjectedBlock>,
 ): NormalizedMessage | null => {
     const content = texts.join("\n\n").trim();
 
-    if (!content || injectedPrefixes.some((prefix) => content.startsWith(prefix))) {
+    if (!content || isInjectedText(content, injectedBlocks)) {
         return null;
     }
 

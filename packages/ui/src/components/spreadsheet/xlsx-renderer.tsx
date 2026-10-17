@@ -326,7 +326,7 @@ const XlsxRenderer = ({ className, fileName, labels, source }: XlsxRendererProps
                 let result: ParsedWorkbook;
 
                 if (format === "xlsx") {
-                    assertOfficeZipWithinLimits(arrayBuffer);
+                    await assertOfficeZipWithinLimits(arrayBuffer);
 
                     const file =
                         source instanceof File

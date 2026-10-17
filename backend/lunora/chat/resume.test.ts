@@ -82,4 +82,31 @@ describe("latestResumableThread", () => {
             harness.close();
         }
     });
+
+    it("finds an eligible thread past more than the page budget of archived ones", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const target = await harness.run(async (context: any) => {
+                // Newest first: 2,100 archived threads (past the 2,000-row page budget), then the live one.
+                for (let index = 0; index < 2100; index += 1) {
+                    await context.db.insert("threads", {
+                        model: "m",
+                        status: "archived",
+                        title: `a${String(index)}`,
+                        updatedAt: 100_000 - index,
+                        userId: OWNER,
+                    });
+                }
+
+                return await context.db.insert("threads", { model: "m", status: "active", title: "live", updatedAt: 1, userId: OWNER });
+            });
+
+            const result = await harness.withIdentity({ userId: OWNER }).query(latestResumableThread as never, { organizationId: null } as never);
+
+            expect(result).toBe(target);
+        } finally {
+            harness.close();
+        }
+    }, 30_000);
 });

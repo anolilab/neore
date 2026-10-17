@@ -6,10 +6,19 @@
  * `tool_use`, `tool_result`). Only text is kept; sidechain (sub-agent) and
  * meta events are skipped.
  */
-import { asRecord, buildSession, messageFromTexts, parseTimestamp } from "./local-session";
+import type { InjectedBlock } from "./local-session";
+import { asRecord, buildSession, isInjectedText, messageFromTexts, parseTimestamp } from "./local-session";
 import type { NormalizedConversation, NormalizedMessage } from "./types";
 
-const HARNESS_PREFIXES = ["<command-name>", "<command-message>", "<local-command-", "<system-reminder>", "Caveat: The messages below"];
+// A slash-command echo is several tags in one block (message, name, args), so it is matched by its
+// opening tag alone. A block that ends with a fixed closing tag must open and close with it.
+const HARNESS_BLOCKS: InjectedBlock[] = [
+    { open: "<command-name>" },
+    { open: "<command-message>" },
+    { open: "<local-command-" },
+    { close: "</system-reminder>", open: "<system-reminder>" },
+    { open: "Caveat: The messages below" },
+];
 
 export const isClaudeCodeRecord = (record: unknown): boolean => {
     const item = asRecord(record);
@@ -97,8 +106,8 @@ const parseClaudeCode = (data: unknown): NormalizedConversation[] => {
         }
 
         // A harness block (a reminder, a command echo) is not the user's words; the prompt beside it is.
-        const kept = texts.filter((text) => HARNESS_PREFIXES.every((prefix) => !text.trimStart().startsWith(prefix)));
-        const message = messageFromTexts(kept, event.type, parseTimestamp(event.timestamp), HARNESS_PREFIXES);
+        const kept = texts.filter((text) => !isInjectedText(text, HARNESS_BLOCKS));
+        const message = messageFromTexts(kept, event.type, parseTimestamp(event.timestamp), HARNESS_BLOCKS);
 
         if (message) {
             messages.push(message);

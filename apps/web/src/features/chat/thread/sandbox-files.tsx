@@ -130,7 +130,7 @@ const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
                 const blob = await response.blob();
 
                 // A small download can expand far past what the browser should parse.
-                assertOfficeZipWithinLimits(await blob.arrayBuffer());
+                await assertOfficeZipWithinLimits(await blob.arrayBuffer());
                 setState({ blob });
             } catch {
                 // A timeout shows the failure; an unmount shows nothing.

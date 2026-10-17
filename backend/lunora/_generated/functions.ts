@@ -1056,6 +1056,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "notifications_push:unsubscribePush": lunora_notifications_push_126.unsubscribePush as unknown as RegisteredLunoraFunction,
     "notifications_task_email:claimOutcomeEmail": lunora_notifications_task_email_127.claimOutcomeEmail as unknown as RegisteredLunoraFunction,
     "notifications_task_email:dispatchOutcomeEmails": lunora_notifications_task_email_127.dispatchOutcomeEmails as unknown as RegisteredLunoraFunction,
+    "notifications_task_email:holdsOutcomeEmailClaim": lunora_notifications_task_email_127.holdsOutcomeEmailClaim as unknown as RegisteredLunoraFunction,
     "notifications_task_email:listPendingOutcomeEmails": lunora_notifications_task_email_127.listPendingOutcomeEmails as unknown as RegisteredLunoraFunction,
     "notifications_task_email:loadRecipientEmail": lunora_notifications_task_email_127.loadRecipientEmail as unknown as RegisteredLunoraFunction,
     "notifications_task_email:sendPendingOutcomeEmails": lunora_notifications_task_email_127.sendPendingOutcomeEmails as unknown as RegisteredLunoraFunction,
@@ -6659,6 +6660,13 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["id"] !== "string") return DEFER;
 return { "id": source["id"] };
 });
+installCompiledValidatorMap(lunora_notifications_task_email_127.holdsOutcomeEmailClaim.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["claimedAt"] !== "number" || !Number.isFinite(source["claimedAt"])) return DEFER;
+if (typeof source["id"] !== "string") return DEFER;
+return { "claimedAt": source["claimedAt"], "id": source["id"] };
+});
 installCompiledValidatorMap(lunora_notifications_task_email_127.setTaskEmailEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9109,6 +9117,7 @@ export interface Caller {
         task_email: {
             claimOutcomeEmail: (args: { id: Id<"outcomeEmails"> }) => Promise<number | null>;
             dispatchOutcomeEmails: (args?: {}) => Promise<null>;
+            holdsOutcomeEmailClaim: (args: { claimedAt: number; id: Id<"outcomeEmails"> }) => Promise<boolean>;
             listPendingOutcomeEmails: (args?: {}) => Promise<Array<{ id: Id<"outcomeEmails">; link: string; title: string; userId: string }>>;
             loadRecipientEmail: (args: { userId: string }) => Promise<string | null>;
             sendPendingOutcomeEmails: (args?: {}) => Promise<null>;
@@ -10664,6 +10673,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         task_email: {
             claimOutcomeEmail: (args) => callRegistered(context, "notifications_task_email:claimOutcomeEmail", args),
             dispatchOutcomeEmails: (args) => callRegistered(context, "notifications_task_email:dispatchOutcomeEmails", args),
+            holdsOutcomeEmailClaim: (args) => callRegistered(context, "notifications_task_email:holdsOutcomeEmailClaim", args),
             listPendingOutcomeEmails: (args) => callRegistered(context, "notifications_task_email:listPendingOutcomeEmails", args),
             loadRecipientEmail: (args) => callRegistered(context, "notifications_task_email:loadRecipientEmail", args),
             sendPendingOutcomeEmails: (args) => callRegistered(context, "notifications_task_email:sendPendingOutcomeEmails", args),

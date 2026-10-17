@@ -11,12 +11,18 @@
  * `response_item` messages exist. Context the CLI injects as user
  * messages (environment and instruction blocks) is skipped.
  */
-import { asRecord, buildSession, messageFromTexts, parseTimestamp } from "./local-session";
+import type { InjectedBlock } from "./local-session";
+import { asRecord, buildSession, isInjectedText, messageFromTexts, parseTimestamp } from "./local-session";
 import type { NormalizedConversation, NormalizedMessage } from "./types";
 
 const RECORD_TYPES = new Set(["event_msg", "response_item", "session_meta", "turn_context"]);
 const TOOL_PAYLOAD_TYPES = new Set(["custom_tool_call", "custom_tool_call_output", "function_call", "function_call_output"]);
-const INJECTED_PREFIXES = ["<environment_context>", "<user_instructions>", "# AGENTS.md instructions"];
+const INJECTED_BLOCKS: InjectedBlock[] = [
+    { close: "</environment_context>", open: "<environment_context>" },
+    { close: "</user_instructions>", open: "<user_instructions>" },
+    // No closing tag: the trailing marker of this block is not verified against real exports.
+    { open: "# AGENTS.md instructions" },
+];
 
 export const isCodexRecord = (record: unknown): boolean => {
     const item = asRecord(record);
@@ -43,7 +49,7 @@ const keptTexts = (payload: Record<string, unknown>): string[] => {
     return content
         .map((block) => asRecord(block))
         .flatMap((block) => (block && (block.type === "input_text" || block.type === "output_text") && typeof block.text === "string" ? [block.text] : []))
-        .filter((text) => INJECTED_PREFIXES.every((prefix) => !text.trimStart().startsWith(prefix)));
+        .filter((text) => !isInjectedText(text, INJECTED_BLOCKS));
 };
 
 const responseText = (payload: Record<string, unknown>): string => keptTexts(payload).join("\n\n").trim();
@@ -86,7 +92,7 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
             const text = responseText(payload);
 
             // Injected context is not kept, so it cannot stand in for the prompt it would have shadowed.
-            if (messageFromTexts([text], payload.role, undefined, INJECTED_PREFIXES)) {
+            if (messageFromTexts([text], payload.role, undefined, INJECTED_BLOCKS)) {
                 const key = `${payload.role}\n${text}`;
 
                 responseCopies.set(key, (responseCopies.get(key) ?? 0) + 1);
@@ -103,7 +109,7 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
             const text = typeof payload.message === "string" ? payload.message.trim() : "";
             const message =
                 role && text && !consumeCopy(responseCopies, `${role}\n${text}`)
-                    ? messageFromTexts([text], role, parseTimestamp(record.timestamp), INJECTED_PREFIXES)
+                    ? messageFromTexts([text], role, parseTimestamp(record.timestamp), INJECTED_BLOCKS)
                     : null;
 
             if (message) {
@@ -127,7 +133,7 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
             continue;
         }
 
-        const message = messageFromTexts(keptTexts(payload), payload.role, parseTimestamp(record.timestamp), INJECTED_PREFIXES);
+        const message = messageFromTexts(keptTexts(payload), payload.role, parseTimestamp(record.timestamp), INJECTED_BLOCKS);
 
         if (message) {
             messages.push(message);

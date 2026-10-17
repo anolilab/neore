@@ -119,6 +119,19 @@ export const claimOutcomeEmail = internalMutation
     });
 
 /**
+ * Whether the claim a send run took is still its own. A run that stalled past the recovery window
+ * may have had its row reclaimed, and must not mail a second time. Checked right before the send.
+ */
+export const holdsOutcomeEmailClaim = internalQuery
+    .input({ claimedAt: v.number(), id: v.id("outcomeEmails") })
+    .output(v.boolean())
+    .query(async ({ args: { claimedAt, id }, ctx }) => {
+        const row = await ctx.db.get(id);
+
+        return row?.status === "sending" && row.claimedAt === claimedAt;
+    });
+
+/**
  * Records one send. `skipped` (setting off, account being deleted, no verified address)
  * deletes the row: nothing is owed. A failure counts an attempt and keeps the row
  * pending until the cap, then marks it `failed`.
@@ -213,6 +226,11 @@ export const sendPendingOutcomeEmails = internalAction
                 if (to && !SITE_URL) {
                     result = "failed";
                 } else if (to && SITE_URL) {
+                    // Narrows the window in which a reclaimed row could be mailed twice to this check and the queue call.
+                    if (!(await ctx.runQuery(internal.notifications.task_email.holdsOutcomeEmailClaim, { claimedAt, id }))) {
+                        continue;
+                    }
+
                     const { default: TaskOutcomeEmail } = await import("../email/templates/task-outcome");
                     const subject = `${title.replaceAll(/\s+/g, " ")} has finished`;
 

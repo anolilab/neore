@@ -61,7 +61,7 @@ const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) =>
                     return;
                 }
 
-                assertOfficeZipWithinLimits(arrayBuffer);
+                await assertOfficeZipWithinLimits(arrayBuffer);
 
                 const result = await mammoth.convertToHtml({ arrayBuffer });
 

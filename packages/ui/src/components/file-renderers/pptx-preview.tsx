@@ -53,7 +53,7 @@ const parsePptxSlides = async (data: ArrayBuffer | Blob): Promise<SlideContent[]
 
     const arrayBuffer = data instanceof Blob ? await data.arrayBuffer() : data;
 
-    assertOfficeZipWithinLimits(arrayBuffer);
+    await assertOfficeZipWithinLimits(arrayBuffer);
 
     const zip = await JSZip.loadAsync(arrayBuffer);
 

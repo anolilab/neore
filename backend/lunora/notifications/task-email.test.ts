@@ -12,6 +12,7 @@ import { notify } from "./notify";
 import {
     dispatchOutcomeEmails,
     claimOutcomeEmail,
+    holdsOutcomeEmailClaim,
     listPendingOutcomeEmails,
     loadRecipientEmail,
     OUTCOME_EMAIL_MAX_ATTEMPTS,
@@ -48,6 +49,7 @@ const run = async <R>(procedure: unknown, args: Record<string, unknown> = {}): P
 
 const handlers = new Map<unknown, unknown>([
     [internal.notifications.task_email.claimOutcomeEmail, claimOutcomeEmail],
+    [internal.notifications.task_email.holdsOutcomeEmailClaim, holdsOutcomeEmailClaim],
     [internal.notifications.task_email.listPendingOutcomeEmails, listPendingOutcomeEmails],
     [internal.notifications.task_email.loadRecipientEmail, loadRecipientEmail],
     [internal.notifications.task_email.settleOutcomeEmail, settleOutcomeEmail],
@@ -152,6 +154,18 @@ describe("sweep", () => {
 
         expect(await claim()).not.toBeNull();
         expect(await claim()).toBeNull();
+    });
+
+    it("does not mail a row whose claim was taken over after the run listed it", async () => {
+        await seedUser();
+        await write();
+        const [row] = await outbox();
+        const claimedAt = await harness.run(async (ctx: any) => await claimOutcomeEmail.handler(ctx, { id: row._id }));
+        const holds = async (token: number) =>
+            await harness.run(async (ctx: any) => await holdsOutcomeEmailClaim.handler(ctx, { claimedAt: token, id: row._id }));
+
+        expect(await holds(claimedAt as number)).toBe(true);
+        expect(await holds((claimedAt as number) - 1)).toBe(false);
     });
 
     it("keeps the row pending with attempts incremented when the mailer fails, then gives up at the cap", async () => {

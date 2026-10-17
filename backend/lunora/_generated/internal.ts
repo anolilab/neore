@@ -763,6 +763,7 @@ export interface InternalApiTypes {
         task_email: {
             claimOutcomeEmail: FunctionReference<"mutation", { id: Id<"outcomeEmails"> }, number | null>;
             dispatchOutcomeEmails: FunctionReference<"mutation", {}, null>;
+            holdsOutcomeEmailClaim: FunctionReference<"query", { claimedAt: number; id: Id<"outcomeEmails"> }, boolean>;
             listPendingOutcomeEmails: FunctionReference<"query", {}, Array<{ id: Id<"outcomeEmails">; link: string; title: string; userId: string }>>;
             loadRecipientEmail: FunctionReference<"query", { userId: string }, string | null>;
             sendPendingOutcomeEmails: FunctionReference<"action", {}, null>;
@@ -1709,6 +1710,7 @@ export const internal: InternalApiTypes = {
         task_email: {
             claimOutcomeEmail: { __lunoraRef: "notifications_task_email:claimOutcomeEmail" },
             dispatchOutcomeEmails: { __lunoraRef: "notifications_task_email:dispatchOutcomeEmails" },
+            holdsOutcomeEmailClaim: { __lunoraRef: "notifications_task_email:holdsOutcomeEmailClaim" },
             listPendingOutcomeEmails: { __lunoraRef: "notifications_task_email:listPendingOutcomeEmails" },
             loadRecipientEmail: { __lunoraRef: "notifications_task_email:loadRecipientEmail" },
             sendPendingOutcomeEmails: { __lunoraRef: "notifications_task_email:sendPendingOutcomeEmails" },

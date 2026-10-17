@@ -9,9 +9,9 @@ import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import { formatDateTime } from "@neore/ui/utils/locale-format";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileUp, GitCompare, Lock, LockOpen, Pencil, Play, Plus, Trash2 } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -59,6 +59,15 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
     const [compareIds, setCompareIds] = useState<Id<"evalRuns">[]>([]);
 
     const cases = detail?.cases ?? [];
+    const queryClient = useQueryClient();
+
+    // The comparison is not live, so it is refetched when a run's status or a case changes. Progress writes
+    // (the next case index, costs) leave both untouched, so they do not re-run the aggregate.
+    const comparisonState = `${runs.map((run) => `${run._id}:${run.status}`).join("|")}#${cases.map((evalCase) => `${evalCase._id}:${String(evalCase.frozen)}`).join("|")}`;
+
+    useEffect(() => {
+        void queryClient.invalidateQueries({ queryKey: crpc.evals.functions.compareModels.queryKey({ datasetId: dataset._id }) });
+    }, [comparisonState, crpc, dataset._id, queryClient]);
     const comparePair = orderForComparison(runs.filter((run) => compareIds.includes(run._id)));
 
     const confirmCaseDelete = async () => {

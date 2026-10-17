@@ -183,9 +183,10 @@ export const processConversationBatch = internalMutation
                     createdBy: `import:${args.provider}`,
                     status: "active",
                     title: conv.title || "Imported conversation",
-                    // The sidebar sorts by updatedAt: the source's latest activity, so a long chat
-                    // that was active recently is not ranked by its start date. (_creationTime is
-                    // system-set and cannot be written.)
+                    // Resume, Home's recent threads and the Daily Brief read updatedAt: the source's
+                    // latest activity, so a long chat that was active recently is not ranked by its
+                    // start date. The sidebar sorts by createdAt above. (_creationTime is system-set
+                    // and cannot be written.)
                     updatedAt: lastActivityOf(conv, context.now),
                     userId: args.userId,
                 });

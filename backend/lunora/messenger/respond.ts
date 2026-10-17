@@ -212,7 +212,7 @@ const generateReply = async (ctx: ActionCtx, threadId: Id<"threads">, userId: st
 const sendToolReplyMedia = async (
     ctx: ActionCtx,
     options: { delivery: Delivery; keys: Record<string, string>; threadId: Id<"threads">; userId: string },
-): Promise<"sent" | "window_closed"> => {
+): Promise<"not_sent" | "sent" | "window_closed"> => {
     const { delivery, keys } = options;
 
     if (!isReplyWindowOpen(delivery)) {
@@ -351,7 +351,7 @@ export const sendNotice = internalAction
  * Route a message to the correct platform's send function.
  * Uses per-user decrypted bot tokens from messengerKeys.
  */
-const sendPlatformMessage = async (delivery: Delivery, text: string, messengerKeys: Record<string, string>): Promise<"sent" | "window_closed"> => {
+const sendPlatformMessage = async (delivery: Delivery, text: string, messengerKeys: Record<string, string>): Promise<"not_sent" | "sent" | "window_closed"> => {
     const { platform, platformChatId: chatId } = delivery;
 
     switch (platform) {
@@ -403,9 +403,14 @@ const sendPlatformMessage = async (delivery: Delivery, text: string, messengerKe
             return "sent";
         }
         case "telegram": {
-            await sendTelegramMessage(requireKey(messengerKeys, "telegram_bot_token", "Telegram bot token"), chatId, text);
+            // Nothing to say is not a refusal: a tool reply's files still go out. Only a failed send is `not_sent`.
+            if (text.trim() === "") {
+                return "sent";
+            }
 
-            return "sent";
+            const delivered = await sendTelegramMessage(requireKey(messengerKeys, "telegram_bot_token", "Telegram bot token"), chatId, text);
+
+            return delivered ? "sent" : "not_sent";
         }
         case "wechat": {
             return await sendWeChatMessage(

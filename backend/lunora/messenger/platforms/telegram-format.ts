@@ -159,6 +159,27 @@ const linkify = (text: string, onText: (plain: string) => string, onLink: (label
 
 const emphasis = (text: string): string => text.replaceAll(BOLD, "<b>$1</b>").replaceAll(ITALIC, "<i>$1</i>");
 
+const LINK_SLOT = /(\d+)/g;
+
+/**
+ * Emphasis over a whole plain segment, so `*see [docs](url)*` closes around its link. Links are
+ * swapped for slots first: the URL never reaches the emphasis pass, and the slot cannot split a marker.
+ */
+const inlineText = (plain: string): string => {
+    const links: string[] = [];
+    const withSlots = linkify(
+        plain,
+        (text) => text,
+        (label, url) => {
+            links.push(`<a href="${url.replaceAll('"', "&quot;")}">${emphasis(label)}</a>`);
+
+            return `${links.length - 1}`;
+        },
+    );
+
+    return emphasis(withSlots).replaceAll(LINK_SLOT, (_, index: string) => links[Number(index)] ?? "");
+};
+
 const inline = (text: string): string =>
     text
         .split(INLINE_CODE)
@@ -167,7 +188,7 @@ const inline = (text: string): string =>
                 return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
             }
 
-            return linkify(escapeHtml(part), emphasis, (label, url) => `<a href="${url.replaceAll('"', "&quot;")}">${emphasis(label)}</a>`);
+            return inlineText(escapeHtml(part));
         })
         .join("");
 

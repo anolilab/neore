@@ -4673,6 +4673,11 @@
     {
       "from": "function:notifications_task_email:sendPendingOutcomeEmails",
       "kind": "call",
+      "to": "function:notifications_task_email:holdsOutcomeEmailClaim"
+    },
+    {
+      "from": "function:notifications_task_email:sendPendingOutcomeEmails",
+      "kind": "call",
       "to": "function:notifications_task_email:listPendingOutcomeEmails"
     },
     {
@@ -12041,6 +12046,13 @@
       "id": "function:notifications_task_email:dispatchOutcomeEmails",
       "kind": "function",
       "name": "notifications.task_email.dispatchOutcomeEmails",
+      "module": "notifications"
+    },
+    {
+      "detail": "query",
+      "id": "function:notifications_task_email:holdsOutcomeEmailClaim",
+      "kind": "function",
+      "name": "notifications.task_email.holdsOutcomeEmailClaim",
       "module": "notifications"
     },
     {

@@ -227,3 +227,66 @@ describe("Codex legacy prompts with a later copy", () => {
         expect(conversation?.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
     });
 });
+
+describe("injected blocks match only when they are complete", () => {
+    it("keeps a prompt that starts with an injected marker but is not wrapped in it", () => {
+        const rollout = [
+            {
+                payload: {
+                    content: [{ text: "<environment_context> is what the CLI writes; why does my import drop it?", type: "input_text" }],
+                    role: "user",
+                    type: "message",
+                },
+                type: "response_item",
+            },
+            {
+                payload: { content: [{ text: "Because the block was unclosed.", type: "output_text" }], role: "assistant", type: "message" },
+                type: "response_item",
+            },
+        ];
+
+        const [conversation] = parseExportFile(rollout, "codex").conversations;
+
+        expect(conversation?.messages[0]?.content).toContain("why does my import drop it?");
+    });
+});
+
+describe("Claude Code slash-command echoes", () => {
+    it("drops a command echo made of message, name and args tags, and keeps the prompt", () => {
+        const records = [
+            {
+                isSidechain: false,
+                message: {
+                    content: [
+                        {
+                            text: "<command-message>review is running</command-message>\n<command-name>/review</command-name>\n<command-args>main</command-args>",
+                            type: "text",
+                        },
+                    ],
+                    role: "user",
+                },
+                sessionId: "s1",
+                timestamp: "2026-10-01T10:00:00.000Z",
+                type: "user",
+            },
+            {
+                isSidechain: false,
+                message: { content: "Fix the build", role: "user" },
+                sessionId: "s1",
+                timestamp: "2026-10-01T10:00:01.000Z",
+                type: "user",
+            },
+            {
+                isSidechain: false,
+                message: { content: [{ text: "Reviewed.", type: "text" }], role: "assistant" },
+                sessionId: "s1",
+                timestamp: "2026-10-01T10:00:02.000Z",
+                type: "assistant",
+            },
+        ];
+
+        const [conversation] = parseExportFile(records, "claude-code").conversations;
+
+        expect(conversation?.messages.map((message) => message.content)).toEqual(["Fix the build", "Reviewed."]);
+    });
+});

@@ -17,6 +17,11 @@ describe("formatTelegramMessage", () => {
         expect(html("[x](https://a.test/?q=1&r=2)")).toBe('<a href="https://a.test/?q=1&amp;r=2">x</a>');
     });
 
+    it("closes emphasis that wraps a link, and keeps the link's URL out of it", () => {
+        expect(html("*see [docs](https://a.test/*x*)*")).toBe('<i>see <a href="https://a.test/*x*">docs</a></i>');
+        expect(html("**[bold link](https://a.test)**")).toBe('<b><a href="https://a.test">bold link</a></b>');
+    });
+
     it("leaves markdown inside code untouched", () => {
         expect(html("```ts\nconst a = **b**;\n```")).toBe("<pre>const a = **b**;</pre>");
     });
