@@ -21,7 +21,7 @@ import { patchRow, withoutUndefined } from "../lib/patch";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
-import { notifyQuietly } from "../notifications/notify";
+import { notifyOutcome } from "../notifications/task-email";
 import { MAX_LENGTH } from "../lib/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
@@ -537,15 +537,19 @@ export const updateExecution = internalMutation
             const trigger = execution ? await ctx.db.get(execution.triggerId) : null;
 
             if (trigger) {
-                await notifyQuietly(ctx, {
-                    dedupeKey: `trigger:${executionId}`,
-                    link: threadId ? `/chat/${threadId}` : "/dashboard/settings/chat/triggers",
-                    outcome: status === "completed" ? "success" : "failure",
-                    title: trigger.name,
-                    type: "trigger",
-                    userId: trigger.userId,
-                    ...(error && { body: error }),
-                });
+                await notifyOutcome(
+                    ctx,
+                    {
+                        dedupeKey: `trigger:${executionId}`,
+                        link: threadId ? `/chat/${threadId}` : "/dashboard/settings/chat/triggers",
+                        outcome: status === "completed" ? "success" : "failure",
+                        title: trigger.name,
+                        type: "trigger",
+                        userId: trigger.userId,
+                        ...(error && { body: error }),
+                    },
+                    Boolean(threadId),
+                );
             }
         }
 
