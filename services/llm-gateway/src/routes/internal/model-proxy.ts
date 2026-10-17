@@ -315,6 +315,8 @@ modelProxyRouter.openapi(
                     let lastFinishReason: string | undefined;
 
                     try {
+                        let sawError = false;
+
                         while (true) {
                             const { done, value } = await reader.read();
 
@@ -322,6 +324,10 @@ modelProxyRouter.openapi(
 
                             if (ttftMs === undefined) {
                                 ttftMs = Date.now() - startTime;
+                            }
+
+                            if (value.type === "error") {
+                                sawError = true;
                             }
 
                             // Track usage from finish chunk
@@ -382,7 +388,8 @@ modelProxyRouter.openapi(
                                     },
                                     c.var.telemetry,
                                 ),
-                                ...(isCancelled ? [] : [policy.recordHealth.success(latencyMs)]),
+                                ...(isCancelled || sawError ? [] : [policy.recordHealth.success(latencyMs)]),
+                                ...(sawError && !isCancelled ? [policy.recordHealth.failure()] : []),
                                 usageReporter.report({
                                     billingMode,
                                     byokFeeRate,
