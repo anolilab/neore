@@ -42,17 +42,18 @@ export const deleteUserNotifications = internalMutation
     .input({ userId: v.string() })
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args: { userId }, ctx }) => {
-        const [notifications, devices, briefState] = await Promise.all([
+        const [notifications, devices, briefState, outbox] = await Promise.all([
             ctx.db.notifications.findMany({ limit: BATCH, where: { userId } }),
             ctx.push.list({ limit: BATCH, userId }),
             ctx.db.dailyBriefState.findMany({ limit: BATCH, where: { userId } }),
+            ctx.db.outcomeEmails.findMany({ limit: BATCH, where: { userId } }),
         ]);
-        const rows = [...notifications.page, ...briefState.page];
+        const rows = [...notifications.page, ...briefState.page, ...outbox.page];
 
         await Promise.all([
             ...rows.map(async (row) => await ctx.db.delete(row._id)),
             ...devices.map(async (device) => await ctx.push.unregister(device.id, { userId })),
         ]);
 
-        return { hasMore: [notifications.page, devices, briefState.page].some((page) => page.length >= BATCH) };
+        return { hasMore: [notifications.page, devices, briefState.page, outbox.page].some((page) => page.length >= BATCH) };
     });

@@ -97,26 +97,27 @@ export const notify = async (ctx: MutationCtx, input: NotificationInput): Promis
 
     const notificationId = await ctx.db.insert("notifications", { ...row, createdAt: Date.now() });
 
-    // Side effects are best-effort, each on its own: the inbox row is already written,
-    // and a failed mail schedule must neither hide the row nor skip the push.
-    // Decided here, on the shard that wrote the row, so a notification handed to the
-    // recipient's shard is mailed exactly like one written in place.
+    // The mail is an outbox row in this same write, so it exists exactly when the inbox
+    // row does; the housekeeping sweep sends it (`task-email.ts`). Decided here, on the
+    // shard that wrote the row, so a notification handed to the recipient's shard is
+    // mailed like one written in place.
     if (shouldEmailOutcome({ emailOutcome: input.emailOutcome, outcome: input.outcome })) {
-        try {
-            const settings = await ctx.db.userSettings.findFirst({ where: { userId: row.userId } });
+        const settings = await ctx.db.userSettings.findFirst({ where: { userId: row.userId } });
 
-            if (settings?.taskEmailEnabled === true) {
-                await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendTaskOutcomeEmail, {
-                    link: row.link ?? "/",
-                    notificationId: notificationId as string,
-                    title: row.title,
-                    userId: row.userId,
-                });
-            }
-        } catch (error) {
-            console.warn("[notifications] Failed to schedule the outcome email:", error);
+        if (settings?.taskEmailEnabled === true) {
+            await ctx.db.insert("outcomeEmails", {
+                attempts: 0,
+                createdAt: Date.now(),
+                link: row.link ?? "/",
+                notificationId,
+                status: "pending",
+                title: row.title,
+                userId: row.userId,
+            });
         }
     }
+
+    // Push is best-effort: the rows are already written, and a failed schedule must not undo them.
 
     if (isPushConfigured()) {
         try {

@@ -203,6 +203,7 @@ const OWNER_TABLES = [
     "messengerConnections",
     "notifications",
     "oauthStates",
+    "outcomeEmails",
     "passkey",
     "presentations",
     "sandboxSessions",
