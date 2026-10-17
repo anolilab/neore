@@ -20,8 +20,15 @@ import { ChatImportError, extractJsonFromFile, parseExportFile } from "./parsers
 import type { ImportProvider, NormalizedConversation } from "./parsers/types";
 
 /** An export with nothing in it: an empty array or object. */
-const isEmptyExport = (value: unknown): boolean =>
-    (Array.isArray(value) && value.length === 0) || (typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === 0);
+/** An export with nothing in it. An object file arrives wrapped once more, so `[{}]` counts too. */
+const isEmptyExport = (value: unknown): boolean => {
+    const unwrapped = Array.isArray(value) && value.length === 1 ? (value[0] as unknown) : value;
+
+    return (
+        (Array.isArray(unwrapped) && unwrapped.length === 0) ||
+        (typeof unwrapped === "object" && unwrapped !== null && !Array.isArray(unwrapped) && Object.keys(unwrapped).length === 0)
+    );
+};
 
 const PROVIDER_LABELS: Record<ImportProvider, string> = {
     chatgpt: "ChatGPT",

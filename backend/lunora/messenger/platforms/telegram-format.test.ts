@@ -167,6 +167,7 @@ describe("a cut line's middle", () => {
         const text = chunks.map((chunk) => chunk.source).join("");
 
         expect(text).toContain("# not a heading");
+        expect(chunks.map((chunk) => chunk.html).join("")).toContain("# not a heading");
         expect(chunks.every((chunk) => !chunk.html.includes("<b># "))).toBe(true);
     });
 });
