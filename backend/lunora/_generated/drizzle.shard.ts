@@ -828,6 +828,7 @@ export const notifications = sqliteTable("notifications", {
     _creationTime: integer("_creationTime").notNull(),
     body: text("body"),
     dedupeKey: text("dedupeKey"),
+    emailOutcome: integer("emailOutcome", { mode: "boolean" }),
     link: text("link"),
     outcome: text("outcome", { mode: "json" }).$type<"success" | "failure">(),
     title: text("title").notNull(),

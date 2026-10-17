@@ -97,16 +97,43 @@ export const notify = async (ctx: MutationCtx, input: NotificationInput): Promis
 
     const notificationId = await ctx.db.insert("notifications", { ...row, createdAt: Date.now() });
 
-    if (isPushConfigured()) {
-        const [device] = await ctx.push.list({ limit: 1, userId: row.userId });
+    // Side effects are best-effort: the inbox row is already written, and a failed
+    // push lookup or mail schedule must not make the caller report it as missing.
+    try {
+        // Decided here, on the shard that wrote the row, so a notification handed to
+        // the recipient's shard is mailed exactly like one written in place.
+        if (shouldEmailOutcome({ emailOutcome: input.emailOutcome, outcome: input.outcome })) {
+            const settings = await ctx.db.userSettings.findFirst({ where: { userId: row.userId } });
 
-        if (device) {
-            await ctx.scheduler.runAfter(0, internal.notifications.push.sendPushForNotification, { notificationId, userId: row.userId });
+            if (settings?.taskEmailEnabled === true) {
+                await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendTaskOutcomeEmail, {
+                    link: row.link ?? "/",
+                    title: row.title,
+                    userId: row.userId,
+                });
+            }
         }
+
+        if (isPushConfigured()) {
+            const [device] = await ctx.push.list({ limit: 1, userId: row.userId });
+
+            if (device) {
+                await ctx.scheduler.runAfter(0, internal.notifications.push.sendPushForNotification, { notificationId, userId: row.userId });
+            }
+        }
+    } catch (error) {
+        console.warn("[notifications] Failed to finish a notification after it was written:", error);
     }
 
     return notificationId;
 };
+
+/**
+ * Only a successful run that produced a result is mailed (the caller says so with
+ * `emailOutcome`), and only a NEW row gets here: a duplicate returns before the insert.
+ */
+export const shouldEmailOutcome = (input: { emailOutcome?: boolean; outcome?: "failure" | "success" }): boolean =>
+    input.emailOutcome === true && input.outcome === "success";
 
 /** For writers that must not fail on a notification: logs and swallows. Returns the id, or `null`. */
 export const notifyQuietly = async (ctx: MutationCtx, input: NotificationInput): Promise<Id<"notifications"> | null> => {

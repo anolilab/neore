@@ -24,6 +24,8 @@ export const vNotificationOutcome = v.union(v.literal("success"), v.literal("fai
 export const notificationInputFields = {
     body: v.optional(v.string()),
     dedupeKey: v.optional(v.string()),
+    /** Mail this outcome to the owner if they opted in. Only a new success is mailed. */
+    emailOutcome: v.optional(v.boolean()),
     link: v.optional(v.string()),
     outcome: v.optional(vNotificationOutcome),
     title: v.string(),

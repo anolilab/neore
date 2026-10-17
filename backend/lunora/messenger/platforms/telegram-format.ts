@@ -1,6 +1,30 @@
-import { splitMessage } from "../lib/types";
-
 export const TELEGRAM_MESSAGE_LIMIT = 4096;
+
+/**
+ * Splits `line` into pieces of at most `size` characters without dropping any
+ * character: a cut at a space keeps that space at the start of the next piece,
+ * so the pieces joined back together are exactly `line`. Unlike `splitMessage`,
+ * which trims the remainder, this keeps the spaces inside a code line.
+ */
+export const splitLossless = (line: string, size: number): string[] => {
+    const pieces: string[] = [];
+    let rest = line;
+
+    while (rest.length > size) {
+        let cut = rest.lastIndexOf(" ", size);
+
+        if (cut <= 0) {
+            cut = size;
+        }
+
+        pieces.push(rest.slice(0, cut));
+        rest = rest.slice(cut);
+    }
+
+    pieces.push(rest);
+
+    return pieces;
+};
 
 export interface TelegramChunk {
     html: string;
@@ -14,32 +38,92 @@ interface Block {
 
 const escapeHtml = (text: string): string => text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
+const INLINE_CODE = /(`[^\n`]+`)/;
+const BOLD = /\*\*(?!\s)([^*\n]+)\*\*/g;
+const ITALIC = /(?<![\w*])\*(?!\s)([^\n*]+)\*(?![\w*])/g;
+const HEADING = /^#{1,6} (.*)$/;
+const BULLET = /^( *)[-*+] +/;
+const HTTP_URL_START = /^https?:\/\//;
+const WHITESPACE = /\s/;
+
+/**
+ * Turns `[label](https://…)` into `render(label, url)`. The URL may contain
+ * balanced parentheses (`…/Function_(mathematics)`); anything else is left as text.
+ */
+const linkify = (text: string, render: (label: string, url: string) => string): string => {
+    let out = "";
+    let index = 0;
+
+    for (let open = text.indexOf("["); open !== -1; open = text.indexOf("[", index)) {
+        const close = text.indexOf("](", open);
+        const label = close === -1 ? "" : text.slice(open + 1, close);
+        const urlStart = close + 2;
+        const isLink = close !== -1 && !label.includes("]") && !label.includes("\n") && HTTP_URL_START.test(text.slice(urlStart, urlStart + 8));
+
+        if (!isLink) {
+            out += text.slice(index, open + 1);
+            index = open + 1;
+
+            continue;
+        }
+
+        let depth = 0;
+        let end = -1;
+
+        for (let at = urlStart; at < text.length && end === -1; at += 1) {
+            const char = text.charAt(at);
+
+            if (WHITESPACE.test(char)) {
+                break;
+            }
+
+            if (char === "(") {
+                depth += 1;
+            } else if (char === ")") {
+                if (depth === 0) {
+                    end = at;
+                } else {
+                    depth -= 1;
+                }
+            }
+        }
+
+        if (end === -1) {
+            out += text.slice(index, open + 1);
+            index = open + 1;
+
+            continue;
+        }
+
+        out += text.slice(index, open) + render(label, text.slice(urlStart, end));
+        index = end + 1;
+    }
+
+    return out + text.slice(index);
+};
+
 const inline = (text: string): string =>
     text
-        .split(/(`[^\n`]+`)/)
+        .split(INLINE_CODE)
         .map((part, index) => {
             if (index % 2 === 1) {
                 return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
             }
 
-            return escapeHtml(part)
-                .replaceAll(
-                    /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
-                    (_match, label: string, url: string) => `<a href="${url.replaceAll('"', "&quot;")}">${label}</a>`,
-                )
-                .replaceAll(/\*\*(?!\s)(.+?)\*\*/g, "<b>$1</b>")
-                .replaceAll(/(?<![\w*])\*(?!\s)([^\n*]+?)\*(?![\w*])/g, "<i>$1</i>");
+            return linkify(escapeHtml(part), (label, url) => `<a href="${url.replaceAll('"', "&quot;")}">${label}</a>`)
+                .replaceAll(BOLD, "<b>$1</b>")
+                .replaceAll(ITALIC, "<i>$1</i>");
         })
         .join("");
 
 const renderLine = (line: string): string => {
-    const heading = /^#{1,6}\s+(.*)$/.exec(line);
+    const heading = HEADING.exec(line);
 
     if (heading) {
         return `<b>${inline(heading[1] as string)}</b>`;
     }
 
-    return inline(line.replace(/^(\s*)[-*+]\s+/, "$1• "));
+    return inline(line.replace(BULLET, "$1• "));
 };
 
 /** Blocks are fenced code (kept whole) and runs of lines between blank lines. */
@@ -49,10 +133,12 @@ const toBlocks = (markdown: string): Block[] => {
     let fence: string[] | undefined;
 
     const flush = () => {
-        if (current.length > 0) {
-            blocks.push({ code: false, lines: current });
-            current = [];
+        if (current.length === 0) {
+            return;
         }
+
+        blocks.push({ code: false, lines: current });
+        current = [];
     };
 
     for (const line of markdown.split("\n")) {
@@ -107,7 +193,9 @@ const splitBlock = (block: Block, limit: number): TelegramChunk[] => {
         if (renderBlock(block, [line]).html.length > limit) {
             // ponytail: an over-long line is cut by source length, not rendered length; a piece Telegram still rejects falls back to plain text
             // Escaping and tags can multiply the length of a line by up to about six, so the source piece is a sixth of the limit.
-            for (const part of splitMessage(line, Math.floor(limit / 6))) {
+            const parts = splitLossless(line, Math.floor(limit / 6));
+
+            for (const part of parts) {
                 pieces.push(renderBlock(block, [part]));
             }
         } else {
@@ -130,7 +218,9 @@ export const formatTelegramMessage = (markdown: string, limit: number = TELEGRAM
     const chunks: TelegramChunk[] = [];
     let current: TelegramChunk | undefined;
 
-    for (const piece of toBlocks(markdown).flatMap((block) => splitBlock(block, limit))) {
+    const pieces = toBlocks(markdown).flatMap((block) => splitBlock(block, limit));
+
+    for (const piece of pieces) {
         if (current && current.html.length + 2 + piece.html.length <= limit) {
             current = { html: `${current.html}\n\n${piece.html}`, source: `${current.source}\n\n${piece.source}` };
         } else {

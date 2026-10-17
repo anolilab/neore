@@ -160,6 +160,7 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
                                                 <div className="flex justify-end gap-1">
                                                     <Button
                                                         aria-label={t`Edit case ${String(index + 1)}`}
+                                                        disabled={evalCase.frozen}
                                                         onClick={() => setCaseDialog({ editing: evalCase, open: true })}
                                                         size="icon"
                                                         variant="ghost"

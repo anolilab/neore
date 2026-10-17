@@ -266,6 +266,7 @@ for a schema table that is neither policed nor listed:
 | `chat_import_functions.startImportJob` | mutation | authMutation + RL | chatImportJobs | key rebuilt under the CALLER's staging prefix from `uploadId` (`uploads/<userId>/<uploadId>`) — never caller-chosen | **fixed** (high) — any r2Key was read and then deleted; later a `files` row the caller owned, now ownership by construction (`lib/upload-route.ts`) |
 | `chat_composite.getThreadListData` | query | liteAuthQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_composite.getThreadWithData` | query | liteAuthQuery | threads | thread access (owner/grant) | ok |
+| `chat_resume.latestResumableThread` | query | liteAuthQuery | — | caller-scoped (ctx.user), reads only the caller's own threads | ok |
 | `chat_custom_providers.deleteCustomProvider` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_custom_providers.listCustomProviders` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_custom_providers.probeCustomProvider` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |

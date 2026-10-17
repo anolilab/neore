@@ -9182,6 +9182,13 @@
       "module": "chat"
     },
     {
+      "detail": "query",
+      "id": "function:chat_resume:latestResumableThread",
+      "kind": "function",
+      "name": "chat.resume.latestResumableThread",
+      "module": "chat"
+    },
+    {
       "detail": "mutation",
       "id": "function:chat_sharing:acceptThreadInvite",
       "kind": "function",
@@ -17938,14 +17945,14 @@
     {
       "file": "notifications/notify",
       "kind": "schedule",
-      "line": 104,
+      "line": 109,
       "reason": "\"notify\" is not a registered function"
     },
     {
-      "file": "notifications/task-email",
+      "file": "notifications/notify",
       "kind": "schedule",
-      "line": 76,
-      "reason": "\"notifyOutcome\" is not a registered function"
+      "line": 121,
+      "reason": "\"notify\" is not a registered function"
     },
     {
       "file": "pages/functions",

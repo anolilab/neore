@@ -37,7 +37,15 @@ export class ChatImportError extends Error {
  * - Gemini: Object/array with `messages` field and role = "USER"/"MODEL".
  */
 /** Files that ship inside a ChatGPT export archive but hold no conversations. */
-const NON_CONVERSATION_EXPORT_FILES = new Set(["account.json", "message_feedback.json", "model_comparisons.json", "shared_conversations.json", "user.json"]);
+const NON_CONVERSATION_EXPORT_FILES = new Set([
+    "account.json",
+    "message_feedback.json",
+    "model_comparisons.json",
+    "projects.json",
+    "shared_conversations.json",
+    "user.json",
+    "users.json",
+]);
 
 const detectProvider = (data: unknown): ImportProvider => {
     if (Array.isArray(data) && data.length > 0) {
@@ -161,16 +169,23 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
         const records: unknown[] = [];
 
         const text = await file.text();
+        const lines = text
+            .split("\n")
+            .map((line, index) => {
+                return { line, number: index + 1 };
+            })
+            .filter(({ line }) => line.trim());
 
-        for (const line of text.split("\n")) {
-            if (!line.trim()) {
-                continue;
-            }
-
+        for (const [index, { line, number }] of lines.entries()) {
             try {
                 records.push(JSON.parse(line));
             } catch {
-                // Skip a truncated or corrupt line
+                // A transcript still being written can end in a partial line; any other bad line is a damaged turn.
+                if (index === lines.length - 1) {
+                    break;
+                }
+
+                throw new ChatImportError(msg`Line ${number} of this transcript is not valid JSON, so the import was stopped.`);
             }
         }
 

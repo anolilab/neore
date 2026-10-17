@@ -27,7 +27,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { enqueueJob } from "../lib/job-queue";
-import { notifyOutcome } from "../notifications/task-email";
+import { notifyQuietly } from "../notifications/notify";
 import { patchById, withoutUndefined } from "../lib/patch";
 import type { SkillContext } from "../skills/executor";
 import { prepareSkillInvocation } from "../skills/executor";
@@ -341,20 +341,18 @@ const notifyTaskRound = async (
     run: Doc<"taskRuns">,
     outcome: "failure" | "success",
     detail: string | undefined,
-): Promise<void> =>
-    await notifyOutcome(
-        ctx,
-        {
-            dedupeKey: `task:${run._id}`,
-            link: "/tasks",
-            outcome,
-            title: task.title,
-            type: "task",
-            userId: task.userId,
-            ...(detail && { body: detail }),
-        },
-        Boolean(detail),
-    );
+): Promise<void> => {
+    await notifyQuietly(ctx, {
+        dedupeKey: `task:${run._id}`,
+        emailOutcome: Boolean(detail),
+        link: "/tasks",
+        outcome,
+        title: task.title,
+        type: "task",
+        userId: task.userId,
+        ...(detail && { body: detail }),
+    });
+};
 
 export const completeRound = internalMutation
     .input({

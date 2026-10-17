@@ -131,7 +131,6 @@ const DataImport: FC = () => {
                 // format with the first one's parser and drop its sessions silently.
                 const results = jsonDataArray.map((jsonData) => parseExportFile(jsonData));
                 const providers = new Set(results.map((result) => result.provider));
-                const allConversations = results.flatMap((result) => result.conversations);
 
                 // One import job carries one provider, so a mixed selection cannot run.
                 if (providers.size > 1) {
@@ -141,6 +140,7 @@ const DataImport: FC = () => {
                 }
 
                 const [detectedProvider] = providers;
+                const allConversations = results.flatMap((result) => result.conversations);
 
                 if (!detectedProvider || allConversations.length === 0) {
                     setState({ message: t`No conversations found in the file.`, step: "error" });

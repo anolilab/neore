@@ -922,6 +922,7 @@ export interface Doc_notifications {
     _creationTime: number;
     body?: string;
     dedupeKey?: string;
+    emailOutcome?: boolean;
     link?: string;
     outcome?: "success" | "failure";
     title: string;
@@ -3556,6 +3557,7 @@ export interface Insert_notifications {
     _creationTime?: number;
     body?: string;
     dedupeKey?: string;
+    emailOutcome?: boolean;
     link?: string;
     outcome?: "success" | "failure";
     title: string;

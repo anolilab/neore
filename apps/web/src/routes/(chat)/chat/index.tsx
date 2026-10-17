@@ -8,15 +8,13 @@ import { toast } from "sonner";
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import Assistant from "@/features/chat/assistant";
-import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
-import { pickResumeThreadId } from "@/features/chat/core/utils/resume-thread";
+import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-// Module scope, so it outlives this component's mounts for one page load. Only the
-// first /chat visit resumes; "New chat" and the other in-app paths land here later
-// and must get a blank chat. Effects never run during SSR, so it is never shared.
-let resumeAttemptedThisLoad = false;
+// Module scope, so it outlives this component's mounts: a page load resumes once.
+// Effects never run during SSR, so it is never shared between requests.
+const resumeState = { consumed: false };
 
 const ChatPage = () => {
     const route = "/(chat)/chat/";
@@ -31,10 +29,8 @@ const ChatPage = () => {
     const navigate = useNavigate();
     const crpc = useCRPC();
     const { data: userSettings } = useUserSettings();
-    const resumeLastChat = userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage;
-    const { data: listData } = useQuery(
-        crpc.chat.composite.getThreadListData.queryOptions(resumeLastChat ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS } : skipToken),
-    );
+    const resumeLastChat = BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage;
+    const { data: latestThreadId, isSuccess: latestResolved } = useQuery(crpc.chat.resume.latestResumableThread.queryOptions(resumeLastChat ? {} : skipToken));
 
     const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
 
@@ -59,19 +55,16 @@ const ChatPage = () => {
     }, [hasInitialMessage]);
 
     useEffect(() => {
-        if (!resumeLastChat || !listData || resumeAttemptedThisLoad) {
+        if (!resumeLastChat || !latestResolved || resumeState.consumed) {
             return;
         }
 
-        resumeAttemptedThisLoad = true;
+        resumeState.consumed = true;
 
-        const branchIds = new Set(listData.relationships.map((relationship) => relationship.threadId));
-        const threadId = pickResumeThreadId(listData.threads.page, branchIds);
-
-        if (threadId) {
-            void navigate({ params: { threadId }, replace: true, search: { initialMessage: undefined }, to: "/chat/$threadId" });
+        if (latestThreadId) {
+            void navigate({ params: { threadId: latestThreadId }, replace: true, search: { initialMessage: undefined }, to: "/chat/$threadId" });
         }
-    }, [listData, navigate, resumeLastChat]);
+    }, [latestResolved, latestThreadId, navigate, resumeLastChat]);
 
     useEffect(() => {
         if (!redirectReason || shownNotificationRef.current === redirectReason) {

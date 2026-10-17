@@ -1,25 +1,22 @@
 /**
  * OPT-IN email for a task or trigger run that finished with a result.
  *
- * The in-app notification stays the source of truth: {@link notifyOutcome}
- * writes it through `notify()`, and only a NEW notification (not a redelivery,
- * not handed to another shard) can schedule the mail. The mutation only
- * schedules; {@link sendTaskOutcomeEmail} renders and queues it, so no mutation
- * touches the mailer.
+ * The in-app notification stays the source of truth. `notify()` schedules
+ * {@link sendTaskOutcomeEmail} on the shard that writes a NEW notification, so a
+ * redelivery or a duplicate never mails, and neither does a write handed to
+ * another shard without being mailed there. The action renders and queues the
+ * mail, so no mutation touches the mailer.
  */
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalQuery } from "../_generated/server";
 import { saveUserSettings } from "../auth/lib/preference-writes";
 import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, rateLimit } from "../lib/crpc";
-import type { NotificationInput } from "./notify";
-import { notifyQuietly } from "./notify";
 
 /** The settings toggle. */
 export const setTaskEmailEnabled = authMutation
@@ -42,51 +39,17 @@ export const setTaskEmailEnabled = authMutation
         return null;
     });
 
-/**
- * Only a NEW notification for a successful run that produced a result is mailed,
- * and only to users who opted in.
- */
-export const shouldEmailOutcome = (input: {
-    hasResult: boolean;
-    notificationId: Id<"notifications"> | null;
-    outcome: "failure" | "success" | undefined;
-    taskEmailEnabled: boolean | undefined;
-}): boolean => input.notificationId !== null && input.hasResult && input.outcome === "success" && input.taskEmailEnabled === true;
-
-/**
- * Writes the inbox entry (never failing the caller), then mails the outcome when
- * {@link shouldEmailOutcome} says so. `hasResult` is the caller's own meaning of
- * "this run produced something to read": a summary for a task, a thread for a trigger.
- */
-export const notifyOutcome = async (ctx: MutationCtx, input: NotificationInput, hasResult: boolean): Promise<void> => {
-    const notificationId = await notifyQuietly(ctx, input);
-
-    if (!notificationId) {
-        return;
-    }
-
-    const settings = await ctx.db.userSettings.findFirst({ where: { userId: input.userId } });
-
-    if (!shouldEmailOutcome({ hasResult, notificationId, outcome: input.outcome, taskEmailEnabled: settings?.taskEmailEnabled })) {
-        return;
-    }
-
-    // The inbox entry is already written: a failed mail must not fail the run it reports on.
-    try {
-        await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendTaskOutcomeEmail, {
-            link: input.link ?? "/",
-            title: input.title,
-            userId: input.userId,
-        });
-    } catch (error) {
-        console.warn("[notifications] Failed to schedule the outcome email:", error);
-    }
-};
-
 export const loadRecipientEmail = internalQuery
     .input({ userId: v.string() })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { userId }, ctx }) => {
+        const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
+
+        // Checked again here: the user may have turned the setting off after the mail was scheduled.
+        if (settings?.taskEmailEnabled !== true) {
+            return null;
+        }
+
         const user = await ctx.db.user.findFirst({ where: { _id: userId as Id<"user"> } });
 
         return user?.email || null;

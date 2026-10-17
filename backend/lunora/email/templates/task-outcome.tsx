@@ -14,7 +14,7 @@ const TaskOutcomeEmail = ({ title, url }: TaskOutcomeEmailProps) => (
                 <Heading style={{ color: "#2563eb" }}>{title}</Heading>
                 <Text>Status: finished with a result.</Text>
                 <Text>
-                    <Link href={url}>View the result</Link>
+                    <Link href={url}>Open it in Neore</Link>
                 </Text>
                 <Text style={{ color: "#666", fontSize: "14px", marginTop: "20px" }}>You can turn these emails off in your notification settings.</Text>
             </Container>

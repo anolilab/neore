@@ -5,8 +5,10 @@
  * line, `{ timestamp, type, payload }`. `response_item` payloads of
  * `type: "message"` carry `role` and a `content` array of `input_text` /
  * `output_text` blocks; `function_call`, `function_call_output` and tool-call
- * payloads are counted and dropped, as are `reasoning`, `event_msg`,
- * `turn_context` and `session_meta` records. Context the CLI injects as user
+ * payloads are counted and dropped, as are `reasoning`,
+ * `turn_context` and `session_meta` records. Legacy rollouts carry their turns as
+ * `event_msg` `user_message` / `agent_message` instead, read only when no
+ * `response_item` messages exist. Context the CLI injects as user
  * messages (environment and instruction blocks) is skipped.
  */
 import { asRecord, buildSession, messageFromTexts, parseTimestamp } from "./local-session";
@@ -22,6 +24,15 @@ export const isCodexRecord = (record: unknown): boolean => {
     return typeof item?.type === "string" && RECORD_TYPES.has(item.type) && asRecord(item.payload) !== undefined;
 };
 
+/** The role of a legacy `event_msg` turn, or undefined for any other event. */
+const eventRole = (type: unknown): NormalizedMessage["role"] | undefined => {
+    if (type === "user_message") {
+        return "user";
+    }
+
+    return type === "agent_message" ? "assistant" : undefined;
+};
+
 const parseCodex = (data: unknown): NormalizedConversation[] => {
     if (!Array.isArray(data)) {
         throw new TypeError("Expected an array of rollout records");
@@ -30,9 +41,31 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
     const messages: NormalizedMessage[] = [];
     let dropped = 0;
 
+    // Current rollouts repeat every turn as a `response_item` message; older ones
+    // carry turns only as `event_msg` user/agent messages. Use one source, never both.
+    const hasResponseMessages = data.some((raw) => {
+        const payload = asRecord(asRecord(raw)?.payload);
+
+        return asRecord(raw)?.type === "response_item" && payload?.type === "message";
+    });
+
     for (const raw of data) {
         const record = asRecord(raw);
         const payload = asRecord(record?.payload);
+
+        if (record?.type === "event_msg" && !hasResponseMessages && payload) {
+            const role = eventRole(payload.type);
+            const message =
+                role && typeof payload.message === "string"
+                    ? messageFromTexts([payload.message], role, parseTimestamp(record.timestamp), INJECTED_PREFIXES)
+                    : null;
+
+            if (message) {
+                messages.push(message);
+            }
+
+            continue;
+        }
 
         if (record?.type !== "response_item" || !payload) {
             continue;

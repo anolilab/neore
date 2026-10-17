@@ -39,6 +39,13 @@ const useOptimisticSetting = (
 ): { checked: boolean; disabled: boolean; onCheckedChange: (checked: boolean) => void } => {
     const [pending, setPending] = useState<boolean | undefined>(undefined);
 
+    // Once the saved value catches up with the switch, the local value is no longer needed.
+    useEffect(() => {
+        if (pending !== undefined && saved === pending) {
+            setPending(undefined);
+        }
+    }, [pending, saved]);
+
     return {
         checked: pending ?? saved === true,
         disabled: mutation.isPending,
@@ -48,7 +55,7 @@ const useOptimisticSetting = (
                 { enabled: checked },
                 {
                     onError: () => {
-                        setPending(!checked);
+                        setPending(undefined);
                         toast.error(messages.error);
                     },
                     onSuccess: () => toast.success(checked ? messages.on : messages.off),

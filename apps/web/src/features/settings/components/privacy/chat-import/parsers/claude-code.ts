@@ -17,6 +17,40 @@ export const isClaudeCodeRecord = (record: unknown): boolean => {
     return typeof item?.sessionId === "string" && (item.type === "user" || item.type === "assistant") && asRecord(item.message) !== undefined;
 };
 
+const isMainMessage = (event: Record<string, unknown>): boolean =>
+    (event.type === "user" || event.type === "assistant") && event.isSidechain !== true && event.isMeta !== true;
+
+/**
+ * The events on the ACTIVE branch. A resumed session keeps its abandoned forks in
+ * the same file, linked by `parentUuid`; the active branch ends at the last main
+ * message in file order and runs back to the root. Events without a uuid (titles,
+ * snapshots) are kept as they are.
+ */
+const activeBranch = (events: Record<string, unknown>[]): Record<string, unknown>[] => {
+    const byUuid = new Map<string, Record<string, unknown>>();
+
+    for (const event of events) {
+        if (typeof event.uuid === "string") {
+            byUuid.set(event.uuid, event);
+        }
+    }
+
+    const leaf = events.findLast((event) => isMainMessage(event) && typeof event.uuid === "string");
+
+    if (!leaf) {
+        return events;
+    }
+
+    const onBranch = new Set<string>();
+
+    for (let node: Record<string, unknown> | undefined = leaf; node && typeof node.uuid === "string" && !onBranch.has(node.uuid); ) {
+        onBranch.add(node.uuid);
+        node = typeof node.parentUuid === "string" ? byUuid.get(node.parentUuid) : undefined;
+    }
+
+    return events.filter((event) => typeof event.uuid !== "string" || onBranch.has(event.uuid));
+};
+
 const parseClaudeCode = (data: unknown): NormalizedConversation[] => {
     if (!Array.isArray(data)) {
         throw new TypeError("Expected an array of session events");
@@ -25,13 +59,9 @@ const parseClaudeCode = (data: unknown): NormalizedConversation[] => {
     const messages: NormalizedMessage[] = [];
     let dropped = 0;
     let title: string | undefined;
+    const events = data.map((raw) => asRecord(raw)).filter((event): event is Record<string, unknown> => event !== undefined);
 
-    for (const raw of data) {
-        const event = asRecord(raw);
-
-        if (!event) {
-            continue;
-        }
+    for (const event of activeBranch(events)) {
 
         if (event.type === "summary" && typeof event.summary === "string") {
             title ??= event.summary;

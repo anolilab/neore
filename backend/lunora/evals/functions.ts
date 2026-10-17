@@ -54,6 +54,11 @@ import { MAX_LENGTH } from "../lib/validators";
 const MAX_RUNS_LISTED = 50;
 
 const MAX_COMPARED_MODELS = 6;
+/**
+ * How far back the comparison looks for each model's newest finished run. Ceiling: a
+ * dataset with more runs than this in its history can hide an older model.
+ */
+const MAX_RUNS_SCANNED_FOR_COMPARISON = 500;
 
 /** Knowledge files one run may be restricted to. */
 const MAX_TARGET_FILES = 50;
@@ -898,15 +903,16 @@ export const compareRuns = authQuery
  * model run with a skill run that happens to use that model.
  */
 const comparisonKey = (target: Infer<typeof vEvalTarget>): string => {
+    // JSON, not a delimiter: a model id or prompt may itself contain any separator.
     if (target.kind === "skill") {
-        return `skill:${target.skillId}:${target.model ?? ""}`;
+        return JSON.stringify(["skill", target.skillId, target.model ?? null]);
     }
 
     if (target.kind === "knowledge") {
-        return `knowledge:${target.fileIds.join(",")}:${target.model ?? ""}`;
+        return JSON.stringify(["knowledge", target.fileIds, target.model ?? null]);
     }
 
-    return `model:${target.model}:${target.systemPrompt ?? ""}`;
+    return JSON.stringify(["model", target.model, target.systemPrompt ?? null]);
 };
 
 export const compareModels = authQuery
@@ -919,7 +925,7 @@ export const compareModels = authQuery
             .query("evalRuns")
             .withIndex("by_dataset_and_createdAt", (q) => q.eq("datasetId", dataset._id))
             .order("desc")
-            .take(MAX_RUNS_LISTED);
+            .take(MAX_RUNS_SCANNED_FOR_COMPARISON);
         const newestPerTarget = new Map<string, Doc<"evalRuns">>();
 
         for (const run of recent) {

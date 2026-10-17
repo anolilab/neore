@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatTelegramMessage } from "./telegram-format";
+import { formatTelegramMessage, splitLossless } from "./telegram-format";
 
 const html = (markdown: string): string => formatTelegramMessage(markdown)[0]?.html ?? "";
 
@@ -23,7 +23,7 @@ describe("formatTelegramMessage", () => {
 
     it("splits long replies at block boundaries under the limit", () => {
         const paragraph = "word ".repeat(100).trim();
-        const chunks = formatTelegramMessage(Array.from({ length: 20 }, () => paragraph).join("\n\n"), 1200);
+        const chunks = formatTelegramMessage(`${paragraph}\n\n`.repeat(20).trimEnd(), 1200);
 
         expect(chunks.length).toBeGreaterThan(1);
 
@@ -46,5 +46,18 @@ describe("formatTelegramMessage", () => {
         }
 
         expect(chunks.map((chunk) => chunk.html).join("\n")).toContain("line 49");
+    });
+});
+
+describe("splitLossless", () => {
+    it("keeps every character, including the spaces at each cut", () => {
+        const line = "const   value = compute(alpha,  beta,   gamma, delta, epsilon, zeta, eta, theta)";
+
+        for (const size of [7, 16, 40]) {
+            const pieces = splitLossless(line, size);
+
+            expect(pieces.join("")).toBe(line);
+            expect(pieces.every((piece) => piece.length <= size)).toBe(true);
+        }
     });
 });

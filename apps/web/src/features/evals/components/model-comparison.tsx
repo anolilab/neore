@@ -33,7 +33,9 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
         return <p className="text-muted-foreground text-sm">{t`Run this dataset against at least two models to compare them.`}</p>;
     }
 
-    const names = data.runs.map((run) => run.target.model ?? run.target.kind);
+    // Two runs can share a model; a number keeps their columns apart.
+    const bases = data.runs.map((run) => run.label ?? run.target.model ?? run.target.kind);
+    const names = bases.map((base, index) => (bases.filter((other) => other === base).length > 1 ? `${base} (${index + 1})` : base));
     const outcome = (passed: boolean | null) => {
         if (passed === null) {
             return "—";

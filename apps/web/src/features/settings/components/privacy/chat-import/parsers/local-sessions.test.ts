@@ -111,8 +111,14 @@ describe("detection does not steal existing formats", () => {
 });
 
 describe("extractJsonFromFile", () => {
-    it("reads .jsonl lines and skips corrupt ones", async () => {
-        const text = `${JSON.stringify(codexRollout[0])}\nnot json\n\n${JSON.stringify(codexRollout[2])}\n`;
+    it("stops on a damaged line in the middle of a transcript, naming it", async () => {
+        const text = `${JSON.stringify(codexRollout[0])}\nnot json\n${JSON.stringify(codexRollout[2])}\n`;
+
+        await expect(extractJsonFromFile(new File([text], "rollout.jsonl"))).rejects.toThrow("Line 2");
+    });
+
+    it("tolerates a truncated final line, as a transcript still being written can end with one", async () => {
+        const text = `${JSON.stringify(codexRollout[0])}\n${JSON.stringify(codexRollout[2])}\n{"partial`;
         const [records] = await extractJsonFromFile(new File([text], "rollout.jsonl"));
 
         expect(records).toHaveLength(2);

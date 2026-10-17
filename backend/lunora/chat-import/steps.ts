@@ -166,7 +166,9 @@ export const processConversationBatch = internalMutation
                     createdBy: `import:${args.provider}`,
                     status: "active",
                     title: conv.title || "Imported conversation",
-                    updatedAt: context.now,
+                    // The sidebar sorts by updatedAt; the source date keeps imports in their
+                    // real order. (_creationTime is system-set and cannot be written.)
+                    updatedAt: conv.createdAt ?? context.now,
                     userId: args.userId,
                 });
 

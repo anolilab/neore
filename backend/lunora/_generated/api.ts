@@ -267,6 +267,9 @@ export interface ApiTypes {
                 updatePinSelectedText: FunctionReference<"mutation", { pinId: string; selectedText: string }, void>;
             };
         };
+        resume: {
+            latestResumableThread: FunctionReference<"query", {}, string | null>;
+        };
         sharing: {
             acceptThreadInvite: FunctionReference<"mutation", { inviteToken: string }, { ownerId: string; permission: "read" | "write" | "admin"; threadId: string }>;
             createThreadInvite: FunctionReference<"mutation", { customHours?: number; expirationType: "1_day" | "7_days" | "custom"; invitedEmail: string; permission: "read" | "write" | "admin"; threadId: Id<"threads"> }, { expiresAt: number; inviteToken: string }>;
@@ -1001,6 +1004,9 @@ export const api: ApiTypes = {
                 updatePinNote: { __lunoraRef: "chat_pins_functions:updatePinNote" },
                 updatePinSelectedText: { __lunoraRef: "chat_pins_functions:updatePinSelectedText" },
             },
+        },
+        resume: {
+            latestResumableThread: { __lunoraRef: "chat_resume:latestResumableThread" },
         },
         sharing: {
             acceptThreadInvite: { __lunoraRef: "chat_sharing:acceptThreadInvite" },
