@@ -23,6 +23,8 @@ const ChatPage = () => {
     const redirectReason = Route.useSearch({ select: ({ redirectReason: selected }) => selected });
     const hasInitialMessage = Route.useSearch({ select: ({ initialMessage }) => initialMessage });
     const location = useLocation();
+    // TanStack keys each history entry; a new navigation gets a new key.
+    const navigationKey = location.state.__TSR_key;
     const { t } = useLingui();
     const shownNotificationRef = useRef<string | undefined>(undefined);
     const initialMessageReadRef = useRef(false);
@@ -30,6 +32,9 @@ const ChatPage = () => {
     const crpc = useCRPC();
     const { data: userSettings } = useUserSettings();
     const resumeLastChat = BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage;
+    // The location this screen mounted on. Any navigation since then (New chat, a
+    // sidebar link) cancels a resume that was still waiting for its data.
+    const mountLocationKey = useRef(navigationKey);
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(crpc.chat.resume.latestResumableThread.queryOptions(resumeLastChat ? {} : skipToken));
 
     const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
@@ -61,10 +66,14 @@ const ChatPage = () => {
 
         resumeState.consumed = true;
 
+        if (navigationKey !== mountLocationKey.current) {
+            return;
+        }
+
         if (latestThreadId) {
             void navigate({ params: { threadId: latestThreadId }, replace: true, search: { initialMessage: undefined }, to: "/chat/$threadId" });
         }
-    }, [latestResolved, latestThreadId, navigate, resumeLastChat]);
+    }, [latestResolved, latestThreadId, navigationKey, navigate, resumeLastChat]);
 
     useEffect(() => {
         if (!redirectReason || shownNotificationRef.current === redirectReason) {
