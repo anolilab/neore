@@ -21,7 +21,6 @@ import {
     executeCodeNode,
     executeFileNode,
     executeOutputNode,
-    executeTextNode,
     type ExecutionContext,
     extractUrl,
     getExecutionOrder,
@@ -33,6 +32,8 @@ import {
     type WorkflowContent,
     type WorkflowNode,
 } from "./core";
+import { imageRequestArgs, systemPromptFor, videoInputArgs, videoNodeOutput, workflowInputErrors } from "./media-args";
+import { executeTextNode } from "./mention-targets";
 import { MAX_LENGTH } from "../lib/validators";
 
 // ============================================================================
@@ -100,7 +101,7 @@ const executeAINode = async (node: WorkflowNode, context: ExecutionContext, user
             maxOutputTokens: data.maxTokens,
             model: languageModel,
             prompt,
-            system: data.systemPrompt,
+            system: systemPromptFor(node, context),
             temperature: data.temperature,
         });
 
@@ -149,8 +150,7 @@ const executeImageNode = async (node: WorkflowNode, context: ExecutionContext, a
         return { output: data.imageUrl ?? "", success: true };
     }
 
-    const inputPrompt = getLastOutput(context);
-    const prompt = typeof inputPrompt === "string" ? inputPrompt : data.prompt;
+    const { prompt, referenceImages } = imageRequestArgs(node, context);
 
     if (!prompt) {
         return { error: "No prompt provided for image generation", success: false };
@@ -164,6 +164,7 @@ const executeImageNode = async (node: WorkflowNode, context: ExecutionContext, a
             prompt,
             threadId: "workflow",
             userId,
+            ...(referenceImages.length > 0 && { referenceImages }),
         });
 
         return { output: result, success: true };
@@ -497,15 +498,17 @@ const executeVideoNode = async (node: WorkflowNode, context: ExecutionContext, a
 
     const inputValue = getLastOutput(context);
 
-    // If mode is image-to-video, dispatch to the image-to-video action
-    if (data.mode === "image-to-video") {
-        const imageUrl = extractUrl(inputValue, "imageUrl");
+    try {
+        const inputs = await videoInputArgs(node, context, actionContext);
 
-        if (!imageUrl) {
-            return { error: "No image input provided for image-to-video mode", success: false };
-        }
+        // If mode is image-to-video, dispatch to the image-to-video action
+        if (data.mode === "image-to-video") {
+            const imageUrl = inputs.frameUrl ?? extractUrl(inputValue, "imageUrl");
 
-        try {
+            if (!imageUrl) {
+                return { error: "No image input provided for image-to-video mode", success: false };
+            }
+
             const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
                 duration: data.duration,
                 fps: data.fps,
@@ -513,37 +516,35 @@ const executeVideoNode = async (node: WorkflowNode, context: ExecutionContext, a
                 model: data.model,
                 motionStrength: data.motionStrength,
                 prompt: data.prompt,
+                referenceAudioUrls: inputs.referenceAudioUrls,
+                referenceVideoUrls: inputs.referenceVideoUrls,
                 threadId: "workflow",
                 userId,
             });
 
-            return { output: result, success: true };
-        } catch (error) {
-            return {
-                error: error instanceof Error ? error.message : "Image-to-video generation failed",
-                success: false,
-            };
+            return { output: videoNodeOutput(result, data.prompt ?? ""), success: true };
         }
-    }
 
-    // Default: text-to-video mode
-    const prompt = data.prompt ?? (typeof inputValue === "string" ? inputValue : "");
+        // Default: text-to-video mode
+        const prompt = data.prompt ?? (typeof inputValue === "string" ? inputValue : "");
 
-    if (!prompt) {
-        return { error: "No prompt provided for video generation", success: false };
-    }
+        if (!prompt) {
+            return { error: "No prompt provided for video generation", success: false };
+        }
 
-    try {
         const result = await actionContext.runAction(internal.chat.functions.generateVideo, {
             aspectRatio: data.aspectRatio ?? "16:9",
             duration: data.duration ?? 5,
             model: data.model ?? "fal:mochi-v1",
             prompt,
+            referenceAudioUrls: inputs.referenceAudioUrls,
+            referenceVideoUrls: inputs.referenceVideoUrls,
+            startFrameUrl: inputs.frameUrl,
             threadId: "workflow",
             userId,
         });
 
-        return { output: result, success: true };
+        return { output: videoNodeOutput(result, prompt), success: true };
     } catch (error) {
         return {
             error: error instanceof Error ? error.message : "Video generation failed",
@@ -791,13 +792,15 @@ const executeImageToVideoNode = async (
     };
 
     const inputValue = getLastOutput(context);
-    const imageUrl = extractUrl(inputValue, "imageUrl");
-
-    if (!imageUrl) {
-        return { error: "No image input provided for image-to-video", success: false };
-    }
 
     try {
+        const inputs = await videoInputArgs(node, context, actionContext);
+        const imageUrl = inputs.frameUrl ?? extractUrl(inputValue, "imageUrl");
+
+        if (!imageUrl) {
+            return { error: "No image input provided for image-to-video", success: false };
+        }
+
         const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
             duration: data.duration,
             fps: data.fps,
@@ -806,11 +809,13 @@ const executeImageToVideoNode = async (
             model: data.model,
             motionStrength: data.motionStrength,
             prompt: data.prompt,
+            referenceAudioUrls: inputs.referenceAudioUrls,
+            referenceVideoUrls: inputs.referenceVideoUrls,
             threadId: "workflow",
             userId,
         });
 
-        return { output: result, success: true };
+        return { output: videoNodeOutput(result, data.prompt ?? ""), success: true };
     } catch (error) {
         return {
             error: error instanceof Error ? error.message : "Image-to-video generation failed",
@@ -959,6 +964,13 @@ export const executeWorkflow = authAction
             throw new LunoraError("BAD_REQUEST", "Workflow has no nodes");
         }
 
+        // Checked before any node runs, so a run that cannot finish never bills an earlier clip.
+        const inputErrors = workflowInputErrors(workflowContent);
+
+        if (inputErrors.length > 0) {
+            throw new LunoraError("BAD_REQUEST", inputErrors.join("; "));
+        }
+
         const userProviderKeys = await context.runQuery(internal.auth.functions.getDecryptedProviderKeysQuery, { userId });
 
         const execution = await context.runMutation(internal.agent.workflow_executions.create, {
@@ -979,6 +991,7 @@ export const executeWorkflow = authAction
 
             const executionContext: ExecutionContext = {
                 data: {},
+                graph: { edges: workflowContent.edges, nodes: workflowContent.nodes },
                 nodeOutputs: {},
                 variables: variables ?? {},
             };
@@ -995,7 +1008,7 @@ export const executeWorkflow = authAction
 
                 const nodeExecution = await context.runMutation(internal.agent.node_executions.create, {
                     executionId,
-                    input: getNodeInput(nodeId, workflowContent.edges, executionContext),
+                    input: getNodeInput(nodeId, executionContext),
                     nodeId,
                     nodeType: node.type,
                     startedAt: Date.now(),

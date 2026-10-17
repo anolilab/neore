@@ -23,7 +23,6 @@ import {
     executeCodeNode,
     executeFileNode,
     executeOutputNode,
-    executeTextNode,
     type ExecutionContext,
     extractUrl,
     getExecutionOrder,
@@ -34,6 +33,8 @@ import {
     type WorkflowContent,
     type WorkflowNode,
 } from "./core";
+import { imageRequestArgs, systemPromptFor, videoInputArgs, videoNodeOutput, workflowInputErrors } from "./media-args";
+import { executeTextNode } from "./mention-targets";
 
 let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
 
@@ -108,6 +109,13 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
         return Response.json({ error: "Workflow has no nodes" }, { status: 400 });
     }
 
+    // Checked before any node runs, so a run that cannot finish never bills an earlier clip.
+    const inputErrors = workflowInputErrors(workflowContent);
+
+    if (inputErrors.length > 0) {
+        return Response.json({ error: inputErrors.join("; ") }, { status: 400 });
+    }
+
     const userProviderKeys = await context.runQuery(internal.auth.functions.getDecryptedProviderKeysQuery, { userId });
 
     const execution = await context.runMutation(internal.agent.workflow_executions.create, {
@@ -135,6 +143,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
     // Start streaming execution
     const executeWorkflow = async () => {
         const executionContext: ExecutionContext = {
+            graph: { edges: workflowContent.edges, nodes: workflowContent.nodes },
             nodeOutputs: {},
             variables: variables ?? {},
         };
@@ -490,7 +499,7 @@ const executeAINodeStreaming = async (
         maxOutputTokens: data.maxTokens,
         model: languageModel,
         prompt,
-        system: data.systemPrompt,
+        system: systemPromptFor(node, context),
         temperature: data.temperature,
     });
 
@@ -533,16 +542,16 @@ const executeImageNodeStreaming = async (
         return { output: data.imageUrl ?? "" };
     }
 
-    const inputPrompt = getLastOutput(context);
-    const genPrompt = typeof inputPrompt === "string" ? inputPrompt : data.prompt;
+    const { prompt, referenceImages } = imageRequestArgs(node, context);
 
     const result = await actionContext.runAction(internal.chat.functions.generateImage, {
         imageSize: data.aspectRatio ?? "1:1",
         model: data.model ?? "fal:flux-dev",
         numImages: 1,
-        prompt: genPrompt ?? "",
+        prompt: prompt ?? "",
         threadId: "workflow",
         userId,
+        ...(referenceImages.length > 0 && { referenceImages }),
     });
 
     return { output: result };
@@ -568,10 +577,11 @@ const executeVideoNodeStreaming = async (
     };
 
     const inputValue = getLastOutput(context);
+    const inputs = await videoInputArgs(node, context, actionContext);
 
     // If mode is image-to-video, dispatch to the image-to-video action
     if (data.mode === "image-to-video") {
-        const imageUrl = extractUrl(inputValue, "imageUrl");
+        const imageUrl = inputs.frameUrl ?? extractUrl(inputValue, "imageUrl");
 
         if (!imageUrl) {
             throw new Error("No image input provided for image-to-video mode");
@@ -584,11 +594,13 @@ const executeVideoNodeStreaming = async (
             model: data.model,
             motionStrength: data.motionStrength,
             prompt: data.prompt,
+            referenceAudioUrls: inputs.referenceAudioUrls,
+            referenceVideoUrls: inputs.referenceVideoUrls,
             threadId: "workflow",
             userId,
         });
 
-        return { output: result };
+        return { output: videoNodeOutput(result, data.prompt ?? "") };
     }
 
     // Default: text-to-video mode
@@ -599,11 +611,14 @@ const executeVideoNodeStreaming = async (
         duration: data.duration ?? 5,
         model: data.model ?? "fal:mochi-v1",
         prompt: genPrompt,
+        referenceAudioUrls: inputs.referenceAudioUrls,
+        referenceVideoUrls: inputs.referenceVideoUrls,
+        startFrameUrl: inputs.frameUrl,
         threadId: "workflow",
         userId,
     });
 
-    return { output: result };
+    return { output: videoNodeOutput(result, genPrompt) };
 };
 
 /**
@@ -1044,7 +1059,8 @@ const executeImageToVideoNodeStreaming = async (
     };
 
     const inputValue = getLastOutput(context);
-    const imageUrl = extractUrl(inputValue, "imageUrl");
+    const inputs = await videoInputArgs(node, context, actionContext);
+    const imageUrl = inputs.frameUrl ?? extractUrl(inputValue, "imageUrl");
 
     if (!imageUrl) {
         throw new Error("No image input provided for image-to-video");
@@ -1058,11 +1074,13 @@ const executeImageToVideoNodeStreaming = async (
         model: data.model,
         motionStrength: data.motionStrength,
         prompt: data.prompt,
+        referenceAudioUrls: inputs.referenceAudioUrls,
+        referenceVideoUrls: inputs.referenceVideoUrls,
         threadId: "workflow",
         userId,
     });
 
-    return { output: result };
+    return { output: videoNodeOutput(result, data.prompt ?? "") };
 };
 
 /**

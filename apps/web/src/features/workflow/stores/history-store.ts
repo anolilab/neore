@@ -205,7 +205,8 @@ const commit = (): void => {
     recorder.baseline = next;
 };
 
-const flushPendingCommit = (): void => {
+/** Commits a pending edit now, so the next write starts its own undo step. */
+export const flushPendingHistory = (): void => {
     if (recorder.timer === undefined) {
         return;
     }
@@ -217,7 +218,7 @@ const flushPendingCommit = (): void => {
 /** Runs a store write that must not become an undo step: loads, remote applies, and history restores. */
 export const withoutHistory = (apply: () => void): void => {
     // A local edit still inside the debounce window becomes its own step before the external write.
-    flushPendingCommit();
+    flushPendingHistory();
     recorder.isApplyingExternal = true;
 
     try {
@@ -239,17 +240,17 @@ const applyEntry = (entry: HistoryEntry | null | undefined): void => {
 };
 
 export const undoWorkflow = (): void => {
-    flushPendingCommit();
+    flushPendingHistory();
     applyEntry(useHistoryStore.getState().undo());
 };
 
 export const redoWorkflow = (): void => {
-    flushPendingCommit();
+    flushPendingHistory();
     applyEntry(useHistoryStore.getState().redo());
 };
 
 export const restoreWorkflowEntry = (id: string): void => {
-    flushPendingCommit();
+    flushPendingHistory();
     applyEntry(useHistoryStore.getState().restoreEntry(id));
 };
 

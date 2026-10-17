@@ -19,6 +19,7 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
     const config = NODE_CONFIGS.file;
     const { t } = useLingui();
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const lunora = useLunora();
 
     const onDrop = useCallback(
@@ -30,6 +31,7 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
             }
 
             setIsUploading(true);
+            setUploadError(null);
 
             try {
                 // The same signed-URL upload as a chat attachment, with its limits.
@@ -42,17 +44,13 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
                     fileUrl: result.url,
                 });
             } catch {
-                // Fallback to blob URL if upload fails
-                updateNode(id, {
-                    fileName: file.name,
-                    fileType: file.type,
-                    fileUrl: URL.createObjectURL(file),
-                });
+                // No local fallback: a blob URL is not reachable from another node or a later run.
+                setUploadError(t`This file could not be uploaded. Check its type and size, then try again.`);
+            } finally {
+                setIsUploading(false);
             }
-
-            setIsUploading(false);
         },
-        [id, lunora, updateNode],
+        [id, lunora, t, updateNode],
     );
 
     const { getInputProps, getRootProps, isDragActive } = useDropzone({
@@ -113,6 +111,10 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
                         )}
                     </div>
                 )}
+                {/* Always mounted, so the error is announced when it appears. */}
+                <p aria-live="polite" className="text-destructive mt-1 text-xs" role="status">
+                    {uploadError}
+                </p>
             </div>
         </BaseNode>
     );

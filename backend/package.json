@@ -33,7 +33,8 @@
         "./public-api/scopes": "./lunora/public-api/scopes.ts",
         "./schema": "./lunora/schema.ts",
         "./server": "./lunora/_generated/server.ts",
-        "./skills/markdown": "./lunora/skills/markdown.ts"
+        "./skills/markdown": "./lunora/skills/markdown.ts",
+        "./workflow/mentions": "./lunora/workflow/mentions.ts"
     },
     "scripts": {
         "build": "node scripts/run-then-codegen.mjs lunora build --emit-bindings lunora-bindings.json",

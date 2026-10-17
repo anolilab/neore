@@ -112,14 +112,5 @@ export const buildSkillDownload = async (
     return { blob: await zip.generateAsync({ type: "blob" }), filename: `${exported.slug}.zip` };
 };
 
-/** Saves a blob through a temporary object URL. */
-export const saveBlob = (blob: Blob, filename: string): void => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = filename;
-    link.click();
-    // Revoked on the next task: some browsers start the download asynchronously.
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-};
+// The download helper lives in `@/lib/download`; re-exported for the skill list, which saves through it.
+export { saveBlob } from "@/lib/download";

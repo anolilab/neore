@@ -1,6 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Label } from "@ui/components/label";
-import { Textarea } from "@ui/components/textarea";
 import type { Node, NodeProps } from "@xyflow/react";
 import { Brain } from "lucide-react";
 import { memo } from "react";
@@ -10,6 +9,7 @@ import { ModelPicker } from "@/components/model-picker";
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { AINodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
+import MentionPromptField from "../mention-prompt-field";
 import BaseNode from "./base-node";
 
 const AINodeComponent = (props: NodeProps<Node<AINodeData>>) => {
@@ -38,19 +38,15 @@ const AINodeComponent = (props: NodeProps<Node<AINodeData>>) => {
                     </div>
                 </div>
 
-                <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-system`}>
-                        <Trans>System Prompt (optional)</Trans>
-                    </Label>
-                    <Textarea
-                        className="nodrag min-h-[60px] resize-none text-sm"
-                        id={`${id}-system`}
-                        onChange={(e) => handleSystemPromptChange(e.target.value)}
-                        placeholder={t`Instructions for the AI...`}
-                        rows={2}
-                        value={data.systemPrompt ?? ""}
-                    />
-                </div>
+                <MentionPromptField
+                    height="72px"
+                    hint={<Trans>Type @ to insert the output of a connected text node</Trans>}
+                    label={<Trans>System Prompt (optional)</Trans>}
+                    nodeId={id}
+                    onChange={handleSystemPromptChange}
+                    placeholder={t`Instructions for the AI...`}
+                    value={data.systemPrompt ?? ""}
+                />
             </div>
         </BaseNode>
     );

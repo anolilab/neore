@@ -78,6 +78,7 @@ export {
     MODELS_VERSION,
     MUSIC_CATALOG,
     type Provider,
+    REFERENCE_MEDIA_CAPS,
     type RegistryKey,
     TEXT_CATALOG,
     VIDEO_CATALOG,

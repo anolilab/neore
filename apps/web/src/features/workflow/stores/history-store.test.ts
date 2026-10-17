@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkflowContent, WorkflowNode } from "../types";
-import { HISTORY_DEBOUNCE_MS, MAX_HISTORY_ENTRIES, redoWorkflow, startHistoryRecording, undoWorkflow, useHistoryStore, withoutHistory } from "./history-store";
+import {
+    flushPendingHistory,
+    HISTORY_DEBOUNCE_MS,
+    MAX_HISTORY_ENTRIES,
+    redoWorkflow,
+    startHistoryRecording,
+    undoWorkflow,
+    useHistoryStore,
+    withoutHistory,
+} from "./history-store";
 import { useWorkflowStore } from "./workflow-store";
 
 vi.mock("@lingui/core/macro", () => {
@@ -161,5 +170,22 @@ describe("workflow history recording", () => {
         recording.stop = startHistoryRecording();
 
         expect(useHistoryStore.getState().entries).toHaveLength(0);
+    });
+});
+
+describe("flushPendingHistory", () => {
+    it("turns an edit still inside the debounce window into its own step", () => {
+        const edge = { id: "e1", source: "a", target: "a" };
+
+        useWorkflowStore.getState().setEdges([edge]);
+        flushPendingHistory();
+        useWorkflowStore.getState().setEdges([]);
+        vi.advanceTimersByTime(HISTORY_DEBOUNCE_MS);
+
+        expect(useHistoryStore.getState().entries).toHaveLength(3);
+
+        undoWorkflow();
+
+        expect(useWorkflowStore.getState().edges).toEqual([edge]);
     });
 });

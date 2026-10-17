@@ -176,3 +176,71 @@ export function autoLayout(nodes: WorkflowNode[], edges: WorkflowEdge[], options
         return node;
     });
 }
+
+/**
+ * The nodes a selection-based layout may move: selected, and neither a group nor a grouped child.
+ * A child's position is relative to its group, so moving it would move it out of the group.
+ */
+export const layoutSelection = (nodes: ReadonlyArray<WorkflowNode>): WorkflowNode[] => nodes.filter((n) => n.selected && n.type !== "group" && !n.parentId);
+
+const ARRANGE_GAP = 56;
+
+/**
+ * Arranges the selected nodes into a compact grid, centred on the selection's
+ * bounding-box centre. Returns the same array when fewer than two nodes qualify.
+ */
+export function arrangeSelectedGrid(nodes: WorkflowNode[], gap: number = ARRANGE_GAP): WorkflowNode[] {
+    const selected = layoutSelection(nodes);
+
+    if (selected.length < 2) return nodes;
+
+    const size = (n: WorkflowNode) => {
+        return {
+            height: n.measured?.height ?? n.height ?? DEFAULTS.nodeHeight,
+            width: n.measured?.width ?? n.width ?? DEFAULTS.nodeWidth,
+        };
+    };
+
+    // Reading order: top to bottom, then left to right, filled row by row.
+    const ordered = selected.toSorted((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+    const cols = Math.ceil(Math.sqrt(ordered.length));
+    const rows = Math.ceil(ordered.length / cols);
+    const cells = ordered.map((n, i) => {
+        return { col: i % cols, node: n, row: Math.floor(i / cols), ...size(n) };
+    });
+
+    // Each column is as wide as its widest node, each row as tall as its tallest.
+    const colWidths = Array.from({ length: cols }, (_, c) => Math.max(0, ...cells.filter((cell) => cell.col === c).map((cell) => cell.width)));
+    const rowHeights = Array.from({ length: rows }, (_, r) => Math.max(0, ...cells.filter((cell) => cell.row === r).map((cell) => cell.height)));
+
+    const gridWidth = colWidths.reduce((sum, w) => sum + w, 0) + gap * (cols - 1);
+    const gridHeight = rowHeights.reduce((sum, h) => sum + h, 0) + gap * (rows - 1);
+
+    const bounds = {
+        maxX: Math.max(...selected.map((n) => n.position.x + size(n).width)),
+        maxY: Math.max(...selected.map((n) => n.position.y + size(n).height)),
+        minX: Math.min(...selected.map((n) => n.position.x)),
+        minY: Math.min(...selected.map((n) => n.position.y)),
+    };
+    const originX = (bounds.minX + bounds.maxX) / 2 - gridWidth / 2;
+    const originY = (bounds.minY + bounds.maxY) / 2 - gridHeight / 2;
+
+    const colX = colWidths.map((_, c) => originX + colWidths.slice(0, c).reduce((sum, w) => sum + w + gap, 0));
+    const rowY = rowHeights.map((_, r) => originY + rowHeights.slice(0, r).reduce((sum, h) => sum + h + gap, 0));
+
+    const positions = new Map(
+        cells.map((cell) => [
+            cell.node.id,
+            {
+                x: colX[cell.col]! + (colWidths[cell.col]! - cell.width) / 2,
+                y: rowY[cell.row]! + (rowHeights[cell.row]! - cell.height) / 2,
+            },
+        ]),
+    );
+
+    return nodes.map((node) => {
+        const pos = positions.get(node.id);
+
+        return pos ? { ...node, position: pos } : node;
+    });
+}

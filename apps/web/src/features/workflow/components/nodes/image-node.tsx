@@ -2,7 +2,6 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Input } from "@ui/components/input";
 import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
-import { Textarea } from "@ui/components/textarea";
 import type { Node, NodeProps } from "@xyflow/react";
 import { Image as ImageIcon } from "lucide-react";
 import { memo } from "react";
@@ -11,6 +10,7 @@ import { useWorkflowStore } from "../../stores/workflow-store";
 import type { ImageNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { startImageSelection } from "../../utils/workflow-image";
+import MentionPromptField from "../mention-prompt-field";
 import BaseNode from "./base-node";
 
 const ImageNodeComponent = (props: NodeProps<Node<ImageNodeData>>) => {
@@ -78,19 +78,16 @@ const ImageNodeComponent = (props: NodeProps<Node<ImageNodeData>>) => {
                         )}
                     </div>
                 ) : (
-                    <div className="space-y-1.5">
-                        <Label className="text-muted-foreground text-xs" htmlFor={`${id}-prompt`}>
-                            <Trans>Generation Prompt</Trans>
-                        </Label>
-                        <Textarea
-                            className="nodrag min-h-[60px] resize-none text-sm"
-                            id={`${id}-prompt`}
-                            onChange={(e) => handlePromptChange(e.target.value)}
-                            placeholder={t`Describe the image to generate...`}
-                            rows={2}
-                            value={data.prompt ?? ""}
-                        />
-                    </div>
+                    <MentionPromptField
+                        height="72px"
+                        hint={<Trans>Type @ to refer to a connected text node or image</Trans>}
+                        kinds={["text", "image"]}
+                        label={<Trans>Generation Prompt</Trans>}
+                        nodeId={id}
+                        onChange={handlePromptChange}
+                        placeholder={t`Describe the image to generate...`}
+                        value={data.prompt ?? ""}
+                    />
                 )}
             </div>
         </BaseNode>

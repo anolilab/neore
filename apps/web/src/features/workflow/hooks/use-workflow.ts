@@ -1,5 +1,6 @@
 "use client";
 
+import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -10,6 +11,7 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { withoutHistory } from "../stores/history-store";
 import { useWorkflowStore } from "../stores/workflow-store";
 import type { WorkflowContent } from "../types";
+import { announceRunFinished, requestRunNotificationPermission } from "../utils/run-notification";
 
 // `projectId`/`executionId` reach these hooks as plain strings from the
 // `/workflow/$workflowId` route param and from the workflow store (which only
@@ -146,6 +148,7 @@ export const useAutoSaveWorkflow = (projectId: string | undefined, enabled: bool
  */
 export const useWorkflowExecution = (projectId: string | undefined) => {
     const crpc = useCRPC();
+    const { t } = useLingui();
     const setExecutionStatus = useWorkflowStore((state) => state.setExecutionStatus);
     const setNodeExecutionStatus = useWorkflowStore((state) => state.setNodeExecutionStatus);
     const resetExecution = useWorkflowStore((state) => state.resetExecution);
@@ -168,6 +171,12 @@ export const useWorkflowExecution = (projectId: string | undefined) => {
             if (!projectId || currentNodes.length === 0) {
                 return undefined;
             }
+
+            // Still inside the Run click, before any await: browsers only honour the prompt from a gesture.
+            requestRunNotificationPermission();
+
+            const announceRun = (succeeded: boolean) =>
+                announceRunFinished({ tag: projectId, title: succeeded ? t`Workflow run finished` : t`Workflow run failed` });
 
             // Reset previous execution state
             resetExecution();
@@ -197,17 +206,21 @@ export const useWorkflowExecution = (projectId: string | undefined) => {
                             output: result.outputs?.[node.id],
                         });
                     }
+
+                    announceRun(true);
                 } else {
                     setExecutionStatus("failed");
+                    announceRun(false);
                 }
 
                 return result;
             } catch (error) {
                 setExecutionStatus("failed");
+                announceRun(false);
                 throw error;
             }
         },
-        [projectId, resetExecution, setExecutionStatus, setNodeExecutionStatus],
+        [projectId, resetExecution, setExecutionStatus, setNodeExecutionStatus, t],
     );
 
     return {
