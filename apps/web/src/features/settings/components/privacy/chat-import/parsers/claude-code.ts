@@ -46,7 +46,7 @@ const activeBranch = (events: Record<string, unknown>[]): Record<string, unknown
     for (let node: Record<string, unknown> | undefined = leaf; node && typeof node.uuid === "string" && !onBranch.has(node.uuid);) {
         onBranch.add(node.uuid);
         // A compaction boundary has an empty parentUuid; its old link lives on as logicalParentUuid.
-        const parent = typeof node.parentUuid === "string" && node.parentUuid !== "" ? node.parentUuid : node.logicalParentUuid;
+        const parent: unknown = typeof node.parentUuid === "string" && node.parentUuid !== "" ? node.parentUuid : node.logicalParentUuid;
 
         node = typeof parent === "string" ? byUuid.get(parent) : undefined;
     }

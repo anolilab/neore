@@ -16,6 +16,37 @@ interface ModelComparisonProps {
 }
 
 /** The newest finished run of each model on a dataset, side by side: totals per model, then every case's outcome. */
+
+/**
+ * One header per run. A repeated name gets the smallest "(n)" suffix that no other
+ * header already uses, so a user label such as "GPT (1)" cannot collide with it.
+ */
+const uniqueNames = (bases: string[]): string[] => {
+    const taken = new Set(bases);
+    const seen = new Set<string>();
+
+    return bases.map((base) => {
+        if (!seen.has(base)) {
+            seen.add(base);
+
+            return base;
+        }
+
+        let suffix = 1;
+
+        while (taken.has(`${base} (${suffix})`)) {
+            suffix += 1;
+        }
+
+        const name = `${base} (${suffix})`;
+
+        taken.add(name);
+        seen.add(name);
+
+        return name;
+    });
+};
+
 const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -34,8 +65,7 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
     }
 
     // Two runs can share a model; a number keeps their columns apart.
-    const bases = data.runs.map((run) => run.label ?? run.target.model ?? run.target.kind);
-    const names = bases.map((base, index) => (bases.filter((other) => other === base).length > 1 ? `${base} (${index + 1})` : base));
+    const names = uniqueNames(data.runs.map((run) => run.label ?? run.target.model ?? run.target.kind));
     const outcome = (passed: boolean | null) => {
         if (passed === null) {
             return "—";
@@ -54,6 +84,7 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
                             <TableHead>{t`Model`}</TableHead>
                             <TableHead className="text-right">{t`Passed`}</TableHead>
                             <TableHead className="text-right">{t`Failed`}</TableHead>
+                            <TableHead className="text-right">{t`Errors`}</TableHead>
                             <TableHead className="text-right">{t`Pass rate`}</TableHead>
                             <TableHead className="text-right">{t`Cost`}</TableHead>
                         </TableRow>
@@ -64,6 +95,7 @@ const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
                                 <TableHead scope="row">{names[index]}</TableHead>
                                 <TableCell className="text-right tabular-nums">{run.summary?.passed ?? 0}</TableCell>
                                 <TableCell className="text-right tabular-nums">{(run.summary?.scored ?? 0) - (run.summary?.passed ?? 0)}</TableCell>
+                                <TableCell className="text-right tabular-nums">{run.summary?.errored ?? 0}</TableCell>
                                 <TableCell className="text-right tabular-nums">{formatPercent(run.summary?.passRate)}</TableCell>
                                 <TableCell className="text-right tabular-nums">{formatCost(run.costMicrodollars)}</TableCell>
                             </TableRow>

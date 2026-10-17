@@ -9,7 +9,7 @@ const hasClosedCode = (text: string): boolean => text.split("`").length % 2 === 
  * so the pieces joined back together are exactly `line`. Unlike `splitMessage`,
  * which trims the remainder, this keeps the spaces inside a code line.
  */
-export const splitLossless = (line: string, size: number): string[] => {
+export const splitLossless = (line: string, size: number, inlineCode = true): string[] => {
     const pieces: string[] = [];
     let rest = line;
 
@@ -17,14 +17,14 @@ export const splitLossless = (line: string, size: number): string[] => {
         let cut = rest.lastIndexOf(" ", size);
 
         // Never cut inside an inline code span: step back to an earlier space outside one.
-        while (cut > 0 && !hasClosedCode(rest.slice(0, cut))) {
+        while (inlineCode && cut > 0 && !hasClosedCode(rest.slice(0, cut))) {
             cut = rest.lastIndexOf(" ", cut - 1);
         }
 
         if (cut <= 0) {
             // No space outside a code span fits: close the span at the end of this piece
             // and reopen it at the start of the next, so both still render as code.
-            if (!hasClosedCode(rest.slice(0, size))) {
+            if (inlineCode && !hasClosedCode(rest.slice(0, size))) {
                 pieces.push(`${rest.slice(0, size - 1)}\``);
                 rest = `\`${rest.slice(size - 1)}`;
 
@@ -219,7 +219,8 @@ const splitBlock = (block: Block, limit: number): TelegramChunk[] => {
         if (renderBlock(block, [line]).html.length > limit) {
             // ponytail: an over-long line is cut by source length, not rendered length; a piece Telegram still rejects falls back to plain text
             // Escaping and tags can multiply the length of a line by up to about six, so the source piece is a sixth of the limit.
-            const parts = splitLossless(line, Math.floor(limit / 6));
+            // Inside a fenced block a backtick is literal text, not a code delimiter.
+            const parts = splitLossless(line, Math.floor(limit / 6), !block.code);
 
             for (const part of parts) {
                 pieces.push(renderBlock(block, [part]));

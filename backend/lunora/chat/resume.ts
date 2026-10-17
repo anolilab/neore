@@ -21,11 +21,12 @@ export const latestResumableThread = liteAuthQuery
         const { page } = await ctx.db.threads.findMany({
             limit: RESUME_SCAN_LIMIT,
             orderBy: [{ updatedAt: "desc" }],
-            where: { deleted: false, userId },
+            where: { userId },
         });
 
+        // `deleted` is unset on ordinary inserts, and unset means live (as in the thread list).
         for (const thread of page) {
-            if (thread.status === "archived" || thread.isTemporary) {
+            if (thread.deleted || thread.status === "archived" || thread.isTemporary) {
                 continue;
             }
 
