@@ -3,6 +3,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { SandboxOutputFile, SandboxOutputs, SkippedSandboxFile } from "@neore/chat-ui/types";
 import { formatFileSize, isDocx, isPdf } from "@neore/ui/components/file-renderers/file-type-utilities";
+import { assertOfficeZipWithinLimits } from "@neore/ui/utils/office-zip-limits";
 import { DownloadIcon, EyeIcon, FileArchiveIcon, FileAudioIcon, FileIcon, FileImageIcon, FileSpreadsheetIcon, FileTextIcon, FileVideoIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { Component, lazy, Suspense, useEffect, useState } from "react";
@@ -115,7 +116,11 @@ const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
                     throw new Error(`HTTP ${response.status}`);
                 }
 
-                setState({ blob: await response.blob() });
+                const blob = await response.blob();
+
+                // A small download can expand far past what the browser should parse.
+                assertOfficeZipWithinLimits(await blob.arrayBuffer());
+                setState({ blob });
             } catch {
                 // A timeout shows the failure; an unmount shows nothing.
                 if (!unmounted) {
