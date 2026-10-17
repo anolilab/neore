@@ -4,5 +4,4 @@
  * URL. A page opened with a query (a prompt, a handoff) is not a resume, and any
  * later visit to /chat (New chat, a sidebar link) is not one either.
  */
-export const BOOTED_ON_CHAT_INDEX =
-    globalThis.location !== undefined && /^\/chat\/?$/.test(globalThis.location.pathname) && globalThis.location.search === "";
+export const BOOTED_ON_CHAT_INDEX = globalThis.location !== undefined && /^\/chat\/?$/.test(globalThis.location.pathname) && globalThis.location.search === "";
