@@ -155,6 +155,29 @@ export const parseExportFile = (data: unknown, provider?: ImportProvider): Parse
  * Extract JSON from a file. Handles both direct JSON files
  * and JSON files within ZIP archives.
  */
+/** One JSON record per non-empty line; any damaged line stops the import (see the error). */
+const parseJsonLines = (text: string): unknown[] => {
+    const records: unknown[] = [];
+    const lines = text
+        .split("\n")
+        .map((line, index) => {
+            return { line, number: index + 1 };
+        })
+        .filter(({ line }) => line.trim());
+
+    for (const { line, number } of lines) {
+        try {
+            records.push(JSON.parse(line));
+        } catch {
+            // Any damaged line stops the import: a turn cannot be dropped silently, and a
+            // partial last line is indistinguishable from a complete but corrupt one.
+            throw new ChatImportError(msg`Line ${number} of this transcript is not valid JSON, so the import was stopped.`);
+        }
+    }
+
+    return records;
+};
+
 export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
     const fileName = file.name.toLowerCase();
 
@@ -166,27 +189,7 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
     }
 
     if (fileName.endsWith(".jsonl")) {
-        const records: unknown[] = [];
-
-        const text = await file.text();
-        const lines = text
-            .split("\n")
-            .map((line, index) => {
-                return { line, number: index + 1 };
-            })
-            .filter(({ line }) => line.trim());
-
-        for (const { line, number } of lines) {
-            try {
-                records.push(JSON.parse(line));
-            } catch {
-                // Any damaged line stops the import: a turn cannot be dropped silently, and a
-                // partial last line is indistinguishable from a complete but corrupt one.
-                throw new ChatImportError(msg`Line ${number} of this transcript is not valid JSON, so the import was stopped.`);
-            }
-        }
-
-        return [records];
+        return [parseJsonLines(await file.text())];
     }
 
     if (fileName.endsWith(".zip")) {
@@ -201,7 +204,9 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
                 continue;
             }
 
-            if (!path.toLowerCase().endsWith(".json")) {
+            const lowerPath = path.toLowerCase();
+
+            if (!lowerPath.endsWith(".json") && !lowerPath.endsWith(".jsonl")) {
                 continue;
             }
 
@@ -214,11 +219,14 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
 
             try {
                 const text = await zipEntry.async("text");
-                const parsed = JSON.parse(text);
 
-                jsonFiles.push(parsed);
-            } catch {
-                // Skip unparseable JSON files
+                // A transcript is one array of records, as when it is selected directly.
+                jsonFiles.push(lowerPath.endsWith(".jsonl") ? parseJsonLines(text) : JSON.parse(text));
+            } catch (error) {
+                // A damaged transcript is an error, not a file to skip.
+                if (error instanceof ChatImportError) {
+                    throw error;
+                }
             }
         }
 

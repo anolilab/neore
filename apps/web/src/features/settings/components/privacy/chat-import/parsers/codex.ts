@@ -33,6 +33,17 @@ const eventRole = (type: unknown): NormalizedMessage["role"] | undefined => {
     return type === "agent_message" ? "assistant" : undefined;
 };
 
+/** The text of a `response_item` message: its `input_text` and `output_text` blocks, joined. */
+const responseText = (payload: Record<string, unknown>): string => {
+    const content = Array.isArray(payload.content) ? payload.content : [];
+
+    return content
+        .map((block) => asRecord(block))
+        .flatMap((block) => (block && (block.type === "input_text" || block.type === "output_text") && typeof block.text === "string" ? [block.text] : []))
+        .join("\n\n")
+        .trim();
+};
+
 const parseCodex = (data: unknown): NormalizedConversation[] => {
     if (!Array.isArray(data)) {
         throw new TypeError("Expected an array of rollout records");
@@ -42,15 +53,16 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
     let dropped = 0;
 
     // Current rollouts repeat each turn as a `response_item` message; older ones carry turns only as
-    // `event_msg` messages. Per role: take the `event_msg` copy only where no `response_item` one exists.
-    const responseRoles = new Set<string>();
+    // `event_msg` messages. An `event_msg` turn is skipped only when a `response_item` message with the
+    // same role and text exists, so a prompt with no copy is never lost.
+    const responseTexts = new Set<string>();
 
     for (const raw of data) {
         const record = asRecord(raw);
         const payload = asRecord(record?.payload);
 
         if (record?.type === "response_item" && payload?.type === "message" && typeof payload.role === "string") {
-            responseRoles.add(payload.role);
+            responseTexts.add(`${payload.role}\n${responseText(payload)}`);
         }
     }
 
@@ -60,9 +72,10 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
 
         if (record?.type === "event_msg" && payload) {
             const role = eventRole(payload.type);
+            const text = typeof payload.message === "string" ? payload.message.trim() : "";
             const message =
-                role && !responseRoles.has(role) && typeof payload.message === "string"
-                    ? messageFromTexts([payload.message], role, parseTimestamp(record.timestamp), INJECTED_PREFIXES)
+                role && text && !responseTexts.has(`${role}\n${text}`)
+                    ? messageFromTexts([text], role, parseTimestamp(record.timestamp), INJECTED_PREFIXES)
                     : null;
 
             if (message) {

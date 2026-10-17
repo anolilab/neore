@@ -156,3 +156,18 @@ describe("Codex rollouts mixing both turn formats", () => {
         expect(conversation?.messages[0]?.content).toBe("Summarise the logs");
     });
 });
+
+describe("Codex prompts beside unrelated response items", () => {
+    it("keeps a legacy prompt that has no response-item copy", () => {
+        const rollout = [
+            { payload: { message: "Only as a legacy event", type: "user_message" }, timestamp: "2026-10-01T10:00:00Z", type: "event_msg" },
+            { payload: { content: [{ text: "A different prompt", type: "input_text" }], role: "user", type: "message" }, type: "response_item" },
+        ];
+
+        const [conversation] = parseExportFile(rollout, "codex").conversations;
+
+        // Both are user turns in a row, so the importer merges them into one message.
+        expect(conversation?.messages[0]?.content).toContain("Only as a legacy event");
+        expect(conversation?.messages[0]?.content).toContain("A different prompt");
+    });
+});

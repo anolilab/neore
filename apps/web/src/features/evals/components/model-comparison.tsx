@@ -50,7 +50,10 @@ const uniqueNames = (bases: string[]): string[] => {
 const ModelComparison = ({ datasetId }: ModelComparisonProps) => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const { data, isLoading } = useQuery(crpc.evals.functions.compareModels.queryOptions({ datasetId }));
+    const { data, isLoading } = useQuery(
+        // A heavy aggregate over runs in progress: not live, so each progress write does not re-run it.
+        crpc.evals.functions.compareModels.queryOptions({ datasetId }, { live: false }),
+    );
 
     if (isLoading || !data) {
         return (
