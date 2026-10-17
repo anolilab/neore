@@ -17,6 +17,7 @@ import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { MAX_LENGTH } from "../lib/validators";
 import { patchById } from "../lib/patch";
 
 /** Pending rows one send run takes; the rest wait for the next sweep. */
@@ -50,7 +51,7 @@ export const setTaskEmailEnabled = authMutation
     });
 
 export const loadRecipientEmail = internalQuery
-    .input({ userId: v.string() })
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { userId }, ctx }) => {
         // Checked again here: the setting or the account may have changed after the row was written.
@@ -166,9 +167,14 @@ export const dispatchOutcomeEmails = internalMutation
             }
         }
 
+        // A pending row, or a claim abandoned by a run that died: either needs a send run.
         const { page: pending } = await ctx.db.outcomeEmails.findMany({ limit: 1, where: { status: "pending" } });
+        const { page: abandoned } = await ctx.db.outcomeEmails.findMany({
+            limit: 1,
+            where: { claimedAt: { lt: ctx.now - OUTCOME_CLAIM_RECOVERY_MS }, status: "sending" },
+        });
 
-        if (pending.length > 0) {
+        if (pending.length > 0 || abandoned.length > 0) {
             await ctx.scheduler.runAfter(0, internal.notifications.task_email.sendPendingOutcomeEmails, {});
         }
 
