@@ -48,6 +48,22 @@ const keptTexts = (payload: Record<string, unknown>): string[] => {
 
 const responseText = (payload: Record<string, unknown>): string => keptTexts(payload).join("\n\n").trim();
 
+/**
+ * True when a legacy event is a copy of a response message to skip. Each response message can
+ * account for one copy; a legacy event with no copy left is kept.
+ */
+const consumeCopy = (copies: Map<string, number>, key: string): boolean => {
+    const left = copies.get(key) ?? 0;
+
+    if (left === 0) {
+        return false;
+    }
+
+    copies.set(key, left - 1);
+
+    return true;
+};
+
 const parseCodex = (data: unknown): NormalizedConversation[] => {
     if (!Array.isArray(data)) {
         throw new TypeError("Expected an array of rollout records");
@@ -59,7 +75,8 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
     // Current rollouts repeat each turn as a `response_item` message; older ones carry turns only as
     // `event_msg` messages. An `event_msg` turn is skipped only when a `response_item` message with the
     // same role and text exists, so a prompt with no copy is never lost.
-    const responseTexts = new Set<string>();
+    // Each response-item message can account for one legacy copy of the same role and text, in order.
+    const responseCopies = new Map<string, number>();
 
     for (const raw of data) {
         const record = asRecord(raw);
@@ -70,7 +87,9 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
 
             // Injected context is not kept, so it cannot stand in for the prompt it would have shadowed.
             if (messageFromTexts([text], payload.role, undefined, INJECTED_PREFIXES)) {
-                responseTexts.add(`${payload.role}\n${text}`);
+                const key = `${payload.role}\n${text}`;
+
+                responseCopies.set(key, (responseCopies.get(key) ?? 0) + 1);
             }
         }
     }
@@ -83,7 +102,7 @@ const parseCodex = (data: unknown): NormalizedConversation[] => {
             const role = eventRole(payload.type);
             const text = typeof payload.message === "string" ? payload.message.trim() : "";
             const message =
-                role && text && !responseTexts.has(`${role}\n${text}`)
+                role && text && !consumeCopy(responseCopies, `${role}\n${text}`)
                     ? messageFromTexts([text], role, parseTimestamp(record.timestamp), INJECTED_PREFIXES)
                     : null;
 

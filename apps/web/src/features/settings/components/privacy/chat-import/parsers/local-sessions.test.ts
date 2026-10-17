@@ -211,3 +211,19 @@ describe("merged transcript records", () => {
         expect(conversation?.messages[0]?.createdAt).toBe(Date.parse("2026-10-05T10:00:00Z"));
     });
 });
+
+describe("Codex legacy prompts with a later copy", () => {
+    it("keeps an earlier legacy prompt whose text is repeated later as a response item", () => {
+        const rollout = [
+            { payload: { message: "Run the tests", type: "user_message" }, timestamp: "2026-10-01T10:00:00Z", type: "event_msg" },
+            { payload: { content: [{ text: "Run the tests", type: "input_text" }], role: "user", type: "message" }, type: "response_item" },
+            { payload: { content: [{ text: "Done.", type: "output_text" }], role: "assistant", type: "message" }, type: "response_item" },
+        ];
+
+        const [conversation] = parseExportFile(rollout, "codex").conversations;
+
+        // The legacy event and the response item are one prompt: the copy is skipped, the prompt kept once.
+        expect(conversation?.messages[0]?.content).toContain("Run the tests");
+        expect(conversation?.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
+    });
+});
