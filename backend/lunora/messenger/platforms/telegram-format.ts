@@ -22,6 +22,15 @@ export const splitLossless = (line: string, size: number): string[] => {
         }
 
         if (cut <= 0) {
+            // No space outside a code span fits: close the span at the end of this piece
+            // and reopen it at the start of the next, so both still render as code.
+            if (!hasClosedCode(rest.slice(0, size))) {
+                pieces.push(`${rest.slice(0, size - 1)}\``);
+                rest = `\`${rest.slice(size - 1)}`;
+
+                continue;
+            }
+
             cut = size;
         }
 

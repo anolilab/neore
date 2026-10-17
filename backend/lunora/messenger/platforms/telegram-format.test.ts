@@ -75,11 +75,19 @@ describe("links and code in Telegram output", () => {
         expect(chunk?.html).toBe('<a href="https://en.wikipedia.org/wiki/Function_(mathematics)">article</a>');
     });
 
-    it("never cuts an inline code span when splitting a long line", () => {
+    it("never leaves an inline code span open across a split", () => {
         const line = `${"word ".repeat(30)}\`code span with spaces\` ${"tail ".repeat(20)}`;
 
         for (const piece of splitLossless(line, 40)) {
             expect(piece.split("`").length % 2).toBe(1);
         }
+    });
+
+    it("splits a code span longer than a piece into closed, reopened pieces", () => {
+        const line = `\`${"x".repeat(120)}\``;
+        const pieces = splitLossless(line, 40);
+
+        expect(pieces.every((piece) => piece.length <= 40)).toBe(true);
+        expect(pieces.every((piece) => piece.split("`").length % 2 === 1)).toBe(true);
     });
 });
