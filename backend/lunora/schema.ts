@@ -2515,6 +2515,7 @@ export const schema = defineSchema({
         .index("by_user_and_order", ["userId", "order"])
         // Home's "recent threads" and the Daily Brief's "threads touched since".
         .index("by_user_and_updatedAt", ["userId", "updatedAt"])
+        .index("by_user_and_organization_and_updatedAt", ["userId", "organizationId", "updatedAt"])
         .searchIndex("title", { field: "title", filterFields: ["userId"] })
         .searchIndex("summary", { field: "summary", filterFields: ["userId"] })
         .relations((r) => {

@@ -8272,6 +8272,12 @@
           "optional": false,
           "unique": false
         },
+        "claimedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -8316,6 +8322,13 @@
               "optional": false,
               "unique": false,
               "literal": "\"pending\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"sending\""
             },
             {
               "kind": "literal",
@@ -14320,6 +14333,14 @@
           "fields": [
             "userId",
             "organizationId"
+          ],
+          "unique": false
+        },
+        "by_user_and_organization_and_updatedAt": {
+          "fields": [
+            "userId",
+            "organizationId",
+            "updatedAt"
           ],
           "unique": false
         },

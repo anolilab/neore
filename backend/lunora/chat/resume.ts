@@ -4,9 +4,10 @@
  *
  * Read by activity (`updatedAt`), not the thread list's creation-time page,
  * and branch status is checked per candidate, so a long history cannot hide
- * the thread the user was last in. No index covers (user, organization, team,
- * updatedAt), so the scope is applied while paging; the walk is bounded by
- * `scanPages`' page budget, not by a fixed thread count.
+ * the thread the user was last in. `by_user_and_organization_and_updatedAt`
+ * reads only the active workspace's threads, so other workspaces never count
+ * against the walk. The team is not an index column (it is optional in the
+ * sidebar scope), so it is checked per candidate under `scanPages`' page budget.
  */
 import { v } from "lunorash/server";
 
@@ -34,7 +35,8 @@ export const latestResumableThread = liteAuthQuery
                     cursor,
                     limit: PAGE_SIZE,
                     orderBy: [{ updatedAt: "desc" }],
-                    where: { userId },
+                    // `null` is the personal space, an unset column.
+                    where: { organizationId: args.organizationId === null ? { isNull: true } : args.organizationId, userId },
                 }),
             async (thread) => {
                 // `deleted` is unset on ordinary inserts, and unset means live (as in the thread list).
@@ -44,7 +46,7 @@ export const latestResumableThread = liteAuthQuery
                     return false;
                 }
 
-                if ((thread.organizationId ?? null) !== args.organizationId || (args.teamId !== undefined && thread.teamId !== args.teamId)) {
+                if (args.teamId !== undefined && thread.teamId !== args.teamId) {
                     return false;
                 }
 
