@@ -36,7 +36,7 @@ describe("sendTelegramMessage with an empty reply", () => {
     it("reports nothing sent when there is nothing to send", async () => {
         fetchWithDeadline.mockReset();
 
-        await expect(sendTelegramMessage("token", 1, "   ")).resolves.toBe(false);
+        await expect(sendTelegramMessage("token", 1, " ".repeat(3))).resolves.toBe(false);
         expect(fetchWithDeadline).not.toHaveBeenCalled();
     });
 });

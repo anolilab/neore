@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
