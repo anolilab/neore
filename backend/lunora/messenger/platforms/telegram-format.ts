@@ -164,7 +164,6 @@ const renderLine = (line: string): string => {
     return inline(line.replace(BULLET, "$1• "));
 };
 
-/** Blocks are fenced code (kept whole) and runs of lines between blank lines. */
 /**
  * A closing fence is a line of backticks and nothing else, at least as long as the opening
  * fence: a shorter run inside a longer block is code, not the end of it.
@@ -179,6 +178,7 @@ const LEADING_BACKTICKS = /^`+/;
 
 const fenceLength = (line: string): number => line.trimStart().length - line.trimStart().replace(LEADING_BACKTICKS, "").length;
 
+/** Blocks are fenced code (kept whole) and runs of lines between blank lines. */
 const toBlocks = (markdown: string): Block[] => {
     const blocks: Block[] = [];
     let current: string[] = [];
@@ -244,7 +244,6 @@ const renderBlock = (block: Block, lines: string[]): TelegramChunk =>
         ? { html: `<pre>${escapeHtml(lines.join("\n"))}</pre>`, source: `${openFence(block)}${lines.join("\n")}${closeFence(block)}` }
         : { html: lines.map((line) => renderLine(line)).join("\n"), source: lines.join("\n") };
 
-/** Pieces of one block, each rendering to at most `limit` characters. */
 /** The join before a block: its blank lines, and at least one blank line between blocks. */
 const blankGap = (block: Block): string => "\n".repeat(Math.max(1, block.blanks) + 1);
 
@@ -255,6 +254,7 @@ const renderPart = (block: Block, lines: string[]): TelegramChunk => {
     return block.code ? { ...rendered, source: lines.join("\n") } : rendered;
 };
 
+/** Pieces of one block, each rendering to at most `limit` characters. */
 const splitBlock = (block: Block, limit: number): Piece[] => {
     const whole = renderBlock(block, block.lines);
 
