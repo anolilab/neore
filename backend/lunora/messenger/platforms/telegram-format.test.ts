@@ -49,6 +49,37 @@ describe("formatTelegramMessage", () => {
     });
 });
 
+describe("plain-text source of a split code block", () => {
+    const codeLines = Array.from({ length: 60 }, (_, index) => `${String(index).padStart(2, "0")} ${"x".repeat(37)}`);
+
+    it("reproduces the original fenced block, fenced once", () => {
+        const original = `\`\`\`\n${codeLines.join("\n")}\n\`\`\``;
+        const chunks = formatTelegramMessage(original, 300);
+
+        expect(chunks.length).toBeGreaterThan(2);
+        expect(chunks.map((chunk) => chunk.source).join("\n")).toBe(original);
+    });
+
+    it("keeps the language tag on the opening fence only", () => {
+        const original = `\`\`\`ts\n${codeLines.join("\n")}\n\`\`\``;
+        const joined = formatTelegramMessage(original, 300)
+            .map((chunk) => chunk.source)
+            .join("\n");
+
+        expect(joined).toBe(original);
+        expect(joined.split("```")).toHaveLength(3);
+    });
+
+    it("does not close a fence the reply left open", () => {
+        const original = `\`\`\`ts\n${codeLines.join("\n")}`;
+        const joined = formatTelegramMessage(original, 300)
+            .map((chunk) => chunk.source)
+            .join("\n");
+
+        expect(joined).toBe(original);
+    });
+});
+
 describe("splitLossless", () => {
     it("keeps every character, including the spaces at each cut", () => {
         const line = "const   value = compute(alpha,  beta,   gamma, delta, epsilon, zeta, eta, theta)";
