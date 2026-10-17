@@ -1,6 +1,6 @@
 {
     "name": "@neore/native",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "private": true,
     "description": "Tauri v2 desktop and mobile shell around the deployed Neore web app",
     "type": "module",
