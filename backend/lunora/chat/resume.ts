@@ -4,24 +4,18 @@
  *
  * Read by activity (`updatedAt`), not the thread list's creation-time page,
  * and branch status is checked per candidate, so a long history cannot hide
- * the thread the user was last in.
+ * the thread the user was last in. No index covers (user, organization, team,
+ * updatedAt), so the scope is applied while paging; the walk is bounded by
+ * `scanPages`' page budget, not by a fixed thread count.
  */
 import { v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
 import { liteAuthQuery } from "../lib/crpc";
+import { scanPages } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
 
-/** Threads read per page, and the most threads a resume will look through. */
-const PAGE_SIZE = 50;
-
-/** The fields a resume reads from each thread, and the page cursor. */
-interface ScanPage {
-    continueCursor: string | null;
-    isDone: boolean;
-    page: { _id: Id<"threads">; deleted?: boolean; isTemporary?: boolean; organizationId?: string; status: string; teamId?: string }[];
-}
-const MAX_THREADS_SCANNED = 500;
+/** Threads read per page. */
+const PAGE_SIZE = 100;
 
 export const latestResumableThread = liteAuthQuery
     .input({
@@ -32,41 +26,37 @@ export const latestResumableThread = liteAuthQuery
     .output(v.union(v.string(), v.null()))
     .query(async ({ args, ctx }): Promise<string | null> => {
         const { userId } = ctx.user;
-        let cursor: string | null = null;
+        let found: string | null = null;
 
-        for (let scanned = 0; scanned < MAX_THREADS_SCANNED; scanned += PAGE_SIZE) {
-            const threads: ScanPage = await ctx.db.threads.findMany({
-                cursor,
-                limit: PAGE_SIZE,
-                orderBy: [{ updatedAt: "desc" }],
-                where: { userId },
-            });
-
-            // `deleted` is unset on ordinary inserts, and unset means live (as in the thread list).
-            for (const thread of threads.page) {
+        await scanPages(
+            async (cursor) =>
+                await ctx.db.threads.findMany({
+                    cursor,
+                    limit: PAGE_SIZE,
+                    orderBy: [{ updatedAt: "desc" }],
+                    where: { userId },
+                }),
+            async (thread) => {
+                // `deleted` is unset on ordinary inserts, and unset means live (as in the thread list).
                 // Archived is the only status that is not live: a thread streaming a reply or one whose last run
                 // failed is still the user's latest chat.
                 if (thread.deleted || thread.status === "archived" || thread.isTemporary) {
-                    continue;
+                    return false;
                 }
 
                 if ((thread.organizationId ?? null) !== args.organizationId || (args.teamId !== undefined && thread.teamId !== args.teamId)) {
-                    continue;
+                    return false;
                 }
 
-                const branch = await ctx.db.threadRelationships.findFirst({ where: { threadId: thread._id } });
-
-                if (!branch) {
-                    return thread._id as string;
+                if (await ctx.db.threadRelationships.findFirst({ where: { threadId: thread._id } })) {
+                    return false;
                 }
-            }
 
-            if (threads.isDone || !threads.continueCursor) {
-                break;
-            }
+                found = thread._id as string;
 
-            cursor = threads.continueCursor;
-        }
+                return true;
+            },
+        );
 
-        return null;
+        return found;
     });

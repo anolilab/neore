@@ -48,17 +48,15 @@ import {
     vJudgeVerdict,
     vRetrievalMetrics,
 } from "./validators";
+import { scanPages, type ScanPage } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
 
 /** Runs listed per dataset, newest first. */
 const MAX_RUNS_LISTED = 50;
 
 const MAX_COMPARED_MODELS = 6;
-/**
- * How far back the comparison looks for each model's newest finished run. Ceiling: a
- * dataset with more runs than this in its history can hide an older model.
- */
-const MAX_RUNS_SCANNED_FOR_COMPARISON = 500;
+/** Runs read per page while looking for each target's newest finished run. */
+const COMPARISON_PAGE_SIZE = 100;
 
 /** Knowledge files one run may be restricted to. */
 const MAX_TARGET_FILES = 50;
@@ -938,20 +936,29 @@ export const compareModels = authQuery
     .query(async ({ args, ctx }) => {
         const { userId } = ctx.user;
         const dataset = await requireOwnedDataset(ctx, args.datasetId, userId);
-        const recent = await ctx.db
-            .query("evalRuns")
-            .withIndex("by_dataset_and_createdAt", (q) => q.eq("datasetId", dataset._id))
-            .order("desc")
-            .take(MAX_RUNS_SCANNED_FOR_COMPARISON);
         const newestPerTarget = new Map<string, Doc<"evalRuns">>();
 
-        for (const run of recent) {
-            const key = comparisonKey(run.target);
+        // Newest first, so the first finished run seen per target is its newest. The walk has no
+        // fixed run count (a target's last run may sit under hundreds of newer ones); only
+        // `scanPages`' page budget bounds it. It does not stop at MAX_COMPARED_MODELS targets
+        // because `omittedTargets` counts the rest.
+        await scanPages(
+            async (cursor) =>
+                (await ctx.db
+                    .query("evalRuns")
+                    .withIndex("by_dataset_and_createdAt", (q) => q.eq("datasetId", dataset._id))
+                    .order("desc")
+                    .paginate({ cursor, numItems: COMPARISON_PAGE_SIZE })) as ScanPage<Doc<"evalRuns">>,
+            (run) => {
+                const key = comparisonKey(run.target);
 
-            if (run.userId === userId && (run.status === "completed" || run.status === "cost_capped") && !newestPerTarget.has(key)) {
-                newestPerTarget.set(key, run);
-            }
-        }
+                if (run.userId === userId && (run.status === "completed" || run.status === "cost_capped") && !newestPerTarget.has(key)) {
+                    newestPerTarget.set(key, run);
+                }
+
+                return false;
+            },
+        );
 
         const allRuns = [...newestPerTarget.values()];
         const runs = allRuns.slice(0, MAX_COMPARED_MODELS);
