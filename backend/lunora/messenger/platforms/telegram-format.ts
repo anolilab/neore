@@ -62,6 +62,8 @@ interface Block {
     /** False for a fence the reply never closed: the plain source must not gain a closing fence. */
     closed?: boolean;
     code: boolean;
+    /** The opening fence's backtick count: a longer fence can hold a shorter one as code. */
+    fence?: number;
     /** The language tag on a fenced block's opening line, kept for the plain-text retry. */
     info?: string;
     lines: string[];
@@ -217,7 +219,7 @@ const toBlocks = (markdown: string): Block[] => {
     for (const line of markdown.split("\n")) {
         if (fence) {
             if (isClosingFence(line, openLength)) {
-                blocks.push({ blanks: fenceBlanks, closed: true, code: true, info: fenceInfo, lines: fence });
+                blocks.push({ blanks: fenceBlanks, closed: true, code: true, fence: openLength, info: fenceInfo, lines: fence });
                 fence = undefined;
             } else {
                 fence.push(line);
@@ -243,7 +245,7 @@ const toBlocks = (markdown: string): Block[] => {
     }
 
     if (fence) {
-        blocks.push({ blanks: fenceBlanks, code: true, info: fenceInfo, lines: fence });
+        blocks.push({ blanks: fenceBlanks, code: true, fence: openLength, info: fenceInfo, lines: fence });
     }
 
     flush();
@@ -251,8 +253,8 @@ const toBlocks = (markdown: string): Block[] => {
     return blocks;
 };
 
-const openFence = (block: Block): string => `\`\`\`${block.info ?? ""}\n`;
-const closeFence = (block: Block): string => (block.closed ? "\n```" : "");
+const openFence = (block: Block): string => `${"`".repeat(block.fence ?? 3)}${block.info ?? ""}\n`;
+const closeFence = (block: Block): string => (block.closed ? `\n${"`".repeat(block.fence ?? 3)}` : "");
 
 const renderBlock = (block: Block, lines: string[]): TelegramChunk =>
     block.code

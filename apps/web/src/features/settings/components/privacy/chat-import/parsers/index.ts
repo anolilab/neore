@@ -228,10 +228,8 @@ export const extractJsonFromFile = async (file: File): Promise<unknown[]> => {
             }
         }
 
-        if (jsonFiles.length === 0) {
-            throw new ChatImportError(msg`No valid JSON conversation files found in the ZIP archive.`);
-        }
-
+        // An archive with no conversation files yields nothing; the selection's other files still import,
+        // and a selection with nothing to import reports "No conversations found".
         return jsonFiles;
     }
 

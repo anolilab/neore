@@ -96,6 +96,17 @@ const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | unde
 
 const PPTX_FETCH_TIMEOUT_MS = 30_000;
 
+/** Announced to assistive technology while a preview is still loading. */
+const PreviewLoading: FC = () => {
+    const { t } = useLingui();
+
+    return (
+        <p className="text-muted-foreground p-3 text-sm" role="status">
+            {t`Loading preview…`}
+        </p>
+    );
+};
+
 const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
     const { t } = useLingui();
     const [state, setState] = useState<{ blob?: Blob; failed?: boolean }>({});
@@ -148,7 +159,7 @@ const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
         );
     }
 
-    return state.blob ? <PptxPreview data={state.blob} fileName={name} /> : null;
+    return state.blob ? <PptxPreview data={state.blob} fileName={name} /> : <PreviewLoading />;
 };
 
 /**
@@ -184,7 +195,7 @@ const OfficePreview: FC<{ file: SandboxOutputFile; kind: OfficeKind }> = ({ file
     return (
         <div className="border-border mt-2 max-h-[32rem] overflow-auto rounded-lg border">
             <PreviewBoundary fallback={t`This preview could not be loaded.`}>
-                <Suspense fallback={null}>
+                <Suspense fallback={<PreviewLoading />}>
                     {kind === "pdf" && <PdfViewer filename={file.name} url={file.url} />}
                     {kind === "docx" && <DocxPreview filename={file.name} url={file.url} />}
                     {kind === "pptx" && <PptxFromUrl name={file.name} url={file.url} />}

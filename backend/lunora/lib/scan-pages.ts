@@ -39,6 +39,10 @@ export const scanPages = async <T>(
             return false;
         }
 
+        if (result.continueCursor === cursor) {
+            throw new Error("scanPages: the continuation cursor did not advance");
+        }
+
         cursor = result.continueCursor;
     }
 

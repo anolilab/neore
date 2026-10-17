@@ -262,3 +262,12 @@ describe("malformed links", () => {
         expect(Date.now() - started).toBeLessThan(2000);
     });
 });
+
+describe("fence length", () => {
+    it("keeps a four-backtick fence as four backticks in the plain source", () => {
+        const [chunk] = formatTelegramMessage("````\n```\ninner\n```\n````");
+
+        expect(chunk?.source.startsWith("````\n")).toBe(true);
+        expect(chunk?.source.endsWith("\n````")).toBe(true);
+    });
+});
