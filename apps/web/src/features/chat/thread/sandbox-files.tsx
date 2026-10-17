@@ -3,8 +3,22 @@
 import { useLingui } from "@lingui/react/macro";
 import type { SandboxOutputFile, SandboxOutputs, SkippedSandboxFile } from "@neore/chat-ui/types";
 import { formatFileSize } from "@neore/ui/components/file-renderers/file-type-utilities";
-import { DownloadIcon, FileArchiveIcon, FileAudioIcon, FileIcon, FileImageIcon, FileSpreadsheetIcon, FileTextIcon, FileVideoIcon } from "lucide-react";
+import { DownloadIcon, EyeIcon, FileArchiveIcon, FileAudioIcon, FileIcon, FileImageIcon, FileSpreadsheetIcon, FileTextIcon, FileVideoIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
+
+const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer"));
+const DocxPreview = lazy(() => import("@neore/ui/components/file-renderers/docx-preview"));
+const PptxPreview = lazy(() =>
+    import("@neore/ui/components/file-renderers/pptx-preview").then((m) => {
+        return { default: m.PptxPreview };
+    }),
+);
+const XlsxRenderer = lazy(() =>
+    import("@neore/ui/components/spreadsheet/xlsx-renderer").then((m) => {
+        return { default: m.XlsxRenderer };
+    }),
+);
 
 /**
  * Files a code-execution or shell run saved to its output directory. Each
@@ -55,10 +69,64 @@ const fileIcon = (mediaType: string): ReactNode => {
     return <FileIcon aria-hidden className={ICON_CLASS} />;
 };
 
+type OfficeKind = "docx" | "pdf" | "pptx" | "xlsx";
+
+const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | undefined => {
+    const extension = name.split(".").pop()?.toLowerCase();
+
+    if (mediaType === "application/pdf" || extension === "pdf") {
+        return "pdf";
+    }
+
+    if (mediaType.includes("wordprocessingml") || extension === "docx") {
+        return "docx";
+    }
+
+    if (mediaType.includes("presentationml") || extension === "pptx") {
+        return "pptx";
+    }
+
+    if (mediaType.includes("spreadsheetml") || extension === "xlsx") {
+        return "xlsx";
+    }
+
+    return undefined;
+};
+
+const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
+    const [data, setData] = useState<Blob>();
+
+    useEffect(() => {
+        const controller = new AbortController();
+
+        fetch(url, { signal: controller.signal })
+            .then(async (response) => response.blob())
+            .then(setData)
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [url]);
+
+    return data ? <PptxPreview data={data} fileName={name} /> : null;
+};
+
+const OfficePreview: FC<{ file: SandboxOutputFile; kind: OfficeKind }> = ({ file, kind }) => (
+    <div className="border-border mt-2 max-h-[32rem] overflow-auto rounded-lg border">
+        <Suspense fallback={null}>
+            {kind === "pdf" && <PdfViewer filename={file.name} url={file.url} />}
+            {kind === "docx" && <DocxPreview filename={file.name} url={file.url} />}
+            {kind === "pptx" && <PptxFromUrl name={file.name} url={file.url} />}
+            {kind === "xlsx" && <XlsxRenderer fileName={file.name} source={file.url} />}
+        </Suspense>
+    </div>
+);
+
 const SandboxFileChip: FC<{ file: SandboxOutputFile }> = ({ file }) => {
     const { t } = useLingui();
     const { name } = file;
     const size = formatFileSize(file.size);
+    const [isPreviewing, setIsPreviewing] = useState(false);
+    const kind = officeKindOf(file);
     const body = (
         <>
             {fileIcon(file.mediaType)}
@@ -79,18 +147,32 @@ const SandboxFileChip: FC<{ file: SandboxOutputFile }> = ({ file }) => {
     }
 
     return (
-        <li className="max-w-full">
-            <a
-                aria-label={t`Download ${name} (${size})`}
-                className="border-border hover:bg-muted flex max-w-full items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
-                download={file.name}
-                href={file.url}
-                rel="noopener noreferrer"
-                target="_blank"
-            >
-                {body}
-                <DownloadIcon aria-hidden className="text-muted-foreground size-3.5 shrink-0" />
-            </a>
+        <li className={isPreviewing ? "w-full" : "max-w-full"}>
+            <div className="flex max-w-full items-center gap-1">
+                <a
+                    aria-label={t`Download ${name} (${size})`}
+                    className="border-border hover:bg-muted flex max-w-full items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                    download={file.name}
+                    href={file.url}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                >
+                    {body}
+                    <DownloadIcon aria-hidden className="text-muted-foreground size-3.5 shrink-0" />
+                </a>
+                {kind && (
+                    <button
+                        aria-expanded={isPreviewing}
+                        aria-label={t`Preview ${name}`}
+                        className="border-border hover:bg-muted rounded-lg border p-2 transition-colors"
+                        onClick={() => setIsPreviewing((previous) => !previous)}
+                        type="button"
+                    >
+                        <EyeIcon aria-hidden className="size-4" />
+                    </button>
+                )}
+            </div>
+            {kind && isPreviewing && <OfficePreview file={file} kind={kind} />}
         </li>
     );
 };
