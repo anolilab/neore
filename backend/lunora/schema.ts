@@ -2779,6 +2779,8 @@ export const schema = defineSchema({
         nickname: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
         profession: v.optional(v.string()),
+        // Opt-in: opening /chat lands on the most recent thread. Absent = off.
+        resumeLastChat: v.optional(v.boolean()),
         sendBehavior: v.optional(v.string()),
         temporaryChatRetentionHours: v.optional(v.number()),
         timezone: v.optional(v.string()),

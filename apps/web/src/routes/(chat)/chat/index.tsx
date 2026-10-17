@@ -1,12 +1,17 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
-import { createFileRoute, useLocation, useRouteContext } from "@tanstack/react-router";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { createFileRoute, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import Assistant from "@/features/chat/assistant";
+import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
+import { pickResumeThreadId } from "@/features/chat/core/utils/resume-thread";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 const ChatPage = () => {
     const route = "/(chat)/chat/";
@@ -18,6 +23,13 @@ const ChatPage = () => {
     const { t } = useLingui();
     const shownNotificationRef = useRef<string | undefined>(undefined);
     const initialMessageReadRef = useRef(false);
+    const navigate = useNavigate();
+    const crpc = useCRPC();
+    const { data: userSettings } = useUserSettings();
+    const resumeLastChat = userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage;
+    const { data: listData } = useQuery(
+        crpc.chat.composite.getThreadListData.queryOptions(resumeLastChat ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS } : skipToken),
+    );
 
     const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
 
@@ -40,6 +52,19 @@ const ChatPage = () => {
         initialMessageReadRef.current = true;
         setInitialMessage(message);
     }, [hasInitialMessage]);
+
+    useEffect(() => {
+        if (!resumeLastChat || !listData) {
+            return;
+        }
+
+        const branchIds = new Set(listData.relationships.map((relationship) => relationship.threadId));
+        const threadId = pickResumeThreadId(listData.threads.page, branchIds);
+
+        if (threadId) {
+            void navigate({ params: { threadId }, replace: true, search: { initialMessage: undefined }, to: "/chat/$threadId" });
+        }
+    }, [listData, navigate, resumeLastChat]);
 
     useEffect(() => {
         if (!redirectReason || shownNotificationRef.current === redirectReason) {

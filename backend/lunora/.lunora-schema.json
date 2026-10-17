@@ -15821,6 +15821,12 @@
           "optional": true,
           "unique": false
         },
+        "resumeLastChat": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "sendBehavior": {
           "kind": "string",
           "nullable": false,
