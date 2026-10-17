@@ -27,6 +27,9 @@ import { Document, Page, pdfjs } from "react-pdf";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+// A stalled signed-URL request must not leave the spinner up forever.
+const PDF_LOAD_TIMEOUT_MS = 30_000;
+
 export interface PdfViewerProps {
     className?: string;
     filename?: string;
@@ -36,6 +39,7 @@ export interface PdfViewerProps {
 const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
     const { t } = useLingui();
     const [numberPages, setNumberPages] = useState<number>(0);
+    const [loadState, setLoadState] = useState<"failed" | "loaded" | "loading">("loading");
     const [pageNumber, setPageNumber] = useState(1);
     const [scale, setScale] = useState(1);
     const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
@@ -43,7 +47,21 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
 
     const onDocumentLoadSuccess = useCallback(({ numPages: total }: { numPages: number }) => {
         setNumberPages(total);
+        setLoadState("loaded");
     }, []);
+
+    const onDocumentLoadError = useCallback(() => setLoadState("failed"), []);
+
+    // A new file starts loading again; a file still loading at the deadline is reported as failed.
+    useEffect(() => {
+        setLoadState("loading");
+
+        const deadline = setTimeout(() => {
+            setLoadState((state) => (state === "loading" ? "failed" : state));
+        }, PDF_LOAD_TIMEOUT_MS);
+
+        return () => clearTimeout(deadline);
+    }, [url]);
 
     useEffect(() => {
         if (!containerRef.current) {
@@ -126,19 +144,27 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
 
             {/* PDF Content */}
             <div className="overflow-auto bg-gray-100 p-4 dark:bg-gray-900" ref={containerRef} style={{ maxHeight: "600px" }}>
-                <Document
-                    file={url}
-                    loading={
-                        <div className="flex items-center justify-center py-12">
-                            <ZoomIn className="text-muted-foreground size-6 animate-pulse" />
-                        </div>
-                    }
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    // react-pdf 11 suspends by default; keep the inline `loading` UI instead.
-                    suspense={false}
-                >
-                    <Page pageNumber={pageNumber} renderAnnotationLayer renderTextLayer width={pageWidth} />
-                </Document>
+                {loadState === "failed" ? (
+                    <p className="text-muted-foreground py-12 text-center text-sm" role="status">
+                        {t`This preview could not be loaded.`}
+                    </p>
+                ) : (
+                    <Document
+                        file={url}
+                        loading={
+                            <div className="flex items-center justify-center py-12" role="status">
+                                <ZoomIn aria-hidden="true" className="text-muted-foreground size-6 animate-pulse" />
+                                <span className="sr-only">{t`Loading preview…`}</span>
+                            </div>
+                        }
+                        onLoadError={onDocumentLoadError}
+                        onLoadSuccess={onDocumentLoadSuccess}
+                        // react-pdf 11 suspends by default; keep the inline `loading` UI instead.
+                        suspense={false}
+                    >
+                        <Page pageNumber={pageNumber} renderAnnotationLayer renderTextLayer width={pageWidth} />
+                    </Document>
+                )}
             </div>
         </div>
     );
