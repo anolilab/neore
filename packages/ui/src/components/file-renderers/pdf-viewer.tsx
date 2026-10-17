@@ -45,23 +45,34 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
     const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    const loadDeadlineRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    // Measures inactivity, not total time: every progress report restarts the deadline, so a large file still arriving is not failed.
+    const armLoadDeadline = useCallback(() => {
+        clearTimeout(loadDeadlineRef.current);
+        loadDeadlineRef.current = setTimeout(() => {
+            setLoadState((state) => (state === "loading" ? "failed" : state));
+        }, PDF_LOAD_TIMEOUT_MS);
+    }, []);
+
     const onDocumentLoadSuccess = useCallback(({ numPages: total }: { numPages: number }) => {
+        clearTimeout(loadDeadlineRef.current);
         setNumberPages(total);
         setLoadState("loaded");
     }, []);
 
-    const onDocumentLoadError = useCallback(() => setLoadState("failed"), []);
+    const onDocumentLoadError = useCallback(() => {
+        clearTimeout(loadDeadlineRef.current);
+        setLoadState("failed");
+    }, []);
 
-    // A new file starts loading again; a file still loading at the deadline is reported as failed.
+    // A new file starts loading again.
     useEffect(() => {
         setLoadState("loading");
+        armLoadDeadline();
 
-        const deadline = setTimeout(() => {
-            setLoadState((state) => (state === "loading" ? "failed" : state));
-        }, PDF_LOAD_TIMEOUT_MS);
-
-        return () => clearTimeout(deadline);
-    }, [url]);
+        return () => clearTimeout(loadDeadlineRef.current);
+    }, [armLoadDeadline, url]);
 
     useEffect(() => {
         if (!containerRef.current) {
@@ -158,6 +169,7 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
                             </div>
                         }
                         onLoadError={onDocumentLoadError}
+                        onLoadProgress={armLoadDeadline}
                         onLoadSuccess={onDocumentLoadSuccess}
                         // react-pdf 11 suspends by default; keep the inline `loading` UI instead.
                         suspense={false}

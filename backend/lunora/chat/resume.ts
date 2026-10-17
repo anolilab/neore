@@ -11,6 +11,7 @@
  */
 import { v } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
 import { liteAuthQuery } from "../lib/crpc";
 import { scanPages } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
@@ -28,10 +29,12 @@ export const latestResumableThread = liteAuthQuery
     .query(async ({ args, ctx }): Promise<string | null> => {
         const { userId } = ctx.user;
         let found: string | null = null;
+        // The page's threads that are branches: one lookup per page, not one per thread.
+        let branchIds = new Set<string>();
 
         await scanPages(
-            async (cursor) =>
-                await ctx.db.threads.findMany({
+            async (cursor) => {
+                const threads = await ctx.db.threads.findMany({
                     cursor,
                     limit: PAGE_SIZE,
                     orderBy: [{ updatedAt: "desc" }],
@@ -50,10 +53,19 @@ export const latestResumableThread = liteAuthQuery
                             ...(args.teamId === undefined ? [] : [{ teamId: args.teamId }]),
                         ],
                     },
-                }),
+                });
+
+                // No limit: the lookup is bounded by the page's thread ids, and a thread may have several rows.
+                const ids = threads.page.map((thread) => thread._id as Id<"threads">);
+                const relationships = ids.length === 0 ? { page: [] } : await ctx.db.threadRelationships.findMany({ where: { threadId: { in: ids } } });
+
+                branchIds = new Set(relationships.page.map((relationship) => relationship.threadId as string));
+
+                return threads;
+            },
             async (thread) => {
                 // A branch is not a chat of its own: its parent is listed instead.
-                if (await ctx.db.threadRelationships.findFirst({ where: { threadId: thread._id } })) {
+                if (branchIds.has(thread._id as string)) {
                     return false;
                 }
 

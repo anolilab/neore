@@ -55,6 +55,28 @@ describe("latestResumableThread", () => {
         }
     });
 
+    it("skips a newer branch and returns the chat it branched from", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const target = await harness.run(async (context: any) => {
+                const base = { model: "m", status: "active", userId: OWNER };
+                const parent = await context.db.insert("threads", { ...base, title: "parent", updatedAt: 1 });
+                const branch = await context.db.insert("threads", { ...base, title: "branch", updatedAt: 2 });
+
+                await context.db.insert("threadRelationships", { branchType: "branch", createdAt: 2, parentThreadId: parent, threadId: branch, userId: OWNER });
+
+                return parent;
+            });
+
+            const result = await harness.withIdentity({ userId: OWNER }).query(latestResumableThread as never, { organizationId: null } as never);
+
+            expect(result).toBe(target);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("finds a thread more than 500 threads down, past other workspaces", async () => {
         const harness = lunoraTest(schema as never);
 
