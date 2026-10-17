@@ -73,9 +73,13 @@ const countInflatedBytes = async (data: Uint8Array<ArrayBuffer>, method: number,
 export const assertOfficeZipWithinLimits = async (buffer: ArrayBuffer, limits: OfficeZipLimits = DEFAULT_LIMITS): Promise<void> => {
     const view = new DataView(buffer);
     const lowest = Math.max(0, buffer.byteLength - EOCD_MIN_LENGTH - MAX_ZIP_COMMENT);
+    // A comment may itself contain the signature bytes, so the record is the one whose comment length
+    // reaches exactly to the end of the buffer.
+    const isEndRecordAt = (at: number): boolean =>
+        view.getUint32(at, true) === EOCD_SIGNATURE && view.getUint16(at + 20, true) === buffer.byteLength - at - EOCD_MIN_LENGTH;
     let eocd = buffer.byteLength - EOCD_MIN_LENGTH;
 
-    while (eocd >= lowest && view.getUint32(eocd, true) !== EOCD_SIGNATURE) {
+    while (eocd >= lowest && !isEndRecordAt(eocd)) {
         eocd -= 1;
     }
 

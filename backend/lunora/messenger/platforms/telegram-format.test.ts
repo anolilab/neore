@@ -22,6 +22,10 @@ describe("formatTelegramMessage", () => {
         expect(html("**[bold link](https://a.test)**")).toBe('<b><a href="https://a.test">bold link</a></b>');
     });
 
+    it("keeps reply text that looks like a link slot, next to a real link", () => {
+        expect(html("[x](https://a.test) \uE0000\uE001")).toBe('<a href="https://a.test">x</a> \uE0000\uE001');
+    });
+
     it("leaves markdown inside code untouched", () => {
         expect(html("```ts\nconst a = **b**;\n```")).toBe("<pre>const a = **b**;</pre>");
     });

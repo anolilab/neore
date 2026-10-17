@@ -8,14 +8,14 @@ const SMALL = { maxBytes: 1000, maxEntries: 3 };
 
 const CENTRAL_ENTRY_SIGNATURE = 0x02_01_4b_50;
 
-const buildZip = async (files: Record<string, string>): Promise<ArrayBuffer> => {
+const buildZip = async (files: Record<string, string>, comment?: string): Promise<ArrayBuffer> => {
     const zip = new JSZip();
 
     for (const [name, content] of Object.entries(files)) {
         zip.file(name, content);
     }
 
-    return zip.generateAsync({ compression: "DEFLATE", type: "arraybuffer" });
+    return zip.generateAsync({ comment, compression: "DEFLATE", type: "arraybuffer" });
 };
 
 describe(assertOfficeZipWithinLimits, () => {
@@ -51,6 +51,12 @@ describe(assertOfficeZipWithinLimits, () => {
         view.setUint32(central + 24, 10, true);
 
         await expect(assertOfficeZipWithinLimits(buffer, SMALL)).rejects.toThrow("expands too large");
+    });
+
+    it("reads the real end record when the archive comment contains its signature", async () => {
+        const buffer = await buildZip({ "a.xml": "<a/>" }, "PK\u0005\u0006 not a record, just comment text");
+
+        await expect(assertOfficeZipWithinLimits(buffer, SMALL)).resolves.toBeUndefined();
     });
 
     it("rejects too many entries", async () => {

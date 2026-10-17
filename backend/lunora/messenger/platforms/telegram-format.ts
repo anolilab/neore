@@ -159,25 +159,53 @@ const linkify = (text: string, onText: (plain: string) => string, onLink: (label
 
 const emphasis = (text: string): string => text.replaceAll(BOLD, "<b>$1</b>").replaceAll(ITALIC, "<i>$1</i>");
 
-const LINK_SLOT = /(\d+)/g;
+/**
+ * A private-use character that does not occur in `text`, to delimit link slots. Reply text can
+ * contain any character, so a fixed delimiter could be read back as a slot.
+ */
+// The Unicode private-use area, U+E000 to U+F8FF.
+const PRIVATE_USE_FIRST = 57_344;
+const PRIVATE_USE_LAST = 63_743;
+
+const slotMarkerFor = (text: string): string | undefined => {
+    for (let code = PRIVATE_USE_FIRST; code <= PRIVATE_USE_LAST; code += 1) {
+        const char = String.fromCodePoint(code);
+
+        if (!text.includes(char)) {
+            return char;
+        }
+    }
+
+    return undefined;
+};
+
+const linkHtml = (label: string, url: string): string => `<a href="${url.replaceAll('"', "&quot;")}">${emphasis(label)}</a>`;
 
 /**
  * Emphasis over a whole plain segment, so `*see [docs](url)*` closes around its link. Links are
  * swapped for slots first: the URL never reaches the emphasis pass, and the slot cannot split a marker.
  */
 const inlineText = (plain: string): string => {
+    const marker = slotMarkerFor(plain);
+
+    // The segment uses every private-use character, so there is no free delimiter: emphasis stays per segment.
+    if (marker === undefined) {
+        return linkify(plain, emphasis, linkHtml);
+    }
+
     const links: string[] = [];
     const withSlots = linkify(
         plain,
         (text) => text,
         (label, url) => {
-            links.push(`<a href="${url.replaceAll('"', "&quot;")}">${emphasis(label)}</a>`);
+            links.push(linkHtml(label, url));
 
-            return `${links.length - 1}`;
+            return `${marker}${String(links.length - 1)}${marker}`;
         },
     );
+    const slot = new RegExp(String.raw`${marker}(\d+)${marker}`, "g");
 
-    return emphasis(withSlots).replaceAll(LINK_SLOT, (_, index: string) => links[Number(index)] ?? "");
+    return emphasis(withSlots).replaceAll(slot, (_, index: string) => links[Number(index)] ?? "");
 };
 
 const inline = (text: string): string =>
