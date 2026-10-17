@@ -623,6 +623,7 @@ class AppBuilder<Env extends object> {
             ["messengerConnections", { mode: { field: "userId", kind: "shardBy" } }],
             ["nodeExecutions", { mode: { kind: "root" } }],
             ["notifications", { mode: { field: "userId", kind: "shardBy" } }],
+            ["outcomeEmails", { mode: { field: "userId", kind: "shardBy" } }],
             ["oauthStates", { mode: { field: "userId", kind: "shardBy" } }],
             ["organization", { mode: { kind: "global" } }],
             ["pageAccess", { mode: { kind: "global" } }],

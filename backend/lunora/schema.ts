@@ -1413,7 +1413,6 @@ export const schema = defineSchema({
         .index("by_state", ["state"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
-
     organization: defineTable({
         allowedModels: v.optional(v.array(v.string())),
         baseTier: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise"))),
@@ -1447,6 +1446,24 @@ export const schema = defineSchema({
         .index("name", ["name"])
         .index("slug", ["slug"])
         .triggers((t) => auditTriggersFor(t, "organization", AUDIT_TABLES["organization"]!)),
+
+    // The outbox for opt-in task-outcome mail (`notifications/task-email.ts`): written
+    // in `notify()`'s own transaction, one row per inbox row, sent by the housekeeping
+    // sweep. Sent rows are pruned after 7 days; failed ones (attempt cap) likewise.
+    outcomeEmails: defineTable({
+        attempts: v.number(),
+        createdAt: v.number(),
+        link: v.string(),
+        notificationId: v.id("notifications"),
+        sentAt: v.optional(v.number()),
+        status: v.union(v.literal("pending"), v.literal("sent"), v.literal("failed")),
+        title: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_status_createdAt", ["status", "createdAt"])
+        .index("by_notificationId", ["notificationId"])
+        .index("by_userId", ["userId"]),
 
     // Pages workspace (`pages/`). A grant: `userId` is the GRANTEE, `ownerId`
     // the page owner — so a grantee's "shared with me" list is one index read.

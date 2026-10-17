@@ -4641,24 +4641,44 @@
       "to": "table:notifications"
     },
     {
+      "from": "function:notifications_gdpr:deleteUserNotifications",
+      "kind": "write",
+      "to": "table:outcomeEmails"
+    },
+    {
       "from": "function:notifications_push:sendPushForNotification",
       "kind": "call",
       "to": "function:notifications_push:loadPushNotification"
     },
     {
-      "from": "function:notifications_task_email:sendTaskOutcomeEmail",
-      "kind": "call",
-      "to": "function:notifications_task_email:claimOutcomeEmail"
+      "from": "function:notifications_task_email:dispatchOutcomeEmails",
+      "kind": "schedule",
+      "to": "function:notifications_task_email:sendPendingOutcomeEmails"
     },
     {
-      "from": "function:notifications_task_email:sendTaskOutcomeEmail",
+      "from": "function:notifications_task_email:dispatchOutcomeEmails",
+      "kind": "write",
+      "to": "table:outcomeEmails"
+    },
+    {
+      "from": "function:notifications_task_email:sendPendingOutcomeEmails",
+      "kind": "call",
+      "to": "function:notifications_task_email:listPendingOutcomeEmails"
+    },
+    {
+      "from": "function:notifications_task_email:sendPendingOutcomeEmails",
       "kind": "call",
       "to": "function:notifications_task_email:loadRecipientEmail"
     },
     {
-      "from": "function:notifications_task_email:sendTaskOutcomeEmail",
+      "from": "function:notifications_task_email:sendPendingOutcomeEmails",
       "kind": "call",
-      "to": "function:notifications_task_email:releaseOutcomeEmail"
+      "to": "function:notifications_task_email:settleOutcomeEmail"
+    },
+    {
+      "from": "function:notifications_task_email:settleOutcomeEmail",
+      "kind": "write",
+      "to": "table:outcomeEmails"
     },
     {
       "from": "function:pages_agent:proposePageEdit",
@@ -12001,9 +12021,16 @@
     },
     {
       "detail": "mutation",
-      "id": "function:notifications_task_email:claimOutcomeEmail",
+      "id": "function:notifications_task_email:dispatchOutcomeEmails",
       "kind": "function",
-      "name": "notifications.task_email.claimOutcomeEmail",
+      "name": "notifications.task_email.dispatchOutcomeEmails",
+      "module": "notifications"
+    },
+    {
+      "detail": "query",
+      "id": "function:notifications_task_email:listPendingOutcomeEmails",
+      "kind": "function",
+      "name": "notifications.task_email.listPendingOutcomeEmails",
       "module": "notifications"
     },
     {
@@ -12014,17 +12041,10 @@
       "module": "notifications"
     },
     {
-      "detail": "mutation",
-      "id": "function:notifications_task_email:releaseOutcomeEmail",
-      "kind": "function",
-      "name": "notifications.task_email.releaseOutcomeEmail",
-      "module": "notifications"
-    },
-    {
       "detail": "action",
-      "id": "function:notifications_task_email:sendTaskOutcomeEmail",
+      "id": "function:notifications_task_email:sendPendingOutcomeEmails",
       "kind": "function",
-      "name": "notifications.task_email.sendTaskOutcomeEmail",
+      "name": "notifications.task_email.sendPendingOutcomeEmails",
       "module": "notifications"
     },
     {
@@ -12032,6 +12052,13 @@
       "id": "function:notifications_task_email:setTaskEmailEnabled",
       "kind": "function",
       "name": "notifications.task_email.setTaskEmailEnabled",
+      "module": "notifications"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:notifications_task_email:settleOutcomeEmail",
+      "kind": "function",
+      "name": "notifications.task_email.settleOutcomeEmail",
       "module": "notifications"
     },
     {
@@ -14235,6 +14262,12 @@
       "module": "auth"
     },
     {
+      "id": "table:outcomeEmails",
+      "kind": "table",
+      "name": "outcomeEmails",
+      "module": "notifications"
+    },
+    {
       "id": "table:pageAccess",
       "kind": "table",
       "name": "pageAccess",
@@ -14874,7 +14907,8 @@
       "name": "notifications",
       "tables": [
         "dailyBriefState",
-        "notifications"
+        "notifications",
+        "outcomeEmails"
       ]
     },
     {
@@ -17734,31 +17768,31 @@
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 116,
+      "line": 117,
       "reason": "\"noteShardActivity\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 118,
+      "line": 119,
       "reason": "\"noteShardActivity\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 136,
+      "line": 137,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 142,
+      "line": 143,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "call",
-      "line": 242,
+      "line": 243,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -17973,14 +18007,14 @@
     },
     {
       "file": "notifications/notify",
-      "kind": "schedule",
-      "line": 109,
+      "kind": "write",
+      "line": 108,
       "reason": "\"notify\" is not a registered function"
     },
     {
       "file": "notifications/notify",
       "kind": "schedule",
-      "line": 126,
+      "line": 127,
       "reason": "\"notify\" is not a registered function"
     },
     {

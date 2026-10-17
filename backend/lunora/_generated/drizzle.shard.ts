@@ -843,6 +843,23 @@ export const notifications = sqliteTable("notifications", {
     by_userId_createdAt: index("by_userId_createdAt").on(t.userId, t.createdAt),
 }));
 
+export const outcomeEmails = sqliteTable("outcomeEmails", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    attempts: real("attempts").notNull(),
+    createdAt: real("createdAt").notNull(),
+    link: text("link").notNull(),
+    notificationId: text("notificationId").references((): AnySQLiteColumn => notifications._id).notNull(),
+    sentAt: real("sentAt"),
+    status: text("status", { mode: "json" }).$type<"pending" | "sent" | "failed">().notNull(),
+    title: text("title").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_notificationId: index("by_notificationId").on(t.notificationId),
+    by_status_createdAt: index("by_status_createdAt").on(t.status, t.createdAt),
+}));
+
 export const oauthStates = sqliteTable("oauthStates", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

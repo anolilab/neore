@@ -63,6 +63,7 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "cleanupExpiredExports", ref: internal.gdpr.request_sweeps.cleanupExpiredExports },
     { name: "handleGdprRequestTimeouts", ref: internal.gdpr.request_sweeps.handleGdprRequestTimeouts },
     { name: "pruneOldNotifications", ref: internal.notifications.functions.pruneOldNotifications },
+    { name: "dispatchOutcomeEmails", ref: internal.notifications.task_email.dispatchOutcomeEmails },
     { name: "sweepDeviceCalls", ref: internal.devices.internal.sweepDeviceCalls },
     { name: "sweepKnowledgeFiles", ref: internal.knowledge.housekeeping.sweepKnowledgeFiles },
     { name: "pruneRetainedActivity", ref: internal.gdpr.retention.pruneRetainedActivity },
