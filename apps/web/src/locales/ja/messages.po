@@ -2949,7 +2949,7 @@ msgstr "アプリケーションエラー"
 
 #: src/features/canvas/canvas-panel.tsx:117
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:328
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:382
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:430
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:212
 msgid "Apply"
 msgstr "適用"
@@ -4404,8 +4404,8 @@ msgstr "カナダ"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/pins/pin-item.tsx:282
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:357
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:366
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
 #: src/features/chat/thread/edit-composer.tsx:124
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
@@ -8810,7 +8810,7 @@ msgstr "例：導入部を簡潔にし、最後に要約を追加する"
 msgid "e.g. Work"
 msgstr "例：仕事"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:233
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:281
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "例：簡潔な出力を重視する、初心者向けにする..."
 
@@ -8826,7 +8826,7 @@ msgstr "例：もっと簡潔に、技術的な詳細を追加、わかりやす
 msgid "e.g., Make it more concise, add technical details, improve clarity..."
 msgstr "例：もっと簡潔に、技術的な詳細を追加、わかりやすく..."
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:302
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:350
 msgid "e.g., Make it more concise, require markdown output, add safety rules..."
 msgstr "例：もっと簡潔に、Markdown 出力を必須に、安全ルールを追加..."
 
@@ -8842,7 +8842,7 @@ msgstr "例：プロダクトデザイナー、ソフトウェア開発者"
 msgid "e.g., Professional Writer"
 msgstr "例：プロのライター"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:341
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:389
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:163
 msgid "e.g., Strict JSON coder"
 msgstr "例：厳格な JSON コーダー"
@@ -10497,7 +10497,7 @@ msgstr "パスキーを追加できませんでした"
 msgid "Failed to apply preset"
 msgstr "プリセットを適用できませんでした"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:144
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:172
 msgid "Failed to apply system prompt"
 msgstr "システムプロンプトを適用できませんでした"
 
@@ -10971,7 +10971,7 @@ msgstr "MCP サーバーを保存できませんでした"
 msgid "Failed to save messenger key"
 msgstr "メッセンジャーキーを保存できませんでした"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:165
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:193
 msgid "Failed to save preset"
 msgstr "プリセットを保存できませんでした"
 
@@ -15435,6 +15435,10 @@ msgstr "以前のメッセージを読み込む"
 msgid "Load more"
 msgstr "さらに読み込む"
 
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:222
+msgid "Load new prompt"
+msgstr ""
+
 #: src/features/chat/prompt-improvement/components/apply-preset-menu.tsx:57
 msgid "Load preset"
 msgstr "プリセットを読み込む"
@@ -17661,7 +17665,7 @@ msgstr "次のページ"
 msgid "Next slide"
 msgstr "次のスライド"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:261
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:309
 #: src/features/chat/thread/message-branch-switcher.tsx:62
 #: src/features/chat/thread/message-branch-switcher.tsx:62
 msgid "Next version"
@@ -19251,7 +19255,7 @@ msgstr "操作「{label}」に失敗しました"
 msgid "Optimization Instructions"
 msgstr "最適化の指示"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:228
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:276
 msgid "Optimization notes (optional)"
 msgstr "最適化のメモ（任意）"
 
@@ -19260,12 +19264,12 @@ msgid "Optimization rejected"
 msgstr "最適化が拒否されました"
 
 #: src/features/chat/prompt-improvement/components/composer-prompt-improvement-button.tsx:115
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:190
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:238
 msgid "Optimization style"
 msgstr "最適化のスタイル"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:41
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
 #: src/features/chat/sidebar/thread-sidebar.tsx:178
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:218
@@ -19285,7 +19289,7 @@ msgstr "プリセットのプロンプトを最適化"
 msgid "Optimize Prompt"
 msgstr "プロンプトを最適化"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:172
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:200
 msgid "Optimize system prompt"
 msgstr "システムプロンプトを最適化"
 
@@ -19314,7 +19318,7 @@ msgstr "大規模なシンプルタスク向けに最適化"
 msgid "Optimized for speed at scale"
 msgstr "大規模でのスピードに最適化"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:241
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:289
 msgid "Optimized prompt"
 msgstr "最適化されたプロンプト"
 
@@ -19322,7 +19326,7 @@ msgstr "最適化されたプロンプト"
 msgid "Optimized Prompt"
 msgstr "最適化されたプロンプト"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:389
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:437
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:222
 msgid "Optimizing..."
 msgstr "最適化しています..."
@@ -19472,7 +19476,7 @@ msgstr "初代 ChatGPT 画像モデル"
 msgid "Original Prompt"
 msgstr "元のプロンプト"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:216
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:264
 msgid "Original system prompt"
 msgstr "元のシステムプロンプト"
 
@@ -19866,7 +19870,7 @@ msgstr "画像 URL を貼り付け..."
 msgid "Paste only what fits in the existing rows"
 msgstr "既存の行に収まる分だけ貼り付け"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:222
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:270
 msgid "Paste or write a system prompt to optimize..."
 msgstr "最適化するシステムプロンプトを貼り付けるか入力してください..."
 
@@ -20504,7 +20508,7 @@ msgstr "プリセットを作成しました"
 msgid "Preset deleted"
 msgstr "プリセットを削除しました"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:322
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:370
 msgid "Preset name"
 msgstr "プリセット名"
 
@@ -20649,7 +20653,7 @@ msgstr "前のページ"
 msgid "Previous slide"
 msgstr "前のスライド"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:245
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:293
 #: src/features/chat/thread/message-branch-switcher.tsx:50
 #: src/features/chat/thread/message-branch-switcher.tsx:52
 msgid "Previous version"
@@ -21348,7 +21352,7 @@ msgstr "このスキルを評価"
 msgid "Rating"
 msgstr "評価"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
 msgid "Re-optimize"
 msgstr "再最適化"
 
@@ -21723,7 +21727,7 @@ msgid "reference video"
 msgstr "参照動画"
 
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:312
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:312
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
 #: src/features/skills/components/skill-builder-dialog.tsx:279
 #: src/features/skills/components/skill-builder-dialog.tsx:307
 msgid "Refine"
@@ -21734,7 +21738,7 @@ msgid "Refine Edge Detection"
 msgstr "エッジ検出を精緻化"
 
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:292
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:294
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:342
 msgid "Refine with feedback (optional)"
 msgstr "フィードバックで改善（任意）"
 
@@ -22584,7 +22588,7 @@ msgstr "取り消しています..."
 #~ msgid "Revoking…"
 #~ msgstr "取り消しています…"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:174
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:202
 msgid "Rewrites your system prompt using a structured template (role, rules, workflows). The model treats your input as evidence to optimize, not as a task to execute."
 msgstr "構造化テンプレート（役割、ルール、ワークフロー）でシステムプロンプトを書き直します。モデルは入力を実行すべきタスクではなく、最適化の対象となる材料として扱います。"
 
@@ -22914,7 +22918,7 @@ msgstr "サウジアラビア"
 #: src/features/auth/components/settings/security/change-password-card.tsx:244
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/pins/pin-item.tsx:283
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:346
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:128
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -22947,7 +22951,7 @@ msgstr "評価ケースとして保存"
 msgid "Save as new version"
 msgstr "新しいバージョンとして保存"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:377
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:425
 msgid "Save as preset"
 msgstr "プリセットとして保存"
 
@@ -23017,7 +23021,7 @@ msgstr "ワークフローを保存"
 msgid "Saved"
 msgstr "保存済み"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:161
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:189
 msgid "Saved as preset"
 msgstr "プリセットとして保存しました"
 
@@ -23027,7 +23031,7 @@ msgid "Saved to \"{0}\""
 msgstr "「{0}」に保存しました"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:346
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:407
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
@@ -25790,7 +25794,7 @@ msgstr "システムプロンプト"
 msgid "System Prompt (optional)"
 msgstr "システムプロンプト（任意）"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:141
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:169
 msgid "System prompt applied"
 msgstr "システムプロンプトを適用しました"
 
@@ -27023,9 +27027,17 @@ msgstr "このスレッド"
 msgid "This thread has been deleted"
 msgstr "このスレッドは削除されました"
 
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:220
+msgid "This thread's system prompt changed while you were editing."
+msgstr ""
+
 #: src/features/knowledge/hooks/use-knowledge-import.ts:262
 msgid "This URL cannot be added."
 msgstr "この URL は追加できません。"
+
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:233
+msgid "This version was optimized from an older system prompt. Re-optimize before applying it."
+msgstr ""
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:46
 msgid "This Week"

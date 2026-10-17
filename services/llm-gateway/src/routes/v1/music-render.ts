@@ -24,6 +24,7 @@ import type { RequestTelemetry } from "../../lib/otel/index.js";
 import { validateWebhookUrl } from "../../lib/webhook-delivery.js";
 import type { FalQueueUrls } from "../../providers/music-factory.js";
 import { MUSIC_MODELS, runFalMusicGeneration } from "../../providers/music-factory.js";
+import type { UsageReport } from "../../usage/reporter.js";
 import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
 import type { MusicRenderMessage } from "./music-types.js";
@@ -52,6 +53,8 @@ export interface MusicJobState {
     sampleRate?: number;
     startedAt?: number;
     status: JobStatus;
+    /** A charge the backend has not accepted yet; a redelivery of the render message retries it. */
+    usagePending?: UsageReport;
     userId: string;
 }
 
@@ -147,6 +150,23 @@ export type RenderOutcome =
     | { kind: "skipped"; reason: "already-completed" }
     | { errorMessage: string; kind: "failed"; retryable: boolean };
 
+const USAGE_NOT_ACCEPTED: RenderOutcome = { errorMessage: "Usage report not accepted by the backend", kind: "failed", retryable: true };
+
+/** Report a job's pending charge and clear it. `false` while the backend has not accepted it. */
+const settlePendingUsage = async (env: AppEnv, job: MusicJobState): Promise<boolean> => {
+    if (!job.usagePending) {
+        return true;
+    }
+
+    if (!(await new UsageReporter(env).report(job.usagePending))) {
+        return false;
+    }
+
+    await putJob(env.RATE_LIMIT_KV, { ...job, usagePending: undefined }).catch(() => {});
+
+    return true;
+};
+
 /** How many times a submitted render may be resumed from its FAL URLs before it fails. */
 export const MUSIC_RENDER_MAX_RESUMES = 5;
 
@@ -156,11 +176,16 @@ export const MUSIC_RENDER_MAX_RESUMES = 5;
  * core (terminal exceptions) and the consumer (transient retries exhausted)
  * without coordinating between them.
  */
-export const markRenderFailed = async (env: AppEnv, message: MusicRenderMessage, errorMessage: string): Promise<void> => {
+export const markRenderFailed = async (
+    env: AppEnv,
+    message: MusicRenderMessage,
+    errorMessage: string,
+    usagePending?: UsageReport,
+): Promise<MusicJobState | undefined> => {
     const existing = await getJob(env.RATE_LIMIT_KV, message.jobId);
 
     if (existing?.status === "completed" || existing?.status === "failed") {
-        return;
+        return undefined;
     }
 
     const failedJob: MusicJobState = {
@@ -177,6 +202,7 @@ export const markRenderFailed = async (env: AppEnv, message: MusicRenderMessage,
         provider: message.modelInfo.provider,
         startedAt: existing?.startedAt,
         status: "failed",
+        usagePending,
         userId: message.userId,
     };
 
@@ -198,6 +224,8 @@ export const markRenderFailed = async (env: AppEnv, message: MusicRenderMessage,
             polling_url: buildPollingUrl(message.origin, message.jobId),
         });
     }
+
+    return failedJob;
 };
 
 /**
@@ -240,8 +268,9 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
 
     const existing = await getJob(env.RATE_LIMIT_KV, jobId);
 
+    // Only a charge still pending from a prior attempt is retried, never the provider call.
     if (existing?.status === "completed" || existing?.status === "failed") {
-        return { kind: "skipped", reason: "already-completed" };
+        return (await settlePendingUsage(env, existing)) ? { kind: "skipped", reason: "already-completed" } : USAGE_NOT_ACCEPTED;
     }
 
     const apiKey = await env.CACHE_KV.get(musicRenderSecretKvKey(jobId));
@@ -281,6 +310,8 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
     // The FAL URLs of the submission, once there is one: a resume reuses them, and a
     // poll failure after submit re-queues the render with them.
     let falUrls: FalQueueUrls | undefined = message.resume ? { responseUrl: message.resume.responseUrl, statusUrl: message.resume.statusUrl } : undefined;
+    // Set once FAL has returned a result: from then on its cost is owed.
+    let usage: UsageReport | undefined;
 
     try {
         // Passthrough whitelist comes from the registry (single source of truth)
@@ -301,13 +332,25 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
         const latencyMs = Date.now() - startTime;
         const extension = result.mimeType.includes("mpeg") || result.mimeType.includes("mp3") ? "mp3" : "wav";
         const r2Key = `music/${userId}/${jobId}.${extension}`;
+        const costMicrodollars = modelInfo.costPerMusicGenerationMicrodollars;
+
+        if (costMicrodollars > 0) {
+            usage = {
+                billingMode: "platform",
+                completionTokens: 0,
+                costMicrodollars,
+                modelId: body.model,
+                orgId,
+                promptTokens: 0,
+                requestId,
+                userId,
+            };
+        }
 
         await env.MUSIC_BUCKET.put(r2Key, result.bytes, {
             customMetadata: { jobId, modelId: body.model, userId },
             httpMetadata: { contentType: result.mimeType },
         });
-
-        const costMicrodollars = modelInfo.costPerMusicGenerationMicrodollars;
 
         const completedJob: MusicJobState = {
             ...inProgressJob,
@@ -318,6 +361,7 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
             r2Key,
             sampleRate: result.sampleRate,
             status: "completed",
+            usagePending: usage,
         };
 
         await putJob(env.RATE_LIMIT_KV, completedJob);
@@ -358,19 +402,6 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
             )
             .catch((error) => console.error("[music] failed to record usage:", error));
 
-        if (costMicrodollars > 0) {
-            await new UsageReporter(env).report({
-                billingMode: "platform",
-                completionTokens: 0,
-                costMicrodollars,
-                modelId: body.model,
-                orgId,
-                promptTokens: 0,
-                requestId,
-                userId,
-            });
-        }
-
         if (body.callback_url) {
             await fireWebhook(body.callback_url, jobId, "completed", {
                 generation_id: jobId,
@@ -382,6 +413,10 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
         }
 
         await env.CACHE_KV.delete(musicRenderSecretKvKey(jobId)).catch(() => {});
+
+        if (!(await settlePendingUsage(env, completedJob))) {
+            return USAGE_NOT_ACCEPTED;
+        }
 
         return { costMicrodollars, kind: "completed", latencyMs };
     } catch (error) {
@@ -406,7 +441,11 @@ export const runMusicRender = async (message: MusicRenderMessage, env: AppEnv, t
         const isRetryable = !isProviderCalled && isTransient(error);
 
         if (!isRetryable) {
-            await markRenderFailed(env, message, errorMessage);
+            const failedJob = await markRenderFailed(env, message, errorMessage, usage);
+
+            if (failedJob && !(await settlePendingUsage(env, failedJob))) {
+                return USAGE_NOT_ACCEPTED;
+            }
         }
 
         return { errorMessage, kind: "failed", retryable: isRetryable };

@@ -2949,7 +2949,7 @@ msgstr "应用错误"
 
 #: src/features/canvas/canvas-panel.tsx:117
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:328
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:382
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:430
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:212
 msgid "Apply"
 msgstr "应用"
@@ -4404,8 +4404,8 @@ msgstr "加拿大"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/pins/pin-item.tsx:282
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:357
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:366
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
 #: src/features/chat/thread/edit-composer.tsx:124
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
@@ -8810,7 +8810,7 @@ msgstr "例如：精简引言并在末尾添加总结"
 msgid "e.g. Work"
 msgstr "例如：工作"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:233
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:281
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "例如：强调简洁输出，面向初学者..."
 
@@ -8826,7 +8826,7 @@ msgstr "例如：更简洁、添加技术细节、提高清晰度、添加示例
 msgid "e.g., Make it more concise, add technical details, improve clarity..."
 msgstr "例如：更简洁、添加技术细节、提高清晰度..."
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:302
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:350
 msgid "e.g., Make it more concise, require markdown output, add safety rules..."
 msgstr "例如：更简洁、要求 Markdown 输出、添加安全规则..."
 
@@ -8842,7 +8842,7 @@ msgstr "例如：产品设计师、软件开发者"
 msgid "e.g., Professional Writer"
 msgstr "例如：专业写手"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:341
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:389
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:163
 msgid "e.g., Strict JSON coder"
 msgstr "例如：严格 JSON 编码器"
@@ -10497,7 +10497,7 @@ msgstr "添加通行密钥失败"
 msgid "Failed to apply preset"
 msgstr "应用预设失败"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:144
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:172
 msgid "Failed to apply system prompt"
 msgstr "应用系统提示词失败"
 
@@ -10971,7 +10971,7 @@ msgstr "保存 MCP 服务器失败"
 msgid "Failed to save messenger key"
 msgstr "保存消息平台密钥失败"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:165
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:193
 msgid "Failed to save preset"
 msgstr "保存预设失败"
 
@@ -15435,6 +15435,10 @@ msgstr "加载更早的消息"
 msgid "Load more"
 msgstr "加载更多"
 
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:222
+msgid "Load new prompt"
+msgstr ""
+
 #: src/features/chat/prompt-improvement/components/apply-preset-menu.tsx:57
 msgid "Load preset"
 msgstr "加载预设"
@@ -17661,7 +17665,7 @@ msgstr "下一页"
 msgid "Next slide"
 msgstr "下一张幻灯片"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:261
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:309
 #: src/features/chat/thread/message-branch-switcher.tsx:62
 #: src/features/chat/thread/message-branch-switcher.tsx:62
 msgid "Next version"
@@ -19251,7 +19255,7 @@ msgstr "操作“{label}”失败"
 msgid "Optimization Instructions"
 msgstr "优化指令"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:228
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:276
 msgid "Optimization notes (optional)"
 msgstr "优化说明（可选）"
 
@@ -19260,12 +19264,12 @@ msgid "Optimization rejected"
 msgstr "优化被拒绝"
 
 #: src/features/chat/prompt-improvement/components/composer-prompt-improvement-button.tsx:115
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:190
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:238
 msgid "Optimization style"
 msgstr "优化风格"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:41
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
 #: src/features/chat/sidebar/thread-sidebar.tsx:178
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:218
@@ -19285,7 +19289,7 @@ msgstr "优化预设提示词"
 msgid "Optimize Prompt"
 msgstr "优化提示词"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:172
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:200
 msgid "Optimize system prompt"
 msgstr "优化系统提示词"
 
@@ -19314,7 +19318,7 @@ msgstr "针对大规模简单任务优化"
 msgid "Optimized for speed at scale"
 msgstr "针对大规模速度优化"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:241
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:289
 msgid "Optimized prompt"
 msgstr "优化后的提示词"
 
@@ -19322,7 +19326,7 @@ msgstr "优化后的提示词"
 msgid "Optimized Prompt"
 msgstr "优化后的提示词"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:389
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:437
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:222
 msgid "Optimizing..."
 msgstr "正在优化..."
@@ -19472,7 +19476,7 @@ msgstr "初代 ChatGPT 图像模型"
 msgid "Original Prompt"
 msgstr "原始提示词"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:216
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:264
 msgid "Original system prompt"
 msgstr "原始系统提示词"
 
@@ -19866,7 +19870,7 @@ msgstr "粘贴图片 URL..."
 msgid "Paste only what fits in the existing rows"
 msgstr "只粘贴现有行能容纳的内容"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:222
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:270
 msgid "Paste or write a system prompt to optimize..."
 msgstr "粘贴或编写要优化的系统提示词..."
 
@@ -20504,7 +20508,7 @@ msgstr "预设已创建"
 msgid "Preset deleted"
 msgstr "预设已删除"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:322
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:370
 msgid "Preset name"
 msgstr "预设名称"
 
@@ -20649,7 +20653,7 @@ msgstr "上一页"
 msgid "Previous slide"
 msgstr "上一张幻灯片"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:245
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:293
 #: src/features/chat/thread/message-branch-switcher.tsx:50
 #: src/features/chat/thread/message-branch-switcher.tsx:52
 msgid "Previous version"
@@ -21348,7 +21352,7 @@ msgstr "为此技能评分"
 msgid "Rating"
 msgstr "评分"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
 msgid "Re-optimize"
 msgstr "重新优化"
 
@@ -21723,7 +21727,7 @@ msgid "reference video"
 msgstr "参考视频"
 
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:312
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:312
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
 #: src/features/skills/components/skill-builder-dialog.tsx:279
 #: src/features/skills/components/skill-builder-dialog.tsx:307
 msgid "Refine"
@@ -21734,7 +21738,7 @@ msgid "Refine Edge Detection"
 msgstr "精细边缘检测"
 
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:292
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:294
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:342
 msgid "Refine with feedback (optional)"
 msgstr "根据反馈改进（可选）"
 
@@ -22584,7 +22588,7 @@ msgstr "正在撤销..."
 #~ msgid "Revoking…"
 #~ msgstr "正在吊销…"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:174
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:202
 msgid "Rewrites your system prompt using a structured template (role, rules, workflows). The model treats your input as evidence to optimize, not as a task to execute."
 msgstr "使用结构化模板（角色、规则、工作流）重写你的系统提示词。模型会将你的输入视为待优化的材料，而不是要执行的任务。"
 
@@ -22914,7 +22918,7 @@ msgstr "沙特阿拉伯"
 #: src/features/auth/components/settings/security/change-password-card.tsx:244
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/pins/pin-item.tsx:283
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:346
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:128
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -22947,7 +22951,7 @@ msgstr "保存为评测用例"
 msgid "Save as new version"
 msgstr "另存为新版本"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:377
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:425
 msgid "Save as preset"
 msgstr "保存为预设"
 
@@ -23017,7 +23021,7 @@ msgstr "保存工作流"
 msgid "Saved"
 msgstr "已保存"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:161
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:189
 msgid "Saved as preset"
 msgstr "已保存为预设"
 
@@ -23027,7 +23031,7 @@ msgid "Saved to \"{0}\""
 msgstr "已保存到“{0}”"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:346
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:407
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
@@ -25790,7 +25794,7 @@ msgstr "系统提示词"
 msgid "System Prompt (optional)"
 msgstr "系统提示词（可选）"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:141
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:169
 msgid "System prompt applied"
 msgstr "系统提示词已应用"
 
@@ -27023,9 +27027,17 @@ msgstr "此对话"
 msgid "This thread has been deleted"
 msgstr "此对话已被删除"
 
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:220
+msgid "This thread's system prompt changed while you were editing."
+msgstr ""
+
 #: src/features/knowledge/hooks/use-knowledge-import.ts:262
 msgid "This URL cannot be added."
 msgstr "无法添加此 URL。"
+
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:233
+msgid "This version was optimized from an older system prompt. Re-optimize before applying it."
+msgstr ""
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:46
 msgid "This Week"

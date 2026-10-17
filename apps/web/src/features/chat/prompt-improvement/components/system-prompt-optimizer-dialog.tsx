@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import useOptimizerStyleLabels from "@/features/chat/prompt-improvement/hooks/use-optimizer-style-labels";
 import type { SystemOptimizerStyle } from "@/features/chat/prompt-improvement/lib/optimizer-client";
 import { iteratePromptRequest, optimizeSystemPromptRequest } from "@/features/chat/prompt-improvement/lib/optimizer-client";
+import { resolvePromptSeed } from "@/features/chat/prompt-improvement/lib/prompt-seed";
 import getSessionToken from "@/lib/auth/server-functions";
 import { ErrorUtilities } from "@/lib/errors";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -47,6 +48,13 @@ interface SystemPromptOptimizerDialogProps {
 
 const STYLE_OPTIONS: SystemOptimizerStyle[] = ["general", "analytical", "output-format"];
 
+interface OptimizedVersion {
+    basedOn: string;
+    text: string;
+}
+
+const EMPTY_OPTIMIZED: { history: OptimizedVersion[]; index: number } = { history: [], index: 0 };
+
 type SystemPromptOptimizerDialogBodyProps = Omit<SystemPromptOptimizerDialogProps, "open">;
 
 const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> = ({ initialPrompt, modelId, onApply, onOpenChange, threadId, title }) => {
@@ -63,17 +71,37 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
     const { isPending: isCreatingPreset, mutateAsync: createPreset } = useMutation(crpc.system_prompts.functions.createPreset.mutationOptions());
 
     const [style, setStyle] = useState<SystemOptimizerStyle>("general");
+    const [seed, setSeed] = useState(initialPrompt);
     const [prompt, setPrompt] = useState(initialPrompt);
     const [improvementInstructions, setImprovementInstructions] = useState("");
     const [iterateInput, setIterateInput] = useState("");
-    const [optimized, setOptimized] = useState<{ history: string[]; index: number }>({ history: [], index: 0 });
+    const [optimized, setOptimized] = useState(EMPTY_OPTIMIZED);
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [error, setError] = useState<Error | null>(null);
     const [saveAsPresetOpen, setSaveAsPresetOpen] = useState(false);
     const [presetName, setPresetName] = useState("");
 
+    const seedState = resolvePromptSeed({ initialPrompt, prompt, seed });
+
+    if (seed !== initialPrompt && seedState !== "stale-edits") {
+        setSeed(initialPrompt);
+
+        if (seedState === "reseed") {
+            setPrompt(initialPrompt);
+            setOptimized(EMPTY_OPTIMIZED);
+        }
+    }
+
+    const loadNewPrompt = useCallback(() => {
+        setSeed(initialPrompt);
+        setPrompt(initialPrompt);
+        setOptimized(EMPTY_OPTIMIZED);
+    }, [initialPrompt]);
+
     const { history: optimizedHistory, index: currentIndex } = optimized;
-    const currentOptimized = optimizedHistory[currentIndex] ?? "";
+    const currentVersion = optimizedHistory[currentIndex];
+    const currentOptimized = currentVersion?.text ?? "";
+    const isCurrentOptimizedStale = currentVersion !== undefined && currentVersion.basedOn !== initialPrompt;
     const canGoPrevious = currentIndex > 0;
     const canGoNext = currentIndex < optimizedHistory.length - 1;
 
@@ -93,17 +121,17 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
             });
 
             setOptimized((state) => {
-                return { history: [...state.history, optimizedPrompt], index: state.history.length };
+                return { history: [...state.history, { basedOn: initialPrompt, text: optimizedPrompt }], index: state.history.length };
             });
         } catch (error_: any) {
             setError(error_);
         }
 
         setIsOptimizing(false);
-    }, [getJwtToken, improvementInstructions, modelId, prompt, style, threadId]);
+    }, [getJwtToken, improvementInstructions, initialPrompt, modelId, prompt, style, threadId]);
 
     const handleIterate = useCallback(async () => {
-        if (!currentOptimized.trim() || !iterateInput.trim()) {
+        if (!currentVersion || !currentOptimized.trim() || !iterateInput.trim()) {
             return;
         }
 
@@ -121,7 +149,7 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
             });
 
             setOptimized((state) => {
-                return { history: [...state.history, refined], index: state.history.length };
+                return { history: [...state.history, { basedOn: currentVersion.basedOn, text: refined }], index: state.history.length };
             });
             setIterateInput("");
         } catch (error_: any) {
@@ -129,10 +157,10 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
         }
 
         setIsOptimizing(false);
-    }, [currentOptimized, getJwtToken, iterateInput, threadId]);
+    }, [currentOptimized, currentVersion, getJwtToken, iterateInput, threadId]);
 
     const handleApply = useCallback(async () => {
-        if (!currentOptimized.trim()) {
+        if (!currentOptimized.trim() || isCurrentOptimizedStale) {
             return;
         }
 
@@ -143,7 +171,7 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
         } catch {
             toast.error(t`Failed to apply system prompt`);
         }
-    }, [currentOptimized, onApply, onOpenChange, t]);
+    }, [currentOptimized, isCurrentOptimizedStale, onApply, onOpenChange, t]);
 
     const handleSaveAsPreset = useCallback(async () => {
         const trimmedName = presetName.trim();
@@ -183,6 +211,26 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
                     >
                         <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
                         <span>{ErrorUtilities.getUserMessage(error, i18n)}</span>
+                    </div>
+                )}
+
+                {seedState === "stale-edits" && (
+                    <div className="bg-muted/50 flex items-center gap-2 rounded-md border px-3 py-2 text-sm" role="status">
+                        <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
+                        <span className="flex-1">{t`This thread's system prompt changed while you were editing.`}</span>
+                        <Button disabled={isOptimizing} onClick={loadNewPrompt} size="sm" type="button" variant="outline">
+                            {t`Load new prompt`}
+                        </Button>
+                    </div>
+                )}
+
+                {isCurrentOptimizedStale && (
+                    <div
+                        className="bg-destructive/10 border-destructive/20 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                        role="alert"
+                    >
+                        <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
+                        <span>{t`This version was optimized from an older system prompt. Re-optimize before applying it.`}</span>
                     </div>
                 )}
 
@@ -281,7 +329,7 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
                                 setOptimized((state) => {
                                     const history = [...state.history];
 
-                                    history[state.index] = e.target.value;
+                                    history[state.index] = { basedOn: history[state.index]?.basedOn ?? initialPrompt, text: e.target.value };
 
                                     return { ...state, history };
                                 })
@@ -378,7 +426,7 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
                     </Button>
                 )}
                 {optimizedHistory.length > 0 && (
-                    <Button disabled={isOptimizing || !currentOptimized.trim()} onClick={handleApply} variant="outline">
+                    <Button disabled={isOptimizing || isCurrentOptimizedStale || !currentOptimized.trim()} onClick={handleApply} variant="outline">
                         {t`Apply`}
                     </Button>
                 )}

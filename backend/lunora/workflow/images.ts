@@ -5,13 +5,15 @@
  * read, each such node gets a fresh `imageUrl` — but only when the workflow's OWNER holds
  * a grant for the file. A viewer of a shared or gallery workflow therefore sees exactly
  * what the author could see: no grant is written for anyone else, and unpublishing the
- * workflow ends the viewer's access with it.
+ * workflow ends the viewer's access with it. A FORK is the one exception: the forker
+ * becomes the copy's owner, so they are granted what the author held ({@link grantWorkflowImages}).
  *
  * The same owner-granted files are counted in their `refcount` while a workflow
  * references them ({@link countedWorkflowImageIds}), or the unused-file sweep deletes them.
  */
 import type { Id } from "../_generated/dataModel";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { insertChatFileAccess } from "../agent/table-writes";
 import { displayUrlExpiresInSeconds } from "../lib/storage-ref";
 
 interface ImageNode {
@@ -68,6 +70,28 @@ export const countedWorkflowImageIds = async (
     const counted = new Set(files.map((file) => file._id as string));
 
     return { next: next.filter((id) => counted.has(id)), previous: previous.filter((id) => counted.has(id)) };
+};
+
+/**
+ * Grant `toUserId` the image files on `content`'s nodes that `fromUserId` (a fork's
+ * source author) holds a grant for. An id the author holds no grant for is never granted.
+ */
+export const grantWorkflowImages = async (db: MutationCtx["db"], fromUserId: string, toUserId: string, content: unknown): Promise<void> => {
+    const files = await grantedFiles(db, fromUserId, workflowImageFileIds(content));
+    const fileIds = files.map((file) => file._id as Id<"chatFiles">);
+
+    if (fileIds.length === 0) {
+        return;
+    }
+
+    const { page: existing } = await db.chatFileAccess.findMany({ where: { fileId: { in: fileIds }, userId: toUserId } });
+    const held = new Set(existing.map((grant) => grant.fileId as string));
+
+    for (const fileId of fileIds) {
+        if (!held.has(fileId)) {
+            await insertChatFileAccess(db, fileId, toUserId);
+        }
+    }
 };
 
 export const signWorkflowImages = async <T>(context: Pick<QueryCtx, "db" | "storage">, ownerId: string | undefined, content: T): Promise<T> => {

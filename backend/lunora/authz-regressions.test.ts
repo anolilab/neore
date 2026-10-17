@@ -902,6 +902,33 @@ describe("stored media survives the owner's legitimate copies", () => {
         expect(await grantsOf(STRANGER)).toEqual([MINE]);
     });
 
+    it("forking a public workflow grants the forker the author's imageFileId images — never an id the author holds no grant for", async () => {
+        const mineId = await seedChatFile(MINE, OWNER);
+        const victimId = await seedChatFile(VICTIM, GRANTEE);
+        const sourceProjectId = await run(
+            async (context) =>
+                await context.db.insert("projects", {
+                    createdAt: 0,
+                    isPublic: true,
+                    name: "W",
+                    projectType: "workflow",
+                    title: "W",
+                    userId: OWNER,
+                    workflowContent: {
+                        edges: [],
+                        nodes: [
+                            { data: { imageFileId: mineId }, id: "n1", position: { x: 0, y: 0 }, type: "image" },
+                            { data: { imageFileId: victimId }, id: "n2", position: { x: 0, y: 0 }, type: "image" },
+                        ],
+                    },
+                }),
+        );
+
+        await as(STRANGER).action(procedureAt("workflow_fork", "forkWorkflow"), { sourceProjectId } as never);
+
+        expect(await grantsOf(STRANGER)).toEqual([MINE]);
+    });
+
     it("forking a public workflow copies the author's own vault images to the forker — never a vault key the author planted", async () => {
         const AUTHOR_VAULT = "vault-author-image";
         const VICTIM_VAULT = "vault-victim-image";

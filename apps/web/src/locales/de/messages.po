@@ -2949,7 +2949,7 @@ msgstr "Anwendungsfehler"
 
 #: src/features/canvas/canvas-panel.tsx:117
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:328
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:382
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:430
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:212
 msgid "Apply"
 msgstr "Anwenden"
@@ -4404,8 +4404,8 @@ msgstr "Kanada"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/pins/pin-item.tsx:282
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:357
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:366
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
 #: src/features/chat/thread/edit-composer.tsx:124
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
@@ -8810,7 +8810,7 @@ msgstr "z. B. Straffe die Einleitung und füge am Ende eine Zusammenfassung hinz
 msgid "e.g. Work"
 msgstr "z. B. Arbeit"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:233
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:281
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "z. B. Betone knappe Ausgaben, richte dich an Einsteiger..."
 
@@ -8826,7 +8826,7 @@ msgstr "z. B. Kürzer fassen, technische Details hinzufügen, Klarheit verbesser
 msgid "e.g., Make it more concise, add technical details, improve clarity..."
 msgstr "z. B. Kürzer fassen, technische Details hinzufügen, Klarheit verbessern..."
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:302
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:350
 msgid "e.g., Make it more concise, require markdown output, add safety rules..."
 msgstr "z. B. Mach ihn knapper, verlange Markdown-Ausgabe, füge Sicherheitsregeln hinzu..."
 
@@ -8842,7 +8842,7 @@ msgstr "z. B. Produktdesigner, Softwareentwickler"
 msgid "e.g., Professional Writer"
 msgstr "z. B. Professioneller Autor"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:341
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:389
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:163
 msgid "e.g., Strict JSON coder"
 msgstr "z. B. Strenger JSON-Coder"
@@ -10497,7 +10497,7 @@ msgstr "Passkey konnte nicht hinzugefügt werden"
 msgid "Failed to apply preset"
 msgstr "Vorlage konnte nicht angewendet werden"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:144
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:172
 msgid "Failed to apply system prompt"
 msgstr "System-Prompt konnte nicht angewendet werden"
 
@@ -10971,7 +10971,7 @@ msgstr "MCP-Server konnte nicht gespeichert werden"
 msgid "Failed to save messenger key"
 msgstr "Messenger-Schlüssel konnte nicht gespeichert werden"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:165
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:193
 msgid "Failed to save preset"
 msgstr "Vorlage konnte nicht gespeichert werden"
 
@@ -15435,6 +15435,10 @@ msgstr "Frühere Nachrichten laden"
 msgid "Load more"
 msgstr "Mehr laden"
 
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:222
+msgid "Load new prompt"
+msgstr ""
+
 #: src/features/chat/prompt-improvement/components/apply-preset-menu.tsx:57
 msgid "Load preset"
 msgstr "Vorlage laden"
@@ -17661,7 +17665,7 @@ msgstr "Nächste Seite"
 msgid "Next slide"
 msgstr "Nächste Folie"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:261
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:309
 #: src/features/chat/thread/message-branch-switcher.tsx:62
 #: src/features/chat/thread/message-branch-switcher.tsx:62
 msgid "Next version"
@@ -19251,7 +19255,7 @@ msgstr "Vorgang \"{label}\" fehlgeschlagen"
 msgid "Optimization Instructions"
 msgstr "Optimierungsanweisungen"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:228
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:276
 msgid "Optimization notes (optional)"
 msgstr "Hinweise zur Optimierung (optional)"
 
@@ -19260,12 +19264,12 @@ msgid "Optimization rejected"
 msgstr "Optimierung abgelehnt"
 
 #: src/features/chat/prompt-improvement/components/composer-prompt-improvement-button.tsx:115
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:190
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:238
 msgid "Optimization style"
 msgstr "Optimierungsstil"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:41
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
 #: src/features/chat/sidebar/thread-sidebar.tsx:178
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:218
@@ -19285,7 +19289,7 @@ msgstr "Prompt der Vorlage optimieren"
 msgid "Optimize Prompt"
 msgstr "Prompt optimieren"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:172
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:200
 msgid "Optimize system prompt"
 msgstr "System-Prompt optimieren"
 
@@ -19314,7 +19318,7 @@ msgstr "Optimiert für einfache Aufgaben in riesigem Maßstab"
 msgid "Optimized for speed at scale"
 msgstr "Optimiert für Geschwindigkeit im großen Maßstab"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:241
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:289
 msgid "Optimized prompt"
 msgstr "Optimierter Prompt"
 
@@ -19322,7 +19326,7 @@ msgstr "Optimierter Prompt"
 msgid "Optimized Prompt"
 msgstr "Optimierter Prompt"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:389
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:437
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:222
 msgid "Optimizing..."
 msgstr "Wird optimiert..."
@@ -19472,7 +19476,7 @@ msgstr "Ursprüngliches ChatGPT-Bildmodell"
 msgid "Original Prompt"
 msgstr "Ursprünglicher Prompt"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:216
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:264
 msgid "Original system prompt"
 msgstr "Ursprünglicher System-Prompt"
 
@@ -19866,7 +19870,7 @@ msgstr "Bild-URL einfügen..."
 msgid "Paste only what fits in the existing rows"
 msgstr "Nur einfügen, was in die vorhandenen Zeilen passt"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:222
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:270
 msgid "Paste or write a system prompt to optimize..."
 msgstr "Füge einen System-Prompt zum Optimieren ein oder schreib einen..."
 
@@ -20504,7 +20508,7 @@ msgstr "Vorlage erstellt"
 msgid "Preset deleted"
 msgstr "Vorlage gelöscht"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:322
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:370
 msgid "Preset name"
 msgstr "Name der Vorlage"
 
@@ -20649,7 +20653,7 @@ msgstr "Vorherige Seite"
 msgid "Previous slide"
 msgstr "Vorherige Folie"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:245
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:293
 #: src/features/chat/thread/message-branch-switcher.tsx:50
 #: src/features/chat/thread/message-branch-switcher.tsx:52
 msgid "Previous version"
@@ -21348,7 +21352,7 @@ msgstr "Diesen Skill bewerten"
 msgid "Rating"
 msgstr "Bewertung"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
 msgid "Re-optimize"
 msgstr "Erneut optimieren"
 
@@ -21723,7 +21727,7 @@ msgid "reference video"
 msgstr "Referenzvideo"
 
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:312
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:312
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
 #: src/features/skills/components/skill-builder-dialog.tsx:279
 #: src/features/skills/components/skill-builder-dialog.tsx:307
 msgid "Refine"
@@ -21734,7 +21738,7 @@ msgid "Refine Edge Detection"
 msgstr "Kantenerkennung verfeinern"
 
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:292
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:294
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:342
 msgid "Refine with feedback (optional)"
 msgstr "Mit Feedback verfeinern (optional)"
 
@@ -22584,7 +22588,7 @@ msgstr "Wird widerrufen..."
 #~ msgid "Revoking…"
 #~ msgstr "Wird widerrufen…"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:174
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:202
 msgid "Rewrites your system prompt using a structured template (role, rules, workflows). The model treats your input as evidence to optimize, not as a task to execute."
 msgstr "Schreibt deinen System-Prompt mit einer strukturierten Vorlage (Rolle, Regeln, Workflows) neu. Das Modell behandelt deine Eingabe als Material zum Optimieren, nicht als auszuführende Aufgabe."
 
@@ -22914,7 +22918,7 @@ msgstr "Saudi-Arabien"
 #: src/features/auth/components/settings/security/change-password-card.tsx:244
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/pins/pin-item.tsx:283
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:346
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:128
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -22947,7 +22951,7 @@ msgstr "Als Eval-Testfall speichern"
 msgid "Save as new version"
 msgstr "Als neue Version speichern"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:377
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:425
 msgid "Save as preset"
 msgstr "Als Vorlage speichern"
 
@@ -23017,7 +23021,7 @@ msgstr "Workflow speichern"
 msgid "Saved"
 msgstr "Gespeichert"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:161
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:189
 msgid "Saved as preset"
 msgstr "Als Vorlage gespeichert"
 
@@ -23027,7 +23031,7 @@ msgid "Saved to \"{0}\""
 msgstr "In \"{0}\" gespeichert"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:346
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:407
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
@@ -25790,7 +25794,7 @@ msgstr "System-Prompt"
 msgid "System Prompt (optional)"
 msgstr "System-Prompt (optional)"
 
-#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:141
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:169
 msgid "System prompt applied"
 msgstr "System-Prompt angewendet"
 
@@ -27023,9 +27027,17 @@ msgstr "Dieser Thread"
 msgid "This thread has been deleted"
 msgstr "Dieser Thread wurde gelöscht"
 
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:220
+msgid "This thread's system prompt changed while you were editing."
+msgstr ""
+
 #: src/features/knowledge/hooks/use-knowledge-import.ts:262
 msgid "This URL cannot be added."
 msgstr "Diese URL kann nicht hinzugefügt werden."
+
+#: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:233
+msgid "This version was optimized from an older system prompt. Re-optimize before applying it."
+msgstr ""
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:46
 msgid "This Week"
