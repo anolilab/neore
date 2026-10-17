@@ -191,6 +191,55 @@ describe("blank lines between blocks", () => {
     });
 });
 
+describe("a split code block", () => {
+    const count = (text: string, tag: string): number => text.split(tag).length - 1;
+    const lines = Array.from({ length: 60 }, (_, index) => `line ${index} <&>`).join("\n");
+
+    it("renders one code box per chunk, not one per piece", () => {
+        const chunks = formatTelegramMessage(`\`\`\`ts\n${lines}\n\`\`\``, 300);
+
+        expect(chunks.length).toBeGreaterThan(2);
+
+        for (const chunk of chunks) {
+            expect(count(chunk.html, "<pre>")).toBe(1);
+            expect(count(chunk.html, "</pre>")).toBe(1);
+            expect(chunk.html.length).toBeLessThanOrEqual(300);
+        }
+
+        const inner = chunks.map((chunk) => chunk.html.slice("<pre>".length, -"</pre>".length)).join("\n");
+
+        expect(inner).toBe(lines.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"));
+        expect(chunks.map((chunk) => chunk.source).join("\n")).toBe(`\`\`\`ts\n${lines}\n\`\`\``);
+    });
+
+    it("joins the parts of one long code line with nothing, inside one box", () => {
+        const long = "x".repeat(400);
+        const chunks = formatTelegramMessage(`\`\`\`\n${long}\n\`\`\``, 120);
+
+        expect(chunks.map((chunk) => chunk.html.slice(5, -6)).join("")).toBe(long);
+
+        for (const chunk of chunks) {
+            expect(count(chunk.html, "<pre>")).toBe(1);
+        }
+    });
+
+    it("keeps a following paragraph out of the box, and an unterminated fence unclosed", () => {
+        const chunks = formatTelegramMessage(`\`\`\`\n${lines}\n\`\`\`\n\nafter`, 300);
+
+        expect(chunks.at(-1)?.html.endsWith("</pre>\n\nafter")).toBe(true);
+
+        const open = formatTelegramMessage(`\`\`\`\n${lines}`, 300);
+
+        expect(
+            open
+                .map((chunk) => chunk.source)
+                .join("\n")
+                .endsWith("```"),
+        ).toBe(false);
+        expect(open.every((chunk) => count(chunk.html, "<pre>") === 1)).toBe(true);
+    });
+});
+
 describe("a cut line's middle", () => {
     it("does not read a piece's leading '#' as a heading", () => {
         const line = `${"word ".repeat(40)}# not a heading ${"word ".repeat(40)}`;
