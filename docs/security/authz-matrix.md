@@ -390,6 +390,7 @@ for a schema table that is neither policed nor listed:
 | `devices_functions.revokeDevice` | mutation | authMutation + RL | devices, deviceCalls | row.userId == caller | ok — new; deletes the row and its secret, expires open calls |
 | `devices_functions.updateDeviceManifest` | mutation | authMutation + RL | devices | row.userId == caller; HMAC of the device's secret over the manifest | ok — new; fresh, monotonic `issuedAt`, tools re-validated |
 | `evals_functions.cancelRun` | mutation | authMutation + RL | evalRuns | owner helper | ok |
+| `evals_functions.compareModels` | query | authQuery | evalDatasets, evalRuns | owner helper; row.userId == caller | ok |
 | `evals_functions.compareRuns` | query | authQuery | evalRuns | owner helper | ok |
 | `evals_functions.createCase` | mutation | authMutation + RL | evalCases, evalDatasets | owner helper | ok |
 | `evals_functions.createDataset` | mutation | authMutation + RL | evalDatasets | owner helper | ok |
@@ -401,6 +402,7 @@ for a schema table that is neither policed nor listed:
 | `evals_functions.importCases` | mutation | authMutation + RL | evalCases, evalDatasets | owner helper | ok |
 | `evals_functions.listDatasets` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `evals_functions.listRuns` | query | authQuery | evalDatasets | owner helper; row.userId == caller | ok |
+| `evals_functions.setCaseFrozen` | mutation | authMutation + RL | evalCases | owner helper | ok |
 | `evals_functions.startRun` | mutation | authMutation + RL | evalDatasets, evalRuns, knowledgeFiles, skills | owner helper | ok |
 | `evals_functions.updateCase` | mutation | authMutation + RL | evalCases | owner helper | ok |
 | `evals_functions.updateDataset` | mutation | authMutation + RL | evalDatasets | owner helper | ok |
