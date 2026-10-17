@@ -38,6 +38,13 @@ const PROVIDER_LABELS: Record<ImportProvider, string> = {
     gemini: "Google Gemini",
 };
 
+/** The normalised conversations as the one JSON file the import uploads. */
+const importPayload = (conversations: NormalizedConversation[]): File => new File([JSON.stringify(conversations)], "import.json", { type: "application/json" });
+
+/** The upload route refuses a larger file with a generic error, so a selection is checked before it is previewed. */
+const isTooLargeToUpload = (conversations: NormalizedConversation[]): boolean =>
+    importPayload(conversations).size > chatAttachmentLimit("application/json").maxBytes;
+
 type ImportState =
     | { step: "idle" }
     | { step: "parsing" }
@@ -214,6 +221,12 @@ const DataImport: FC = () => {
                     return;
                 }
 
+                if (isTooLargeToUpload(allConversations)) {
+                    setState({ message: t`This selection is too large to import at once. Import fewer files at a time.`, step: "error" });
+
+                    return;
+                }
+
                 setState({
                     conversations: allConversations,
                     provider: detectedProvider,
@@ -233,14 +246,7 @@ const DataImport: FC = () => {
         }
 
         const { conversations, provider } = state;
-        const payload = new File([JSON.stringify(conversations)], "import.json", { type: "application/json" });
-
-        // The upload route refuses a larger file with a generic error, so say what to do before sending it.
-        if (payload.size > chatAttachmentLimit(payload.type).maxBytes) {
-            setState({ message: t`This selection is too large to import at once. Import fewer files at a time.`, step: "error" });
-
-            return;
-        }
+        const payload = importPayload(conversations);
 
         setState({ provider, step: "uploading" });
 
