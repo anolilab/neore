@@ -39,18 +39,19 @@ const MessageList = memo(
         const { t } = useLingui();
         const bottomRef = useRef<HTMLDivElement>(null);
         const containerRef = useRef<HTMLDivElement>(null);
-        const lastMessageCount = useRef(messages.length);
+        const lastMessageId = messages.at(-1)?.id;
+        const previousLastMessageId = useRef(lastMessageId);
 
-        // Auto-scroll to bottom when streaming or new messages arrive
+        // Auto-scroll to bottom when streaming or a new last message arrives (not when older ones are prepended)
         useEffect(() => {
-            const shouldScroll = isStreaming || messages.length !== lastMessageCount.current;
+            const shouldScroll = isStreaming || lastMessageId !== previousLastMessageId.current;
 
             if (shouldScroll && bottomRef.current) {
                 bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
             }
 
-            lastMessageCount.current = messages.length;
-        }, [isStreaming, messages.length]);
+            previousLastMessageId.current = lastMessageId;
+        }, [isStreaming, lastMessageId]);
 
         if (messages.length === 0) {
             return (

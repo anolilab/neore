@@ -249,6 +249,8 @@ const LiveWaveform = ({
             return undefined;
         }
 
+        let cancelled = false;
+
         const setupMicrophone = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -265,6 +267,12 @@ const LiveWaveform = ({
                               noiseSuppression: true,
                           },
                 });
+
+                if (cancelled) {
+                    stream.getTracks().forEach((track) => track.stop());
+
+                    return;
+                }
 
                 streamRef.current = stream;
                 onStreamReady?.(stream);
@@ -294,6 +302,8 @@ const LiveWaveform = ({
         setupMicrophone();
 
         return () => {
+            cancelled = true;
+
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach((track) => track.stop());
                 streamRef.current = null;

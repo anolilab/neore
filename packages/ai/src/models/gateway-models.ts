@@ -61,6 +61,8 @@ export const deriveImageModels = (): Record<string, GatewayImageModelInfo> => {
     for (const definition of MODEL_REGISTRY) {
         if (definition.mode !== "image") continue;
 
+        if (definition.enabled === false) continue;
+
         if (!definition.gatewayKey) continue;
 
         if (definition.costPerImageMicrodollars === undefined) continue;
@@ -83,6 +85,8 @@ export const deriveVideoModels = (): Record<string, GatewayVideoModelInfo> => {
 
     for (const definition of MODEL_REGISTRY) {
         if (definition.mode !== "video") continue;
+
+        if (definition.enabled === false) continue;
 
         if (!definition.gatewayKey) continue;
 
@@ -140,6 +144,8 @@ export const deriveMusicModels = (): Record<string, GatewayMusicModelInfo> => {
 
     for (const definition of MODEL_REGISTRY) {
         if (definition.mode !== "music") continue;
+
+        if (definition.enabled === false) continue;
 
         if (!definition.gatewayKey) continue;
 

@@ -184,62 +184,65 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
     };
 
     return (
-        <button
+        <div
             className={cn(
                 "group relative overflow-hidden rounded-lg",
                 "border-1 transition-all duration-200",
                 "hover:ring-primary/50 hover:ring-2 hover:ring-offset-2",
-                "focus-visible:ring-primary focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
                 isSelected ? "border-primary ring-primary ring-2 ring-offset-2" : "border-transparent",
                 className,
             )}
             data-selected={isSelected}
             data-slot="image-gallery-item"
-            onClick={handleClick}
-            type="button"
         >
-            {/* Image/Video thumbnail with lazy loading */}
-            {item.nsfwStatus === "blocked" || item.nsfwStatus === "checking" ? (
-                <div className="bg-muted flex aspect-square items-center justify-center">
-                    <div className="flex flex-col items-center gap-1.5">
-                        <AlertCircle className="size-6 text-amber-500" />
-                        <span className="text-muted-foreground text-[10px]">{item.nsfwStatus === "checking" ? "Scanning..." : "Flagged"}</span>
-                    </div>
-                </div>
-            ) : (
-                <LazyImage
-                    alt={item.alt || t`Gallery item`}
-                    aspectRatioClassName="border-0 bg-muted"
-                    className="transition-transform duration-300 group-hover:scale-105"
-                    fallback={undefined}
-                    inView
-                    ratio={1}
-                    src={thumbnailSource}
-                />
-            )}
-
-            {/* Overlay for videos */}
-            {item.type === "video" && (
-                <>
-                    {/* Play icon */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                        <div className="flex size-12 items-center justify-center rounded-full bg-white/90">
-                            <Play className="ml-1 size-6 fill-black text-black" />
+            <button
+                className="focus-visible:ring-primary relative block w-full rounded-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                onClick={handleClick}
+                type="button"
+            >
+                {/* Image/Video thumbnail with lazy loading */}
+                {item.nsfwStatus === "blocked" || item.nsfwStatus === "checking" ? (
+                    <div className="bg-muted flex aspect-square items-center justify-center">
+                        <div className="flex flex-col items-center gap-1.5">
+                            <AlertCircle className="size-6 text-amber-500" />
+                            <span className="text-muted-foreground text-[10px]">{item.nsfwStatus === "checking" ? "Scanning..." : "Flagged"}</span>
                         </div>
                     </div>
+                ) : (
+                    <LazyImage
+                        alt={item.alt || t`Gallery item`}
+                        aspectRatioClassName="border-0 bg-muted"
+                        className="transition-transform duration-300 group-hover:scale-105"
+                        fallback={undefined}
+                        inView
+                        ratio={1}
+                        src={thumbnailSource}
+                    />
+                )}
 
-                    {/* Duration badge */}
-                    {item.duration && (
-                        <div className="absolute right-2 bottom-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">
-                            {formatDuration(item.duration)}
+                {/* Overlay for videos */}
+                {item.type === "video" && (
+                    <>
+                        {/* Play icon */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                            <div className="flex size-12 items-center justify-center rounded-full bg-white/90">
+                                <Play className="ml-1 size-6 fill-black text-black" />
+                            </div>
                         </div>
-                    )}
-                </>
-            )}
+
+                        {/* Duration badge */}
+                        {item.duration && (
+                            <div className="absolute right-2 bottom-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">
+                                {formatDuration(item.duration)}
+                            </div>
+                        )}
+                    </>
+                )}
+            </button>
 
             {/* Selection checkbox - always visible when selection is enabled */}
             {selectionEnabled && (
-                <div
+                <button
                     aria-checked={isSelected}
                     aria-label={isSelected ? t`Deselect image` : t`Select image as reference`}
                     className={cn(
@@ -250,23 +253,11 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
                         !canSelect && !isSelected && "cursor-not-allowed opacity-50",
                     )}
                     onClick={handleCheckboxClick}
-                    onKeyDown={(e) => {
-                        if (!(e.key === "Enter" || e.key === " ")) {
-                            return;
-                        }
-
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        if (canSelect) {
-                            onToggleSelection(item);
-                        }
-                    }}
                     role="checkbox"
-                    tabIndex={0}
+                    type="button"
                 >
                     {isSelected && <Check className="text-primary-foreground size-4" />}
-                </div>
+                </button>
             )}
 
             {/* Aspect ratio indicator */}
@@ -275,7 +266,7 @@ const ImageGalleryItem = ({ className, item }: ImageGalleryItemProps) => {
                     {item.aspectRatio}
                 </div>
             )}
-        </button>
+        </div>
     );
 };
 
@@ -296,62 +287,61 @@ const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
     const [cellAspectRatio, setCellAspectRatio] = useState<string>("4/3");
 
     return (
-        <button
-            className={cn(
-                "group relative overflow-hidden bg-zinc-900 dark:bg-[#111111]",
-                "focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none focus-visible:ring-inset",
-                isSelected && "ring-2 ring-white ring-inset",
-                className,
-            )}
+        <div
+            className={cn("group relative overflow-hidden bg-zinc-900 dark:bg-[#111111]", isSelected && "ring-2 ring-white ring-inset", className)}
             data-selected={isSelected}
             data-slot="krea-gallery-item"
-            onClick={() => onItemClick(item)}
             style={{ aspectRatio: cellAspectRatio }}
-            type="button"
         >
-            {item.nsfwStatus === "blocked" || item.nsfwStatus === "checking" ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-zinc-800">
-                    <div className="flex flex-col items-center gap-1.5">
-                        <AlertCircle className="size-6 text-amber-500" />
-                        <span className="text-xs text-zinc-400">{item.nsfwStatus === "checking" ? "Scanning..." : "Flagged for review"}</span>
-                    </div>
-                </div>
-            ) : (
-                <img
-                    alt={item.alt || ""}
-                    className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                    loading="lazy"
-                    onLoad={(e) => {
-                        const img = e.currentTarget;
-
-                        if (img.naturalWidth && img.naturalHeight) {
-                            setCellAspectRatio(`${img.naturalWidth}/${img.naturalHeight}`);
-                        }
-                    }}
-                    src={item.thumbnail || item.src}
-                />
-            )}
-
-            {/* Dark scrim on hover */}
-            <div className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/15" />
-
-            {/* Video play button */}
-            {item.type === "video" && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="flex size-11 items-center justify-center rounded-full border border-white/20 bg-black/50 opacity-70 backdrop-blur-sm transition-opacity group-hover:opacity-100">
-                        <Play className="ml-0.5 size-5 fill-white text-white" />
-                    </div>
-                    {item.duration && (
-                        <div className="absolute right-2 bottom-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">
-                            {formatDuration(item.duration)}
+            <button
+                className="absolute inset-0 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none focus-visible:ring-inset"
+                onClick={() => onItemClick(item)}
+                type="button"
+            >
+                {item.nsfwStatus === "blocked" || item.nsfwStatus === "checking" ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-800">
+                        <div className="flex flex-col items-center gap-1.5">
+                            <AlertCircle className="size-6 text-amber-500" />
+                            <span className="text-xs text-zinc-400">{item.nsfwStatus === "checking" ? "Scanning..." : "Flagged for review"}</span>
                         </div>
-                    )}
-                </div>
-            )}
+                    </div>
+                ) : (
+                    <img
+                        alt={item.alt || ""}
+                        className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        loading="lazy"
+                        onLoad={(e) => {
+                            const img = e.currentTarget;
+
+                            if (img.naturalWidth && img.naturalHeight) {
+                                setCellAspectRatio(`${img.naturalWidth}/${img.naturalHeight}`);
+                            }
+                        }}
+                        src={item.thumbnail || item.src}
+                    />
+                )}
+
+                {/* Dark scrim on hover */}
+                <div className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/15" />
+
+                {/* Video play button */}
+                {item.type === "video" && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="flex size-11 items-center justify-center rounded-full border border-white/20 bg-black/50 opacity-70 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+                            <Play className="ml-0.5 size-5 fill-white text-white" />
+                        </div>
+                        {item.duration && (
+                            <div className="absolute right-2 bottom-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">
+                                {formatDuration(item.duration)}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </button>
 
             {/* Selection circle */}
             {selectionEnabled && (
-                <div
+                <button
                     aria-checked={isSelected}
                     aria-label={isSelected ? t`Deselect` : t`Select as reference`}
                     className={cn(
@@ -368,25 +358,13 @@ const KreaImageItem = ({ className, item }: ImageGalleryItemProps) => {
                             onToggleSelection(item);
                         }
                     }}
-                    onKeyDown={(e) => {
-                        if (!(e.key === "Enter" || e.key === " ")) {
-                            return;
-                        }
-
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        if (canSelect) {
-                            onToggleSelection(item);
-                        }
-                    }}
                     role="checkbox"
-                    tabIndex={0}
+                    type="button"
                 >
                     {isSelected && <Check className="size-3 text-black" />}
-                </div>
+                </button>
             )}
-        </button>
+        </div>
     );
 };
 

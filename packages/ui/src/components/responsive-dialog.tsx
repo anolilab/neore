@@ -71,10 +71,9 @@ const DialogTrigger = (props: React.ComponentProps<typeof BaseDialogTrigger>) =>
  * close button) on desktop and DrawerContent (bottom sheet with drag handle)
  * on mobile.
  *
- * Desktop-only props like `bottomStickOnMobile`, `onOpenAutoFocus`,
- * `onCloseAutoFocus` are ignored in mobile mode.
+ * Desktop-only props like `bottomStickOnMobile` are ignored in mobile mode.
  */
-const DialogContent = ({ bottomStickOnMobile, children, className, onCloseAutoFocus, onOpenAutoFocus, showCloseButton = true, ...props }: DialogPopupProps) => {
+const DialogContent = ({ bottomStickOnMobile, children, className, showCloseButton = true, ...props }: DialogPopupProps) => {
     const isMobile = React.use(IsMobileContext);
 
     if (isMobile) {
@@ -82,14 +81,7 @@ const DialogContent = ({ bottomStickOnMobile, children, className, onCloseAutoFo
     }
 
     return (
-        <BaseDialogPopup
-            bottomStickOnMobile={bottomStickOnMobile}
-            className={className}
-            onCloseAutoFocus={onCloseAutoFocus}
-            onOpenAutoFocus={onOpenAutoFocus}
-            showCloseButton={showCloseButton}
-            {...props}
-        >
+        <BaseDialogPopup bottomStickOnMobile={bottomStickOnMobile} className={className} showCloseButton={showCloseButton} {...props}>
             {children}
         </BaseDialogPopup>
     );

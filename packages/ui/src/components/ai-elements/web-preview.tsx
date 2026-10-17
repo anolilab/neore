@@ -135,6 +135,14 @@ export const WebPreviewUrl = ({ onChange, onKeyDown, value, ...props }: WebPrevi
     );
 };
 
+const isHttpUrl = (url: string): boolean => {
+    try {
+        return ["http:", "https:"].includes(new URL(url).protocol);
+    } catch {
+        return false;
+    }
+};
+
 export type WebPreviewBodyProps = ComponentProps<"iframe"> & {
     loading?: ReactNode;
 };
@@ -142,13 +150,14 @@ export type WebPreviewBodyProps = ComponentProps<"iframe"> & {
 export const WebPreviewBody = ({ className, loading, src, ...props }: WebPreviewBodyProps) => {
     const { t } = useLingui();
     const { url } = useWebPreview();
+    const frameSource = src ?? url;
 
     return (
         <div className="flex-1">
             <iframe
                 className={cn("size-full", className)}
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-                src={(src ?? url) || undefined}
+                src={isHttpUrl(frameSource) ? frameSource : undefined}
                 title={t`Preview`}
                 {...props}
             />

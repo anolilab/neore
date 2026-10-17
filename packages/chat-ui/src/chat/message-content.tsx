@@ -692,7 +692,6 @@ BrowserToolResultView.displayName = "BrowserToolResultView";
  */
 const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className, components = NO_COMPONENTS, isStreaming = false, message }) => {
     const { t } = useLingui();
-    const resolveCitationLabel = citationLabel ?? ((index: number) => t`Source ${index}`);
     const {
         DeviceToolCall,
         DocumentArtifact,
@@ -852,7 +851,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                         }
                         default: {
                             renderedParts.push(
-                                <div data-markdown-part={textPart.text} key={key}>
+                                <div data-markdown-part={isAnimating ? undefined : textPart.text} key={key}>
                                     <Text isAnimating={isAnimating} text={textPart.text} />
                                 </div>,
                             );
@@ -1050,13 +1049,6 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
         }
     }
 
-    // Build a source URL map for citation markers [1], [2], etc.
-    const sourceUrlMap = new Map<number, string>();
-
-    for (const [index, sourcePart] of sourceParts.entries()) {
-        sourceUrlMap.set(index + 1, sourcePart.type === "source-url" ? sourcePart.url : "#");
-    }
-
     const containerRef = useRef<HTMLDivElement>(null);
 
     // A document-source marker opens its chip. One delegated listener, not one
@@ -1087,14 +1079,33 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
         };
     }, []);
 
-    // Inject citation markers into rendered text after each render
+    // Inject citation markers once the text is final: replacing React-owned text
+    // nodes mid-stream detaches them, freezing the paragraph.
     useEffect(() => {
         const container = containerRef.current;
-        const urlMap = sourceUrlMap;
 
-        if (!container || urlMap.size === 0) {
+        if (isAnimating || !container) {
             return;
         }
+
+        // Citation markers [1], [2], … map to the message's source parts in order.
+        const urlMap = new Map<number, string>();
+
+        for (const part of message.parts) {
+            if (part.type !== "source-url" && part.type !== "source-document") {
+                continue;
+            }
+
+            const sourcePart = part as SourceDocumentPart | SourceUrlPart;
+
+            urlMap.set(urlMap.size + 1, sourcePart.type === "source-url" ? sourcePart.url : "#");
+        }
+
+        if (urlMap.size === 0) {
+            return;
+        }
+
+        const resolveCitationLabel = citationLabel ?? ((index: number) => t`Source ${index}`);
 
         // Find all text nodes that contain [N] patterns
         const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
@@ -1166,7 +1177,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
             textNode.parentNode?.replaceChild(frag, textNode);
         }
-    });
+    }, [isAnimating, message.parts, citationLabel, t]);
 
     return (
         <div className={cn("message-content", className)} ref={containerRef}>

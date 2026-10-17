@@ -86,9 +86,10 @@ const SnappySlider = ({
     ...props
 }: CustomSliderProps) => {
     const sliderRef = React.useRef<HTMLDivElement>(null);
+    const inputId = React.useId();
     const { snappingThreshold = 1 } = config;
 
-    const defaultValueArray = [...values, defaultValue].toSorted((a, b) => a - b);
+    const defaultValueArray = React.useMemo(() => [...values, defaultValue].toSorted((a, b) => a - b), [values, defaultValue]);
 
     // Calculate input bounds using defaultValueArray
     const inputMin = providedMin ?? Math.min(...defaultValueArray);
@@ -191,6 +192,14 @@ const SnappySlider = ({
         [sliderMin, sliderMax, defaultValueArray, currentValue, computedStep, snapping, snappingThreshold, handleValueChange],
     );
 
+    // The drag listeners are installed once per mount; they read the latest
+    // interaction handler from this ref instead of re-subscribing on every render.
+    const handleInteractionRef = React.useRef(handleInteraction);
+
+    React.useEffect(() => {
+        handleInteractionRef.current = handleInteraction;
+    }, [handleInteraction]);
+
     React.useEffect(() => {
         const slider = sliderRef.current;
 
@@ -199,7 +208,7 @@ const SnappySlider = ({
         }
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
-            handleInteraction(moveEvent.clientX);
+            handleInteractionRef.current(moveEvent.clientX);
         };
 
         const handleMouseUp = () => {
@@ -210,7 +219,7 @@ const SnappySlider = ({
         };
 
         const handleTouchMove = (moveEvent: TouchEvent) => {
-            handleInteraction(moveEvent.touches[0]?.clientX ?? 0);
+            handleInteractionRef.current(moveEvent.touches[0]?.clientX ?? 0);
         };
 
         const handleTouchEnd = () => {
@@ -221,7 +230,7 @@ const SnappySlider = ({
         const handleMouseDown = (e: MouseEvent) => {
             // Prevent text selection while dragging
             e.preventDefault();
-            handleInteraction(e.clientX);
+            handleInteractionRef.current(e.clientX);
 
             // Add selection prevention to document during drag
             document.body.style.userSelect = "none";
@@ -232,7 +241,7 @@ const SnappySlider = ({
 
         const handleTouchStart = (e: TouchEvent) => {
             e.preventDefault();
-            handleInteraction(e.touches[0]?.clientX ?? 0);
+            handleInteractionRef.current(e.touches[0]?.clientX ?? 0);
 
             document.addEventListener("touchmove", handleTouchMove, { passive: false });
             document.addEventListener("touchend", handleTouchEnd, { passive: true });
@@ -251,7 +260,7 @@ const SnappySlider = ({
             // Ensure we clean up the user-select style if component unmounts during drag
             document.body.style.userSelect = "";
         };
-    }, [sliderMin, sliderMax, onChange, values, defaultValue, label, computedStep, snapping, snappingThreshold, handleInteraction]);
+    }, []);
 
     React.useEffect(() => {
         const slider = sliderRef.current;
@@ -305,9 +314,10 @@ const SnappySlider = ({
             {...props}
         >
             <SnappySliderHeader>
-                <SnappySliderLabel>{label}</SnappySliderLabel>
+                <SnappySliderLabel htmlFor={inputId}>{label}</SnappySliderLabel>
                 <SnappySliderValue
                     className={cn(isOutOfBounds && "opacity-75")}
+                    id={inputId}
                     onBlur={handleInputBlur}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}

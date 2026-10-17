@@ -2,9 +2,9 @@
  * Tiny Mustache-style template renderer for prompt-optimizer templates.
  *
  * Supports only the two patterns used by the ported templates:
- *   - `{{varName}}`                        → JSON.stringify-safe substitution
+ *   - `{{varName}}`                        → raw substitution (same as triple braces)
  *   - `{{{varName}}}`                      → raw substitution
- *   - `{{#helpers.toJson}}{{{varName}}}{{/helpers.toJson}}` → JSON-stringify the value
+ *   - `{{#helpers.toJson}}{{{varName}}}{{/helpers.toJson}}` → JSON-stringify the value (the only quoting form)
  *
  * Missing/undefined values render as empty string.
  *

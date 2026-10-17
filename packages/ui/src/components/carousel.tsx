@@ -68,6 +68,7 @@ const Carousel = ({ children, className, opts, orientation = "horizontal", plugi
 
         return () => {
             api?.off("select", onSelect);
+            api?.off("reInit", onSelect);
         };
     }, [api, onSelect]);
 

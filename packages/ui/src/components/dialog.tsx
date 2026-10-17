@@ -7,9 +7,6 @@ import { ScrollArea } from "@ui/components/scroll-area";
 import cn from "@ui/utils/cn";
 import { XIcon } from "lucide-react";
 import * as React from "react";
-import { Activity, createContext, use } from "react";
-
-const DialogContext = createContext<{ open: boolean } | null>(null);
 
 export interface DialogProps extends Omit<DialogPrimitive.Root.Props, "onOpenChange"> {
     /**
@@ -30,15 +27,7 @@ const DialogRoot = ({ onOpenChange, onOpenChangeWithDetails, open, ...props }: D
         onOpenChangeWithDetails?.(newOpen, eventDetails);
     };
 
-    const contextValue = React.useMemo(() => {
-        return { open: open ?? false };
-    }, [open]);
-
-    return (
-        <DialogContext value={contextValue}>
-            <DialogPrimitive.Root onOpenChange={handleOpenChange} open={open} {...props} />
-        </DialogContext>
-    );
+    return <DialogPrimitive.Root onOpenChange={handleOpenChange} open={open} {...props} />;
 };
 
 const Dialog = DialogRoot;
@@ -70,68 +59,11 @@ const DialogViewport = ({ className, ...props }: DialogPrimitive.Viewport.Props)
 
 export interface DialogPopupProps extends DialogPrimitive.Popup.Props {
     bottomStickOnMobile?: boolean;
-
-    /**
-     * @deprecated Use finalFocus on Dialog root instead. This is kept for backward compatibility.
-     * Event handler called when focus moves outside the component after closing.
-     */
-    onCloseAutoFocus?: (event: Event) => void;
-
-    /**
-     * @deprecated Use initialFocus on Dialog root instead. This is kept for backward compatibility.
-     * Event handler called when focus moves into the component after opening.
-     */
-    onOpenAutoFocus?: (event: Event) => void;
     showCloseButton?: boolean;
 }
 
-const DialogPopup = ({
-    bottomStickOnMobile = true,
-    children,
-    className,
-    onCloseAutoFocus,
-    onOpenAutoFocus,
-    showCloseButton = true,
-    ...props
-}: DialogPopupProps) => {
+const DialogPopup = ({ bottomStickOnMobile = true, children, className, showCloseButton = true, ...props }: DialogPopupProps) => {
     const { t } = useLingui();
-    const context = use(DialogContext);
-    const popupRef = React.useRef<HTMLDivElement>(null);
-
-    // Handle focus callbacks via data attributes
-    React.useEffect(() => {
-        const popup = popupRef.current;
-
-        if (!popup) {
-            return undefined;
-        }
-
-        const observer = new MutationObserver((mutations) => {
-            for (const mutation of mutations) {
-                if (mutation.attributeName === "data-open") {
-                    const isOpen = "open" in popup.dataset;
-
-                    if (isOpen && onOpenAutoFocus) {
-                        const event = new Event("focus", { cancelable: true });
-
-                        onOpenAutoFocus(event);
-                    }
-                } else if (mutation.attributeName === "data-closed") {
-                    const isClosed = "closed" in popup.dataset;
-
-                    if (isClosed && onCloseAutoFocus) {
-                        const event = new Event("focus", { cancelable: true });
-
-                        onCloseAutoFocus(event);
-                    }
-                }
-            }
-        });
-
-        observer.observe(popup, { attributes: true });
-
-        return () => observer.disconnect();
-    }, [onOpenAutoFocus, onCloseAutoFocus]);
 
     return (
         <DialogPortal>
@@ -145,10 +77,9 @@ const DialogPopup = ({
                         className,
                     )}
                     data-slot="dialog-popup"
-                    ref={popupRef}
                     {...props}
                 >
-                    <Activity mode={context?.open ? "visible" : "hidden"}>{children}</Activity>
+                    {children}
                     {showCloseButton && (
                         <DialogPrimitive.Close aria-label={t`Close`} className="absolute end-2 top-2" render={<Button size="icon" variant="ghost" />}>
                             <XIcon aria-hidden="true" />

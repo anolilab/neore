@@ -120,13 +120,7 @@ function ContextMenuImpl<TData extends RowData>({
         };
     }, [contextMenu.x, contextMenu.y]);
 
-    const onCloseAutoFocus: NonNullable<React.ComponentProps<typeof DropdownMenuContent>["onCloseAutoFocus"]> = React.useCallback(
-        (event) => {
-            event.preventDefault();
-            propsRef.current.dataGridRef?.current?.focus();
-        },
-        [propsRef],
-    );
+    const finalFocus = React.useCallback(() => propsRef.current.dataGridRef?.current ?? true, [propsRef]);
 
     const onCopy = React.useCallback(() => {
         propsRef.current.onCellsCopy?.();
@@ -225,7 +219,7 @@ function ContextMenuImpl<TData extends RowData>({
     return (
         <DropdownMenu onOpenChange={onContextMenuOpenChange} open={contextMenu.open}>
             <DropdownMenuTrigger style={triggerStyle} />
-            <DropdownMenuContent align="start" className="w-48" data-grid-popover="" onCloseAutoFocus={onCloseAutoFocus}>
+            <DropdownMenuContent align="start" className="w-48" data-grid-popover="" finalFocus={finalFocus}>
                 <DropdownMenuItem onSelect={onCopy}>
                     <CopyIcon />
                     {t`Copy`}

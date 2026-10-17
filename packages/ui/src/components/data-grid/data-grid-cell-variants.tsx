@@ -283,15 +283,16 @@ export const LongTextCell = <TData extends RowData>({
         [tableMeta, value, initialValue, rowIndex, columnId, readOnly],
     );
 
-    const onOpenAutoFocus: NonNullable<React.ComponentProps<typeof PopoverContent>["onOpenAutoFocus"]> = React.useCallback((event) => {
-        event.preventDefault();
+    const initialFocus = React.useCallback(() => {
+        const textarea = textareaRef.current;
 
-        if (textareaRef.current) {
-            textareaRef.current.focus();
-            const { length } = textareaRef.current.value;
+        if (textarea) {
+            const { length } = textarea.value;
 
-            textareaRef.current.setSelectionRange(length, length);
+            textarea.setSelectionRange(length, length);
         }
+
+        return textarea;
     }, []);
 
     const onBlur = React.useCallback(() => {
@@ -368,7 +369,7 @@ export const LongTextCell = <TData extends RowData>({
                 align="start"
                 className="w-[400px] rounded-none p-0"
                 data-grid-cell-editor=""
-                onOpenAutoFocus={onOpenAutoFocus}
+                initialFocus={initialFocus}
                 side="bottom"
                 sideOffset={sideOffset}
             >
@@ -1121,11 +1122,6 @@ export const MultiSelectCell = <TData extends RowData>({
         [tableMeta, rowIndex, columnId, readOnly],
     );
 
-    const onOpenAutoFocus: NonNullable<React.ComponentProps<typeof PopoverContent>["onOpenAutoFocus"]> = React.useCallback((event) => {
-        event.preventDefault();
-        inputRef.current?.focus();
-    }, []);
-
     const onWrapperKeyDown = React.useCallback(
         (event: React.KeyboardEvent<HTMLDivElement>) => {
             if (isEditing && event.key === "Escape") {
@@ -1199,7 +1195,7 @@ export const MultiSelectCell = <TData extends RowData>({
                         align="start"
                         className="w-[300px] rounded-none p-0"
                         data-grid-cell-editor=""
-                        onOpenAutoFocus={onOpenAutoFocus}
+                        initialFocus={inputRef}
                         sideOffset={sideOffset}
                     >
                         <div className="**:data-[slot=command-input-wrapper]:h-auto **:data-[slot=command-input-wrapper]:border-none **:data-[slot=command-input-wrapper]:p-0 [&_[data-slot=command-input-wrapper]_svg]:hidden">
@@ -1944,19 +1940,6 @@ export const FileCell = <TData extends RowData>({
         [tableMeta, rowIndex, columnId, readOnly],
     );
 
-    const onEscapeKeyDown: NonNullable<React.ComponentProps<typeof PopoverContent>["onEscapeKeyDown"]> = React.useCallback((event) => {
-        // Prevent the escape key from propagating to the data grid's keyboard handler
-        // which would call blurCell() and remove focus from the cell
-        event.stopPropagation();
-    }, []);
-
-    const onOpenAutoFocus: NonNullable<React.ComponentProps<typeof PopoverContent>["onOpenAutoFocus"]> = React.useCallback((event) => {
-        event.preventDefault();
-        queueMicrotask(() => {
-            dropzoneRef.current?.focus();
-        });
-    }, []);
-
     const onWrapperKeyDown = React.useCallback(
         (event: React.KeyboardEvent<HTMLDivElement>) => {
             if (isEditing) {
@@ -2070,8 +2053,7 @@ export const FileCell = <TData extends RowData>({
                         align="start"
                         className="w-[400px] rounded-none p-0"
                         data-grid-cell-editor=""
-                        onEscapeKeyDown={onEscapeKeyDown}
-                        onOpenAutoFocus={onOpenAutoFocus}
+                        initialFocus={dropzoneRef}
                         sideOffset={sideOffset}
                     >
                         <div className="flex flex-col gap-2 p-3">
