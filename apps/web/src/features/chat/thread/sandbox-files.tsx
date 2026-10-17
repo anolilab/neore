@@ -109,7 +109,9 @@ const PreviewLoading: FC = () => {
 
 const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
     const { t } = useLingui();
-    const [state, setState] = useState<{ blob?: Blob; failed?: boolean }>({});
+    // The result carries the URL it belongs to: a deck from an earlier file is never shown for this one.
+    const [result, setResult] = useState<{ blob?: Blob; failed?: boolean; url?: string }>({});
+    const state = result.url === url ? result : {};
 
     useEffect(() => {
         const controller = new AbortController();
@@ -131,11 +133,15 @@ const PptxFromUrl: FC<{ name: string; url: string }> = ({ name, url }) => {
 
                 // A small download can expand far past what the browser should parse.
                 await assertOfficeZipWithinLimits(await blob.arrayBuffer());
-                setState({ blob });
+
+                // A load superseded by a newer URL, or by unmount, must not write over the current one.
+                if (!unmounted) {
+                    setResult({ blob, url });
+                }
             } catch {
                 // A timeout shows the failure; an unmount shows nothing.
                 if (!unmounted) {
-                    setState({ failed: true });
+                    setResult({ failed: true, url });
                 }
             } finally {
                 clearTimeout(deadline);
