@@ -30,7 +30,7 @@
  */
 import type { AppEnv } from "../env.js";
 import { createQueueMessageTelemetry } from "../lib/otel/index.js";
-import { markRenderFailed, runVideoRender } from "../routes/v1/video-render.js";
+import { deferPendingUsage, markRenderFailed, runVideoRender } from "../routes/v1/video-render.js";
 import type { VideoRenderMessage } from "../routes/v1/video-types.js";
 import { VIDEO_RENDER_MESSAGE_VERSION } from "../routes/v1/video-types.js";
 
@@ -153,6 +153,7 @@ const handleRenderMessage = async (message: Message<VideoRenderMessage>, queueNa
                     await markRenderFailed(env, body, `${outcome.errorMessage} (retries exhausted after ${message.attempts} attempts)`).catch((error) =>
                         console.error("[video] failed to finalise render after retries exhausted:", error),
                     );
+                    await deferPendingUsage(env, body.jobId).catch((error) => console.error("[video] failed to defer pending usage:", error));
                 }
 
                 message.ack();
@@ -172,6 +173,7 @@ const handleRenderMessage = async (message: Message<VideoRenderMessage>, queueNa
         } else {
             outcomeStatus = "failed";
             await markRenderFailed(env, body, `Consumer error: ${renderError.message}`).catch(() => {});
+            await deferPendingUsage(env, body.jobId).catch((deferError) => console.error("[video] failed to defer pending usage:", deferError));
             message.ack();
         }
     } finally {

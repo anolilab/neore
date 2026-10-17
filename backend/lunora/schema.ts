@@ -345,6 +345,7 @@ export const schema = defineSchema({
         nsfwStatus: v.optional(v.union(v.literal("pending"), v.literal("checking"), v.literal("safe"), v.literal("blocked"), v.literal("failed"))),
         refcount: v.number(),
         storageId: v.string(),
+        unreferencedSince: v.optional(v.number()),
     })
         // `.global()`: content-addressed (`agent-files/<sha256>`), so identical
         // bytes stored by two users share ONE R2 object. Its refcount must see

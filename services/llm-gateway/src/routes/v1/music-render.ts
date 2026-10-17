@@ -24,6 +24,7 @@ import type { RequestTelemetry } from "../../lib/otel/index.js";
 import { validateWebhookUrl } from "../../lib/webhook-delivery.js";
 import type { FalQueueUrls } from "../../providers/music-factory.js";
 import { MUSIC_MODELS, runFalMusicGeneration } from "../../providers/music-factory.js";
+import { deferUsageReport } from "../../usage/pending.js";
 import type { UsageReport } from "../../usage/reporter.js";
 import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
@@ -165,6 +166,15 @@ const settlePendingUsage = async (env: AppEnv, job: MusicJobState): Promise<bool
     await putJob(env.RATE_LIMIT_KV, { ...job, usagePending: undefined }).catch(() => {});
 
     return true;
+};
+
+/** Hand a charge the queue's retries could not settle to the usage sweeper. */
+export const deferPendingUsage = async (env: AppEnv, jobId: string): Promise<void> => {
+    const job = await getJob(env.RATE_LIMIT_KV, jobId);
+
+    if (job?.usagePending) {
+        await deferUsageReport(env.USAGE_DB, job.usagePending);
+    }
 };
 
 /** How many times a submitted render may be resumed from its FAL URLs before it fails. */

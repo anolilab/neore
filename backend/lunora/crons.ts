@@ -5,6 +5,7 @@ import { v } from "lunorash/server";
 import { internal } from "./_generated/internal";
 import type { ActionCtx } from "./_generated/server";
 import { internalAction, internalMutation } from "./_generated/server";
+import { isUnusedFileDue } from "./agent/files";
 import { leaseTemporaryThreadMarkers } from "./agent/table-writes";
 import type { PeriodicJob } from "./lib/cron-schedule";
 import { dueJobs } from "./lib/cron-schedule";
@@ -13,8 +14,6 @@ import { cronsLogger } from "./lib/logger";
 import { scheduleObjectDeletion } from "./lib/storage-cleanup";
 
 export const crons = cronJobs();
-
-const THRESHOLD_MS = 1000 * 60 * 60 * 24;
 
 // Keep-alive to prevent cold starts - runs every 10 minutes
 export const keepAlive = internalMutation
@@ -38,7 +37,7 @@ export const deleteUnusedFiles = internalMutation
                 numItems: 100,
             },
         });
-        const toDelete = files.page.filter((f) => f.lastTouchedAt < context.now - THRESHOLD_MS);
+        const toDelete = files.page.filter((f) => isUnusedFileDue(f, context.now));
 
         if (toDelete.length > 0) {
             cronsLogger.debug(`Deleting ${toDelete.length} files...`);

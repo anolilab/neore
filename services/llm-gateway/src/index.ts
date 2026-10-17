@@ -43,6 +43,7 @@ import { videoRouter } from "./routes/v1/video.js";
 import type { VideoRenderMessage } from "./routes/v1/video-types.js";
 import { recomputeTierPools } from "./routing/tier-assignment.js";
 import { UsageAggregator } from "./usage/aggregator.js";
+import { sweepPendingUsage } from "./usage/pending.js";
 
 export const app = new OpenAPIHono<HonoEnv>();
 
@@ -242,7 +243,7 @@ export default {
                 break;
             }
 
-            // Every 5 minutes — reset expired circuit breakers
+            // Every 5 minutes — reset expired circuit breakers, retry deferred usage charges
             case "*/5 * * * *": {
                 try {
                     await env.USAGE_DB.prepare(
@@ -251,6 +252,10 @@ export default {
                 } catch {
                     // Non-critical
                 }
+
+                await sweepPendingUsage(env).catch((error: unknown) =>
+                    logger.error("[Cron] Pending usage sweep failed", error instanceof Error ? error : undefined),
+                );
 
                 break;
             }
