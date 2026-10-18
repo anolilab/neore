@@ -1601,6 +1601,11 @@
       "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
     },
     {
+      "from": "function:chat_functions:generateImageToVideo",
+      "kind": "call",
+      "to": "function:auth_functions:getUserRunPlanQuery"
+    },
+    {
       "from": "function:chat_functions:generateSummary",
       "kind": "call",
       "to": "function:agent_threads:getThreadInternal"
@@ -1609,6 +1614,11 @@
       "from": "function:chat_functions:generateSummary",
       "kind": "schedule",
       "to": "function:chat_functions:createSummarizeChat"
+    },
+    {
+      "from": "function:chat_functions:generateVideo",
+      "kind": "call",
+      "to": "function:auth_functions:getUserRunPlanQuery"
     },
     {
       "from": "function:chat_functions:getAllThreadRelationships",
@@ -18724,151 +18734,151 @@
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 100,
+      "line": 111,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 119,
+      "line": 130,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 121,
+      "line": 132,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 154,
+      "line": 165,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 173,
+      "line": 184,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 390,
+      "line": 401,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 402,
+      "line": 413,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 414,
+      "line": 425,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 432,
+      "line": 443,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 547,
+      "line": 558,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 597,
+      "line": 600,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 616,
+      "line": 608,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 649,
+      "line": 631,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 683,
+      "line": 665,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 719,
+      "line": 701,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 770,
+      "line": 752,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 818,
+      "line": 800,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 871,
+      "line": 853,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 916,
+      "line": 898,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 952,
+      "line": 934,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 989,
+      "line": 971,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1036,
+      "line": 1018,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1082,
+      "line": 1057,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "workflow/http",
+      "kind": "call",
+      "line": 1090,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
       "line": 1127,
-      "reason": "the default export is not a registered function"
-    },
-    {
-      "file": "workflow/http",
-      "kind": "call",
-      "line": 1164,
       "reason": "the default export is not a registered function"
     },
     {
