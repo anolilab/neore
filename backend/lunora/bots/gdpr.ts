@@ -18,7 +18,7 @@ export const eraseBotsForUser = async (ctx: MutationCtx, userId: string): Promis
 
     // One delete at a time: every write to a table in `lib/audit-triggers.ts` fires a trigger.
     for (const bot of bots) {
-        // The external computer is killed, not just forgotten: its sandbox id dies with the session row.
+        // The kill is scheduled with the sandbox id, so it still runs after the session row is erased.
         await retireBotComputersIn(ctx, bot._id);
         await ctx.db.delete(bot._id);
     }

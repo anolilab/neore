@@ -38,6 +38,7 @@ const SETTINGS_PAGES = [
     "auth/security",
     "auth/teams",
     "chat/agent",
+    "chat/bots",
     "chat/devices",
     "chat/knowledge",
     "chat/mcp",
