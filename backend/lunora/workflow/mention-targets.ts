@@ -6,7 +6,15 @@
  * image output that carries a URL, so a mention never names something the run cannot send.
  */
 import { type ExecutionContext, extractUrl, getLastOutput, type NodeExecutionResult, type WorkflowNode } from "./core";
-import { expandTemplate, type MentionAvailable, type MentionKind, type MentionTarget, mentionableSources, referenceImageIds } from "./mentions";
+import {
+    expandTemplate,
+    type MentionAvailable,
+    type MentionKind,
+    type MentionTarget,
+    mentionableSources,
+    referenceImageIds,
+    type TemplateFormat,
+} from "./mentions";
 
 const imageUrlOf = (context: ExecutionContext, nodeId: string): string | undefined => extractUrl(context.nodeOutputs[nodeId], "imageUrl");
 
@@ -61,6 +69,7 @@ export const expandNodeMentions = (node: WorkflowNode, text: string, context: Ex
 export const executeTextNode = (node: WorkflowNode, context: ExecutionContext): NodeExecutionResult => {
     const data = node.data as {
         content?: string;
+        format?: TemplateFormat;
         mode: "input" | "transform";
         template?: string;
     };
@@ -73,32 +82,37 @@ export const executeTextNode = (node: WorkflowNode, context: ExecutionContext): 
 
     // One pass over the template: `{{variable}}` and `@mention` are both resolved as they are
     // met, so neither a variable's value nor a mentioned output is scanned for the other.
-    const text = expandTemplate(data.template ?? "", mentionTargetsFor(node, context, ["text"]), (variableName) => {
-        // First check explicit variables. `?? …` rather than an `in` guard: a
-        // present-but-undefined entry would otherwise return undefined from a
-        // replacer that must return a string, which stringifies as "undefined"
-        // into the prompt. Falling through to the node-output lookup is right.
-        const variable = context.variables[variableName];
+    const text = expandTemplate(
+        data.template ?? "",
+        mentionTargetsFor(node, context, ["text"]),
+        (variableName) => {
+            // First check explicit variables. `?? …` rather than an `in` guard: a
+            // present-but-undefined entry would otherwise return undefined from a
+            // replacer that must return a string, which stringifies as "undefined"
+            // into the prompt. Falling through to the node-output lookup is right.
+            const variable = context.variables[variableName];
 
-        if (variable !== undefined) {
-            return variable;
-        }
-
-        // Then check node outputs
-        if (Object.hasOwn(context.nodeOutputs, variableName)) {
-            return asText(context.nodeOutputs[variableName]);
-        }
-
-        // Check if it's a node ID reference
-        for (const [nodeId, output] of Object.entries(context.nodeOutputs)) {
-            if (nodeId.includes(variableName) || variableName.includes(nodeId)) {
-                return asText(output);
+            if (variable !== undefined) {
+                return variable;
             }
-        }
 
-        // `{{input}}` is the most recent input
-        return variableName === "input" ? asText(getLastOutput(context)) : undefined;
-    });
+            // Then check node outputs
+            if (Object.hasOwn(context.nodeOutputs, variableName)) {
+                return asText(context.nodeOutputs[variableName]);
+            }
+
+            // Check if it's a node ID reference
+            for (const [nodeId, output] of Object.entries(context.nodeOutputs)) {
+                if (nodeId.includes(variableName) || variableName.includes(nodeId)) {
+                    return asText(output);
+                }
+            }
+
+            // `{{input}}` is the most recent input
+            return variableName === "input" ? asText(getLastOutput(context)) : undefined;
+        },
+        data.format,
+    );
 
     return { output: text, success: true };
 };

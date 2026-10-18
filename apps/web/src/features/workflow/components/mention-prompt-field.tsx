@@ -9,11 +9,17 @@ import { mentionableLabels } from "../utils/mention-labels";
 import CodemirrorCompact from "./codemirror-compact";
 
 interface MentionPromptFieldProps {
+    /** Rendered under the editor, above the hint. */
+    children?: ReactNode;
     height: string;
     hint: ReactNode;
     /** Upstream node kinds whose labels can be mentioned. Defaults to text only. */
     kinds?: ReadonlyArray<MentionKind>;
     label: ReactNode;
+    /** The CodeMirror language. Defaults to plain text. */
+    language?: string;
+    /** Wrap long lines. Defaults on; JSON and YAML turn it off, where a wrapped line reads as two. */
+    lineWrapping?: boolean;
     /** The node the prompt belongs to; its direct upstream nodes supply the labels. */
     nodeId: string;
     onChange: (value: string) => void;
@@ -22,7 +28,19 @@ interface MentionPromptFieldProps {
 }
 
 /** A prose prompt with `@` mentions of the node's connected inputs. The visible label names the editor. */
-const MentionPromptField = ({ height, hint, kinds, label, nodeId, onChange, placeholder, value }: MentionPromptFieldProps) => {
+const MentionPromptField = ({
+    children,
+    height,
+    hint,
+    kinds,
+    label,
+    language = "text",
+    lineWrapping = true,
+    nodeId,
+    onChange,
+    placeholder,
+    value,
+}: MentionPromptFieldProps) => {
     const labelId = useId();
     const mentionLabels = useWorkflowStore(useShallow((state) => mentionableLabels(state.nodes, state.edges, nodeId, kinds)));
 
@@ -35,14 +53,15 @@ const MentionPromptField = ({ height, hint, kinds, label, nodeId, onChange, plac
                 ariaLabelledBy={labelId}
                 className="nodrag"
                 height={height}
-                language="text"
-                lineWrapping
+                language={language}
+                lineWrapping={lineWrapping}
                 mentionLabels={mentionLabels}
                 onChange={onChange}
                 placeholder={placeholder}
                 prose
                 value={value}
             />
+            {children}
             <p className="text-muted-foreground text-xs">{hint}</p>
         </div>
     );

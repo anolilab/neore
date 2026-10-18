@@ -26,6 +26,18 @@ describe("mentions in a text template", () => {
         expect(executeTextNode(target, ctx).output).toBe("north / @Summary / s2");
     });
 
+    it("escapes a mentioned output in a JSON template, so a quote or newline in it keeps the document valid", () => {
+        const sources = [labelled("a", "text", "Notes")];
+        const target = node("tpl", "text", { format: "json", mode: "transform", template: '{"subject": "@Notes"}' });
+        const ctx = {
+            graph: { edges: [{ id: "e", source: "a", target: "tpl" }], nodes: [target, ...sources] },
+            nodeOutputs: { a: 'He said "hi"\nbye' },
+            variables: {},
+        };
+
+        expect(JSON.parse(executeTextNode(target, ctx).output as string)).toEqual({ subject: 'He said "hi"\nbye' });
+    });
+
     it("lists the image inputs of a node in edge order, one per source, and numbers mentions by it", () => {
         const sources = [labelled("pic", "image", "Frame"), labelled("note", "text", "Note"), labelled("ref", "style-ref", "Style")];
         const outputs = { note: "x", pic: "https://x.example/p.png", ref: { imageUrl: "https://x.example/r.png" } };

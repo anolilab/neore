@@ -53,6 +53,50 @@ describe("expandTemplate", () => {
     });
 });
 
+describe("expandTemplate in a JSON template", () => {
+    const note = 'He said "hi"\nbye';
+
+    it("escapes a value spliced into a string literal, so the document still parses to the same value", () => {
+        const out = expandTemplate('{"s":"@Notes"}', [text("a", "Notes", note)], noVariables, "json");
+
+        expect(JSON.parse(out)).toEqual({ s: note });
+    });
+
+    it("escapes a variable inside a string literal, and cannot add a key from an upstream output", () => {
+        const injected = '", "admin": true, "x": "';
+        const out = expandTemplate('{"s": "{{input}}"}', [], (name) => (name === "input" ? injected : undefined), "json");
+
+        expect(JSON.parse(out)).toEqual({ s: injected });
+    });
+
+    it("splices a value raw outside a string, so an array or number stays a JSON value", () => {
+        const out = expandTemplate('{"items": {{input}}}', [], (name) => (name === "input" ? "[1,2]" : undefined), "json");
+
+        expect(JSON.parse(out)).toEqual({ items: [1, 2] });
+    });
+
+    it("treats an escaped quote in the template as inside the string, and a doubled backslash as closing it", () => {
+        const escapedQuote = expandTemplate(
+            String.raw`{"a": "say \"@Notes\"", "b": {{input}}}`,
+            [text("n", "Notes", "x\ny")],
+            (name) => (name === "input" ? "1" : undefined),
+            "json",
+        );
+        // `\\` is an escaped backslash, so the quote after it closes the string and the mention that follows is inside a new one.
+        const closed = expandTemplate(String.raw`{"a": "\\", "b": "@Notes"}`, [text("n", "Notes", "x\ny")], noVariables, "json");
+
+        expect(JSON.parse(escapedQuote)).toEqual({ a: 'say "x\ny"', b: 1 });
+        expect(JSON.parse(closed)).toEqual({ a: "\\", b: "x\ny" });
+    });
+
+    it("leaves text and yaml templates unchanged", () => {
+        const value = 'say "hi"\n';
+
+        expect(expandTemplate('"@Notes"', [text("a", "Notes", value)], noVariables, "text")).toBe(`"${value}"`);
+        expect(expandTemplate('k: "@Notes"', [text("a", "Notes", value)], noVariables, "yaml")).toBe(`k: "${value}"`);
+    });
+});
+
 describe("frame handles", () => {
     it("round-trips every frame kind through its handle id, and rejects anything else", () => {
         for (const kind of FRAME_KINDS) {

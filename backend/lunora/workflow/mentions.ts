@@ -170,17 +170,43 @@ const isWordChar = (char: string | undefined): boolean => char !== undefined && 
 const labelAt = (text: string, start: number, label: string): boolean =>
     text.slice(start, start + label.length).toLowerCase() === label.toLowerCase() && !isWordChar(text[start + label.length]);
 
+/** The format a template's output is written in. A JSON template escapes the values it splices into a string literal. */
+export type TemplateFormat = "text" | "json" | "yaml";
+
+/** Whether the quote at `index` is escaped: an odd run of backslashes directly before it. */
+const isEscapedAt = (template: string, index: number): boolean => {
+    let backslashes = 0;
+
+    while (template[index - 1 - backslashes] === "\\") {
+        backslashes += 1;
+    }
+
+    return backslashes % 2 === 1;
+};
+
 /**
  * Expand `{{name}}` through `variable` and `@label` through `mentions` in one left-to-right pass.
  *
  * An unresolved token stays literal. When two targets share a label, the first wins; callers
  * exclude ambiguous labels so a mention never silently picks one. The longest label wins over
  * a shorter one that is its prefix.
+ *
+ * In a JSON template, a value spliced inside a string literal of the template is escaped, so a
+ * quote or a newline in it cannot break the document or add keys; outside a string it is spliced
+ * raw, so `{"items": {{input}}}` takes an array. YAML is not escaped: a value with a newline or a
+ * quote can still change the document's structure, so a YAML template is only as safe as its values.
  */
-export const expandTemplate = (template: string, mentions: ReadonlyArray<MentionTarget>, variable: (name: string) => string | undefined): string => {
+export const expandTemplate = (
+    template: string,
+    mentions: ReadonlyArray<MentionTarget>,
+    variable: (name: string) => string | undefined,
+    format: TemplateFormat = "text",
+): string => {
     const targets = mentions.filter((target) => target.label.length > 0).toSorted((a, b) => b.label.length - a.label.length);
+    const escapeFor = (value: string, inString: boolean): string => (format === "json" && inString ? JSON.stringify(value).slice(1, -1) : value);
     let text = "";
     let index = 0;
+    let inString = false;
 
     while (index < template.length) {
         if (template[index] === "{") {
@@ -189,7 +215,9 @@ export const expandTemplate = (template: string, mentions: ReadonlyArray<Mention
             const match = VARIABLE.exec(template);
 
             if (match) {
-                text += variable(match[1]!) ?? match[0];
+                const value = variable(match[1]!);
+
+                text += value === undefined ? match[0] : escapeFor(value, inString);
                 index += match[0].length;
 
                 continue;
@@ -200,11 +228,15 @@ export const expandTemplate = (template: string, mentions: ReadonlyArray<Mention
             const target = targets.find((candidate) => labelAt(template, index + 1, candidate.label));
 
             if (target) {
-                text += target.replacement;
+                text += escapeFor(target.replacement, inString);
                 index += 1 + target.label.length;
 
                 continue;
             }
+        }
+
+        if (format === "json" && template[index] === '"' && !isEscapedAt(template, index)) {
+            inString = !inString;
         }
 
         text += template[index];
