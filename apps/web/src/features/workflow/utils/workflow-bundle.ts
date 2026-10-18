@@ -268,7 +268,12 @@ const decodeDataUrl = (url: string): BundleSource | undefined => {
         return undefined;
     }
 
-    return { bytes: Uint8Array.from(atob(match[2]!), (character) => character.codePointAt(0)!), contentType: match[1]!.toLowerCase() };
+    try {
+        return { bytes: Uint8Array.from(atob(match[2]!), (character) => character.codePointAt(0)!), contentType: match[1]!.toLowerCase() };
+    } catch {
+        // Malformed base64: the caller counts this asset as skipped rather than failing the whole export.
+        return undefined;
+    }
 };
 
 const isValidNode = (node: unknown): node is WorkflowNode =>

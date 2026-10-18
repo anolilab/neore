@@ -1,9 +1,10 @@
-import { MEDIA_DEFAULT_MODELS } from "@neore/ai/models";
+import { MEDIA_DEFAULT_MODELS, MODEL_REGISTRY } from "@neore/ai/models";
 import { describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
 import { executionContextOf } from "./test-execution-context";
+import { videoInputErrors } from "./video-inputs";
 import {
     imageRequestArgs,
     imageToVideoArgs,
@@ -13,6 +14,7 @@ import {
     type WorkflowFileContext,
     videoInputArgs,
     videoNodeOutput,
+    videoPromptOf,
     videoRunInputError,
     workflowInputErrors,
 } from "./media-args";
@@ -267,6 +269,123 @@ describe("videoRunInputError", () => {
 
         expect(videoRunInputError(gen, context([], [gen], {}))).toBe("No image input provided for image-to-video mode");
         expect(videoRunInputError(gen, context(frame, [gen, node("src", "video", {})], {}))).toBeUndefined();
+    });
+});
+
+describe("wired inputs are read by role, whatever order the run produced them", () => {
+    /** An enabled fal row that takes an image and reference clips, so a reference wire is sent. */
+    const referenceRow = MODEL_REGISTRY.find(
+        (definition) =>
+            definition.mode === "video" &&
+            definition.enabled !== false &&
+            definition.provider === "fal" &&
+            definition.supportsImageToVideo === true &&
+            (definition.maxReferenceVideos ?? 0) > 0,
+    );
+
+    const picture = { assets: [{ imageUrl: "https://x.example/still.png", mimeType: "image/png" }] };
+    const otherPicture = { assets: [{ imageUrl: "https://x.example/other.png", mimeType: "image/png" }] };
+    const referenceFileOutput = { fileId: "file-ref", name: "ref.mp4", type: "video/mp4" };
+    const files = {
+        runAction: vi.fn(),
+        runMutation: vi.fn(),
+        runQuery: vi.fn(async (_query: unknown, { fileId }: { fileId: string }) => `https://signed.example/${fileId}`),
+    } as unknown as WorkflowFileContext;
+
+    /** The run's outputs, inserted in `order`: `getLastOutput` reads the last one. */
+    const outputsIn = (order: "first" | "last", entries: Record<string, unknown>) => {
+        const keys = Object.keys(entries);
+
+        return Object.fromEntries((order === "last" ? keys : keys.toReversed()).map((key) => [key, entries[key]]));
+    };
+
+    const wire = (id: string, source: string, target: string): WorkflowEdge => {
+        return { id, source, target };
+    };
+
+    it("takes a wired image as the start image and a reference file as the reference clip, in either run order", async () => {
+        expect(referenceRow, "an enabled fal row with reference clips").toBeDefined();
+
+        for (const order of ["first", "last"] as const) {
+            const target = node("gen", "image-to-video", { model: referenceRow?.id });
+            const nodes = [target, node("image", "image"), node("ref", "file", { fileType: "video/mp4" })];
+            const edges = [wire("e1", "image", "gen"), wire("e2", "ref", "gen")];
+            const ctx = context(edges, nodes, outputsIn(order, { image: picture, ref: referenceFileOutput }));
+
+            expect(videoRunInputError(target, ctx), order).toBeUndefined();
+
+            const args = await videoInputArgs(target, ctx, files, "user-1");
+
+            expect(args.frameUrl, order).toBe("https://x.example/still.png");
+            expect(args.referenceVideoUrls, order).toStrictEqual(["https://signed.example/file-ref"]);
+        }
+    });
+
+    it("takes a wired text as the prompt and a reference file as the reference clip, in either run order", async () => {
+        expect(referenceRow, "an enabled fal row with reference clips").toBeDefined();
+
+        for (const order of ["first", "last"] as const) {
+            const target = node("gen", "video", { mode: "text-to-video", model: referenceRow?.id });
+            const nodes = [target, node("text", "text"), node("ref", "file", { fileType: "video/mp4" })];
+            const edges = [wire("e1", "text", "gen"), wire("e2", "ref", "gen")];
+            const ctx = context(edges, nodes, outputsIn(order, { ref: referenceFileOutput, text: "a fox" }));
+
+            expect(videoRunInputError(target, ctx), order).toBeUndefined();
+            expect(videoPromptOf(target, ctx), order).toBe("a fox");
+
+            const args = await videoInputArgs(target, ctx, files, "user-1");
+
+            // A text-to-video node never takes an upstream image as its start frame.
+            expect(args.frameUrl, order).toBeUndefined();
+            expect(args.referenceVideoUrls, order).toStrictEqual(["https://signed.example/file-ref"]);
+        }
+    });
+
+    it("keeps the first wired image in edge order when two image nodes feed one target, whatever order they ran in", async () => {
+        const target = node("gen", "image-to-video", { model: referenceRow?.id });
+        const nodes = [target, node("first", "image"), node("second", "image")];
+        const edges = [wire("e1", "first", "gen"), wire("e2", "second", "gen")];
+
+        for (const order of ["first", "last"] as const) {
+            const ctx = context(edges, nodes, outputsIn(order, { first: picture, second: otherPicture }));
+
+            const args = await videoInputArgs(target, ctx, files, "user-1");
+
+            expect(args.frameUrl, order).toBe("https://x.example/still.png");
+        }
+    });
+
+    it("refuses a frame wire and a reference-media wire with no prompt, and does not borrow an unrelated latest text output as the prompt", () => {
+        const target = node("gen", "video", { mode: "text-to-video" });
+        const nodes = [target, node("src", "video"), node("ref", "file", { fileType: "video/mp4" }), node("unrelated", "text")];
+        const edges = [{ id: "e1", source: "src", sourceHandle: "frame-end", target: "gen" }, wire("e2", "ref", "gen")];
+        const ctx = context(edges, nodes, {
+            ref: referenceFileOutput,
+            src: { assets: [{ mimeType: "video/mp4", videoUrl: "https://x.example/c.mp4" }] },
+            unrelated: "stray",
+        });
+
+        expect(videoRunInputError(target, ctx)).toBe("No prompt provided for video generation");
+        expect(videoInputErrors(nodes, edges)).toContain(
+            "The end frame feeds a text-to-video node with no prompt; give it a prompt or wire a text node into it",
+        );
+    });
+
+    it("keeps reading the latest output for a graph whose only wire is one it cannot classify", async () => {
+        const text = node("gen", "video", { mode: "text-to-video" });
+        const code = node("code", "code");
+        const textEdges = [wire("e", "code", "gen")];
+        const textCtx = context(textEdges, [text, code], { code: "unclassified", latest: "from the run" });
+
+        expect(videoPromptOf(text, textCtx)).toBe("from the run");
+
+        const image = node("gen", "image-to-video", { model: referenceRow?.id });
+        const imageCtx = context(textEdges, [image, code], { code: { url: "https://x.example/code.png" } });
+
+        expect(videoRunInputError(image, imageCtx)).toBeUndefined();
+        const args = await videoInputArgs(image, imageCtx, files, "user-1");
+
+        expect(args.frameUrl).toBe("https://x.example/code.png");
     });
 });
 

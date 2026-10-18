@@ -17684,61 +17684,61 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 84,
+      "line": 85,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 84,
+      "line": 85,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 84,
+      "line": 85,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 84,
+      "line": 85,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 98,
+      "line": 99,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 98,
+      "line": 99,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 101,
+      "line": 102,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 101,
+      "line": 102,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 141,
+      "line": 142,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 202,
+      "line": 203,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -18866,25 +18866,25 @@
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 51,
+      "line": 53,
       "reason": "\"videoInputArgs\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 87,
+      "line": 89,
       "reason": "\"videoInputArgs\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 362,
+      "line": 368,
       "reason": "\"runVideoNode\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 371,
+      "line": 377,
       "reason": "\"runVideoNode\" is not a registered function"
     },
     {
@@ -18902,19 +18902,25 @@
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 71,
+      "line": 73,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 83,
+      "line": 85,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 109,
+      "line": 120,
+      "reason": "\"chargePaidCall\" is not a registered function"
+    },
+    {
+      "file": "workflow/video-billing",
+      "kind": "call",
+      "line": 172,
       "reason": "\"chargePaidCall\" is not a registered function"
     }
   ],

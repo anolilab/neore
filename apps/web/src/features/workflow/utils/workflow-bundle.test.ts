@@ -257,6 +257,19 @@ describe("workflow bundle", () => {
         expect(Object.keys(archive.files)).toEqual(["workflow.json"]);
     });
 
+    it("skips an inline image with malformed base64 instead of failing the whole export", async () => {
+        const source = content([
+            node("bad", "image", { imageUrl: "data:image/png;base64,!!!not-base64!!!", mode: "input" }),
+            node("good", "image", { imageUrl: `data:image/png;base64,${PNG_BASE64}`, mode: "input" }),
+        ]);
+
+        const exported = await exportWorkflowBundle(source, { createZip: createJsZip, fetchBytes, signUrl: sign });
+        const archive = await JSZip.loadAsync(await exported.blob.arrayBuffer());
+
+        expect(exported.skipped).toBe(1);
+        expect(Object.keys(archive.files).filter((name) => PNG_ASSET.test(name))).toHaveLength(1);
+    });
+
     it("loads a legacy plain workflow JSON without assets", async () => {
         const legacy = { edges: [], nodes: [node("t", "text", { content: "hello", mode: "input" })] };
         const bundle = await readWorkflowBundle(new File([JSON.stringify(legacy)], "workflow.json"), OPTIONS);

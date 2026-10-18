@@ -1,4 +1,4 @@
-import { FAL_IMAGE, MODEL_REGISTRY, WORKFLOW_KIND_ACCEPTS } from "@neore/ai/models";
+import { FAL_IMAGE, FAL_VIDEO, MODEL_REGISTRY, WORKFLOW_KIND_ACCEPTS } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
 import { requireEnabledModel } from "./enabled-model";
@@ -41,5 +41,26 @@ describe("requireEnabledModel", () => {
         );
 
         expect(() => requireEnabledModel(withoutUpscale.id, WORKFLOW_KIND_ACCEPTS.upscale, "image upscale")).toThrow("is not an enabled image upscale model");
+    });
+
+    it("refuses an enabled text-only fal video row for image-to-video, with the same message as an unknown id", () => {
+        const textOnly = findRow(
+            "an enabled fal text-only video row",
+            (m) => m.mode === "video" && m.provider === "fal" && m.enabled !== false && m.supportsTextToVideo === true && m.supportsImageToVideo !== true,
+        );
+
+        expect(() => requireEnabledModel(textOnly.id, WORKFLOW_KIND_ACCEPTS.imageToVideo, "image-to-video")).toThrow(
+            `Model ${textOnly.id} is not an enabled image-to-video model`,
+        );
+        expect(() => requireEnabledModel(textOnly.id, FAL_VIDEO, "image-to-video")).not.toThrow();
+    });
+
+    it("accepts an enabled fal row that takes an image input for image-to-video", () => {
+        const imageToVideo = findRow(
+            "an enabled fal image-to-video row",
+            (m) => m.mode === "video" && m.provider === "fal" && m.enabled !== false && m.supportsImageToVideo === true,
+        );
+
+        expect(requireEnabledModel(imageToVideo.id, WORKFLOW_KIND_ACCEPTS.imageToVideo, "image-to-video").id).toBe(imageToVideo.id);
     });
 });

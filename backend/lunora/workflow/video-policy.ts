@@ -2,7 +2,7 @@
  * What a workflow video run may use and what it costs, decided from the graph and the registry before
  * any paid call. Pure: the registry is read directly, the plan comes in as an argument.
  */
-import { enabledModelOf, exceedsFreePlanCap, FAL_VIDEO, falVideoMicrodollarsOf, requiresPaidPlan } from "@neore/ai/models";
+import { enabledModelOf, exceedsFreePlanCap, falVideoMicrodollarsOf, requiresPaidPlan, WORKFLOW_KIND_ACCEPTS } from "@neore/ai/models";
 
 import { TEXT_TO_VIDEO_PROVIDERS } from "../chat/lib/video-providers";
 import { byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
@@ -85,8 +85,8 @@ export const premiumVideoErrors = (nodes: ReadonlyArray<WorkflowNode>, canUsePre
 /**
  * One line per video node the video actions refuse whatever the plan, so a doomed run is stopped before any
  * node spends a daily unit. Uses the actions' own rules: a text-to-video node needs an enabled video row
- * on a provider the action calls (`TEXT_TO_VIDEO_PROVIDERS`); an image-to-video node needs an enabled fal
- * video row (`FAL_VIDEO`).
+ * on a provider the action calls (`TEXT_TO_VIDEO_PROVIDERS`); an image-to-video node needs an enabled fal row that
+ * takes an image input (the `imageToVideo` accept rule in the registry package).
  */
 export const unrunnableVideoErrors = (nodes: ReadonlyArray<WorkflowNode>): string[] =>
     nodes.flatMap((node) => {
@@ -99,7 +99,9 @@ export const unrunnableVideoErrors = (nodes: ReadonlyArray<WorkflowNode>): strin
         const modelId = modelIdFor(node, kind);
 
         if (kind === "imageToVideo") {
-            return enabledModelOf(modelId, FAL_VIDEO) ? [] : [`The "${labelOf(node)}" node's model ${modelId} is not an enabled fal video model`];
+            return enabledModelOf(modelId, WORKFLOW_KIND_ACCEPTS.imageToVideo)
+                ? []
+                : [`The "${labelOf(node)}" node's model ${modelId} is not an enabled fal image-to-video model`];
         }
 
         const definition = enabledModelOf(modelId, { mode: "video" });

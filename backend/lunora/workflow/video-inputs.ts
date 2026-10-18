@@ -6,8 +6,8 @@
 import { falVideoFixedSecondsOf, MODEL_LOOKUP, type ModelDefinition, resolveWorkflowModel } from "@neore/ai/models";
 
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
-import { sourceNodesOf } from "./core";
-import { isFrameHandleId, parseFrameHandle, type FrameKind, TEXT_MENTION_NODE_TYPES } from "./mentions";
+import { extractUrl, getLastOutput, sourceNodesOf } from "./core";
+import { IMAGE_OUTPUT_NODE_TYPES, isFrameHandleId, parseFrameHandle, type FrameKind, TEXT_MENTION_NODE_TYPES } from "./mentions";
 import { falDurationInput, referenceVideoLimitSeconds } from "../chat/lib/fal-reference-mapping";
 
 /** Media a video node reads, before it is turned into URLs. */
@@ -79,12 +79,117 @@ export const frameSourceOf = (node: WorkflowNode, context: ExecutionContext): Fr
     return found && { clip: mediaOf(context.nodeOutputs[found.source.id]), kind: found.kind, sourceId: found.source.id };
 };
 
+/** The node types whose output is text, and so is the prompt a wire into a video node carries. */
+const TEXT_OUTPUT_NODE_TYPES: ReadonlySet<string> = new Set([...TEXT_MENTION_NODE_TYPES, "transcription"]);
+
+/** The node types whose output is a reference clip or track (a video, or an audio node's track). */
+const REFERENCE_OUTPUT_NODE_TYPES: ReadonlySet<string> = new Set([...VIDEO_OUTPUT_NODE_TYPES, "audio"]);
+
+/**
+ * The role a wired source plays in a video node. It comes from the source's TYPE (and a file's declared type), so
+ * the graph checks before a run and the run itself read each wire the same way, whatever order the nodes ran in:
+ * - `text`: its output is the prompt;
+ * - `image`: its output is the start image (an image node's URL, or an image file);
+ * - `reference`: its output is a reference clip or track (a video, an audio, or any other file).
+ *
+ * `undefined` for a source that plays none of these; such a wire is not classified (see `primaryInputsOf`).
+ */
+export type WireRole = "text" | "image" | "reference";
+
+export const wireRoleOf = (source: WorkflowNode): WireRole | undefined => {
+    if (TEXT_OUTPUT_NODE_TYPES.has(source.type)) {
+        return "text";
+    }
+
+    if (source.type === "file") {
+        return typeof source.data.fileType === "string" && source.data.fileType.startsWith("image/") ? "image" : "reference";
+    }
+
+    if (IMAGE_OUTPUT_NODE_TYPES.includes(source.type)) {
+        return "image";
+    }
+
+    return REFERENCE_OUTPUT_NODE_TYPES.has(source.type) ? "reference" : undefined;
+};
+
+/** The image a classified `image` wire carries: a file's stored or provider reference, or an image node's URL. */
+const imageRefOf = (source: WorkflowNode, output: unknown): MediaRef | undefined => {
+    if (source.type === "file") {
+        return mediaOf(output)?.ref;
+    }
+
+    const url = extractUrl(output, "imageUrl");
+
+    return url ? { url } : undefined;
+};
+
+/** What the classified wires into a video node carry. */
+export interface PrimaryInputs {
+    /** Whether any incoming wire has a role, a frame wire included. When none does, the graph predates the roles (see `wiredInputsOf`). */
+    classified: boolean;
+    image?: MediaRef;
+    prompt?: string;
+}
+
+/**
+ * The primary inputs of a video node, from its own incoming wires and never from the run's order. The first image
+ * wire (in edge order) is the image and the first text wire is the prompt; a text wire with no string output (a node
+ * that has not produced one) contributes nothing. Reference media is not read here: see `resolveVideoInputs`.
+ */
+export const primaryInputsOf = (node: WorkflowNode, context: ExecutionContext): PrimaryInputs => {
+    const primary: PrimaryInputs = { classified: false };
+
+    for (const { edge, node: source } of sourceNodesOf(node, context)) {
+        if (isFrameHandleId(edge.sourceHandle)) {
+            primary.classified = true;
+
+            continue;
+        }
+
+        const role = wireRoleOf(source);
+
+        if (role === undefined) {
+            continue;
+        }
+
+        primary.classified = true;
+
+        const output = context.nodeOutputs[source.id];
+
+        if (role === "text" && typeof output === "string") {
+            primary.prompt ??= output;
+        } else if (role === "image") {
+            primary.image ??= imageRefOf(source, output);
+        }
+    }
+
+    return primary;
+};
+
+/**
+ * The prompt and start image a video node reads, as a run reads them: the classified wires (`primaryInputsOf`), or,
+ * for a graph saved before wires had roles (no wire classifies), the latest output, as it always was. Every check and
+ * every provider argument goes through here, so validation and the run cannot disagree.
+ */
+export const wiredInputsOf = (node: WorkflowNode, context: ExecutionContext): { image?: MediaRef; prompt?: string } => {
+    const primary = primaryInputsOf(node, context);
+
+    if (primary.classified) {
+        return primary;
+    }
+
+    const latest = getLastOutput(context);
+    const url = extractUrl(latest, "imageUrl");
+
+    return { image: url ? { url } : undefined, prompt: typeof latest === "string" ? latest : undefined };
+};
+
 /**
  * What a video node reads from its incoming edges, by handle, not by execution order.
  *
- * A frame wire is the image input, and `frame` is the stored frame extracted for it (see
- * `frameSourceOf`). Any other wire contributes its output as a reference video or audio by MIME
- * type; anything that is neither is ignored.
+ * A frame wire is the image input, and `frame` is the stored frame extracted for it (see `frameSourceOf`). A
+ * reference wire contributes its clip or track by MIME type. An image-to-video run with no frame wire starts from
+ * its wired image (`wiredInputsOf`); a text-to-video run never takes an upstream image as its start frame.
  */
 export const resolveVideoInputs = (node: WorkflowNode, context: ExecutionContext, frame?: MediaRef): VideoInputs => {
     const inputs: VideoInputs = { referenceAudios: [], referenceVideos: [] };
@@ -96,6 +201,10 @@ export const resolveVideoInputs = (node: WorkflowNode, context: ExecutionContext
             continue;
         }
 
+        if (wireRoleOf(source) !== "reference") {
+            continue;
+        }
+
         const media = mediaOf(context.nodeOutputs[source.id]);
 
         if (media?.mimeType.startsWith("video/")) {
@@ -103,6 +212,10 @@ export const resolveVideoInputs = (node: WorkflowNode, context: ExecutionContext
         } else if (media?.mimeType.startsWith("audio/")) {
             inputs.referenceAudios.push(media.ref);
         }
+    }
+
+    if (inputs.image === undefined && videoKindOf(node) === "imageToVideo") {
+        inputs.image = wiredInputsOf(node, context).image;
     }
 
     return inputs;
@@ -222,12 +335,6 @@ export const resolveVideoInputUrls = async (
 };
 
 /**
- * The node types whose output is text the prompt path reads as a string (`videoPromptOf`). A wire from any
- * other type (a file, a video) carries media, not a prompt.
- */
-const TEXT_OUTPUT_NODE_TYPES: ReadonlySet<string> = new Set([...TEXT_MENTION_NODE_TYPES, "transcription"]);
-
-/**
  * What a video node fed by a frame needs before its paid call: a model that takes an image input
  * (the registry's `supportsImageToVideo`), and a prompt when it runs text-to-video. The prompt is the
  * node's own, when it stores one (`videoPromptOf` reads a stored string before anything wired, even an
@@ -247,7 +354,7 @@ const frameTargetErrors = (target: WorkflowNode, kind: FrameKind, byId: Readonly
             : edges.some((edge) => {
                   const source = byId.get(edge.source);
 
-                  return edge.target === target.id && !isFrameHandleId(edge.sourceHandle) && source !== undefined && TEXT_OUTPUT_NODE_TYPES.has(source.type);
+                  return edge.target === target.id && !isFrameHandleId(edge.sourceHandle) && source !== undefined && wireRoleOf(source) === "text";
               });
 
     if (target.type === "video" && target.data.mode !== "image-to-video" && !hasPrompt) {

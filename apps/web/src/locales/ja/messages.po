@@ -1805,7 +1805,7 @@ msgstr "ページを追加"
 msgid "Add Passkey"
 msgstr "パスキーを追加"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+#: src/features/workflow/components/nodes/video-frames-section.tsx:121
 msgid "Add picked frame as image node"
 msgstr "選択したフレームを画像ノードとして追加"
 
@@ -4622,7 +4622,7 @@ msgstr "画面をキャプチャ"
 #~ msgid "captured"
 #~ msgstr "キャプチャ済み"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+#: src/features/workflow/components/nodes/video-frames-section.tsx:121
 msgid "Capturing…"
 msgstr "キャプチャ中…"
 
@@ -12148,11 +12148,11 @@ msgstr "Google をリードする Veo 3.x シリーズの基盤"
 msgid "FPS"
 msgstr "FPS"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:67
+#: src/features/workflow/components/nodes/video-frames-section.tsx:69
 msgid "Frame capture failed"
 msgstr "フレームのキャプチャに失敗しました"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:77
+#: src/features/workflow/components/nodes/video-frames-section.tsx:79
 msgid "Frames"
 msgstr "フレーム"
 
@@ -15078,7 +15078,7 @@ msgstr "最終確認 {0}"
 msgid "Last error"
 msgstr "最新のエラー"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:40
+#: src/features/workflow/components/nodes/video-frames-section.tsx:41
 msgid "Last frame"
 msgstr "最後のフレーム"
 
@@ -20218,7 +20218,7 @@ msgstr "色を選択"
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "画像を最大 {maxReferences} 枚選択してください。選択した順番でモデルに渡されます。"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:105
+#: src/features/workflow/components/nodes/video-frames-section.tsx:107
 msgid "Picked at (s)"
 msgstr "選択位置 (秒)"
 
@@ -20226,7 +20226,7 @@ msgstr "選択位置 (秒)"
 #~ msgid "Picked frame"
 #~ msgstr "選択したフレーム"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:91
+#: src/features/workflow/components/nodes/video-frames-section.tsx:93
 msgid "Picked frame wire (remove it)"
 msgstr "選択フレームの接続（削除）"
 
@@ -22953,7 +22953,7 @@ msgstr "実行の進捗"
 msgid "Run Python, see charts and images instantly"
 msgstr "Python を実行して、グラフや画像をすぐに確認"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:124
+#: src/features/workflow/components/nodes/video-frames-section.tsx:126
 msgid "Run the node first to pick a frame"
 msgstr "フレームを選ぶには、先にノードを実行してください"
 
@@ -25133,7 +25133,7 @@ msgstr "無料でチャットを始める"
 msgid "Start editing cell"
 msgstr "セルの編集を開始"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:39
+#: src/features/workflow/components/nodes/video-frames-section.tsx:40
 #: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
 msgstr "開始フレーム"
@@ -26570,7 +26570,7 @@ msgstr "アーカイブに含まれるファイルが多すぎます。"
 msgid "The assistant has a question"
 msgstr "アシスタントから質問があります"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:66
+#: src/features/workflow/components/nodes/video-frames-section.tsx:68
 msgid "The browser cannot read this video to capture a frame"
 msgstr "ブラウザーがこの動画を読み取れないため、フレームをキャプチャできません"
 

@@ -208,7 +208,23 @@ describe("unrunnableVideoErrors", () => {
 
     it("refuses an unknown model, naming the node", () => {
         expect(unrunnableVideoErrors([node("n", "image-to-video", { label: "Still", model: "no-such-model" })])).toStrictEqual([
-            `The "Still" node's model no-such-model is not an enabled fal video model`,
+            `The "Still" node's model no-such-model is not an enabled fal image-to-video model`,
+        ]);
+    });
+
+    it("refuses an enabled text-only fal row for an image-to-video node: the row takes no image input", () => {
+        const textOnly = registry.find(
+            (definition) =>
+                definition.mode === "video" &&
+                definition.enabled !== false &&
+                definition.provider === "fal" &&
+                definition.supportsTextToVideo === true &&
+                definition.supportsImageToVideo !== true,
+        );
+
+        expect(textOnly, "an enabled fal text-only video row").toBeDefined();
+        expect(unrunnableVideoErrors([node("i", "image-to-video", { label: "Still", model: textOnly?.id })])).toStrictEqual([
+            `The "Still" node's model ${textOnly?.id} is not an enabled fal image-to-video model`,
         ]);
     });
 
@@ -224,9 +240,10 @@ describe("unrunnableVideoErrors", () => {
         expect(unrunnableVideoErrors([node("i", "image-to-video", { model: offFal?.id })])).toHaveLength(1);
     });
 
-    it("accepts every enabled fal video row for an image-to-video node", () => {
+    it("accepts every enabled fal row that takes an image input for an image-to-video node", () => {
         const fal = [...MODEL_LOOKUP.values()].filter(
-            (definition) => definition.mode === "video" && definition.enabled !== false && definition.provider === "fal",
+            (definition) =>
+                definition.mode === "video" && definition.enabled !== false && definition.provider === "fal" && definition.supportsImageToVideo === true,
         );
 
         expect(fal.length).toBeGreaterThan(0);

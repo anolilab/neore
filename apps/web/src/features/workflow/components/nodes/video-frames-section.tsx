@@ -11,6 +11,7 @@ import { useLunora } from "@/lib/lunora/crpc";
 
 import { useWorkflowStore } from "../../stores/workflow-store";
 import NODE_CONFIGS from "../../types";
+import { absolutePositionOf } from "../../utils/node-position";
 import { captureVideoFrame, FrameCaptureError, pickedFrameTime, videoUrlOfOutput } from "../../utils/video-frame";
 import { storeWorkflowImage } from "../../utils/workflow-image";
 
@@ -53,11 +54,12 @@ export const VideoFramesSection = ({ nodeId, pickedTime }: VideoFramesSectionPro
         try {
             const blob = await captureVideoFrame(videoUrl, (duration) => pickedFrameTime(duration, pickedTime ?? 0));
             const imageFileId = await storeWorkflowImage(lunora, new File([blob], "picked-frame.png", { type: "image/png" }));
-            const video = useWorkflowStore.getState().nodes.find((node) => node.id === nodeId);
+            // The new node is top level, so a video inside a group is placed by its canvas position, not the group-relative one.
+            const origin = absolutePositionOf(useWorkflowStore.getState().nodes, nodeId);
 
             addNode(
                 "image",
-                { x: (video?.position.x ?? 0) + IMAGE_NODE_OFFSET_X, y: video?.position.y ?? 0 },
+                { x: origin.x + IMAGE_NODE_OFFSET_X, y: origin.y },
                 { imageFileId, imageUrl: undefined, label: i18n._(NODE_CONFIGS.image.defaultLabel), mode: "input" },
             );
         } catch (error_) {

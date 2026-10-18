@@ -1,5 +1,8 @@
+import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
+import { deductCreditsFromGateway } from "../auth/billing";
+import schema from "../schema";
 import { internal } from "../_generated/internal";
 import type { WorkflowNode } from "./core";
 import { runBilledVideo, type VideoRunCosts, workflowVideoErrors } from "./video-billing";
@@ -40,6 +43,60 @@ const makeCtx = ({ creditsLeft = null, limitOk = true }: Answers = {}) => {
     });
 
     return { runMutation, runQuery };
+};
+
+/** The request id of the clip charge for run `run` and node `gen`. */
+const REQUEST_ID = 'workflow-video:["run","gen"]';
+
+/**
+ * A deduction ledger keyed on the request id, as `applyGatewayDeduction` is: a repeat of a request id posts nothing.
+ * `deductFailures` makes the first deductions throw; `recordFails` makes the claim write throw.
+ */
+const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures?: number; recordFails?: boolean } = {}) => {
+    const ledger = new Map<string, number>();
+    const posted: string[] = [];
+    const deductions: Record<string, unknown>[] = [];
+    const claims: unknown[] = [];
+    let failures = deductFailures;
+    const runMutation = vi.fn(async (reference: unknown, args?: any) => {
+        if (reference === internal.auth.billing.deductCreditsFromGateway) {
+            deductions.push(args);
+
+            if (failures > 0) {
+                failures -= 1;
+
+                throw new Error("ledger unavailable");
+            }
+
+            if (!ledger.has(args.requestId)) {
+                ledger.set(args.requestId, args.costMicrodollars);
+                posted.push(args.requestId);
+            }
+
+            return undefined;
+        }
+
+        if (reference === internal.lib.claim_once.claimKey) {
+            if (recordFails) {
+                throw new Error("claims unavailable");
+            }
+
+            claims.push(args);
+
+            return true;
+        }
+
+        if (reference === internal.chat.daily_charge.chargeDailyUnit) {
+            return true;
+        }
+
+        return undefined;
+    });
+    const runQuery = vi.fn(async () => {
+        return { creditsLeft: null };
+    });
+
+    return { claims, deductions, ledger, posted, runMutation, runQuery };
 };
 
 const videoNode = node("gen", "video", { label: "Hero", mode: "text-to-video", model: PAID });
@@ -183,22 +240,92 @@ describe("runBilledVideo", () => {
         expect(unpriced.runMutation.mock.calls.some(([reference]) => reference === internal.auth.billing.deductCreditsFromGateway)).toBe(false);
     });
 
-    it("charges nothing without an organization, and keeps a finished clip when its charge cannot be recorded", async () => {
+    it("charges nothing without an organization", async () => {
         const noOrg = makeCtx();
 
         await runBilledVideo(noOrg, executionContextOf({ orgId: undefined }), videoNode, "u1", costs(), async () => "clip");
         expect(noOrg.runMutation.mock.calls.some(([reference]) => reference === internal.auth.billing.deductCreditsFromGateway)).toBe(false);
+    });
 
-        const failing = makeCtx();
+    it("retries a failed deduction once, with the same request id, and records nothing when the retry lands", async () => {
+        const ctx = ledgerCtx({ deductFailures: 1 });
 
-        failing.runMutation.mockImplementation(async (reference: unknown) => {
-            if (reference === internal.auth.billing.deductCreditsFromGateway) {
-                throw new Error("ledger unavailable");
-            }
+        await expect(runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip")).resolves.toBe("clip");
 
-            return true;
-        });
+        expect(ctx.deductions).toHaveLength(2);
+        expect(ctx.deductions.map((args) => args.requestId)).toStrictEqual([REQUEST_ID, REQUEST_ID]);
+        expect(ctx.claims).toStrictEqual([]);
+        expect(ctx.posted).toStrictEqual([REQUEST_ID]);
+    });
 
-        await expect(runBilledVideo(failing, executionContextOf(), videoNode, "u1", costs(), async () => "clip")).resolves.toBe("clip");
+    it("records a charge that failed twice for the next sweep, and still returns the finished clip", async () => {
+        const ctx = ledgerCtx({ deductFailures: 2 });
+
+        await expect(runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip")).resolves.toBe("clip");
+
+        expect(ctx.deductions).toHaveLength(2);
+        expect(ctx.posted).toStrictEqual([]);
+        expect(ctx.claims).toStrictEqual([
+            {
+                key: REQUEST_ID,
+                leaseMs: 60_000,
+                onLapse: {
+                    args: JSON.stringify({
+                        billingMode: "platform",
+                        costMicrodollars: CLIP,
+                        modelId: PAID,
+                        orgId: "org-1",
+                        requestId: REQUEST_ID,
+                        userId: "u1",
+                    }),
+                    target: internal.auth.billing.deductCreditsFromGateway.__lunoraRef,
+                },
+                scope: "video-charge",
+                ttlMs: 24 * 60 * 60 * 1000,
+                userId: "u1",
+            },
+        ]);
+    });
+
+    it("completes a recorded charge once when the sweep lapses it, and a repeat sweep charges nothing more", async () => {
+        const ctx = ledgerCtx({ deductFailures: 2 });
+
+        await runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip");
+
+        // The sweep (`reapLapsedClaims`) runs the record's target with its args and the claim key.
+        const [record] = ctx.claims as { key: string; onLapse: { args: string; target: string } }[];
+        const sweep = async () =>
+            await ctx.runMutation(internal.auth.billing.deductCreditsFromGateway, { ...JSON.parse(record!.onLapse.args), claimKey: record!.key });
+
+        await sweep();
+        await sweep();
+
+        expect(ctx.posted).toStrictEqual([REQUEST_ID]);
+        expect(ctx.ledger.get(REQUEST_ID)).toBe(CLIP);
+    });
+
+    it("keeps the finished clip even when the record of a failed charge cannot be written", async () => {
+        const ctx = ledgerCtx({ deductFailures: 2, recordFails: true });
+
+        await expect(runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip")).resolves.toBe("clip");
+        expect(ctx.posted).toStrictEqual([]);
+    });
+});
+
+describe("the recorded charge's lapse target", () => {
+    it("accepts the sweep's extra claim key, so a lapse is not refused by the deduction's input check", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            // `reapLapsedClaims` runs the target with its onLapse args plus `claimKey`; the procedure must take that.
+            await expect(
+                harness.run(
+                    async (ctx: any) =>
+                        await ctx.runMutation(deductCreditsFromGateway, { claimKey: "k", costMicrodollars: 1, modelId: "m", requestId: "r", userId: "u" }),
+                ),
+            ).resolves.toBeUndefined();
+        } finally {
+            harness.close();
+        }
     });
 });

@@ -9,7 +9,7 @@ import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
-import { type ExecutionContext, extractUrl, getLastOutput, type WorkflowContent, type WorkflowNode } from "./core";
+import { type ExecutionContext, getLastOutput, type WorkflowContent, type WorkflowNode } from "./core";
 import { expandNodeMentions, referenceImageUrls } from "./mention-targets";
 import { isFrameHandleId } from "./mentions";
 import { runBilledVideo, type VideoRunCosts } from "./video-billing";
@@ -27,6 +27,8 @@ import {
     videoDurationOf,
     videoInputErrors,
     videoKindOf,
+    wireRoleOf,
+    wiredInputsOf,
 } from "./video-inputs";
 import { frameClipSeconds, frameExtractionMicrodollars, frameRequestId, videoRunCost } from "./video-policy";
 import { readRunPlan } from "../chat/lib/agent-run";
@@ -118,7 +120,7 @@ export const referenceSecondsOf = (node: WorkflowNode, context: ExecutionContext
     const wired = context.graph.edges
         .filter((edge) => edge.target === node.id && !isFrameHandleId(edge.sourceHandle))
         .flatMap((edge) => context.graph.nodes.filter((candidate) => candidate.id === edge.source))
-        .filter((source) => mediaOf(context.nodeOutputs[source.id])?.mimeType.startsWith("video/") === true)
+        .filter((source) => wireRoleOf(source) === "reference" && mediaOf(context.nodeOutputs[source.id])?.mimeType.startsWith("video/") === true)
         .slice(0, cap);
 
     if (wired.length === 0) {
@@ -170,21 +172,22 @@ export const videoInputArgs = async (node: WorkflowNode, context: ExecutionConte
     const inputs = await resolveVideoInputUrls(node, context, sign, model, frame);
 
     return {
+        // The start image: a wired frame, or for image-to-video the wired image (`resolveVideoInputs`).
         frameUrl: inputs.image,
+        prompt: wiredInputsOf(node, context).prompt,
         referenceAudioUrls: inputs.referenceAudioUrls,
         referenceVideoUrls: inputs.referenceVideoUrls,
     };
 };
 
 /**
- * A video node's prompt: its own, else the run's latest output when that is text. The one reading both
- * entry points use, so a run and a stream cannot disagree on what a node sends.
+ * A video node's prompt: its own stored prompt, else the text wired into it (`wiredInputsOf`). The one reading
+ * both entry points use, so a run and a stream cannot disagree on what a node sends.
  */
 export const videoPromptOf = (node: WorkflowNode, context: ExecutionContext): string => {
     const data = node.data as { prompt?: string };
-    const inputValue = getLastOutput(context);
 
-    return data.prompt ?? (typeof inputValue === "string" ? inputValue : "");
+    return data.prompt ?? wiredInputsOf(node, context).prompt ?? "";
 };
 
 /** The fields a video node's run reads: its generation settings, and the prompt and mode it stores. */
@@ -207,13 +210,16 @@ export interface ImageToVideoNodeRunData extends VideoNodeRunData {
 
 export type VideoInputArgs = Awaited<ReturnType<typeof videoInputArgs>>;
 
+/** The provider inputs a video action takes; the wired prompt is optional, since a text-to-video run sends its own. */
+type InputArgsWithPrompt = Omit<VideoInputArgs, "prompt"> & Partial<Pick<VideoInputArgs, "prompt">>;
+
 /**
  * The arguments of the image-to-video action for a video node. The options are sent only when the
  * stored value has the type the action takes; the action keeps only the ones the model accepts
  * (`fal-video-inputs.ts`), so a value left over from an earlier model is dropped there. The duration is
  * the run's billed length (`videoDurationOf`), so the endpoint is sent the length the run pays for.
  */
-export const imageToVideoArgs = (node: WorkflowNode, imageUrl: string, inputs: VideoInputArgs, userId: string) => {
+export const imageToVideoArgs = (node: WorkflowNode, imageUrl: string, inputs: InputArgsWithPrompt, userId: string) => {
     const data = node.data as ImageToVideoNodeRunData;
 
     return {
@@ -225,7 +231,7 @@ export const imageToVideoArgs = (node: WorkflowNode, imageUrl: string, inputs: V
         loop: node.type === "image-to-video" ? data.loop : undefined,
         model: modelIdFor(node, "imageToVideo"),
         motionStrength: data.motionStrength,
-        prompt: data.prompt,
+        prompt: data.prompt ?? inputs.prompt,
         referenceAudioUrls: inputs.referenceAudioUrls,
         referenceVideoUrls: inputs.referenceVideoUrls,
         resolution: typeof data.resolution === "string" ? data.resolution : undefined,
@@ -235,7 +241,7 @@ export const imageToVideoArgs = (node: WorkflowNode, imageUrl: string, inputs: V
 };
 
 /** The arguments of the text-to-video action for a video node, with the node's defaults for what it leaves unset. */
-export const textToVideoArgs = (node: WorkflowNode, prompt: string, inputs: VideoInputArgs, userId: string) => {
+export const textToVideoArgs = (node: WorkflowNode, prompt: string, inputs: InputArgsWithPrompt, userId: string) => {
     const data = node.data as VideoNodeRunData;
 
     return {
@@ -260,7 +266,7 @@ export const textToVideoArgs = (node: WorkflowNode, prompt: string, inputs: Vide
  */
 export const videoRunInputError = (node: WorkflowNode, context: ExecutionContext): string | undefined => {
     if (videoKindOf(node) === "imageToVideo") {
-        const hasImage = frameSourceOf(node, context) !== undefined || Boolean(extractUrl(getLastOutput(context), "imageUrl"));
+        const hasImage = frameSourceOf(node, context) !== undefined || wiredInputsOf(node, context).image !== undefined;
 
         return hasImage ? undefined : "No image input provided for image-to-video mode";
     }
@@ -353,7 +359,7 @@ export const runVideoNode = async (
         const inputs = await videoInputArgs(node, context, actionContext, userId);
 
         if (kind === "imageToVideo") {
-            const imageUrl = inputs.frameUrl ?? extractUrl(getLastOutput(context), "imageUrl");
+            const imageUrl = inputs.frameUrl;
 
             if (!imageUrl) {
                 throw new Error("No image input provided for image-to-video mode");
@@ -364,7 +370,7 @@ export const runVideoNode = async (
                 organizationId: context.orgId ?? null,
             });
 
-            return videoNodeOutput(result, (node.data as { prompt?: string }).prompt ?? "");
+            return videoNodeOutput(result, (node.data as { prompt?: string }).prompt ?? inputs.prompt ?? "");
         }
 
         const prompt = videoPromptOf(node, context);

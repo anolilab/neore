@@ -10,7 +10,9 @@
  *   to need it in the run, the frame extracted for it. The node run takes one unit of the daily video quota that
  *   `/chat/media` and the chat video tool take, once: a retry of the same node finds it taken (frame extraction takes none);
  * - per node, after a clip is made: its cost is deducted from the account's credits, keyed on the run and
- *   node so a retry is a no-op. A failed generation settles nothing, so it is not charged.
+ *   node so a retry is a no-op. A failed generation settles nothing, so it is not charged. A deduction that
+ *   fails is retried once, then recorded as a claim the next sweep deducts again (`chargePaidCall`); the clip is
+ *   returned either way, since the paid work is done.
  * - per frame extraction: charged by the extraction action (`media-ops.ts`) once fal has accepted the request,
  *   whatever happens after. Keyed on the run and source clip, so a second node reading the frame pays nothing.
  *
@@ -92,9 +94,60 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
     }
 };
 
+/** A paid call's charge, keyed on its request id so a repeat of it is a no-op on the ledger. */
+interface Charge {
+    costMicrodollars: number;
+    modelId: string;
+    orgId: string;
+    requestId: string;
+}
+
+/** The deduction for one charge, as `deductCreditsFromGateway` takes it. */
+const deductionOf = (charge: Charge, userId: string) => {
+    return {
+        billingMode: "platform" as const,
+        costMicrodollars: charge.costMicrodollars,
+        modelId: charge.modelId,
+        orgId: charge.orgId,
+        requestId: charge.requestId,
+        userId,
+    };
+};
+
+/** One deduction attempt. A failure is logged and reported as `false`, never thrown. */
+const deductOnce = async (context: Pick<ActionCtx, "runMutation">, charge: Charge, userId: string): Promise<boolean> => {
+    try {
+        await context.runMutation(internal.auth.billing.deductCreditsFromGateway, deductionOf(charge, userId));
+
+        return true;
+    } catch (error) {
+        chatLogger.warn("[workflow] video charge attempt failed", { error, modelId: charge.modelId, requestId: charge.requestId });
+
+        return false;
+    }
+};
+
+/** The claim scope a charge that could not be deducted is recorded under; its key is the charge's request id. */
+const CHARGE_RECORD_SCOPE = "video-charge";
+
+/**
+ * How long a recorded charge waits before the next sweep retries it. `reapLapsedClaims` runs on the cron tick (root) and on
+ * shard housekeeping (user shards), so a lapse is found within minutes, not at this exact deadline.
+ */
+const CHARGE_RETRY_LEASE_MS = 60 * 1000;
+
+/** Long enough for the sweep to find the record; the claim purge drops it after. */
+const CHARGE_RECORD_TTL_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Deducts one paid call's cost from the account's credits, keyed on `requestId` so a retry is a no-op. A call
- * with no organization is not charged. A failure is logged and not thrown: the paid work already happened.
+ * with no organization is not charged.
+ *
+ * The paid work already happened, so this never throws: a finished clip is returned even if its charge fails.
+ * The deduction is retried once at once. If both attempts fail, the charge is recorded as a claim (`video-charge`)
+ * whose lease lapses on the next sweep; `reapLapsedClaims` then runs the same deduction with the same request id,
+ * and the ledger makes a second run of it a no-op. A lapse runs once: if that deduction also fails, nothing retries
+ * it, and the scheduler's failure is the only trace (a residual limit).
  */
 export const chargePaidCall = async (
     context: Pick<ActionCtx, "runMutation">,
@@ -105,19 +158,35 @@ export const chargePaidCall = async (
         return;
     }
 
+    const charge: Charge = { costMicrodollars: call.costMicrodollars, modelId: call.modelId, orgId: call.orgId, requestId: call.requestId };
+
+    if (await deductOnce(context, charge, userId)) {
+        return;
+    }
+
+    if (await deductOnce(context, charge, userId)) {
+        return;
+    }
+
     try {
-        await context.runMutation(internal.auth.billing.deductCreditsFromGateway, {
-            billingMode: "platform",
-            costMicrodollars: call.costMicrodollars,
-            modelId: call.modelId,
-            orgId: call.orgId,
-            requestId: call.requestId,
+        const recorded = await context.runMutation(internal.lib.claim_once.claimKey, {
+            key: charge.requestId,
+            leaseMs: CHARGE_RETRY_LEASE_MS,
+            // The sweep adds `claimKey` to these args; `deductCreditsFromGateway` strips it (`v.object` drops unknown keys).
+            onLapse: { args: JSON.stringify(deductionOf(charge, userId)), target: internal.auth.billing.deductCreditsFromGateway.__lunoraRef },
+            scope: CHARGE_RECORD_SCOPE,
+            ttlMs: CHARGE_RECORD_TTL_MS,
             userId,
         });
+
+        // `recorded` is `false` when a record for this request id already existed: that record's own lease then decides whether a sweep runs it again.
+        chatLogger.error("[workflow] video charge failed twice; recorded for the next sweep", {
+            modelId: charge.modelId,
+            recorded,
+            requestId: charge.requestId,
+        });
     } catch (error) {
-        // The clip or frame exists and fal is paid: failing the node would hide a finished result and invite a paid re-run.
-        // The charge is lost instead, and the log is where it is found.
-        chatLogger.error("[workflow] could not record a video charge", { error, requestId: call.requestId });
+        chatLogger.error("[workflow] video charge could not be recorded", { error, modelId: charge.modelId, requestId: charge.requestId });
     }
 };
 

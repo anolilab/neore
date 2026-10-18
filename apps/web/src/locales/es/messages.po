@@ -1805,7 +1805,7 @@ msgstr "Añadir página"
 msgid "Add Passkey"
 msgstr "Añadir passkey"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+#: src/features/workflow/components/nodes/video-frames-section.tsx:121
 msgid "Add picked frame as image node"
 msgstr "Añadir el fotograma elegido como nodo de imagen"
 
@@ -4622,7 +4622,7 @@ msgstr "Capturar pantalla"
 #~ msgid "captured"
 #~ msgstr "capturado"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+#: src/features/workflow/components/nodes/video-frames-section.tsx:121
 msgid "Capturing…"
 msgstr "Capturando…"
 
@@ -12148,11 +12148,11 @@ msgstr "La base de la destacada serie Veo 3.x de Google"
 msgid "FPS"
 msgstr "FPS"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:67
+#: src/features/workflow/components/nodes/video-frames-section.tsx:69
 msgid "Frame capture failed"
 msgstr "Error al capturar el fotograma"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:77
+#: src/features/workflow/components/nodes/video-frames-section.tsx:79
 msgid "Frames"
 msgstr "Fotogramas"
 
@@ -15078,7 +15078,7 @@ msgstr "Última confirmación: {0}"
 msgid "Last error"
 msgstr "Último error"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:40
+#: src/features/workflow/components/nodes/video-frames-section.tsx:41
 msgid "Last frame"
 msgstr "Último fotograma"
 
@@ -20218,7 +20218,7 @@ msgstr "Elegir color"
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "Elige hasta {maxReferences} imágenes. El orden en que las selecciones es el orden en que las verá el modelo."
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:105
+#: src/features/workflow/components/nodes/video-frames-section.tsx:107
 msgid "Picked at (s)"
 msgstr "Elegido en (s)"
 
@@ -20226,7 +20226,7 @@ msgstr "Elegido en (s)"
 #~ msgid "Picked frame"
 #~ msgstr "Fotograma elegido"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:91
+#: src/features/workflow/components/nodes/video-frames-section.tsx:93
 msgid "Picked frame wire (remove it)"
 msgstr "Conexión del fotograma elegido (quitar)"
 
@@ -22953,7 +22953,7 @@ msgstr "Progreso de la ejecución"
 msgid "Run Python, see charts and images instantly"
 msgstr "Ejecuta Python y ve gráficos e imágenes al instante"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:124
+#: src/features/workflow/components/nodes/video-frames-section.tsx:126
 msgid "Run the node first to pick a frame"
 msgstr "Ejecuta primero el nodo para elegir un fotograma"
 
@@ -25133,7 +25133,7 @@ msgstr "Empieza a chatear gratis"
 msgid "Start editing cell"
 msgstr "Empezar a editar la celda"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:39
+#: src/features/workflow/components/nodes/video-frames-section.tsx:40
 #: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
 msgstr "Fotograma inicial"
@@ -26570,7 +26570,7 @@ msgstr "El archivo contiene demasiados archivos."
 msgid "The assistant has a question"
 msgstr "El asistente tiene una pregunta"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:66
+#: src/features/workflow/components/nodes/video-frames-section.tsx:68
 msgid "The browser cannot read this video to capture a frame"
 msgstr "El navegador no puede leer este vídeo para capturar un fotograma"
 

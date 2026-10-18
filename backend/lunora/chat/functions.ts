@@ -11,7 +11,7 @@ import {
     DEFAULT_USER_PROMPT_OPTIMIZATION_MODEL,
 } from "@neore/ai/constants";
 import type { ImageSize, ModelDefinition } from "@neore/ai/models";
-import { exceedsFreePlanCap, FAL_IMAGE, FAL_VIDEO, MODEL_LOOKUP, REFERENCE_MEDIA_CAPS, resolveWorkflowModel, WORKFLOW_KIND_ACCEPTS } from "@neore/ai/models";
+import { exceedsFreePlanCap, FAL_IMAGE, MODEL_LOOKUP, REFERENCE_MEDIA_CAPS, resolveWorkflowModel, WORKFLOW_KIND_ACCEPTS } from "@neore/ai/models";
 import { getFollowupSuggestionsPrompt, getThreadTitlePrompt } from "@neore/ai/prompts";
 import { buildCinemaPrompt } from "@neore/ai/prompts/cinema";
 import {
@@ -5544,8 +5544,8 @@ export const generateImageToVideo = internalAction
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        // Unset is the workflow's default; a set model must be an enabled fal video row, and its endpoint is the registry's.
-        const modelDefinition = requireEnabledModel(resolveWorkflowModel("imageToVideo", model), FAL_VIDEO, "image-to-video");
+        // Unset is the workflow's default; a set model must be an enabled fal row that takes an image input, and its endpoint is the registry's.
+        const modelDefinition = requireEnabledModel(resolveWorkflowModel("imageToVideo", model), WORKFLOW_KIND_ACCEPTS.imageToVideo, "image-to-video");
         const endpoint = modelDefinition.modelApiId;
         const paidPlan = await gateVideoPlan(context, modelDefinition, userId, organizationId);
 

@@ -1804,7 +1804,7 @@ msgstr "Add page"
 msgid "Add Passkey"
 msgstr "Add Passkey"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+#: src/features/workflow/components/nodes/video-frames-section.tsx:121
 msgid "Add picked frame as image node"
 msgstr "Add picked frame as image node"
 
@@ -4621,7 +4621,7 @@ msgstr "Capture screen"
 #~ msgid "captured"
 #~ msgstr "captured"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+#: src/features/workflow/components/nodes/video-frames-section.tsx:121
 msgid "Capturing…"
 msgstr "Capturing…"
 
@@ -12147,11 +12147,11 @@ msgstr "Foundation of Google's leading Veo 3.x series"
 msgid "FPS"
 msgstr "FPS"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:67
+#: src/features/workflow/components/nodes/video-frames-section.tsx:69
 msgid "Frame capture failed"
 msgstr "Frame capture failed"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:77
+#: src/features/workflow/components/nodes/video-frames-section.tsx:79
 msgid "Frames"
 msgstr "Frames"
 
@@ -15077,7 +15077,7 @@ msgstr "Last confirmed {0}"
 msgid "Last error"
 msgstr "Last error"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:40
+#: src/features/workflow/components/nodes/video-frames-section.tsx:41
 msgid "Last frame"
 msgstr "Last frame"
 
@@ -20217,7 +20217,7 @@ msgstr "Pick color"
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:105
+#: src/features/workflow/components/nodes/video-frames-section.tsx:107
 msgid "Picked at (s)"
 msgstr "Picked at (s)"
 
@@ -20225,7 +20225,7 @@ msgstr "Picked at (s)"
 #~ msgid "Picked frame"
 #~ msgstr "Picked frame"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:91
+#: src/features/workflow/components/nodes/video-frames-section.tsx:93
 msgid "Picked frame wire (remove it)"
 msgstr "Picked frame wire (remove it)"
 
@@ -22952,7 +22952,7 @@ msgstr "Run progress"
 msgid "Run Python, see charts and images instantly"
 msgstr "Run Python, see charts and images instantly"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:124
+#: src/features/workflow/components/nodes/video-frames-section.tsx:126
 msgid "Run the node first to pick a frame"
 msgstr "Run the node first to pick a frame"
 
@@ -25132,7 +25132,7 @@ msgstr "Start chatting free"
 msgid "Start editing cell"
 msgstr "Start editing cell"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:39
+#: src/features/workflow/components/nodes/video-frames-section.tsx:40
 #: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
 msgstr "Start frame"
@@ -26569,7 +26569,7 @@ msgstr "The archive holds too many files."
 msgid "The assistant has a question"
 msgstr "The assistant has a question"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:66
+#: src/features/workflow/components/nodes/video-frames-section.tsx:68
 msgid "The browser cannot read this video to capture a frame"
 msgstr "The browser cannot read this video to capture a frame"
 

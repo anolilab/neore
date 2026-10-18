@@ -1805,7 +1805,7 @@ msgstr "Dodaj stronę"
 msgid "Add Passkey"
 msgstr "Dodaj klucz dostępu"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+#: src/features/workflow/components/nodes/video-frames-section.tsx:121
 msgid "Add picked frame as image node"
 msgstr "Dodaj wybraną klatkę jako węzeł obrazu"
 
@@ -4622,7 +4622,7 @@ msgstr "Zrzut ekranu"
 #~ msgid "captured"
 #~ msgstr "przechwycono"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+#: src/features/workflow/components/nodes/video-frames-section.tsx:121
 msgid "Capturing…"
 msgstr "Przechwytywanie…"
 
@@ -12148,11 +12148,11 @@ msgstr "Podstawa czołowej serii Veo 3.x od Google"
 msgid "FPS"
 msgstr "FPS"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:67
+#: src/features/workflow/components/nodes/video-frames-section.tsx:69
 msgid "Frame capture failed"
 msgstr "Nie udało się przechwycić klatki"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:77
+#: src/features/workflow/components/nodes/video-frames-section.tsx:79
 msgid "Frames"
 msgstr "Klatki"
 
@@ -15078,7 +15078,7 @@ msgstr "Ostatnio potwierdzono {0}"
 msgid "Last error"
 msgstr "Ostatni błąd"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:40
+#: src/features/workflow/components/nodes/video-frames-section.tsx:41
 msgid "Last frame"
 msgstr "Ostatnia klatka"
 
@@ -20218,7 +20218,7 @@ msgstr "Wybierz kolor"
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "Wybierz do {maxReferences} obrazów. Kolejność zaznaczania to kolejność, w jakiej zobaczy je model."
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:105
+#: src/features/workflow/components/nodes/video-frames-section.tsx:107
 msgid "Picked at (s)"
 msgstr "Wybrano w (s)"
 
@@ -20226,7 +20226,7 @@ msgstr "Wybrano w (s)"
 #~ msgid "Picked frame"
 #~ msgstr "Wybrana klatka"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:91
+#: src/features/workflow/components/nodes/video-frames-section.tsx:93
 msgid "Picked frame wire (remove it)"
 msgstr "Połączenie wybranej klatki (usuń)"
 
@@ -22953,7 +22953,7 @@ msgstr "Postęp przebiegu"
 msgid "Run Python, see charts and images instantly"
 msgstr "Uruchamiaj Pythona i od razu zobacz wykresy i obrazy"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:124
+#: src/features/workflow/components/nodes/video-frames-section.tsx:126
 msgid "Run the node first to pick a frame"
 msgstr "Najpierw uruchom węzeł, aby wybrać klatkę"
 
@@ -25133,7 +25133,7 @@ msgstr "Zacznij rozmawiać za darmo"
 msgid "Start editing cell"
 msgstr "Zacznij edytować komórkę"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:39
+#: src/features/workflow/components/nodes/video-frames-section.tsx:40
 #: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
 msgstr "Klatka początkowa"
@@ -26570,7 +26570,7 @@ msgstr "Archiwum zawiera zbyt wiele plików."
 msgid "The assistant has a question"
 msgstr "Asystent ma pytanie"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:66
+#: src/features/workflow/components/nodes/video-frames-section.tsx:68
 msgid "The browser cannot read this video to capture a frame"
 msgstr "Przeglądarka nie może odczytać tego wideo, aby przechwycić klatkę"
 
