@@ -71,7 +71,7 @@ import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
-import { buildFalReferenceImageInput, buildFalReferenceVideoInput } from "./lib/fal-reference-mapping";
+import { buildFalReferenceImageInput, buildFalReferenceVideoInput, falDurationInput } from "./lib/fal-reference-mapping";
 import { getAgentForUser, validateThreadAccess, validateThreadAccessWithData } from "./lib/thread-helpers";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
@@ -4187,7 +4187,7 @@ export const generateVideo = internalAction
                     }
 
                     if (duration !== undefined) {
-                        falInput.duration = duration;
+                        falInput.duration = falDurationInput(modelDefinition, duration);
                     }
 
                     const falResult = await callFalApi<Parameters<typeof resolveFalVideoUrl>[0]>(endpoint, falInput, falApiKey);
@@ -5526,7 +5526,7 @@ export const generateImageToVideo = internalAction
             }
 
             if (duration) {
-                input.duration = duration;
+                input.duration = falDurationInput(modelDefinition, duration);
             }
 
             if (motionStrength !== undefined) {

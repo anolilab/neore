@@ -2,7 +2,7 @@ import type { ModelDefinition } from "@neore/ai/models";
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
-import { buildFalReferenceImageInput, buildFalReferenceVideoInput, referenceVideoLimitSeconds } from "./fal-reference-mapping";
+import { buildFalReferenceImageInput, buildFalReferenceVideoInput, falDurationInput, referenceVideoLimitSeconds } from "./fal-reference-mapping";
 
 const URL_A = "https://files.example.com/a.png";
 const URL_B = "https://files.example.com/b.png";
@@ -161,5 +161,22 @@ describe("referenceVideoLimitSeconds", () => {
         expect(referenceVideoLimitSeconds(videoModel("google/gemini-omni-flash/v1.1/reference-to-video", { videos: 3 }))).toBeUndefined();
         expect(referenceVideoLimitSeconds(videoModel("bytedance/seedance-2.0/reference-to-video", {}))).toBeUndefined();
         expect(referenceVideoLimitSeconds(undefined)).toBeUndefined();
+    });
+});
+
+describe("falDurationInput", () => {
+    it("sends Seedance 2.0 reference-to-video a string within its 4 to 15 second enum", () => {
+        const model = videoModel("bytedance/seedance-2.0/reference-to-video", {});
+
+        expect(falDurationInput(model, 8)).toBe("8");
+        expect(falDurationInput(model, 2)).toBe("4");
+        expect(falDurationInput(model, 30)).toBe("15");
+        expect(falDurationInput(model, 6.4)).toBe("6");
+    });
+
+    it("leaves the number alone for every other endpoint, and an unset duration unset", () => {
+        expect(falDurationInput(videoModel("fal-ai/kling-video/v3/pro/image-to-video", {}), 5)).toBe(5);
+        expect(falDurationInput(undefined, 5)).toBe(5);
+        expect(falDurationInput(videoModel("bytedance/seedance-2.0/reference-to-video", {}), undefined)).toBeUndefined();
     });
 });

@@ -71,6 +71,8 @@ interface FalReferenceField {
 
 interface FalVideoReferenceSpec {
     audios?: FalReferenceField;
+    /** The endpoint's `duration` is a string enum of whole seconds in this range, not a number. */
+    durationSeconds?: { max: number; min: number };
     /** Fixed fields the endpoint requires alongside the references. */
     extra?: Record<string, string>;
     images?: FalReferenceField;
@@ -87,12 +89,14 @@ interface FalVideoReferenceSpec {
 const FAL_VIDEO_REFERENCE_FIELDS: Record<string, FalVideoReferenceSpec> = {
     "bytedance/seedance-2.0/fast/reference-to-video": {
         audios: { name: "audio_urls" },
+        durationSeconds: { max: 15, min: 4 },
         images: { name: "image_urls" },
         totalSeconds: 15,
         videos: { name: "video_urls" },
     },
     "bytedance/seedance-2.0/reference-to-video": {
         audios: { name: "audio_urls" },
+        durationSeconds: { max: 15, min: 4 },
         images: { name: "image_urls" },
         totalSeconds: 15,
         videos: { name: "video_urls" },
@@ -101,6 +105,21 @@ const FAL_VIDEO_REFERENCE_FIELDS: Record<string, FalVideoReferenceSpec> = {
         images: { name: "image_urls" },
         videos: { name: "reference_video_urls" },
     },
+};
+
+/**
+ * The `duration` to send for an endpoint. FAL documents Seedance 2.0 reference-to-video's as a
+ * string enum of whole seconds (4 to 15, or "auto"), so a number is sent as the nearest allowed
+ * string; every other endpoint keeps the number it was given.
+ */
+export const falDurationInput = (modelDefinition: ModelDefinition | undefined, duration: number | undefined): number | string | undefined => {
+    const range = modelDefinition && FAL_VIDEO_REFERENCE_FIELDS[modelDefinition.modelApiId]?.durationSeconds;
+
+    if (duration === undefined || !range) {
+        return duration;
+    }
+
+    return String(Math.min(range.max, Math.max(range.min, Math.round(duration))));
 };
 
 /**
