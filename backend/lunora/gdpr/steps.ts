@@ -406,13 +406,13 @@ export const generateExportFile = internalAction
         // (`collectActivityForExport`). Optional for the same in-flight-replay
         // reason as `threadTags`.
         activity: v.optional(v.any()),
+        // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        bots: v.optional(v.any()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
         conversations: v.any(),
-        // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
-        // the same in-flight-replay reason as `threadTags`.
-        bots: v.optional(v.any()),
         // Paired devices and their call audit (`devices/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         devices: v.optional(v.any()),
@@ -449,13 +449,13 @@ export const generateExportFile = internalAction
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
         const exportData = {
+            bots: args.bots ?? { bots: [] },
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {
                 email: args.userEmail,
                 id: args.userId,
             },
-            bots: args.bots ?? { bots: [] },
             devices: args.devices ?? { calls: [], devices: [] },
             evals: args.evals ?? { datasets: [] },
             exportDate: new Date().toISOString(),

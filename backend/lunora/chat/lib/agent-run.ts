@@ -347,9 +347,15 @@ export const loadRunContext = async (
         prefsPromise,
         threadSettingsPromise,
         loadUserProviderKeys(ctx, userId),
-        prefsPromise.then(async (loaded) =>
-            loaded.memoryEnabled && retrievalText ? await retrieveMemories(ctx, userId, retrievalText, (await botPromise)?.botId) : undefined,
-        ),
+        prefsPromise.then(async (loaded) => {
+            if (!loaded.memoryEnabled || !retrievalText) {
+                return undefined;
+            }
+
+            const memoryBot = await botPromise;
+
+            return await retrieveMemories(ctx, userId, retrievalText, memoryBot?.botId);
+        }),
         retrievalText ? retrieveKnowledgeContext(ctx, { query: retrievalText, threadId, userId }) : undefined,
         threadSettingsPromise.then(async (settings) =>
             settings?.projectId ? await ctx.runQuery(api.agent.projects.getProject, { projectId: settings.projectId as Id<"projects"> }) : null,
@@ -381,12 +387,12 @@ export const loadRunContext = async (
     }
 
     return {
+        /** The bot this chat runs as, when it resolves; its memory is written in that scope. */
+        botId: bot?.botId,
         /** Appended to the agent's instructions, in this order. */
         contextParts,
         /** The passages behind the `[n]` citations; `afterRun` records them on the reply. */
         knowledgeSources: knowledgeContext?.sources ?? [],
-        /** The bot this chat runs as, when it resolves; its memory is written in that scope. */
-        botId: bot?.botId,
         memoryEnabled: prefs.memoryEnabled,
         prefs: {
             language: args.threadLanguage || prefs.language,
