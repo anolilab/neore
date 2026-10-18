@@ -23,6 +23,7 @@ export {
     type ParsedCustomModelId,
 } from "./custom-model-id";
 export {
+    exceedsFreePlanCap,
     FAL_VIDEO_INPUTS,
     falVideoInputsOf,
     type FalVideoInputSpec,

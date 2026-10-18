@@ -97,3 +97,17 @@ export const formatJson = (text: string): JsonFormat => {
 
     return { ok: true, text: JSON.stringify(parsed.value, null, 2) };
 };
+
+// A string literal (kept whole), or a bare `{{variable}}` or `@mention` outside one (read as null). Strings come first, so a token inside quotes is never touched.
+const STRING_OR_BARE_TOKEN = /"(?:[^"\\]|\\[\s\S])*"|\{\{[^{}]*\}\}|@[^\s"',:[\]{}]+/g;
+
+/**
+ * Whether an invalid template is invalid only because of a placeholder or mention outside quotes:
+ * with each one read as `null`, the value a run may splice in, the text parses. Any other error (a
+ * stray comma, a missing bracket) is not explained by a token, so this is false for it.
+ */
+export const isBareTokenCause = (text: string): boolean => {
+    const withNulls = text.replaceAll(STRING_OR_BARE_TOKEN, (match) => (match.startsWith('"') ? match : "null"));
+
+    return withNulls !== text && parse(withNulls).ok;
+};

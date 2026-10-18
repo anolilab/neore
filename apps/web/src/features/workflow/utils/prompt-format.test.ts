@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkJson, errorPosition, formatJson, MAX_JSON_CHECK_CHARS } from "./prompt-format";
+import { checkJson, errorPosition, formatJson, isBareTokenCause, MAX_JSON_CHECK_CHARS } from "./prompt-format";
 
 describe("errorPosition", () => {
     it("reads the line and column that Firefox and newer V8 name", () => {
@@ -54,5 +54,23 @@ describe("checkJson / formatJson", () => {
 
     it("formats a plain @Notes mention, which the text already holds as written", () => {
         expect(checkJson('{"s": "@Notes"}')).toStrictEqual({ formatChangesValues: false, status: "valid" });
+    });
+});
+
+describe("isBareTokenCause", () => {
+    it("is true when a bare placeholder or mention is the only thing breaking the JSON", () => {
+        expect(isBareTokenCause('{"n": {{count}}}')).toBe(true);
+        expect(isBareTokenCause('{"items": {{input}}, "n": 1}')).toBe(true);
+        expect(isBareTokenCause('{"a": @Notes}')).toBe(true);
+    });
+
+    it("is false for an error no token explains, even when a token is present", () => {
+        expect(isBareTokenCause('{"a": 1,}')).toBe(false);
+        expect(isBareTokenCause('{"a": {{x}},}')).toBe(false);
+    });
+
+    it("ignores a token inside quotes, which the text already holds as valid", () => {
+        expect(isBareTokenCause('{"s": "{{input}}"}')).toBe(false);
+        expect(isBareTokenCause('{"s": "@Notes"}')).toBe(false);
     });
 });

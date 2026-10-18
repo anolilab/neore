@@ -285,3 +285,20 @@ export const resolutionWithinFreePlan = (modelApiId: string | undefined, resolut
 
     return allowed.toSorted((a, b) => b.height - a.height)[0]?.value;
 };
+
+/**
+ * Whether a requested resolution would render above the free plan's cap, after snapping to the
+ * endpoint's values. A resolution with no readable height counts as above it. Only then does a run
+ * need the caller's plan.
+ */
+export const exceedsFreePlanCap = (modelApiId: string | undefined, resolution: string | undefined): boolean => {
+    const snapped = snapVideoOptions(modelApiId, { resolution }).resolution;
+
+    if (snapped === undefined) {
+        return false;
+    }
+
+    const height = heightOf(snapped);
+
+    return height === undefined || height > FREE_PLAN_MAX_HEIGHT;
+};

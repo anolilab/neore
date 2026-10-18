@@ -88,7 +88,7 @@ msgstr "({jobFailed} failed)"
 msgid "(attachments only)"
 msgstr "(attachments only)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:100
+#: src/features/settings/components/chat/default-models-settings.tsx:98
 msgid "(default)"
 msgstr "(default)"
 
@@ -1386,6 +1386,10 @@ msgstr "A new version of the app is available."
 msgid "A page shared from Neore."
 msgstr "A page shared from Neore."
 
+#: src/features/workflow/components/nodes/text-node.tsx:218
+msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
+msgstr "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
+
 #: src/features/notifications/lib/notification-labels.ts:27
 msgid "A question is waiting for you"
 msgstr "A question is waiting for you"
@@ -1449,6 +1453,10 @@ msgstr "about {0} (opens in a new tab)"
 #: src/features/settings/components/personalization/personalization-settings.tsx:147
 msgid "About You"
 msgstr "About You"
+
+#: src/features/workflow/components/nodes/video-model-options.tsx:95
+msgid "Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p."
+msgstr "Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p."
 
 #: src/features/chat/thread/composer-search-mode.tsx:50
 msgid "Academic"
@@ -4943,15 +4951,15 @@ msgstr "Choose a unique username"
 msgid "Choose at least one permission"
 msgstr "Choose at least one permission"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:225
+#: src/features/settings/components/chat/default-models-settings.tsx:223
 msgid "Choose default image models"
 msgstr "Choose default image models"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:183
+#: src/features/settings/components/chat/default-models-settings.tsx:181
 msgid "Choose default text models"
 msgstr "Choose default text models"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:267
+#: src/features/settings/components/chat/default-models-settings.tsx:265
 msgid "Choose default video models"
 msgstr "Choose default video models"
 
@@ -7658,55 +7666,55 @@ msgstr "Default language updated"
 msgid "Default Model"
 msgstr "Default Model"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:282
+#: src/features/settings/components/chat/default-models-settings.tsx:280
 msgid "Default model for animating a single image"
 msgstr "Default model for animating a single image"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:187
+#: src/features/settings/components/chat/default-models-settings.tsx:185
 msgid "Default model for chat and text generation"
 msgstr "Default model for chat and text generation"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:251
+#: src/features/settings/components/chat/default-models-settings.tsx:249
 msgid "Default model for combining multiple reference images"
 msgstr "Default model for combining multiple reference images"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:315
+#: src/features/settings/components/chat/default-models-settings.tsx:302
 msgid "Default model for editing or transforming existing video"
 msgstr "Default model for editing or transforming existing video"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:229
+#: src/features/settings/components/chat/default-models-settings.tsx:227
 msgid "Default model for generating images from text prompts"
 msgstr "Default model for generating images from text prompts"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:304
+#: src/features/settings/components/chat/default-models-settings.tsx:291
 msgid "Default model for generating video from multiple images"
 msgstr "Default model for generating video from multiple images"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:271
+#: src/features/settings/components/chat/default-models-settings.tsx:269
 msgid "Default model for generating video from text prompts"
 msgstr "Default model for generating video from text prompts"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:198
+#: src/features/settings/components/chat/default-models-settings.tsx:196
 msgid "Default model for image understanding and analysis"
 msgstr "Default model for image understanding and analysis"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:240
+#: src/features/settings/components/chat/default-models-settings.tsx:238
 msgid "Default model for transforming existing images"
 msgstr "Default model for transforming existing images"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:326
+#: src/features/settings/components/chat/default-models-settings.tsx:313
 msgid "Default model for video generation from mixed inputs"
 msgstr "Default model for video generation from mixed inputs"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:293
-msgid "Default model for video generation with start and end frames"
-msgstr "Default model for video generation with start and end frames"
+#~ msgid "Default model for video generation with start and end frames"
+#~ msgstr "Default model for video generation with start and end frames"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:209
+#: src/features/settings/components/chat/default-models-settings.tsx:207
 msgid "Default model for video understanding and transcription"
 msgstr "Default model for video understanding and transcription"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:169
+#: src/features/settings/components/chat/default-models-settings.tsx:167
 msgid "Default model updated"
 msgstr "Default model updated"
 
@@ -9677,7 +9685,7 @@ msgid "Enter text or leave empty to use input from previous node..."
 msgstr "Enter text or leave empty to use input from previous node..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:381
-#: src/features/workflow/components/nodes/text-node.tsx:150
+#: src/features/workflow/components/nodes/text-node.tsx:151
 msgid "Enter text..."
 msgstr "Enter text..."
 
@@ -11163,7 +11171,7 @@ msgstr "Failed to update configuration"
 msgid "Failed to update connection"
 msgstr "Failed to update connection"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:163
+#: src/features/settings/components/chat/default-models-settings.tsx:161
 msgid "Failed to update default model"
 msgstr "Failed to update default model"
 
@@ -11905,8 +11913,8 @@ msgid "Firefox works too, and may ask the same question."
 msgstr "Firefox works too, and may ask the same question."
 
 #: src/features/settings/components/chat/default-models-settings.tsx:296
-msgid "First frame / last frame"
-msgstr "First frame / last frame"
+#~ msgid "First frame / last frame"
+#~ msgstr "First frame / last frame"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:121
 msgid "First of each month at 9 AM"
@@ -12115,7 +12123,7 @@ msgstr "Forked \"{0}\" — opening your copy."
 msgid "Forking..."
 msgstr "Forking..."
 
-#: src/features/workflow/components/nodes/text-node.tsx:204
+#: src/features/workflow/components/nodes/text-node.tsx:212
 msgid "Format"
 msgstr "Format"
 
@@ -12580,7 +12588,7 @@ msgstr "Generate an image of a cozy reading nook with warm lighting and plants."
 msgid "Generate an image or video..."
 msgstr "Generate an image or video..."
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:43
+#: src/features/workflow/components/nodes/video-model-options.tsx:49
 msgid "Generate audio"
 msgstr "Generate audio"
 
@@ -13825,7 +13833,7 @@ msgstr "illustration"
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
-#: src/features/settings/components/chat/default-models-settings.tsx:224
+#: src/features/settings/components/chat/default-models-settings.tsx:222
 #: src/features/settings/components/chat/models-settings.tsx:38
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:71
 #: src/features/workflow/components/gallery/gallery-card.tsx:27
@@ -13900,15 +13908,15 @@ msgstr "Image generation model"
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "Image to apply the style to (or use input from previous node)"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:243
+#: src/features/settings/components/chat/default-models-settings.tsx:241
 msgid "Image to image"
 msgstr "Image to image"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:201
+#: src/features/settings/components/chat/default-models-settings.tsx:199
 msgid "Image to text"
 msgstr "Image to text"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:285
+#: src/features/settings/components/chat/default-models-settings.tsx:283
 msgid "Image to video"
 msgstr "Image to video"
 
@@ -13956,11 +13964,11 @@ msgstr "Images"
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
 msgstr "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:254
+#: src/features/settings/components/chat/default-models-settings.tsx:252
 msgid "Images to image"
 msgstr "Images to image"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:307
+#: src/features/settings/components/chat/default-models-settings.tsx:294
 msgid "Images to video"
 msgstr "Images to video"
 
@@ -14306,7 +14314,7 @@ msgstr "inpainting"
 msgid "Input"
 msgstr "Input"
 
-#: src/features/workflow/components/nodes/text-node.tsx:130
+#: src/features/workflow/components/nodes/text-node.tsx:131
 msgid "Input (Rich Text)"
 msgstr "Input (Rich Text)"
 
@@ -14738,7 +14746,7 @@ msgid "JPEG image"
 msgstr "JPEG image"
 
 #: src/features/workflow/components/nodes/output-node.tsx:18
-#: src/features/workflow/components/nodes/text-node.tsx:169
+#: src/features/workflow/components/nodes/text-node.tsx:170
 msgid "JSON"
 msgstr "JSON"
 
@@ -15744,7 +15752,7 @@ msgstr "Loading your overview…"
 #: src/features/settings/components/chat/agent-settings.tsx:28
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
-#: src/features/settings/components/chat/default-models-settings.tsx:134
+#: src/features/settings/components/chat/default-models-settings.tsx:132
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:165
 #: src/features/settings/components/chat/trigger-settings.tsx:776
@@ -16771,7 +16779,7 @@ msgstr "Mistral's small reasoning LLM"
 msgid "Mistral's smallest 3B multi-modal model"
 msgstr "Mistral's smallest 3B multi-modal model"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:329
+#: src/features/settings/components/chat/default-models-settings.tsx:316
 msgid "Mixed to video"
 msgstr "Mixed to video"
 
@@ -16788,7 +16796,7 @@ msgstr "Mobile app icon"
 
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
-#: src/features/workflow/components/nodes/text-node.tsx:122
+#: src/features/workflow/components/nodes/text-node.tsx:123
 #: src/features/workflow/components/nodes/video-node.tsx:115
 msgid "Mode"
 msgstr "Mode"
@@ -18116,7 +18124,7 @@ msgstr "No microphone"
 msgid "No microphone found."
 msgstr "No microphone found."
 
-#: src/features/settings/components/chat/default-models-settings.tsx:77
+#: src/features/settings/components/chat/default-models-settings.tsx:75
 msgid "No models available"
 msgstr "No models available"
 
@@ -20302,8 +20310,8 @@ msgid "Pixelize"
 msgstr "Pixelize"
 
 #: src/features/workflow/components/nodes/text-node.tsx:210
-msgid "Placeholders outside quotes are checked as written, so this may read as invalid until a run fills them in"
-msgstr "Placeholders outside quotes are checked as written, so this may read as invalid until a run fills them in"
+#~ msgid "Placeholders outside quotes are checked as written, so this may read as invalid until a run fills them in"
+#~ msgstr "Placeholders outside quotes are checked as written, so this may read as invalid until a run fills them in"
 
 #: src/features/chat/thread/composer.tsx:260
 msgid "Plan a project or brainstorm ideas..."
@@ -20878,6 +20886,7 @@ msgstr "Private by default"
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:553
+#: src/features/workflow/components/nodes/video-model-options.tsx:86
 msgid "Pro"
 msgstr "Pro"
 
@@ -21109,7 +21118,7 @@ msgstr "Prompt created successfully"
 msgid "Prompt deleted"
 msgstr "Prompt deleted"
 
-#: src/features/workflow/components/nodes/text-node.tsx:158
+#: src/features/workflow/components/nodes/text-node.tsx:159
 msgid "Prompt format"
 msgstr "Prompt format"
 
@@ -21866,7 +21875,7 @@ msgstr "Reference images"
 msgid "Reference Images ({referenceCount}/{maxImages})"
 msgstr "Reference Images ({referenceCount}/{maxImages})"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:117
+#: src/features/workflow/components/nodes/video-model-options.tsx:139
 msgid "Reference mode"
 msgstr "Reference mode"
 
@@ -21891,7 +21900,7 @@ msgstr "reference video"
 msgid "Reference videos together must be at least {0} seconds."
 msgstr "Reference videos together must be at least {0} seconds."
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:133
+#: src/features/workflow/components/nodes/video-model-options.tsx:155
 msgid "References"
 msgstr "References"
 
@@ -22538,7 +22547,7 @@ msgstr "Reset zoom (currently {zoomPercent}%)"
 msgid "Resize {label} column"
 msgstr "Resize {label} column"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:57
+#: src/features/workflow/components/nodes/video-model-options.tsx:63
 msgid "Resolution"
 msgstr "Resolution"
 
@@ -25119,7 +25128,7 @@ msgid "Start editing cell"
 msgstr "Start editing cell"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:39
-#: src/features/workflow/components/nodes/video-model-options.tsx:133
+#: src/features/workflow/components/nodes/video-model-options.tsx:155
 msgid "Start frame"
 msgstr "Start frame"
 
@@ -25965,8 +25974,8 @@ msgstr "Synthesizer (weighs both sides)"
 msgid "System"
 msgstr "System"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:67
-#: src/features/settings/components/chat/default-models-settings.tsx:103
+#: src/features/settings/components/chat/default-models-settings.tsx:65
+#: src/features/settings/components/chat/default-models-settings.tsx:101
 msgid "System default"
 msgstr "System default"
 
@@ -26274,7 +26283,7 @@ msgstr "Telugu"
 msgid "Telugu (India)"
 msgstr "Telugu (India)"
 
-#: src/features/workflow/components/nodes/text-node.tsx:180
+#: src/features/workflow/components/nodes/text-node.tsx:181
 msgid "Template"
 msgstr "Template"
 
@@ -26371,11 +26380,11 @@ msgstr "text"
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
-#: src/features/settings/components/chat/default-models-settings.tsx:182
+#: src/features/settings/components/chat/default-models-settings.tsx:180
 #: src/features/settings/components/chat/models-settings.tsx:42
 #: src/features/workflow/components/gallery/gallery-card.tsx:28
 #: src/features/workflow/components/nodes/output-node.tsx:16
-#: src/features/workflow/components/nodes/text-node.tsx:166
+#: src/features/workflow/components/nodes/text-node.tsx:167
 #: src/features/workflow/components/template-picker.tsx:21
 #: src/features/workflow/types/index.ts:622
 #: src/features/workflow/types/index.ts:626
@@ -26399,7 +26408,7 @@ msgstr "Text & chat"
 msgid "Text alignment"
 msgstr "Text alignment"
 
-#: src/features/workflow/components/nodes/text-node.tsx:142
+#: src/features/workflow/components/nodes/text-node.tsx:143
 msgid "Text Content"
 msgstr "Text Content"
 
@@ -26456,7 +26465,7 @@ msgstr "Text the answer must contain (case-insensitive)"
 msgid "Text the answer must not contain"
 msgstr "Text the answer must not contain"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:232
+#: src/features/settings/components/chat/default-models-settings.tsx:230
 msgid "Text to image"
 msgstr "Text to image"
 
@@ -26472,11 +26481,11 @@ msgstr "Text to Speak"
 msgid "Text to Speech"
 msgstr "Text to Speech"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:190
+#: src/features/settings/components/chat/default-models-settings.tsx:188
 msgid "Text to text"
 msgstr "Text to text"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:274
+#: src/features/settings/components/chat/default-models-settings.tsx:272
 msgid "Text to video"
 msgstr "Text to video"
 
@@ -27741,7 +27750,7 @@ msgstr "Transcription"
 msgid "Transform"
 msgstr "Transform"
 
-#: src/features/workflow/components/nodes/text-node.tsx:133
+#: src/features/workflow/components/nodes/text-node.tsx:134
 msgid "Transform (Template)"
 msgstr "Transform (Template)"
 
@@ -28050,7 +28059,7 @@ msgid "Type"
 msgstr "Type"
 
 #: src/features/workflow/components/nodes/ai-node.tsx:43
-#: src/features/workflow/components/nodes/text-node.tsx:179
+#: src/features/workflow/components/nodes/text-node.tsx:180
 msgid "Type @ to insert the output of a connected text node"
 msgstr "Type @ to insert the output of a connected text node"
 
@@ -28742,7 +28751,7 @@ msgstr "Use {0, plural, one {# reference} other {# references}}"
 msgid "Use {0} instead"
 msgstr "Use {0} instead"
 
-#: src/features/workflow/components/nodes/text-node.tsx:185
+#: src/features/workflow/components/nodes/text-node.tsx:186
 msgid "Use {templateVariable} for variables from connected nodes..."
 msgstr "Use {templateVariable} for variables from connected nodes..."
 
@@ -29270,7 +29279,7 @@ msgstr "video"
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
-#: src/features/settings/components/chat/default-models-settings.tsx:266
+#: src/features/settings/components/chat/default-models-settings.tsx:264
 #: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:78
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
@@ -29343,11 +29352,11 @@ msgstr "Video Result"
 msgid "Video thumbnail"
 msgstr "Video thumbnail"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:212
+#: src/features/settings/components/chat/default-models-settings.tsx:210
 msgid "Video to text"
 msgstr "Video to text"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:318
+#: src/features/settings/components/chat/default-models-settings.tsx:305
 msgid "Video to video"
 msgstr "Video to video"
 
@@ -30241,7 +30250,7 @@ msgstr "Xiaomi's fast Mimo V2 Flash model via OpenRouter (thinking disabled)"
 msgid "Y position"
 msgstr "Y position"
 
-#: src/features/workflow/components/nodes/text-node.tsx:172
+#: src/features/workflow/components/nodes/text-node.tsx:173
 msgid "YAML"
 msgstr "YAML"
 

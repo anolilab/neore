@@ -14,7 +14,7 @@ import { useWorkflowStore } from "../../stores/workflow-store";
 import type { TextNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import type { JsonCheck } from "../../utils/prompt-format";
-import { checkJson, formatJson } from "../../utils/prompt-format";
+import { checkJson, formatJson, isBareTokenCause } from "../../utils/prompt-format";
 import MentionPromptField from "../mention-prompt-field";
 import BaseNode from "./base-node";
 
@@ -113,6 +113,7 @@ const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
 
     const state = jsonCheck && jsonState(jsonCheck);
     const detail = jsonCheck && jsonDetail(jsonCheck);
+    const bareTokenCause = useMemo(() => jsonCheck?.status === "invalid" && isBareTokenCause(template), [jsonCheck, template]);
 
     return (
         <BaseNode {...props} color={config.color} icon={<Type className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
@@ -185,15 +186,22 @@ const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
                             placeholder={t`Use ${templateVariable} for variables from connected nodes...`}
                             value={template}
                         >
-                            {jsonCheck && state && (
+                            {/* Mounted for every JSON template, so the first state change is announced; it is empty while there is no state. */}
+                            {jsonCheck && (
                                 <div className="flex items-center justify-between gap-2">
                                     <p className={cn("text-xs", jsonCheck.status === "valid" ? "text-muted-foreground" : "text-destructive")}>
                                         <span aria-live="polite" role="status">
                                             {state}
                                         </span>
-                                        {detail && <span> · {detail}</span>}
+                                        {detail && (
+                                            <span id={`${id}-json-detail`}>
+                                                {" · "}
+                                                {detail}
+                                            </span>
+                                        )}
                                     </p>
                                     <Button
+                                        aria-describedby={detail ? `${id}-json-detail` : undefined}
                                         className="nodrag"
                                         disabled={jsonCheck.status !== "valid" || jsonCheck.formatChangesValues}
                                         onClick={handleFormat}
@@ -205,9 +213,11 @@ const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
                                     </Button>
                                 </div>
                             )}
-                            {jsonCheck?.status === "invalid" && template.includes("{{") && (
+                            {bareTokenCause && (
                                 <p className="text-muted-foreground text-xs">
-                                    <Trans>Placeholders outside quotes are checked as written, so this may read as invalid until a run fills them in</Trans>
+                                    <Trans>
+                                        A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in
+                                    </Trans>
                                 </p>
                             )}
                         </MentionPromptField>

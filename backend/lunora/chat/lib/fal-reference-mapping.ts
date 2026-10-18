@@ -1,4 +1,4 @@
-import { falVideoInputsOf, type ModelDefinition, resolutionWithinFreePlan, snapVideoOptions, type VideoOptions } from "@neore/ai/models";
+import { falVideoInputsOf, MODEL_LOOKUP, type ModelDefinition, resolutionWithinFreePlan, snapVideoOptions, type VideoOptions } from "@neore/ai/models";
 
 /**
  * FAL endpoint -> reference-media field mapping for the reference picker and the workflow's
@@ -61,6 +61,29 @@ export const buildFalReferenceImageInput = (modelDefinition: ModelDefinition, re
     }
 
     return result;
+};
+
+/** The FAL endpoint an image-to-video call uses when its node names no model. */
+const DEFAULT_IMAGE_TO_VIDEO_ENDPOINT = "fal-ai/kling-video/v2.1/standard/image-to-video";
+
+/**
+ * The FAL call a video action makes for a `model` argument. Unset keeps the default endpoint. A set
+ * model must be an enabled fal video row, and its endpoint is the registry's `modelApiId`, so a stored
+ * node cannot name an endpoint the registry does not offer. `undefined` for any other model: the
+ * action rejects it before any FAL call.
+ */
+export const falVideoTargetOf = (model: string | undefined): { definition: ModelDefinition | undefined; endpoint: string } | undefined => {
+    if (!model) {
+        return { definition: undefined, endpoint: DEFAULT_IMAGE_TO_VIDEO_ENDPOINT };
+    }
+
+    const definition = MODEL_LOOKUP.get(model);
+
+    if (definition?.mode !== "video" || definition.provider !== "fal" || definition.enabled === false) {
+        return undefined;
+    }
+
+    return { definition, endpoint: definition.modelApiId };
 };
 
 /**

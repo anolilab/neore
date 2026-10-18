@@ -193,7 +193,8 @@ const isEscapedAt = (template: string, index: number): boolean => {
  *
  * In a JSON template, a value spliced inside a string literal of the template is escaped, so a
  * quote or a newline in it cannot break the document or add keys; outside a string it is spliced
- * raw, so `{"items": {{input}}}` takes an array. YAML is not escaped: a value with a newline or a
+ * raw, so `{"items": {{input}}}` takes an array. That raw splice is the template author's responsibility:
+ * a value like `1, "admin": true` adds a key there. YAML is not escaped: a value with a newline or a
  * quote can still change the document's structure, so a YAML template is only as safe as its values.
  */
 export const expandTemplate = (

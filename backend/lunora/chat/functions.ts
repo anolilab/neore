@@ -11,7 +11,7 @@ import {
     DEFAULT_USER_PROMPT_OPTIMIZATION_MODEL,
 } from "@neore/ai/constants";
 import type { ImageSize, ModelDefinition } from "@neore/ai/models";
-import { MODEL_LOOKUP, REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
+import { exceedsFreePlanCap, MODEL_LOOKUP, REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { getFollowupSuggestionsPrompt, getThreadTitlePrompt } from "@neore/ai/prompts";
 import { buildCinemaPrompt } from "@neore/ai/prompts/cinema";
 import {
@@ -74,6 +74,7 @@ import { buildReasoningProviderOptions } from "./lib/reasoning-options";
 import {
     buildFalReferenceImageInput,
     buildFalReferenceVideoInput,
+    falVideoTargetOf,
     falAcceptsAspectRatio,
     falDurationInput,
     falVideoOptionInput,
@@ -4090,9 +4091,9 @@ const videoOptionFields = {
 };
 
 /**
- * Whether a video run may render above 1080p: a platform admin or a paid plan. Read only for an
- * explicit resolution, since no endpoint defaults above 1080p. Workflow runs have only a user id, so
- * this reads the plan rather than trusting the caller.
+ * Whether a video run may render above 1080p: a platform admin or a paid plan. Callers read it only
+ * when the snapped resolution is above the free cap (`exceedsFreePlanCap`). Workflow runs have only a
+ * user id, so this reads the plan rather than trusting the caller.
  */
 const canRenderAboveFullHd = async (context: ActionContext, userId: string): Promise<boolean> => {
     const { isAdmin, plan } = await context.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId });
@@ -4151,8 +4152,8 @@ export const generateVideo = internalAction
         } = args;
         const modelDefinition = MODEL_LOOKUP.get(model);
 
-        if (!modelDefinition || modelDefinition.mode !== "video") {
-            throw new LunoraError("BAD_REQUEST", `Model ${model} is not a video generation model`);
+        if (!modelDefinition || modelDefinition.mode !== "video" || modelDefinition.enabled === false) {
+            throw new LunoraError("BAD_REQUEST", `Model ${model} is not an enabled video generation model`);
         }
 
         if (startFrameUrl && !modelDefinition.supportsImageToVideo) {
@@ -4195,7 +4196,7 @@ export const generateVideo = internalAction
                 }
 
                 const endpoint = modelDefinition.modelApiId ?? model;
-                const premium = args.resolution !== undefined && (await canRenderAboveFullHd(context, userId));
+                const premium = exceedsFreePlanCap(modelDefinition.modelApiId, args.resolution) && (await canRenderAboveFullHd(context, userId));
                 const referenceInput = buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl });
                 const falInput: FalRequestInput = { prompt: enhancedPrompt, ...referenceInput, ...falVideoOptionInput(modelDefinition, args, premium) };
 
@@ -5536,13 +5537,18 @@ export const generateImageToVideo = internalAction
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        // Registry ids are not FAL endpoints for every model: the reference mapping is keyed by `modelApiId`.
-        const modelDefinition = model ? MODEL_LOOKUP.get(model) : undefined;
-        const endpoint = modelDefinition?.modelApiId ?? model ?? "fal-ai/kling-video/v2.1/standard/image-to-video";
+        // A set model must be an enabled fal video row: its endpoint is the registry's, never one a stored node names.
+        const target = falVideoTargetOf(model);
+
+        if (!target) {
+            throw new LunoraError("BAD_REQUEST", `Model ${model} is not an enabled fal video model`);
+        }
+
+        const { definition: modelDefinition, endpoint } = target;
 
         chatLogger.debug("[cvx][img2video] Starting image-to-video", { duration, endpoint });
 
-        const premium = args.resolution !== undefined && (await canRenderAboveFullHd(context, userId));
+        const premium = exceedsFreePlanCap(modelDefinition?.modelApiId, args.resolution) && (await canRenderAboveFullHd(context, userId));
         const input: FalRequestInput = {
             ...buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl: imageUrl }),
             ...falVideoOptionInput(modelDefinition, args, premium),

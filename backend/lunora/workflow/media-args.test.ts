@@ -92,7 +92,7 @@ describe("video action arguments", () => {
         });
     });
 
-    it("gives text-to-video its defaults and passes the start frame, while image-to-video passes the node's prompt and loop", () => {
+    it("gives text-to-video its defaults and passes the start frame, while image-to-video passes the node's prompt, and never a loop the video node lacks", () => {
         expect(textToVideoArgs(node("v", "video", {}), "a fox", { ...noInputs, frameUrl: "https://x.example/f.png" }, "u")).toMatchObject({
             aspectRatio: "16:9",
             duration: 5,
@@ -100,13 +100,10 @@ describe("video action arguments", () => {
             prompt: "a fox",
             startFrameUrl: "https://x.example/f.png",
         });
-        expect(imageToVideoArgs(node("v", "video", { loop: true, prompt: "spin" }), "https://x.example/i.png", noInputs, "u")).toMatchObject({
-            imageUrl: "https://x.example/i.png",
-            loop: true,
-            prompt: "spin",
-            threadId: "workflow",
-            userId: "u",
-        });
+        const args = imageToVideoArgs(node("v", "video", { loop: true, prompt: "spin" }), "https://x.example/i.png", noInputs, "u");
+
+        expect(args).toMatchObject({ imageUrl: "https://x.example/i.png", prompt: "spin", threadId: "workflow", userId: "u" });
+        expect(args).not.toHaveProperty("loop");
     });
 });
 

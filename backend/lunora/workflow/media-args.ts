@@ -113,12 +113,16 @@ export interface VideoNodeRunData {
     duration?: number;
     fps?: number;
     generateAudio?: boolean;
-    loop?: boolean;
     mode?: "text-to-video" | "image-to-video";
     model?: string;
     motionStrength?: number;
     prompt?: string;
     resolution?: string;
+}
+
+/** An image-to-video node's fields: the video fields, and whether the clip loops, which only that node has. */
+export interface ImageToVideoNodeRunData extends VideoNodeRunData {
+    loop?: boolean;
 }
 
 export type VideoInputArgs = Awaited<ReturnType<typeof videoInputArgs>>;
@@ -136,7 +140,6 @@ export const imageToVideoArgs = (node: WorkflowNode, imageUrl: string, inputs: V
         fps: data.fps,
         generateAudio: typeof data.generateAudio === "boolean" ? data.generateAudio : undefined,
         imageUrl,
-        loop: data.loop,
         model: data.model,
         motionStrength: data.motionStrength,
         prompt: data.prompt,

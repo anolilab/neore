@@ -35,6 +35,7 @@ import {
 } from "./core";
 import {
     imageRequestArgs,
+    type ImageToVideoNodeRunData,
     imageToVideoArgs,
     systemPromptFor,
     textToVideoArgs,
@@ -1038,7 +1039,7 @@ const executeImageToVideoNodeStreaming = async (
     actionContext: HttpActionCtx,
     userId: string,
 ): Promise<{ output: unknown }> => {
-    const data = node.data as VideoNodeRunData;
+    const data = node.data as ImageToVideoNodeRunData;
 
     const inputValue = getLastOutput(context);
     const inputError = videoRunInputError(node, context);
@@ -1054,7 +1055,10 @@ const executeImageToVideoNodeStreaming = async (
         throw new Error("No image input provided for image-to-video");
     }
 
-    const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, imageToVideoArgs(node, imageUrl, inputs, userId));
+    const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
+        ...imageToVideoArgs(node, imageUrl, inputs, userId),
+        loop: data.loop,
+    });
 
     return { output: videoNodeOutput(result, data.prompt ?? "") };
 };

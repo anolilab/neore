@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { FAL_VIDEO_INPUTS, resolutionWithinFreePlan, snapVideoOptions, videoOptionsOf } from "./fal-video-inputs";
+import { exceedsFreePlanCap, FAL_VIDEO_INPUTS, resolutionWithinFreePlan, snapVideoOptions, videoOptionsOf } from "./fal-video-inputs";
 import { MODEL_REGISTRY } from "./registry";
 
 const enabledFalVideoRows = MODEL_REGISTRY.filter((row) => row.mode === "video" && row.provider === "fal" && row.enabled !== false);
@@ -82,5 +82,20 @@ describe("resolutionWithinFreePlan", () => {
     it("has no value to fall back to for an endpoint with nothing under the cap, or no resolution input", () => {
         expect(resolutionWithinFreePlan("fal-ai/kling-video/v3/4k/text-to-video", "4k")).toBeUndefined();
         expect(resolutionWithinFreePlan("fal-ai/not-in-the-table", "4k")).toBeUndefined();
+    });
+});
+
+describe("exceedsFreePlanCap", () => {
+    it("is false for a resolution at or under the cap, and for one the endpoint drops", () => {
+        expect(exceedsFreePlanCap("fal-ai/veo3.1/image-to-video", "720p")).toBe(false);
+        expect(exceedsFreePlanCap("fal-ai/veo3.1/image-to-video", "1080p")).toBe(false);
+        // 4k is not a value Seedance 2.0 fast takes, so it is dropped and never reaches the plan check.
+        expect(exceedsFreePlanCap("bytedance/seedance-2.0/fast/image-to-video", "4k")).toBe(false);
+        expect(exceedsFreePlanCap("fal-ai/not-in-the-table", "4k")).toBe(false);
+        expect(exceedsFreePlanCap("fal-ai/veo3.1/image-to-video", undefined)).toBe(false);
+    });
+
+    it("is true for a resolution the endpoint takes above the cap", () => {
+        expect(exceedsFreePlanCap("fal-ai/veo3.1/image-to-video", "4k")).toBe(true);
     });
 });

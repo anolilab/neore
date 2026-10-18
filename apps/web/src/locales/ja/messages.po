@@ -89,7 +89,7 @@ msgstr "（{jobFailed} 件失敗）"
 msgid "(attachments only)"
 msgstr "（添付ファイルのみ）"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:100
+#: src/features/settings/components/chat/default-models-settings.tsx:98
 msgid "(default)"
 msgstr "（既定）"
 
@@ -1387,6 +1387,10 @@ msgstr "新しいバージョンのアプリが利用可能です。"
 msgid "A page shared from Neore."
 msgstr "Neore から共有されたページです。"
 
+#: src/features/workflow/components/nodes/text-node.tsx:218
+msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
+msgstr "引用符の外のプレースホルダーまたは @メンションはここでは null として扱われるため、実行時に値が入るまでこのエラーが出ることがあります"
+
 #: src/features/notifications/lib/notification-labels.ts:27
 msgid "A question is waiting for you"
 msgstr "回答待ちの質問があります"
@@ -1450,6 +1454,10 @@ msgstr "{0} について（新しいタブで開きます）"
 #: src/features/settings/components/personalization/personalization-settings.tsx:147
 msgid "About You"
 msgstr "あなたについて"
+
+#: src/features/workflow/components/nodes/video-model-options.tsx:95
+msgid "Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p."
+msgstr "{FREE_PLAN_MAX_HEIGHT}p を超えるには Pro プランが必要です。それ以外は {FREE_PLAN_MAX_HEIGHT}p で動画が生成されます。"
 
 #: src/features/chat/thread/composer-search-mode.tsx:50
 msgid "Academic"
@@ -4944,15 +4952,15 @@ msgstr "一意のユーザー名を選んでください"
 msgid "Choose at least one permission"
 msgstr "権限を 1 つ以上選択してください"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:225
+#: src/features/settings/components/chat/default-models-settings.tsx:223
 msgid "Choose default image models"
 msgstr "既定の画像モデルを選択"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:183
+#: src/features/settings/components/chat/default-models-settings.tsx:181
 msgid "Choose default text models"
 msgstr "既定のテキストモデルを選択"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:267
+#: src/features/settings/components/chat/default-models-settings.tsx:265
 msgid "Choose default video models"
 msgstr "既定の動画モデルを選択"
 
@@ -7659,55 +7667,55 @@ msgstr "既定の言語を更新しました"
 msgid "Default Model"
 msgstr "既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:282
+#: src/features/settings/components/chat/default-models-settings.tsx:280
 msgid "Default model for animating a single image"
 msgstr "単一の画像をアニメーション化する既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:187
+#: src/features/settings/components/chat/default-models-settings.tsx:185
 msgid "Default model for chat and text generation"
 msgstr "チャットとテキスト生成の既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:251
+#: src/features/settings/components/chat/default-models-settings.tsx:249
 msgid "Default model for combining multiple reference images"
 msgstr "複数の参照画像を組み合わせる既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:315
+#: src/features/settings/components/chat/default-models-settings.tsx:302
 msgid "Default model for editing or transforming existing video"
 msgstr "既存の動画を編集・変換する既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:229
+#: src/features/settings/components/chat/default-models-settings.tsx:227
 msgid "Default model for generating images from text prompts"
 msgstr "テキストプロンプトから画像を生成する既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:304
+#: src/features/settings/components/chat/default-models-settings.tsx:291
 msgid "Default model for generating video from multiple images"
 msgstr "複数の画像から動画を生成する既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:271
+#: src/features/settings/components/chat/default-models-settings.tsx:269
 msgid "Default model for generating video from text prompts"
 msgstr "テキストプロンプトから動画を生成する既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:198
+#: src/features/settings/components/chat/default-models-settings.tsx:196
 msgid "Default model for image understanding and analysis"
 msgstr "画像の理解と分析の既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:240
+#: src/features/settings/components/chat/default-models-settings.tsx:238
 msgid "Default model for transforming existing images"
 msgstr "既存の画像を変換する既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:326
+#: src/features/settings/components/chat/default-models-settings.tsx:313
 msgid "Default model for video generation from mixed inputs"
 msgstr "複合入力から動画を生成する既定のモデル"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:293
-msgid "Default model for video generation with start and end frames"
-msgstr "開始・終了フレームを指定して動画を生成する既定のモデル"
+#~ msgid "Default model for video generation with start and end frames"
+#~ msgstr "開始・終了フレームを指定して動画を生成する既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:209
+#: src/features/settings/components/chat/default-models-settings.tsx:207
 msgid "Default model for video understanding and transcription"
 msgstr "動画の理解と文字起こしの既定のモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:169
+#: src/features/settings/components/chat/default-models-settings.tsx:167
 msgid "Default model updated"
 msgstr "既定のモデルを更新しました"
 
@@ -9678,7 +9686,7 @@ msgid "Enter text or leave empty to use input from previous node..."
 msgstr "テキストを入力するか、空欄のままにして前のノードの入力を使用..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:381
-#: src/features/workflow/components/nodes/text-node.tsx:150
+#: src/features/workflow/components/nodes/text-node.tsx:151
 msgid "Enter text..."
 msgstr "テキストを入力..."
 
@@ -11164,7 +11172,7 @@ msgstr "設定を更新できませんでした"
 msgid "Failed to update connection"
 msgstr "接続を更新できませんでした"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:163
+#: src/features/settings/components/chat/default-models-settings.tsx:161
 msgid "Failed to update default model"
 msgstr "既定のモデルを更新できませんでした"
 
@@ -11906,8 +11914,8 @@ msgid "Firefox works too, and may ask the same question."
 msgstr "Firefox でも動作し、同じ確認が表示される場合があります。"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:296
-msgid "First frame / last frame"
-msgstr "最初のフレーム / 最後のフレーム"
+#~ msgid "First frame / last frame"
+#~ msgstr "最初のフレーム / 最後のフレーム"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:121
 msgid "First of each month at 9 AM"
@@ -12116,7 +12124,7 @@ msgstr "「{0}」をフォークしました — コピーを開いています�
 msgid "Forking..."
 msgstr "フォークしています..."
 
-#: src/features/workflow/components/nodes/text-node.tsx:204
+#: src/features/workflow/components/nodes/text-node.tsx:212
 msgid "Format"
 msgstr "整形"
 
@@ -12581,7 +12589,7 @@ msgstr "暖かい照明と植物に囲まれた居心地のよい読書スペー
 msgid "Generate an image or video..."
 msgstr "画像または動画を生成..."
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:43
+#: src/features/workflow/components/nodes/video-model-options.tsx:49
 msgid "Generate audio"
 msgstr "音声を生成"
 
@@ -13826,7 +13834,7 @@ msgstr "イラスト"
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
-#: src/features/settings/components/chat/default-models-settings.tsx:224
+#: src/features/settings/components/chat/default-models-settings.tsx:222
 #: src/features/settings/components/chat/models-settings.tsx:38
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:71
 #: src/features/workflow/components/gallery/gallery-card.tsx:27
@@ -13901,15 +13909,15 @@ msgstr "画像生成モデル"
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "スタイルを適用する画像（または前のノードの入力を使用）"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:243
+#: src/features/settings/components/chat/default-models-settings.tsx:241
 msgid "Image to image"
 msgstr "画像から画像"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:201
+#: src/features/settings/components/chat/default-models-settings.tsx:199
 msgid "Image to text"
 msgstr "画像からテキスト"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:285
+#: src/features/settings/components/chat/default-models-settings.tsx:283
 msgid "Image to video"
 msgstr "画像から動画"
 
@@ -13957,11 +13965,11 @@ msgstr "画像"
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
 msgstr "最新の知識、Web 検索のコンテキスト、題材に関する複雑な推論を必要とする画像"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:254
+#: src/features/settings/components/chat/default-models-settings.tsx:252
 msgid "Images to image"
 msgstr "複数画像から画像"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:307
+#: src/features/settings/components/chat/default-models-settings.tsx:294
 msgid "Images to video"
 msgstr "複数画像から動画"
 
@@ -14307,7 +14315,7 @@ msgstr "インペインティング"
 msgid "Input"
 msgstr "入力"
 
-#: src/features/workflow/components/nodes/text-node.tsx:130
+#: src/features/workflow/components/nodes/text-node.tsx:131
 msgid "Input (Rich Text)"
 msgstr "入力（リッチテキスト）"
 
@@ -14739,7 +14747,7 @@ msgid "JPEG image"
 msgstr "JPEG 画像"
 
 #: src/features/workflow/components/nodes/output-node.tsx:18
-#: src/features/workflow/components/nodes/text-node.tsx:169
+#: src/features/workflow/components/nodes/text-node.tsx:170
 msgid "JSON"
 msgstr "JSON"
 
@@ -15745,7 +15753,7 @@ msgstr "概要を読み込み中…"
 #: src/features/settings/components/chat/agent-settings.tsx:28
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
-#: src/features/settings/components/chat/default-models-settings.tsx:134
+#: src/features/settings/components/chat/default-models-settings.tsx:132
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:165
 #: src/features/settings/components/chat/trigger-settings.tsx:776
@@ -16772,7 +16780,7 @@ msgstr "Mistral の小型推論 LLM"
 msgid "Mistral's smallest 3B multi-modal model"
 msgstr "Mistral の最小 3B マルチモーダルモデル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:329
+#: src/features/settings/components/chat/default-models-settings.tsx:316
 msgid "Mixed to video"
 msgstr "ミックスから動画"
 
@@ -16789,7 +16797,7 @@ msgstr "モバイルアプリアイコン"
 
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
-#: src/features/workflow/components/nodes/text-node.tsx:122
+#: src/features/workflow/components/nodes/text-node.tsx:123
 #: src/features/workflow/components/nodes/video-node.tsx:115
 msgid "Mode"
 msgstr "モード"
@@ -18117,7 +18125,7 @@ msgstr "マイクなし"
 msgid "No microphone found."
 msgstr "マイクが見つかりません。"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:77
+#: src/features/settings/components/chat/default-models-settings.tsx:75
 msgid "No models available"
 msgstr "利用可能なモデルがありません"
 
@@ -20303,8 +20311,8 @@ msgid "Pixelize"
 msgstr "ピクセル化"
 
 #: src/features/workflow/components/nodes/text-node.tsx:210
-msgid "Placeholders outside quotes are checked as written, so this may read as invalid until a run fills them in"
-msgstr "引用符の外のプレースホルダーはそのまま検証されるため、実行時に値が入るまで無効に見えることがあります"
+#~ msgid "Placeholders outside quotes are checked as written, so this may read as invalid until a run fills them in"
+#~ msgstr "引用符の外のプレースホルダーはそのまま検証されるため、実行時に値が入るまで無効に見えることがあります"
 
 #: src/features/chat/thread/composer.tsx:260
 msgid "Plan a project or brainstorm ideas..."
@@ -20879,6 +20887,7 @@ msgstr "デフォルトでプライベート"
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:553
+#: src/features/workflow/components/nodes/video-model-options.tsx:86
 msgid "Pro"
 msgstr "Pro"
 
@@ -21110,7 +21119,7 @@ msgstr "プロンプトを作成しました"
 msgid "Prompt deleted"
 msgstr "プロンプトを削除しました"
 
-#: src/features/workflow/components/nodes/text-node.tsx:158
+#: src/features/workflow/components/nodes/text-node.tsx:159
 msgid "Prompt format"
 msgstr "プロンプトの形式"
 
@@ -21867,7 +21876,7 @@ msgstr "参照画像"
 msgid "Reference Images ({referenceCount}/{maxImages})"
 msgstr "参照画像 ({referenceCount}/{maxImages})"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:117
+#: src/features/workflow/components/nodes/video-model-options.tsx:139
 msgid "Reference mode"
 msgstr "参照モード"
 
@@ -21892,7 +21901,7 @@ msgstr "参照動画"
 msgid "Reference videos together must be at least {0} seconds."
 msgstr "参照動画の合計は {0} 秒以上にしてください。"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:133
+#: src/features/workflow/components/nodes/video-model-options.tsx:155
 msgid "References"
 msgstr "参照"
 
@@ -22539,7 +22548,7 @@ msgstr "ズームをリセット (現在 {zoomPercent}%)"
 msgid "Resize {label} column"
 msgstr "{label} 列のサイズを変更"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:57
+#: src/features/workflow/components/nodes/video-model-options.tsx:63
 msgid "Resolution"
 msgstr "解像度"
 
@@ -25120,7 +25129,7 @@ msgid "Start editing cell"
 msgstr "セルの編集を開始"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:39
-#: src/features/workflow/components/nodes/video-model-options.tsx:133
+#: src/features/workflow/components/nodes/video-model-options.tsx:155
 msgid "Start frame"
 msgstr "開始フレーム"
 
@@ -25966,8 +25975,8 @@ msgstr "統合役（双方を比較検討する）"
 msgid "System"
 msgstr "システム"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:67
-#: src/features/settings/components/chat/default-models-settings.tsx:103
+#: src/features/settings/components/chat/default-models-settings.tsx:65
+#: src/features/settings/components/chat/default-models-settings.tsx:101
 msgid "System default"
 msgstr "システムの既定"
 
@@ -26275,7 +26284,7 @@ msgstr "テルグ語"
 msgid "Telugu (India)"
 msgstr "テルグ語（インド）"
 
-#: src/features/workflow/components/nodes/text-node.tsx:180
+#: src/features/workflow/components/nodes/text-node.tsx:181
 msgid "Template"
 msgstr "テンプレート"
 
@@ -26372,11 +26381,11 @@ msgstr "テキスト"
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
-#: src/features/settings/components/chat/default-models-settings.tsx:182
+#: src/features/settings/components/chat/default-models-settings.tsx:180
 #: src/features/settings/components/chat/models-settings.tsx:42
 #: src/features/workflow/components/gallery/gallery-card.tsx:28
 #: src/features/workflow/components/nodes/output-node.tsx:16
-#: src/features/workflow/components/nodes/text-node.tsx:166
+#: src/features/workflow/components/nodes/text-node.tsx:167
 #: src/features/workflow/components/template-picker.tsx:21
 #: src/features/workflow/types/index.ts:622
 #: src/features/workflow/types/index.ts:626
@@ -26400,7 +26409,7 @@ msgstr "テキストとチャット"
 msgid "Text alignment"
 msgstr "テキストの配置"
 
-#: src/features/workflow/components/nodes/text-node.tsx:142
+#: src/features/workflow/components/nodes/text-node.tsx:143
 msgid "Text Content"
 msgstr "テキストコンテンツ"
 
@@ -26457,7 +26466,7 @@ msgstr "回答に含まれるべきテキスト（大文字と小文字を区別
 msgid "Text the answer must not contain"
 msgstr "回答に含まれてはいけないテキスト"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:232
+#: src/features/settings/components/chat/default-models-settings.tsx:230
 msgid "Text to image"
 msgstr "テキストから画像"
 
@@ -26473,11 +26482,11 @@ msgstr "読み上げるテキスト"
 msgid "Text to Speech"
 msgstr "テキスト読み上げ"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:190
+#: src/features/settings/components/chat/default-models-settings.tsx:188
 msgid "Text to text"
 msgstr "テキストからテキスト"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:274
+#: src/features/settings/components/chat/default-models-settings.tsx:272
 msgid "Text to video"
 msgstr "テキストから動画"
 
@@ -27742,7 +27751,7 @@ msgstr "文字起こし"
 msgid "Transform"
 msgstr "変形"
 
-#: src/features/workflow/components/nodes/text-node.tsx:133
+#: src/features/workflow/components/nodes/text-node.tsx:134
 msgid "Transform (Template)"
 msgstr "変換 (テンプレート)"
 
@@ -28051,7 +28060,7 @@ msgid "Type"
 msgstr "種類"
 
 #: src/features/workflow/components/nodes/ai-node.tsx:43
-#: src/features/workflow/components/nodes/text-node.tsx:179
+#: src/features/workflow/components/nodes/text-node.tsx:180
 msgid "Type @ to insert the output of a connected text node"
 msgstr "@ を入力すると、接続されたテキストノードの出力を挿入できます"
 
@@ -28743,7 +28752,7 @@ msgstr "{0, plural, other {# 件の参照を使用}}"
 msgid "Use {0} instead"
 msgstr "代わりに {0} を使用"
 
-#: src/features/workflow/components/nodes/text-node.tsx:185
+#: src/features/workflow/components/nodes/text-node.tsx:186
 msgid "Use {templateVariable} for variables from connected nodes..."
 msgstr "接続されたノードの変数には {templateVariable} を使用します..."
 
@@ -29271,7 +29280,7 @@ msgstr "動画"
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
-#: src/features/settings/components/chat/default-models-settings.tsx:266
+#: src/features/settings/components/chat/default-models-settings.tsx:264
 #: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:78
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
@@ -29344,11 +29353,11 @@ msgstr "動画の結果"
 msgid "Video thumbnail"
 msgstr "動画サムネイル"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:212
+#: src/features/settings/components/chat/default-models-settings.tsx:210
 msgid "Video to text"
 msgstr "動画からテキスト"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:318
+#: src/features/settings/components/chat/default-models-settings.tsx:305
 msgid "Video to video"
 msgstr "動画から動画"
 
@@ -30242,7 +30251,7 @@ msgstr "OpenRouter 経由の Xiaomi の高速 Mimo V2 Flash モデル（思考�
 msgid "Y position"
 msgstr "Y 座標"
 
-#: src/features/workflow/components/nodes/text-node.tsx:172
+#: src/features/workflow/components/nodes/text-node.tsx:173
 msgid "YAML"
 msgstr "YAML"
 

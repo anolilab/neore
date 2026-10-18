@@ -1,6 +1,6 @@
 import { Trans } from "@lingui/react/macro";
 import type { GatewayModel } from "@neore/ai/models";
-import { videoOptionsOf } from "@neore/ai/models";
+import { FREE_PLAN_MAX_HEIGHT, resolutionWithinFreePlan, videoOptionsOf } from "@neore/ai/models";
 import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
 import { Switch } from "@ui/components/switch";
@@ -28,11 +28,17 @@ interface VideoModelOptionsProps {
  */
 export const VideoModelOptions = ({ data, id, modelId }: VideoModelOptionsProps) => {
     const updateNode = useWorkflowStore((state) => state.updateNode);
-    const options = videoOptionsOf(registryApiIdOf(modelId));
+    const modelApiId = registryApiIdOf(modelId);
+    const options = videoOptionsOf(modelApiId);
 
     if (!options || (options.audioDefault === null && !options.resolution)) {
         return null;
     }
+
+    // A value above the free plan's cap is offered, not disabled: plan membership also counts organizations and admins, which the web does not see. The server renders it at the cap otherwise.
+    const aboveFreePlan = (value: string): boolean => resolutionWithinFreePlan(modelApiId, value) !== value;
+    const resolutionNoteId = `${id}-resolution-note`;
+    const hasAboveFreePlan = options.resolution?.values.some((value) => aboveFreePlan(value)) ?? false;
 
     return (
         <>
@@ -64,17 +70,33 @@ export const VideoModelOptions = ({ data, id, modelId }: VideoModelOptionsProps)
                         }}
                         value={data.resolution ?? options.resolution.default}
                     >
-                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-resolution`}>
+                        <SelectTrigger
+                            aria-describedby={hasAboveFreePlan ? resolutionNoteId : undefined}
+                            className="nodrag h-8 text-sm"
+                            id={`${id}-resolution`}
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             {options.resolution.values.map((value) => (
                                 <SelectItem key={value} value={value}>
                                     {value}
+                                    {aboveFreePlan(value) && (
+                                        <span className="ml-1 text-xs text-amber-500">
+                                            <Trans>Pro</Trans>
+                                        </span>
+                                    )}
                                 </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
+                    {hasAboveFreePlan && (
+                        <p className="text-muted-foreground text-xs" id={resolutionNoteId}>
+                            <Trans>
+                                Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p.
+                            </Trans>
+                        </p>
+                    )}
                 </div>
             )}
         </>

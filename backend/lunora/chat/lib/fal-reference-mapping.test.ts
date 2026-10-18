@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
     buildFalReferenceImageInput,
     buildFalReferenceVideoInput,
+    falVideoTargetOf,
     falAcceptsAspectRatio,
     falDurationInput,
     falVideoOptionInput,
@@ -255,5 +256,27 @@ describe("start frame field", () => {
     it("sends the start frame into the Veo reference array, and nothing when there is no start frame", () => {
         expect(buildFalReferenceVideoInput(model("fal-ai/veo3.1/reference-to-video", 3), { startFrameUrl: URL_A })).toEqual({ image_urls: [URL_A] });
         expect(buildFalReferenceVideoInput(model("fal-ai/veo3.1/reference-to-video", 3), {})).toEqual({});
+    });
+});
+
+describe("falVideoTargetOf", () => {
+    it("keeps the default endpoint when the node names no model", () => {
+        expect(falVideoTargetOf(undefined)).toEqual({ definition: undefined, endpoint: "fal-ai/kling-video/v2.1/standard/image-to-video" });
+    });
+
+    it("sends an enabled fal video row to its registry endpoint", () => {
+        expect(falVideoTargetOf("fal-ai/veo3.1/image-to-video")?.endpoint).toBe("fal-ai/veo3.1/image-to-video");
+    });
+
+    it("rejects a registry row that is disabled", () => {
+        expect(falVideoTargetOf("fal-ai/mochi-v1")).toBeUndefined();
+    });
+
+    it("rejects a video row from another provider", () => {
+        expect(falVideoTargetOf("replicate/minimax-video-01")).toBeUndefined();
+    });
+
+    it("rejects an id the registry does not offer, so it never becomes a FAL endpoint", () => {
+        expect(falVideoTargetOf("fal-ai/some-endpoint-nobody-registered")).toBeUndefined();
     });
 });
