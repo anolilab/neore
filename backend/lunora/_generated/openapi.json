@@ -22758,6 +22758,85 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#file:finalizeReferenceMedia": {
+      "post": {
+        "description": "Invoke the `action` `file:finalizeReferenceMedia` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "file:finalizeReferenceMedia",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "filename": {
+                        "type": "string"
+                      },
+                      "uploadId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "filename",
+                      "uploadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "file:finalizeReferenceMedia",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "fileId": {
+                      "description": "Id<\"chatFiles\">",
+                      "type": "string",
+                      "x-lunora-table": "chatFiles"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "fileId",
+                    "url"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: file:finalizeReferenceMedia",
+        "tags": [
+          "file"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#file:getChatFileExtraction": {
       "post": {
         "description": "Invoke the `query` `file:getChatFileExtraction` over the Lunora RPC envelope (POST /_lunora/rpc).",

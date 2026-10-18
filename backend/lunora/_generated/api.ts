@@ -388,6 +388,7 @@ export interface ApiTypes {
     };
     file: {
         finalizeChatUpload: FunctionReference<"action", { filename: string; uploadId: string }, { fileId: Id<"chatFiles">; url: string }>;
+        finalizeReferenceMedia: FunctionReference<"action", { filename: string; uploadId: string }, { fileId: Id<"chatFiles">; url: string }>;
         getChatFileExtraction: FunctionReference<"query", { fileId: Id<"chatFiles"> }, null | { status: "pending" | "processing" | "completed" | "failed" | "unsupported" }>;
         getChatFileImageUrl: FunctionReference<"query", { fileId: Id<"chatFiles"> }, null | string>;
     };
@@ -1124,6 +1125,7 @@ export const api: ApiTypes = {
     },
     file: {
         finalizeChatUpload: { __lunoraRef: "file:finalizeChatUpload" },
+        finalizeReferenceMedia: { __lunoraRef: "file:finalizeReferenceMedia" },
         getChatFileExtraction: { __lunoraRef: "file:getChatFileExtraction" },
         getChatFileImageUrl: { __lunoraRef: "file:getChatFileImageUrl" },
     },

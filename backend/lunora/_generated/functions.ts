@@ -175,7 +175,8 @@ import * as lunora_workflow_fork_170 from "../workflow/fork.js";
 import * as lunora_workflow_functions_171 from "../workflow/functions.js";
 import * as lunora_workflow_gallery_172 from "../workflow/gallery.js";
 import * as lunora_workflow_generate_173 from "../workflow/generate.js";
-import * as lunora_workflow_presence_174 from "../workflow/presence.js";
+import * as lunora_workflow_media_ops_174 from "../workflow/media-ops.js";
+import * as lunora_workflow_presence_175 from "../workflow/presence.js";
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
 import { LunoraError } from "lunorash/server";
@@ -817,6 +818,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "evals_internal:completeCase": lunora_evals_internal_83.completeCase as unknown as RegisteredLunoraFunction,
     "evals_internal:reapCase": lunora_evals_internal_83.reapCase as unknown as RegisteredLunoraFunction,
     "file:finalizeChatUpload": lunora_file_84.finalizeChatUpload as unknown as RegisteredLunoraFunction,
+    "file:finalizeReferenceMedia": lunora_file_84.finalizeReferenceMedia as unknown as RegisteredLunoraFunction,
     "file:getChatFileExtraction": lunora_file_84.getChatFileExtraction as unknown as RegisteredLunoraFunction,
     "file:getChatFileImageUrl": lunora_file_84.getChatFileImageUrl as unknown as RegisteredLunoraFunction,
     "file:purgeStagedChatUploads": lunora_file_84.purgeStagedChatUploads as unknown as RegisteredLunoraFunction,
@@ -1308,14 +1310,15 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "workflow_gallery:unpublishWorkflow": lunora_workflow_gallery_172.unpublishWorkflow as unknown as RegisteredLunoraFunction,
     "workflow_gallery:updateGalleryMeta": lunora_workflow_gallery_172.updateGalleryMeta as unknown as RegisteredLunoraFunction,
     "workflow_generate:generateWorkflowFromPrompt": lunora_workflow_generate_173.generateWorkflowFromPrompt as unknown as RegisteredLunoraFunction,
-    "workflow_presence:checkNodeLock": lunora_workflow_presence_174.checkNodeLock as unknown as RegisteredLunoraFunction,
-    "workflow_presence:cleanupStalePresence": lunora_workflow_presence_174.cleanupStalePresence as unknown as RegisteredLunoraFunction,
-    "workflow_presence:disconnect": lunora_workflow_presence_174.disconnect as unknown as RegisteredLunoraFunction,
-    "workflow_presence:heartbeat": lunora_workflow_presence_174.heartbeat as unknown as RegisteredLunoraFunction,
-    "workflow_presence:listPresence": lunora_workflow_presence_174.listPresence as unknown as RegisteredLunoraFunction,
-    "workflow_presence:listVersions": lunora_workflow_presence_174.listVersions as unknown as RegisteredLunoraFunction,
-    "workflow_presence:restoreVersion": lunora_workflow_presence_174.restoreVersion as unknown as RegisteredLunoraFunction,
-    "workflow_presence:saveVersion": lunora_workflow_presence_174.saveVersion as unknown as RegisteredLunoraFunction,
+    "workflow_media_ops:extractVideoFrame": lunora_workflow_media_ops_174.extractVideoFrame as unknown as RegisteredLunoraFunction,
+    "workflow_presence:checkNodeLock": lunora_workflow_presence_175.checkNodeLock as unknown as RegisteredLunoraFunction,
+    "workflow_presence:cleanupStalePresence": lunora_workflow_presence_175.cleanupStalePresence as unknown as RegisteredLunoraFunction,
+    "workflow_presence:disconnect": lunora_workflow_presence_175.disconnect as unknown as RegisteredLunoraFunction,
+    "workflow_presence:heartbeat": lunora_workflow_presence_175.heartbeat as unknown as RegisteredLunoraFunction,
+    "workflow_presence:listPresence": lunora_workflow_presence_175.listPresence as unknown as RegisteredLunoraFunction,
+    "workflow_presence:listVersions": lunora_workflow_presence_175.listVersions as unknown as RegisteredLunoraFunction,
+    "workflow_presence:restoreVersion": lunora_workflow_presence_175.restoreVersion as unknown as RegisteredLunoraFunction,
+    "workflow_presence:saveVersion": lunora_workflow_presence_175.saveVersion as unknown as RegisteredLunoraFunction,
 };
 
 /**
@@ -7867,13 +7870,13 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_presence_174.listPresence.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_presence_175.listPresence.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_presence_174.listVersions.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_presence_175.listVersions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -8731,6 +8734,7 @@ export interface Caller {
     };
     file: {
         finalizeChatUpload: (args: { filename: string; uploadId: string }) => Promise<{ fileId: Id<"chatFiles">; url: string }>;
+        finalizeReferenceMedia: (args: { filename: string; uploadId: string }) => Promise<{ fileId: Id<"chatFiles">; url: string }>;
         getChatFileExtraction: (args: { fileId: Id<"chatFiles"> }) => Promise<null | { status: "pending" | "processing" | "completed" | "failed" | "unsupported" }>;
         getChatFileImageUrl: (args: { fileId: Id<"chatFiles"> }) => Promise<null | string>;
         purgeStagedChatUploads: (args: { userId: string }) => Promise<{ deleted: number }>;
@@ -9443,6 +9447,9 @@ export interface Caller {
         };
         generate: {
             generateWorkflowFromPrompt: (args: { prompt: string }) => Promise<{ edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "output" | "image" | "text" | "file" | "code" | "branch" | "video" | "audio" | "ai" | "img2img" | "upscale" | "inpaint" | "outpaint" | "background-removal" | "image-to-video" | "transcription"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+        };
+        media_ops: {
+            extractVideoFrame: (args: { frame: "start" | "end"; threadId: string; userId: string; videoUrl: string }) => Promise<{ fileId: string; mimeType: string }>;
         };
         presence: {
             checkNodeLock: (args: { nodeId: string; projectId: Id<"projects"> }) => Promise<{ locked: boolean; lockedBy: string | null; lockerColor: string | null }>;
@@ -10285,6 +10292,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
     },
     file: {
         finalizeChatUpload: (args) => callRegistered(context, "file:finalizeChatUpload", args),
+        finalizeReferenceMedia: (args) => callRegistered(context, "file:finalizeReferenceMedia", args),
         getChatFileExtraction: (args) => callRegistered(context, "file:getChatFileExtraction", args),
         getChatFileImageUrl: (args) => callRegistered(context, "file:getChatFileImageUrl", args),
         purgeStagedChatUploads: (args) => callRegistered(context, "file:purgeStagedChatUploads", args),
@@ -10997,6 +11005,9 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         generate: {
             generateWorkflowFromPrompt: (args) => callRegistered(context, "workflow_generate:generateWorkflowFromPrompt", args),
+        },
+        media_ops: {
+            extractVideoFrame: (args) => callRegistered(context, "workflow_media_ops:extractVideoFrame", args),
         },
         presence: {
             checkNodeLock: (args) => callRegistered(context, "workflow_presence:checkNodeLock", args),

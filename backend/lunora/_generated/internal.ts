@@ -947,6 +947,9 @@ export interface InternalApiTypes {
             getPublicWorkflowOwner: FunctionReference<"query", { publicAccessToken: string }, string | null>;
             readPublicWorkflow: FunctionReference<"query", { publicAccessToken: string }, { _id: Id<"projects">; color: string | undefined; description: string | undefined; galleryCategory: "image" | "text" | "video" | "audio" | "automation" | undefined; galleryFeatured: boolean; galleryForkCount: number; galleryPublishedAt: number | undefined; galleryTags: string[]; galleryViewCount: number; icon: string | undefined; title: string; workflowContent: { edges: Array<{ id: string; source: string; sourceHandle?: string; target: string; targetHandle?: string; type?: string; }>; nodes: Array<{ data?: unknown; id: string; position: { x: number; y: number; }; type: string; }>; viewport?: { x: number; y: number; zoom: number; }; } | undefined; } | null>;
         };
+        media_ops: {
+            extractVideoFrame: FunctionReference<"action", { frame: "start" | "end"; threadId: string; userId: string; videoUrl: string }, { fileId: string; mimeType: string }>;
+        };
         presence: {
             cleanupStalePresence: FunctionReference<"mutation", {}, { cleaned: number }>;
         };
@@ -1893,6 +1896,9 @@ export const internal: InternalApiTypes = {
         gallery: {
             getPublicWorkflowOwner: { __lunoraRef: "workflow_gallery:getPublicWorkflowOwner" },
             readPublicWorkflow: { __lunoraRef: "workflow_gallery:readPublicWorkflow" },
+        },
+        media_ops: {
+            extractVideoFrame: { __lunoraRef: "workflow_media_ops:extractVideoFrame" },
         },
         presence: {
             cleanupStalePresence: { __lunoraRef: "workflow_presence:cleanupStalePresence" },

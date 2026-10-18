@@ -1391,6 +1391,11 @@ msgstr "Eine von Neore geteilte Seite."
 msgid "A question is waiting for you"
 msgstr "Eine Frage wartet auf dich"
 
+#. placeholder {0}: String(REFERENCE_VIDEO_MAX_SECONDS)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:214
+msgid "A reference video can be at most {0} seconds."
+msgstr "Ein Referenzvideo darf höchstens {0} Sekunden lang sein."
+
 #: src/features/evals/components/case-fields.tsx:30
 msgid "A regular expression the answer must match"
 msgstr "Ein regulärer Ausdruck, dem die Antwort entsprechen muss"
@@ -1775,7 +1780,7 @@ msgstr "Weitere Zeilen hinzufügen"
 msgid "Add node"
 msgstr "Node hinzufügen"
 
-#: src/features/workflow/types/index.ts:454
+#: src/features/workflow/types/index.ts:455
 msgid "Add notes and annotations to the canvas"
 msgstr "Notizen und Anmerkungen zum Canvas hinzufügen"
 
@@ -1791,6 +1796,10 @@ msgstr "Seite hinzufügen"
 #: src/features/auth/components/settings/passkey/passkeys-card.tsx:87
 msgid "Add Passkey"
 msgstr "Passkey hinzufügen"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+msgid "Add picked frame as image node"
+msgstr "Gewähltes Bild als Bildknoten hinzufügen"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:390
 #: src/features/settings/components/chat/native-providers-settings.tsx:461
@@ -2005,8 +2014,8 @@ msgstr "Erweiterte Steuerung der Kamerabewegung"
 msgid "Advanced coding tasks requiring OpenAI's refined Codex capabilities"
 msgstr "Anspruchsvolle Coding-Aufgaben, die die verfeinerten Codex-Fähigkeiten von OpenAI erfordern"
 
-#: src/features/workflow/types/index.ts:366
-#: src/features/workflow/types/index.ts:370
+#: src/features/workflow/types/index.ts:367
+#: src/features/workflow/types/index.ts:371
 msgid "Advanced Controls"
 msgstr "Erweiterte Steuerung"
 
@@ -2229,7 +2238,7 @@ msgid "Aggregate scores of both runs"
 msgstr "Gesamtbewertungen beider Durchläufe"
 
 #: src/features/chat/pins/pin-item.tsx:228
-#: src/features/workflow/types/index.ts:376
+#: src/features/workflow/types/index.ts:377
 msgid "AI"
 msgstr "KI"
 
@@ -2263,7 +2272,7 @@ msgstr "KI-Bildgenerierung"
 msgid "AI Memory System"
 msgstr "KI-Erinnerungssystem"
 
-#: src/features/workflow/types/index.ts:380
+#: src/features/workflow/types/index.ts:381
 msgid "AI Model"
 msgstr "KI-Modell"
 
@@ -2742,7 +2751,7 @@ msgstr "Analytics"
 msgid "Angle"
 msgstr "Winkel"
 
-#: src/features/workflow/types/index.ts:518
+#: src/features/workflow/types/index.ts:519
 msgid "Animate static images with AI"
 msgstr "Statische Bilder mit KI animieren"
 
@@ -2990,7 +2999,7 @@ msgstr "Best Practices, Muster und domänenspezifische Richtlinien anwenden. Ber
 msgid "Apply changes"
 msgstr "Änderungen übernehmen"
 
-#: src/features/workflow/types/index.ts:606
+#: src/features/workflow/types/index.ts:607
 msgid "Apply consistent artistic style across generations"
 msgstr "Einheitlichen künstlerischen Stil über alle Generierungen anwenden"
 
@@ -3314,7 +3323,7 @@ msgstr "Auckland"
 msgid "Audio"
 msgstr "Audio"
 
-#: src/features/workflow/types/index.ts:390
+#: src/features/workflow/types/index.ts:391
 msgid "Audio (TTS)"
 msgstr "Audio (TTS)"
 
@@ -3566,7 +3575,7 @@ msgstr "Zurück zu den Workflows"
 msgid "Background Color (optional)"
 msgstr "Hintergrundfarbe (optional)"
 
-#: src/features/workflow/types/index.ts:405
+#: src/features/workflow/types/index.ts:406
 msgid "Background Removal"
 msgstr "Hintergrundentfernung"
 
@@ -3605,15 +3614,15 @@ msgstr "ausgewogen"
 msgid "Balanced"
 msgstr "Ausgewogen"
 
-#: src/lib/model-descriptions.ts:37
+#: src/lib/model-descriptions.ts:42
 msgid "Balanced 32B model from Alibaba"
 msgstr "Ausgewogenes 32B-Modell von Alibaba"
 
-#: src/lib/model-descriptions.ts:38
+#: src/lib/model-descriptions.ts:43
 msgid "Balanced frontier model from Anthropic"
 msgstr "Ausgewogenes Spitzenmodell von Anthropic"
 
-#: src/lib/model-descriptions.ts:39
+#: src/lib/model-descriptions.ts:44
 msgid "Balanced GPT-5 family model from OpenAI"
 msgstr "Ausgewogenes Modell der GPT-5-Familie von OpenAI"
 
@@ -3824,31 +3833,31 @@ msgstr "Bessere Prompt-Treue"
 msgid "Better speed-to-quality ratio than the full GPT-5"
 msgstr "Besseres Verhältnis von Geschwindigkeit zu Qualität als das volle GPT-5"
 
-#: src/lib/model-descriptions.ts:40
+#: src/lib/model-descriptions.ts:45
 msgid "BFL's frontier model for image editing"
 msgstr "BFLs Spitzenmodell für Bildbearbeitung"
 
-#: src/lib/model-descriptions.ts:41
+#: src/lib/model-descriptions.ts:46
 msgid "BFL's highest quality FLUX model via direct API"
 msgstr "BFLs hochwertigstes FLUX-Modell über die direkte API"
 
-#: src/lib/model-descriptions.ts:42
+#: src/lib/model-descriptions.ts:47
 msgid "BFL's highest quality model via Replicate"
 msgstr "BFLs hochwertigstes Modell über Replicate"
 
-#: src/lib/model-descriptions.ts:43
+#: src/lib/model-descriptions.ts:48
 msgid "BFL's highest quality text-to-image model — up to 2K resolution with improved photorealism"
 msgstr "BFLs hochwertigstes Text-zu-Bild-Modell — bis zu 2K-Auflösung mit verbessertem Fotorealismus"
 
-#: src/lib/model-descriptions.ts:44
+#: src/lib/model-descriptions.ts:49
 msgid "BFL's latest generation model via Replicate"
 msgstr "BFLs Modell der neuesten Generation über Replicate"
 
-#: src/lib/model-descriptions.ts:45
+#: src/lib/model-descriptions.ts:50
 msgid "BFL's maximum quality FLUX Kontext model"
 msgstr "BFLs FLUX-Kontext-Modell mit maximaler Qualität"
 
-#: src/lib/model-descriptions.ts:46
+#: src/lib/model-descriptions.ts:51
 msgid "BFL's professional FLUX model via direct API"
 msgstr "BFLs professionelles FLUX-Modell über die direkte API"
 
@@ -4010,8 +4019,8 @@ msgstr "Brainstorming"
 #: src/features/chat/core/hooks/use-thread-manager.ts:134
 #: src/features/chat/core/hooks/use-thread-manager.ts:147
 #: src/features/tasks/components/task-form-dialog.tsx:281
-#: src/features/workflow/types/index.ts:417
-#: src/features/workflow/types/index.ts:421
+#: src/features/workflow/types/index.ts:418
+#: src/features/workflow/types/index.ts:422
 msgid "Branch"
 msgstr "Branch"
 
@@ -4284,7 +4293,7 @@ msgstr "ByteDance"
 msgid "ByteDance medium-pro quality tier"
 msgstr "ByteDance Qualitätsstufe Medium-Pro"
 
-#: src/lib/model-descriptions.ts:47
+#: src/lib/model-descriptions.ts:52
 msgid "ByteDance Seedance 2.0 — next-gen high-quality video with end-frame and reference support"
 msgstr "ByteDance Seedance 2.0 — hochwertiges Video der nächsten Generation mit Endframe- und Referenzunterstützung"
 
@@ -4300,7 +4309,7 @@ msgstr "ByteDances zugängliches Bildmodell"
 msgid "ByteDance's capable vision reasoning model"
 msgstr "ByteDances leistungsfähiges Vision-Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:48
+#: src/lib/model-descriptions.ts:53
 msgid "ByteDance's compact and efficient reasoning model"
 msgstr "ByteDances kompaktes und effizientes Reasoning-Modell"
 
@@ -4308,7 +4317,7 @@ msgstr "ByteDances kompaktes und effizientes Reasoning-Modell"
 msgid "ByteDance's compact reasoning model"
 msgstr "ByteDances kompaktes Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:49
+#: src/lib/model-descriptions.ts:54
 msgid "ByteDance's fast vision reasoning model"
 msgstr "ByteDances schnelles Vision-Reasoning-Modell"
 
@@ -4324,13 +4333,17 @@ msgstr "ByteDances hochwertige Seedance-Stufe"
 msgid "ByteDance's latest and most capable reasoning model"
 msgstr "ByteDances neuestes und leistungsfähigstes Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:50
+#: src/lib/model-descriptions.ts:55
 msgid "ByteDance's latest reasoning model"
 msgstr "ByteDances neuestes Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:51
+#: src/lib/model-descriptions.ts:56
 msgid "ByteDance's recent reasoning model"
 msgstr "ByteDances aktuelles Reasoning-Modell"
+
+#: src/lib/model-descriptions.ts:38
+msgid "ByteDance's Seedream 5.0 Pro text-to-image model, up to 2K output"
+msgstr "Text-zu-Bild-Modell Seedream 5.0 Pro von ByteDance, bis zu 2K-Ausgabe"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:105
 msgid "BZIP2 compressed"
@@ -4476,6 +4489,7 @@ msgstr "Kanada"
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:501
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:232
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
 #: src/routes/auth/extension.tsx:145
 msgid "Cancel"
@@ -4564,11 +4578,11 @@ msgstr "Fähigkeiten"
 msgid "capable"
 msgstr "leistungsfähig"
 
-#: src/lib/model-descriptions.ts:52
+#: src/lib/model-descriptions.ts:57
 msgid "Capable balanced model from xAI with vision support"
 msgstr "Leistungsfähiges, ausgewogenes Modell von xAI mit Vision-Unterstützung"
 
-#: src/lib/model-descriptions.ts:53
+#: src/lib/model-descriptions.ts:58
 msgid "Capable open-source model from Meta"
 msgstr "Leistungsfähiges Open-Source-Modell von Meta"
 
@@ -4585,22 +4599,22 @@ msgid "Caption text"
 msgstr "Bildunterschrift"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:102
-msgid "Capture"
-msgstr "Aufnehmen"
+#~ msgid "Capture"
+#~ msgstr "Aufnehmen"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:95
-msgid "Capture {label}"
-msgstr "{label} aufnehmen"
+#~ msgid "Capture {label}"
+#~ msgstr "{label} aufnehmen"
 
 #: src/features/chat/thread/composer-input-area.tsx:192
 msgid "Capture screen"
 msgstr "Bildschirm aufnehmen"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:92
-msgid "captured"
-msgstr "aufgenommen"
+#~ msgid "captured"
+#~ msgstr "aufgenommen"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:102
+#: src/features/workflow/components/nodes/video-frames-section.tsx:119
 msgid "Capturing…"
 msgstr "Wird aufgenommen …"
 
@@ -4624,7 +4638,7 @@ msgstr "Testfälle in {0}"
 msgid "Cases with no reported cost used {0} of {1} budgeted tokens."
 msgstr "Testfälle ohne gemeldete Kosten haben {0} von {1} budgetierten Tokens verbraucht."
 
-#: src/lib/model-descriptions.ts:54
+#: src/lib/model-descriptions.ts:59
 msgid "Cassette AI text-to-music — up to 3-minute clips at 44.1kHz stereo."
 msgstr "Cassette AI Text-zu-Musik — Clips bis zu 3 Minuten in 44,1 kHz Stereo."
 
@@ -4752,8 +4766,8 @@ msgid "Character performance"
 msgstr "Charakterdarstellung"
 
 #: src/features/workflow/templates/index.ts:288
-#: src/features/workflow/types/index.ts:433
-#: src/features/workflow/types/index.ts:437
+#: src/features/workflow/types/index.ts:434
+#: src/features/workflow/types/index.ts:438
 msgid "Character Reference"
 msgstr "Charakterreferenz"
 
@@ -4835,7 +4849,7 @@ msgstr "Chats in diesem Projekt durchsuchen diese Sammlungen und zitieren sie."
 msgid "Chats that use its models will stop working until you pick another model."
 msgstr "Chats, die seine Modelle verwenden, funktionieren nicht mehr, bis du ein anderes Modell auswählst."
 
-#: src/lib/model-descriptions.ts:55
+#: src/lib/model-descriptions.ts:60
 msgid "Cheapest medium-quality Hailuo 2.3 tier — best cost-to-quality ratio"
 msgstr "Günstigste Hailuo-2.3-Stufe mit mittlerer Qualität — bestes Preis-Leistungs-Verhältnis"
 
@@ -5010,11 +5024,11 @@ msgstr "Filmische KI-Videos"
 msgid "Cinematic depth and visual flair"
 msgstr "Filmische Tiefe und visuelles Flair"
 
-#: src/lib/model-descriptions.ts:56
+#: src/lib/model-descriptions.ts:61
 msgid "Cinematic image model with references"
 msgstr "Cineastisches Bildmodell mit Referenzen"
 
-#: src/lib/model-descriptions.ts:57
+#: src/lib/model-descriptions.ts:62
 msgid "Cinematic quality with improved motion"
 msgstr "Kinoqualität mit verbesserter Bewegung"
 
@@ -5303,8 +5317,8 @@ msgstr "Cloud-Anbieterkonten"
 #: src/features/canvas/canvas-panel.tsx:735
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/workflow/components/nodes/code-node.tsx:60
-#: src/features/workflow/types/index.ts:443
-#: src/features/workflow/types/index.ts:447
+#: src/features/workflow/types/index.ts:444
+#: src/features/workflow/types/index.ts:448
 msgid "Code"
 msgstr "Code"
 
@@ -5412,15 +5426,15 @@ msgstr "Coding-Aufgaben, die Alibabas spezialisiertes 30B-Coding-Modell erforder
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "Coding-Aufgaben, die Mistrals spezialisiertes, auf Entwicklung ausgerichtetes Modell erfordern"
 
-#: src/lib/model-descriptions.ts:58
+#: src/lib/model-descriptions.ts:63
 msgid "Coding-specialized model from Alibaba"
 msgstr "Auf Coding spezialisiertes Modell von Alibaba"
 
-#: src/lib/model-descriptions.ts:59
+#: src/lib/model-descriptions.ts:64
 msgid "Cohere's advanced command LLM"
 msgstr "Coheres fortschrittliches Command-LLM"
 
-#: src/lib/model-descriptions.ts:60
+#: src/lib/model-descriptions.ts:65
 msgid "Cohere's advanced command LLM with thinking"
 msgstr "Coheres fortschrittliches Command-LLM mit Thinking"
 
@@ -5542,8 +5556,8 @@ msgstr "Befehle"
 #: src/features/pages/components/page-comments-panel.tsx:146
 #: src/features/pages/components/page-view.tsx:429
 #: src/features/workflow/components/nodes/comment-node.tsx:95
-#: src/features/workflow/types/index.ts:453
-#: src/features/workflow/types/index.ts:457
+#: src/features/workflow/types/index.ts:454
+#: src/features/workflow/types/index.ts:458
 msgid "Comment"
 msgstr "Kommentieren"
 
@@ -5606,7 +5620,7 @@ msgstr "Kompaktes Codex-Modell für schnellere Codegenerierung"
 msgid "Compact coding model from Mistral"
 msgstr "Kompaktes Coding-Modell von Mistral"
 
-#: src/lib/model-descriptions.ts:61
+#: src/lib/model-descriptions.ts:66
 msgid "Compact distilled reasoning model from DeepSeek"
 msgstr "Kompaktes destilliertes Reasoning-Modell von DeepSeek"
 
@@ -5656,7 +5670,7 @@ msgstr "Modelle vergleichen"
 msgid "Compare outputs from multiple image models side-by-side"
 msgstr "Ausgaben mehrerer Bildmodelle nebeneinander vergleichen"
 
-#: src/features/workflow/types/index.ts:591
+#: src/features/workflow/types/index.ts:592
 msgid "Compare outputs from multiple models side-by-side"
 msgstr "Ausgaben mehrerer Modelle nebeneinander vergleichen"
 
@@ -5817,7 +5831,7 @@ msgstr "Kontext wird komprimiert..."
 msgid "Condition (JavaScript expression)"
 msgstr "Bedingung (JavaScript-Ausdruck)"
 
-#: src/features/workflow/types/index.ts:418
+#: src/features/workflow/types/index.ts:419
 msgid "Conditional branching"
 msgstr "Bedingte Verzweigung"
 
@@ -6183,7 +6197,7 @@ msgstr "Vertrieb kontaktieren"
 msgid "Contact support"
 msgstr "Support kontaktieren"
 
-#: src/features/workflow/types/index.ts:491
+#: src/features/workflow/types/index.ts:492
 msgid "Container for organizing workflow nodes"
 msgstr "Container zum Organisieren von Workflow-Nodes"
 
@@ -6339,8 +6353,8 @@ msgstr "Lege fest, welche KI-Anbieter deine Anfragen bearbeiten dürfen."
 msgid "controlled"
 msgstr "kontrolliert"
 
-#: src/features/workflow/types/index.ts:470
-#: src/features/workflow/types/index.ts:474
+#: src/features/workflow/types/index.ts:471
+#: src/features/workflow/types/index.ts:475
 msgid "ControlNet"
 msgstr "ControlNet"
 
@@ -6374,11 +6388,11 @@ msgstr "Konvertieren"
 msgid "Convert Account"
 msgstr "Konto konvertieren"
 
-#: src/features/workflow/types/index.ts:626
+#: src/features/workflow/types/index.ts:627
 msgid "Convert speech to text"
 msgstr "Sprache in Text umwandeln"
 
-#: src/features/workflow/types/index.ts:387
+#: src/features/workflow/types/index.ts:388
 msgid "Convert text to speech"
 msgstr "Text in Sprache umwandeln"
 
@@ -7587,19 +7601,19 @@ msgstr "Tief, dokumentarische Klarheit"
 msgid "Deeper, more context"
 msgstr "Tiefer, mehr Kontext"
 
-#: src/lib/model-descriptions.ts:62
+#: src/lib/model-descriptions.ts:67
 msgid "DeepSeek V3.1 optimized for software engineering"
 msgstr "DeepSeek V3.1, optimiert für Softwareentwicklung"
 
-#: src/lib/model-descriptions.ts:63
+#: src/lib/model-descriptions.ts:68
 msgid "DeepSeek's advanced chat LLM with thinking"
 msgstr "DeepSeeks fortschrittliches Chat-LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:64
+#: src/lib/model-descriptions.ts:69
 msgid "DeepSeek's experimental advanced chat LLM"
 msgstr "DeepSeeks experimentelles fortschrittliches Chat-LLM"
 
-#: src/lib/model-descriptions.ts:65
+#: src/lib/model-descriptions.ts:70
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeeks experimentelles fortschrittliches Chat-LLM mit Thinking"
 
@@ -8474,7 +8488,7 @@ msgstr "Verworfen — es geht ohne Antwort weiter"
 msgid "Display model names on results"
 msgstr "Modellnamen bei Ergebnissen anzeigen"
 
-#: src/features/workflow/types/index.ts:577
+#: src/features/workflow/types/index.ts:578
 msgid "Display results"
 msgstr "Ergebnisse anzeigen"
 
@@ -8494,7 +8508,7 @@ msgstr "Gruppe auflösen und alle untergeordneten Elemente freigeben"
 msgid "distilled"
 msgstr "destilliert"
 
-#: src/lib/model-descriptions.ts:66
+#: src/lib/model-descriptions.ts:71
 msgid "Distilled and open sourced version of Krea 1"
 msgstr "Destillierte Open-Source-Version von Krea 1"
 
@@ -8734,11 +8748,11 @@ msgstr "Maske zeichnen"
 msgid "Drawing tools"
 msgstr "Zeichenwerkzeuge"
 
-#: src/features/workflow/components/nodes/file-node.tsx:108
+#: src/features/workflow/components/nodes/file-node.tsx:165
 msgid "Drop file here"
 msgstr "Datei hier ablegen"
 
-#: src/features/workflow/components/nodes/file-node.tsx:108
+#: src/features/workflow/components/nodes/file-node.tsx:165
 msgid "Drop file or click to upload"
 msgstr "Datei ablegen oder zum Hochladen klicken"
 
@@ -9086,7 +9100,7 @@ msgstr "Folie {slideNumber} bearbeiten"
 msgid "Edit specific regions"
 msgstr "Bestimmte Bereiche bearbeiten"
 
-#: src/features/workflow/types/index.ts:538
+#: src/features/workflow/types/index.ts:539
 msgid "Edit specific regions of an image"
 msgstr "Bestimmte Bereiche eines Bildes bearbeiten"
 
@@ -9473,6 +9487,7 @@ msgid "Encrypted at rest and never shown again. Local servers such as Ollama usu
 msgstr "Verschlüsselt gespeichert und nie wieder angezeigt. Lokale Server wie Ollama brauchen meist keinen."
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:215
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:188
 msgid "End"
 msgstr "Ende"
 
@@ -9553,7 +9568,7 @@ msgstr "Details verbessern"
 msgid "Enhance Faces"
 msgstr "Gesichter verbessern"
 
-#: src/features/workflow/types/index.ts:636
+#: src/features/workflow/types/index.ts:637
 msgid "Enhance image resolution"
 msgstr "Bildauflösung erhöhen"
 
@@ -10134,7 +10149,7 @@ msgstr "Ausführen"
 msgid "Execute cleanup"
 msgstr "Bereinigung ausführen"
 
-#: src/features/workflow/types/index.ts:444
+#: src/features/workflow/types/index.ts:445
 msgid "Execute code"
 msgstr "Code ausführen"
 
@@ -10207,7 +10222,7 @@ msgstr "Gruppe ausklappen"
 msgid "Expand group to show children"
 msgstr "Gruppe ausklappen, um untergeordnete Elemente anzuzeigen"
 
-#: src/features/workflow/types/index.ts:567
+#: src/features/workflow/types/index.ts:568
 msgid "Expand image canvas beyond original borders"
 msgstr "Bild-Canvas über die ursprünglichen Ränder hinaus erweitern"
 
@@ -11339,19 +11354,19 @@ msgstr "Schnell"
 msgid "Fast and affordable AI"
 msgstr "Schnelle und günstige KI"
 
-#: src/lib/model-descriptions.ts:67
+#: src/lib/model-descriptions.ts:72
 msgid "Fast and cheap model. Up to 12 seconds"
 msgstr "Schnelles und günstiges Modell. Bis zu 12 Sekunden"
 
-#: src/lib/model-descriptions.ts:68
+#: src/lib/model-descriptions.ts:73
 msgid "Fast and cheap next-gen model"
 msgstr "Schnelles und günstiges Modell der nächsten Generation"
 
-#: src/lib/model-descriptions.ts:69
+#: src/lib/model-descriptions.ts:74
 msgid "Fast and efficient model from Z.AI"
 msgstr "Schnelles und effizientes Modell von Z.AI"
 
-#: src/lib/model-descriptions.ts:70
+#: src/lib/model-descriptions.ts:75
 msgid "Fast and efficient multimodal model from Google"
 msgstr "Schnelles und effizientes multimodales Modell von Google"
 
@@ -11415,7 +11430,7 @@ msgstr "Schnelle Inferenz mit Bild- und PDF-Unterstützung"
 msgid "Fast iteration cycle for creative exploration"
 msgstr "Schnelle Iterationszyklen für kreatives Erkunden"
 
-#: src/lib/model-descriptions.ts:71
+#: src/lib/model-descriptions.ts:76
 msgid "Fast model. Best for LoRAs"
 msgstr "Schnelles Modell. Ideal für LoRAs"
 
@@ -11492,7 +11507,7 @@ msgstr "Schnelle, effiziente Aufgaben, die das optimierte Flash-Modell von StepF
 msgid "Fast, general purpose"
 msgstr "Schnell, allgemein einsetzbar"
 
-#: src/lib/model-descriptions.ts:72
+#: src/lib/model-descriptions.ts:77
 msgid "Fast, high-quality model from ByteDance"
 msgstr "Schnelles, hochwertiges Modell von ByteDance"
 
@@ -11500,7 +11515,7 @@ msgstr "Schnelles, hochwertiges Modell von ByteDance"
 msgid "Fast, high-quality video generation backed by xAI's foundation model technology"
 msgstr "Schnelle, hochwertige Videogenerierung auf Basis der Foundation-Model-Technologie von xAI"
 
-#: src/lib/model-descriptions.ts:73
+#: src/lib/model-descriptions.ts:78
 msgid "Fast, high-quality video generation by xAI"
 msgstr "Schnelle, hochwertige Videogenerierung von xAI"
 
@@ -11508,7 +11523,7 @@ msgstr "Schnelle, hochwertige Videogenerierung von xAI"
 msgid "Fast, high-quality video generation from ByteDance's professional-tier Seedance model"
 msgstr "Schnelle, hochwertige Videogenerierung mit ByteDances Seedance-Modell der Profistufe"
 
-#: src/lib/model-descriptions.ts:74
+#: src/lib/model-descriptions.ts:79
 msgid "Fast, inexpensive model with live previews"
 msgstr "Schnelles, günstiges Modell mit Live-Vorschau"
 
@@ -11520,7 +11535,7 @@ msgstr "Schnelle, günstige Modelle"
 msgid "Fast, low-cost models. 20 messages a day."
 msgstr "Schnelle, günstige Modelle. 20 Nachrichten pro Tag."
 
-#: src/lib/model-descriptions.ts:75
+#: src/lib/model-descriptions.ts:80
 msgid "Fast, lower-quality model from Alibaba"
 msgstr "Schnelles Modell mit geringerer Qualität von Alibaba"
 
@@ -11536,7 +11551,7 @@ msgstr "Schneller und leichter als das volle GLM 4.5"
 msgid "Faster and more affordable than Veo 3"
 msgstr "Schneller und günstiger als Veo 3"
 
-#: src/lib/model-descriptions.ts:76
+#: src/lib/model-descriptions.ts:81
 msgid "Faster and more affordable version of Veo 3.1 with audio"
 msgstr "Schnellere und günstigere Version von Veo 3.1 mit Audio"
 
@@ -11548,11 +11563,11 @@ msgstr "Schnellere Inferenz als das volle R1-Modell"
 msgid "Faster version of the top-ranked Veo 3.1"
 msgstr "Schnellere Version des Spitzenreiters Veo 3.1"
 
-#: src/lib/model-descriptions.ts:77
+#: src/lib/model-descriptions.ts:82
 msgid "Faster, cheaper Seedance 1.5 variant from ByteDance"
 msgstr "Schnellere, günstigere Seedance-1.5-Variante von ByteDance"
 
-#: src/lib/model-descriptions.ts:78
+#: src/lib/model-descriptions.ts:83
 msgid "Faster, cheaper Seedance 2.0 variant — quick iterations at high quality"
 msgstr "Schnellere, günstigere Seedance-2.0-Variante — schnelle Iterationen in hoher Qualität"
 
@@ -11560,7 +11575,7 @@ msgstr "Schnellere, günstigere Seedance-2.0-Variante — schnelle Iterationen i
 msgid "Faster, cheaper variant of Seedance 2.0"
 msgstr "Schnellere, günstigere Variante von Seedance 2.0"
 
-#: src/lib/model-descriptions.ts:79
+#: src/lib/model-descriptions.ts:84
 msgid "Faster, more affordable Veo 3 variant with optional audio"
 msgstr "Schnellere, günstigere Veo-3-Variante mit optionalem Audio"
 
@@ -11580,15 +11595,15 @@ msgstr "Schnellste verfügbare Bildgenerierung"
 msgid "Fastest in the Wan model family"
 msgstr "Das schnellste Modell der Wan-Familie"
 
-#: src/lib/model-descriptions.ts:80
+#: src/lib/model-descriptions.ts:85
 msgid "Fastest low-quality model with video Lora support"
 msgstr "Schnellstes Modell mit geringer Qualität und Video-LoRA-Unterstützung"
 
-#: src/lib/model-descriptions.ts:81
+#: src/lib/model-descriptions.ts:86
 msgid "Fastest model. Realistic, low diversity"
 msgstr "Schnellstes Modell. Realistisch, geringe Vielfalt"
 
-#: src/lib/model-descriptions.ts:82
+#: src/lib/model-descriptions.ts:87
 msgid "Fastest, most affordable Claude model"
 msgstr "Schnellstes und günstigstes Claude-Modell"
 
@@ -11666,8 +11681,8 @@ msgstr "Modelle abrufen"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:26
 #: src/features/evals/components/import-cases-dialog.tsx:81
-#: src/features/workflow/types/index.ts:480
-#: src/features/workflow/types/index.ts:484
+#: src/features/workflow/types/index.ts:481
+#: src/features/workflow/types/index.ts:485
 msgid "File"
 msgstr "Datei"
 
@@ -11679,7 +11694,7 @@ msgstr "Datei \"{fileName}\" erfolgreich gelöscht"
 msgid "File access and AI-powered universal search across work apps"
 msgstr "Dateizugriff und KI-gestützte universelle Suche über Arbeits-Apps hinweg"
 
-#: src/features/workflow/types/index.ts:481
+#: src/features/workflow/types/index.ts:482
 msgid "File input"
 msgstr "Dateieingabe"
 
@@ -11857,7 +11872,7 @@ msgstr "Die besten Restaurants für italienische Küche in meiner Nähe finden"
 msgid "Find tutorials on how to learn Python programming"
 msgstr "Tutorials zum Erlernen der Python-Programmierung finden"
 
-#: src/features/workflow/types/index.ts:367
+#: src/features/workflow/types/index.ts:368
 msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
 msgstr "CFG Scale, Sampler, Scheduler und Seed feinjustieren"
 
@@ -11955,15 +11970,15 @@ msgstr "Vertikal spiegeln"
 msgid "fluid motion"
 msgstr "flüssige Bewegung"
 
-#: src/lib/model-descriptions.ts:83
+#: src/lib/model-descriptions.ts:88
 msgid "FLUX Kontext Max for highest quality editing via Fireworks"
 msgstr "FLUX Kontext Max für Bearbeitung in höchster Qualität über Fireworks"
 
-#: src/lib/model-descriptions.ts:84
+#: src/lib/model-descriptions.ts:89
 msgid "FLUX Kontext Pro for image editing via Fireworks"
 msgstr "FLUX Kontext Pro für Bildbearbeitung über Fireworks"
 
-#: src/lib/model-descriptions.ts:85
+#: src/lib/model-descriptions.ts:90
 msgid "FLUX.1 Dev model via Fireworks"
 msgstr "FLUX.1-Dev-Modell über Fireworks"
 
@@ -11971,7 +11986,7 @@ msgstr "FLUX.1-Dev-Modell über Fireworks"
 msgid "FLUX.2 architecture improvements"
 msgstr "Verbesserungen der FLUX.2-Architektur"
 
-#: src/lib/model-descriptions.ts:86
+#: src/lib/model-descriptions.ts:91
 msgid "FLUX.2 dev with enhanced realism and native editing"
 msgstr "FLUX.2 Dev mit verbessertem Realismus und nativer Bearbeitung"
 
@@ -12117,11 +12132,11 @@ msgstr "Grundlage von Googles führender Veo-3.x-Reihe"
 msgid "FPS"
 msgstr "FPS"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:69
+#: src/features/workflow/components/nodes/video-frames-section.tsx:67
 msgid "Frame capture failed"
 msgstr "Bildaufnahme fehlgeschlagen"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:85
+#: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "Frames"
 msgstr "Einzelbilder"
 
@@ -12270,35 +12285,35 @@ msgstr "Frontier-Intelligenz"
 msgid "Frontier intelligence for complex scenes"
 msgstr "Frontier-Intelligenz für komplexe Szenen"
 
-#: src/lib/model-descriptions.ts:87
+#: src/lib/model-descriptions.ts:92
 msgid "Frontier model by Black Forest Labs"
 msgstr "Spitzenmodell von Black Forest Labs"
 
-#: src/lib/model-descriptions.ts:88
+#: src/lib/model-descriptions.ts:93
 msgid "Frontier model designed for image editing"
 msgstr "Spitzenmodell für Bildbearbeitung"
 
-#: src/lib/model-descriptions.ts:89
+#: src/lib/model-descriptions.ts:94
 msgid "Frontier model designed for image editing, optimized for Krea"
 msgstr "Spitzenmodell für Bildbearbeitung, optimiert für Krea"
 
-#: src/lib/model-descriptions.ts:90
+#: src/lib/model-descriptions.ts:95
 msgid "Frontier model for complex image references"
 msgstr "Spitzenmodell für komplexe Bildreferenzen"
 
-#: src/lib/model-descriptions.ts:91
+#: src/lib/model-descriptions.ts:96
 msgid "Frontier model from Kling with native audio"
 msgstr "Spitzenmodell von Kling mit nativem Audio"
 
-#: src/lib/model-descriptions.ts:92
+#: src/lib/model-descriptions.ts:97
 msgid "Frontier model with 1080p resolution"
 msgstr "Spitzenmodell mit 1080p-Auflösung"
 
-#: src/lib/model-descriptions.ts:93
+#: src/lib/model-descriptions.ts:98
 msgid "Frontier model with exceptional long context from Google"
 msgstr "Spitzenmodell mit außergewöhnlich langem Kontext von Google"
 
-#: src/lib/model-descriptions.ts:94
+#: src/lib/model-descriptions.ts:99
 msgid "Frontier model with extended thinking from Anthropic"
 msgstr "Spitzenmodell mit erweitertem Thinking von Anthropic"
 
@@ -12601,7 +12616,7 @@ msgstr "Video generieren"
 msgid "Generate Video"
 msgstr "Video generieren"
 
-#: src/features/workflow/types/index.ts:646
+#: src/features/workflow/types/index.ts:647
 msgid "Generate videos from text or images"
 msgstr "Videos aus Text oder Bildern generieren"
 
@@ -13021,7 +13036,7 @@ msgstr "Google-Flaggschiff"
 msgid "Google Gemini"
 msgstr "Google Gemini"
 
-#: src/lib/model-descriptions.ts:95
+#: src/lib/model-descriptions.ts:100
 msgid "Google Lyria 2 — 30s text-to-music clips at 48kHz with negative-prompt support."
 msgstr "Google Lyria 2 — 30-Sekunden-Musikclips aus Text in 48 kHz mit Unterstützung für Negativ-Prompts."
 
@@ -13029,23 +13044,23 @@ msgstr "Google Lyria 2 — 30-Sekunden-Musikclips aus Text in 48 kHz mit Unterst
 msgid "Google reliability at budget pricing"
 msgstr "Google-Zuverlässigkeit zum Budgetpreis"
 
-#: src/lib/model-descriptions.ts:96
+#: src/lib/model-descriptions.ts:101
 msgid "Google Veo 2 — high-quality cinematic video generation"
 msgstr "Google Veo 2 — hochwertige, cineastische Videogenerierung"
 
-#: src/lib/model-descriptions.ts:97
+#: src/lib/model-descriptions.ts:102
 msgid "Google Veo 3 — frontier video generation with native audio"
 msgstr "Google Veo 3 — Spitzen-Videogenerierung mit nativem Audio"
 
-#: src/lib/model-descriptions.ts:98
+#: src/lib/model-descriptions.ts:103
 msgid "Google's advanced LLM with thinking"
 msgstr "Googles fortschrittliches LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:99
+#: src/lib/model-descriptions.ts:104
 msgid "Google's advanced small LLM with thinking"
 msgstr "Googles fortschrittliches kleines LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:100
+#: src/lib/model-descriptions.ts:105
 msgid "Google's current generation image model"
 msgstr "Googles Bildmodell der aktuellen Generation"
 
@@ -13057,11 +13072,15 @@ msgstr "Googles Qualität der aktuellen Generation"
 msgid "Google's fastest image generation"
 msgstr "Googles schnellste Bildgenerierung"
 
-#: src/lib/model-descriptions.ts:101
+#: src/lib/model-descriptions.ts:106
 msgid "Google's fastest image model"
 msgstr "Googles schnellstes Bildmodell"
 
-#: src/lib/model-descriptions.ts:102
+#: src/lib/model-descriptions.ts:40
+msgid "Google's Gemini Omni Flash 1.1 reference-to-video, guided by images and short reference videos"
+msgstr "Referenz-zu-Video mit Gemini Omni Flash 1.1 von Google, gesteuert durch Bilder und kurze Referenzvideos"
+
+#: src/lib/model-descriptions.ts:107
 msgid "Google's highest quality image model"
 msgstr "Googles hochwertigstes Bildmodell"
 
@@ -13069,11 +13088,11 @@ msgstr "Googles hochwertigstes Bildmodell"
 msgid "Google's highest-quality image model"
 msgstr "Googles hochwertigstes Bildmodell"
 
-#: src/lib/model-descriptions.ts:103
+#: src/lib/model-descriptions.ts:108
 msgid "Google's latest small SOTA LLM with thinking"
 msgstr "Googles neuestes kleines SOTA-LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:104
+#: src/lib/model-descriptions.ts:109
 msgid "Google's most advanced AI video model with native audio and reference images"
 msgstr "Googles fortschrittlichstes KI-Videomodell mit nativem Audio und Referenzbildern"
 
@@ -13081,7 +13100,7 @@ msgstr "Googles fortschrittlichstes KI-Videomodell mit nativem Audio und Referen
 msgid "Google's most advanced image generation model"
 msgstr "Googles fortschrittlichstes Bildgenerierungsmodell"
 
-#: src/lib/model-descriptions.ts:105
+#: src/lib/model-descriptions.ts:110
 msgid "Google's new state-of-the-art fast image generation and editing model"
 msgstr "Googles neues hochmodernes, schnelles Modell zur Bildgenerierung und -bearbeitung"
 
@@ -13093,7 +13112,7 @@ msgstr "Googles neues schnelles Modell auf dem neuesten Stand der Technik"
 msgid "Google's newest flagship model with advanced reasoning"
 msgstr "Googles neuestes Flaggschiff-Modell mit fortgeschrittenem Reasoning"
 
-#: src/lib/model-descriptions.ts:106
+#: src/lib/model-descriptions.ts:111
 msgid "Google's newest flagship with advanced reasoning"
 msgstr "Googles neuestes Flaggschiff mit fortgeschrittenem Reasoning"
 
@@ -13105,7 +13124,7 @@ msgstr "Googles Flash der nächsten Generation mit transparentem Reasoning"
 msgid "Google's optimized performance-cost balance"
 msgstr "Googles optimierte Balance aus Leistung und Kosten"
 
-#: src/lib/model-descriptions.ts:107
+#: src/lib/model-descriptions.ts:112
 msgid "Google's previous generation image model"
 msgstr "Googles Bildmodell der vorherigen Generation"
 
@@ -13113,7 +13132,7 @@ msgstr "Googles Bildmodell der vorherigen Generation"
 msgid "Google's proven photorealism quality"
 msgstr "Googles bewährte fotorealistische Qualität"
 
-#: src/lib/model-descriptions.ts:108
+#: src/lib/model-descriptions.ts:113
 msgid "Google's state-of-the-art image generation and editing model"
 msgstr "Googles hochmodernes Modell zur Bildgenerierung und -bearbeitung"
 
@@ -13209,8 +13228,8 @@ msgstr "Grok-Modelle von xAI mit Echtzeit-Webzugriff"
 #: src/features/workflow/components/nodes/group-node.tsx:299
 #: src/features/workflow/components/nodes/group-node.tsx:317
 #: src/features/workflow/hooks/use-workflow-shortcuts.ts:181
-#: src/features/workflow/types/index.ts:490
-#: src/features/workflow/types/index.ts:494
+#: src/features/workflow/types/index.ts:491
+#: src/features/workflow/types/index.ts:495
 msgid "Group"
 msgstr "Gruppieren"
 
@@ -13263,7 +13282,7 @@ msgstr "Gastkonten verwenden nur kostenlose Modelle."
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gastkonten nutzen nur kostenlose Modelle. Registriere dich, um alle Modelle freizuschalten."
 
-#: src/features/workflow/types/index.ts:471
+#: src/features/workflow/types/index.ts:472
 msgid "Guide generation with pose, depth, or edge detection"
 msgstr "Generierung mit Pose-, Tiefen- oder Kantenerkennung steuern"
 
@@ -13489,15 +13508,15 @@ msgstr "Hochwertige Bildgenerierung mit Googles bewährten KI-Fähigkeiten für 
 msgid "High-quality image synthesis"
 msgstr "Hochwertige Bildsynthese"
 
-#: src/lib/model-descriptions.ts:109
+#: src/lib/model-descriptions.ts:114
 msgid "High-quality model with camera control"
 msgstr "Hochwertiges Modell mit Kamerasteuerung"
 
-#: src/lib/model-descriptions.ts:110
+#: src/lib/model-descriptions.ts:115
 msgid "High-quality model with great aesthetics"
 msgstr "Hochwertiges Modell mit großartiger Ästhetik"
 
-#: src/lib/model-descriptions.ts:111
+#: src/lib/model-descriptions.ts:116
 msgid "High-quality model with reference images support"
 msgstr "Hochwertiges Modell mit Unterstützung für Referenzbilder"
 
@@ -13581,7 +13600,7 @@ msgstr "Ausgabe in höchster Qualität von Black Forest Labs"
 msgid "Highly aesthetic visual output"
 msgstr "Visuelle Ausgabe mit hoher Ästhetik"
 
-#: src/lib/model-descriptions.ts:112
+#: src/lib/model-descriptions.ts:117
 msgid "Highly aesthetic, general-purpose model"
 msgstr "Sehr ästhetisches Allzweckmodell"
 
@@ -13802,8 +13821,8 @@ msgstr "Illustration"
 #: src/features/workflow/components/nodes/output-node.tsx:19
 #: src/features/workflow/components/template-picker.tsx:20
 #: src/features/workflow/templates/index.ts:363
-#: src/features/workflow/types/index.ts:500
-#: src/features/workflow/types/index.ts:504
+#: src/features/workflow/types/index.ts:501
+#: src/features/workflow/types/index.ts:505
 #: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Image"
 msgstr "Bild"
@@ -13883,8 +13902,8 @@ msgid "Image to video"
 msgstr "Bild zu Video"
 
 #: src/features/workflow/components/nodes/video-node.tsx:125
-#: src/features/workflow/types/index.ts:517
-#: src/features/workflow/types/index.ts:521
+#: src/features/workflow/types/index.ts:518
+#: src/features/workflow/types/index.ts:522
 msgid "Image to Video"
 msgstr "Bild zu Video"
 
@@ -13913,8 +13932,8 @@ msgstr "Bildvariation & -bearbeitung"
 msgid "Image whose artistic style will be applied"
 msgstr "Bild, dessen künstlerischer Stil angewendet wird"
 
-#: src/features/workflow/types/index.ts:527
-#: src/features/workflow/types/index.ts:531
+#: src/features/workflow/types/index.ts:528
+#: src/features/workflow/types/index.ts:532
 msgid "Image-to-Image"
 msgstr "Bild-zu-Bild"
 
@@ -14109,11 +14128,11 @@ msgstr "Bessere Benchmark-Leistung bei komplexen Aufgaben"
 msgid "Improved detail over Imagen 3"
 msgstr "Mehr Details als Imagen 3"
 
-#: src/lib/model-descriptions.ts:113
+#: src/lib/model-descriptions.ts:118
 msgid "Improved fast multimodal model from Google"
 msgstr "Verbessertes schnelles multimodales Modell von Google"
 
-#: src/lib/model-descriptions.ts:114
+#: src/lib/model-descriptions.ts:119
 msgid "Improved general-purpose model from DeepSeek"
 msgstr "Verbessertes Allzweckmodell von DeepSeek"
 
@@ -14207,7 +14226,7 @@ msgstr "Inaktivitätsschwelle"
 msgid "Inactivity threshold (days)"
 msgstr "Inaktivitätsschwelle (Tage)"
 
-#: src/lib/model-descriptions.ts:115
+#: src/lib/model-descriptions.ts:120
 msgid "Inception's diffusion-based language model"
 msgstr "Inceptions diffusionsbasiertes Sprachmodell"
 
@@ -14253,8 +14272,8 @@ msgstr "Von Organisation übernehmen"
 
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
 #: src/features/workflow/templates/index.ts:379
-#: src/features/workflow/types/index.ts:537
-#: src/features/workflow/types/index.ts:541
+#: src/features/workflow/types/index.ts:538
+#: src/features/workflow/types/index.ts:542
 msgid "Inpaint"
 msgstr "Inpaint"
 
@@ -14292,11 +14311,11 @@ msgstr "Eingabebild"
 msgid "Input is required"
 msgstr "Eingabe ist erforderlich"
 
-#: src/features/workflow/types/index.ts:501
+#: src/features/workflow/types/index.ts:502
 msgid "Input or generate images"
 msgstr "Bilder eingeben oder generieren"
 
-#: src/features/workflow/types/index.ts:616
+#: src/features/workflow/types/index.ts:617
 msgid "Input or transform text"
 msgstr "Text eingeben oder umwandeln"
 
@@ -14399,7 +14418,7 @@ msgstr "intelligent"
 msgid "Intelligent scene composition"
 msgstr "Intelligente Szenenkomposition"
 
-#: src/lib/model-descriptions.ts:116
+#: src/lib/model-descriptions.ts:121
 msgid "Intelligent video model that thinks before generating"
 msgstr "Intelligentes Videomodell, das vor dem Generieren nachdenkt"
 
@@ -14767,6 +14786,10 @@ msgstr "Aktuelle Zeilen behalten"
 msgid "Keep files"
 msgstr "Dateien behalten"
 
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:143
+msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
+msgstr "Einen Teil des Videos behalten. Der behaltene Teil wird in diesem Browser als MP4 neu kodiert, das kann einen Moment dauern."
+
 #: src/features/chat/header/temporary-chat-dropdown.tsx:292
 msgid "Keep Permanently"
 msgstr "Dauerhaft behalten"
@@ -14824,7 +14847,7 @@ msgstr "Khmer"
 msgid "Khmer (Cambodia)"
 msgstr "Khmer (Kambodscha)"
 
-#: src/lib/model-descriptions.ts:117
+#: src/lib/model-descriptions.ts:122
 msgid "Kling 2.6 text-to-video with native audio via direct API"
 msgstr "Kling 2.6 Text-zu-Video mit nativem Audio über die direkte API"
 
@@ -14903,7 +14926,7 @@ msgstr "Kreas typische ästhetische Qualität"
 msgid "KV-backed rate limiting per user and tier. Configurable burst and sustained limits."
 msgstr "KV-basierte Ratenbegrenzung pro Nutzer und Tarif. Konfigurierbare Burst- und Dauerlimits."
 
-#: src/lib/model-descriptions.ts:118
+#: src/lib/model-descriptions.ts:123
 msgid "Kwaipilot's advanced coding LLM"
 msgstr "Kwaipilots fortschrittliches Coding-LLM"
 
@@ -15030,7 +15053,7 @@ msgstr "Zuletzt bestätigt {0}"
 msgid "Last error"
 msgstr "Letzter Fehler"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:78
+#: src/features/workflow/components/nodes/video-frames-section.tsx:40
 msgid "Last frame"
 msgstr "Letztes Bild"
 
@@ -15110,7 +15133,7 @@ msgstr "Neueste Codex-Generation mit verbesserten Fähigkeiten"
 msgid "Latest coding agent run"
 msgstr "Letzter Durchlauf des Coding-Agents"
 
-#: src/lib/model-descriptions.ts:119
+#: src/lib/model-descriptions.ts:124
 msgid "Latest flagship model from Anthropic"
 msgstr "Neuestes Flaggschiff-Modell von Anthropic"
 
@@ -15122,11 +15145,11 @@ msgstr "neueste Spitzenklasse"
 msgid "Latest frontier generation from Hailuo"
 msgstr "Neueste Spitzengeneration von Hailuo"
 
-#: src/lib/model-descriptions.ts:120
+#: src/lib/model-descriptions.ts:125
 msgid "Latest frontier Kling model with native audio and extended durations"
 msgstr "Neuestes Kling-Spitzenmodell mit nativem Audio und längerer Dauer"
 
-#: src/lib/model-descriptions.ts:121
+#: src/lib/model-descriptions.ts:126
 msgid "Latest frontier model from Runway with native text-to-video"
 msgstr "Neuestes Spitzenmodell von Runway mit nativem Text-zu-Video"
 
@@ -15138,7 +15161,7 @@ msgstr "Neueste Spitzen-Videoqualität von Kling"
 msgid "Latest general-purpose capabilities from DeepSeek"
 msgstr "Neueste Allzweck-Fähigkeiten von DeepSeek"
 
-#: src/lib/model-descriptions.ts:122
+#: src/lib/model-descriptions.ts:127
 msgid "Latest general-purpose model from DeepSeek"
 msgstr "Neuestes Allzweckmodell von DeepSeek"
 
@@ -15154,11 +15177,11 @@ msgstr "Neueste Generation von Alibaba"
 msgid "Latest generation from Runway"
 msgstr "Neueste Generation von Runway"
 
-#: src/lib/model-descriptions.ts:123
+#: src/lib/model-descriptions.ts:128
 msgid "Latest generation model from Alibaba"
 msgstr "Modell der neuesten Generation von Alibaba"
 
-#: src/lib/model-descriptions.ts:124
+#: src/lib/model-descriptions.ts:129
 msgid "Latest GPT-5 series model from OpenAI"
 msgstr "Neuestes Modell der GPT-5-Serie von OpenAI"
 
@@ -15166,19 +15189,19 @@ msgstr "Neuestes Modell der GPT-5-Serie von OpenAI"
 msgid "Latest in the GPT-5 family with continued improvements"
 msgstr "Das Neueste der GPT-5-Familie mit fortlaufenden Verbesserungen"
 
-#: src/lib/model-descriptions.ts:125
+#: src/lib/model-descriptions.ts:130
 msgid "Latest Kling image-to-video model via direct API"
 msgstr "Neuestes Kling-Bild-zu-Video-Modell über die direkte API"
 
-#: src/lib/model-descriptions.ts:126
+#: src/lib/model-descriptions.ts:131
 msgid "Latest Kling text-to-video model via direct API"
 msgstr "Neuestes Kling-Text-zu-Video-Modell über die direkte API"
 
-#: src/lib/model-descriptions.ts:127
+#: src/lib/model-descriptions.ts:132
 msgid "Latest medium quality model from Alibaba"
 msgstr "Neuestes Modell mittlerer Qualität von Alibaba"
 
-#: src/lib/model-descriptions.ts:128
+#: src/lib/model-descriptions.ts:133
 msgid "Latest medium quality model from ByteDance with audio generation and end frame support"
 msgstr "Neuestes Modell mittlerer Qualität von ByteDance mit Audiogenerierung und Endframe-Unterstützung"
 
@@ -15202,7 +15225,7 @@ msgstr "Neuestes Sonnet-Update mit besserer Befolgung von Anweisungen"
 msgid "Latest Sonnet with transparent reasoning for complex analytical tasks"
 msgstr "Neuestes Sonnet mit transparentem Reasoning für komplexe analytische Aufgaben"
 
-#: src/lib/model-descriptions.ts:129
+#: src/lib/model-descriptions.ts:134
 msgid "Latest updated Sonnet model from Anthropic"
 msgstr "Neuestes aktualisiertes Sonnet-Modell von Anthropic"
 
@@ -15341,7 +15364,7 @@ msgstr "Aufhellen"
 msgid "Lightning-fast inference at production scale"
 msgstr "Blitzschnelle Inferenz im Produktionsmaßstab"
 
-#: src/lib/model-descriptions.ts:130
+#: src/lib/model-descriptions.ts:135
 msgid "Lightricks LTX — fast open-source video model, low latency"
 msgstr "Lightricks LTX — schnelles Open-Source-Videomodell mit geringer Latenz"
 
@@ -15823,7 +15846,7 @@ msgstr "Generierung langer Texte in Bildern"
 msgid "Long video clips (up to 12 seconds) generated quickly at an affordable price point"
 msgstr "Lange Videoclips (bis zu 12 Sekunden), schnell und günstig generiert"
 
-#: src/lib/model-descriptions.ts:131
+#: src/lib/model-descriptions.ts:136
 msgid "Long-context model from Moonshot AI"
 msgstr "Modell mit langem Kontext von Moonshot AI"
 
@@ -15894,15 +15917,15 @@ msgstr "KI-Grundlage von Luma Labs"
 msgid "Luma's best-in-class video model"
 msgstr "Lumas erstklassiges Videomodell"
 
-#: src/lib/model-descriptions.ts:132
+#: src/lib/model-descriptions.ts:137
 msgid "Luma's Dream Machine image generation model"
 msgstr "Lumas Dream-Machine-Modell zur Bildgenerierung"
 
-#: src/lib/model-descriptions.ts:133
+#: src/lib/model-descriptions.ts:138
 msgid "Luma's fast image generation model"
 msgstr "Lumas schnelles Modell zur Bildgenerierung"
 
-#: src/lib/model-descriptions.ts:134
+#: src/lib/model-descriptions.ts:139
 msgid "Luma's second-generation video model — realistic visuals with natural, coherent motion"
 msgstr "Lumas Videomodell der zweiten Generation — realistische Bilder mit natürlicher, stimmiger Bewegung"
 
@@ -15954,7 +15977,7 @@ msgstr "Hauptschriftart aktualisiert"
 msgid "Maintain original structure"
 msgstr "Originalstruktur beibehalten"
 
-#: src/features/workflow/types/index.ts:434
+#: src/features/workflow/types/index.ts:435
 msgid "Maintain subject consistency across generations"
 msgstr "Motivkonsistenz über Generierungen hinweg beibehalten"
 
@@ -16187,7 +16210,7 @@ msgstr "Masken-URL (optional)"
 msgid "massive"
 msgstr "riesig"
 
-#: src/lib/model-descriptions.ts:135
+#: src/lib/model-descriptions.ts:140
 msgid "Massive 235B MoE model from Alibaba"
 msgstr "Riesiges 235B-MoE-Modell von Alibaba"
 
@@ -16334,23 +16357,23 @@ msgstr "mittlere Qualität"
 msgid "Medium quality at manageable cost"
 msgstr "Mittlere Qualität zu überschaubaren Kosten"
 
-#: src/lib/model-descriptions.ts:136
+#: src/lib/model-descriptions.ts:141
 msgid "Medium quality model by Black Forest"
 msgstr "Modell mittlerer Qualität von Black Forest"
 
-#: src/lib/model-descriptions.ts:137
+#: src/lib/model-descriptions.ts:142
 msgid "Medium quality model for photorealism"
 msgstr "Modell mittlerer Qualität für Fotorealismus"
 
-#: src/lib/model-descriptions.ts:138
+#: src/lib/model-descriptions.ts:143
 msgid "Medium quality model for rendering text"
 msgstr "Modell mittlerer Qualität für Textdarstellung"
 
-#: src/lib/model-descriptions.ts:139
+#: src/lib/model-descriptions.ts:144
 msgid "Medium quality model with a focus on cinematic visuals"
 msgstr "Modell mittlerer Qualität mit Fokus auf cineastischer Optik"
 
-#: src/lib/model-descriptions.ts:140
+#: src/lib/model-descriptions.ts:145
 msgid "Medium quality model with reasoning and web search"
 msgstr "Modell mittlerer Qualität mit Reasoning und Websuche"
 
@@ -16541,7 +16564,7 @@ msgstr "Messenger-Schlüssel gespeichert"
 msgid "Meta's latest open-source model with multimodal vision"
 msgstr "Metas neuestes Open-Source-Modell mit multimodaler Bildverarbeitung"
 
-#: src/lib/model-descriptions.ts:141
+#: src/lib/model-descriptions.ts:146
 msgid "Meta's MusicGen text-to-music — medium / large / melody variants via passthrough."
 msgstr "Metas MusicGen Text-zu-Musik — Varianten medium / large / melody per Passthrough."
 
@@ -16585,7 +16608,7 @@ msgstr "Minimale Kosten für einfache Klassifizierung und Extraktion"
 msgid "Minimal cost for simple tasks"
 msgstr "Minimale Kosten für einfache Aufgaben"
 
-#: src/lib/model-descriptions.ts:142
+#: src/lib/model-descriptions.ts:147
 msgid "MiniMax Hailuo 02 frontier tier — dynamic motion, high fidelity"
 msgstr "MiniMax Hailuo 02 Spitzenstufe — dynamische Bewegung, hohe Wiedergabetreue"
 
@@ -16597,23 +16620,23 @@ msgstr "MiniMax Hailuo 02, Pro-Stufe"
 msgid "MiniMax Hailuo 02 standard tier"
 msgstr "MiniMax Hailuo 02, Standardstufe"
 
-#: src/lib/model-descriptions.ts:143
+#: src/lib/model-descriptions.ts:148
 msgid "MiniMax Hailuo 02 standard tier — balanced quality and speed"
 msgstr "MiniMax Hailuo 02 Standardstufe — ausgewogene Qualität und Geschwindigkeit"
 
-#: src/lib/model-descriptions.ts:144
+#: src/lib/model-descriptions.ts:149
 msgid "MiniMax Hailuo 2.3 frontier tier — dynamic motion, latest generation"
 msgstr "MiniMax Hailuo 2.3 Spitzenstufe — dynamische Bewegung, neueste Generation"
 
-#: src/lib/model-descriptions.ts:145
+#: src/lib/model-descriptions.ts:150
 msgid "MiniMax Hailuo 2.3 standard tier — strong motion, balanced cost"
 msgstr "MiniMax Hailuo 2.3 Standardstufe — starke Bewegung, ausgewogene Kosten"
 
-#: src/lib/model-descriptions.ts:146
+#: src/lib/model-descriptions.ts:151
 msgid "MiniMax video generation model via Replicate"
 msgstr "MiniMax-Videogenerierungsmodell über Replicate"
 
-#: src/lib/model-descriptions.ts:147
+#: src/lib/model-descriptions.ts:152
 msgid "MiniMax Video-01 Live — high-quality model optimized for animating people"
 msgstr "MiniMax Video-01 Live — hochwertiges Modell, optimiert für die Animation von Personen"
 
@@ -16621,7 +16644,7 @@ msgstr "MiniMax Video-01 Live — hochwertiges Modell, optimiert für die Animat
 msgid "MiniMax's advanced production model"
 msgstr "Das fortschrittliche Produktionsmodell von MiniMax"
 
-#: src/lib/model-descriptions.ts:148
+#: src/lib/model-descriptions.ts:153
 msgid "MiniMax's advanced reasoning LLM"
 msgstr "MiniMax' fortschrittliches Reasoning-LLM"
 
@@ -16629,7 +16652,7 @@ msgstr "MiniMax' fortschrittliches Reasoning-LLM"
 msgid "MiniMax's advanced reasoning model"
 msgstr "Das fortschrittliche Reasoning-Modell von MiniMax"
 
-#: src/lib/model-descriptions.ts:149
+#: src/lib/model-descriptions.ts:154
 msgid "MiniMax's fast advanced reasoning LLM"
 msgstr "MiniMax' schnelles, fortschrittliches Reasoning-LLM"
 
@@ -16638,7 +16661,7 @@ msgid "MiniMax's fastest model with reasoning capability"
 msgstr "Das schnellste Modell von MiniMax mit Reasoning-Fähigkeit"
 
 #: src/features/marketing/data/models-data.ts:1278
-#: src/lib/model-descriptions.ts:150
+#: src/lib/model-descriptions.ts:155
 msgid "MiniMax's most capable reasoning LLM"
 msgstr "Das leistungsfähigste Reasoning-LLM von MiniMax"
 
@@ -16676,7 +16699,7 @@ msgid "Mistral's balanced medium model"
 msgstr "Mistrals ausgewogenes mittleres Modell"
 
 #: src/features/marketing/data/models-data.ts:1338
-#: src/lib/model-descriptions.ts:151
+#: src/lib/model-descriptions.ts:156
 msgid "Mistral's coding-focused LLM"
 msgstr "Mistrals auf Programmierung fokussiertes LLM"
 
@@ -16688,27 +16711,27 @@ msgstr "Mistrals erstes dediziertes Reasoning-Modell"
 msgid "Mistral's largest Ministral model at 14B"
 msgstr "Mistrals größtes Ministral-Modell mit 14B"
 
-#: src/lib/model-descriptions.ts:152
+#: src/lib/model-descriptions.ts:157
 msgid "Mistral's latest and greatest large multi-modal LLM"
 msgstr "Mistrals neuestes und bestes großes multimodales LLM"
 
-#: src/lib/model-descriptions.ts:153
+#: src/lib/model-descriptions.ts:158
 msgid "Mistral's medium multi-modal LLM"
 msgstr "Mistrals mittleres multimodales LLM"
 
-#: src/lib/model-descriptions.ts:154
+#: src/lib/model-descriptions.ts:159
 msgid "Mistral's medium reasoning LLM"
 msgstr "Mistrals mittleres Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:155
+#: src/lib/model-descriptions.ts:160
 msgid "Mistral's mini-model 14B multi-modal LLM"
 msgstr "Mistrals 14B-Mini-Modell, multimodales LLM"
 
-#: src/lib/model-descriptions.ts:156
+#: src/lib/model-descriptions.ts:161
 msgid "Mistral's mini-model 3B multi-modal LLM"
 msgstr "Mistrals 3B-Mini-Modell, multimodales LLM"
 
-#: src/lib/model-descriptions.ts:157
+#: src/lib/model-descriptions.ts:162
 msgid "Mistral's mini-model 8B multi-modal LLM"
 msgstr "Mistrals 8B-Mini-Modell, multimodales LLM"
 
@@ -16716,11 +16739,11 @@ msgstr "Mistrals 8B-Mini-Modell, multimodales LLM"
 msgid "Mistral's most capable model with 675B total parameters"
 msgstr "Mistrals leistungsfähigstes Modell mit insgesamt 675B Parametern"
 
-#: src/lib/model-descriptions.ts:158
+#: src/lib/model-descriptions.ts:163
 msgid "Mistral's small coding-focused LLM"
 msgstr "Mistrals kleines, auf Programmierung fokussiertes LLM"
 
-#: src/lib/model-descriptions.ts:159
+#: src/lib/model-descriptions.ts:164
 msgid "Mistral's small reasoning LLM"
 msgstr "Mistrals kleines Reasoning-LLM"
 
@@ -16956,7 +16979,7 @@ msgstr "Monatlich"
 msgid "Monthly cost (microdollars)"
 msgstr "Monatliche Kosten (Mikrodollar)"
 
-#: src/lib/model-descriptions.ts:160
+#: src/lib/model-descriptions.ts:165
 msgid "Moonshot AI's advanced base LLM"
 msgstr "Moonshot AIs fortschrittliches Basis-LLM"
 
@@ -16968,7 +16991,7 @@ msgstr "Das effiziente Basismodell von Moonshot AI"
 msgid "Moonshot AI's flagship conversation model"
 msgstr "Das Flaggschiff-Konversationsmodell von Moonshot AI"
 
-#: src/lib/model-descriptions.ts:161
+#: src/lib/model-descriptions.ts:166
 msgid "MoonShot AI's latest multi-modal LLM with thinking"
 msgstr "Moonshot AIs neuestes multimodales LLM mit Thinking"
 
@@ -16976,7 +16999,7 @@ msgstr "Moonshot AIs neuestes multimodales LLM mit Thinking"
 msgid "Moonshot AI's latest vision-enabled flagship"
 msgstr "Das neueste Flaggschiff von Moonshot AI mit Bildverständnis"
 
-#: src/lib/model-descriptions.ts:162
+#: src/lib/model-descriptions.ts:167
 msgid "MoonShot AI's latest vision-enabled LLM"
 msgstr "Moonshot AIs neuestes LLM mit Vision"
 
@@ -17043,7 +17066,7 @@ msgstr "Wie viel der Testfall höchstens kosten darf, in US-Dollar"
 msgid "Most Used"
 msgstr "Am häufigsten verwendet"
 
-#: src/lib/model-descriptions.ts:163
+#: src/lib/model-descriptions.ts:168
 msgid "Most versatile intelligent model"
 msgstr "Vielseitigstes intelligentes Modell"
 
@@ -17196,7 +17219,7 @@ msgstr "multimodal"
 msgid "Multimodal analysis for images and documents"
 msgstr "Multimodale Analyse von Bildern und Dokumenten"
 
-#: src/lib/model-descriptions.ts:164
+#: src/lib/model-descriptions.ts:169
 msgid "Multimodal open-source model from Meta"
 msgstr "Multimodales Open-Source-Modell von Meta"
 
@@ -17618,11 +17641,11 @@ msgstr "Neues Ziel"
 msgid "New group chat"
 msgstr "Neuer Gruppenchat"
 
-#: src/lib/model-descriptions.ts:165
+#: src/lib/model-descriptions.ts:170
 msgid "New high quality model for photorealism and text rendering"
 msgstr "Neues hochwertiges Modell für Fotorealismus und Textdarstellung"
 
-#: src/lib/model-descriptions.ts:166
+#: src/lib/model-descriptions.ts:171
 msgid "New model excelling at anime"
 msgstr "Neues Modell, das bei Anime glänzt"
 
@@ -17766,7 +17789,7 @@ msgstr "Next-Gen"
 msgid "Next-gen creative AI"
 msgstr "Kreative KI der nächsten Generation"
 
-#: src/lib/model-descriptions.ts:167
+#: src/lib/model-descriptions.ts:172
 msgid "Next-gen fast model preview from Google"
 msgstr "Vorschau auf Googles schnelles Modell der nächsten Generation"
 
@@ -17778,7 +17801,7 @@ msgstr "Schnelles Reasoning der nächsten Generation auf Googles neuester Flash-
 msgid "Next-gen Flux architecture at budget cost"
 msgstr "Flux-Architektur der nächsten Generation zum Sparpreis"
 
-#: src/lib/model-descriptions.ts:168
+#: src/lib/model-descriptions.ts:173
 msgid "Next-gen frontier model preview from Google"
 msgstr "Vorschau auf Googles Spitzenmodell der nächsten Generation"
 
@@ -17786,7 +17809,7 @@ msgstr "Vorschau auf Googles Spitzenmodell der nächsten Generation"
 msgid "Next-gen image generation"
 msgstr "Bildgenerierung der nächsten Generation"
 
-#: src/lib/model-descriptions.ts:169
+#: src/lib/model-descriptions.ts:174
 msgid "Next-gen model with improved dynamics and enhanced style adaptation"
 msgstr "Modell der nächsten Generation mit verbesserter Dynamik und besserer Stilanpassung"
 
@@ -18627,8 +18650,8 @@ msgstr "Anzahl der Bilder"
 msgid "Number of messages"
 msgstr "Anzahl der Nachrichten"
 
-#: src/features/workflow/types/index.ts:551
-#: src/features/workflow/types/index.ts:555
+#: src/features/workflow/types/index.ts:552
+#: src/features/workflow/types/index.ts:556
 msgid "Object Editor"
 msgstr "Objekt-Editor"
 
@@ -18676,7 +18699,7 @@ msgstr "Offset: 0x{hoveredOffsetHex} ({hoveredByte}) = 0x{hoveredValueHex} ({hov
 msgid "Oil Painting"
 msgstr "Ölgemälde"
 
-#: src/lib/model-descriptions.ts:170
+#: src/lib/model-descriptions.ts:175
 msgid "Old generation cinematic model with higher consistency"
 msgstr "Cineastisches Modell der älteren Generation mit höherer Konsistenz"
 
@@ -19107,7 +19130,7 @@ msgstr "Open-Source-Zugang zu modernster KI von Alibaba"
 msgid "Open-source AI deployments requiring capable, unrestricted access to Meta's Llama 3.3"
 msgstr "Open-Source-KI-Deployments, die leistungsfähigen, uneingeschränkten Zugang zu Metas Llama 3.3 erfordern"
 
-#: src/lib/model-descriptions.ts:171
+#: src/lib/model-descriptions.ts:176
 msgid "Open-source audio-video model with native sound, 4K output, and lip sync from Lightricks"
 msgstr "Open-Source-Audio-Video-Modell von Lightricks mit nativem Ton, 4K-Ausgabe und Lippensynchronisation"
 
@@ -19119,7 +19142,7 @@ msgstr "Open-Source-Deployments, die OpenAIs größeres, leistungsfähigeres OSS
 msgid "Open-source from Lightricks"
 msgstr "Open Source von Lightricks"
 
-#: src/lib/model-descriptions.ts:172
+#: src/lib/model-descriptions.ts:177
 msgid "Open-source frontier reasoning model from DeepSeek"
 msgstr "Open-Source-Spitzenmodell für Reasoning von DeepSeek"
 
@@ -19127,7 +19150,7 @@ msgstr "Open-Source-Spitzenmodell für Reasoning von DeepSeek"
 msgid "Open-source frontier-level reasoning model"
 msgstr "Open-Source-Reasoning-Modell auf Spitzenniveau"
 
-#: src/lib/model-descriptions.ts:173
+#: src/lib/model-descriptions.ts:178
 msgid "Open-source model competitive with top closed image models"
 msgstr "Open-Source-Modell, das mit den besten geschlossenen Bildmodellen mithält"
 
@@ -19191,15 +19214,15 @@ msgstr "Videokohärenz in OpenAI-Qualität"
 msgid "OpenAI's advanced 120B open-source model"
 msgstr "OpenAIs fortschrittliches 120B-Open-Source-Modell"
 
-#: src/lib/model-descriptions.ts:174
+#: src/lib/model-descriptions.ts:179
 msgid "OpenAI's advanced coding LLM"
 msgstr "OpenAIs fortschrittliches Coding-LLM"
 
-#: src/lib/model-descriptions.ts:175
+#: src/lib/model-descriptions.ts:180
 msgid "OpenAI's advanced instruction-following LLM"
 msgstr "OpenAIs fortschrittliches LLM für Anweisungsbefolgung"
 
-#: src/lib/model-descriptions.ts:176
+#: src/lib/model-descriptions.ts:181
 msgid "OpenAI's advanced open-source LLM"
 msgstr "OpenAIs fortschrittliches Open-Source-LLM"
 
@@ -19207,11 +19230,11 @@ msgstr "OpenAIs fortschrittliches Open-Source-LLM"
 msgid "OpenAI's advanced reasoning architecture"
 msgstr "OpenAIs fortschrittliche Reasoning-Architektur"
 
-#: src/lib/model-descriptions.ts:177
+#: src/lib/model-descriptions.ts:182
 msgid "OpenAI's advanced reasoning LLM"
 msgstr "OpenAIs fortschrittliches Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:178
+#: src/lib/model-descriptions.ts:183
 msgid "OpenAI's compact coding LLM"
 msgstr "OpenAIs kompaktes Coding-LLM"
 
@@ -19219,20 +19242,24 @@ msgstr "OpenAIs kompaktes Coding-LLM"
 msgid "OpenAI's efficient mini reasoning model"
 msgstr "OpenAIs effizientes Mini-Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:179
+#: src/lib/model-descriptions.ts:184
 msgid "OpenAI's flagship frontier model"
 msgstr "OpenAIs Flaggschiff-Spitzenmodell"
 
-#: src/lib/model-descriptions.ts:180
+#: src/lib/model-descriptions.ts:37
+msgid "OpenAI's GPT Image 2 text-to-image model"
+msgstr "Text-zu-Bild-Modell GPT Image 2 von OpenAI"
+
+#: src/lib/model-descriptions.ts:185
 msgid "OpenAI's latest advanced coding LLM"
 msgstr "OpenAIs neuestes fortschrittliches Coding-LLM"
 
-#: src/lib/model-descriptions.ts:181
+#: src/lib/model-descriptions.ts:186
 msgid "OpenAI's latest and greatest reasoning LLM"
 msgstr "OpenAIs neuestes und bestes Reasoning-LLM"
 
 #: src/features/marketing/data/models-data.ts:1050
-#: src/lib/model-descriptions.ts:182
+#: src/lib/model-descriptions.ts:187
 msgid "OpenAI's latest flagship reasoning LLM"
 msgstr "OpenAIs neuestes Flaggschiff-Reasoning-LLM"
 
@@ -19240,7 +19267,7 @@ msgstr "OpenAIs neuestes Flaggschiff-Reasoning-LLM"
 msgid "OpenAI's latest model with thinking transparency"
 msgstr "OpenAIs neuestes Modell mit transparentem Denkprozess"
 
-#: src/lib/model-descriptions.ts:183
+#: src/lib/model-descriptions.ts:188
 msgid "OpenAI's most advanced flagship video generation model"
 msgstr "OpenAIs fortschrittlichstes Flaggschiff-Modell zur Videogenerierung"
 
@@ -19252,7 +19279,7 @@ msgstr "OpenAIs fortschrittlichstes Spitzenmodell"
 msgid "OpenAI's most advanced video model"
 msgstr "OpenAIs fortschrittlichstes Videomodell"
 
-#: src/lib/model-descriptions.ts:184
+#: src/lib/model-descriptions.ts:189
 msgid "OpenAI's most capable coding LLM"
 msgstr "OpenAIs leistungsstärkstes Coding-LLM"
 
@@ -19264,15 +19291,15 @@ msgstr "OpenAIs leistungsfähigstes Coding-Modell"
 msgid "OpenAI's most capable model in the 5.2 family"
 msgstr "OpenAIs leistungsfähigstes Modell der 5.2-Familie"
 
-#: src/lib/model-descriptions.ts:185
+#: src/lib/model-descriptions.ts:190
 msgid "OpenAI's most capable premium model"
 msgstr "OpenAIs leistungsstärkstes Premium-Modell"
 
-#: src/lib/model-descriptions.ts:186
+#: src/lib/model-descriptions.ts:191
 msgid "OpenAI's new powerful video model. Rich world knowledge with very stable structure"
 msgstr "OpenAIs neues leistungsstarkes Videomodell. Umfangreiches Weltwissen mit sehr stabiler Struktur"
 
-#: src/lib/model-descriptions.ts:187
+#: src/lib/model-descriptions.ts:192
 msgid "OpenAI's newest coding LLM"
 msgstr "OpenAIs neuestes Coding-LLM"
 
@@ -19284,23 +19311,23 @@ msgstr "OpenAIs neuestes Coding-Modell"
 msgid "OpenAI's open-source 20B model"
 msgstr "OpenAIs Open-Source-Modell mit 20B"
 
-#: src/lib/model-descriptions.ts:188
+#: src/lib/model-descriptions.ts:193
 msgid "OpenAI's recent and smart reasoning LLM"
 msgstr "OpenAIs aktuelles, intelligentes Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:189
+#: src/lib/model-descriptions.ts:194
 msgid "OpenAI's recent mini reasoning LLM"
 msgstr "OpenAIs aktuelles Mini-Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:190
+#: src/lib/model-descriptions.ts:195
 msgid "OpenAI's small LLM"
 msgstr "OpenAIs kleines LLM"
 
-#: src/lib/model-descriptions.ts:191
+#: src/lib/model-descriptions.ts:196
 msgid "OpenAI's small open-source LLM"
 msgstr "OpenAIs kleines Open-Source-LLM"
 
-#: src/lib/model-descriptions.ts:192
+#: src/lib/model-descriptions.ts:197
 msgid "OpenAI's smallest LLM"
 msgstr "OpenAIs kleinstes LLM"
 
@@ -19552,7 +19579,7 @@ msgstr "Threads organisieren"
 msgid "Original"
 msgstr "Original"
 
-#: src/lib/model-descriptions.ts:193
+#: src/lib/model-descriptions.ts:198
 msgid "Original ChatGPT image model"
 msgstr "Ursprüngliches ChatGPT-Bildmodell"
 
@@ -19599,8 +19626,8 @@ msgid "Outcome of every case per model"
 msgstr ""
 
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
-#: src/features/workflow/types/index.ts:566
-#: src/features/workflow/types/index.ts:570
+#: src/features/workflow/types/index.ts:567
+#: src/features/workflow/types/index.ts:571
 msgid "Outpaint"
 msgstr "Outpainting"
 
@@ -19608,8 +19635,8 @@ msgstr "Outpainting"
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
-#: src/features/workflow/types/index.ts:576
-#: src/features/workflow/types/index.ts:580
+#: src/features/workflow/types/index.ts:577
+#: src/features/workflow/types/index.ts:581
 msgid "Output"
 msgstr "Ausgabe"
 
@@ -19771,8 +19798,8 @@ msgstr "Paraguay"
 msgid "Parallel"
 msgstr "Parallel"
 
-#: src/features/workflow/types/index.ts:590
-#: src/features/workflow/types/index.ts:594
+#: src/features/workflow/types/index.ts:591
+#: src/features/workflow/types/index.ts:595
 msgid "Parallel Compare"
 msgstr "Paralleler Vergleich"
 
@@ -20162,13 +20189,17 @@ msgstr "Farbe wählen"
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "Wähle bis zu {maxReferences} Bilder. In der Reihenfolge, in der du sie auswählst, sieht sie auch das Modell."
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:110
+#: src/features/workflow/components/nodes/video-frames-section.tsx:105
 msgid "Picked at (s)"
 msgstr "Gewählt bei (s)"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:79
-msgid "Picked frame"
-msgstr "Gewähltes Bild"
+#~ msgid "Picked frame"
+#~ msgstr "Gewähltes Bild"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:91
+msgid "Picked frame wire (remove it)"
+msgstr "Verbindung des gewählten Bilds (entfernen)"
 
 #: src/features/local-models/components/ollama-model-manager.tsx:230
 msgid "Picker up to date"
@@ -20182,7 +20213,7 @@ msgstr "Pika Labs"
 msgid "Pika Labs 2.2 — narrative-focused generation"
 msgstr "Pika Labs 2.2 – erzählorientierte Generierung"
 
-#: src/lib/model-descriptions.ts:194
+#: src/lib/model-descriptions.ts:199
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — erzählorientiertes Videomodell mit starkem Storytelling und Bewegungssteuerung"
 
@@ -20469,11 +20500,11 @@ msgstr "leistungsstark"
 msgid "Powerful 8B model with vision capabilities"
 msgstr "Leistungsstarkes 8B-Modell mit Bildverständnis"
 
-#: src/lib/model-descriptions.ts:195
+#: src/lib/model-descriptions.ts:200
 msgid "Powerful general-purpose model from Z.AI"
 msgstr "Leistungsstarkes Allzweckmodell von Z.AI"
 
-#: src/lib/model-descriptions.ts:196
+#: src/lib/model-descriptions.ts:201
 msgid "Powerful multimodal model from MiniMax"
 msgstr "Leistungsstarkes multimodales Modell von MiniMax"
 
@@ -20719,7 +20750,7 @@ msgstr "Vorheriger Branch"
 msgid "Previous export was cancelled"
 msgstr "Vorheriger Export wurde abgebrochen"
 
-#: src/lib/model-descriptions.ts:197
+#: src/lib/model-descriptions.ts:202
 msgid "Previous generation high-quality model for complex scenes"
 msgstr "Hochwertiges Modell der vorherigen Generation für komplexe Szenen"
 
@@ -20842,7 +20873,7 @@ msgstr "Jede Nachricht unabhängig verarbeiten, nur mit dem System-Prompt und de
 msgid "Process text through an AI language model"
 msgstr "Text mit einem KI-Sprachmodell verarbeiten"
 
-#: src/features/workflow/types/index.ts:377
+#: src/features/workflow/types/index.ts:378
 msgid "Process with AI model"
 msgstr "Mit KI-Modell verarbeiten"
 
@@ -21356,27 +21387,27 @@ msgstr "Schnelle, günstige Videogenerierung mit Alibabas Wan-Modell in einer sc
 msgid "Quote Card"
 msgstr "Zitatkarte"
 
-#: src/lib/model-descriptions.ts:198
+#: src/lib/model-descriptions.ts:203
 msgid "Qwen's advanced instruct LLM"
 msgstr "Qwens fortschrittliches Instruct-LLM"
 
-#: src/lib/model-descriptions.ts:199
+#: src/lib/model-descriptions.ts:204
 msgid "Qwen's advanced instruct LLM preview"
 msgstr "Vorschau auf Qwens fortschrittliches Instruct-LLM"
 
-#: src/lib/model-descriptions.ts:200
+#: src/lib/model-descriptions.ts:205
 msgid "Qwen's advanced thinking LLM"
 msgstr "Qwens fortschrittliches Thinking-LLM"
 
-#: src/lib/model-descriptions.ts:201
+#: src/lib/model-descriptions.ts:206
 msgid "Qwen's advanced vision LLM"
 msgstr "Qwens fortschrittliches Vision-LLM"
 
-#: src/lib/model-descriptions.ts:202
+#: src/lib/model-descriptions.ts:207
 msgid "Qwen's advanced vision LLM with thinking"
 msgstr "Qwens fortschrittliches Vision-LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:203
+#: src/lib/model-descriptions.ts:208
 msgid "Qwen's most advanced instruct LLM"
 msgstr "Qwens fortschrittlichstes Instruct-LLM"
 
@@ -21384,7 +21415,7 @@ msgstr "Qwens fortschrittlichstes Instruct-LLM"
 msgid "Qwen's most advanced reasoning capability"
 msgstr "Qwens fortschrittlichste Reasoning-Fähigkeit"
 
-#: src/lib/model-descriptions.ts:204
+#: src/lib/model-descriptions.ts:209
 msgid "Qwen's most advanced reasoning LLM"
 msgstr "Qwens fortschrittlichstes Reasoning-LLM"
 
@@ -21412,6 +21443,10 @@ msgstr "Zufällig"
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:187
 msgid "Random seed"
 msgstr "Zufalls-Seed"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:167
+msgid "Range to keep"
+msgstr "Zu behaltender Bereich"
 
 #: src/features/settings/components/account/account-settings.tsx:537
 msgid "Range: 1 hour to 7 days (168 hours)"
@@ -21644,11 +21679,11 @@ msgstr "Reasoning-Aufgaben, die Alibabas 80B-MoE-Modell mit Denkfähigkeit erfor
 msgid "Reasoning toggle for flexible task handling"
 msgstr "Umschaltbares Reasoning für flexible Aufgabenbearbeitung"
 
-#: src/lib/model-descriptions.ts:205
+#: src/lib/model-descriptions.ts:210
 msgid "Reasoning version of Kimi K2 from Moonshot AI"
 msgstr "Reasoning-Version von Kimi K2 von Moonshot AI"
 
-#: src/lib/model-descriptions.ts:206
+#: src/lib/model-descriptions.ts:211
 msgid "Reasoning version of Qwen3 235B from Alibaba"
 msgstr "Reasoning-Version von Qwen3 235B von Alibaba"
 
@@ -21729,11 +21764,11 @@ msgstr "Konto wiederherstellen"
 msgid "Recover Account"
 msgstr "Konto wiederherstellen"
 
-#: src/lib/model-descriptions.ts:207
+#: src/lib/model-descriptions.ts:212
 msgid "Recraft V4 Pro — true visual taste for brand systems and production-ready workflows"
 msgstr "Recraft V4 Pro — echtes visuelles Gespür für Markensysteme und produktionsreife Workflows"
 
-#: src/lib/model-descriptions.ts:208
+#: src/lib/model-descriptions.ts:213
 msgid "Recraft's text-to-image model with long text generation, vector art, and brand-style images"
 msgstr "Recrafts Text-zu-Bild-Modell mit langer Textgenerierung, Vektorgrafiken und Bildern im Markenstil"
 
@@ -21819,6 +21854,11 @@ msgstr "Referenzstärke"
 msgid "reference video"
 msgstr "Referenzvideo"
 
+#. placeholder {0}: String(REFERENCE_VIDEO_MIN_SECONDS)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:210
+msgid "Reference videos together must be at least {0} seconds."
+msgstr "Referenzvideos müssen zusammen mindestens {0} Sekunden lang sein."
+
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:312
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
 #: src/features/skills/components/skill-builder-dialog.tsx:279
@@ -21844,7 +21884,7 @@ msgstr "verfeinert"
 msgid "Refined capabilities over Claude Sonnet 4"
 msgstr "Verfeinerte Fähigkeiten gegenüber Claude Sonnet 4"
 
-#: src/lib/model-descriptions.ts:209
+#: src/lib/model-descriptions.ts:214
 msgid "Refined flagship model from Anthropic"
 msgstr "Verfeinertes Flaggschiff-Modell von Anthropic"
 
@@ -21852,7 +21892,7 @@ msgstr "Verfeinertes Flaggschiff-Modell von Anthropic"
 msgid "Refined frontier capabilities over Claude Opus 4"
 msgstr "Verfeinerte Spitzenfähigkeiten gegenüber Claude Opus 4"
 
-#: src/lib/model-descriptions.ts:210
+#: src/lib/model-descriptions.ts:215
 msgid "Refined GPT-5 update from OpenAI"
 msgstr "Verfeinertes GPT-5-Update von OpenAI"
 
@@ -22092,11 +22132,11 @@ msgstr "Alle entfernen"
 msgid "Remove All Files"
 msgstr "Alle Dateien entfernen"
 
-#: src/features/workflow/types/index.ts:401
+#: src/features/workflow/types/index.ts:402
 msgid "Remove Background"
 msgstr "Hintergrund entfernen"
 
-#: src/features/workflow/types/index.ts:402
+#: src/features/workflow/types/index.ts:403
 msgid "Remove background and extract subject"
 msgstr "Hintergrund entfernen und Motiv freistellen"
 
@@ -22118,7 +22158,7 @@ msgid "Remove endpoint?"
 msgstr "Endpunkt entfernen?"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:85
+#: src/features/workflow/components/nodes/file-node.tsx:142
 msgid "Remove file"
 msgstr "Datei entfernen"
 
@@ -22169,7 +22209,7 @@ msgstr "Modell entfernen"
 msgid "Remove Object"
 msgstr "Objekt entfernen"
 
-#: src/features/workflow/types/index.ts:552
+#: src/features/workflow/types/index.ts:553
 msgid "Remove or add objects in an image"
 msgstr "Objekte in einem Bild entfernen oder hinzufügen"
 
@@ -22858,9 +22898,13 @@ msgstr "Fortschritt des Durchlaufs"
 msgid "Run Python, see charts and images instantly"
 msgstr "Python ausführen, Diagramme und Bilder sofort sehen"
 
+#: src/features/workflow/components/nodes/video-frames-section.tsx:124
+msgid "Run the node first to pick a frame"
+msgstr "Führe zuerst den Knoten aus, um ein Bild zu wählen"
+
 #: src/features/workflow/components/nodes/video-frames-section.tsx:125
-msgid "Run the node to capture its frames"
-msgstr "Führe den Knoten aus, um seine Bilder aufzunehmen"
+#~ msgid "Run the node to capture its frames"
+#~ msgstr "Führe den Knoten aus, um seine Bilder aufzunehmen"
 
 #: src/features/skills/components/skill-form-dialog.tsx:245
 msgid "Run the skill by typing /command in chat."
@@ -23707,7 +23751,7 @@ msgstr "Selektive Schärfeebene"
 msgid "semi-realistic"
 msgstr "halbrealistisch"
 
-#: src/lib/model-descriptions.ts:211
+#: src/lib/model-descriptions.ts:216
 msgid "Semi-realistic model with good prompt adherence"
 msgstr "Halbrealistisches Modell mit guter Prompt-Treue"
 
@@ -24508,11 +24552,11 @@ msgstr "Slowenisch"
 msgid "Slovenian (Slovenia)"
 msgstr "Slowenisch (Slowenien)"
 
-#: src/lib/model-descriptions.ts:212
+#: src/lib/model-descriptions.ts:217
 msgid "Slow cinematic model with realistic textures"
 msgstr "Langsames cineastisches Modell mit realistischen Texturen"
 
-#: src/lib/model-descriptions.ts:213
+#: src/lib/model-descriptions.ts:218
 msgid "Slow model with high control and 10s duration"
 msgstr "Langsames Modell mit viel Kontrolle und 10 s Dauer"
 
@@ -24656,7 +24700,7 @@ msgstr "Sortierung"
 msgid "SOTA cost-efficiency with 2M token context"
 msgstr "Kosteneffizienz auf dem neuesten Stand mit 2M-Token-Kontext"
 
-#: src/lib/model-descriptions.ts:214
+#: src/lib/model-descriptions.ts:219
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "SOTA mit Vektorgrafik und Typografie über Replicate"
 
@@ -24842,7 +24886,7 @@ msgstr "Spracherkennung wird von deinem Browser nicht unterstützt"
 msgid "Speech synthesis and transcription"
 msgstr "Sprachsynthese und Transkription"
 
-#: src/features/workflow/types/index.ts:625
+#: src/features/workflow/types/index.ts:626
 msgid "Speech to Text"
 msgstr "Sprache zu Text"
 
@@ -24854,6 +24898,10 @@ msgstr "Sprache-zu-Text"
 #: src/features/chat/thread/composer-research-depth.tsx:25
 msgid "Speed"
 msgstr "Geschwindigkeit"
+
+#: src/lib/model-descriptions.ts:39
+msgid "Speed tier of Nano Banana 2 for fast text-to-image generation"
+msgstr "Schnelle Stufe von Nano Banana 2 für rasche Text-zu-Bild-Generierung"
 
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:145
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:247
@@ -24905,7 +24953,7 @@ msgstr "SSO"
 msgid "SSO & team management"
 msgstr "SSO & Teamverwaltung"
 
-#: src/lib/model-descriptions.ts:215
+#: src/lib/model-descriptions.ts:220
 msgid "Stability AI's Stable Audio 2.5 — high-quality text-to-music, up to ~190s."
 msgstr "Stability AIs Stable Audio 2.5 — hochwertige Text-zu-Musik-Generierung, bis zu ca. 190 s."
 
@@ -24964,6 +25012,7 @@ msgid "Starred"
 msgstr "Markiert"
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:206
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:170
 msgid "Start"
 msgstr "Starten"
 
@@ -25029,7 +25078,7 @@ msgstr "Kostenlos chatten starten"
 msgid "Start editing cell"
 msgstr "Zelle bearbeiten"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:77
+#: src/features/workflow/components/nodes/video-frames-section.tsx:39
 msgid "Start frame"
 msgstr "Startbild"
 
@@ -25176,7 +25225,7 @@ msgstr "Schritt {0} von {totalSteps}: {title}"
 msgid "Step-by-step tutorials for getting the most out of Neore Chat"
 msgstr "Schritt-für-Schritt-Tutorials, um das Beste aus Neore Chat herauszuholen"
 
-#: src/lib/model-descriptions.ts:216
+#: src/lib/model-descriptions.ts:221
 msgid "StepFun's fast and efficient LLM"
 msgstr "StepFuns schnelles und effizientes LLM"
 
@@ -25350,7 +25399,7 @@ msgstr "Starke Ergebnisse in kommerzieller Qualität"
 msgid "Strong complex scene handling"
 msgstr "Souveräner Umgang mit komplexen Szenen"
 
-#: src/lib/model-descriptions.ts:217
+#: src/lib/model-descriptions.ts:222
 msgid "Strong general-purpose and coding model from DeepSeek"
 msgstr "Starkes Allzweck- und Coding-Modell von DeepSeek"
 
@@ -25584,8 +25633,8 @@ msgstr "Stilbild"
 msgid "Style Image URL"
 msgstr "Stilbild-URL"
 
-#: src/features/workflow/types/index.ts:605
-#: src/features/workflow/types/index.ts:609
+#: src/features/workflow/types/index.ts:606
+#: src/features/workflow/types/index.ts:610
 msgid "Style Reference"
 msgstr "Stilreferenz"
 
@@ -26286,8 +26335,8 @@ msgstr "Text"
 #: src/features/workflow/components/gallery/gallery-card.tsx:28
 #: src/features/workflow/components/nodes/output-node.tsx:16
 #: src/features/workflow/components/template-picker.tsx:21
-#: src/features/workflow/types/index.ts:615
-#: src/features/workflow/types/index.ts:619
+#: src/features/workflow/types/index.ts:616
+#: src/features/workflow/types/index.ts:620
 #: src/routes/(chat)/workflow/gallery.tsx:22
 msgid "Text"
 msgstr "Text"
@@ -26377,7 +26426,7 @@ msgstr "Text zu Bild"
 msgid "Text to Speak"
 msgstr "Text zu Sprache"
 
-#: src/features/workflow/types/index.ts:386
+#: src/features/workflow/types/index.ts:387
 msgid "Text to Speech"
 msgstr "Text zu Sprache"
 
@@ -26464,7 +26513,7 @@ msgstr "Das Archiv enthält zu viele Dateien."
 msgid "The assistant has a question"
 msgstr "Der Assistent hat eine Frage"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:68
+#: src/features/workflow/components/nodes/video-frames-section.tsx:66
 msgid "The browser cannot read this video to capture a frame"
 msgstr "Der Browser kann dieses Video nicht lesen, um ein Bild aufzunehmen"
 
@@ -26757,6 +26806,11 @@ msgstr "Das Token, das du in der Serverkonfiguration eingegeben hast"
 msgid "The trigger stops running and its execution history is removed. This cannot be undone."
 msgstr ""
 
+#. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:115
+msgid "The trimmed video is larger than {0} MB. Choose a shorter range."
+msgstr "Das gekürzte Video ist größer als {0} MB. Wähle einen kürzeren Bereich."
+
 #: src/features/marketing/components/gateway-footer.tsx:79
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Das einheitliche LLM-Gateway für moderne KI-Anwendungen."
@@ -26981,7 +27035,7 @@ msgstr "Dieser Endpunkt ist nicht Ollama. Die Modellverwaltung ist nur für Olla
 msgid "This file could not be read."
 msgstr "Diese Datei konnte nicht gelesen werden."
 
-#: src/features/workflow/components/nodes/file-node.tsx:48
+#: src/features/workflow/components/nodes/file-node.tsx:85
 msgid "This file could not be uploaded. Check its type and size, then try again."
 msgstr "Diese Datei konnte nicht hochgeladen werden. Prüfe Typ und Größe und versuche es erneut."
 
@@ -27179,6 +27233,19 @@ msgstr "Diese URL kann nicht hinzugefügt werden."
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:233
 msgid "This version was optimized from an older system prompt. Re-optimize before applying it."
 msgstr ""
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:162
+msgid "This video cannot be previewed in this browser, so it cannot be trimmed here."
+msgstr "Dieses Video kann in diesem Browser nicht angezeigt werden und lässt sich hier nicht kürzen."
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:116
+msgid "This video could not be trimmed in this browser. Upload it without trimming instead."
+msgstr "Dieses Video konnte in diesem Browser nicht gekürzt werden. Lade es stattdessen ohne Kürzen hoch."
+
+#. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:226
+msgid "This video is larger than {0} MB, so it must be trimmed."
+msgstr "Dieses Video ist größer als {0} MB und muss gekürzt werden."
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:46
 msgid "This Week"
@@ -27545,7 +27612,7 @@ msgstr "Coding-Leistung auf Spitzenniveau, die mit proprietären Modellen mithä
 msgid "Top-tier frontier performance with 4.6 generation improvements"
 msgstr "Spitzenleistung mit den Verbesserungen der Generation 4.6"
 
-#: src/lib/model-descriptions.ts:218
+#: src/lib/model-descriptions.ts:223
 msgid "Top-tier Kling text-to-video with unparalleled motion fluidity"
 msgstr "Erstklassiges Kling Text-zu-Video mit unübertroffen flüssiger Bewegung"
 
@@ -27618,7 +27685,7 @@ msgstr "Mit RL auf Reasoning-Verläufen trainiert"
 msgid "Transcribe an audio file, summarize the text with AI, then convert back to speech"
 msgstr "Eine Audiodatei transkribieren, den Text mit KI zusammenfassen und dann wieder in Sprache umwandeln"
 
-#: src/features/workflow/types/index.ts:629
+#: src/features/workflow/types/index.ts:630
 msgid "Transcription"
 msgstr "Transkription"
 
@@ -27636,7 +27703,7 @@ msgstr "Transformieren (Vorlage)"
 msgid "Transform an image with AI guidance"
 msgstr "Ein Bild mit KI-Unterstützung umwandeln"
 
-#: src/features/workflow/types/index.ts:528
+#: src/features/workflow/types/index.ts:529
 msgid "Transform images with AI guidance"
 msgstr "Bilder mit KI-Unterstützung umwandeln"
 
@@ -27769,6 +27836,28 @@ msgstr "Trigger"
 #: src/features/marketing/components/tutorials-page.tsx:91
 msgid "Triggers & Automation"
 msgstr "Trigger & Automatisierung"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:240
+msgid "Trim and upload"
+msgstr "Kürzen und hochladen"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:141
+msgid "Trim video"
+msgstr "Video kürzen"
+
+#. placeholder {0}: formatSeconds(length)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:207
+msgid "Trimmed length: {0} s"
+msgstr "Gekürzte Länge: {0} s"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:218
+msgid "Trimming progress"
+msgstr "Fortschritt des Kürzens"
+
+#. placeholder {0}: String(progress)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:216
+msgid "Trimming… {0}%"
+msgstr "Wird gekürzt … {0} %"
 
 #: src/features/workflow/components/nodes/branch-node.tsx:20
 msgid "True"
@@ -27986,7 +28075,7 @@ msgstr "ultraschnell"
 msgid "ultra quality"
 msgstr "Ultra-Qualität"
 
-#: src/lib/model-descriptions.ts:219
+#: src/lib/model-descriptions.ts:224
 msgid "Ultra-fast budget model from Google"
 msgstr "Ultraschnelles Budget-Modell von Google"
 
@@ -28002,7 +28091,7 @@ msgstr "Ultraschnelle Inferenz für Open-Source-Modelle wie Llama und Mixtral"
 msgid "Ultra-fast inference tasks requiring Inception's novel diffusion-based architecture"
 msgstr "Ultraschnelle Inferenzaufgaben, die Inceptions neuartige diffusionsbasierte Architektur erfordern"
 
-#: src/lib/model-descriptions.ts:220
+#: src/lib/model-descriptions.ts:225
 msgid "Ultra-fast lightweight GPT-5 model from OpenAI"
 msgstr "Ultraschnelles, leichtgewichtiges GPT-5-Modell von OpenAI"
 
@@ -28341,7 +28430,7 @@ msgstr "Aktualisiere die Galerie-Einstellungen deines Workflows oder ziehe die V
 msgid "updated"
 msgstr "aktualisiert"
 
-#: src/lib/model-descriptions.ts:221
+#: src/lib/model-descriptions.ts:226
 msgid "Updated balanced frontier model from Anthropic"
 msgstr "Aktualisiertes ausgewogenes Spitzenmodell von Anthropic"
 
@@ -28353,7 +28442,7 @@ msgstr "Aktualisierte Fähigkeiten gegenüber GLM 4.5"
 msgid "Updated Codex with improved code quality"
 msgstr "Aktualisiertes Codex mit verbesserter Codequalität"
 
-#: src/lib/model-descriptions.ts:222
+#: src/lib/model-descriptions.ts:227
 msgid "Updated general-purpose model from Z.AI"
 msgstr "Aktualisiertes Allzweckmodell von Z.AI"
 
@@ -28361,11 +28450,11 @@ msgstr "Aktualisiertes Allzweckmodell von Z.AI"
 msgid "Updated M2 architecture with improved capabilities"
 msgstr "Aktualisierte M2-Architektur mit verbesserten Fähigkeiten"
 
-#: src/lib/model-descriptions.ts:223
+#: src/lib/model-descriptions.ts:228
 msgid "Updated multimodal model from MiniMax"
 msgstr "Aktualisiertes multimodales Modell von MiniMax"
 
-#: src/lib/model-descriptions.ts:224
+#: src/lib/model-descriptions.ts:229
 msgid "Updated open-source reasoning model from DeepSeek"
 msgstr "Aktualisiertes Open-Source-Reasoning-Modell von DeepSeek"
 
@@ -28385,7 +28474,7 @@ msgstr "Folie aktualisiert"
 msgid "Updated slide {slideNumber}"
 msgstr "Folie {slideNumber} aktualisiert"
 
-#: src/lib/model-descriptions.ts:225
+#: src/lib/model-descriptions.ts:230
 msgid "Updated vision model from Z.AI"
 msgstr "Aktualisiertes Vision-Modell von Z.AI"
 
@@ -28493,6 +28582,10 @@ msgstr "Logo hochladen"
 msgid "Upload new file"
 msgstr "Neue Datei hochladen"
 
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
+msgid "Upload without trimming"
+msgstr "Ohne Kürzen hochladen"
+
 #: src/features/auth/components/organization/organization-logo-card.tsx:134
 #: src/features/auth/components/organization/organization-logo-card.tsx:193
 msgid "Upload your organization's logo"
@@ -28517,13 +28610,13 @@ msgstr "Daten für Import von {0} werden hochgeladen..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:101
+#: src/features/workflow/components/nodes/file-node.tsx:158
 msgid "Uploading..."
 msgstr "Wird hochgeladen..."
 
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:85
-#: src/features/workflow/types/index.ts:635
-#: src/features/workflow/types/index.ts:639
+#: src/features/workflow/types/index.ts:636
+#: src/features/workflow/types/index.ts:640
 msgid "Upscale"
 msgstr "Hochskalieren"
 
@@ -28942,11 +29035,11 @@ msgstr "Vektor-Embeddings für beliebigen Text"
 msgid "Venezuela"
 msgstr "Venezuela"
 
-#: src/lib/model-descriptions.ts:226
+#: src/lib/model-descriptions.ts:231
 msgid "Vercel's v0 1.0 model"
 msgstr "Vercels v0-1.0-Modell"
 
-#: src/lib/model-descriptions.ts:227
+#: src/lib/model-descriptions.ts:232
 msgid "Vercel's v0 1.5 model"
 msgstr "Vercels v0-1.5-Modell"
 
@@ -29110,7 +29203,7 @@ msgstr "Sehr tief, Landschaftstiefe"
 msgid "Very fast generation speed"
 msgstr "Sehr schnelle Generierung"
 
-#: src/lib/model-descriptions.ts:228
+#: src/lib/model-descriptions.ts:233
 msgid "Very intelligent model. Best for logos"
 msgstr "Sehr intelligentes Modell. Ideal für Logos"
 
@@ -29133,8 +29226,8 @@ msgstr "Video"
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
 #: src/features/workflow/components/gallery/publish-dialog.tsx:30
 #: src/features/workflow/components/template-picker.tsx:22
-#: src/features/workflow/types/index.ts:645
-#: src/features/workflow/types/index.ts:649
+#: src/features/workflow/types/index.ts:646
+#: src/features/workflow/types/index.ts:650
 #: src/routes/(chat)/workflow/gallery.tsx:23
 msgid "Video"
 msgstr "Video"
@@ -29142,6 +29235,12 @@ msgstr "Video"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:120
 msgid "Video attachment"
 msgstr "Videoanhang"
+
+#. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
+#. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
+#: src/features/workflow/components/nodes/file-node.tsx:65
+msgid "Video can be at most {0} MB and audio at most {1} MB."
+msgstr "Videos dürfen höchstens {0} MB und Audiodateien höchstens {1} MB groß sein."
 
 #: src/features/marketing/components/landing-page.tsx:287
 msgid "Video Creation"
@@ -29446,7 +29545,7 @@ msgstr "Bildaufgaben, die Z.AIs aktualisierte und verbesserte multimodale Fähig
 msgid "Vision understanding alongside strong text capabilities"
 msgstr "Bildverständnis neben starken Textfähigkeiten"
 
-#: src/lib/model-descriptions.ts:229
+#: src/lib/model-descriptions.ts:234
 msgid "Vision-capable model from Z.AI"
 msgstr "Vision-fähiges Modell von Z.AI"
 
@@ -30027,11 +30126,11 @@ msgstr "X-Position"
 msgid "xAI"
 msgstr "xAI"
 
-#: src/lib/model-descriptions.ts:230
+#: src/lib/model-descriptions.ts:235
 msgid "xAI's advanced coding LLM"
 msgstr "xAIs fortschrittliches Coding-LLM"
 
-#: src/lib/model-descriptions.ts:231
+#: src/lib/model-descriptions.ts:236
 msgid "xAI's Aurora-based image generation model"
 msgstr "xAIs Aurora-basiertes Modell zur Bildgenerierung"
 
@@ -30044,7 +30143,7 @@ msgid "xAI's capable balanced model with vision support"
 msgstr "xAIs leistungsfähiges, ausgewogenes Modell mit Bildverständnis"
 
 #: src/features/marketing/data/models-data.ts:873
-#: src/lib/model-descriptions.ts:232
+#: src/lib/model-descriptions.ts:237
 msgid "xAI's flagship frontier model with advanced reasoning"
 msgstr "xAIs Flaggschiff-Spitzenmodell mit fortschrittlichem Reasoning"
 
@@ -30052,15 +30151,19 @@ msgstr "xAIs Flaggschiff-Spitzenmodell mit fortschrittlichem Reasoning"
 msgid "xAI's foundation model capabilities"
 msgstr "Fähigkeiten des xAI-Basismodells"
 
-#: src/lib/model-descriptions.ts:233
+#: src/lib/model-descriptions.ts:238
 msgid "xAI's greatest and fastest multimodel LLM"
 msgstr "xAIs bestes und schnellstes multimodales LLM"
 
-#: src/lib/model-descriptions.ts:234
+#: src/lib/model-descriptions.ts:239
 msgid "xAI's greatest and fastest multimodel reasoning LLM"
 msgstr "xAIs bestes und schnellstes multimodales Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:235
+#: src/lib/model-descriptions.ts:41
+msgid "xAI's Grok Imagine 1.5 image-to-video model"
+msgstr "Bild-zu-Video-Modell Grok Imagine 1.5 von xAI"
+
+#: src/lib/model-descriptions.ts:240
 msgid "xAI's image generation model"
 msgstr "xAIs Modell zur Bildgenerierung"
 
@@ -30068,19 +30171,19 @@ msgstr "xAIs Modell zur Bildgenerierung"
 msgid "xAI's most compact reasoning model"
 msgstr "xAIs kompaktestes Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:236
+#: src/lib/model-descriptions.ts:241
 msgid "xAI's previous fastest multimodel LLM"
 msgstr "xAIs vorheriges schnellstes multimodales LLM"
 
-#: src/lib/model-descriptions.ts:237
+#: src/lib/model-descriptions.ts:242
 msgid "xAI's previous fastest multimodel reasoning LLM"
 msgstr "xAIs vorheriges schnellstes multimodales Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:238
+#: src/lib/model-descriptions.ts:243
 msgid "xAI's recent smallest LLM"
 msgstr "xAIs aktuelles kleinstes LLM"
 
-#: src/lib/model-descriptions.ts:239
+#: src/lib/model-descriptions.ts:244
 msgid "Xiaomi's fast Mimo V2 Flash model via OpenRouter (thinking disabled)"
 msgstr "Xiaomis schnelles Mimo-V2-Flash-Modell über OpenRouter (Thinking deaktiviert)"
 
@@ -30503,7 +30606,7 @@ msgstr "Z.AIs neuestes Allzweck-Modell"
 msgid "Z.AI's latest vision model with broader capability"
 msgstr "Z.AIs neuestes Bildverständnis-Modell mit breiteren Fähigkeiten"
 
-#: src/lib/model-descriptions.ts:240
+#: src/lib/model-descriptions.ts:245
 msgid "Z.AI's most capable frontier model"
 msgstr "Z.AIs leistungsstärkstes Spitzenmodell"
 
@@ -30520,19 +30623,19 @@ msgstr "Z.AIs Flaggschiff-Modell mit erweitertem Bildverständnis"
 msgid "Zero Data Retention (ZDR)"
 msgstr "Keine Datenspeicherung (ZDR)"
 
-#: src/lib/model-descriptions.ts:241
+#: src/lib/model-descriptions.ts:246
 msgid "Zhipu AI's fast vision reasoning LLM"
 msgstr "Zhipu AIs schnelles Vision-Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:242
+#: src/lib/model-descriptions.ts:247
 msgid "Zhipu AI's latest fast vision reasoning LLM"
 msgstr "Zhipu AIs neuestes schnelles Vision-Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:243
+#: src/lib/model-descriptions.ts:248
 msgid "Zhipu AI's most powerful LLM"
 msgstr "Zhipu AIs leistungsstärkstes LLM"
 
-#: src/lib/model-descriptions.ts:244
+#: src/lib/model-descriptions.ts:249
 msgid "Zhipu AI's most powerful reasoning LLM"
 msgstr "Zhipu AIs leistungsstärkstes Reasoning-LLM"
 

@@ -10419,6 +10419,12 @@
       "name": "file.finalizeChatUpload"
     },
     {
+      "detail": "action",
+      "id": "function:file:finalizeReferenceMedia",
+      "kind": "function",
+      "name": "file.finalizeReferenceMedia"
+    },
+    {
       "detail": "query",
       "id": "function:file:getChatFileExtraction",
       "kind": "function",
@@ -13814,6 +13820,13 @@
       "id": "function:workflow_generate:generateWorkflowFromPrompt",
       "kind": "function",
       "name": "workflow.generate.generateWorkflowFromPrompt",
+      "module": "workflow"
+    },
+    {
+      "detail": "action",
+      "id": "function:workflow_media_ops:extractVideoFrame",
+      "kind": "function",
+      "name": "workflow.media_ops.extractVideoFrame",
       "module": "workflow"
     },
     {
@@ -17655,7 +17668,7 @@
     {
       "file": "lib/chat-upload",
       "kind": "schedule",
-      "line": 163,
+      "line": 195,
       "reason": "\"finalizeStagedUpload\" is not a registered function"
     },
     {
@@ -17767,6 +17780,18 @@
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
+      "file": "lib/reference-media-upload",
+      "kind": "call",
+      "line": 282,
+      "reason": "\"finalizeStagedReferenceMedia\" is not a registered function"
+    },
+    {
+      "file": "lib/reference-media-upload",
+      "kind": "call",
+      "line": 292,
+      "reason": "\"finalizeStagedReferenceMedia\" is not a registered function"
+    },
+    {
       "file": "lib/rls/scope",
       "kind": "read",
       "line": 371,
@@ -17847,13 +17872,13 @@
     {
       "file": "lib/upload-route",
       "kind": "call",
-      "line": 131,
+      "line": 217,
       "reason": "\"handleUploadRequest\" is not a registered function"
     },
     {
       "file": "lib/upload-route",
       "kind": "schedule",
-      "line": 141,
+      "line": 227,
       "reason": "\"handleUploadRequest\" is not a registered function"
     },
     {
@@ -18759,97 +18784,103 @@
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 590,
+      "line": 597,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 609,
+      "line": 616,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 642,
+      "line": 649,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 676,
+      "line": 683,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 712,
+      "line": 719,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 763,
+      "line": 770,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 811,
+      "line": 818,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 864,
+      "line": 871,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 909,
+      "line": 916,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 945,
+      "line": 952,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 982,
+      "line": 989,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1029,
+      "line": 1036,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1069,
+      "line": 1082,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1114,
+      "line": 1127,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1151,
+      "line": 1164,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 22,
+      "line": 27,
+      "reason": "\"videoInputArgs\" is not a registered function"
+    },
+    {
+      "file": "workflow/media-args",
+      "kind": "call",
+      "line": 45,
       "reason": "\"videoInputArgs\" is not a registered function"
     }
   ],

@@ -1391,6 +1391,11 @@ msgstr "Neore から共有されたページです。"
 msgid "A question is waiting for you"
 msgstr "回答待ちの質問があります"
 
+#. placeholder {0}: String(REFERENCE_VIDEO_MAX_SECONDS)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:214
+msgid "A reference video can be at most {0} seconds."
+msgstr "参照動画の長さは最大 {0} 秒です。"
+
 #: src/features/evals/components/case-fields.tsx:30
 msgid "A regular expression the answer must match"
 msgstr "回答が一致すべき正規表現"
@@ -1775,7 +1780,7 @@ msgstr "行を追加"
 msgid "Add node"
 msgstr "ノードを追加"
 
-#: src/features/workflow/types/index.ts:454
+#: src/features/workflow/types/index.ts:455
 msgid "Add notes and annotations to the canvas"
 msgstr "キャンバスにメモや注釈を追加"
 
@@ -1791,6 +1796,10 @@ msgstr "ページを追加"
 #: src/features/auth/components/settings/passkey/passkeys-card.tsx:87
 msgid "Add Passkey"
 msgstr "パスキーを追加"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:119
+msgid "Add picked frame as image node"
+msgstr "選択したフレームを画像ノードとして追加"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:390
 #: src/features/settings/components/chat/native-providers-settings.tsx:461
@@ -2005,8 +2014,8 @@ msgstr "高度なカメラワーク制御"
 msgid "Advanced coding tasks requiring OpenAI's refined Codex capabilities"
 msgstr "OpenAI の洗練された Codex 機能を必要とする高度なコーディングタスク"
 
-#: src/features/workflow/types/index.ts:366
-#: src/features/workflow/types/index.ts:370
+#: src/features/workflow/types/index.ts:367
+#: src/features/workflow/types/index.ts:371
 msgid "Advanced Controls"
 msgstr "高度なコントロール"
 
@@ -2229,7 +2238,7 @@ msgid "Aggregate scores of both runs"
 msgstr "両方の実行の集計スコア"
 
 #: src/features/chat/pins/pin-item.tsx:228
-#: src/features/workflow/types/index.ts:376
+#: src/features/workflow/types/index.ts:377
 msgid "AI"
 msgstr "AI"
 
@@ -2263,7 +2272,7 @@ msgstr "AI 画像生成"
 msgid "AI Memory System"
 msgstr "AI メモリシステム"
 
-#: src/features/workflow/types/index.ts:380
+#: src/features/workflow/types/index.ts:381
 msgid "AI Model"
 msgstr "AI モデル"
 
@@ -2742,7 +2751,7 @@ msgstr "アナリティクス"
 msgid "Angle"
 msgstr "角度"
 
-#: src/features/workflow/types/index.ts:518
+#: src/features/workflow/types/index.ts:519
 msgid "Animate static images with AI"
 msgstr "AI で静止画像をアニメーション化"
 
@@ -2990,7 +2999,7 @@ msgstr "ベストプラクティス、パターン、分野固有のガイドラ
 msgid "Apply changes"
 msgstr "変更を適用"
 
-#: src/features/workflow/types/index.ts:606
+#: src/features/workflow/types/index.ts:607
 msgid "Apply consistent artistic style across generations"
 msgstr "生成全体で一貫した芸術的スタイルを適用"
 
@@ -3314,7 +3323,7 @@ msgstr "オークランド"
 msgid "Audio"
 msgstr "音声"
 
-#: src/features/workflow/types/index.ts:390
+#: src/features/workflow/types/index.ts:391
 msgid "Audio (TTS)"
 msgstr "音声（TTS）"
 
@@ -3566,7 +3575,7 @@ msgstr "ワークフローに戻る"
 msgid "Background Color (optional)"
 msgstr "背景色（任意）"
 
-#: src/features/workflow/types/index.ts:405
+#: src/features/workflow/types/index.ts:406
 msgid "Background Removal"
 msgstr "背景除去"
 
@@ -3605,15 +3614,15 @@ msgstr "バランス型"
 msgid "Balanced"
 msgstr "バランス"
 
-#: src/lib/model-descriptions.ts:37
+#: src/lib/model-descriptions.ts:42
 msgid "Balanced 32B model from Alibaba"
 msgstr "Alibaba のバランス型 32B モデル"
 
-#: src/lib/model-descriptions.ts:38
+#: src/lib/model-descriptions.ts:43
 msgid "Balanced frontier model from Anthropic"
 msgstr "Anthropic のバランス型フロンティアモデル"
 
-#: src/lib/model-descriptions.ts:39
+#: src/lib/model-descriptions.ts:44
 msgid "Balanced GPT-5 family model from OpenAI"
 msgstr "OpenAI のバランス型 GPT-5 ファミリーモデル"
 
@@ -3824,31 +3833,31 @@ msgstr "プロンプトへの忠実度が向上"
 msgid "Better speed-to-quality ratio than the full GPT-5"
 msgstr "フル版の GPT-5 よりも優れた速度と品質の比率"
 
-#: src/lib/model-descriptions.ts:40
+#: src/lib/model-descriptions.ts:45
 msgid "BFL's frontier model for image editing"
 msgstr "画像編集向けの BFL のフロンティアモデル"
 
-#: src/lib/model-descriptions.ts:41
+#: src/lib/model-descriptions.ts:46
 msgid "BFL's highest quality FLUX model via direct API"
 msgstr "直接 API 経由の BFL 最高品質の FLUX モデル"
 
-#: src/lib/model-descriptions.ts:42
+#: src/lib/model-descriptions.ts:47
 msgid "BFL's highest quality model via Replicate"
 msgstr "Replicate 経由の BFL 最高品質モデル"
 
-#: src/lib/model-descriptions.ts:43
+#: src/lib/model-descriptions.ts:48
 msgid "BFL's highest quality text-to-image model — up to 2K resolution with improved photorealism"
 msgstr "BFL 最高品質のテキストから画像生成モデル — 最大 2K 解像度、フォトリアリズムが向上"
 
-#: src/lib/model-descriptions.ts:44
+#: src/lib/model-descriptions.ts:49
 msgid "BFL's latest generation model via Replicate"
 msgstr "Replicate 経由の BFL 最新世代モデル"
 
-#: src/lib/model-descriptions.ts:45
+#: src/lib/model-descriptions.ts:50
 msgid "BFL's maximum quality FLUX Kontext model"
 msgstr "BFL 最高品質の FLUX Kontext モデル"
 
-#: src/lib/model-descriptions.ts:46
+#: src/lib/model-descriptions.ts:51
 msgid "BFL's professional FLUX model via direct API"
 msgstr "直接 API 経由の BFL プロフェッショナル FLUX モデル"
 
@@ -4010,8 +4019,8 @@ msgstr "ブレインストーミング"
 #: src/features/chat/core/hooks/use-thread-manager.ts:134
 #: src/features/chat/core/hooks/use-thread-manager.ts:147
 #: src/features/tasks/components/task-form-dialog.tsx:281
-#: src/features/workflow/types/index.ts:417
-#: src/features/workflow/types/index.ts:421
+#: src/features/workflow/types/index.ts:418
+#: src/features/workflow/types/index.ts:422
 msgid "Branch"
 msgstr "ブランチ"
 
@@ -4284,7 +4293,7 @@ msgstr "ByteDance"
 msgid "ByteDance medium-pro quality tier"
 msgstr "ByteDance のミディアムプロ品質ティア"
 
-#: src/lib/model-descriptions.ts:47
+#: src/lib/model-descriptions.ts:52
 msgid "ByteDance Seedance 2.0 — next-gen high-quality video with end-frame and reference support"
 msgstr "ByteDance Seedance 2.0 — 終了フレームと参照に対応した次世代の高品質動画"
 
@@ -4300,7 +4309,7 @@ msgstr "ByteDance の手頃な画像モデル"
 msgid "ByteDance's capable vision reasoning model"
 msgstr "ByteDance の高性能なビジョン推論モデル"
 
-#: src/lib/model-descriptions.ts:48
+#: src/lib/model-descriptions.ts:53
 msgid "ByteDance's compact and efficient reasoning model"
 msgstr "ByteDance のコンパクトで効率的な推論モデル"
 
@@ -4308,7 +4317,7 @@ msgstr "ByteDance のコンパクトで効率的な推論モデル"
 msgid "ByteDance's compact reasoning model"
 msgstr "ByteDance のコンパクトな推論モデル"
 
-#: src/lib/model-descriptions.ts:49
+#: src/lib/model-descriptions.ts:54
 msgid "ByteDance's fast vision reasoning model"
 msgstr "ByteDance の高速ビジョン推論モデル"
 
@@ -4324,13 +4333,17 @@ msgstr "ByteDance の高品質な Seedance ティア"
 msgid "ByteDance's latest and most capable reasoning model"
 msgstr "ByteDance の最新かつ最も高性能な推論モデル"
 
-#: src/lib/model-descriptions.ts:50
+#: src/lib/model-descriptions.ts:55
 msgid "ByteDance's latest reasoning model"
 msgstr "ByteDance の最新推論モデル"
 
-#: src/lib/model-descriptions.ts:51
+#: src/lib/model-descriptions.ts:56
 msgid "ByteDance's recent reasoning model"
 msgstr "ByteDance の比較的新しい推論モデル"
+
+#: src/lib/model-descriptions.ts:38
+msgid "ByteDance's Seedream 5.0 Pro text-to-image model, up to 2K output"
+msgstr "ByteDance のテキストから画像を生成するモデル Seedream 5.0 Pro（最大 2K 出力）"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:105
 msgid "BZIP2 compressed"
@@ -4476,6 +4489,7 @@ msgstr "カナダ"
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:501
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:232
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
 #: src/routes/auth/extension.tsx:145
 msgid "Cancel"
@@ -4564,11 +4578,11 @@ msgstr "機能"
 msgid "capable"
 msgstr "高性能"
 
-#: src/lib/model-descriptions.ts:52
+#: src/lib/model-descriptions.ts:57
 msgid "Capable balanced model from xAI with vision support"
 msgstr "ビジョン対応の xAI の高性能バランス型モデル"
 
-#: src/lib/model-descriptions.ts:53
+#: src/lib/model-descriptions.ts:58
 msgid "Capable open-source model from Meta"
 msgstr "Meta の高性能オープンソースモデル"
 
@@ -4585,22 +4599,22 @@ msgid "Caption text"
 msgstr "キャプションテキスト"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:102
-msgid "Capture"
-msgstr "キャプチャ"
+#~ msgid "Capture"
+#~ msgstr "キャプチャ"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:95
-msgid "Capture {label}"
-msgstr "{label} をキャプチャ"
+#~ msgid "Capture {label}"
+#~ msgstr "{label} をキャプチャ"
 
 #: src/features/chat/thread/composer-input-area.tsx:192
 msgid "Capture screen"
 msgstr "画面をキャプチャ"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:92
-msgid "captured"
-msgstr "キャプチャ済み"
+#~ msgid "captured"
+#~ msgstr "キャプチャ済み"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:102
+#: src/features/workflow/components/nodes/video-frames-section.tsx:119
 msgid "Capturing…"
 msgstr "キャプチャ中…"
 
@@ -4624,7 +4638,7 @@ msgstr "{0} のケース"
 msgid "Cases with no reported cost used {0} of {1} budgeted tokens."
 msgstr "コストが報告されないケースで、予算 {1} トークン中 {0} トークンを使用しました。"
 
-#: src/lib/model-descriptions.ts:54
+#: src/lib/model-descriptions.ts:59
 msgid "Cassette AI text-to-music — up to 3-minute clips at 44.1kHz stereo."
 msgstr "Cassette AI のテキストから音楽生成 — 44.1kHz ステレオで最大 3 分のクリップ。"
 
@@ -4752,8 +4766,8 @@ msgid "Character performance"
 msgstr "キャラクターの演技"
 
 #: src/features/workflow/templates/index.ts:288
-#: src/features/workflow/types/index.ts:433
-#: src/features/workflow/types/index.ts:437
+#: src/features/workflow/types/index.ts:434
+#: src/features/workflow/types/index.ts:438
 msgid "Character Reference"
 msgstr "キャラクター参照"
 
@@ -4835,7 +4849,7 @@ msgstr "このプロジェクトのチャットはこれらのコレクション
 msgid "Chats that use its models will stop working until you pick another model."
 msgstr "このプロバイダーのモデルを使うチャットは、別のモデルを選ぶまで動作しなくなります。"
 
-#: src/lib/model-descriptions.ts:55
+#: src/lib/model-descriptions.ts:60
 msgid "Cheapest medium-quality Hailuo 2.3 tier — best cost-to-quality ratio"
 msgstr "Hailuo 2.3 の最も安価な中品質ティア — 最高のコストパフォーマンス"
 
@@ -5010,11 +5024,11 @@ msgstr "シネマティックな AI 動画"
 msgid "Cinematic depth and visual flair"
 msgstr "映画のような奥行きと映像美"
 
-#: src/lib/model-descriptions.ts:56
+#: src/lib/model-descriptions.ts:61
 msgid "Cinematic image model with references"
 msgstr "参照画像に対応したシネマティックな画像モデル"
 
-#: src/lib/model-descriptions.ts:57
+#: src/lib/model-descriptions.ts:62
 msgid "Cinematic quality with improved motion"
 msgstr "動きが改善されたシネマティック品質"
 
@@ -5303,8 +5317,8 @@ msgstr "クラウドプロバイダーアカウント"
 #: src/features/canvas/canvas-panel.tsx:735
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/workflow/components/nodes/code-node.tsx:60
-#: src/features/workflow/types/index.ts:443
-#: src/features/workflow/types/index.ts:447
+#: src/features/workflow/types/index.ts:444
+#: src/features/workflow/types/index.ts:448
 msgid "Code"
 msgstr "コード"
 
@@ -5412,15 +5426,15 @@ msgstr "Alibaba の特化型 30B コーディングモデルを必要とする�
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "Mistral の開発特化型モデルを必要とするコーディングタスク"
 
-#: src/lib/model-descriptions.ts:58
+#: src/lib/model-descriptions.ts:63
 msgid "Coding-specialized model from Alibaba"
 msgstr "Alibaba のコーディング特化モデル"
 
-#: src/lib/model-descriptions.ts:59
+#: src/lib/model-descriptions.ts:64
 msgid "Cohere's advanced command LLM"
 msgstr "Cohere の高度なコマンド LLM"
 
-#: src/lib/model-descriptions.ts:60
+#: src/lib/model-descriptions.ts:65
 msgid "Cohere's advanced command LLM with thinking"
 msgstr "Cohere の思考機能付き高度なコマンド LLM"
 
@@ -5542,8 +5556,8 @@ msgstr "コマンド"
 #: src/features/pages/components/page-comments-panel.tsx:146
 #: src/features/pages/components/page-view.tsx:429
 #: src/features/workflow/components/nodes/comment-node.tsx:95
-#: src/features/workflow/types/index.ts:453
-#: src/features/workflow/types/index.ts:457
+#: src/features/workflow/types/index.ts:454
+#: src/features/workflow/types/index.ts:458
 msgid "Comment"
 msgstr "コメント"
 
@@ -5606,7 +5620,7 @@ msgstr "より高速なコード生成のためのコンパクトな Codex モ�
 msgid "Compact coding model from Mistral"
 msgstr "Mistral のコンパクトなコーディングモデル"
 
-#: src/lib/model-descriptions.ts:61
+#: src/lib/model-descriptions.ts:66
 msgid "Compact distilled reasoning model from DeepSeek"
 msgstr "DeepSeek のコンパクトな蒸留推論モデル"
 
@@ -5656,7 +5670,7 @@ msgstr "モデルを比較"
 msgid "Compare outputs from multiple image models side-by-side"
 msgstr "複数の画像モデルの出力を並べて比較"
 
-#: src/features/workflow/types/index.ts:591
+#: src/features/workflow/types/index.ts:592
 msgid "Compare outputs from multiple models side-by-side"
 msgstr "複数のモデルの出力を並べて比較"
 
@@ -5817,7 +5831,7 @@ msgstr "コンテキストを圧縮しています..."
 msgid "Condition (JavaScript expression)"
 msgstr "条件（JavaScript の式）"
 
-#: src/features/workflow/types/index.ts:418
+#: src/features/workflow/types/index.ts:419
 msgid "Conditional branching"
 msgstr "条件分岐"
 
@@ -6183,7 +6197,7 @@ msgstr "営業に問い合わせる"
 msgid "Contact support"
 msgstr "サポートに問い合わせる"
 
-#: src/features/workflow/types/index.ts:491
+#: src/features/workflow/types/index.ts:492
 msgid "Container for organizing workflow nodes"
 msgstr "ワークフローのノードを整理するためのコンテナー"
 
@@ -6339,8 +6353,8 @@ msgstr "リクエストを処理できる AI プロバイダーを管理しま�
 msgid "controlled"
 msgstr "制御性"
 
-#: src/features/workflow/types/index.ts:470
-#: src/features/workflow/types/index.ts:474
+#: src/features/workflow/types/index.ts:471
+#: src/features/workflow/types/index.ts:475
 msgid "ControlNet"
 msgstr "ControlNet"
 
@@ -6374,11 +6388,11 @@ msgstr "変換"
 msgid "Convert Account"
 msgstr "アカウントを変換"
 
-#: src/features/workflow/types/index.ts:626
+#: src/features/workflow/types/index.ts:627
 msgid "Convert speech to text"
 msgstr "音声をテキストに変換"
 
-#: src/features/workflow/types/index.ts:387
+#: src/features/workflow/types/index.ts:388
 msgid "Convert text to speech"
 msgstr "テキストを音声に変換"
 
@@ -7587,19 +7601,19 @@ msgstr "深い被写界深度、ドキュメンタリーの明瞭さ"
 msgid "Deeper, more context"
 msgstr "より深く、より多くの背景"
 
-#: src/lib/model-descriptions.ts:62
+#: src/lib/model-descriptions.ts:67
 msgid "DeepSeek V3.1 optimized for software engineering"
 msgstr "ソフトウェアエンジニアリング向けに最適化された DeepSeek V3.1"
 
-#: src/lib/model-descriptions.ts:63
+#: src/lib/model-descriptions.ts:68
 msgid "DeepSeek's advanced chat LLM with thinking"
 msgstr "DeepSeek の思考機能付き高度なチャット LLM"
 
-#: src/lib/model-descriptions.ts:64
+#: src/lib/model-descriptions.ts:69
 msgid "DeepSeek's experimental advanced chat LLM"
 msgstr "DeepSeek の実験的な高度チャット LLM"
 
-#: src/lib/model-descriptions.ts:65
+#: src/lib/model-descriptions.ts:70
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek の思考機能付き実験的な高度チャット LLM"
 
@@ -8474,7 +8488,7 @@ msgstr "閉じました — 回答なしで続行中"
 msgid "Display model names on results"
 msgstr "結果にモデル名を表示"
 
-#: src/features/workflow/types/index.ts:577
+#: src/features/workflow/types/index.ts:578
 msgid "Display results"
 msgstr "結果を表示"
 
@@ -8494,7 +8508,7 @@ msgstr "グループを解除してすべての子要素を解放"
 msgid "distilled"
 msgstr "蒸留"
 
-#: src/lib/model-descriptions.ts:66
+#: src/lib/model-descriptions.ts:71
 msgid "Distilled and open sourced version of Krea 1"
 msgstr "Krea 1 の蒸留・オープンソース版"
 
@@ -8734,11 +8748,11 @@ msgstr "マスクを描画"
 msgid "Drawing tools"
 msgstr "描画ツール"
 
-#: src/features/workflow/components/nodes/file-node.tsx:108
+#: src/features/workflow/components/nodes/file-node.tsx:165
 msgid "Drop file here"
 msgstr "ここにファイルをドロップ"
 
-#: src/features/workflow/components/nodes/file-node.tsx:108
+#: src/features/workflow/components/nodes/file-node.tsx:165
 msgid "Drop file or click to upload"
 msgstr "ファイルをドロップするか、クリックしてアップロード"
 
@@ -9086,7 +9100,7 @@ msgstr "スライド {slideNumber} を編集"
 msgid "Edit specific regions"
 msgstr "特定の領域を編集"
 
-#: src/features/workflow/types/index.ts:538
+#: src/features/workflow/types/index.ts:539
 msgid "Edit specific regions of an image"
 msgstr "画像の特定の領域を編集"
 
@@ -9473,6 +9487,7 @@ msgid "Encrypted at rest and never shown again. Local servers such as Ollama usu
 msgstr "保存時に暗号化され、再表示されることはありません。Ollama などのローカルサーバーでは通常不要です。"
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:215
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:188
 msgid "End"
 msgstr "終了"
 
@@ -9553,7 +9568,7 @@ msgstr "ディテールを強化"
 msgid "Enhance Faces"
 msgstr "顔を補正"
 
-#: src/features/workflow/types/index.ts:636
+#: src/features/workflow/types/index.ts:637
 msgid "Enhance image resolution"
 msgstr "画像の解像度を向上"
 
@@ -10134,7 +10149,7 @@ msgstr "実行"
 msgid "Execute cleanup"
 msgstr "クリーンアップを実行"
 
-#: src/features/workflow/types/index.ts:444
+#: src/features/workflow/types/index.ts:445
 msgid "Execute code"
 msgstr "コードを実行"
 
@@ -10207,7 +10222,7 @@ msgstr "グループを展開"
 msgid "Expand group to show children"
 msgstr "グループを展開して子要素を表示"
 
-#: src/features/workflow/types/index.ts:567
+#: src/features/workflow/types/index.ts:568
 msgid "Expand image canvas beyond original borders"
 msgstr "画像のキャンバスを元の境界を超えて拡張"
 
@@ -11339,19 +11354,19 @@ msgstr "高速"
 msgid "Fast and affordable AI"
 msgstr "高速で手頃な AI"
 
-#: src/lib/model-descriptions.ts:67
+#: src/lib/model-descriptions.ts:72
 msgid "Fast and cheap model. Up to 12 seconds"
 msgstr "高速で安価なモデル。最大 12 秒"
 
-#: src/lib/model-descriptions.ts:68
+#: src/lib/model-descriptions.ts:73
 msgid "Fast and cheap next-gen model"
 msgstr "高速で安価な次世代モデル"
 
-#: src/lib/model-descriptions.ts:69
+#: src/lib/model-descriptions.ts:74
 msgid "Fast and efficient model from Z.AI"
 msgstr "Z.AI の高速で効率的なモデル"
 
-#: src/lib/model-descriptions.ts:70
+#: src/lib/model-descriptions.ts:75
 msgid "Fast and efficient multimodal model from Google"
 msgstr "Google の高速で効率的なマルチモーダルモデル"
 
@@ -11415,7 +11430,7 @@ msgstr "ビジョンと PDF に対応した高速推論"
 msgid "Fast iteration cycle for creative exploration"
 msgstr "クリエイティブな探索のための高速な試行サイクル"
 
-#: src/lib/model-descriptions.ts:71
+#: src/lib/model-descriptions.ts:76
 msgid "Fast model. Best for LoRAs"
 msgstr "高速モデル。LoRA に最適"
 
@@ -11492,7 +11507,7 @@ msgstr "StepFun の最適化された Flash モデルを必要とする高速で
 msgid "Fast, general purpose"
 msgstr "高速、汎用"
 
-#: src/lib/model-descriptions.ts:72
+#: src/lib/model-descriptions.ts:77
 msgid "Fast, high-quality model from ByteDance"
 msgstr "ByteDance の高速・高品質モデル"
 
@@ -11500,7 +11515,7 @@ msgstr "ByteDance の高速・高品質モデル"
 msgid "Fast, high-quality video generation backed by xAI's foundation model technology"
 msgstr "xAI の基盤モデル技術に支えられた高速で高品質な動画生成"
 
-#: src/lib/model-descriptions.ts:73
+#: src/lib/model-descriptions.ts:78
 msgid "Fast, high-quality video generation by xAI"
 msgstr "xAI による高速・高品質な動画生成"
 
@@ -11508,7 +11523,7 @@ msgstr "xAI による高速・高品質な動画生成"
 msgid "Fast, high-quality video generation from ByteDance's professional-tier Seedance model"
 msgstr "ByteDance のプロ向け Seedance モデルによる高速で高品質な動画生成"
 
-#: src/lib/model-descriptions.ts:74
+#: src/lib/model-descriptions.ts:79
 msgid "Fast, inexpensive model with live previews"
 msgstr "ライブプレビュー付きの高速で安価なモデル"
 
@@ -11520,7 +11535,7 @@ msgstr "高速で低コストなモデル"
 msgid "Fast, low-cost models. 20 messages a day."
 msgstr "高速で低コストなモデル。1日20メッセージ。"
 
-#: src/lib/model-descriptions.ts:75
+#: src/lib/model-descriptions.ts:80
 msgid "Fast, lower-quality model from Alibaba"
 msgstr "Alibaba の高速・低品質モデル"
 
@@ -11536,7 +11551,7 @@ msgstr "フル版の GLM 4.5 より高速かつ軽量"
 msgid "Faster and more affordable than Veo 3"
 msgstr "Veo 3 より高速で手頃"
 
-#: src/lib/model-descriptions.ts:76
+#: src/lib/model-descriptions.ts:81
 msgid "Faster and more affordable version of Veo 3.1 with audio"
 msgstr "音声付きの Veo 3.1 の高速で手頃なバージョン"
 
@@ -11548,11 +11563,11 @@ msgstr "フル版の R1 モデルより高速な推論"
 msgid "Faster version of the top-ranked Veo 3.1"
 msgstr "トップランクの Veo 3.1 の高速版"
 
-#: src/lib/model-descriptions.ts:77
+#: src/lib/model-descriptions.ts:82
 msgid "Faster, cheaper Seedance 1.5 variant from ByteDance"
 msgstr "ByteDance の Seedance 1.5 の高速・低価格版"
 
-#: src/lib/model-descriptions.ts:78
+#: src/lib/model-descriptions.ts:83
 msgid "Faster, cheaper Seedance 2.0 variant — quick iterations at high quality"
 msgstr "Seedance 2.0 の高速・低価格版 — 高品質のまま素早く反復"
 
@@ -11560,7 +11575,7 @@ msgstr "Seedance 2.0 の高速・低価格版 — 高品質のまま素早く反
 msgid "Faster, cheaper variant of Seedance 2.0"
 msgstr "Seedance 2.0 の高速・低価格版"
 
-#: src/lib/model-descriptions.ts:79
+#: src/lib/model-descriptions.ts:84
 msgid "Faster, more affordable Veo 3 variant with optional audio"
 msgstr "オプションの音声付き、Veo 3 の高速で手頃なバリアント"
 
@@ -11580,15 +11595,15 @@ msgstr "利用可能な中で最速の画像生成"
 msgid "Fastest in the Wan model family"
 msgstr "Wan モデルファミリーで最速"
 
-#: src/lib/model-descriptions.ts:80
+#: src/lib/model-descriptions.ts:85
 msgid "Fastest low-quality model with video Lora support"
 msgstr "動画 LoRA に対応した最速の低品質モデル"
 
-#: src/lib/model-descriptions.ts:81
+#: src/lib/model-descriptions.ts:86
 msgid "Fastest model. Realistic, low diversity"
 msgstr "最速モデル。リアル、多様性は低め"
 
-#: src/lib/model-descriptions.ts:82
+#: src/lib/model-descriptions.ts:87
 msgid "Fastest, most affordable Claude model"
 msgstr "最速で最も手頃な Claude モデル"
 
@@ -11666,8 +11681,8 @@ msgstr "モデルを取得"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:26
 #: src/features/evals/components/import-cases-dialog.tsx:81
-#: src/features/workflow/types/index.ts:480
-#: src/features/workflow/types/index.ts:484
+#: src/features/workflow/types/index.ts:481
+#: src/features/workflow/types/index.ts:485
 msgid "File"
 msgstr "ファイル"
 
@@ -11679,7 +11694,7 @@ msgstr "ファイル「{fileName}」を削除しました"
 msgid "File access and AI-powered universal search across work apps"
 msgstr "仕事用アプリ全体のファイルアクセスと AI によるユニバーサル検索"
 
-#: src/features/workflow/types/index.ts:481
+#: src/features/workflow/types/index.ts:482
 msgid "File input"
 msgstr "ファイル入力"
 
@@ -11857,7 +11872,7 @@ msgstr "近くのおすすめイタリアンレストランを探す"
 msgid "Find tutorials on how to learn Python programming"
 msgstr "Python プログラミングを学ぶためのチュートリアルを探す"
 
-#: src/features/workflow/types/index.ts:367
+#: src/features/workflow/types/index.ts:368
 msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
 msgstr "CFG スケール、サンプラー、スケジューラー、シードを微調整"
 
@@ -11955,15 +11970,15 @@ msgstr "上下反転"
 msgid "fluid motion"
 msgstr "滑らかな動き"
 
-#: src/lib/model-descriptions.ts:83
+#: src/lib/model-descriptions.ts:88
 msgid "FLUX Kontext Max for highest quality editing via Fireworks"
 msgstr "Fireworks 経由の最高品質編集向け FLUX Kontext Max"
 
-#: src/lib/model-descriptions.ts:84
+#: src/lib/model-descriptions.ts:89
 msgid "FLUX Kontext Pro for image editing via Fireworks"
 msgstr "Fireworks 経由の画像編集向け FLUX Kontext Pro"
 
-#: src/lib/model-descriptions.ts:85
+#: src/lib/model-descriptions.ts:90
 msgid "FLUX.1 Dev model via Fireworks"
 msgstr "Fireworks 経由の FLUX.1 Dev モデル"
 
@@ -11971,7 +11986,7 @@ msgstr "Fireworks 経由の FLUX.1 Dev モデル"
 msgid "FLUX.2 architecture improvements"
 msgstr "FLUX.2 アーキテクチャの改良"
 
-#: src/lib/model-descriptions.ts:86
+#: src/lib/model-descriptions.ts:91
 msgid "FLUX.2 dev with enhanced realism and native editing"
 msgstr "リアリズムの強化とネイティブ編集に対応した FLUX.2 dev"
 
@@ -12117,11 +12132,11 @@ msgstr "Google をリードする Veo 3.x シリーズの基盤"
 msgid "FPS"
 msgstr "FPS"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:69
+#: src/features/workflow/components/nodes/video-frames-section.tsx:67
 msgid "Frame capture failed"
 msgstr "フレームのキャプチャに失敗しました"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:85
+#: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "Frames"
 msgstr "フレーム"
 
@@ -12270,35 +12285,35 @@ msgstr "フロンティアレベルの知性"
 msgid "Frontier intelligence for complex scenes"
 msgstr "複雑なシーンのためのフロンティアレベルの知性"
 
-#: src/lib/model-descriptions.ts:87
+#: src/lib/model-descriptions.ts:92
 msgid "Frontier model by Black Forest Labs"
 msgstr "Black Forest Labs のフロンティアモデル"
 
-#: src/lib/model-descriptions.ts:88
+#: src/lib/model-descriptions.ts:93
 msgid "Frontier model designed for image editing"
 msgstr "画像編集向けに設計されたフロンティアモデル"
 
-#: src/lib/model-descriptions.ts:89
+#: src/lib/model-descriptions.ts:94
 msgid "Frontier model designed for image editing, optimized for Krea"
 msgstr "画像編集向けに設計され、Krea 向けに最適化されたフロンティアモデル"
 
-#: src/lib/model-descriptions.ts:90
+#: src/lib/model-descriptions.ts:95
 msgid "Frontier model for complex image references"
 msgstr "複雑な参照画像に対応したフロンティアモデル"
 
-#: src/lib/model-descriptions.ts:91
+#: src/lib/model-descriptions.ts:96
 msgid "Frontier model from Kling with native audio"
 msgstr "ネイティブ音声付きの Kling のフロンティアモデル"
 
-#: src/lib/model-descriptions.ts:92
+#: src/lib/model-descriptions.ts:97
 msgid "Frontier model with 1080p resolution"
 msgstr "1080p 解像度のフロンティアモデル"
 
-#: src/lib/model-descriptions.ts:93
+#: src/lib/model-descriptions.ts:98
 msgid "Frontier model with exceptional long context from Google"
 msgstr "卓越したロングコンテキストを備えた Google のフロンティアモデル"
 
-#: src/lib/model-descriptions.ts:94
+#: src/lib/model-descriptions.ts:99
 msgid "Frontier model with extended thinking from Anthropic"
 msgstr "Anthropic の拡張思考付きフロンティアモデル"
 
@@ -12601,7 +12616,7 @@ msgstr "動画を生成"
 msgid "Generate Video"
 msgstr "動画を生成"
 
-#: src/features/workflow/types/index.ts:646
+#: src/features/workflow/types/index.ts:647
 msgid "Generate videos from text or images"
 msgstr "テキストや画像から動画を生成"
 
@@ -13021,7 +13036,7 @@ msgstr "Google のフラッグシップ"
 msgid "Google Gemini"
 msgstr "Google Gemini"
 
-#: src/lib/model-descriptions.ts:95
+#: src/lib/model-descriptions.ts:100
 msgid "Google Lyria 2 — 30s text-to-music clips at 48kHz with negative-prompt support."
 msgstr "Google Lyria 2 — ネガティブプロンプト対応、48kHz で 30 秒のテキストから音楽生成クリップ。"
 
@@ -13029,23 +13044,23 @@ msgstr "Google Lyria 2 — ネガティブプロンプト対応、48kHz で 30 �
 msgid "Google reliability at budget pricing"
 msgstr "低価格で Google の信頼性"
 
-#: src/lib/model-descriptions.ts:96
+#: src/lib/model-descriptions.ts:101
 msgid "Google Veo 2 — high-quality cinematic video generation"
 msgstr "Google Veo 2 — 高品質なシネマティック動画生成"
 
-#: src/lib/model-descriptions.ts:97
+#: src/lib/model-descriptions.ts:102
 msgid "Google Veo 3 — frontier video generation with native audio"
 msgstr "Google Veo 3 — ネイティブ音声付きのフロンティア動画生成"
 
-#: src/lib/model-descriptions.ts:98
+#: src/lib/model-descriptions.ts:103
 msgid "Google's advanced LLM with thinking"
 msgstr "Google の思考機能付き高度な LLM"
 
-#: src/lib/model-descriptions.ts:99
+#: src/lib/model-descriptions.ts:104
 msgid "Google's advanced small LLM with thinking"
 msgstr "Google の思考機能付き高度な小型 LLM"
 
-#: src/lib/model-descriptions.ts:100
+#: src/lib/model-descriptions.ts:105
 msgid "Google's current generation image model"
 msgstr "Google の現行世代の画像モデル"
 
@@ -13057,11 +13072,15 @@ msgstr "Google の現行世代の品質"
 msgid "Google's fastest image generation"
 msgstr "Google 最速の画像生成"
 
-#: src/lib/model-descriptions.ts:101
+#: src/lib/model-descriptions.ts:106
 msgid "Google's fastest image model"
 msgstr "Google の最速の画像モデル"
 
-#: src/lib/model-descriptions.ts:102
+#: src/lib/model-descriptions.ts:40
+msgid "Google's Gemini Omni Flash 1.1 reference-to-video, guided by images and short reference videos"
+msgstr "画像と短い参照動画で誘導する Google の Gemini Omni Flash 1.1 リファレンストゥビデオ"
+
+#: src/lib/model-descriptions.ts:107
 msgid "Google's highest quality image model"
 msgstr "Google の最高品質の画像モデル"
 
@@ -13069,11 +13088,11 @@ msgstr "Google の最高品質の画像モデル"
 msgid "Google's highest-quality image model"
 msgstr "Google で最高品質の画像モデル"
 
-#: src/lib/model-descriptions.ts:103
+#: src/lib/model-descriptions.ts:108
 msgid "Google's latest small SOTA LLM with thinking"
 msgstr "Google の思考機能付き最新の小型 SOTA LLM"
 
-#: src/lib/model-descriptions.ts:104
+#: src/lib/model-descriptions.ts:109
 msgid "Google's most advanced AI video model with native audio and reference images"
 msgstr "ネイティブ音声と参照画像に対応した Google の最先端 AI 動画モデル"
 
@@ -13081,7 +13100,7 @@ msgstr "ネイティブ音声と参照画像に対応した Google の最先端 
 msgid "Google's most advanced image generation model"
 msgstr "Google の最も高度な画像生成モデル"
 
-#: src/lib/model-descriptions.ts:105
+#: src/lib/model-descriptions.ts:110
 msgid "Google's new state-of-the-art fast image generation and editing model"
 msgstr "Google の新しい最先端の高速画像生成・編集モデル"
 
@@ -13093,7 +13112,7 @@ msgstr "Google の新しい最先端高速モデル"
 msgid "Google's newest flagship model with advanced reasoning"
 msgstr "高度な推論を備えた Google の最新フラッグシップモデル"
 
-#: src/lib/model-descriptions.ts:106
+#: src/lib/model-descriptions.ts:111
 msgid "Google's newest flagship with advanced reasoning"
 msgstr "高度な推論を備えた Google の最新フラッグシップ"
 
@@ -13105,7 +13124,7 @@ msgstr "推論を可視化した Google の次世代 Flash"
 msgid "Google's optimized performance-cost balance"
 msgstr "Google の最適化された性能とコストのバランス"
 
-#: src/lib/model-descriptions.ts:107
+#: src/lib/model-descriptions.ts:112
 msgid "Google's previous generation image model"
 msgstr "Google の旧世代の画像モデル"
 
@@ -13113,7 +13132,7 @@ msgstr "Google の旧世代の画像モデル"
 msgid "Google's proven photorealism quality"
 msgstr "Google の実績あるフォトリアリズム品質"
 
-#: src/lib/model-descriptions.ts:108
+#: src/lib/model-descriptions.ts:113
 msgid "Google's state-of-the-art image generation and editing model"
 msgstr "Google の最先端の画像生成・編集モデル"
 
@@ -13209,8 +13228,8 @@ msgstr "リアルタイムの Web アクセスに対応した xAI の Grok モ�
 #: src/features/workflow/components/nodes/group-node.tsx:299
 #: src/features/workflow/components/nodes/group-node.tsx:317
 #: src/features/workflow/hooks/use-workflow-shortcuts.ts:181
-#: src/features/workflow/types/index.ts:490
-#: src/features/workflow/types/index.ts:494
+#: src/features/workflow/types/index.ts:491
+#: src/features/workflow/types/index.ts:495
 msgid "Group"
 msgstr "グループ化"
 
@@ -13263,7 +13282,7 @@ msgstr "ゲストアカウントでは無料モデルのみ利用できます。
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "ゲストアカウントでは無料モデルのみ使用できます。サインアップするとすべてのモデルが利用できます。"
 
-#: src/features/workflow/types/index.ts:471
+#: src/features/workflow/types/index.ts:472
 msgid "Guide generation with pose, depth, or edge detection"
 msgstr "ポーズ、深度、エッジ検出で生成をガイド"
 
@@ -13489,15 +13508,15 @@ msgstr "Google の実績ある AI 機能によるフォトリアルな高品質�
 msgid "High-quality image synthesis"
 msgstr "高品質な画像合成"
 
-#: src/lib/model-descriptions.ts:109
+#: src/lib/model-descriptions.ts:114
 msgid "High-quality model with camera control"
 msgstr "カメラ制御に対応した高品質モデル"
 
-#: src/lib/model-descriptions.ts:110
+#: src/lib/model-descriptions.ts:115
 msgid "High-quality model with great aesthetics"
 msgstr "優れた美しさを持つ高品質モデル"
 
-#: src/lib/model-descriptions.ts:111
+#: src/lib/model-descriptions.ts:116
 msgid "High-quality model with reference images support"
 msgstr "参照画像に対応した高品質モデル"
 
@@ -13581,7 +13600,7 @@ msgstr "Black Forest Labs の最高品質の出力"
 msgid "Highly aesthetic visual output"
 msgstr "美しく洗練された映像出力"
 
-#: src/lib/model-descriptions.ts:112
+#: src/lib/model-descriptions.ts:117
 msgid "Highly aesthetic, general-purpose model"
 msgstr "美しさに優れた汎用モデル"
 
@@ -13802,8 +13821,8 @@ msgstr "イラスト"
 #: src/features/workflow/components/nodes/output-node.tsx:19
 #: src/features/workflow/components/template-picker.tsx:20
 #: src/features/workflow/templates/index.ts:363
-#: src/features/workflow/types/index.ts:500
-#: src/features/workflow/types/index.ts:504
+#: src/features/workflow/types/index.ts:501
+#: src/features/workflow/types/index.ts:505
 #: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Image"
 msgstr "画像"
@@ -13883,8 +13902,8 @@ msgid "Image to video"
 msgstr "画像から動画"
 
 #: src/features/workflow/components/nodes/video-node.tsx:125
-#: src/features/workflow/types/index.ts:517
-#: src/features/workflow/types/index.ts:521
+#: src/features/workflow/types/index.ts:518
+#: src/features/workflow/types/index.ts:522
 msgid "Image to Video"
 msgstr "画像から動画"
 
@@ -13913,8 +13932,8 @@ msgstr "画像のバリエーションと編集"
 msgid "Image whose artistic style will be applied"
 msgstr "芸術的スタイルを適用する元の画像"
 
-#: src/features/workflow/types/index.ts:527
-#: src/features/workflow/types/index.ts:531
+#: src/features/workflow/types/index.ts:528
+#: src/features/workflow/types/index.ts:532
 msgid "Image-to-Image"
 msgstr "画像から画像"
 
@@ -14109,11 +14128,11 @@ msgstr "複雑なタスクでのベンチマーク性能が向上"
 msgid "Improved detail over Imagen 3"
 msgstr "Imagen 3 よりディテールが向上"
 
-#: src/lib/model-descriptions.ts:113
+#: src/lib/model-descriptions.ts:118
 msgid "Improved fast multimodal model from Google"
 msgstr "Google の改良された高速マルチモーダルモデル"
 
-#: src/lib/model-descriptions.ts:114
+#: src/lib/model-descriptions.ts:119
 msgid "Improved general-purpose model from DeepSeek"
 msgstr "DeepSeek の改良された汎用モデル"
 
@@ -14207,7 +14226,7 @@ msgstr "非アクティブのしきい値"
 msgid "Inactivity threshold (days)"
 msgstr "非アクティブのしきい値（日）"
 
-#: src/lib/model-descriptions.ts:115
+#: src/lib/model-descriptions.ts:120
 msgid "Inception's diffusion-based language model"
 msgstr "Inception の拡散ベースの言語モデル"
 
@@ -14253,8 +14272,8 @@ msgstr "組織の設定を継承"
 
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
 #: src/features/workflow/templates/index.ts:379
-#: src/features/workflow/types/index.ts:537
-#: src/features/workflow/types/index.ts:541
+#: src/features/workflow/types/index.ts:538
+#: src/features/workflow/types/index.ts:542
 msgid "Inpaint"
 msgstr "インペイント"
 
@@ -14292,11 +14311,11 @@ msgstr "入力画像"
 msgid "Input is required"
 msgstr "入力は必須です"
 
-#: src/features/workflow/types/index.ts:501
+#: src/features/workflow/types/index.ts:502
 msgid "Input or generate images"
 msgstr "画像を入力または生成"
 
-#: src/features/workflow/types/index.ts:616
+#: src/features/workflow/types/index.ts:617
 msgid "Input or transform text"
 msgstr "テキストを入力または変換"
 
@@ -14399,7 +14418,7 @@ msgstr "インテリジェント"
 msgid "Intelligent scene composition"
 msgstr "インテリジェントなシーン構成"
 
-#: src/lib/model-descriptions.ts:116
+#: src/lib/model-descriptions.ts:121
 msgid "Intelligent video model that thinks before generating"
 msgstr "生成前に考えるインテリジェントな動画モデル"
 
@@ -14767,6 +14786,10 @@ msgstr "現在の行を保持"
 msgid "Keep files"
 msgstr "ファイルを残す"
 
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:143
+msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
+msgstr "動画の一部を残します。残した部分はこのブラウザーで MP4 に再エンコードされるため、少し時間がかかることがあります。"
+
 #: src/features/chat/header/temporary-chat-dropdown.tsx:292
 msgid "Keep Permanently"
 msgstr "永続的に保持"
@@ -14824,7 +14847,7 @@ msgstr "クメール語"
 msgid "Khmer (Cambodia)"
 msgstr "クメール語（カンボジア）"
 
-#: src/lib/model-descriptions.ts:117
+#: src/lib/model-descriptions.ts:122
 msgid "Kling 2.6 text-to-video with native audio via direct API"
 msgstr "直接 API 経由のネイティブ音声付き Kling 2.6 テキストから動画生成"
 
@@ -14903,7 +14926,7 @@ msgstr "Krea ならではの美しい画質"
 msgid "KV-backed rate limiting per user and tier. Configurable burst and sustained limits."
 msgstr "ユーザーとティアごとの KV ベースのレート制限。バーストと持続の上限を設定できます。"
 
-#: src/lib/model-descriptions.ts:118
+#: src/lib/model-descriptions.ts:123
 msgid "Kwaipilot's advanced coding LLM"
 msgstr "Kwaipilot の高度なコーディング LLM"
 
@@ -15030,7 +15053,7 @@ msgstr "最終確認 {0}"
 msgid "Last error"
 msgstr "最新のエラー"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:78
+#: src/features/workflow/components/nodes/video-frames-section.tsx:40
 msgid "Last frame"
 msgstr "最後のフレーム"
 
@@ -15110,7 +15133,7 @@ msgstr "機能が向上した最新の Codex 世代"
 msgid "Latest coding agent run"
 msgstr "最新のコーディングエージェントの実行"
 
-#: src/lib/model-descriptions.ts:119
+#: src/lib/model-descriptions.ts:124
 msgid "Latest flagship model from Anthropic"
 msgstr "Anthropic の最新フラッグシップモデル"
 
@@ -15122,11 +15145,11 @@ msgstr "最新フロンティア"
 msgid "Latest frontier generation from Hailuo"
 msgstr "Hailuo の最新フロンティア世代"
 
-#: src/lib/model-descriptions.ts:120
+#: src/lib/model-descriptions.ts:125
 msgid "Latest frontier Kling model with native audio and extended durations"
 msgstr "ネイティブ音声と長い尺に対応した最新のフロンティア Kling モデル"
 
-#: src/lib/model-descriptions.ts:121
+#: src/lib/model-descriptions.ts:126
 msgid "Latest frontier model from Runway with native text-to-video"
 msgstr "ネイティブのテキストから動画生成を備えた Runway の最新フロンティアモデル"
 
@@ -15138,7 +15161,7 @@ msgstr "Kling による最新フロンティア品質の動画"
 msgid "Latest general-purpose capabilities from DeepSeek"
 msgstr "DeepSeek の最新汎用機能"
 
-#: src/lib/model-descriptions.ts:122
+#: src/lib/model-descriptions.ts:127
 msgid "Latest general-purpose model from DeepSeek"
 msgstr "DeepSeek の最新汎用モデル"
 
@@ -15154,11 +15177,11 @@ msgstr "Alibaba の最新世代"
 msgid "Latest generation from Runway"
 msgstr "Runway の最新世代"
 
-#: src/lib/model-descriptions.ts:123
+#: src/lib/model-descriptions.ts:128
 msgid "Latest generation model from Alibaba"
 msgstr "Alibaba の最新世代モデル"
 
-#: src/lib/model-descriptions.ts:124
+#: src/lib/model-descriptions.ts:129
 msgid "Latest GPT-5 series model from OpenAI"
 msgstr "OpenAI の最新 GPT-5 シリーズモデル"
 
@@ -15166,19 +15189,19 @@ msgstr "OpenAI の最新 GPT-5 シリーズモデル"
 msgid "Latest in the GPT-5 family with continued improvements"
 msgstr "改良を続ける GPT-5 ファミリーの最新モデル"
 
-#: src/lib/model-descriptions.ts:125
+#: src/lib/model-descriptions.ts:130
 msgid "Latest Kling image-to-video model via direct API"
 msgstr "直接 API 経由の最新 Kling 画像から動画生成モデル"
 
-#: src/lib/model-descriptions.ts:126
+#: src/lib/model-descriptions.ts:131
 msgid "Latest Kling text-to-video model via direct API"
 msgstr "直接 API 経由の最新 Kling テキストから動画生成モデル"
 
-#: src/lib/model-descriptions.ts:127
+#: src/lib/model-descriptions.ts:132
 msgid "Latest medium quality model from Alibaba"
 msgstr "Alibaba の最新の中品質モデル"
 
-#: src/lib/model-descriptions.ts:128
+#: src/lib/model-descriptions.ts:133
 msgid "Latest medium quality model from ByteDance with audio generation and end frame support"
 msgstr "音声生成と終了フレームに対応した ByteDance の最新の中品質モデル"
 
@@ -15202,7 +15225,7 @@ msgstr "指示追従性が向上した最新の Sonnet アップデート"
 msgid "Latest Sonnet with transparent reasoning for complex analytical tasks"
 msgstr "複雑な分析タスク向けに透明な推論を備えた最新の Sonnet"
 
-#: src/lib/model-descriptions.ts:129
+#: src/lib/model-descriptions.ts:134
 msgid "Latest updated Sonnet model from Anthropic"
 msgstr "Anthropic の最新アップデート版 Sonnet モデル"
 
@@ -15341,7 +15364,7 @@ msgstr "明るくする"
 msgid "Lightning-fast inference at production scale"
 msgstr "本番規模での超高速推論"
 
-#: src/lib/model-descriptions.ts:130
+#: src/lib/model-descriptions.ts:135
 msgid "Lightricks LTX — fast open-source video model, low latency"
 msgstr "Lightricks LTX — 高速なオープンソース動画モデル、低レイテンシ"
 
@@ -15823,7 +15846,7 @@ msgstr "画像内の長文テキスト生成"
 msgid "Long video clips (up to 12 seconds) generated quickly at an affordable price point"
 msgstr "長めの動画クリップ (最大 12 秒) を手頃な価格ですばやく生成"
 
-#: src/lib/model-descriptions.ts:131
+#: src/lib/model-descriptions.ts:136
 msgid "Long-context model from Moonshot AI"
 msgstr "Moonshot AI のロングコンテキストモデル"
 
@@ -15894,15 +15917,15 @@ msgstr "Luma Labs の AI 基盤"
 msgid "Luma's best-in-class video model"
 msgstr "Luma のクラス最高の動画モデル"
 
-#: src/lib/model-descriptions.ts:132
+#: src/lib/model-descriptions.ts:137
 msgid "Luma's Dream Machine image generation model"
 msgstr "Luma の Dream Machine 画像生成モデル"
 
-#: src/lib/model-descriptions.ts:133
+#: src/lib/model-descriptions.ts:138
 msgid "Luma's fast image generation model"
 msgstr "Luma の高速画像生成モデル"
 
-#: src/lib/model-descriptions.ts:134
+#: src/lib/model-descriptions.ts:139
 msgid "Luma's second-generation video model — realistic visuals with natural, coherent motion"
 msgstr "Luma の第 2 世代動画モデル — 自然で一貫した動きのリアルな映像"
 
@@ -15954,7 +15977,7 @@ msgstr "メインフォントを更新しました"
 msgid "Maintain original structure"
 msgstr "元の構造を維持"
 
-#: src/features/workflow/types/index.ts:434
+#: src/features/workflow/types/index.ts:435
 msgid "Maintain subject consistency across generations"
 msgstr "生成間で被写体の一貫性を維持"
 
@@ -16187,7 +16210,7 @@ msgstr "マスク URL (任意)"
 msgid "massive"
 msgstr "大規模"
 
-#: src/lib/model-descriptions.ts:135
+#: src/lib/model-descriptions.ts:140
 msgid "Massive 235B MoE model from Alibaba"
 msgstr "Alibaba の大規模 235B MoE モデル"
 
@@ -16334,23 +16357,23 @@ msgstr "ミディアム品質"
 msgid "Medium quality at manageable cost"
 msgstr "手頃なコストでミディアム品質"
 
-#: src/lib/model-descriptions.ts:136
+#: src/lib/model-descriptions.ts:141
 msgid "Medium quality model by Black Forest"
 msgstr "Black Forest の中品質モデル"
 
-#: src/lib/model-descriptions.ts:137
+#: src/lib/model-descriptions.ts:142
 msgid "Medium quality model for photorealism"
 msgstr "フォトリアリズム向けの中品質モデル"
 
-#: src/lib/model-descriptions.ts:138
+#: src/lib/model-descriptions.ts:143
 msgid "Medium quality model for rendering text"
 msgstr "テキスト描画向けの中品質モデル"
 
-#: src/lib/model-descriptions.ts:139
+#: src/lib/model-descriptions.ts:144
 msgid "Medium quality model with a focus on cinematic visuals"
 msgstr "シネマティックな映像に重点を置いた中品質モデル"
 
-#: src/lib/model-descriptions.ts:140
+#: src/lib/model-descriptions.ts:145
 msgid "Medium quality model with reasoning and web search"
 msgstr "推論とウェブ検索に対応した中品質モデル"
 
@@ -16541,7 +16564,7 @@ msgstr "メッセンジャーキーを保存しました"
 msgid "Meta's latest open-source model with multimodal vision"
 msgstr "マルチモーダルなビジョンを備えた Meta の最新オープンソースモデル"
 
-#: src/lib/model-descriptions.ts:141
+#: src/lib/model-descriptions.ts:146
 msgid "Meta's MusicGen text-to-music — medium / large / melody variants via passthrough."
 msgstr "Meta の MusicGen テキストから音楽生成 — パススルー経由の medium / large / melody バリアント。"
 
@@ -16585,7 +16608,7 @@ msgstr "シンプルな分類や抽出を最小コストで"
 msgid "Minimal cost for simple tasks"
 msgstr "シンプルなタスクを最小コストで"
 
-#: src/lib/model-descriptions.ts:142
+#: src/lib/model-descriptions.ts:147
 msgid "MiniMax Hailuo 02 frontier tier — dynamic motion, high fidelity"
 msgstr "MiniMax Hailuo 02 フロンティアティア — ダイナミックな動き、高忠実度"
 
@@ -16597,23 +16620,23 @@ msgstr "MiniMax Hailuo 02 プロティア"
 msgid "MiniMax Hailuo 02 standard tier"
 msgstr "MiniMax Hailuo 02 スタンダードティア"
 
-#: src/lib/model-descriptions.ts:143
+#: src/lib/model-descriptions.ts:148
 msgid "MiniMax Hailuo 02 standard tier — balanced quality and speed"
 msgstr "MiniMax Hailuo 02 スタンダードティア — 品質と速度のバランス"
 
-#: src/lib/model-descriptions.ts:144
+#: src/lib/model-descriptions.ts:149
 msgid "MiniMax Hailuo 2.3 frontier tier — dynamic motion, latest generation"
 msgstr "MiniMax Hailuo 2.3 フロンティアティア — ダイナミックな動き、最新世代"
 
-#: src/lib/model-descriptions.ts:145
+#: src/lib/model-descriptions.ts:150
 msgid "MiniMax Hailuo 2.3 standard tier — strong motion, balanced cost"
 msgstr "MiniMax Hailuo 2.3 スタンダードティア — 力強い動き、バランスの取れたコスト"
 
-#: src/lib/model-descriptions.ts:146
+#: src/lib/model-descriptions.ts:151
 msgid "MiniMax video generation model via Replicate"
 msgstr "Replicate 経由の MiniMax 動画生成モデル"
 
-#: src/lib/model-descriptions.ts:147
+#: src/lib/model-descriptions.ts:152
 msgid "MiniMax Video-01 Live — high-quality model optimized for animating people"
 msgstr "MiniMax Video-01 Live — 人物のアニメーションに最適化された高品質モデル"
 
@@ -16621,7 +16644,7 @@ msgstr "MiniMax Video-01 Live — 人物のアニメーションに最適化さ�
 msgid "MiniMax's advanced production model"
 msgstr "MiniMax の高度な本番向けモデル"
 
-#: src/lib/model-descriptions.ts:148
+#: src/lib/model-descriptions.ts:153
 msgid "MiniMax's advanced reasoning LLM"
 msgstr "MiniMax の高度な推論 LLM"
 
@@ -16629,7 +16652,7 @@ msgstr "MiniMax の高度な推論 LLM"
 msgid "MiniMax's advanced reasoning model"
 msgstr "MiniMax の高度な推論モデル"
 
-#: src/lib/model-descriptions.ts:149
+#: src/lib/model-descriptions.ts:154
 msgid "MiniMax's fast advanced reasoning LLM"
 msgstr "MiniMax の高速で高度な推論 LLM"
 
@@ -16638,7 +16661,7 @@ msgid "MiniMax's fastest model with reasoning capability"
 msgstr "推論機能を備えた MiniMax の最速モデル"
 
 #: src/features/marketing/data/models-data.ts:1278
-#: src/lib/model-descriptions.ts:150
+#: src/lib/model-descriptions.ts:155
 msgid "MiniMax's most capable reasoning LLM"
 msgstr "MiniMax の最も高性能な推論 LLM"
 
@@ -16676,7 +16699,7 @@ msgid "Mistral's balanced medium model"
 msgstr "Mistral のバランスの取れたミディアムモデル"
 
 #: src/features/marketing/data/models-data.ts:1338
-#: src/lib/model-descriptions.ts:151
+#: src/lib/model-descriptions.ts:156
 msgid "Mistral's coding-focused LLM"
 msgstr "Mistral のコーディング特化 LLM"
 
@@ -16688,27 +16711,27 @@ msgstr "Mistral 初の推論特化モデル"
 msgid "Mistral's largest Ministral model at 14B"
 msgstr "Mistral の最大の Ministral モデル (14B)"
 
-#: src/lib/model-descriptions.ts:152
+#: src/lib/model-descriptions.ts:157
 msgid "Mistral's latest and greatest large multi-modal LLM"
 msgstr "Mistral の最新・最高の大型マルチモーダル LLM"
 
-#: src/lib/model-descriptions.ts:153
+#: src/lib/model-descriptions.ts:158
 msgid "Mistral's medium multi-modal LLM"
 msgstr "Mistral の中型マルチモーダル LLM"
 
-#: src/lib/model-descriptions.ts:154
+#: src/lib/model-descriptions.ts:159
 msgid "Mistral's medium reasoning LLM"
 msgstr "Mistral の中型推論 LLM"
 
-#: src/lib/model-descriptions.ts:155
+#: src/lib/model-descriptions.ts:160
 msgid "Mistral's mini-model 14B multi-modal LLM"
 msgstr "Mistral のミニモデル 14B マルチモーダル LLM"
 
-#: src/lib/model-descriptions.ts:156
+#: src/lib/model-descriptions.ts:161
 msgid "Mistral's mini-model 3B multi-modal LLM"
 msgstr "Mistral のミニモデル 3B マルチモーダル LLM"
 
-#: src/lib/model-descriptions.ts:157
+#: src/lib/model-descriptions.ts:162
 msgid "Mistral's mini-model 8B multi-modal LLM"
 msgstr "Mistral のミニモデル 8B マルチモーダル LLM"
 
@@ -16716,11 +16739,11 @@ msgstr "Mistral のミニモデル 8B マルチモーダル LLM"
 msgid "Mistral's most capable model with 675B total parameters"
 msgstr "総パラメータ数 675B を誇る Mistral の最も高性能なモデル"
 
-#: src/lib/model-descriptions.ts:158
+#: src/lib/model-descriptions.ts:163
 msgid "Mistral's small coding-focused LLM"
 msgstr "Mistral の小型コーディング特化 LLM"
 
-#: src/lib/model-descriptions.ts:159
+#: src/lib/model-descriptions.ts:164
 msgid "Mistral's small reasoning LLM"
 msgstr "Mistral の小型推論 LLM"
 
@@ -16956,7 +16979,7 @@ msgstr "月間"
 msgid "Monthly cost (microdollars)"
 msgstr "月間コスト (マイクロドル)"
 
-#: src/lib/model-descriptions.ts:160
+#: src/lib/model-descriptions.ts:165
 msgid "Moonshot AI's advanced base LLM"
 msgstr "Moonshot AI の高度なベース LLM"
 
@@ -16968,7 +16991,7 @@ msgstr "Moonshot AI の効率的なベースモデル"
 msgid "Moonshot AI's flagship conversation model"
 msgstr "Moonshot AI のフラッグシップ会話モデル"
 
-#: src/lib/model-descriptions.ts:161
+#: src/lib/model-descriptions.ts:166
 msgid "MoonShot AI's latest multi-modal LLM with thinking"
 msgstr "MoonShot AI の思考機能付き最新マルチモーダル LLM"
 
@@ -16976,7 +16999,7 @@ msgstr "MoonShot AI の思考機能付き最新マルチモーダル LLM"
 msgid "Moonshot AI's latest vision-enabled flagship"
 msgstr "Moonshot AI のビジョン対応の最新フラッグシップ"
 
-#: src/lib/model-descriptions.ts:162
+#: src/lib/model-descriptions.ts:167
 msgid "MoonShot AI's latest vision-enabled LLM"
 msgstr "MoonShot AI の最新ビジョン対応 LLM"
 
@@ -17043,7 +17066,7 @@ msgstr "ケースにかけられる最大コスト（米ドル）"
 msgid "Most Used"
 msgstr "よく使う"
 
-#: src/lib/model-descriptions.ts:163
+#: src/lib/model-descriptions.ts:168
 msgid "Most versatile intelligent model"
 msgstr "最も汎用性の高いインテリジェントモデル"
 
@@ -17196,7 +17219,7 @@ msgstr "マルチモーダル"
 msgid "Multimodal analysis for images and documents"
 msgstr "画像とドキュメントのマルチモーダル分析"
 
-#: src/lib/model-descriptions.ts:164
+#: src/lib/model-descriptions.ts:169
 msgid "Multimodal open-source model from Meta"
 msgstr "Meta のマルチモーダルなオープンソースモデル"
 
@@ -17618,11 +17641,11 @@ msgstr "新しい目標"
 msgid "New group chat"
 msgstr "新しいグループチャット"
 
-#: src/lib/model-descriptions.ts:165
+#: src/lib/model-descriptions.ts:170
 msgid "New high quality model for photorealism and text rendering"
 msgstr "フォトリアリズムとテキスト描画に優れた新しい高品質モデル"
 
-#: src/lib/model-descriptions.ts:166
+#: src/lib/model-descriptions.ts:171
 msgid "New model excelling at anime"
 msgstr "アニメに優れた新モデル"
 
@@ -17766,7 +17789,7 @@ msgstr "次世代"
 msgid "Next-gen creative AI"
 msgstr "次世代のクリエイティブ AI"
 
-#: src/lib/model-descriptions.ts:167
+#: src/lib/model-descriptions.ts:172
 msgid "Next-gen fast model preview from Google"
 msgstr "Google の次世代高速モデルのプレビュー"
 
@@ -17778,7 +17801,7 @@ msgstr "Google の最新 Flash アーキテクチャによる思考モード付�
 msgid "Next-gen Flux architecture at budget cost"
 msgstr "低コストで使える次世代 Flux アーキテクチャ"
 
-#: src/lib/model-descriptions.ts:168
+#: src/lib/model-descriptions.ts:173
 msgid "Next-gen frontier model preview from Google"
 msgstr "Google の次世代フロンティアモデルのプレビュー"
 
@@ -17786,7 +17809,7 @@ msgstr "Google の次世代フロンティアモデルのプレビュー"
 msgid "Next-gen image generation"
 msgstr "次世代の画像生成"
 
-#: src/lib/model-descriptions.ts:169
+#: src/lib/model-descriptions.ts:174
 msgid "Next-gen model with improved dynamics and enhanced style adaptation"
 msgstr "ダイナミクスとスタイル適応が向上した次世代モデル"
 
@@ -18627,8 +18650,8 @@ msgstr "画像の枚数"
 msgid "Number of messages"
 msgstr "メッセージ数"
 
-#: src/features/workflow/types/index.ts:551
-#: src/features/workflow/types/index.ts:555
+#: src/features/workflow/types/index.ts:552
+#: src/features/workflow/types/index.ts:556
 msgid "Object Editor"
 msgstr "オブジェクトエディター"
 
@@ -18676,7 +18699,7 @@ msgstr "オフセット: 0x{hoveredOffsetHex} ({hoveredByte}) = 0x{hoveredValueH
 msgid "Oil Painting"
 msgstr "油絵"
 
-#: src/lib/model-descriptions.ts:170
+#: src/lib/model-descriptions.ts:175
 msgid "Old generation cinematic model with higher consistency"
 msgstr "一貫性の高い旧世代のシネマティックモデル"
 
@@ -19107,7 +19130,7 @@ msgstr "Alibaba の最先端 AI にオープンソースでアクセス"
 msgid "Open-source AI deployments requiring capable, unrestricted access to Meta's Llama 3.3"
 msgstr "Meta の Llama 3.3 への高性能で制限のないアクセスを必要とするオープンソース AI のデプロイ"
 
-#: src/lib/model-descriptions.ts:171
+#: src/lib/model-descriptions.ts:176
 msgid "Open-source audio-video model with native sound, 4K output, and lip sync from Lightricks"
 msgstr "Lightricks のネイティブサウンド、4K 出力、リップシンクに対応したオープンソースの音声・動画モデル"
 
@@ -19119,7 +19142,7 @@ msgstr "OpenAI のより大規模で高性能な OSS モデルを必要とする
 msgid "Open-source from Lightricks"
 msgstr "Lightricks によるオープンソース"
 
-#: src/lib/model-descriptions.ts:172
+#: src/lib/model-descriptions.ts:177
 msgid "Open-source frontier reasoning model from DeepSeek"
 msgstr "DeepSeek のオープンソースのフロンティア推論モデル"
 
@@ -19127,7 +19150,7 @@ msgstr "DeepSeek のオープンソースのフロンティア推論モデル"
 msgid "Open-source frontier-level reasoning model"
 msgstr "オープンソースのフロンティアレベル推論モデル"
 
-#: src/lib/model-descriptions.ts:173
+#: src/lib/model-descriptions.ts:178
 msgid "Open-source model competitive with top closed image models"
 msgstr "トップクラスのクローズドな画像モデルに匹敵するオープンソースモデル"
 
@@ -19191,15 +19214,15 @@ msgstr "OpenAI 品質の動画の一貫性"
 msgid "OpenAI's advanced 120B open-source model"
 msgstr "OpenAI の高度な 120B オープンソースモデル"
 
-#: src/lib/model-descriptions.ts:174
+#: src/lib/model-descriptions.ts:179
 msgid "OpenAI's advanced coding LLM"
 msgstr "OpenAI の高度なコーディング LLM"
 
-#: src/lib/model-descriptions.ts:175
+#: src/lib/model-descriptions.ts:180
 msgid "OpenAI's advanced instruction-following LLM"
 msgstr "OpenAI の高度な指示追従 LLM"
 
-#: src/lib/model-descriptions.ts:176
+#: src/lib/model-descriptions.ts:181
 msgid "OpenAI's advanced open-source LLM"
 msgstr "OpenAI の高度なオープンソース LLM"
 
@@ -19207,11 +19230,11 @@ msgstr "OpenAI の高度なオープンソース LLM"
 msgid "OpenAI's advanced reasoning architecture"
 msgstr "OpenAI の高度な推論アーキテクチャ"
 
-#: src/lib/model-descriptions.ts:177
+#: src/lib/model-descriptions.ts:182
 msgid "OpenAI's advanced reasoning LLM"
 msgstr "OpenAI の高度な推論 LLM"
 
-#: src/lib/model-descriptions.ts:178
+#: src/lib/model-descriptions.ts:183
 msgid "OpenAI's compact coding LLM"
 msgstr "OpenAI のコンパクトなコーディング LLM"
 
@@ -19219,20 +19242,24 @@ msgstr "OpenAI のコンパクトなコーディング LLM"
 msgid "OpenAI's efficient mini reasoning model"
 msgstr "OpenAI の効率的な mini 推論モデル"
 
-#: src/lib/model-descriptions.ts:179
+#: src/lib/model-descriptions.ts:184
 msgid "OpenAI's flagship frontier model"
 msgstr "OpenAI のフラッグシップフロンティアモデル"
 
-#: src/lib/model-descriptions.ts:180
+#: src/lib/model-descriptions.ts:37
+msgid "OpenAI's GPT Image 2 text-to-image model"
+msgstr "OpenAI のテキストから画像を生成するモデル GPT Image 2"
+
+#: src/lib/model-descriptions.ts:185
 msgid "OpenAI's latest advanced coding LLM"
 msgstr "OpenAI の最新の高度なコーディング LLM"
 
-#: src/lib/model-descriptions.ts:181
+#: src/lib/model-descriptions.ts:186
 msgid "OpenAI's latest and greatest reasoning LLM"
 msgstr "OpenAI の最新・最高の推論 LLM"
 
 #: src/features/marketing/data/models-data.ts:1050
-#: src/lib/model-descriptions.ts:182
+#: src/lib/model-descriptions.ts:187
 msgid "OpenAI's latest flagship reasoning LLM"
 msgstr "OpenAI の最新フラッグシップ推論 LLM"
 
@@ -19240,7 +19267,7 @@ msgstr "OpenAI の最新フラッグシップ推論 LLM"
 msgid "OpenAI's latest model with thinking transparency"
 msgstr "思考の透明性を備えた OpenAI の最新モデル"
 
-#: src/lib/model-descriptions.ts:183
+#: src/lib/model-descriptions.ts:188
 msgid "OpenAI's most advanced flagship video generation model"
 msgstr "OpenAI の最先端フラッグシップ動画生成モデル"
 
@@ -19252,7 +19279,7 @@ msgstr "OpenAI の最も高度なフロンティアモデル"
 msgid "OpenAI's most advanced video model"
 msgstr "OpenAI の最も高度な動画モデル"
 
-#: src/lib/model-descriptions.ts:184
+#: src/lib/model-descriptions.ts:189
 msgid "OpenAI's most capable coding LLM"
 msgstr "OpenAI の最も高性能なコーディング LLM"
 
@@ -19264,15 +19291,15 @@ msgstr "OpenAI の最も高性能なコーディングモデル"
 msgid "OpenAI's most capable model in the 5.2 family"
 msgstr "5.2 ファミリーで最も高性能な OpenAI モデル"
 
-#: src/lib/model-descriptions.ts:185
+#: src/lib/model-descriptions.ts:190
 msgid "OpenAI's most capable premium model"
 msgstr "OpenAI の最も高性能なプレミアムモデル"
 
-#: src/lib/model-descriptions.ts:186
+#: src/lib/model-descriptions.ts:191
 msgid "OpenAI's new powerful video model. Rich world knowledge with very stable structure"
 msgstr "OpenAI の新しい強力な動画モデル。豊富な世界知識と非常に安定した構造"
 
-#: src/lib/model-descriptions.ts:187
+#: src/lib/model-descriptions.ts:192
 msgid "OpenAI's newest coding LLM"
 msgstr "OpenAI の最新コーディング LLM"
 
@@ -19284,23 +19311,23 @@ msgstr "OpenAI の最新コーディングモデル"
 msgid "OpenAI's open-source 20B model"
 msgstr "OpenAI のオープンソース 20B モデル"
 
-#: src/lib/model-descriptions.ts:188
+#: src/lib/model-descriptions.ts:193
 msgid "OpenAI's recent and smart reasoning LLM"
 msgstr "OpenAI の比較的新しく賢い推論 LLM"
 
-#: src/lib/model-descriptions.ts:189
+#: src/lib/model-descriptions.ts:194
 msgid "OpenAI's recent mini reasoning LLM"
 msgstr "OpenAI の比較的新しいミニ推論 LLM"
 
-#: src/lib/model-descriptions.ts:190
+#: src/lib/model-descriptions.ts:195
 msgid "OpenAI's small LLM"
 msgstr "OpenAI の小型 LLM"
 
-#: src/lib/model-descriptions.ts:191
+#: src/lib/model-descriptions.ts:196
 msgid "OpenAI's small open-source LLM"
 msgstr "OpenAI の小型オープンソース LLM"
 
-#: src/lib/model-descriptions.ts:192
+#: src/lib/model-descriptions.ts:197
 msgid "OpenAI's smallest LLM"
 msgstr "OpenAI の最小の LLM"
 
@@ -19552,7 +19579,7 @@ msgstr "スレッドの整理"
 msgid "Original"
 msgstr "オリジナル"
 
-#: src/lib/model-descriptions.ts:193
+#: src/lib/model-descriptions.ts:198
 msgid "Original ChatGPT image model"
 msgstr "初代 ChatGPT 画像モデル"
 
@@ -19599,8 +19626,8 @@ msgid "Outcome of every case per model"
 msgstr ""
 
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
-#: src/features/workflow/types/index.ts:566
-#: src/features/workflow/types/index.ts:570
+#: src/features/workflow/types/index.ts:567
+#: src/features/workflow/types/index.ts:571
 msgid "Outpaint"
 msgstr "アウトペイント"
 
@@ -19608,8 +19635,8 @@ msgstr "アウトペイント"
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
-#: src/features/workflow/types/index.ts:576
-#: src/features/workflow/types/index.ts:580
+#: src/features/workflow/types/index.ts:577
+#: src/features/workflow/types/index.ts:581
 msgid "Output"
 msgstr "出力"
 
@@ -19771,8 +19798,8 @@ msgstr "パラグアイ"
 msgid "Parallel"
 msgstr "並列"
 
-#: src/features/workflow/types/index.ts:590
-#: src/features/workflow/types/index.ts:594
+#: src/features/workflow/types/index.ts:591
+#: src/features/workflow/types/index.ts:595
 msgid "Parallel Compare"
 msgstr "並列比較"
 
@@ -20162,13 +20189,17 @@ msgstr "色を選択"
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "画像を最大 {maxReferences} 枚選択してください。選択した順番でモデルに渡されます。"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:110
+#: src/features/workflow/components/nodes/video-frames-section.tsx:105
 msgid "Picked at (s)"
 msgstr "選択位置 (秒)"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:79
-msgid "Picked frame"
-msgstr "選択したフレーム"
+#~ msgid "Picked frame"
+#~ msgstr "選択したフレーム"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:91
+msgid "Picked frame wire (remove it)"
+msgstr "選択フレームの接続（削除）"
 
 #: src/features/local-models/components/ollama-model-manager.tsx:230
 msgid "Picker up to date"
@@ -20182,7 +20213,7 @@ msgstr "Pika Labs"
 msgid "Pika Labs 2.2 — narrative-focused generation"
 msgstr "Pika Labs 2.2 — ストーリー重視の生成"
 
-#: src/lib/model-descriptions.ts:194
+#: src/lib/model-descriptions.ts:199
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — 優れたストーリーテリングとモーション制御を備えた物語重視の動画モデル"
 
@@ -20469,11 +20500,11 @@ msgstr "パワフル"
 msgid "Powerful 8B model with vision capabilities"
 msgstr "ビジョン機能を備えたパワフルな 8B モデル"
 
-#: src/lib/model-descriptions.ts:195
+#: src/lib/model-descriptions.ts:200
 msgid "Powerful general-purpose model from Z.AI"
 msgstr "Z.AI の強力な汎用モデル"
 
-#: src/lib/model-descriptions.ts:196
+#: src/lib/model-descriptions.ts:201
 msgid "Powerful multimodal model from MiniMax"
 msgstr "MiniMax の強力なマルチモーダルモデル"
 
@@ -20719,7 +20750,7 @@ msgstr "前のブランチ"
 msgid "Previous export was cancelled"
 msgstr "前回のエクスポートはキャンセルされました"
 
-#: src/lib/model-descriptions.ts:197
+#: src/lib/model-descriptions.ts:202
 msgid "Previous generation high-quality model for complex scenes"
 msgstr "複雑なシーン向けの旧世代の高品質モデル"
 
@@ -20842,7 +20873,7 @@ msgstr "各メッセージを、システムプロンプトと現在の入力の
 msgid "Process text through an AI language model"
 msgstr "AI 言語モデルでテキストを処理"
 
-#: src/features/workflow/types/index.ts:377
+#: src/features/workflow/types/index.ts:378
 msgid "Process with AI model"
 msgstr "AI モデルで処理"
 
@@ -21356,27 +21387,27 @@ msgstr "Alibaba の Wan モデルを使った、高速・低品質ティアで�
 msgid "Quote Card"
 msgstr "引用カード"
 
-#: src/lib/model-descriptions.ts:198
+#: src/lib/model-descriptions.ts:203
 msgid "Qwen's advanced instruct LLM"
 msgstr "Qwen の高度なインストラクト LLM"
 
-#: src/lib/model-descriptions.ts:199
+#: src/lib/model-descriptions.ts:204
 msgid "Qwen's advanced instruct LLM preview"
 msgstr "Qwen の高度なインストラクト LLM プレビュー"
 
-#: src/lib/model-descriptions.ts:200
+#: src/lib/model-descriptions.ts:205
 msgid "Qwen's advanced thinking LLM"
 msgstr "Qwen の高度な思考 LLM"
 
-#: src/lib/model-descriptions.ts:201
+#: src/lib/model-descriptions.ts:206
 msgid "Qwen's advanced vision LLM"
 msgstr "Qwen の高度なビジョン LLM"
 
-#: src/lib/model-descriptions.ts:202
+#: src/lib/model-descriptions.ts:207
 msgid "Qwen's advanced vision LLM with thinking"
 msgstr "Qwen の思考機能付き高度なビジョン LLM"
 
-#: src/lib/model-descriptions.ts:203
+#: src/lib/model-descriptions.ts:208
 msgid "Qwen's most advanced instruct LLM"
 msgstr "Qwen の最先端インストラクト LLM"
 
@@ -21384,7 +21415,7 @@ msgstr "Qwen の最先端インストラクト LLM"
 msgid "Qwen's most advanced reasoning capability"
 msgstr "Qwen の最も高度な推論能力"
 
-#: src/lib/model-descriptions.ts:204
+#: src/lib/model-descriptions.ts:209
 msgid "Qwen's most advanced reasoning LLM"
 msgstr "Qwen の最先端推論 LLM"
 
@@ -21412,6 +21443,10 @@ msgstr "ランダム"
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:187
 msgid "Random seed"
 msgstr "ランダムシード"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:167
+msgid "Range to keep"
+msgstr "残す範囲"
 
 #: src/features/settings/components/account/account-settings.tsx:537
 msgid "Range: 1 hour to 7 days (168 hours)"
@@ -21644,11 +21679,11 @@ msgstr "思考機能を備えた Alibaba の 80B MoE モデルを必要とする
 msgid "Reasoning toggle for flexible task handling"
 msgstr "柔軟なタスク処理のための推論切り替え"
 
-#: src/lib/model-descriptions.ts:205
+#: src/lib/model-descriptions.ts:210
 msgid "Reasoning version of Kimi K2 from Moonshot AI"
 msgstr "Moonshot AI の Kimi K2 推論版"
 
-#: src/lib/model-descriptions.ts:206
+#: src/lib/model-descriptions.ts:211
 msgid "Reasoning version of Qwen3 235B from Alibaba"
 msgstr "Alibaba の Qwen3 235B 推論版"
 
@@ -21729,11 +21764,11 @@ msgstr "アカウントを復旧"
 msgid "Recover Account"
 msgstr "アカウントを復旧"
 
-#: src/lib/model-descriptions.ts:207
+#: src/lib/model-descriptions.ts:212
 msgid "Recraft V4 Pro — true visual taste for brand systems and production-ready workflows"
 msgstr "Recraft V4 Pro — ブランドシステムと本番対応ワークフローのための真のビジュアルセンス"
 
-#: src/lib/model-descriptions.ts:208
+#: src/lib/model-descriptions.ts:213
 msgid "Recraft's text-to-image model with long text generation, vector art, and brand-style images"
 msgstr "長文テキスト生成、ベクターアート、ブランドスタイルの画像に対応した Recraft のテキストから画像生成モデル"
 
@@ -21819,6 +21854,11 @@ msgstr "参照の強さ"
 msgid "reference video"
 msgstr "参照動画"
 
+#. placeholder {0}: String(REFERENCE_VIDEO_MIN_SECONDS)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:210
+msgid "Reference videos together must be at least {0} seconds."
+msgstr "参照動画の合計は {0} 秒以上にしてください。"
+
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:312
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
 #: src/features/skills/components/skill-builder-dialog.tsx:279
@@ -21844,7 +21884,7 @@ msgstr "洗練"
 msgid "Refined capabilities over Claude Sonnet 4"
 msgstr "Claude Sonnet 4 から改良された機能"
 
-#: src/lib/model-descriptions.ts:209
+#: src/lib/model-descriptions.ts:214
 msgid "Refined flagship model from Anthropic"
 msgstr "Anthropic の洗練されたフラッグシップモデル"
 
@@ -21852,7 +21892,7 @@ msgstr "Anthropic の洗練されたフラッグシップモデル"
 msgid "Refined frontier capabilities over Claude Opus 4"
 msgstr "Claude Opus 4 から改良されたフロンティア機能"
 
-#: src/lib/model-descriptions.ts:210
+#: src/lib/model-descriptions.ts:215
 msgid "Refined GPT-5 update from OpenAI"
 msgstr "OpenAI による GPT-5 の改良アップデート"
 
@@ -22092,11 +22132,11 @@ msgstr "すべて削除"
 msgid "Remove All Files"
 msgstr "すべてのファイルを削除"
 
-#: src/features/workflow/types/index.ts:401
+#: src/features/workflow/types/index.ts:402
 msgid "Remove Background"
 msgstr "背景を削除"
 
-#: src/features/workflow/types/index.ts:402
+#: src/features/workflow/types/index.ts:403
 msgid "Remove background and extract subject"
 msgstr "背景を削除して被写体を抽出"
 
@@ -22118,7 +22158,7 @@ msgid "Remove endpoint?"
 msgstr "エンドポイントを削除しますか？"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:85
+#: src/features/workflow/components/nodes/file-node.tsx:142
 msgid "Remove file"
 msgstr "ファイルを削除"
 
@@ -22169,7 +22209,7 @@ msgstr "モデルを削除"
 msgid "Remove Object"
 msgstr "オブジェクトを削除"
 
-#: src/features/workflow/types/index.ts:552
+#: src/features/workflow/types/index.ts:553
 msgid "Remove or add objects in an image"
 msgstr "画像内のオブジェクトを削除または追加"
 
@@ -22858,9 +22898,13 @@ msgstr "実行の進捗"
 msgid "Run Python, see charts and images instantly"
 msgstr "Python を実行して、グラフや画像をすぐに確認"
 
+#: src/features/workflow/components/nodes/video-frames-section.tsx:124
+msgid "Run the node first to pick a frame"
+msgstr "フレームを選ぶには、先にノードを実行してください"
+
 #: src/features/workflow/components/nodes/video-frames-section.tsx:125
-msgid "Run the node to capture its frames"
-msgstr "ノードを実行してフレームをキャプチャします"
+#~ msgid "Run the node to capture its frames"
+#~ msgstr "ノードを実行してフレームをキャプチャします"
 
 #: src/features/skills/components/skill-form-dialog.tsx:245
 msgid "Run the skill by typing /command in chat."
@@ -23707,7 +23751,7 @@ msgstr "選択的なピント面"
 msgid "semi-realistic"
 msgstr "セミリアル"
 
-#: src/lib/model-descriptions.ts:211
+#: src/lib/model-descriptions.ts:216
 msgid "Semi-realistic model with good prompt adherence"
 msgstr "プロンプトへの忠実度が高いセミリアルなモデル"
 
@@ -24508,11 +24552,11 @@ msgstr "スロベニア語"
 msgid "Slovenian (Slovenia)"
 msgstr "スロベニア語（スロベニア）"
 
-#: src/lib/model-descriptions.ts:212
+#: src/lib/model-descriptions.ts:217
 msgid "Slow cinematic model with realistic textures"
 msgstr "リアルな質感を備えた低速のシネマティックモデル"
 
-#: src/lib/model-descriptions.ts:213
+#: src/lib/model-descriptions.ts:218
 msgid "Slow model with high control and 10s duration"
 msgstr "高い制御性と 10 秒の尺を備えた低速モデル"
 
@@ -24656,7 +24700,7 @@ msgstr "並べ替え"
 msgid "SOTA cost-efficiency with 2M token context"
 msgstr "2M トークンのコンテキストで SOTA のコスト効率"
 
-#: src/lib/model-descriptions.ts:214
+#: src/lib/model-descriptions.ts:219
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "Replicate 経由のベクターアートとタイポグラフィ対応の SOTA"
 
@@ -24842,7 +24886,7 @@ msgstr "お使いのブラウザーは音声認識に対応していません"
 msgid "Speech synthesis and transcription"
 msgstr "音声合成と文字起こし"
 
-#: src/features/workflow/types/index.ts:625
+#: src/features/workflow/types/index.ts:626
 msgid "Speech to Text"
 msgstr "音声からテキスト"
 
@@ -24854,6 +24898,10 @@ msgstr "音声からテキスト"
 #: src/features/chat/thread/composer-research-depth.tsx:25
 msgid "Speed"
 msgstr "速度"
+
+#: src/lib/model-descriptions.ts:39
+msgid "Speed tier of Nano Banana 2 for fast text-to-image generation"
+msgstr "高速なテキストから画像への生成に向けた Nano Banana 2 の高速ティア"
 
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:145
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:247
@@ -24905,7 +24953,7 @@ msgstr "SSO"
 msgid "SSO & team management"
 msgstr "SSO とチーム管理"
 
-#: src/lib/model-descriptions.ts:215
+#: src/lib/model-descriptions.ts:220
 msgid "Stability AI's Stable Audio 2.5 — high-quality text-to-music, up to ~190s."
 msgstr "Stability AI の Stable Audio 2.5 — 最大約 190 秒の高品質なテキストから音楽生成。"
 
@@ -24964,6 +25012,7 @@ msgid "Starred"
 msgstr "スター付き"
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:206
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:170
 msgid "Start"
 msgstr "開始"
 
@@ -25029,7 +25078,7 @@ msgstr "無料でチャットを始める"
 msgid "Start editing cell"
 msgstr "セルの編集を開始"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:77
+#: src/features/workflow/components/nodes/video-frames-section.tsx:39
 msgid "Start frame"
 msgstr "開始フレーム"
 
@@ -25176,7 +25225,7 @@ msgstr "ステップ {0} / {totalSteps}：{title}"
 msgid "Step-by-step tutorials for getting the most out of Neore Chat"
 msgstr "Neore Chat を最大限に活用するためのステップごとのチュートリアル"
 
-#: src/lib/model-descriptions.ts:216
+#: src/lib/model-descriptions.ts:221
 msgid "StepFun's fast and efficient LLM"
 msgstr "StepFun の高速で効率的な LLM"
 
@@ -25350,7 +25399,7 @@ msgstr "商用レベルの優れた出力"
 msgid "Strong complex scene handling"
 msgstr "複雑なシーンにも強い"
 
-#: src/lib/model-descriptions.ts:217
+#: src/lib/model-descriptions.ts:222
 msgid "Strong general-purpose and coding model from DeepSeek"
 msgstr "DeepSeek の強力な汎用・コーディングモデル"
 
@@ -25584,8 +25633,8 @@ msgstr "スタイル画像"
 msgid "Style Image URL"
 msgstr "スタイル画像 URL"
 
-#: src/features/workflow/types/index.ts:605
-#: src/features/workflow/types/index.ts:609
+#: src/features/workflow/types/index.ts:606
+#: src/features/workflow/types/index.ts:610
 msgid "Style Reference"
 msgstr "スタイル参照"
 
@@ -26286,8 +26335,8 @@ msgstr "テキスト"
 #: src/features/workflow/components/gallery/gallery-card.tsx:28
 #: src/features/workflow/components/nodes/output-node.tsx:16
 #: src/features/workflow/components/template-picker.tsx:21
-#: src/features/workflow/types/index.ts:615
-#: src/features/workflow/types/index.ts:619
+#: src/features/workflow/types/index.ts:616
+#: src/features/workflow/types/index.ts:620
 #: src/routes/(chat)/workflow/gallery.tsx:22
 msgid "Text"
 msgstr "テキスト"
@@ -26377,7 +26426,7 @@ msgstr "テキストから画像"
 msgid "Text to Speak"
 msgstr "読み上げるテキスト"
 
-#: src/features/workflow/types/index.ts:386
+#: src/features/workflow/types/index.ts:387
 msgid "Text to Speech"
 msgstr "テキスト読み上げ"
 
@@ -26464,7 +26513,7 @@ msgstr "アーカイブに含まれるファイルが多すぎます。"
 msgid "The assistant has a question"
 msgstr "アシスタントから質問があります"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:68
+#: src/features/workflow/components/nodes/video-frames-section.tsx:66
 msgid "The browser cannot read this video to capture a frame"
 msgstr "ブラウザーがこの動画を読み取れないため、フレームをキャプチャできません"
 
@@ -26757,6 +26806,11 @@ msgstr "サーバー設定で入力した Token"
 msgid "The trigger stops running and its execution history is removed. This cannot be undone."
 msgstr ""
 
+#. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:115
+msgid "The trimmed video is larger than {0} MB. Choose a shorter range."
+msgstr "トリミング後の動画が {0} MB を超えています。より短い範囲を選んでください。"
+
 #: src/features/marketing/components/gateway-footer.tsx:79
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "モダンな AI アプリケーションのための統合 LLM ゲートウェイ。"
@@ -26981,7 +27035,7 @@ msgstr "このエンドポイントは Ollama ではありません。モデル�
 msgid "This file could not be read."
 msgstr "このファイルを読み込めませんでした。"
 
-#: src/features/workflow/components/nodes/file-node.tsx:48
+#: src/features/workflow/components/nodes/file-node.tsx:85
 msgid "This file could not be uploaded. Check its type and size, then try again."
 msgstr "このファイルをアップロードできませんでした。種類とサイズを確認して、もう一度お試しください。"
 
@@ -27179,6 +27233,19 @@ msgstr "この URL は追加できません。"
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:233
 msgid "This version was optimized from an older system prompt. Re-optimize before applying it."
 msgstr ""
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:162
+msgid "This video cannot be previewed in this browser, so it cannot be trimmed here."
+msgstr "この動画はこのブラウザーでプレビューできないため、ここではトリミングできません。"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:116
+msgid "This video could not be trimmed in this browser. Upload it without trimming instead."
+msgstr "この動画をこのブラウザーでトリミングできませんでした。トリミングせずにアップロードしてください。"
+
+#. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:226
+msgid "This video is larger than {0} MB, so it must be trimmed."
+msgstr "この動画は {0} MB を超えているため、トリミングが必要です。"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:46
 msgid "This Week"
@@ -27545,7 +27612,7 @@ msgstr "プロプライエタリモデルに匹敵するトップクラスのコ
 msgid "Top-tier frontier performance with 4.6 generation improvements"
 msgstr "4.6 世代の改良によるトップクラスのフロンティア性能"
 
-#: src/lib/model-descriptions.ts:218
+#: src/lib/model-descriptions.ts:223
 msgid "Top-tier Kling text-to-video with unparalleled motion fluidity"
 msgstr "比類のない滑らかな動きを持つ最上位の Kling テキストから動画生成"
 
@@ -27618,7 +27685,7 @@ msgstr "推論トレースを使った強化学習でトレーニング"
 msgid "Transcribe an audio file, summarize the text with AI, then convert back to speech"
 msgstr "音声ファイルを文字起こしし、AI でテキストを要約してから音声に戻す"
 
-#: src/features/workflow/types/index.ts:629
+#: src/features/workflow/types/index.ts:630
 msgid "Transcription"
 msgstr "文字起こし"
 
@@ -27636,7 +27703,7 @@ msgstr "変換 (テンプレート)"
 msgid "Transform an image with AI guidance"
 msgstr "AI のガイドで画像を変換"
 
-#: src/features/workflow/types/index.ts:528
+#: src/features/workflow/types/index.ts:529
 msgid "Transform images with AI guidance"
 msgstr "AI のガイドで画像を変換"
 
@@ -27769,6 +27836,28 @@ msgstr "トリガー"
 #: src/features/marketing/components/tutorials-page.tsx:91
 msgid "Triggers & Automation"
 msgstr "トリガーと自動化"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:240
+msgid "Trim and upload"
+msgstr "トリミングしてアップロード"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:141
+msgid "Trim video"
+msgstr "動画をトリミング"
+
+#. placeholder {0}: formatSeconds(length)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:207
+msgid "Trimmed length: {0} s"
+msgstr "トリミング後の長さ: {0} 秒"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:218
+msgid "Trimming progress"
+msgstr "トリミングの進行状況"
+
+#. placeholder {0}: String(progress)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:216
+msgid "Trimming… {0}%"
+msgstr "トリミング中… {0}%"
 
 #: src/features/workflow/components/nodes/branch-node.tsx:20
 msgid "True"
@@ -27986,7 +28075,7 @@ msgstr "超高速"
 msgid "ultra quality"
 msgstr "超高品質"
 
-#: src/lib/model-descriptions.ts:219
+#: src/lib/model-descriptions.ts:224
 msgid "Ultra-fast budget model from Google"
 msgstr "Google の超高速な低価格モデル"
 
@@ -28002,7 +28091,7 @@ msgstr "Llama や Mixtral などのオープンソースモデルの超高速推
 msgid "Ultra-fast inference tasks requiring Inception's novel diffusion-based architecture"
 msgstr "Inception の新しい拡散ベースアーキテクチャを必要とする超高速推論タスク"
 
-#: src/lib/model-descriptions.ts:220
+#: src/lib/model-descriptions.ts:225
 msgid "Ultra-fast lightweight GPT-5 model from OpenAI"
 msgstr "OpenAI の超高速な軽量 GPT-5 モデル"
 
@@ -28341,7 +28430,7 @@ msgstr "ワークフローのギャラリー設定を更新するか、公開を
 msgid "updated"
 msgstr "更新版"
 
-#: src/lib/model-descriptions.ts:221
+#: src/lib/model-descriptions.ts:226
 msgid "Updated balanced frontier model from Anthropic"
 msgstr "Anthropic のアップデート版バランス型フロンティアモデル"
 
@@ -28353,7 +28442,7 @@ msgstr "GLM 4.5 から機能を更新"
 msgid "Updated Codex with improved code quality"
 msgstr "コード品質が向上した Codex の更新版"
 
-#: src/lib/model-descriptions.ts:222
+#: src/lib/model-descriptions.ts:227
 msgid "Updated general-purpose model from Z.AI"
 msgstr "Z.AI のアップデート版汎用モデル"
 
@@ -28361,11 +28450,11 @@ msgstr "Z.AI のアップデート版汎用モデル"
 msgid "Updated M2 architecture with improved capabilities"
 msgstr "機能が向上した M2 アーキテクチャの更新版"
 
-#: src/lib/model-descriptions.ts:223
+#: src/lib/model-descriptions.ts:228
 msgid "Updated multimodal model from MiniMax"
 msgstr "MiniMax のアップデート版マルチモーダルモデル"
 
-#: src/lib/model-descriptions.ts:224
+#: src/lib/model-descriptions.ts:229
 msgid "Updated open-source reasoning model from DeepSeek"
 msgstr "DeepSeek のアップデート版オープンソース推論モデル"
 
@@ -28385,7 +28474,7 @@ msgstr "スライドを更新しました"
 msgid "Updated slide {slideNumber}"
 msgstr "スライド {slideNumber} を更新しました"
 
-#: src/lib/model-descriptions.ts:225
+#: src/lib/model-descriptions.ts:230
 msgid "Updated vision model from Z.AI"
 msgstr "Z.AI のアップデート版ビジョンモデル"
 
@@ -28493,6 +28582,10 @@ msgstr "ロゴをアップロード"
 msgid "Upload new file"
 msgstr "新しいファイルをアップロード"
 
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
+msgid "Upload without trimming"
+msgstr "トリミングせずにアップロード"
+
 #: src/features/auth/components/organization/organization-logo-card.tsx:134
 #: src/features/auth/components/organization/organization-logo-card.tsx:193
 msgid "Upload your organization's logo"
@@ -28517,13 +28610,13 @@ msgstr "{0} からのインポート用データをアップロードしてい�
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:101
+#: src/features/workflow/components/nodes/file-node.tsx:158
 msgid "Uploading..."
 msgstr "アップロードしています..."
 
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:85
-#: src/features/workflow/types/index.ts:635
-#: src/features/workflow/types/index.ts:639
+#: src/features/workflow/types/index.ts:636
+#: src/features/workflow/types/index.ts:640
 msgid "Upscale"
 msgstr "アップスケール"
 
@@ -28942,11 +29035,11 @@ msgstr "あらゆるテキストのベクトル埋め込み"
 msgid "Venezuela"
 msgstr "ベネズエラ"
 
-#: src/lib/model-descriptions.ts:226
+#: src/lib/model-descriptions.ts:231
 msgid "Vercel's v0 1.0 model"
 msgstr "Vercel の v0 1.0 モデル"
 
-#: src/lib/model-descriptions.ts:227
+#: src/lib/model-descriptions.ts:232
 msgid "Vercel's v0 1.5 model"
 msgstr "Vercel の v0 1.5 モデル"
 
@@ -29110,7 +29203,7 @@ msgstr "非常に深い被写界深度、風景の奥行き"
 msgid "Very fast generation speed"
 msgstr "非常に高速な生成"
 
-#: src/lib/model-descriptions.ts:228
+#: src/lib/model-descriptions.ts:233
 msgid "Very intelligent model. Best for logos"
 msgstr "非常に賢いモデル。ロゴに最適"
 
@@ -29133,8 +29226,8 @@ msgstr "動画"
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
 #: src/features/workflow/components/gallery/publish-dialog.tsx:30
 #: src/features/workflow/components/template-picker.tsx:22
-#: src/features/workflow/types/index.ts:645
-#: src/features/workflow/types/index.ts:649
+#: src/features/workflow/types/index.ts:646
+#: src/features/workflow/types/index.ts:650
 #: src/routes/(chat)/workflow/gallery.tsx:23
 msgid "Video"
 msgstr "動画"
@@ -29142,6 +29235,12 @@ msgstr "動画"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:120
 msgid "Video attachment"
 msgstr "動画の添付ファイル"
+
+#. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
+#. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
+#: src/features/workflow/components/nodes/file-node.tsx:65
+msgid "Video can be at most {0} MB and audio at most {1} MB."
+msgstr "動画は最大 {0} MB、音声は最大 {1} MB です。"
 
 #: src/features/marketing/components/landing-page.tsx:287
 msgid "Video Creation"
@@ -29446,7 +29545,7 @@ msgstr "Z.AI の更新・改良されたマルチモーダル機能を必要と�
 msgid "Vision understanding alongside strong text capabilities"
 msgstr "優れたテキスト能力とあわせたビジョン理解"
 
-#: src/lib/model-descriptions.ts:229
+#: src/lib/model-descriptions.ts:234
 msgid "Vision-capable model from Z.AI"
 msgstr "Z.AI のビジョン対応モデル"
 
@@ -30027,11 +30126,11 @@ msgstr "X 座標"
 msgid "xAI"
 msgstr "xAI"
 
-#: src/lib/model-descriptions.ts:230
+#: src/lib/model-descriptions.ts:235
 msgid "xAI's advanced coding LLM"
 msgstr "xAI の高度なコーディング LLM"
 
-#: src/lib/model-descriptions.ts:231
+#: src/lib/model-descriptions.ts:236
 msgid "xAI's Aurora-based image generation model"
 msgstr "xAI の Aurora ベースの画像生成モデル"
 
@@ -30044,7 +30143,7 @@ msgid "xAI's capable balanced model with vision support"
 msgstr "ビジョン対応の xAI の高性能なバランス型モデル"
 
 #: src/features/marketing/data/models-data.ts:873
-#: src/lib/model-descriptions.ts:232
+#: src/lib/model-descriptions.ts:237
 msgid "xAI's flagship frontier model with advanced reasoning"
 msgstr "高度な推論を備えた xAI のフラッグシップフロンティアモデル"
 
@@ -30052,15 +30151,19 @@ msgstr "高度な推論を備えた xAI のフラッグシップフロンティ�
 msgid "xAI's foundation model capabilities"
 msgstr "xAI の基盤モデルの能力"
 
-#: src/lib/model-descriptions.ts:233
+#: src/lib/model-descriptions.ts:238
 msgid "xAI's greatest and fastest multimodel LLM"
 msgstr "xAI の最高かつ最速のマルチモーダル LLM"
 
-#: src/lib/model-descriptions.ts:234
+#: src/lib/model-descriptions.ts:239
 msgid "xAI's greatest and fastest multimodel reasoning LLM"
 msgstr "xAI の最高かつ最速のマルチモーダル推論 LLM"
 
-#: src/lib/model-descriptions.ts:235
+#: src/lib/model-descriptions.ts:41
+msgid "xAI's Grok Imagine 1.5 image-to-video model"
+msgstr "xAI の画像から動画を生成するモデル Grok Imagine 1.5"
+
+#: src/lib/model-descriptions.ts:240
 msgid "xAI's image generation model"
 msgstr "xAI の画像生成モデル"
 
@@ -30068,19 +30171,19 @@ msgstr "xAI の画像生成モデル"
 msgid "xAI's most compact reasoning model"
 msgstr "xAI の最もコンパクトな推論モデル"
 
-#: src/lib/model-descriptions.ts:236
+#: src/lib/model-descriptions.ts:241
 msgid "xAI's previous fastest multimodel LLM"
 msgstr "xAI の旧世代の最速マルチモーダル LLM"
 
-#: src/lib/model-descriptions.ts:237
+#: src/lib/model-descriptions.ts:242
 msgid "xAI's previous fastest multimodel reasoning LLM"
 msgstr "xAI の旧世代の最速マルチモーダル推論 LLM"
 
-#: src/lib/model-descriptions.ts:238
+#: src/lib/model-descriptions.ts:243
 msgid "xAI's recent smallest LLM"
 msgstr "xAI の比較的新しい最小 LLM"
 
-#: src/lib/model-descriptions.ts:239
+#: src/lib/model-descriptions.ts:244
 msgid "Xiaomi's fast Mimo V2 Flash model via OpenRouter (thinking disabled)"
 msgstr "OpenRouter 経由の Xiaomi の高速 Mimo V2 Flash モデル（思考無効）"
 
@@ -30503,7 +30606,7 @@ msgstr "Z.AI の最新汎用モデル"
 msgid "Z.AI's latest vision model with broader capability"
 msgstr "より幅広い能力を持つ Z.AI の最新ビジョンモデル"
 
-#: src/lib/model-descriptions.ts:240
+#: src/lib/model-descriptions.ts:245
 msgid "Z.AI's most capable frontier model"
 msgstr "Z.AI の最も高性能なフロンティアモデル"
 
@@ -30520,19 +30623,19 @@ msgstr "ビジョンを強化した Z.AI のフラッグシップモデル"
 msgid "Zero Data Retention (ZDR)"
 msgstr "データ保持ゼロ（ZDR）"
 
-#: src/lib/model-descriptions.ts:241
+#: src/lib/model-descriptions.ts:246
 msgid "Zhipu AI's fast vision reasoning LLM"
 msgstr "Zhipu AI の高速ビジョン推論 LLM"
 
-#: src/lib/model-descriptions.ts:242
+#: src/lib/model-descriptions.ts:247
 msgid "Zhipu AI's latest fast vision reasoning LLM"
 msgstr "Zhipu AI の最新の高速ビジョン推論 LLM"
 
-#: src/lib/model-descriptions.ts:243
+#: src/lib/model-descriptions.ts:248
 msgid "Zhipu AI's most powerful LLM"
 msgstr "Zhipu AI の最も強力な LLM"
 
-#: src/lib/model-descriptions.ts:244
+#: src/lib/model-descriptions.ts:249
 msgid "Zhipu AI's most powerful reasoning LLM"
 msgstr "Zhipu AI の最も強力な推論 LLM"
 
