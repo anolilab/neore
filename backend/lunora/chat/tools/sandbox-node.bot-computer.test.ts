@@ -21,7 +21,10 @@ const { connectSandbox, createSandbox, killSandbox } = vi.hoisted(() => {
 });
 
 vi.mock("e2b", () => {
-    return { Sandbox: { connect: connectSandbox, create: createSandbox, kill: killSandbox } };
+    return {
+        Sandbox: { connect: connectSandbox, create: createSandbox, kill: killSandbox },
+        SandboxNotFoundError: class SandboxNotFoundError extends Error {},
+    };
 });
 vi.mock("../../env", () => {
     return { E2B_API_KEY: "test-key" };
@@ -76,7 +79,7 @@ describe("getOrCreateBotComputer sandbox options", () => {
 
         await getOrCreateBotComputer(context, "user-1", "bot-1" as never);
 
-        expect(connectSandbox).toHaveBeenCalledWith("sbx-old", { apiKey: "test-key", timeoutMs: LIFETIME_MS });
+        expect(connectSandbox).toHaveBeenCalledWith("sbx-old", { apiKey: "test-key", requestTimeoutMs: 20_000, timeoutMs: LIFETIME_MS });
         expect(createSandbox).not.toHaveBeenCalled();
     });
 });

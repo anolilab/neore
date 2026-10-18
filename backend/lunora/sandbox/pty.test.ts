@@ -18,7 +18,7 @@ const { connectSandbox, createSandbox, kill, pause, run } = vi.hoisted(() => {
 });
 
 vi.mock("e2b", () => {
-    return { Sandbox: { connect: connectSandbox, create: createSandbox } };
+    return { Sandbox: { connect: connectSandbox, create: createSandbox }, SandboxNotFoundError: class SandboxNotFoundError extends Error {} };
 });
 vi.mock("../env", () => {
     return { E2B_API_KEY: "test-key" };
@@ -73,7 +73,7 @@ describe("runPtyCommand on a bot thread", () => {
             userId: "user-1",
         });
 
-        expect(connectSandbox).toHaveBeenCalledWith("sbx-old", { apiKey: "test-key", timeoutMs: LIFETIME_MS });
+        expect(connectSandbox).toHaveBeenCalledWith("sbx-old", { apiKey: "test-key", requestTimeoutMs: 20_000, timeoutMs: LIFETIME_MS });
         expect(createSandbox).not.toHaveBeenCalled();
         expect(run).toHaveBeenCalledWith("ls", expect.any(Object));
         expect(result).toMatchObject({ exitCode: 0 });

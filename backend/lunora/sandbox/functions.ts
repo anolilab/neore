@@ -123,6 +123,16 @@ export const checkAndTerminateIdle = internalMutation
     .input({
         sessionId: v.id("sandboxSessions"),
     })
+    .output(
+        v.object({
+            decidedAt: v.optional(v.number()),
+            pause: v.optional(v.boolean()),
+            recheckInMs: v.optional(v.number()),
+            sandboxId: v.optional(v.string()),
+            shouldTerminate: v.boolean(),
+            userId: v.optional(v.string()),
+        }),
+    )
     .mutation(async ({ args: { sessionId }, ctx }) => {
         const session = await ctx.db.get(sessionId);
 

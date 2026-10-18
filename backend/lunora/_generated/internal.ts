@@ -814,13 +814,13 @@ export interface InternalApiTypes {
     };
     sandbox: {
         cleanup: {
-            checkAndTerminateSandbox: FunctionReference<"action", { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }, void>;
-            default: FunctionReference<"action", { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }, void>;
-            killSandboxById: FunctionReference<"action", { sandboxId: string }, void>;
+            checkAndTerminateSandbox: FunctionReference<"action", { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }, null>;
+            default: FunctionReference<"action", { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }, null>;
+            killSandboxById: FunctionReference<"action", { sandboxId: string }, null>;
         };
         functions: {
             activateBotComputer: FunctionReference<"mutation", { sandboxId: string; sessionId: Id<"sandboxSessions"> }, boolean>;
-            checkAndTerminateIdle: FunctionReference<"mutation", { sessionId: Id<"sandboxSessions"> }, { shouldTerminate: boolean; recheckInMs?: undefined; userId?: undefined; decidedAt?: undefined; pause?: undefined; sandboxId?: undefined; } | { recheckInMs: number; shouldTerminate: boolean; userId: string; decidedAt?: undefined; pause?: undefined; sandboxId?: undefined; } | { decidedAt: number; pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; userId: string; recheckInMs?: undefined; } | { pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; userId: string; recheckInMs?: undefined; decidedAt?: undefined; }>;
+            checkAndTerminateIdle: FunctionReference<"mutation", { sessionId: Id<"sandboxSessions"> }, { decidedAt?: number; pause?: boolean; recheckInMs?: number; sandboxId?: string; shouldTerminate: boolean; userId?: string }>;
             claimBotComputer: FunctionReference<"mutation", { botId: Id<"bots">; timeoutMs: number; userId: string }, { created: boolean; sandboxId?: string; sessionId: Id<"sandboxSessions">; status: string }>;
             closeSession: FunctionReference<"mutation", { errorMessage?: string; sessionId: Id<"sandboxSessions">; status?: string }, void>;
             createSession: FunctionReference<"mutation", { sandboxId?: string; templateId?: string; threadId: Id<"threads">; timeoutMs?: number; userId: string }, Id<"sandboxSessions">>;

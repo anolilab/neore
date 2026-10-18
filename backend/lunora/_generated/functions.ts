@@ -9340,13 +9340,13 @@ export interface Caller {
     };
     sandbox: {
         cleanup: {
-            checkAndTerminateSandbox: (args: { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }) => Promise<void>;
-            default: (args: { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }) => Promise<void>;
-            killSandboxById: (args: { sandboxId: string }) => Promise<void>;
+            checkAndTerminateSandbox: (args: { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }) => Promise<null>;
+            default: (args: { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }) => Promise<null>;
+            killSandboxById: (args: { sandboxId: string }) => Promise<null>;
         };
         functions: {
             activateBotComputer: (args: { sandboxId: string; sessionId: Id<"sandboxSessions"> }) => Promise<boolean>;
-            checkAndTerminateIdle: (args: { sessionId: Id<"sandboxSessions"> }) => Promise<{ shouldTerminate: boolean; recheckInMs?: undefined; userId?: undefined; decidedAt?: undefined; pause?: undefined; sandboxId?: undefined; } | { recheckInMs: number; shouldTerminate: boolean; userId: string; decidedAt?: undefined; pause?: undefined; sandboxId?: undefined; } | { decidedAt: number; pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; userId: string; recheckInMs?: undefined; } | { pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; userId: string; recheckInMs?: undefined; decidedAt?: undefined; }>;
+            checkAndTerminateIdle: (args: { sessionId: Id<"sandboxSessions"> }) => Promise<{ decidedAt?: number; pause?: boolean; recheckInMs?: number; sandboxId?: string; shouldTerminate: boolean; userId?: string }>;
             claimBotComputer: (args: { botId: Id<"bots">; timeoutMs: number; userId: string }) => Promise<{ created: boolean; sandboxId?: string; sessionId: Id<"sandboxSessions">; status: string }>;
             closeSession: (args: { errorMessage?: string; sessionId: Id<"sandboxSessions">; status?: string }) => Promise<void>;
             createSession: (args: { sandboxId?: string; templateId?: string; threadId: Id<"threads">; timeoutMs?: number; userId: string }) => Promise<Id<"sandboxSessions">>;

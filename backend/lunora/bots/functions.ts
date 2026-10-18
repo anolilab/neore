@@ -112,6 +112,10 @@ export const updateBot = authMutation
             assertUsableModel(patch.model);
         }
 
+        if ((patch.name !== undefined && patch.name.trim() === "") || (patch.instructions !== undefined && patch.instructions.trim() === "")) {
+            throw new LunoraError("INVALID_ARGUMENT", "A bot needs a name and instructions.");
+        }
+
         await patchRow(context.db, bot, withoutUndefined({ ...patch, updatedAt: context.now }));
 
         context.log.event("bots.update_bot", { computerEnabled: patch.computerEnabled });

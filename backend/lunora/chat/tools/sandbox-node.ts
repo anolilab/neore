@@ -51,6 +51,8 @@ const BOT_COMPUTER_START_WAIT_MS = 90_000;
 const STARTING_POLL_MS = 1000;
 /** A kill that stalls must not hang the tool call that is cleaning up. */
 const BOT_KILL_TIMEOUT_MS = 15_000;
+/** Bounds a resume or a connection to a bot computer, so a stalled E2B call cannot hang the tool call. */
+const BOT_REQUEST_TIMEOUT_MS = 20_000;
 
 const killBotSandbox = async (sandboxId: string): Promise<void> => {
     const { Sandbox } = await import("e2b");
@@ -85,35 +87,46 @@ export const getOrCreateBotComputer = async (
         claim = await claimComputer();
     }
 
-    const { Sandbox } = await import("e2b");
+    const { Sandbox, SandboxNotFoundError } = await import("e2b");
 
     if (!claim.created) {
         if (!claim.sandboxId) {
             throw new Error("Your computer is still starting. Try again in a moment.");
         }
 
+        let sandbox: Sandbox;
+
         try {
             // `connect` resumes a paused computer; without its own timeout E2B would keep it only for the 300 s default.
-            const sandbox = await Sandbox.connect(claim.sandboxId, { apiKey: E2B_API_KEY, timeoutMs: BOT_COMPUTER_LIFETIME_MS });
+            sandbox = await Sandbox.connect(claim.sandboxId, {
+                apiKey: E2B_API_KEY,
+                requestTimeoutMs: BOT_REQUEST_TIMEOUT_MS,
+                timeoutMs: BOT_COMPUTER_LIFETIME_MS,
+            });
+        } catch (error) {
+            // Only a computer E2B says is gone is retired. Any other failure keeps its files and asks for a retry.
+            if (error instanceof SandboxNotFoundError) {
+                await context.runMutation(internal.sandbox.functions.closeSession, {
+                    errorMessage: "Computer no longer available",
+                    sessionId: claim.sessionId,
+                    status: "terminated",
+                });
 
-            if (!(await context.runMutation(internal.sandbox.functions.activateBotComputer, { sandboxId: claim.sandboxId, sessionId: claim.sessionId }))) {
-                await killBotSandbox(claim.sandboxId);
-
-                throw new Error("Your computer was retired while it was resuming.");
+                throw new Error("Your computer was lost. Try again to start a new one.", { cause: error });
             }
 
-            await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000, userId);
-
-            return { isNew: false, sandbox, sessionId: claim.sessionId };
-        } catch {
-            await context.runMutation(internal.sandbox.functions.closeSession, {
-                errorMessage: "Computer no longer available",
-                sessionId: claim.sessionId,
-                status: "terminated",
-            });
-
-            throw new Error("Your computer was lost. Try again to start a new one.");
+            throw new Error("Could not reach your computer. Try again in a moment.", { cause: error });
         }
+
+        if (!(await context.runMutation(internal.sandbox.functions.activateBotComputer, { sandboxId: claim.sandboxId, sessionId: claim.sessionId }))) {
+            await killBotSandbox(claim.sandboxId);
+
+            throw new Error("Your computer was retired while it was resuming.");
+        }
+
+        await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000, userId);
+
+        return { isNew: false, sandbox, sessionId: claim.sessionId };
     }
 
     let sandbox: Sandbox | undefined;
