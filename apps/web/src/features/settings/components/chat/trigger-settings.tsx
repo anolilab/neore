@@ -38,7 +38,7 @@ import {
     Zap,
 } from "lucide-react";
 import type { FC } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
 import env from "@/lib/env";
@@ -158,6 +158,9 @@ interface TriggerFormProps {
 }
 
 const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onChange, onSubmit, title }) => {
+    // Generated ids: the create and edit forms can be open together, and fixed ids would make their labels ambiguous.
+    const botPickerId = useId();
+    const botComputerId = useId();
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const { data: bots = [] } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
@@ -184,9 +187,12 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 {/* Description */}
                 {/* Bot: a routine that names a bot runs on the bot's model and instructions */}
                 <div className="space-y-1.5">
-                    <Label htmlFor="trigger-bot">{t`Run as bot (optional)`}</Label>
-                    <Select onValueChange={(value) => onChange({ ...formData, botId: value === NO_BOT ? "" : (value ?? "") })} value={formData.botId || NO_BOT}>
-                        <SelectTrigger id="trigger-bot">
+                    <Label htmlFor={botPickerId}>{t`Run as bot (optional)`}</Label>
+                    <Select
+                        onValueChange={(value) => onChange({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") })}
+                        value={formData.botId || NO_BOT}
+                    >
+                        <SelectTrigger id={botPickerId}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -202,14 +208,14 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 {formData.type === "schedule" && bots.some((bot) => bot._id === formData.botId && bot.computerEnabled) && (
                     <div className="flex items-center justify-between gap-4">
                         <div>
-                            <Label htmlFor="trigger-bot-computer">{t`Let the bot use its computer`}</Label>
+                            <Label htmlFor={botComputerId}>{t`Let the bot use its computer`}</Label>
                             <p className="text-muted-foreground text-xs">
                                 {t`Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings.`}
                             </p>
                         </div>
                         <Switch
                             checked={formData.botComputer}
-                            id="trigger-bot-computer"
+                            id={botComputerId}
                             onCheckedChange={(checked: boolean) => onChange({ ...formData, botComputer: checked })}
                         />
                     </div>
