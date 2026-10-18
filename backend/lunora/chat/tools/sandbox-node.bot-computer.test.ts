@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "../../_generated/internal";
 import { getOrCreateBotComputer } from "./sandbox-node";
 
-const { connectSandbox, createSandbox } = vi.hoisted(() => {
+const { connectSandbox, createSandbox, killSandbox } = vi.hoisted(() => {
     return {
         connectSandbox: vi.fn(async (_id: string, _options: unknown) => {
             return { sandboxId: "sbx-resumed" };
@@ -16,11 +16,12 @@ const { connectSandbox, createSandbox } = vi.hoisted(() => {
         createSandbox: vi.fn(async (_options: unknown) => {
             return { sandboxId: "sbx-new" };
         }),
+        killSandbox: vi.fn(async (_id: string, _options: unknown) => true),
     };
 });
 
 vi.mock("e2b", () => {
-    return { Sandbox: { connect: connectSandbox, create: createSandbox } };
+    return { Sandbox: { connect: connectSandbox, create: createSandbox, kill: killSandbox } };
 });
 vi.mock("../../env", () => {
     return { E2B_API_KEY: "test-key" };
@@ -82,13 +83,11 @@ describe("getOrCreateBotComputer sandbox options", () => {
 
 describe("getOrCreateBotComputer when the claim was retired", () => {
     it("kills the new sandbox and refuses, so no second computer keeps running", async () => {
-        const kill = vi.fn(async () => undefined);
-
-        createSandbox.mockResolvedValueOnce({ kill, sandboxId: "sbx-extra" } as never);
+        createSandbox.mockResolvedValueOnce({ sandboxId: "sbx-extra" } as never);
 
         const context = fakeContext({ created: true, status: "starting" }, false);
 
         await expect(getOrCreateBotComputer(context, "user-1", "bot-1" as never)).rejects.toThrow("retired while it was starting");
-        expect(kill).toHaveBeenCalledTimes(1);
+        expect(killSandbox).toHaveBeenCalledWith("sbx-extra", expect.objectContaining({ apiKey: "test-key" }));
     });
 });

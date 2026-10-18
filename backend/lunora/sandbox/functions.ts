@@ -260,7 +260,10 @@ export const activateBotComputer = internalMutation
 
         const stillOurs = session.status === "starting" || session.status === "paused" || (session.status === "active" && session.sandboxId === sandboxId);
 
-        if (!stillOurs) {
+        // A claim that landed after the bot was retired, or was deleted, is refused even though its row is fresh.
+        const botStillExists = session.botId !== undefined && (await ctx.db.get(session.botId)) !== null;
+
+        if (!stillOurs || !botStillExists) {
             return false;
         }
 

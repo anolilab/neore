@@ -45,6 +45,17 @@ const truncate = (text: string, maxLength = MAX_OUTPUT_LENGTH): string => {
 const BOT_COMPUTER_IDLE_MS = 10 * 60_000;
 /** E2B's own lifetime cap for a running computer: a safety net if the idle pause never runs. */
 const BOT_COMPUTER_LIFETIME_MS = 60 * 60_000;
+/** How long a call waits for another caller's computer to finish starting, polled this often. */
+const BOT_COMPUTER_START_WAIT_MS = 90_000;
+const STARTING_POLL_MS = 1000;
+/** A kill that stalls must not hang the tool call that is cleaning up. */
+const BOT_KILL_TIMEOUT_MS = 15_000;
+
+const killBotSandbox = async (sandboxId: string): Promise<void> => {
+    const { Sandbox } = await import("e2b");
+
+    await Sandbox.kill(sandboxId, { apiKey: E2B_API_KEY, requestTimeoutMs: BOT_KILL_TIMEOUT_MS }).catch(() => undefined);
+};
 
 /**
  * The bot's one long-lived computer. A paused one is resumed with `connect`, which
@@ -56,11 +67,22 @@ export const getOrCreateBotComputer = async (
     userId: string,
     botId: Id<"bots">,
 ): Promise<{ isNew: boolean; sandbox: Sandbox; sessionId: Id<"sandboxSessions"> }> => {
-    const claim = await context.runMutation(internal.sandbox.functions.claimBotComputer, {
-        botId,
-        timeoutMs: BOT_COMPUTER_IDLE_MS,
-        userId,
-    });
+    const claimComputer = async () =>
+        await context.runMutation(internal.sandbox.functions.claimBotComputer, {
+            botId,
+            timeoutMs: BOT_COMPUTER_IDLE_MS,
+            userId,
+        });
+
+    let claim = await claimComputer();
+
+    // Another caller is creating the computer: wait for it, so a parallel tool call is not refused.
+    for (let waited = 0; !claim.created && !claim.sandboxId && waited < BOT_COMPUTER_START_WAIT_MS; waited += STARTING_POLL_MS) {
+        await new Promise((resolve) => {
+            setTimeout(resolve, STARTING_POLL_MS);
+        });
+        claim = await claimComputer();
+    }
 
     const { Sandbox } = await import("e2b");
 
@@ -74,7 +96,7 @@ export const getOrCreateBotComputer = async (
             const sandbox = await Sandbox.connect(claim.sandboxId, { apiKey: E2B_API_KEY, timeoutMs: BOT_COMPUTER_LIFETIME_MS });
 
             if (!(await context.runMutation(internal.sandbox.functions.activateBotComputer, { sandboxId: claim.sandboxId, sessionId: claim.sessionId }))) {
-                await sandbox.kill();
+                await killBotSandbox(claim.sandboxId);
 
                 throw new Error("Your computer was retired while it was resuming.");
             }
@@ -115,7 +137,9 @@ export const getOrCreateBotComputer = async (
     } catch (error) {
         // A sandbox made but not adopted by its session must not run on outside the session. Its kill
         // is best effort: a failed kill still leaves the sandbox to E2B's own lifetime cap.
-        await sandbox?.kill().catch(() => undefined);
+        if (sandbox) {
+            await killBotSandbox(sandbox.sandboxId);
+        }
 
         await context.runMutation(internal.sandbox.functions.closeSession, {
             errorMessage: error instanceof Error ? error.message : String(error),
