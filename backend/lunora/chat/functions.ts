@@ -71,7 +71,7 @@ import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
-import { buildFalReferenceImageInput, buildFalReferenceVideoInput, falDurationInput } from "./lib/fal-reference-mapping";
+import { buildFalReferenceImageInput, buildFalReferenceVideoInput, falAcceptsAspectRatio, falDurationInput } from "./lib/fal-reference-mapping";
 import { getAgentForUser, validateThreadAccess, validateThreadAccessWithData } from "./lib/thread-helpers";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
@@ -4182,12 +4182,14 @@ export const generateVideo = internalAction
                         throw new LunoraError("BAD_REQUEST", `Model ${model} requires a startFrameUrl or reference image (image-to-video only).`);
                     }
 
-                    if (aspectRatio && aspectRatio !== "auto") {
+                    if (aspectRatio && aspectRatio !== "auto" && falAcceptsAspectRatio(modelDefinition)) {
                         falInput.aspect_ratio = aspectRatio;
                     }
 
-                    if (duration !== undefined) {
-                        falInput.duration = falDurationInput(modelDefinition, duration);
+                    const falDuration = falDurationInput(modelDefinition, duration);
+
+                    if (falDuration !== undefined) {
+                        falInput.duration = falDuration;
                     }
 
                     const falResult = await callFalApi<Parameters<typeof resolveFalVideoUrl>[0]>(endpoint, falInput, falApiKey);
@@ -5526,7 +5528,11 @@ export const generateImageToVideo = internalAction
             }
 
             if (duration) {
-                input.duration = falDurationInput(modelDefinition, duration);
+                const falDuration = falDurationInput(modelDefinition, duration);
+
+                if (falDuration !== undefined) {
+                    input.duration = falDuration;
+                }
             }
 
             if (motionStrength !== undefined) {

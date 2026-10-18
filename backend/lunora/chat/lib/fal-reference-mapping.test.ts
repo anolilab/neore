@@ -2,7 +2,14 @@ import type { ModelDefinition } from "@neore/ai/models";
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
-import { buildFalReferenceImageInput, buildFalReferenceVideoInput, falDurationInput, referenceVideoLimitSeconds } from "./fal-reference-mapping";
+import {
+    buildFalReferenceImageInput,
+    buildFalReferenceVideoInput,
+    FAL_VIDEO_INPUTS,
+    falAcceptsAspectRatio,
+    falDurationInput,
+    referenceVideoLimitSeconds,
+} from "./fal-reference-mapping";
 
 const URL_A = "https://files.example.com/a.png";
 const URL_B = "https://files.example.com/b.png";
@@ -174,9 +181,57 @@ describe("falDurationInput", () => {
         expect(falDurationInput(model, 6.4)).toBe("6");
     });
 
-    it("leaves the number alone for every other endpoint, and an unset duration unset", () => {
-        expect(falDurationInput(videoModel("fal-ai/kling-video/v3/pro/image-to-video", {}), 5)).toBe(5);
-        expect(falDurationInput(undefined, 5)).toBe(5);
+    it("writes each schema's format, snapping to the nearest allowed value", () => {
+        // "text": a numeric string; Kling's enum is "5" and "10".
+        expect(falDurationInput(videoModel("fal-ai/kling-video/v2.5-turbo/pro/text-to-video", {}), 7)).toBe("5");
+        expect(falDurationInput(videoModel("fal-ai/kling-video/v2.5-turbo/pro/text-to-video", {}), 8)).toBe("10");
+        // "seconds": a string with an s; Veo 3.1 takes 4s, 6s or 8s.
+        expect(falDurationInput(videoModel("fal-ai/veo3.1", {}), 7.5)).toBe("8s");
+        // "int": a JSON number; Grok takes 1 to 15.
+        expect(falDurationInput(videoModel("xai/grok-imagine-video/v1.5/image-to-video", {}), 30)).toBe(15);
+    });
+
+    it("sends the only value a const schema allows", () => {
+        expect(falDurationInput(videoModel("fal-ai/veo3.1/reference-to-video", {}), 4)).toBe("8s");
+    });
+
+    it("sends no duration to an endpoint whose length is fixed, or when none was asked for", () => {
+        expect(falDurationInput(videoModel("fal-ai/ltx-video", {}), 5)).toBeUndefined();
+        expect(falDurationInput(videoModel("fal-ai/minimax/hailuo-02/pro/text-to-video", {}), 6)).toBeUndefined();
         expect(falDurationInput(videoModel("bytedance/seedance-2.0/reference-to-video", {}), undefined)).toBeUndefined();
+    });
+
+    it("uses the unprefixed Seedance 2.0 and the Kling text-to-video schemas for their repointed ids", () => {
+        expect(falDurationInput(videoModel("bytedance/seedance-2.0/text-to-video", {}), 6)).toBe("6");
+        expect(falDurationInput(videoModel("fal-ai/kling-video/v1.5/pro/text-to-video", {}), 7)).toBe("5");
+    });
+
+    it("keeps the number as given for an unverified endpoint, and for no model", () => {
+        expect(falDurationInput(videoModel("fal-ai/bytedance/seedance/v1.5/lite/text-to-video", {}), 5)).toBe(5);
+        expect(falDurationInput(undefined, 5)).toBe(5);
+    });
+});
+
+describe("falAcceptsAspectRatio", () => {
+    it("omits aspect_ratio for endpoints whose schema has no such input", () => {
+        expect(falAcceptsAspectRatio(videoModel("xai/grok-imagine-video/v1.5/image-to-video", {}))).toBe(false);
+        expect(falAcceptsAspectRatio(videoModel("fal-ai/minimax/hailuo-02/standard/text-to-video", {}))).toBe(false);
+        expect(falAcceptsAspectRatio(videoModel("fal-ai/stable-video", {}))).toBe(false);
+        expect(falAcceptsAspectRatio(videoModel("fal-ai/veo3.1", {}))).toBe(true);
+        expect(falAcceptsAspectRatio(videoModel("fal-ai/bytedance/seedance/v1.5/lite/text-to-video", {}))).toBe(true);
+    });
+});
+
+describe("FAL_VIDEO_INPUTS", () => {
+    it("has an entry for every enabled fal video row, so a new row cannot skip its schema", () => {
+        const keys = Object.keys(FAL_VIDEO_INPUTS);
+
+        for (const definition of MODEL_REGISTRY) {
+            if (definition.mode !== "video" || definition.provider !== "fal" || definition.enabled === false) {
+                continue;
+            }
+
+            expect(keys, definition.id).toContain(definition.modelApiId);
+        }
     });
 });

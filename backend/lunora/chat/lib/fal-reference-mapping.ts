@@ -71,8 +71,6 @@ interface FalReferenceField {
 
 interface FalVideoReferenceSpec {
     audios?: FalReferenceField;
-    /** The endpoint's `duration` is a string enum of whole seconds in this range, not a number. */
-    durationSeconds?: { max: number; min: number };
     /** Fixed fields the endpoint requires alongside the references. */
     extra?: Record<string, string>;
     images?: FalReferenceField;
@@ -89,14 +87,12 @@ interface FalVideoReferenceSpec {
 const FAL_VIDEO_REFERENCE_FIELDS: Record<string, FalVideoReferenceSpec> = {
     "bytedance/seedance-2.0/fast/reference-to-video": {
         audios: { name: "audio_urls" },
-        durationSeconds: { max: 15, min: 4 },
         images: { name: "image_urls" },
         totalSeconds: 15,
         videos: { name: "video_urls" },
     },
     "bytedance/seedance-2.0/reference-to-video": {
         audios: { name: "audio_urls" },
-        durationSeconds: { max: 15, min: 4 },
         images: { name: "image_urls" },
         totalSeconds: 15,
         videos: { name: "video_urls" },
@@ -107,19 +103,130 @@ const FAL_VIDEO_REFERENCE_FIELDS: Record<string, FalVideoReferenceSpec> = {
     },
 };
 
+const range = (min: number, max: number): number[] => Array.from({ length: max - min + 1 }, (_, index) => min + index);
+
+/** How an endpoint takes `duration`: `int` is a JSON number, `text` a numeric string ("5"), `seconds` a string with an s ("5s"). */
+interface FalDurationSpec {
+    format: "int" | "seconds" | "text";
+    /** Seconds the endpoint accepts. The schema's `"auto"` is left out: a duration here is always a number. */
+    values: ReadonlyArray<number>;
+}
+
+interface FalVideoInputSpec {
+    /** Whether the endpoint takes `aspect_ratio` at all. */
+    aspectRatio: boolean;
+    /** `null` when the endpoint has no `duration` input, so its length is fixed and nothing is sent. */
+    duration: FalDurationSpec | null;
+}
+
 /**
- * The `duration` to send for an endpoint. FAL documents Seedance 2.0 reference-to-video's as a
- * string enum of whole seconds (4 to 15, or "auto"), so a number is sent as the nearest allowed
- * string; every other endpoint keeps the number it was given.
+ * FAL video inputs from each endpoint's OpenAPI input schema, keyed by the registry's `modelApiId`.
+ * `"unverified"` marks an endpoint whose schema could not be fetched: its row keeps the behaviour
+ * it had before this table (the number as given, `aspect_ratio` when set). Every enabled fal video
+ * row must have an entry (`fal-reference-mapping.test.ts` checks).
+ */
+export const FAL_VIDEO_INPUTS: Record<string, FalVideoInputSpec | "unverified"> = {
+    "bytedance/seedance-2.0/fast/image-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
+    "bytedance/seedance-2.0/fast/reference-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
+    "bytedance/seedance-2.0/fast/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
+    "bytedance/seedance-2.0/image-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
+    "bytedance/seedance-2.0/reference-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
+    "bytedance/seedance-2.0/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
+    "fal-ai/bytedance/seedance/v1.5/lite/image-to-video": "unverified",
+    "fal-ai/bytedance/seedance/v1.5/lite/text-to-video": "unverified",
+    "fal-ai/bytedance/seedance/v1.5/pro/image-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 12) } },
+    "fal-ai/bytedance/seedance/v1.5/pro/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 12) } },
+    "fal-ai/kling-video/o1/standard/video-to-video/edit": { aspectRatio: false, duration: null },
+    "fal-ai/kling-video/o3/4k/image-to-video": { aspectRatio: false, duration: { format: "text", values: range(3, 15) } },
+    "fal-ai/kling-video/o3/4k/reference-to-video": { aspectRatio: true, duration: { format: "text", values: range(3, 15) } },
+    "fal-ai/kling-video/o3/4k/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(3, 15) } },
+    "fal-ai/kling-video/o3/standard/image-to-video": { aspectRatio: false, duration: { format: "text", values: range(3, 15) } },
+    "fal-ai/kling-video/v1.5/pro/image-to-video": { aspectRatio: true, duration: { format: "text", values: [5, 10] } },
+    "fal-ai/kling-video/v1.5/pro/text-to-video": { aspectRatio: true, duration: { format: "text", values: [5, 10] } },
+    "fal-ai/kling-video/v2.5-turbo/pro/image-to-video": { aspectRatio: false, duration: { format: "text", values: [5, 10] } },
+    "fal-ai/kling-video/v2.5-turbo/pro/text-to-video": { aspectRatio: true, duration: { format: "text", values: [5, 10] } },
+    "fal-ai/kling-video/v3/4k/image-to-video": { aspectRatio: false, duration: { format: "text", values: range(3, 15) } },
+    "fal-ai/kling-video/v3/4k/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(3, 15) } },
+    "fal-ai/kling-video/v3/pro/image-to-video": { aspectRatio: false, duration: { format: "text", values: range(3, 15) } },
+    "fal-ai/ltx-video": { aspectRatio: false, duration: null },
+    "fal-ai/luma-dream-machine": { aspectRatio: true, duration: null },
+    "fal-ai/luma-dream-machine/image-to-video": { aspectRatio: true, duration: null },
+    "fal-ai/luma-dream-machine/ray-2": { aspectRatio: true, duration: { format: "seconds", values: [5, 9] } },
+    "fal-ai/minimax/hailuo-02/pro/image-to-video": { aspectRatio: false, duration: null },
+    "fal-ai/minimax/hailuo-02/pro/text-to-video": { aspectRatio: false, duration: null },
+    "fal-ai/minimax/hailuo-02/standard/image-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
+    "fal-ai/minimax/hailuo-02/standard/text-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
+    "fal-ai/minimax/hailuo-2.3-fast/standard/image-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
+    "fal-ai/minimax/hailuo-2.3-fast/standard/text-to-video": "unverified",
+    "fal-ai/minimax/hailuo-2.3/pro/image-to-video": { aspectRatio: false, duration: null },
+    "fal-ai/minimax/hailuo-2.3/pro/text-to-video": { aspectRatio: false, duration: null },
+    "fal-ai/minimax/hailuo-2.3/standard/image-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
+    "fal-ai/minimax/hailuo-2.3/standard/text-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
+    "fal-ai/minimax/video-01": { aspectRatio: false, duration: null },
+    "fal-ai/minimax/video-01-live": { aspectRatio: false, duration: null },
+    "fal-ai/minimax/video-01-live/image-to-video": { aspectRatio: false, duration: null },
+    "fal-ai/pika/v2.2/image-to-video": { aspectRatio: false, duration: { format: "int", values: [5, 10] } },
+    "fal-ai/pika/v2.2/text-to-video": { aspectRatio: true, duration: { format: "int", values: [5, 10] } },
+    "fal-ai/stable-video": { aspectRatio: false, duration: null },
+    "fal-ai/veo2": { aspectRatio: true, duration: { format: "seconds", values: range(5, 8) } },
+    "fal-ai/veo2/image-to-video": { aspectRatio: false, duration: { format: "seconds", values: range(5, 8) } },
+    "fal-ai/veo3": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "fal-ai/veo3.1": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "fal-ai/veo3.1/fast": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "fal-ai/veo3.1/fast/first-last-frame-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "fal-ai/veo3.1/fast/image-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "fal-ai/veo3.1/fast/reference-to-video": { aspectRatio: true, duration: { format: "seconds", values: [8] } },
+    "fal-ai/veo3.1/first-last-frame-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "fal-ai/veo3.1/image-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "fal-ai/veo3.1/reference-to-video": { aspectRatio: true, duration: { format: "seconds", values: [8] } },
+    "fal-ai/veo3/fast": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "fal-ai/veo3/fast/image-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "fal-ai/veo3/image-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
+    "google/gemini-omni-flash/v1.1/reference-to-video": { aspectRatio: true, duration: { format: "int", values: range(3, 10) } },
+    "xai/grok-imagine-video/v1.5/image-to-video": { aspectRatio: false, duration: { format: "int", values: range(1, 15) } },
+};
+
+/**
+ * The `duration` to send for an endpoint: the number snapped to the nearest value the endpoint
+ * accepts, in the format its schema names. `undefined` when the endpoint has no `duration` input
+ * (send nothing) or when nothing was asked for. An unverified endpoint gets the number as given.
  */
 export const falDurationInput = (modelDefinition: ModelDefinition | undefined, duration: number | undefined): number | string | undefined => {
-    const range = modelDefinition && FAL_VIDEO_REFERENCE_FIELDS[modelDefinition.modelApiId]?.durationSeconds;
+    if (duration === undefined) {
+        return undefined;
+    }
 
-    if (duration === undefined || !range) {
+    const spec = modelDefinition && FAL_VIDEO_INPUTS[modelDefinition.modelApiId];
+
+    if (!spec || spec === "unverified") {
         return duration;
     }
 
-    return String(Math.min(range.max, Math.max(range.min, Math.round(duration))));
+    if (!spec.duration) {
+        return undefined;
+    }
+
+    const { format, values } = spec.duration;
+    let nearest = values[0] ?? duration;
+
+    for (const value of values) {
+        if (Math.abs(value - duration) < Math.abs(nearest - duration)) {
+            nearest = value;
+        }
+    }
+
+    if (format === "int") {
+        return nearest;
+    }
+
+    return format === "seconds" ? `${nearest}s` : String(nearest);
+};
+
+/** Whether `aspect_ratio` goes to the endpoint. An unverified endpoint is sent it, as before. */
+export const falAcceptsAspectRatio = (modelDefinition: ModelDefinition | undefined): boolean => {
+    const spec = modelDefinition && FAL_VIDEO_INPUTS[modelDefinition.modelApiId];
+
+    return !spec || spec === "unverified" || spec.aspectRatio;
 };
 
 /**
