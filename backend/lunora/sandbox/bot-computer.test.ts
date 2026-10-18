@@ -8,7 +8,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { checkAndTerminateIdle, claimBotComputer } from "./functions";
+import { checkAndTerminateIdle, claimBotComputer, markBotComputerPaused } from "./functions";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -58,14 +58,31 @@ const readStatus = async (id: string): Promise<string> => {
 };
 
 describe("checkAndTerminateIdle", () => {
-    it("pauses an idle bot computer and keeps its session", async () => {
+    it("decides an idle bot computer should pause, and records it paused only once the pause succeeds", async () => {
         const botId = await insertBot();
         const sessionId = await insertSession({ botId, lastActivityAt: Date.now() - 11 * 60_000, sandboxId: "sbx-1" });
 
         const result = await harness.run(async (ctx: any) => await ctx.runMutation(checkAndTerminateIdle, { sessionId }));
 
         expect(result).toMatchObject({ pause: true, sandboxId: "sbx-1", shouldTerminate: true });
+        expect(await readStatus(sessionId)).toBe("active");
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(markBotComputerPaused, { decidedAt: result.decidedAt, sessionId }));
+
         expect(await readStatus(sessionId)).toBe("paused");
+    });
+
+    it("keeps a computer active when a call used it after the pause was decided", async () => {
+        const botId = await insertBot();
+        const sessionId = await insertSession({ botId, lastActivityAt: Date.now() - 11 * 60_000, sandboxId: "sbx-1" });
+
+        const result = await harness.run(async (ctx: any) => await ctx.runMutation(checkAndTerminateIdle, { sessionId }));
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(sessionId, { lastActivityAt: result.decidedAt + 1 }));
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(markBotComputerPaused, { decidedAt: result.decidedAt, sessionId }));
+
+        expect(await readStatus(sessionId)).toBe("active");
     });
 
     it("terminates an idle thread sandbox", async () => {

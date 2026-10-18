@@ -57,6 +57,11 @@ export const createBot = authMutation
 
         assertUsableModel(args.model);
 
+        // The web form trims its fields, but an API caller sends them raw: a blank name or instruction is refused here.
+        if (args.name.trim() === "" || args.instructions.trim() === "") {
+            throw new LunoraError("INVALID_ARGUMENT", "A bot needs a name and instructions.");
+        }
+
         const owned = await context.db
             .query("bots")
             .withIndex("by_userId", (q) => q.eq("userId", userId))

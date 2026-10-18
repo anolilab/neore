@@ -1169,6 +1169,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "sandbox_functions:createSession": lunora_sandbox_functions_141.createSession as unknown as RegisteredLunoraFunction,
     "sandbox_functions:getActiveSession": lunora_sandbox_functions_141.getActiveSession as unknown as RegisteredLunoraFunction,
     "sandbox_functions:logAction": lunora_sandbox_functions_141.logAction as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:markBotComputerPaused": lunora_sandbox_functions_141.markBotComputerPaused as unknown as RegisteredLunoraFunction,
     "sandbox_functions:retireBotComputers": lunora_sandbox_functions_141.retireBotComputers as unknown as RegisteredLunoraFunction,
     "sandbox_functions:updateSession": lunora_sandbox_functions_141.updateSession as unknown as RegisteredLunoraFunction,
     "sandbox_pool_functions:claimWarmSandbox": lunora_sandbox_pool_functions_142.claimWarmSandbox as unknown as RegisteredLunoraFunction,
@@ -5160,14 +5161,14 @@ __has1 = true;
 }
 let __has2 = false;
 let __val2;
-if (source["codingAgentRuns"] !== undefined) {
-__val2 = source["codingAgentRuns"];
+if (source["bots"] !== undefined) {
+__val2 = source["bots"];
 __has2 = true;
 }
 let __has3 = false;
 let __val3;
-if (source["bots"] !== undefined) {
-__val3 = source["bots"];
+if (source["codingAgentRuns"] !== undefined) {
+__val3 = source["codingAgentRuns"];
 __has3 = true;
 }
 let __has4 = false;
@@ -5215,7 +5216,7 @@ __has10 = true;
 }
 if (typeof source["userEmail"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
-return { ...(__has1 ? { "activity": __val1 } : {}), ...(__has2 ? { "codingAgentRuns": __val2 } : {}), "conversations": source["conversations"], ...(__has3 ? { "bots": __val3 } : {}), ...(__has4 ? { "devices": __val4 } : {}), ...(__has5 ? { "evals": __val5 } : {}), "files": source["files"], ...(__has6 ? { "memories": __val6 } : {}), ...(__has7 ? { "notifications": __val7 } : {}), ...(__has8 ? { "pages": __val8 } : {}), "profile": source["profile"], "prompts": source["prompts"], "requestId": source["requestId"], "settings": source["settings"], ...(__has9 ? { "tasks": __val9 } : {}), ...(__has10 ? { "threadTags": __val10 } : {}), "userEmail": source["userEmail"], "userId": source["userId"] };
+return { ...(__has1 ? { "activity": __val1 } : {}), ...(__has2 ? { "bots": __val2 } : {}), ...(__has3 ? { "codingAgentRuns": __val3 } : {}), "conversations": source["conversations"], ...(__has4 ? { "devices": __val4 } : {}), ...(__has5 ? { "evals": __val5 } : {}), "files": source["files"], ...(__has6 ? { "memories": __val6 } : {}), ...(__has7 ? { "notifications": __val7 } : {}), ...(__has8 ? { "pages": __val8 } : {}), "profile": source["profile"], "prompts": source["prompts"], "requestId": source["requestId"], "settings": source["settings"], ...(__has9 ? { "tasks": __val9 } : {}), ...(__has10 ? { "threadTags": __val10 } : {}), "userEmail": source["userEmail"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_gdpr_steps_90.sendExportReadyEmail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -7000,14 +7001,28 @@ return { ...(__has1 ? { "days": __val1 } : {}) };
 installCompiledValidatorMap(lunora_sandbox_cleanup_140.checkAndTerminateSandbox.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["pauseAttempt"] !== undefined) {
+if (typeof source["pauseAttempt"] !== "number" || !Number.isFinite(source["pauseAttempt"])) return DEFER;
+__val1 = source["pauseAttempt"];
+__has1 = true;
+}
 if (typeof source["sessionId"] !== "string") return DEFER;
-return { "sessionId": source["sessionId"] };
+return { ...(__has1 ? { "pauseAttempt": __val1 } : {}), "sessionId": source["sessionId"] };
 });
 installCompiledValidatorMap(lunora_sandbox_cleanup_140.default.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["pauseAttempt"] !== undefined) {
+if (typeof source["pauseAttempt"] !== "number" || !Number.isFinite(source["pauseAttempt"])) return DEFER;
+__val1 = source["pauseAttempt"];
+__has1 = true;
+}
 if (typeof source["sessionId"] !== "string") return DEFER;
-return { "sessionId": source["sessionId"] };
+return { ...(__has1 ? { "pauseAttempt": __val1 } : {}), "sessionId": source["sessionId"] };
 });
 installCompiledValidatorMap(lunora_sandbox_cleanup_140.killSandboxById.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -7117,6 +7132,13 @@ __has5 = true;
 }
 if (typeof source["success"] !== "boolean") return DEFER;
 return { "action": source["action"], ...(__has1 ? { "command": __val1 } : {}), ...(__has2 ? { "durationMs": __val2 } : {}), ...(__has3 ? { "exitCode": __val3 } : {}), "sessionId": source["sessionId"], ...(__has4 ? { "stderr": __val4 } : {}), ...(__has5 ? { "stdout": __val5 } : {}), "success": source["success"] };
+});
+installCompiledValidatorMap(lunora_sandbox_functions_141.markBotComputerPaused.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["decidedAt"] !== "number" || !Number.isFinite(source["decidedAt"])) return DEFER;
+if (typeof source["sessionId"] !== "string") return DEFER;
+return { "decidedAt": source["decidedAt"], "sessionId": source["sessionId"] };
 });
 installCompiledValidatorMap(lunora_sandbox_functions_141.retireBotComputers.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8891,7 +8913,7 @@ export interface Caller {
             collectPrompts: (args: { userId: string }) => Promise<{ promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: (args: { userId: string }) => Promise<{ aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: (args: { userId: string }) => Promise<Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: (args: { activity?: unknown; codingAgentRuns?: unknown; conversations?: unknown; bots?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string }) => Promise<string>;
+            generateExportFile: (args: { activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string }) => Promise<string>;
             sendExportReadyEmail: (args: { requestId: Id<"gdprRequests">; userEmail: string }) => Promise<null>;
             deletion_steps: {
                 deleteAuthRecords: (args: { userId: string }) => Promise<null>;
@@ -9318,18 +9340,19 @@ export interface Caller {
     };
     sandbox: {
         cleanup: {
-            checkAndTerminateSandbox: (args: { sessionId: Id<"sandboxSessions"> }) => Promise<void>;
-            default: (args: { sessionId: Id<"sandboxSessions"> }) => Promise<void>;
+            checkAndTerminateSandbox: (args: { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }) => Promise<void>;
+            default: (args: { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }) => Promise<void>;
             killSandboxById: (args: { sandboxId: string }) => Promise<void>;
         };
         functions: {
             activateBotComputer: (args: { sandboxId: string; sessionId: Id<"sandboxSessions"> }) => Promise<boolean>;
-            checkAndTerminateIdle: (args: { sessionId: Id<"sandboxSessions"> }) => Promise<{ shouldTerminate: boolean; recheckInMs?: undefined; pause?: undefined; sandboxId?: undefined; } | { recheckInMs: number; shouldTerminate: boolean; pause?: undefined; sandboxId?: undefined; } | { pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; recheckInMs?: undefined; }>;
+            checkAndTerminateIdle: (args: { sessionId: Id<"sandboxSessions"> }) => Promise<{ shouldTerminate: boolean; recheckInMs?: undefined; decidedAt?: undefined; pause?: undefined; sandboxId?: undefined; } | { recheckInMs: number; shouldTerminate: boolean; decidedAt?: undefined; pause?: undefined; sandboxId?: undefined; } | { decidedAt: number; pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; recheckInMs?: undefined; } | { pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; recheckInMs?: undefined; decidedAt?: undefined; }>;
             claimBotComputer: (args: { botId: Id<"bots">; timeoutMs: number; userId: string }) => Promise<{ created: boolean; sandboxId?: string; sessionId: Id<"sandboxSessions">; status: string }>;
             closeSession: (args: { errorMessage?: string; sessionId: Id<"sandboxSessions">; status?: string }) => Promise<void>;
             createSession: (args: { sandboxId?: string; templateId?: string; threadId: Id<"threads">; timeoutMs?: number; userId: string }) => Promise<Id<"sandboxSessions">>;
             getActiveSession: (args: { threadId: Id<"threads"> }) => Promise<import("./dataModel.js").Doc_sandboxSessions | null>;
             logAction: (args: { action: string; command?: string; durationMs?: number; exitCode?: number; sessionId: Id<"sandboxSessions">; stderr?: string; stdout?: string; success: boolean }) => Promise<void>;
+            markBotComputerPaused: (args: { decidedAt: number; sessionId: Id<"sandboxSessions"> }) => Promise<null>;
             retireBotComputers: (args: { botId: Id<"bots"> }) => Promise<null>;
             updateSession: (args: { cleanupFnId?: string; completedAt?: number; errorMessage?: string; sandboxId?: string; sessionId: Id<"sandboxSessions">; status?: string }) => Promise<void>;
         };
@@ -10907,6 +10930,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             createSession: (args) => callRegistered(context, "sandbox_functions:createSession", args),
             getActiveSession: (args) => callRegistered(context, "sandbox_functions:getActiveSession", args),
             logAction: (args) => callRegistered(context, "sandbox_functions:logAction", args),
+            markBotComputerPaused: (args) => callRegistered(context, "sandbox_functions:markBotComputerPaused", args),
             retireBotComputers: (args) => callRegistered(context, "sandbox_functions:retireBotComputers", args),
             updateSession: (args) => callRegistered(context, "sandbox_functions:updateSession", args),
         },

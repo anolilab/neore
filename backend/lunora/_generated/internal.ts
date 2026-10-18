@@ -528,7 +528,7 @@ export interface InternalApiTypes {
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: FunctionReference<"query", { userId: string }, { aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: FunctionReference<"query", { userId: string }, Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: FunctionReference<"action", { activity?: unknown; codingAgentRuns?: unknown; conversations?: unknown; bots?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string }, string>;
+            generateExportFile: FunctionReference<"action", { activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; requestId: Id<"gdprRequests">; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string }, string>;
             sendExportReadyEmail: FunctionReference<"action", { requestId: Id<"gdprRequests">; userEmail: string }, null>;
             deletion_steps: {
                 deleteAuthRecords: FunctionReference<"mutation", { userId: string }, null>;
@@ -814,18 +814,19 @@ export interface InternalApiTypes {
     };
     sandbox: {
         cleanup: {
-            checkAndTerminateSandbox: FunctionReference<"action", { sessionId: Id<"sandboxSessions"> }, void>;
-            default: FunctionReference<"action", { sessionId: Id<"sandboxSessions"> }, void>;
+            checkAndTerminateSandbox: FunctionReference<"action", { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }, void>;
+            default: FunctionReference<"action", { pauseAttempt?: number; sessionId: Id<"sandboxSessions"> }, void>;
             killSandboxById: FunctionReference<"action", { sandboxId: string }, void>;
         };
         functions: {
             activateBotComputer: FunctionReference<"mutation", { sandboxId: string; sessionId: Id<"sandboxSessions"> }, boolean>;
-            checkAndTerminateIdle: FunctionReference<"mutation", { sessionId: Id<"sandboxSessions"> }, { shouldTerminate: boolean; recheckInMs?: undefined; pause?: undefined; sandboxId?: undefined; } | { recheckInMs: number; shouldTerminate: boolean; pause?: undefined; sandboxId?: undefined; } | { pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; recheckInMs?: undefined; }>;
+            checkAndTerminateIdle: FunctionReference<"mutation", { sessionId: Id<"sandboxSessions"> }, { shouldTerminate: boolean; recheckInMs?: undefined; decidedAt?: undefined; pause?: undefined; sandboxId?: undefined; } | { recheckInMs: number; shouldTerminate: boolean; decidedAt?: undefined; pause?: undefined; sandboxId?: undefined; } | { decidedAt: number; pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; recheckInMs?: undefined; } | { pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; recheckInMs?: undefined; decidedAt?: undefined; }>;
             claimBotComputer: FunctionReference<"mutation", { botId: Id<"bots">; timeoutMs: number; userId: string }, { created: boolean; sandboxId?: string; sessionId: Id<"sandboxSessions">; status: string }>;
             closeSession: FunctionReference<"mutation", { errorMessage?: string; sessionId: Id<"sandboxSessions">; status?: string }, void>;
             createSession: FunctionReference<"mutation", { sandboxId?: string; templateId?: string; threadId: Id<"threads">; timeoutMs?: number; userId: string }, Id<"sandboxSessions">>;
             getActiveSession: FunctionReference<"query", { threadId: Id<"threads"> }, import("./dataModel.js").Doc_sandboxSessions | null>;
             logAction: FunctionReference<"mutation", { action: string; command?: string; durationMs?: number; exitCode?: number; sessionId: Id<"sandboxSessions">; stderr?: string; stdout?: string; success: boolean }, void>;
+            markBotComputerPaused: FunctionReference<"mutation", { decidedAt: number; sessionId: Id<"sandboxSessions"> }, null>;
             retireBotComputers: FunctionReference<"mutation", { botId: Id<"bots"> }, null>;
             updateSession: FunctionReference<"mutation", { cleanupFnId?: string; completedAt?: number; errorMessage?: string; sandboxId?: string; sessionId: Id<"sandboxSessions">; status?: string }, void>;
         };
@@ -1791,6 +1792,7 @@ export const internal: InternalApiTypes = {
             createSession: { __lunoraRef: "sandbox_functions:createSession" },
             getActiveSession: { __lunoraRef: "sandbox_functions:getActiveSession" },
             logAction: { __lunoraRef: "sandbox_functions:logAction" },
+            markBotComputerPaused: { __lunoraRef: "sandbox_functions:markBotComputerPaused" },
             retireBotComputers: { __lunoraRef: "sandbox_functions:retireBotComputers" },
             updateSession: { __lunoraRef: "sandbox_functions:updateSession" },
         },

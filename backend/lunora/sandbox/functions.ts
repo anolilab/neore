@@ -140,14 +140,33 @@ export const checkAndTerminateIdle = internalMutation
 
         // A bot's computer keeps its filesystem and memory: it is paused, not killed,
         // and the next call resumes it (`sandbox-node.ts#getOrCreateBotComputer`).
-        const pause = session.botId !== undefined;
+        // A bot's computer stays active until its pause succeeds (`markBotComputerPaused`), so a failed pause is retried.
+        if (session.botId !== undefined) {
+            return { decidedAt: ctx.now, pause: true, sandboxId: session.sandboxId, shouldTerminate: true };
+        }
 
-        await ctx.db.patch(
-            sessionId,
-            pause ? { lastActivityAt: ctx.now, status: "paused" } : { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" },
-        );
+        await ctx.db.patch(sessionId, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
 
-        return { pause, sandboxId: session.sandboxId, shouldTerminate: true };
+        return { pause: false, sandboxId: session.sandboxId, shouldTerminate: true };
+    });
+
+/**
+ * Records a bot computer as paused once its remote pause has succeeded. A call that used the computer after the
+ * pause was decided is newer than `decidedAt`: the computer stays active, and that call's next use resumes it.
+ */
+export const markBotComputerPaused = internalMutation
+    .input({ decidedAt: v.number(), sessionId: v.id("sandboxSessions") })
+    .output(v.null())
+    .mutation(async ({ args: { decidedAt, sessionId }, ctx }) => {
+        const session = await ctx.db.get(sessionId);
+
+        if (!session || session.status !== "active" || session.lastActivityAt > decidedAt) {
+            return null;
+        }
+
+        await ctx.db.patch(sessionId, { status: "paused" });
+
+        return null;
     });
 
 /** A `starting` claim older than this was abandoned mid-create, so the next caller may take over. */

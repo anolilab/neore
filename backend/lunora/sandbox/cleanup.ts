@@ -14,11 +14,16 @@ import { E2B_API_KEY } from "../env";
 
 ("use node");
 
+/** A failed pause is retried this many times; past that, E2B's lifetime cap pauses the computer. */
+const MAX_PAUSE_ATTEMPTS = 5;
+const PAUSE_RETRY_MS = 60_000;
+
 export const checkAndTerminateSandbox = internalAction
     .input({
+        pauseAttempt: v.optional(v.number()),
         sessionId: v.id("sandboxSessions"),
     })
-    .action(async ({ args: { sessionId }, ctx }) => {
+    .action(async ({ args: { pauseAttempt = 1, sessionId }, ctx }) => {
         const result = await ctx.runMutation(internal.sandbox.functions.checkAndTerminateIdle, {
             sessionId,
         });
@@ -42,16 +47,26 @@ export const checkAndTerminateSandbox = internalAction
 
                 if (result.pause) {
                     await sandbox.pause();
+
+                    if (result.decidedAt !== undefined) {
+                        await ctx.runMutation(internal.sandbox.functions.markBotComputerPaused, { decidedAt: result.decidedAt, sessionId });
+                    }
                 } else {
                     await sandbox.kill();
                 }
             } catch {
-                // Sandbox may already be gone — that's fine
+                // Sandbox may already be gone. A bot's computer whose pause failed is retried, so it does not run on
+                // until its lifetime cap; the retry stops after a few attempts.
+                if (result.pause && pauseAttempt < MAX_PAUSE_ATTEMPTS) {
+                    await ctx.scheduler.runAfter(PAUSE_RETRY_MS, internal.sandbox.cleanup.checkAndTerminateSandbox, {
+                        pauseAttempt: pauseAttempt + 1,
+                        sessionId,
+                    });
+                }
             }
         }
     });
 
-/** Kill a sandbox by id, for a retired bot computer. Best-effort: it may have timed out already. */
 /** A scheduled kill must not hang the cleanup action when E2B stalls. */
 const KILL_REQUEST_TIMEOUT_MS = 15_000;
 
