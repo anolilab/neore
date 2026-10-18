@@ -5681,38 +5681,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
-installCompiledValidatorMap(lunora_knowledge_functions_100.saveChunks.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (!Array.isArray(source["chunks"])) return DEFER;
-const __arr1 = new Array(source["chunks"].length);
-for (let __i1 = 0; __i1 < source["chunks"].length; __i1++) {
-const __e1 = source["chunks"][__i1];
-if (typeof __e1 !== "object" || __e1 === null || Array.isArray(__e1)) return DEFER;
-if (Object.getPrototypeOf(__e1) !== Object.prototype && Object.getPrototypeOf(__e1) !== null) return DEFER;
-if (typeof __e1["chunkIndex"] !== "number" || !Number.isFinite(__e1["chunkIndex"])) return DEFER;
-if (typeof __e1["content"] !== "string") return DEFER;
-let __has2 = false;
-let __val2;
-if (__e1["embeddingId"] !== undefined) {
-if (typeof __e1["embeddingId"] !== "string") return DEFER;
-__val2 = __e1["embeddingId"];
-__has2 = true;
-}
-let __has3 = false;
-let __val3;
-if (__e1["tokenCount"] !== undefined) {
-if (typeof __e1["tokenCount"] !== "number" || !Number.isFinite(__e1["tokenCount"])) return DEFER;
-__val3 = __e1["tokenCount"];
-__has3 = true;
-}
-const __obj4 = { "chunkIndex": __e1["chunkIndex"], "content": __e1["content"], ...(__has2 ? { "embeddingId": __val2 } : {}), ...(__has3 ? { "tokenCount": __val3 } : {}) };
-__arr1[__i1] = __obj4;
-}
-if (typeof source["fileId"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "chunks": __arr1, "fileId": source["fileId"], "userId": source["userId"] };
-});
 installCompiledValidatorMap(lunora_knowledge_functions_100.updateFileStatus.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8883,7 +8851,7 @@ export interface Caller {
             listFiles: (args?: {}) => Promise<import("./dataModel.js").Doc_knowledgeFiles[]>;
             recordKnowledgeSources: (args: { messageId: Id<"messages">; sources: Array<{ id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type?: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" }> }) => Promise<null>;
             removeFile: (args: { fileId: Id<"knowledgeFiles"> }) => Promise<{ success: boolean; }>;
-            saveChunks: (args: { chunks: Array<{ chunkIndex: number; content: string; embeddingId?: string; tokenCount?: number }>; fileId: Id<"knowledgeFiles">; userId: string }) => Promise<boolean>;
+            saveChunks: (args: { chunks: Array<{ chunkIndex: number; content: string; embeddingId?: string; sectionHeading?: string; tokenCount?: number }>; fileId: Id<"knowledgeFiles">; userId: string }) => Promise<boolean>;
             updateFileStatus: (args: { chunkCount?: number; error?: string; fileId: Id<"knowledgeFiles">; name?: string; size?: number; status: string; summary?: string }) => Promise<boolean>;
         };
         housekeeping: {

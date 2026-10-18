@@ -18,7 +18,7 @@ import { MAX_EXTRACTION_DOCUMENT_BYTES, MAX_EXTRACTION_DOCUMENT_MEGABYTES } from
 import { FETCH_TIMEOUT_LONG_MS } from "../lib/fetch-timeout";
 import { gatewayFetch, isServiceBound, serviceFetch, type ServicesContext } from "../lib/services";
 import { readStoredObject } from "../lib/storage-read";
-import { chunkText, estimateTokens } from "./chunking";
+import { chunkText, embeddingInput, estimateTokens } from "./chunking";
 import { documentToText, fetchUrlDocument, type ParseDocument } from "./sources";
 
 ("use node");
@@ -202,7 +202,7 @@ export const ingestFile = internalAction
             const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), { userId: args.userId });
 
             const { embedMany } = await import("../agent/client/search");
-            const chunkTexts = chunks.map((c) => c.content.slice(0, 2000));
+            const chunkTexts = chunks.map((c) => embeddingInput(c).slice(0, 2000));
             const { embeddings } = await embedMany(ctx, {
                 embeddingModel,
                 threadId: undefined,
@@ -248,6 +248,7 @@ export const ingestFile = internalAction
                         chunkIndex: chunk.index,
                         content: chunk.content,
                         embeddingId: (embeddingIds[i] as string) ?? undefined,
+                        sectionHeading: chunk.sectionHeading,
                         tokenCount: estimateTokens(chunk.content),
                     };
                 }),

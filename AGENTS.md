@@ -154,6 +154,12 @@ written here is what is not.
   stream tokens). Billing: 1 credit = 1,000 microdollars, via
   `deductCreditsFromGateway`.
 
+- **Knowledge rerank** — `POST /internal/rerank` on the gateway wraps Workers AI
+  `bge-reranker-base`; `retrieve.ts` blends its order with the RRF order instead of
+  replacing it (the model is English/Chinese). `AI` is unbound in dev, so the route
+  answers 503 by design and retrieval keeps the fused order. `workers-types` lost
+  `query` from the model's input type — the request still needs it.
+
 - **Services (service bindings)** — the backend reaches llm-gateway,
   document-parser, browser-renderer and nsfw-checker over Cloudflare service
   bindings declared in `backend/lunora.config.ts` (read STATICALLY by codegen —

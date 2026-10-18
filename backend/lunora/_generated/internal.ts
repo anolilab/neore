@@ -600,7 +600,7 @@ export interface InternalApiTypes {
             getVaultFile: FunctionReference<"query", { vaultFileId: Id<"files"> }, { _id: Id<"files">; key: string | undefined; name: string; } | undefined>;
             keywordSearchChunks: FunctionReference<"query", { knowledgeFileIds: Array<string>; limit: number; query: string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }>>;
             recordKnowledgeSources: FunctionReference<"mutation", { messageId: Id<"messages">; sources: Array<{ id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type?: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" }> }, null>;
-            saveChunks: FunctionReference<"mutation", { chunks: Array<{ chunkIndex: number; content: string; embeddingId?: string; tokenCount?: number }>; fileId: Id<"knowledgeFiles">; userId: string }, boolean>;
+            saveChunks: FunctionReference<"mutation", { chunks: Array<{ chunkIndex: number; content: string; embeddingId?: string; sectionHeading?: string; tokenCount?: number }>; fileId: Id<"knowledgeFiles">; userId: string }, boolean>;
             updateFileStatus: FunctionReference<"mutation", { chunkCount?: number; error?: string; fileId: Id<"knowledgeFiles">; name?: string; size?: number; status: string; summary?: string }, boolean>;
         };
         housekeeping: {

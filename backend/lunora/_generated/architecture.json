@@ -17606,25 +17606,25 @@
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 94,
+      "line": 101,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 178,
+      "line": 185,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 237,
+      "line": 308,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 249,
+      "line": 320,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {
