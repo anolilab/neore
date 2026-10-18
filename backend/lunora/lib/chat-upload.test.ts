@@ -11,8 +11,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { CHAT_UPLOAD_CONTENT_MISMATCH, CHAT_UPLOAD_EXPIRED, CHAT_UPLOAD_TOO_LARGE } from "./chat-upload-codes";
-import { finalizeStagedUpload, purgeStagedUploads, takeStagedUpload } from "./chat-upload";
+import { CHAT_UPLOAD_CONTENT_MISMATCH, CHAT_UPLOAD_EXPIRED, CHAT_UPLOAD_TOO_LARGE, CHAT_UPLOAD_UNSUPPORTED_TYPE } from "./chat-upload-codes";
+import { assertStagedChatJson, finalizeStagedUpload, purgeStagedUploads, takeStagedUpload } from "./chat-upload";
 import { STAGING_TTL_MS, stagingKeyFor, uploadStatePrefixFor } from "./chat-upload-staging";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -28,7 +28,7 @@ const CANONICAL_KEY = /^agent-files\/[\da-f]{64}$/u;
 const byString = (a: string, b: string): number => a.localeCompare(b);
 
 type Harness = ReturnType<typeof lunoraTest>;
-type StoredObject = { bytes: Uint8Array; contentType?: string; uploaded: Date };
+type StoredObject = { bytes: Uint8Array; contentType?: string; customMetadata?: Record<string, string>; uploaded: Date };
 
 let harness: Harness;
 let objects: Map<string, StoredObject>;
@@ -42,7 +42,25 @@ const storage = () => {
             const object = objects.get(key);
 
             return object
-                ? { body: new Response(object.bytes as BodyInit).body, httpMetadata: { contentType: object.contentType }, size: object.bytes.byteLength }
+                ? {
+                      body: new Response(object.bytes as BodyInit).body,
+                      customMetadata: object.customMetadata,
+                      httpMetadata: { contentType: object.contentType },
+                      size: object.bytes.byteLength,
+                  }
+                : null;
+        },
+        getMetadata: async (key: string) => {
+            const object = objects.get(key);
+
+            return object
+                ? {
+                      contentType: object.contentType,
+                      customMetadata: object.customMetadata,
+                      key,
+                      size: object.bytes.byteLength,
+                      uploaded: object.uploaded.getTime(),
+                  }
                 : null;
         },
         getSignedUrl: async (key: string) => `http://localhost:8788/${key}?sig=read`,
@@ -235,5 +253,64 @@ describe(purgeStagedUploads, () => {
         expect([...objects.keys()].toSorted(byString)).toStrictEqual(
             ["agent-files/abc", bobState, stagingKeyFor(ALICE, "b"), stagingKeyFor(BOB, "c")].toSorted(byString),
         );
+    });
+});
+
+describe("cross-purpose staged uploads", () => {
+    const UPLOAD = "V1StGXR8_Z5jdHi6B-myT";
+    const JSON_BYTES = new TextEncoder().encode('[{"title":"t"}]');
+
+    /** An object as the upload route leaves it, stamped for `purpose` (`undefined` is an object from before the stamp). */
+    const put = (key: string, bytes: Uint8Array, contentType: string, purpose: string | undefined) => {
+        objects.set(key, { bytes, contentType, customMetadata: purpose === undefined ? undefined : { purpose }, uploaded: new Date() });
+    };
+
+    it("refuses a reference-media object to a chat finalize, and deletes it", async () => {
+        const ctx = actionContext();
+        const key = stagingKeyFor(ALICE, UPLOAD);
+
+        put(key, PDF, "application/pdf", "reference-media");
+
+        expect(await codeOf(finalize(ctx, ALICE, UPLOAD))).toBe(CHAT_UPLOAD_UNSUPPORTED_TYPE);
+        expect(objects.has(key)).toBe(false);
+        expect(ctx.storage.store).not.toHaveBeenCalled();
+    });
+
+    it("lets a chat-stamped object and an unstamped one (from before the stamp) through to the chat finalize", async () => {
+        const ctx = actionContext();
+
+        put(stagingKeyFor(ALICE, UPLOAD), PDF, "application/pdf", "chat");
+        await expect(finalize(ctx, ALICE, UPLOAD)).resolves.toHaveProperty("fileId");
+
+        put(stagingKeyFor(ALICE, "W2StGXR8_Z5jdHi6B-myT"), PDF, "application/pdf", undefined);
+        await expect(finalize(ctx, ALICE, "W2StGXR8_Z5jdHi6B-myT")).resolves.toHaveProperty("fileId");
+    });
+
+    it("refuses a reference-media object to the chat-import read, before reading it", async () => {
+        const key = stagingKeyFor(ALICE, UPLOAD);
+
+        put(key, JSON_BYTES, "application/json", "reference-media");
+
+        expect(await codeOf(assertStagedChatJson(actionContext() as never, key))).toBe(CHAT_UPLOAD_UNSUPPORTED_TYPE);
+        expect(objects.has(key)).toBe(true);
+    });
+
+    it("lets a chat JSON import through, stamped or not, and refuses non-JSON or an over-cap file", async () => {
+        const ctx = actionContext();
+        const key = stagingKeyFor(ALICE, UPLOAD);
+
+        put(key, JSON_BYTES, "application/json", "chat");
+        await expect(assertStagedChatJson(ctx as never, key)).resolves.toBeUndefined();
+
+        put(key, JSON_BYTES, "application/json", undefined);
+        await expect(assertStagedChatJson(ctx as never, key)).resolves.toBeUndefined();
+
+        put(key, PDF, "application/pdf", "chat");
+        expect(await codeOf(assertStagedChatJson(ctx as never, key))).toBe(CHAT_UPLOAD_UNSUPPORTED_TYPE);
+
+        objects.set(key, { bytes: new Uint8Array(26 * MB), contentType: "application/json", customMetadata: { purpose: "chat" }, uploaded: new Date() });
+        expect(await codeOf(assertStagedChatJson(ctx as never, key))).toBe(CHAT_UPLOAD_TOO_LARGE);
+
+        expect(await codeOf(assertStagedChatJson(ctx as never, stagingKeyFor(BOB, UPLOAD)))).toBe(CHAT_UPLOAD_EXPIRED);
     });
 });

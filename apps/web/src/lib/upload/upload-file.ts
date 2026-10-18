@@ -22,19 +22,33 @@ const statusOf = (error: unknown): number =>
 export interface UploadFileOptions {
     /** The type the file is stored, and checked, as — `file.type` is empty for some extensions. */
     contentType: string;
+
     /** Whole percent, 0–100, as bytes are acknowledged by the server. */
     onProgress?: (percent: number) => void;
+
+    /**
+     * What the file is for, declared on the create. `reference-media` takes a
+     * workflow's video and audio (`document-limits.ts`); absent is a chat
+     * attachment, which refuses those types.
+     */
+    purpose?: "reference-media";
     signal?: AbortSignal;
 }
 
-export const uploadFile = async (file: File, { contentType, onProgress, signal }: UploadFileOptions): Promise<string> => {
+export const uploadFile = async (file: File, { contentType, onProgress, purpose, signal }: UploadFileOptions): Promise<string> => {
     if (signal?.aborted) {
         throw new DOMException("The upload was aborted", "AbortError");
     }
 
     const token = await getSessionToken();
+    const endpoint = new URL("/uploads", env.VITE_LUNORA_URL);
+
+    if (purpose) {
+        endpoint.searchParams.set("purpose", purpose);
+    }
+
     const adapter = createTusAdapter({
-        endpoint: new URL("/uploads", env.VITE_LUNORA_URL).href,
+        endpoint: endpoint.href,
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         // `mimeType` wins over the client's own `filetype` (= `file.type`) on the server.
         metadata: { mimeType: contentType },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countedWorkflowImageIds, signWorkflowImages, workflowImageFileIds } from "./images";
+import { countedWorkflowFileIds, grantWorkflowFiles, signWorkflowImages, workflowFileIds } from "./images";
 
 const content = (...ids: string[]) => {
     return {
@@ -46,11 +46,18 @@ const fakeDb = () => {
     return { db: db as never, reads };
 };
 
-describe("workflowImageFileIds", () => {
+describe("workflowFileIds", () => {
     it("returns each distinct image file id once, ignoring nodes without one", () => {
-        expect(workflowImageFileIds({ nodes: [{ data: { imageFileId: "a" } }, { data: {} }, { data: { imageFileId: "a" } }, {}] })).toStrictEqual(["a"]);
-        expect(workflowImageFileIds(undefined)).toStrictEqual([]);
-        expect(workflowImageFileIds({ nodes: "nope" })).toStrictEqual([]);
+        expect(workflowFileIds({ nodes: [{ data: { imageFileId: "a" } }, { data: {} }, { data: { imageFileId: "a" } }, {}] })).toStrictEqual(["a"]);
+        expect(workflowFileIds(undefined)).toStrictEqual([]);
+        expect(workflowFileIds({ nodes: "nope" })).toStrictEqual([]);
+    });
+
+    it("includes a file node's reference media, so a saved workflow keeps it from the unused-file sweep", () => {
+        expect(workflowFileIds({ nodes: [{ data: { fileId: "v", fileName: "clip.mp4", fileType: "video/mp4" } }, { data: { fileId: "a" } }] })).toStrictEqual([
+            "v",
+            "a",
+        ]);
     });
 
     it("includes the frames a video node captured, skipping unset ones", () => {
@@ -62,25 +69,54 @@ describe("workflowImageFileIds", () => {
             ],
         };
 
-        expect(workflowImageFileIds(captured)).toStrictEqual(["e", "s", "a"]);
+        expect(workflowFileIds(captured)).toStrictEqual(["e", "s", "a"]);
     });
 });
 
-describe("countedWorkflowImageIds", () => {
+describe("countedWorkflowFileIds", () => {
     it("counts only existing files the owner holds a grant for, before and after", async () => {
         const { db } = fakeDb();
 
-        await expect(countedWorkflowImageIds(db, "owner", content("a", "c"), content("a", "b", "c", "d"))).resolves.toStrictEqual({
+        await expect(countedWorkflowFileIds(db, "owner", content("a", "c"), content("a", "b", "c", "d"))).resolves.toStrictEqual({
             next: ["a", "b"],
             previous: ["a"],
         });
     });
 
-    it("reads nothing for content without images", async () => {
+    it("counts a file node's file for its owner, and nothing for a foreign file id", async () => {
+        const { db } = fakeDb();
+        const fileNodes = { nodes: [{ data: { fileId: "a" } }, { data: { fileId: "c" } }] };
+
+        await expect(countedWorkflowFileIds(db, "owner", undefined, fileNodes)).resolves.toStrictEqual({ next: ["a"], previous: [] });
+    });
+
+    it("reads nothing for content without files", async () => {
         const { db, reads } = fakeDb();
 
-        await expect(countedWorkflowImageIds(db, "owner", undefined, content())).resolves.toStrictEqual({ next: [], previous: [] });
+        await expect(countedWorkflowFileIds(db, "owner", undefined, content())).resolves.toStrictEqual({ next: [], previous: [] });
         expect(reads).toStrictEqual([]);
+    });
+});
+
+describe("grantWorkflowFiles", () => {
+    it("grants a fork's author-held files, file nodes included, and never a foreign one", async () => {
+        const { db } = fakeDb();
+        const inserted: { fileId: string; userId: string }[] = [];
+        const writer = {
+            ...(db as Record<string, unknown>),
+            insert: async (_table: string, row: { fileId: string; userId: string }) => {
+                inserted.push(row);
+            },
+        };
+
+        await grantWorkflowFiles(writer as never, "owner", "forker", {
+            nodes: [{ data: { fileId: "a" } }, { data: { imageFileId: "b" } }, { data: { fileId: "c" } }],
+        });
+
+        expect(inserted.map((row) => [row.fileId, row.userId]).toSorted((a, b) => a[0]!.localeCompare(b[0]!))).toStrictEqual([
+            ["a", "forker"],
+            ["b", "forker"],
+        ]);
     });
 });
 

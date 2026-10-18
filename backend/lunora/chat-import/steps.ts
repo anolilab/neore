@@ -4,6 +4,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { insertMessageRow, insertThread } from "../agent/table-writes";
+import { assertStagedChatJson } from "../lib/chat-upload";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { MAX_STORED_READ_BYTES as IMPORT_FILE_MAX_BYTES, readStoredText } from "../lib/storage-read";
 import { withoutUndefined } from "../lib/patch";
@@ -51,7 +52,10 @@ export const processImportFile = internalAction
     })
     .action(async ({ args, ctx: context }) => {
         // 1. Read the import file through `ctx.storage` — it used to be fetched
-        // back from the public bucket URL (`lib/storage-read.ts`).
+        // back from the public bucket URL (`lib/storage-read.ts`). First check it
+        // is a chat upload of JSON within the document cap: nothing else is read whole.
+        await assertStagedChatJson(context, args.r2Key);
+
         const conversations = JSON.parse(await readStoredText(context.storage, args.r2Key, { maxBytes: IMPORT_FILE_MAX_BYTES })) as ImportConversation[];
 
         if (!Array.isArray(conversations) || conversations.length === 0) {

@@ -9,8 +9,8 @@ import type { R2UploadBucket } from "@lunora/storage/upload";
 import { R2_PART_SIZE } from "@lunora/storage/upload";
 import { describe, expect, it, vi } from "vitest";
 
-import { stagingPrefixFor, uploadStatePrefixFor } from "./chat-upload-staging";
-import { handleUploadRequest, UPLOAD_PATH } from "./upload-route";
+import { stagingKeyFor, stagingPrefixFor, uploadStatePrefixFor } from "./chat-upload-staging";
+import { handleUploadRequest, refuseDeclaredPurpose, UPLOAD_PATH } from "./upload-route";
 
 const ORIGIN = "http://localhost:8788";
 const ALICE = "user-alice";
@@ -18,7 +18,7 @@ const BOB = "user-bob";
 const MB = 1024 * 1024;
 const PDF_HEAD = new TextEncoder().encode("%PDF-1.7\n");
 
-type Stored = { bytes: Uint8Array; contentType?: string; etag: string; uploaded: Date };
+type Stored = { bytes: Uint8Array; contentType?: string; customMetadata?: Record<string, string>; etag: string; uploaded: Date };
 type Condition = { etagDoesNotMatch?: string; etagMatches?: string };
 
 const toBytes = async (value: unknown): Promise<Uint8Array> => {
@@ -36,11 +36,11 @@ const toBytes = async (value: unknown): Promise<Uint8Array> => {
 /** An R2 binding as far as the provider uses it: conditional puts, prefix listing, and multipart with R2's equal-part rule. */
 const fakeBucket = () => {
     const objects = new Map<string, Stored>();
-    const uploads = new Map<string, { contentType?: string; key: string; parts: Map<number, Uint8Array> }>();
+    const uploads = new Map<string, { contentType?: string; customMetadata?: Record<string, string>; key: string; parts: Map<number, Uint8Array> }>();
     let counter = 0;
 
-    const store = (key: string, bytes: Uint8Array, contentType?: string) => {
-        const object = { bytes, contentType, etag: createHash("sha256").update(bytes).digest("hex"), uploaded: new Date() };
+    const store = (key: string, bytes: Uint8Array, contentType?: string, customMetadata?: Record<string, string>) => {
+        const object = { bytes, contentType, customMetadata, etag: createHash("sha256").update(bytes).digest("hex"), uploaded: new Date() };
 
         objects.set(key, object);
 
@@ -79,7 +79,7 @@ const fakeBucket = () => {
 
                 uploads.delete(uploadId);
 
-                return store(key, bytes, upload.contentType);
+                return store(key, bytes, upload.contentType, upload.customMetadata);
             },
             key,
             uploadId,
@@ -92,9 +92,14 @@ const fakeBucket = () => {
     };
 
     const bucket = {
-        createMultipartUpload: async (key: string, options?: { httpMetadata?: { contentType?: string } }) => {
+        createMultipartUpload: async (key: string, options?: { customMetadata?: Record<string, string>; httpMetadata?: { contentType?: string } }) => {
             counter += 1;
-            uploads.set(`mp-${String(counter)}`, { contentType: options?.httpMetadata?.contentType, key, parts: new Map() });
+            uploads.set(`mp-${String(counter)}`, {
+                contentType: options?.httpMetadata?.contentType,
+                customMetadata: options?.customMetadata,
+                key,
+                parts: new Map(),
+            });
 
             return multipart(key, `mp-${String(counter)}`);
         },
@@ -132,12 +137,16 @@ const fakeBucket = () => {
                 truncated: false,
             };
         },
-        put: async (key: string, value: unknown, options?: { httpMetadata?: { contentType?: string }; onlyIf?: Condition }) => {
+        put: async (
+            key: string,
+            value: unknown,
+            options?: { customMetadata?: Record<string, string>; httpMetadata?: { contentType?: string }; onlyIf?: Condition },
+        ) => {
             if (options?.onlyIf !== undefined && !meets(options.onlyIf, objects.get(key)?.etag)) {
                 return null;
             }
 
-            return store(key, await toBytes(value), options?.httpMetadata?.contentType);
+            return store(key, await toBytes(value), options?.httpMetadata?.contentType, options?.customMetadata);
         },
         resumeMultipartUpload: (key: string, uploadId: string) => multipart(key, uploadId),
     };
@@ -215,6 +224,20 @@ const pdf = (size: number): Uint8Array => {
     const bytes = new Uint8Array(size);
 
     bytes.set(PDF_HEAD);
+
+    return bytes;
+};
+
+const createFor = (size: number, type: string, purpose?: string) =>
+    new Request(`${ORIGIN}${UPLOAD_PATH}${purpose === undefined ? "" : `?purpose=${purpose}`}`, {
+        headers: { "Tus-Resumable": "1.0.0", "Upload-Length": String(size), "Upload-Metadata": metadata({ filename: "clip", filetype: type }) },
+        method: "POST",
+    });
+
+const mp4 = (size: number): Uint8Array => {
+    const bytes = new Uint8Array(size);
+
+    bytes.set([0, 0, 0, 0x18, ...new TextEncoder().encode("ftypisom")]);
 
     return bytes;
 };
@@ -300,5 +323,62 @@ describe(handleUploadRequest, () => {
         expect(limited.headers.get("Tus-Resumable")).toBe("1.0.0");
         expect(await statusOf(bucket, ALICE, new Request(`${ORIGIN}${UPLOAD_PATH}/${id}`))).toBe(405);
         expect([...objects.keys()].filter((key) => key.startsWith("uploads/"))).toHaveLength(1);
+    });
+
+    describe("purpose", () => {
+        it("admits reference video and audio under reference-media, and refuses the same types under chat with 415", async () => {
+            const { bucket } = fakeBucket();
+
+            expect(await statusOf(bucket, ALICE, createFor(10, "video/mp4", "reference-media"))).toBe(201);
+            expect(await statusOf(bucket, ALICE, createFor(10, "audio/mpeg", "reference-media"))).toBe(201);
+            expect(await statusOf(bucket, ALICE, createFor(10, "video/mp4"))).toBe(415);
+            expect(await statusOf(bucket, ALICE, createFor(10, "audio/mpeg", "chat"))).toBe(415);
+        });
+
+        it("caps reference creates by their own limits, and refuses non-reference types under reference-media", async () => {
+            const { bucket } = fakeBucket();
+
+            expect(await statusOf(bucket, ALICE, createFor(50 * MB + 1, "video/mp4", "reference-media"))).toBe(413);
+            expect(await statusOf(bucket, ALICE, createFor(15 * MB + 1, "audio/wav", "reference-media"))).toBe(413);
+            expect(await statusOf(bucket, ALICE, createFor(10, "application/pdf", "reference-media"))).toBe(415);
+        });
+
+        it("stamps a chat object chat and keeps it under the chat key", async () => {
+            const { bucket, objects } = fakeBucket();
+            const id = await upload(bucket, ALICE, pdf(10));
+
+            expect(objects.get(stagingKeyFor(ALICE, id))?.customMetadata).toStrictEqual({ purpose: "chat" });
+        });
+
+        it("refuses a purpose on the public API's route, and names none otherwise", () => {
+            expect(refuseDeclaredPurpose(new Request(`${ORIGIN}/api/v1/uploads?purpose=reference-media`, { method: "POST" }))?.status).toBe(400);
+            expect(refuseDeclaredPurpose(new Request(`${ORIGIN}/api/v1/uploads?purpose=chat`, { method: "POST" }))?.status).toBe(400);
+            expect(refuseDeclaredPurpose(new Request(`${ORIGIN}/api/v1/uploads`, { method: "POST" }))).toBeUndefined();
+        });
+
+        it("refuses a purpose it does not name, before storing anything", async () => {
+            const { bucket, objects } = fakeBucket();
+
+            expect(await statusOf(bucket, ALICE, createFor(10, "video/mp4", "everything"))).toBe(400);
+            expect(objects.size).toBe(0);
+        });
+
+        it("carries a reference video through its PATCHes, which name no purpose", async () => {
+            const { bucket, objects } = fakeBucket();
+            const bytes = mp4(12 * MB);
+            const created = await send(bucket, ALICE, createFor(bytes.byteLength, "video/mp4", "reference-media"));
+            const location = created.headers.get("Location")!;
+
+            for (let offset = 0; offset < bytes.byteLength; offset += 5 * MB) {
+                expect(await statusOf(bucket, ALICE, patch(location, offset, bytes.subarray(offset, offset + 5 * MB)))).toBe(204);
+            }
+
+            // `Location` may carry the create's query; the object is named by the id alone.
+            const id = location.split("/").pop()!.split("?", 1)[0]!;
+
+            // The object sits under the reference-media key, stamped with its purpose.
+            expect(objects.get(stagingKeyFor(ALICE, id, "reference-media"))?.contentType).toBe("video/mp4");
+            expect(objects.get(stagingKeyFor(ALICE, id, "reference-media"))?.customMetadata).toStrictEqual({ purpose: "reference-media" });
+        });
     });
 });

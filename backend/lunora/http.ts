@@ -31,7 +31,7 @@ import { assertEnv } from "./lib/env-validation";
 import { parseTrustedExtensionOrigins } from "./lib/extension-origins";
 import pailLogger from "./lib/hono-logger";
 import { handleSignedGet } from "./lib/signed-storage";
-import { handleUploadRequest, TUS_REQUEST_HEADERS, TUS_RESPONSE_HEADERS, UPLOAD_PATH } from "./lib/upload-route";
+import { handleUploadRequest, refuseDeclaredPurpose, TUS_REQUEST_HEADERS, TUS_RESPONSE_HEADERS, UPLOAD_PATH } from "./lib/upload-route";
 import { httpLogger } from "./lib/logger";
 import {
     handleDiscordWebhook,
@@ -109,7 +109,7 @@ app.use(
         allowHeaders: ["Authorization", "Content-Type", "Better-Auth-Cookie", "x-captcha-response", ...TUS_REQUEST_HEADERS],
         allowMethods: ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"],
         credentials: true,
-        exposeHeaders: ["Content-Length", "Set-Better-Auth-Cookie", ...TUS_RESPONSE_HEADERS],
+        exposeHeaders: ["Accept-Ranges", "Content-Length", "Content-Range", "Set-Better-Auth-Cookie", ...TUS_RESPONSE_HEADERS],
         maxAge: 600,
         origin: getAllowedOrigins(),
     }),
@@ -283,11 +283,18 @@ app.on(UPLOAD_METHODS, [UPLOAD_PATH, `${UPLOAD_PATH}/:uploadId`], async (c) => a
 
 // The same route for public API clients, API-key authenticated like the rest of
 // `/api/v1` and gated on `knowledge:write` — the only v1 resource that uploads.
-// Registered before the v1 router so it is reached at all.
+// Chat uploads only: a `purpose` is refused before the key is checked. Registered
+// before the v1 router so it is reached at all.
 app.on(
     UPLOAD_METHODS,
     [`${PUBLIC_API_PREFIX}${UPLOAD_PATH}`, `${PUBLIC_API_PREFIX}${UPLOAD_PATH}/:uploadId`],
-    async (c) => await handleUploadRequest(c.var.lunora, c.req.raw, c.env["FILES"], publicApiUploadGate),
+    async (c) =>
+        await handleUploadRequest(
+            c.var.lunora,
+            c.req.raw,
+            c.env["FILES"],
+            async (ctx, request) => refuseDeclaredPurpose(request) ?? (await publicApiUploadGate(ctx, request)),
+        ),
 );
 
 // Public v1 API — API-key authenticated (see `public-api/identity.ts`), with its

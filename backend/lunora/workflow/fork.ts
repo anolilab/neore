@@ -9,7 +9,7 @@ import { grantOwnedChatFiles } from "../lib/storage-ownership";
 import { ownedStorageRefsInUrlFields, storageKeysInUrlFields } from "../lib/stored-url-fields";
 import { throwForbidden, throwNotFound } from "../lib/error-helpers";
 import { MAX_LENGTH } from "../lib/validators";
-import { grantWorkflowImages } from "./images";
+import { grantWorkflowFiles } from "./images";
 import { findOwnedVaultRows, insertVaultCopies, rewriteStorageKeys, scheduleVaultObjectCopies, vVaultRowToCopy, type VaultRowToCopy } from "../vault/fork-copy";
 
 /**
@@ -116,9 +116,9 @@ export const completeFork = internalMutation
             const keys = new Set(storageKeysInUrlFields(source.workflowContent));
             const granted = await grantOwnedChatFiles(context.db, source.userId, userId, keys);
 
-            // Image nodes name their file by `imageFileId`, not by key: grant the ones the
+            // Image and file nodes name their file by id, not by key: grant the ones the
             // author holds too, before `createProject` counts the fork's images.
-            await grantWorkflowImages(context.db, source.userId, userId, source.workflowContent);
+            await grantWorkflowFiles(context.db, source.userId, userId, source.workflowContent);
 
             // A guest account gets its fork without the vault copies: a copy costs
             // storage, and guest accounts are free to create. The images are stripped.

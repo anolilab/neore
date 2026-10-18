@@ -72,6 +72,20 @@ describe(uploadFile, () => {
         expect(progress.at(-1)).toBe(100);
     });
 
+    it("declares a reference-media purpose on the create's URL, and only then", async () => {
+        const server = tusServer();
+
+        vi.stubGlobal("fetch", server.fetch);
+
+        await uploadFile(new File(["ftyp"], "clip.mp4"), { contentType: "video/mp4", purpose: "reference-media" });
+        await uploadFile(new File(["%PDF-1.7"], "a.pdf"), { contentType: "application/pdf" });
+
+        expect(server.requests.filter((request) => request.method === "POST").map((request) => request.url)).toStrictEqual([
+            "http://localhost:8788/uploads?purpose=reference-media",
+            "http://localhost:8788/uploads",
+        ]);
+    });
+
     it.each([
         [413, "too-large"],
         [415, "unsupported"],

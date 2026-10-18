@@ -21,11 +21,27 @@
  * - **Per-user upload state.** In-progress state lives under the caller's own
  *   prefix, so a `PATCH`/`HEAD`/`DELETE` naming someone else's upload id finds
  *   nothing (404).
+ * - **Purpose, declared on the create.** `POST /uploads?purpose=…` names what
+ *   the file is for: `chat` (the default) or `reference-media` (workflow video
+ *   and audio, `document-limits.ts`). Any other value is refused (400). The
+ *   purpose picks the create's allowlist and size caps, and its key: a
+ *   reference-media object is named `uploads/<callerId>/reference-media/<id>`,
+ *   so a chat finalize does not address it. Every staged object is also
+ *   stamped with its purpose in its R2 custom metadata (`purpose`) when the
+ *   object is written, which is lazily, at the first `PATCH` (or at create for
+ *   an empty file). The stamp is derived from the key, never from a request.
+ *   An object with no stamp is chat, which is what the objects written before
+ *   the stamp are. Each finalize step refuses an object stamped for another
+ *   purpose, and checks the real bytes against its own allowlist.
+ * - **The public API takes no purpose.** `/api/v1/uploads` is chat only, and a
+ *   `purpose` there is refused (400) by `refuseDeclaredPurpose`.
  * - **Size caps from the declared type.** A create declaring more than its
- *   type's chat limit (`uploadLimitFor`), or no size, is refused (413) before a
- *   byte is stored, and no chunk may run past the declared length.
- * - **The MIME allowlist** (`UPLOAD_ALLOWED_MIME`): any other declared type is
- *   refused (415).
+ *   purpose's cap for that type, or no size, is refused (413) before a byte is
+ *   stored, and no chunk may run past the declared length. Requests that are
+ *   not creates are bounded by the length declared at creation, so they carry
+ *   no purpose and use the largest cap.
+ * - **The MIME allowlist**: a create whose declared type its purpose does not
+ *   allow is refused (415). `chat` allows `UPLOAD_ALLOWED_MIME` only.
  * - **Rate limited** per caller on each create: past it, 429 with `Retry-After`.
  * - **Write-only.** The handler refuses `GET` (405); downloads stay on signed
  *   URLs (`lib/signed-storage.ts`).
@@ -39,9 +55,11 @@ import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { UPLOAD_ALLOWED_MIME } from "../vault/lib/file-constants";
-import { FINALIZE_MAX_BYTES, normalizeContentType, uploadLimitFor } from "./chat-upload";
-import { STAGING_TTL_MS, stagingKeyFor, uploadStatePrefixFor } from "./chat-upload-staging";
+import { normalizeContentType, uploadLimitFor } from "./chat-upload";
+import type { UploadPurpose } from "./chat-upload-staging";
+import { PURPOSE_METADATA_KEY, purposeOfStagingKey, STAGING_PREFIX, STAGING_TTL_MS, stagingKeyFor, uploadStatePrefixFor } from "./chat-upload-staging";
 import { inShard } from "./http-shard";
+import { MAX_REFERENCE_MEDIA_BYTES, REFERENCE_MEDIA_MIME_TYPES, referenceMediaLimitFor } from "./document-limits";
 
 /** Where browsers upload. The TUS upload URL of each file is `<UPLOAD_PATH>/<uploadId>`. */
 export const UPLOAD_PATH = "/uploads";
@@ -52,12 +70,65 @@ export const TUS_REQUEST_HEADERS = ["Tus-Resumable", "Upload-Length", "Upload-Me
 /** Response headers the TUS client reads, for CORS. */
 export const TUS_RESPONSE_HEADERS = ["Location", "Tus-Resumable", "Upload-Length", "Upload-Offset", "Upload-Metadata"];
 
+const UPLOAD_PURPOSES: ReadonlySet<string> = new Set(["chat", "reference-media"]);
+
+/** The purpose a create declares in `?purpose=` (absent means chat), or `undefined` for a value that names none. */
+const declaredPurpose = (request: Request): UploadPurpose | undefined => {
+    const value = new URL(request.url).searchParams.get("purpose") ?? "chat";
+
+    return UPLOAD_PURPOSES.has(value) ? (value as UploadPurpose) : undefined;
+};
+
+/** The MIME types a create for `purpose` may declare; a request that is not a create gets the union. */
+export const allowedTypesFor = (purpose: UploadPurpose | undefined): ReadonlyArray<string> => {
+    if (purpose === "chat") {
+        return UPLOAD_ALLOWED_MIME;
+    }
+
+    if (purpose === "reference-media") {
+        return REFERENCE_MEDIA_MIME_TYPES;
+    }
+
+    return [...UPLOAD_ALLOWED_MIME, ...REFERENCE_MEDIA_MIME_TYPES];
+};
+
+/** The size cap a create for `purpose` declares a type against. Only creates are capped, so `purpose` is set for them. */
+const sizeCapFor = (purpose: UploadPurpose | undefined, contentType: string): number | undefined =>
+    purpose === "reference-media" ? referenceMediaLimitFor(contentType) : uploadLimitFor(contentType);
+
+/**
+ * The bucket as the provider writes it, with every staged object stamped with
+ * its purpose. The provider creates an object lazily and hands the R2 binding
+ * only a content type, so the stamp is added here, from the key (which names
+ * the purpose at create), on each write that creates an object.
+ */
+const stampStagedObjects = (bucket: R2UploadBucket): R2UploadBucket =>
+    new Proxy(bucket, {
+        get(target, property) {
+            const value: unknown = Reflect.get(target, property, target);
+            const stamp = (key: string, options: object | undefined) =>
+                key.startsWith(STAGING_PREFIX) ? { ...options, customMetadata: { [PURPOSE_METADATA_KEY]: purposeOfStagingKey(key) } } : options;
+
+            if (property === "createMultipartUpload") {
+                return (key: string, options?: object) => target.createMultipartUpload(key, stamp(key, options));
+            }
+
+            if (property === "put") {
+                return (key: string, body: unknown, options?: object) => target.put(key, body as never, stamp(key, options) as never);
+            }
+
+            return typeof value === "function" ? value.bind(target) : value;
+        },
+    });
+
 export interface UserUploadOptions {
     /** Asked on every request that would create an upload; a response refuses it as is. */
     admitCreate: () => Promise<Response | undefined>;
     bucket: R2UploadBucket;
     /** Called with the staging key of every upload created. */
     onCreated: (key: string) => Promise<void>;
+    /** The purpose of a create, or `undefined` for a request continuing an upload already created. */
+    purpose: UploadPurpose | undefined;
     userId: string;
 }
 
@@ -68,14 +139,14 @@ export interface UserUploadOptions {
  * `filename` and `onCreate` close over the caller too, so `@lunora/storage`'s
  * per-request `stateScope` would not save the build.
  */
-export const createUserUploadHandler = ({ admitCreate, bucket, onCreated, userId }: UserUploadOptions): UploadHandler =>
+export const createUserUploadHandler = ({ admitCreate, bucket, onCreated, purpose, userId }: UserUploadOptions): UploadHandler =>
     createUploadHandler({
         authorize: async ({ method }) => method !== "POST" || ((await admitCreate()) ?? true),
-        maxFileSize: FINALIZE_MAX_BYTES,
-        maxFileSizeFor: ({ contentType }) => uploadLimitFor(normalizeContentType(contentType)),
-        storage: createR2BindingUploadStorage(bucket, {
-            allowMIME: [...UPLOAD_ALLOWED_MIME],
-            filename: (file) => stagingKeyFor(userId, file.id),
+        maxFileSize: MAX_REFERENCE_MEDIA_BYTES,
+        maxFileSizeFor: ({ contentType }) => sizeCapFor(purpose, normalizeContentType(contentType)),
+        storage: createR2BindingUploadStorage(stampStagedObjects(bucket), {
+            allowMIME: [...allowedTypesFor(purpose)],
+            filename: (file) => stagingKeyFor(userId, file.id, purpose ?? "chat"),
             onCreate: async (file) => {
                 await onCreated(file.name);
             },
@@ -96,6 +167,14 @@ const refusal = (status: number, message: string, headers: Record<string, string
     Response.json({ error: { message } }, { headers: { ...headers, "Tus-Resumable": "1.0.0" }, status });
 
 /**
+ * The public API's upload route admits chat uploads only, so a `purpose` there
+ * is refused rather than ignored: a reference-media object is not one its
+ * finalize can be reached through from that route.
+ */
+export const refuseDeclaredPurpose = (request: Request): Response | undefined =>
+    new URL(request.url).searchParams.has("purpose") ? refusal(400, "The upload purpose cannot be set on the public API.") : undefined;
+
+/**
  * Serve one upload request for whoever `context.auth` resolved, on that
  * caller's shard. `admit` runs first on every request (a public API key's
  * scope check); a create is then charged against `uploads/create`, and its
@@ -111,6 +190,13 @@ export const handleUploadRequest = async (
 
     if (!userId) {
         return refusal(401, "Authentication required.");
+    }
+
+    const creating = request.method === "POST";
+    const purpose = creating ? declaredPurpose(request) : undefined;
+
+    if (creating && purpose === undefined) {
+        return refusal(400, "Unknown upload purpose.");
     }
 
     if (!isUploadBucket(bucket) || !context.scheduler) {
@@ -140,9 +226,12 @@ export const handleUploadRequest = async (
             onCreated: async (key) => {
                 await scheduler.runAfter(STAGING_TTL_MS, internal.lib.storage_cleanup.deleteObjects, { keys: [key] });
             },
+            purpose,
             userId,
         });
 
         return await handler.fetch(request);
     });
 };
+
+export { type UploadPurpose } from "./chat-upload-staging";
