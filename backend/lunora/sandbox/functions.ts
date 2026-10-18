@@ -135,19 +135,19 @@ export const checkAndTerminateIdle = internalMutation
 
         if (idleMs < timeoutMs) {
             // Not idle yet: the cleanup action checks again once the idle window has run out.
-            return { recheckInMs: timeoutMs - idleMs, shouldTerminate: false };
+            return { recheckInMs: timeoutMs - idleMs, shouldTerminate: false, userId: session.userId };
         }
 
         // A bot's computer keeps its filesystem and memory: it is paused, not killed,
         // and the next call resumes it (`sandbox-node.ts#getOrCreateBotComputer`).
         // A bot's computer stays active until its pause succeeds (`markBotComputerPaused`), so a failed pause is retried.
         if (session.botId !== undefined) {
-            return { decidedAt: ctx.now, pause: true, sandboxId: session.sandboxId, shouldTerminate: true };
+            return { decidedAt: ctx.now, pause: true, sandboxId: session.sandboxId, shouldTerminate: true, userId: session.userId };
         }
 
         await ctx.db.patch(sessionId, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
 
-        return { pause: false, sandboxId: session.sandboxId, shouldTerminate: true };
+        return { pause: false, sandboxId: session.sandboxId, shouldTerminate: true, userId: session.userId };
     });
 
 /**

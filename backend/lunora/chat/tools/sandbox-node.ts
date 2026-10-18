@@ -11,6 +11,7 @@ import type { Sandbox } from "e2b";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
+import { runAfterOnShard } from "../../lib/shard-scheduler";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { internalAction } from "../../_generated/server";
@@ -101,7 +102,7 @@ export const getOrCreateBotComputer = async (
                 throw new Error("Your computer was retired while it was resuming.");
             }
 
-            await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000);
+            await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000, userId);
 
             return { isNew: false, sandbox, sessionId: claim.sessionId };
         } catch {
@@ -131,7 +132,7 @@ export const getOrCreateBotComputer = async (
             throw new Error("Your computer was retired while it was starting.");
         }
 
-        await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000);
+        await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000, userId);
 
         return { isNew: true, sandbox, sessionId: claim.sessionId };
     } catch (error) {
@@ -152,8 +153,9 @@ export const getOrCreateBotComputer = async (
 };
 
 /** Schedule the idle check that pauses or kills a session, and remember it on the session. */
-const armIdleCheck = async (context: any, sessionId: Id<"sandboxSessions">, afterMs: number): Promise<void> => {
-    const cleanupFunctionId = await context.scheduler.runAfter(afterMs, internal.sandbox.cleanup.checkAndTerminateSandbox, { sessionId });
+const armIdleCheck = async (context: any, sessionId: Id<"sandboxSessions">, afterMs: number, userId: string): Promise<void> => {
+    // Routed to the owner's shard: the session row lives there, so the cleanup must run there to find it.
+    const cleanupFunctionId = await runAfterOnShard(context.scheduler, afterMs, internal.sandbox.cleanup.checkAndTerminateSandbox, { sessionId }, userId);
 
     await context.runMutation(internal.sandbox.functions.updateSession, {
         cleanupFnId: String(cleanupFunctionId),
@@ -234,7 +236,13 @@ export const getOrCreateSandbox = async (
     });
 
     // Schedule idle cleanup
-    const cleanupFunctionId = await context.scheduler.runAfter(DEFAULT_TIMEOUT_MS + 10_000, internal.sandbox.cleanup.checkAndTerminateSandbox, { sessionId });
+    const cleanupFunctionId = await runAfterOnShard(
+        context.scheduler,
+        DEFAULT_TIMEOUT_MS + 10_000,
+        internal.sandbox.cleanup.checkAndTerminateSandbox,
+        { sessionId },
+        userId,
+    );
 
     await context.runMutation(internal.sandbox.functions.updateSession, {
         cleanupFnId: String(cleanupFunctionId),

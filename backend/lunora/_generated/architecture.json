@@ -5201,11 +5201,6 @@
       "to": "function:sandbox_functions:markBotComputerPaused"
     },
     {
-      "from": "function:sandbox_cleanup:checkAndTerminateSandbox",
-      "kind": "schedule",
-      "to": "function:sandbox_cleanup:checkAndTerminateSandbox"
-    },
-    {
       "from": "function:sandbox_functions:activateBotComputer",
       "kind": "write",
       "to": "table:sandboxSessions"
@@ -16963,97 +16958,85 @@
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 71,
+      "line": 72,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 98,
+      "line": 99,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 108,
+      "line": 109,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 130,
+      "line": 131,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 144,
-      "reason": "\"getOrCreateBotComputer\" is not a registered function"
-    },
-    {
-      "file": "chat/tools/sandbox-node",
-      "kind": "schedule",
-      "line": 156,
+      "line": 145,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 158,
+      "line": 160,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 178,
+      "line": 180,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 181,
+      "line": 183,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 189,
+      "line": 191,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 201,
+      "line": 203,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 208,
+      "line": 210,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 217,
+      "line": 219,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 230,
-      "reason": "\"getOrCreateSandbox\" is not a registered function"
-    },
-    {
-      "file": "chat/tools/sandbox-node",
-      "kind": "schedule",
-      "line": 237,
+      "line": 232,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 239,
+      "line": 247,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {

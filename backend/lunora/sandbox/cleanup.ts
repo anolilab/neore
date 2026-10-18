@@ -10,6 +10,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { E2B_API_KEY } from "../env";
 
 ("use node");
@@ -30,7 +31,13 @@ export const checkAndTerminateSandbox = internalAction
 
         if (!result.shouldTerminate) {
             if (result.recheckInMs !== undefined) {
-                await ctx.scheduler.runAfter(result.recheckInMs + 1000, internal.sandbox.cleanup.checkAndTerminateSandbox, { sessionId });
+                await runAfterOnShard(
+                    ctx.scheduler,
+                    result.recheckInMs + 1000,
+                    internal.sandbox.cleanup.checkAndTerminateSandbox,
+                    { sessionId },
+                    result.userId,
+                );
             }
 
             return;
@@ -58,10 +65,13 @@ export const checkAndTerminateSandbox = internalAction
                 // Sandbox may already be gone. A bot's computer whose pause failed is retried, so it does not run on
                 // until its lifetime cap; the retry stops after a few attempts.
                 if (result.pause && pauseAttempt < MAX_PAUSE_ATTEMPTS) {
-                    await ctx.scheduler.runAfter(PAUSE_RETRY_MS, internal.sandbox.cleanup.checkAndTerminateSandbox, {
-                        pauseAttempt: pauseAttempt + 1,
-                        sessionId,
-                    });
+                    await runAfterOnShard(
+                        ctx.scheduler,
+                        PAUSE_RETRY_MS,
+                        internal.sandbox.cleanup.checkAndTerminateSandbox,
+                        { pauseAttempt: pauseAttempt + 1, sessionId },
+                        result.userId,
+                    );
                 }
             }
         }
