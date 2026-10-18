@@ -750,8 +750,8 @@ msgstr "{fileCount, plural, one {Änderungen (# Datei)} other {Änderungen (# Da
 msgid "{fileCount, plural, one {Failed to upload # file} other {Failed to upload # files}}"
 msgstr "{fileCount, plural, one {# Datei konnte nicht hochgeladen werden} other {# Dateien konnten nicht hochgeladen werden}}"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:160
-#: src/features/workflow/components/nodes/video-node.tsx:236
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:154
+#: src/features/workflow/components/nodes/video-node.tsx:238
 msgid "{fps} fps"
 msgstr "{fps} fps"
 
@@ -1139,7 +1139,7 @@ msgstr "1.000 Nachrichten pro Tag"
 msgid "1,000 requests/day"
 msgstr "1.000 Anfragen/Tag"
 
-#: src/features/workflow/components/nodes/video-node.tsx:25
+#: src/features/workflow/components/nodes/video-node.tsx:27
 msgid "1:1 (Square)"
 msgstr "1:1 (Quadratisch)"
 
@@ -1167,7 +1167,7 @@ msgstr "1080p"
 msgid "12 seconds"
 msgstr "12 Sekunden"
 
-#: src/features/workflow/components/nodes/video-node.tsx:23
+#: src/features/workflow/components/nodes/video-node.tsx:25
 msgid "16:9 (Landscape)"
 msgstr "16:9 (Querformat)"
 
@@ -1183,7 +1183,7 @@ msgstr "Glas der 1970er, verträumt"
 msgid "20 free messages a day to start. No credit card required. Upgrade when you're ready, cancel anytime."
 msgstr "Zum Start 20 kostenlose Nachrichten pro Tag. Keine Kreditkarte erforderlich. Upgraden, wenn du bereit bist – jederzeit kündbar."
 
-#: src/features/workflow/components/nodes/video-node.tsx:28
+#: src/features/workflow/components/nodes/video-node.tsx:30
 msgid "21:9 (Ultrawide)"
 msgstr "21:9 (Ultrawide)"
 
@@ -1227,7 +1227,7 @@ msgstr "2M-Token-Kontextfenster mit schneller Inferenz"
 msgid "2x squeeze, blue flares"
 msgstr "2x-Squeeze, blaue Flares"
 
-#: src/features/workflow/components/nodes/video-node.tsx:27
+#: src/features/workflow/components/nodes/video-node.tsx:29
 msgid "3:4"
 msgstr "3:4"
 
@@ -1259,11 +1259,11 @@ msgstr "300 DPI"
 msgid "30d"
 msgstr "30T"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:22
+#: src/features/workflow/components/nodes/controlnet-node.tsx:24
 msgid "3D depth estimation"
 msgstr "3D-Tiefenschätzung"
 
-#: src/features/workflow/components/nodes/video-node.tsx:26
+#: src/features/workflow/components/nodes/video-node.tsx:28
 msgid "4:3"
 msgstr "4:3"
 
@@ -1307,7 +1307,7 @@ msgstr "80K-Token-Kontext für die Analyse langer Dokumente"
 msgid "8K digital, punchy saturation"
 msgstr "8K digital, kräftige Sättigung"
 
-#: src/features/workflow/components/nodes/video-node.tsx:24
+#: src/features/workflow/components/nodes/video-node.tsx:26
 msgid "9:16 (Portrait)"
 msgstr "9:16 (Hochformat)"
 
@@ -1455,7 +1455,7 @@ msgstr "über {0} (öffnet in einem neuen Tab)"
 msgid "About You"
 msgstr "Über dich"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:95
+#: src/features/workflow/components/nodes/video-model-options.tsx:92
 msgid "Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p."
 msgstr "Über {FREE_PLAN_MAX_HEIGHT}p ist ein Pro-Tarif nötig. Sonst wird das Video in {FREE_PLAN_MAX_HEIGHT}p erzeugt."
 
@@ -1775,7 +1775,7 @@ msgstr "Mitglied hinzufügen"
 #~ msgid "Add Member Directly"
 #~ msgstr "Mitglied direkt hinzufügen"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:145
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:146
 msgid "Add Model"
 msgstr "Modell hinzufügen"
 
@@ -1788,7 +1788,7 @@ msgstr "Weitere Zeilen hinzufügen"
 msgid "Add node"
 msgstr "Node hinzufügen"
 
-#: src/features/workflow/types/index.ts:461
+#: src/features/workflow/types/index.ts:462
 msgid "Add notes and annotations to the canvas"
 msgstr "Notizen und Anmerkungen zum Canvas hinzufügen"
 
@@ -1818,7 +1818,7 @@ msgstr "Anbieter hinzufügen"
 msgid "Add Rectangle"
 msgstr "Rechteck hinzufügen"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:200
+#: src/features/workflow/components/nodes/character-ref-node.tsx:193
 msgid "Add reference image"
 msgstr "Referenzbild hinzufügen"
 
@@ -1830,7 +1830,7 @@ msgstr "Referenzbilder hinzufügen"
 msgid "Add reference images (up to {maxReferenceImages})"
 msgstr "Referenzbilder hinzufügen (bis zu {maxReferenceImages})"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:219
+#: src/features/workflow/components/nodes/character-ref-node.tsx:212
 msgid "Add reference images to maintain consistency"
 msgstr "Referenzbilder hinzufügen, um die Konsistenz zu wahren"
 
@@ -1896,7 +1896,7 @@ msgstr "Zu Favoriten hinzufügen"
 msgid "Add to starred"
 msgstr "Zu Favoriten hinzufügen"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:24
+#: src/features/workflow/components/nodes/object-editor-node.tsx:26
 msgid "Add/Replace Object"
 msgstr "Objekt hinzufügen/ersetzen"
 
@@ -2022,8 +2022,8 @@ msgstr "Erweiterte Steuerung der Kamerabewegung"
 msgid "Advanced coding tasks requiring OpenAI's refined Codex capabilities"
 msgstr "Anspruchsvolle Coding-Aufgaben, die die verfeinerten Codex-Fähigkeiten von OpenAI erfordern"
 
-#: src/features/workflow/types/index.ts:373
-#: src/features/workflow/types/index.ts:377
+#: src/features/workflow/types/index.ts:374
+#: src/features/workflow/types/index.ts:378
 msgid "Advanced Controls"
 msgstr "Erweiterte Steuerung"
 
@@ -2246,7 +2246,7 @@ msgid "Aggregate scores of both runs"
 msgstr "Gesamtbewertungen beider Durchläufe"
 
 #: src/features/chat/pins/pin-item.tsx:228
-#: src/features/workflow/types/index.ts:383
+#: src/features/workflow/types/index.ts:384
 msgid "AI"
 msgstr "KI"
 
@@ -2255,7 +2255,7 @@ msgstr "KI"
 msgid "AI Chat"
 msgstr "KI-Chat"
 
-#: src/features/workflow/templates/index.ts:484
+#: src/features/workflow/templates/index.ts:485
 msgid "AI Chat Pipeline"
 msgstr "KI-Chat-Pipeline"
 
@@ -2280,7 +2280,7 @@ msgstr "KI-Bildgenerierung"
 msgid "AI Memory System"
 msgstr "KI-Erinnerungssystem"
 
-#: src/features/workflow/types/index.ts:387
+#: src/features/workflow/types/index.ts:388
 msgid "AI Model"
 msgstr "KI-Modell"
 
@@ -2300,7 +2300,7 @@ msgstr "KI-optimiert"
 msgid "AI Provider Keys"
 msgstr "KI-Anbieterschlüssel"
 
-#: src/features/workflow/templates/index.ts:465
+#: src/features/workflow/templates/index.ts:466
 msgid "AI Response"
 msgstr "KI-Antwort"
 
@@ -2501,7 +2501,7 @@ msgstr "Alle Änderungen gespeichert"
 msgid "All chats"
 msgstr "Alle Chats"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:22
+#: src/features/workflow/components/nodes/outpaint-node.tsx:24
 msgid "All Directions"
 msgstr "Alle Richtungen"
 
@@ -2759,7 +2759,7 @@ msgstr "Analytics"
 msgid "Angle"
 msgstr "Winkel"
 
-#: src/features/workflow/types/index.ts:525
+#: src/features/workflow/types/index.ts:526
 msgid "Animate static images with AI"
 msgstr "Statische Bilder mit KI animieren"
 
@@ -2991,11 +2991,11 @@ msgstr "Anwendungsfehler"
 msgid "Apply"
 msgstr "Anwenden"
 
-#: src/features/workflow/templates/index.ts:212
+#: src/features/workflow/templates/index.ts:213
 msgid "Apply an artistic style to any image"
 msgstr "Einen künstlerischen Stil auf jedes Bild anwenden"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:24
+#: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Apply artistic style"
 msgstr "Künstlerischen Stil anwenden"
 
@@ -3007,7 +3007,7 @@ msgstr "Best Practices, Muster und domänenspezifische Richtlinien anwenden. Ber
 msgid "Apply changes"
 msgstr "Änderungen übernehmen"
 
-#: src/features/workflow/types/index.ts:613
+#: src/features/workflow/types/index.ts:614
 msgid "Apply consistent artistic style across generations"
 msgstr "Einheitlichen künstlerischen Stil über alle Generierungen anwenden"
 
@@ -3019,7 +3019,7 @@ msgstr "Zuschnitt anwenden"
 msgid "Apply Mask"
 msgstr "Maske anwenden"
 
-#: src/features/workflow/templates/index.ts:195
+#: src/features/workflow/templates/index.ts:196
 msgid "Apply Style"
 msgstr "Stil anwenden"
 
@@ -3211,7 +3211,7 @@ msgstr "Künstliche Intelligenz"
 
 #: src/features/marketing/data/models-data.ts:98
 #: src/features/marketing/data/models-data.ts:200
-#: src/features/workflow/templates/index.ts:216
+#: src/features/workflow/templates/index.ts:217
 msgid "artistic"
 msgstr "künstlerisch"
 
@@ -3259,7 +3259,7 @@ msgstr "Seitenverhältnis"
 
 #: src/features/chat/thread/media-gallery-view.tsx:448
 #: src/features/chat/thread/media-gallery-view.tsx:533
-#: src/features/workflow/components/nodes/video-node.tsx:178
+#: src/features/workflow/components/nodes/video-node.tsx:180
 msgid "Aspect Ratio"
 msgstr "Seitenverhältnis"
 
@@ -3331,7 +3331,7 @@ msgstr "Auckland"
 msgid "Audio"
 msgstr "Audio"
 
-#: src/features/workflow/types/index.ts:397
+#: src/features/workflow/types/index.ts:398
 msgid "Audio (TTS)"
 msgstr "Audio (TTS)"
 
@@ -3410,7 +3410,7 @@ msgstr "Automatisches Speichern aktiviert"
 msgid "Auto-Delete Active"
 msgstr "Automatisches Löschen aktiv"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:154
+#: src/features/workflow/components/nodes/controlnet-node.tsx:148
 #: src/features/workflow/components/nodes/transcription-node.tsx:16
 msgid "Auto-detect"
 msgstr "Automatisch erkennen"
@@ -3579,11 +3579,11 @@ msgstr "Zurück zur Galerie"
 msgid "Back to workflows"
 msgstr "Zurück zu den Workflows"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:107
+#: src/features/workflow/components/nodes/background-removal-node.tsx:100
 msgid "Background Color (optional)"
 msgstr "Hintergrundfarbe (optional)"
 
-#: src/features/workflow/types/index.ts:412
+#: src/features/workflow/types/index.ts:413
 msgid "Background Removal"
 msgstr "Hintergrundentfernung"
 
@@ -3728,7 +3728,7 @@ msgstr "Bedrock-Konsole → API-Schlüssel. Verschlüsselt gespeichert und nie w
 msgid "Before"
 msgstr "Vorher"
 
-#: src/features/workflow/templates/index.ts:125
+#: src/features/workflow/templates/index.ts:126
 msgid "beginner"
 msgstr "Einsteiger"
 
@@ -3973,7 +3973,7 @@ msgstr "Fetter zentrierter Text"
 msgid "Bolivia"
 msgstr "Bolivien"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:539
 msgid "Bookmark node"
 msgstr "Node als Lesezeichen speichern"
 
@@ -4001,7 +4001,7 @@ msgstr "Bot-Token von @BotFather für deinen Telegram-Bot"
 msgid "Bot token from the Discord Developer Portal"
 msgstr "Bot-Token aus dem Discord Developer Portal"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:26
+#: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
 msgstr "Unten"
 
@@ -4027,8 +4027,8 @@ msgstr "Brainstorming"
 #: src/features/chat/core/hooks/use-thread-manager.ts:134
 #: src/features/chat/core/hooks/use-thread-manager.ts:147
 #: src/features/tasks/components/task-form-dialog.tsx:281
-#: src/features/workflow/types/index.ts:424
-#: src/features/workflow/types/index.ts:428
+#: src/features/workflow/types/index.ts:425
+#: src/features/workflow/types/index.ts:429
 msgid "Branch"
 msgstr "Branch"
 
@@ -4554,7 +4554,7 @@ msgstr "Kandidat"
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "Prompt kann nicht verwendet werden: {errorMessages}"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:23
+#: src/features/workflow/components/nodes/controlnet-node.tsx:25
 msgid "Canny Edge"
 msgstr "Canny Edge"
 
@@ -4757,7 +4757,7 @@ msgstr "Channel Secret aus dem Tab \"Basic settings\", wird zur Prüfung von X-L
 msgid "Channels"
 msgstr "Kanäle"
 
-#: src/features/workflow/templates/index.ts:310
+#: src/features/workflow/templates/index.ts:311
 msgid "character"
 msgstr "Charakter"
 
@@ -4765,7 +4765,7 @@ msgstr "Charakter"
 msgid "character consistency"
 msgstr "Charakterkonsistenz"
 
-#: src/features/workflow/templates/index.ts:309
+#: src/features/workflow/templates/index.ts:310
 msgid "Character Consistency"
 msgstr "Charakterkonsistenz"
 
@@ -4773,9 +4773,9 @@ msgstr "Charakterkonsistenz"
 msgid "Character performance"
 msgstr "Charakterdarstellung"
 
-#: src/features/workflow/templates/index.ts:288
-#: src/features/workflow/types/index.ts:440
-#: src/features/workflow/types/index.ts:444
+#: src/features/workflow/templates/index.ts:289
+#: src/features/workflow/types/index.ts:441
+#: src/features/workflow/types/index.ts:445
 msgid "Character Reference"
 msgstr "Charakterreferenz"
 
@@ -4784,7 +4784,7 @@ msgid "chars"
 msgstr "Zeichen"
 
 #: src/features/marketing/data/models-data.ts:778
-#: src/features/workflow/templates/index.ts:485
+#: src/features/workflow/templates/index.ts:486
 msgid "chat"
 msgstr "Chat"
 
@@ -5325,8 +5325,8 @@ msgstr "Cloud-Anbieterkonten"
 #: src/features/canvas/canvas-panel.tsx:735
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/workflow/components/nodes/code-node.tsx:60
-#: src/features/workflow/types/index.ts:450
-#: src/features/workflow/types/index.ts:454
+#: src/features/workflow/types/index.ts:451
+#: src/features/workflow/types/index.ts:455
 msgid "Code"
 msgstr "Code"
 
@@ -5564,8 +5564,8 @@ msgstr "Befehle"
 #: src/features/pages/components/page-comments-panel.tsx:146
 #: src/features/pages/components/page-view.tsx:429
 #: src/features/workflow/components/nodes/comment-node.tsx:95
-#: src/features/workflow/types/index.ts:460
-#: src/features/workflow/types/index.ts:464
+#: src/features/workflow/types/index.ts:461
+#: src/features/workflow/types/index.ts:465
 msgid "Comment"
 msgstr "Kommentieren"
 
@@ -5670,15 +5670,15 @@ msgstr "Vergleiche, wie verschiedene KI-Modelle einem Einsteiger Quantencomputin
 msgid "Compare models"
 msgstr "Modelle vergleichen"
 
-#: src/features/workflow/templates/index.ts:238
+#: src/features/workflow/templates/index.ts:239
 msgid "Compare Models"
 msgstr "Modelle vergleichen"
 
-#: src/features/workflow/templates/index.ts:254
+#: src/features/workflow/templates/index.ts:255
 msgid "Compare outputs from multiple image models side-by-side"
 msgstr "Ausgaben mehrerer Bildmodelle nebeneinander vergleichen"
 
-#: src/features/workflow/types/index.ts:598
+#: src/features/workflow/types/index.ts:599
 msgid "Compare outputs from multiple models side-by-side"
 msgstr "Ausgaben mehrerer Modelle nebeneinander vergleichen"
 
@@ -5692,11 +5692,11 @@ msgstr "Vor- und Nachteile erneuerbarer Energiequellen vergleichen"
 msgid "Comparing \"{0}\" (baseline) with \"{1}\""
 msgstr "Vergleich von \"{0}\" (Baseline) mit \"{1}\""
 
-#: src/features/workflow/templates/index.ts:258
+#: src/features/workflow/templates/index.ts:259
 msgid "comparison"
 msgstr "Vergleich"
 
-#: src/features/workflow/templates/index.ts:248
+#: src/features/workflow/templates/index.ts:249
 msgid "Comparison Results"
 msgstr "Vergleichsergebnisse"
 
@@ -5823,7 +5823,7 @@ msgstr "Komplexes visuelles Reasoning, das transparentes Denken über visuelle E
 msgid "composition"
 msgstr "Komposition"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:25
+#: src/features/workflow/components/nodes/character-ref-node.tsx:27
 msgid "Composition"
 msgstr "Komposition"
 
@@ -5839,7 +5839,7 @@ msgstr "Kontext wird komprimiert..."
 msgid "Condition (JavaScript expression)"
 msgstr "Bedingung (JavaScript-Ausdruck)"
 
-#: src/features/workflow/types/index.ts:425
+#: src/features/workflow/types/index.ts:426
 msgid "Conditional branching"
 msgstr "Bedingte Verzweigung"
 
@@ -5959,10 +5959,10 @@ msgstr "Verbinde einen LINE Official Account über die Messaging API. Jeder Chat
 msgid "Connect an audio/file node as input"
 msgstr "Einen Audio-/Datei-Node als Eingabe verbinden"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:131
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:176
-#: src/features/workflow/components/nodes/outpaint-node.tsx:157
-#: src/features/workflow/components/nodes/video-node.tsx:165
+#: src/features/workflow/components/nodes/background-removal-node.tsx:124
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:170
+#: src/features/workflow/components/nodes/outpaint-node.tsx:150
+#: src/features/workflow/components/nodes/video-node.tsx:160
 msgid "Connect an image node as input"
 msgstr "Einen Bild-Node als Eingabe verbinden"
 
@@ -5994,8 +5994,8 @@ msgstr "Feishu / Lark verbinden"
 msgid "Connect LINE"
 msgstr "LINE verbinden"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:111
-#: src/features/workflow/components/nodes/object-editor-node.tsx:172
+#: src/features/workflow/components/nodes/inpaint-node.tsx:103
+#: src/features/workflow/components/nodes/object-editor-node.tsx:166
 msgid "Connect mask from upstream node or provide URL"
 msgstr "Maske von einem vorgelagerten Node verbinden oder URL angeben"
 
@@ -6154,7 +6154,7 @@ msgid "Consent Preferences"
 msgstr "Einwilligungseinstellungen"
 
 #: src/features/marketing/data/models-data.ts:332
-#: src/features/workflow/templates/index.ts:310
+#: src/features/workflow/templates/index.ts:311
 msgid "consistency"
 msgstr "Konsistenz"
 
@@ -6205,7 +6205,7 @@ msgstr "Vertrieb kontaktieren"
 msgid "Contact support"
 msgstr "Support kontaktieren"
 
-#: src/features/workflow/types/index.ts:498
+#: src/features/workflow/types/index.ts:499
 msgid "Container for organizing workflow nodes"
 msgstr "Container zum Organisieren von Workflow-Nodes"
 
@@ -6223,11 +6223,11 @@ msgstr "Inhalt"
 msgid "Content Creation"
 msgstr "Content-Erstellung"
 
-#: src/features/workflow/templates/index.ts:187
+#: src/features/workflow/templates/index.ts:188
 msgid "Content Image"
 msgstr "Inhaltsbild"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:118
+#: src/features/workflow/components/nodes/style-ref-node.tsx:110
 msgid "Content Image URL (optional)"
 msgstr "URL des Inhaltsbilds (optional)"
 
@@ -6333,19 +6333,19 @@ msgstr "Schärfentiefe über die Blende steuern"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "Steuere, wie deine persönlichen Informationen in der Benutzeroberfläche angezeigt werden."
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:190
+#: src/features/workflow/components/nodes/controlnet-node.tsx:184
 msgid "Control Strength"
 msgstr "Steuerungsstärke"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:200
+#: src/features/workflow/components/nodes/controlnet-node.tsx:194
 msgid "Control Timing"
 msgstr "Steuerungszeitpunkt"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:107
+#: src/features/workflow/components/nodes/controlnet-node.tsx:108
 msgid "Control Type"
 msgstr "Steuerungstyp"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:223
+#: src/features/workflow/components/nodes/controlnet-node.tsx:217
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "Festlegen, wann der ControlNet-Einfluss während der Generierung wirkt"
 
@@ -6361,12 +6361,12 @@ msgstr "Lege fest, welche KI-Anbieter deine Anfragen bearbeiten dürfen."
 msgid "controlled"
 msgstr "kontrolliert"
 
-#: src/features/workflow/types/index.ts:477
-#: src/features/workflow/types/index.ts:481
+#: src/features/workflow/types/index.ts:478
+#: src/features/workflow/types/index.ts:482
 msgid "ControlNet"
 msgstr "ControlNet"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:129
+#: src/features/workflow/components/nodes/controlnet-node.tsx:130
 msgid "ControlNet Model"
 msgstr "ControlNet-Modell"
 
@@ -6396,11 +6396,11 @@ msgstr "Konvertieren"
 msgid "Convert Account"
 msgstr "Konto konvertieren"
 
-#: src/features/workflow/types/index.ts:633
+#: src/features/workflow/types/index.ts:634
 msgid "Convert speech to text"
 msgstr "Sprache in Text umwandeln"
 
-#: src/features/workflow/types/index.ts:394
+#: src/features/workflow/types/index.ts:395
 msgid "Convert text to speech"
 msgstr "Text in Sprache umwandeln"
 
@@ -7543,7 +7543,7 @@ msgstr "Einen Fehler debuggen oder meinen Code prüfen..."
 msgid "Decompose the goal into an actionable plan."
 msgstr "Zerlege das Ziel in einen umsetzbaren Plan."
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:413
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:415
 msgid "Decrease number of images"
 msgstr "Anzahl der Bilder verringern"
 
@@ -8113,7 +8113,7 @@ msgstr "Deployments, Edge Functions und Frontend-Infrastruktur"
 msgid "Depth"
 msgstr "Tiefe"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:22
+#: src/features/workflow/components/nodes/controlnet-node.tsx:24
 msgid "Depth Map"
 msgstr "Tiefenkarte"
 
@@ -8133,11 +8133,11 @@ msgstr "Abst."
 msgid "Describe a change. You review the result before anything is saved; applying it creates a version you can restore."
 msgstr "Beschreibe eine Änderung. Du prüfst das Ergebnis, bevor etwas gespeichert wird; beim Übernehmen entsteht eine Version, die du wiederherstellen kannst."
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:121
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:115
 msgid "Describe how the image should animate"
 msgstr "Beschreibe, wie das Bild animiert werden soll"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:81
+#: src/features/workflow/components/nodes/img2img-node.tsx:73
 msgid "Describe how to transform the image..."
 msgstr "Beschreibe, wie das Bild umgewandelt werden soll..."
 
@@ -8149,20 +8149,20 @@ msgstr "Beschreibe das zu generierende Bild..."
 msgid "Describe the image you want to create..."
 msgstr "Beschreibe das Bild, das du erstellen möchtest..."
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:116
-#: src/features/workflow/components/nodes/video-node.tsx:159
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:110
+#: src/features/workflow/components/nodes/video-node.tsx:154
 msgid "Describe the motion/animation..."
 msgstr "Beschreibe die Bewegung/Animation..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:176
+#: src/features/workflow/components/nodes/style-ref-node.tsx:168
 msgid "Describe the scene or add style modifiers..."
 msgstr "Beschreibe die Szene oder füge Stilmodifikatoren hinzu..."
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:265
+#: src/features/workflow/components/nodes/character-ref-node.tsx:258
 msgid "Describe the scene or context..."
 msgstr "Beschreibe die Szene oder den Kontext..."
 
-#: src/features/workflow/components/nodes/video-node.tsx:159
+#: src/features/workflow/components/nodes/video-node.tsx:154
 msgid "Describe the video to generate..."
 msgstr "Beschreibe das zu generierende Video..."
 
@@ -8178,11 +8178,11 @@ msgstr "Beschreibe, was der Skill tun soll. Die Felder unten werden für dich zu
 msgid "Describe what this workflow does..."
 msgstr "Beschreibe, was dieser Workflow macht..."
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:131
+#: src/features/workflow/components/nodes/object-editor-node.tsx:125
 msgid "Describe what to add or replace..."
 msgstr "Beschreibe, was hinzugefügt oder ersetzt werden soll..."
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:108
+#: src/features/workflow/components/nodes/outpaint-node.tsx:101
 msgid "Describe what to generate in expanded areas..."
 msgstr "Beschreibe, was in den erweiterten Bereichen generiert werden soll..."
 
@@ -8256,7 +8256,7 @@ msgstr "Designer, die Logos, Icons und Marken-Assets erstellen, bei denen Präzi
 msgid "destructive"
 msgstr "destruktiv"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:515
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:517
 msgid "Detach from group"
 msgstr "Aus Gruppe lösen"
 
@@ -8377,7 +8377,7 @@ msgstr "Digital"
 msgid "Digital Art"
 msgstr "Digitale Kunst"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:117
+#: src/features/workflow/components/nodes/outpaint-node.tsx:110
 msgid "Direction"
 msgstr "Richtung"
 
@@ -8492,11 +8492,11 @@ msgstr ""
 msgid "Dismissed — continuing without an answer"
 msgstr "Verworfen — es geht ohne Antwort weiter"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:174
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:175
 msgid "Display model names on results"
 msgstr "Modellnamen bei Ergebnissen anzeigen"
 
-#: src/features/workflow/types/index.ts:584
+#: src/features/workflow/types/index.ts:585
 msgid "Display results"
 msgstr "Ergebnisse anzeigen"
 
@@ -8658,7 +8658,7 @@ msgstr "Als CSV herunterladen"
 msgid "Download as XLSX"
 msgstr "Als XLSX herunterladen"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:549
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:551
 msgid "Download content"
 msgstr "Inhalt herunterladen"
 
@@ -8823,8 +8823,8 @@ msgstr "Auswahl duplizieren ({selectedNonGroupCount})"
 msgid "Duration"
 msgstr "Dauer"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:130
-#: src/features/workflow/components/nodes/video-node.tsx:197
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:124
+#: src/features/workflow/components/nodes/video-node.tsx:199
 msgid "Duration: {duration}s"
 msgstr "Dauer: {duration} s"
 
@@ -8974,7 +8974,7 @@ msgstr "Edge- und On-Device-Deployment, das Mistrals kleinstes multimodales Mode
 msgid "Edge deployed"
 msgstr "Am Edge bereitgestellt"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:23
+#: src/features/workflow/components/nodes/controlnet-node.tsx:25
 msgid "Edge detection"
 msgstr "Kantenerkennung"
 
@@ -9074,7 +9074,7 @@ msgstr "Bearbeite mich"
 msgid "Edit memory"
 msgstr "Erinnerung bearbeiten"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:87
+#: src/features/workflow/components/nodes/object-editor-node.tsx:88
 msgid "Edit Mode"
 msgstr "Bearbeitungsmodus"
 
@@ -9104,15 +9104,15 @@ msgstr "Skill bearbeiten"
 msgid "Edit Slide {slideNumber}"
 msgstr "Folie {slideNumber} bearbeiten"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
 msgid "Edit specific regions"
 msgstr "Bestimmte Bereiche bearbeiten"
 
-#: src/features/workflow/types/index.ts:545
+#: src/features/workflow/types/index.ts:546
 msgid "Edit specific regions of an image"
 msgstr "Bestimmte Bereiche eines Bildes bearbeiten"
 
-#: src/features/workflow/templates/index.ts:395
+#: src/features/workflow/templates/index.ts:396
 msgid "Edit specific regions of an image with AI"
 msgstr "Bestimmte Bereiche eines Bildes mit KI bearbeiten"
 
@@ -9136,12 +9136,12 @@ msgstr "Nachricht bearbeiten..."
 msgid "edited"
 msgstr "bearbeitet"
 
-#: src/features/workflow/templates/index.ts:389
+#: src/features/workflow/templates/index.ts:390
 msgid "Edited Image"
 msgstr "Bearbeitetes Bild"
 
 #: src/features/marketing/data/models-data.ts:155
-#: src/features/workflow/templates/index.ts:399
+#: src/features/workflow/templates/index.ts:400
 msgid "editing"
 msgstr "Bearbeitung"
 
@@ -9494,7 +9494,7 @@ msgstr "Encrypt Key aus Events & Callbacks > Encryption Strategy (erforderlich �
 msgid "Encrypted at rest and never shown again. Local servers such as Ollama usually need none."
 msgstr "Verschlüsselt gespeichert und nie wieder angezeigt. Lokale Server wie Ollama brauchen meist keinen."
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:215
+#: src/features/workflow/components/nodes/controlnet-node.tsx:209
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:188
 msgid "End"
 msgstr "Ende"
@@ -9566,25 +9566,25 @@ msgstr "Englisch (GB)"
 msgid "English (US)"
 msgstr "Englisch (USA)"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:139
-#: src/features/workflow/components/nodes/upscale-node.tsx:142
+#: src/features/workflow/components/nodes/upscale-node.tsx:132
+#: src/features/workflow/components/nodes/upscale-node.tsx:135
 msgid "Enhance Details"
 msgstr "Details verbessern"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:126
-#: src/features/workflow/components/nodes/upscale-node.tsx:129
+#: src/features/workflow/components/nodes/upscale-node.tsx:119
+#: src/features/workflow/components/nodes/upscale-node.tsx:122
 msgid "Enhance Faces"
 msgstr "Gesichter verbessern"
 
-#: src/features/workflow/types/index.ts:643
+#: src/features/workflow/types/index.ts:644
 msgid "Enhance image resolution"
 msgstr "Bildauflösung erhöhen"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:85
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
 msgid "Enhance resolution"
 msgstr "Auflösung erhöhen"
 
-#: src/features/workflow/templates/index.ts:157
+#: src/features/workflow/templates/index.ts:158
 msgid "Enhanced Image"
 msgstr "Verbessertes Bild"
 
@@ -9608,7 +9608,7 @@ msgstr "Verbessertes Bildverständnis gegenüber GLM 4.5v"
 msgid "Enhanced visual style adaptation"
 msgstr "Verbesserte Anpassung an visuelle Stile"
 
-#: src/features/workflow/templates/index.ts:167
+#: src/features/workflow/templates/index.ts:168
 msgid "enhancement"
 msgstr "Verbesserung"
 
@@ -10157,7 +10157,7 @@ msgstr "Ausführen"
 msgid "Execute cleanup"
 msgstr "Bereinigung ausführen"
 
-#: src/features/workflow/types/index.ts:451
+#: src/features/workflow/types/index.ts:452
 msgid "Execute code"
 msgstr "Code ausführen"
 
@@ -10210,7 +10210,7 @@ msgstr "{title} ausklappen"
 msgid "Expand browser panel"
 msgstr "Browser-Panel ausklappen"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
 msgid "Expand canvas"
 msgstr "Canvas erweitern"
 
@@ -10230,7 +10230,7 @@ msgstr "Gruppe ausklappen"
 msgid "Expand group to show children"
 msgstr "Gruppe ausklappen, um untergeordnete Elemente anzuzeigen"
 
-#: src/features/workflow/types/index.ts:574
+#: src/features/workflow/types/index.ts:575
 msgid "Expand image canvas beyond original borders"
 msgstr "Bild-Canvas über die ursprünglichen Ränder hinaus erweitern"
 
@@ -10242,11 +10242,11 @@ msgstr "Textfeld ausklappen"
 msgid "Expand thinking"
 msgstr "Denkprozess ausklappen"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:554
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:556
 msgid "Expand to fullscreen"
 msgstr "Im Vollbild öffnen"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:135
+#: src/features/workflow/components/nodes/outpaint-node.tsx:128
 msgid "Expand: {expandPixels}px"
 msgstr "Erweitern: {expandPixels}px"
 
@@ -10254,7 +10254,7 @@ msgstr "Erweitern: {expandPixels}px"
 msgid "Expanded Editor"
 msgstr "Erweiterter Editor"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:102
+#: src/features/workflow/components/nodes/outpaint-node.tsx:95
 msgid "Expansion Prompt"
 msgstr "Erweiterungs-Prompt"
 
@@ -10497,7 +10497,7 @@ msgstr "\"{selector}\" extrahieren"
 msgid "Extract page"
 msgstr "Seite extrahieren"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
 msgid "Extract subject"
 msgstr "Motiv extrahieren"
 
@@ -10525,7 +10525,7 @@ msgstr "Extreme Verzerrung"
 msgid "Fable (British)"
 msgstr "Fable (Britisch)"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:23
+#: src/features/workflow/components/nodes/character-ref-node.tsx:25
 msgid "Face"
 msgstr "Gesicht"
 
@@ -11689,8 +11689,8 @@ msgstr "Modelle abrufen"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:26
 #: src/features/evals/components/import-cases-dialog.tsx:81
-#: src/features/workflow/types/index.ts:487
-#: src/features/workflow/types/index.ts:491
+#: src/features/workflow/types/index.ts:488
+#: src/features/workflow/types/index.ts:492
 msgid "File"
 msgstr "Datei"
 
@@ -11702,7 +11702,7 @@ msgstr "Datei \"{fileName}\" erfolgreich gelöscht"
 msgid "File access and AI-powered universal search across work apps"
 msgstr "Dateizugriff und KI-gestützte universelle Suche über Arbeits-Apps hinweg"
 
-#: src/features/workflow/types/index.ts:488
+#: src/features/workflow/types/index.ts:489
 msgid "File input"
 msgstr "Dateieingabe"
 
@@ -11772,7 +11772,7 @@ msgstr "Füllfarbe"
 msgid "Fill in a name, a valid command, a description and instructions before saving."
 msgstr "Gib vor dem Speichern einen Namen, einen gültigen Befehl, eine Beschreibung und Anweisungen ein."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:87
+#: src/features/workflow/components/nodes/inpaint-node.tsx:79
 msgid "Fill Prompt"
 msgstr "Füll-Prompt"
 
@@ -11880,7 +11880,7 @@ msgstr "Die besten Restaurants für italienische Küche in meiner Nähe finden"
 msgid "Find tutorials on how to learn Python programming"
 msgstr "Tutorials zum Erlernen der Python-Programmierung finden"
 
-#: src/features/workflow/types/index.ts:374
+#: src/features/workflow/types/index.ts:375
 msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
 msgstr "CFG Scale, Sampler, Scheduler und Seed feinjustieren"
 
@@ -12565,7 +12565,7 @@ msgstr "4 Bilder mit verschiedenen Modellen generieren und nebeneinander verglei
 msgid "Generate a storyboard for a short documentary"
 msgstr "Ein Storyboard für einen Kurzdokumentarfilm erstellen"
 
-#: src/features/workflow/templates/index.ts:439
+#: src/features/workflow/templates/index.ts:440
 msgid "Generate a video from a text description"
 msgstr "Ein Video aus einer Textbeschreibung generieren"
 
@@ -12573,7 +12573,7 @@ msgstr "Ein Video aus einer Textbeschreibung generieren"
 msgid "Generate an image"
 msgstr "Ein Bild generieren"
 
-#: src/features/workflow/templates/index.ts:121
+#: src/features/workflow/templates/index.ts:122
 msgid "Generate an image from a text prompt"
 msgstr "Ein Bild aus einem Text-Prompt generieren"
 
@@ -12589,7 +12589,7 @@ msgstr "Generiere ein Bild einer gemütlichen Leseecke mit warmem Licht und Pfla
 msgid "Generate an image or video..."
 msgstr "Ein Bild oder Video generieren..."
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:49
+#: src/features/workflow/components/nodes/video-model-options.tsx:50
 msgid "Generate audio"
 msgstr "Audio erzeugen"
 
@@ -12606,11 +12606,11 @@ msgid "Generate image"
 msgstr "Bild generieren"
 
 #: src/features/chat/thread/media-gallery-view.tsx:612
-#: src/features/workflow/templates/index.ts:105
+#: src/features/workflow/templates/index.ts:106
 msgid "Generate Image"
 msgstr "Bild generieren"
 
-#: src/features/workflow/templates/index.ts:306
+#: src/features/workflow/templates/index.ts:307
 msgid "Generate images with consistent character appearance"
 msgstr "Bilder mit einheitlichem Aussehen der Charaktere generieren"
 
@@ -12632,11 +12632,11 @@ msgid "Generate video"
 msgstr "Video generieren"
 
 #: src/features/chat/thread/media-gallery-view.tsx:612
-#: src/features/workflow/templates/index.ts:423
+#: src/features/workflow/templates/index.ts:424
 msgid "Generate Video"
 msgstr "Video generieren"
 
-#: src/features/workflow/types/index.ts:653
+#: src/features/workflow/types/index.ts:661
 msgid "Generate videos from text or images"
 msgstr "Videos aus Text oder Bildern generieren"
 
@@ -12657,7 +12657,7 @@ msgstr "Workflow mit KI generieren"
 msgid "Generated image"
 msgstr "Generiertes Bild"
 
-#: src/features/workflow/templates/index.ts:300
+#: src/features/workflow/templates/index.ts:301
 msgid "Generated Image"
 msgstr "Generiertes Bild"
 
@@ -12710,7 +12710,7 @@ msgstr "Wird generiert..."
 msgid "Generating…"
 msgstr "Wird generiert…"
 
-#: src/features/workflow/templates/index.ts:443
+#: src/features/workflow/templates/index.ts:444
 msgid "generation"
 msgstr "Generierung"
 
@@ -12718,8 +12718,8 @@ msgstr "Generierung"
 msgid "Generation Prompt"
 msgstr "Generierungs-Prompt"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:259
-#: src/features/workflow/components/nodes/style-ref-node.tsx:170
+#: src/features/workflow/components/nodes/character-ref-node.tsx:252
+#: src/features/workflow/components/nodes/style-ref-node.tsx:162
 msgid "Generation Prompt (optional)"
 msgstr "Generierungs-Prompt (optional)"
 
@@ -13248,8 +13248,8 @@ msgstr "Grok-Modelle von xAI mit Echtzeit-Webzugriff"
 #: src/features/workflow/components/nodes/group-node.tsx:299
 #: src/features/workflow/components/nodes/group-node.tsx:317
 #: src/features/workflow/hooks/use-workflow-shortcuts.ts:181
-#: src/features/workflow/types/index.ts:497
-#: src/features/workflow/types/index.ts:501
+#: src/features/workflow/types/index.ts:498
+#: src/features/workflow/types/index.ts:502
 msgid "Group"
 msgstr "Gruppieren"
 
@@ -13302,7 +13302,7 @@ msgstr "Gastkonten verwenden nur kostenlose Modelle."
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gastkonten nutzen nur kostenlose Modelle. Registriere dich, um alle Modelle freizuschalten."
 
-#: src/features/workflow/types/index.ts:478
+#: src/features/workflow/types/index.ts:479
 msgid "Guide generation with pose, depth, or edge detection"
 msgstr "Generierung mit Pose-, Tiefen- oder Kantenerkennung steuern"
 
@@ -13592,7 +13592,7 @@ msgstr "Leichte Aufgaben mit hohem Volumen, die OpenAIs kleinstes und schnellste
 msgid "High-volume, time-sensitive workflows where generation speed is the top priority"
 msgstr "Zeitkritische Workflows mit hohem Volumen, bei denen die Generierungsgeschwindigkeit oberste Priorität hat"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:253
+#: src/features/workflow/components/nodes/character-ref-node.tsx:246
 msgid "Higher = closer match to reference"
 msgstr "Höher = näher an der Referenz"
 
@@ -13600,7 +13600,7 @@ msgstr "Höher = näher an der Referenz"
 msgid "Higher = more prompt adherence, Lower = more creativity"
 msgstr "Höher = stärkere Prompt-Treue, niedriger = mehr Kreativität"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:147
+#: src/features/workflow/components/nodes/style-ref-node.tsx:139
 msgid "Higher = stronger style influence"
 msgstr "Höher = stärkerer Stileinfluss"
 
@@ -13730,15 +13730,15 @@ msgstr "Nur HTTPS. Die Stamm-URL des Servers, wie bei ANTHROPIC_BASE_URL – /v1
 msgid "HTTPS only. Usually ends in /v1."
 msgstr "Nur HTTPS. Endet meist auf /v1."
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:146
+#: src/features/workflow/components/nodes/object-editor-node.tsx:140
 msgid "https://... (white = edit area)"
 msgstr "https://... (weiß = Bearbeitungsbereich)"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:107
+#: src/features/workflow/components/nodes/inpaint-node.tsx:99
 msgid "https://... (white = edit, black = keep)"
 msgstr "https://... (weiß = bearbeiten, schwarz = beibehalten)"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:176
+#: src/features/workflow/components/nodes/controlnet-node.tsx:170
 msgid "https://... or from input"
 msgstr "https://... oder aus der Eingabe"
 
@@ -13750,7 +13750,7 @@ msgstr "Farbton drehen"
 msgid "Human Creativity"
 msgstr "Menschliche Kreativität"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:21
+#: src/features/workflow/components/nodes/controlnet-node.tsx:23
 msgid "Human pose & skeleton"
 msgstr "Menschliche Pose & Skelett"
 
@@ -13840,9 +13840,9 @@ msgstr "Illustration"
 #: src/features/workflow/components/gallery/gallery-card.tsx:27
 #: src/features/workflow/components/nodes/output-node.tsx:19
 #: src/features/workflow/components/template-picker.tsx:20
-#: src/features/workflow/templates/index.ts:363
-#: src/features/workflow/types/index.ts:507
-#: src/features/workflow/types/index.ts:511
+#: src/features/workflow/templates/index.ts:364
+#: src/features/workflow/types/index.ts:508
+#: src/features/workflow/types/index.ts:512
 #: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Image"
 msgstr "Bild"
@@ -13875,7 +13875,7 @@ msgid "Image Gen"
 msgstr "Bildgenerierung"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:91
-#: src/features/workflow/templates/index.ts:125
+#: src/features/workflow/templates/index.ts:126
 msgid "image generation"
 msgstr "Bildgenerierung"
 
@@ -13905,7 +13905,7 @@ msgstr "Modell zur Bildgenerierung"
 #~ msgid "Image is too large. Choose one under 300 KB."
 #~ msgstr ""
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:127
+#: src/features/workflow/components/nodes/style-ref-node.tsx:119
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "Bild, auf das der Stil angewendet wird (oder Eingabe des vorherigen Nodes verwenden)"
 
@@ -13921,17 +13921,17 @@ msgstr "Bild zu Text"
 msgid "Image to video"
 msgstr "Bild zu Video"
 
-#: src/features/workflow/components/nodes/video-node.tsx:126
-#: src/features/workflow/types/index.ts:524
-#: src/features/workflow/types/index.ts:528
+#: src/features/workflow/components/nodes/video-node.tsx:127
+#: src/features/workflow/types/index.ts:525
+#: src/features/workflow/types/index.ts:529
 msgid "Image to Video"
 msgstr "Bild zu Video"
 
-#: src/features/workflow/templates/index.ts:350
+#: src/features/workflow/templates/index.ts:351
 msgid "Image Transform"
 msgstr "Bildumwandlung"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:308
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:309
 msgid "Image upload failed. Try again."
 msgstr ""
 
@@ -13948,12 +13948,12 @@ msgstr "Bild-URL oder hochgeladenes Bild erforderlich"
 msgid "Image variation & editing"
 msgstr "Bildvariation & -bearbeitung"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:112
+#: src/features/workflow/components/nodes/style-ref-node.tsx:104
 msgid "Image whose artistic style will be applied"
 msgstr "Bild, dessen künstlerischer Stil angewendet wird"
 
-#: src/features/workflow/types/index.ts:534
-#: src/features/workflow/types/index.ts:538
+#: src/features/workflow/types/index.ts:535
+#: src/features/workflow/types/index.ts:539
 msgid "Image-to-Image"
 msgstr "Bild-zu-Bild"
 
@@ -13973,11 +13973,11 @@ msgstr "Bilder zu Bild"
 msgid "Images to video"
 msgstr "Bilder zu Video"
 
-#: src/features/workflow/templates/index.ts:351
+#: src/features/workflow/templates/index.ts:352
 msgid "img2img"
 msgstr "img2img"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:90
 msgid "Img2Img"
 msgstr "Img2Img"
 
@@ -14254,7 +14254,7 @@ msgstr "Inceptions diffusionsbasiertes Sprachmodell"
 msgid "Includes audio generation"
 msgstr "Inklusive Audiogenerierung"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:422
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:424
 msgid "Increase number of images"
 msgstr "Anzahl der Bilder erhöhen"
 
@@ -14290,18 +14290,18 @@ msgstr "Von Organisation übernehmen"
 #~ msgid "Initial state"
 #~ msgstr "Ausgangszustand"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
-#: src/features/workflow/templates/index.ts:379
-#: src/features/workflow/types/index.ts:544
-#: src/features/workflow/types/index.ts:548
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
+#: src/features/workflow/templates/index.ts:380
+#: src/features/workflow/types/index.ts:545
+#: src/features/workflow/types/index.ts:549
 msgid "Inpaint"
 msgstr "Inpaint"
 
-#: src/features/workflow/templates/index.ts:398
+#: src/features/workflow/templates/index.ts:399
 msgid "Inpaint Edit"
 msgstr "Inpaint-Bearbeitung"
 
-#: src/features/workflow/templates/index.ts:399
+#: src/features/workflow/templates/index.ts:400
 msgid "inpainting"
 msgstr "Inpainting"
 
@@ -14323,7 +14323,7 @@ msgstr "Eingabe (Rich Text)"
 msgid "Input (URL)"
 msgstr "Eingabe (URL)"
 
-#: src/features/workflow/templates/index.ts:137
+#: src/features/workflow/templates/index.ts:138
 msgid "Input Image"
 msgstr "Eingabebild"
 
@@ -14331,11 +14331,11 @@ msgstr "Eingabebild"
 msgid "Input is required"
 msgstr "Eingabe ist erforderlich"
 
-#: src/features/workflow/types/index.ts:508
+#: src/features/workflow/types/index.ts:509
 msgid "Input or generate images"
 msgstr "Bilder eingeben oder generieren"
 
-#: src/features/workflow/types/index.ts:623
+#: src/features/workflow/types/index.ts:624
 msgid "Input or transform text"
 msgstr "Text eingeben oder umwandeln"
 
@@ -14613,7 +14613,7 @@ msgstr "Einen Skill aufrufen"
 msgid "Invoke Skill"
 msgstr "Skill aufrufen"
 
-#: src/features/workflow/templates/index.ts:310
+#: src/features/workflow/templates/index.ts:311
 msgid "ip-adapter"
 msgstr "ip-adapter"
 
@@ -14975,7 +14975,7 @@ msgstr "Kirgisistan"
 msgid "Label"
 msgstr "Bezeichnung"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:172
+#: src/features/workflow/components/nodes/object-editor-node.tsx:166
 msgid "LAMA uses AI to seamlessly remove objects"
 msgstr "LAMA entfernt Objekte nahtlos mit KI"
 
@@ -15315,7 +15315,7 @@ msgstr "Lass alle abgewählt, um alle indexierten Dateien zu durchsuchen."
 msgid "Leave empty for \"any model\"."
 msgstr "Leer lassen für \"beliebiges Modell\"."
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:126
+#: src/features/workflow/components/nodes/background-removal-node.tsx:119
 msgid "Leave empty for transparent background"
 msgstr "Leer lassen für transparenten Hintergrund"
 
@@ -15336,7 +15336,7 @@ msgid "Leave Team"
 msgstr "Team verlassen"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:397
-#: src/features/workflow/components/nodes/outpaint-node.tsx:23
+#: src/features/workflow/components/nodes/outpaint-node.tsx:25
 msgid "Left"
 msgstr "Links"
 
@@ -15546,7 +15546,7 @@ msgstr "Live-Vorschau – wird aktualisiert, während das Artefakt gestreamt wir
 msgid "LLaMA, Mixtral, Gemma — fastest inference"
 msgstr "LLaMA, Mixtral, Gemma – schnellste Inferenz"
 
-#: src/features/workflow/templates/index.ts:485
+#: src/features/workflow/templates/index.ts:486
 msgid "llm"
 msgstr "llm"
 
@@ -15800,7 +15800,7 @@ msgstr "Standort aktualisiert"
 msgid "Lock group"
 msgstr "Gruppe sperren"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:531
 msgid "Lock node"
 msgstr "Knoten sperren"
 
@@ -15921,7 +15921,7 @@ msgstr "Niedrig"
 msgid "Low latency text-to-video"
 msgstr "Text-zu-Video mit geringer Latenz"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:96
+#: src/features/workflow/components/nodes/img2img-node.tsx:88
 msgid "Lower = subtle changes, Higher = major transformation"
 msgstr "Niedriger = subtile Änderungen, höher = starke Umwandlung"
 
@@ -16002,11 +16002,11 @@ msgstr "Hauptschriftart"
 msgid "Main font updated"
 msgstr "Hauptschriftart aktualisiert"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:157
+#: src/features/workflow/components/nodes/style-ref-node.tsx:149
 msgid "Maintain original structure"
 msgstr "Originalstruktur beibehalten"
 
-#: src/features/workflow/types/index.ts:441
+#: src/features/workflow/types/index.ts:442
 msgid "Maintain subject consistency across generations"
 msgstr "Motivkonsistenz über Generierungen hinweg beibehalten"
 
@@ -16182,11 +16182,11 @@ msgstr "Alle als gelesen markieren"
 msgid "Mark as favorite"
 msgstr "Als Favorit markieren"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:150
+#: src/features/workflow/components/nodes/object-editor-node.tsx:144
 msgid "Mark the area to edit in white"
 msgstr "Den zu bearbeitenden Bereich weiß markieren"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:150
+#: src/features/workflow/components/nodes/object-editor-node.tsx:144
 msgid "Mark the object to remove in white"
 msgstr "Das zu entfernende Objekt weiß markieren"
 
@@ -16219,7 +16219,7 @@ msgstr "Marketing"
 msgid "Marketplace"
 msgstr "Marktplatz"
 
-#: src/features/workflow/templates/index.ts:371
+#: src/features/workflow/templates/index.ts:372
 msgid "Mask"
 msgstr "Maske"
 
@@ -16227,11 +16227,11 @@ msgstr "Maske"
 msgid "Mask preview"
 msgstr "Maskenvorschau"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:140
+#: src/features/workflow/components/nodes/object-editor-node.tsx:134
 msgid "Mask URL"
 msgstr "Masken-URL"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:101
+#: src/features/workflow/components/nodes/inpaint-node.tsx:93
 msgid "Mask URL (optional)"
 msgstr "Masken-URL (optional)"
 
@@ -16248,7 +16248,7 @@ msgstr "Riesiges 235B-MoE-Modell von Alibaba"
 msgid "Match input"
 msgstr "Wie Eingabe"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:25
+#: src/features/workflow/components/nodes/character-ref-node.tsx:27
 msgid "Match layout and structure"
 msgstr "Layout und Struktur übernehmen"
 
@@ -16798,7 +16798,7 @@ msgstr "Mobile-App-Icon"
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
-#: src/features/workflow/components/nodes/video-node.tsx:115
+#: src/features/workflow/components/nodes/video-node.tsx:116
 msgid "Mode"
 msgstr "Modus"
 
@@ -16815,15 +16815,15 @@ msgstr "Modus:"
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
 #: src/features/workflow/components/nodes/character-ref-node.tsx:144
 #: src/features/workflow/components/nodes/image-to-video-node.tsx:89
-#: src/features/workflow/components/nodes/img2img-node.tsx:56
-#: src/features/workflow/components/nodes/inpaint-node.tsx:68
+#: src/features/workflow/components/nodes/img2img-node.tsx:55
+#: src/features/workflow/components/nodes/inpaint-node.tsx:67
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:126
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:215
-#: src/features/workflow/components/nodes/object-editor-node.tsx:105
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:216
+#: src/features/workflow/components/nodes/object-editor-node.tsx:106
 #: src/features/workflow/components/nodes/outpaint-node.tsx:83
-#: src/features/workflow/components/nodes/style-ref-node.tsx:84
+#: src/features/workflow/components/nodes/style-ref-node.tsx:83
 #: src/features/workflow/components/nodes/upscale-node.tsx:88
-#: src/features/workflow/components/nodes/video-node.tsx:134
+#: src/features/workflow/components/nodes/video-node.tsx:135
 #: src/routes/admin/gateway/index.tsx:83
 msgid "Model"
 msgstr "Modell"
@@ -16841,7 +16841,7 @@ msgid "Model comparison"
 msgstr "Modellvergleich"
 
 #: src/features/chat/core/hooks/use-comparison-chat.ts:108
-#: src/features/workflow/templates/index.ts:257
+#: src/features/workflow/templates/index.ts:258
 msgid "Model Comparison"
 msgstr "Modellvergleich"
 
@@ -16935,7 +16935,7 @@ msgstr "Von der Organisation übernommene Modelle:"
 msgid "Models support tool calling"
 msgstr "Modelle unterstützen Tool-Aufrufe"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:96
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:97
 msgid "Models to Compare"
 msgstr "Zu vergleichende Modelle"
 
@@ -17103,13 +17103,13 @@ msgstr "Vielseitigstes intelligentes Modell"
 msgid "motion fluidity"
 msgstr "flüssige Bewegungen"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:110
-#: src/features/workflow/components/nodes/video-node.tsx:153
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:104
+#: src/features/workflow/components/nodes/video-node.tsx:148
 msgid "Motion Prompt"
 msgstr "Bewegungs-Prompt"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:144
-#: src/features/workflow/components/nodes/video-node.tsx:212
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:138
+#: src/features/workflow/components/nodes/video-node.tsx:214
 msgid "Motion: {motionPercent}%"
 msgstr "Bewegung: {motionPercent}%"
 
@@ -17494,9 +17494,9 @@ msgstr "Braucht dich"
 msgid "Negative prompt — what to exclude"
 msgstr "Negativ-Prompt – was ausgeschlossen werden soll"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:120
-#: src/features/workflow/components/nodes/object-editor-node.tsx:159
-#: src/features/workflow/components/nodes/outpaint-node.tsx:144
+#: src/features/workflow/components/nodes/inpaint-node.tsx:112
+#: src/features/workflow/components/nodes/object-editor-node.tsx:153
+#: src/features/workflow/components/nodes/outpaint-node.tsx:137
 msgid "Negative Prompt (optional)"
 msgstr "Negativer Prompt (optional)"
 
@@ -18499,7 +18499,7 @@ msgstr "Keine (Aufgabe der obersten Ebene)"
 msgid "Normal"
 msgstr "Normal"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:24
+#: src/features/workflow/components/nodes/controlnet-node.tsx:26
 msgid "Normal Map"
 msgstr "Normal Map"
 
@@ -18679,12 +18679,12 @@ msgstr "Anzahl der Bilder"
 msgid "Number of messages"
 msgstr "Anzahl der Nachrichten"
 
-#: src/features/workflow/types/index.ts:558
-#: src/features/workflow/types/index.ts:562
+#: src/features/workflow/types/index.ts:559
+#: src/features/workflow/types/index.ts:563
 msgid "Object Editor"
 msgstr "Objekt-Editor"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:125
+#: src/features/workflow/components/nodes/object-editor-node.tsx:119
 msgid "Object Prompt"
 msgstr "Objekt-Prompt"
 
@@ -19511,7 +19511,7 @@ msgstr "oder"
 msgid "or click to browse"
 msgstr "oder klicken zum Durchsuchen"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:164
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:165
 msgid "Or connect a Text node to provide the prompt"
 msgstr "Oder verbinde einen Text-Knoten, um den Prompt zu liefern"
 
@@ -19654,9 +19654,9 @@ msgstr "Unsere Datenschutzrichtlinie erläutert, wie wir deine persönlichen Dat
 msgid "Outcome of every case per model"
 msgstr ""
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
-#: src/features/workflow/types/index.ts:573
-#: src/features/workflow/types/index.ts:577
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
+#: src/features/workflow/types/index.ts:574
+#: src/features/workflow/types/index.ts:578
 msgid "Outpaint"
 msgstr "Outpainting"
 
@@ -19664,8 +19664,8 @@ msgstr "Outpainting"
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
-#: src/features/workflow/types/index.ts:583
-#: src/features/workflow/types/index.ts:587
+#: src/features/workflow/types/index.ts:584
+#: src/features/workflow/types/index.ts:588
 msgid "Output"
 msgstr "Ausgabe"
 
@@ -19677,7 +19677,7 @@ msgstr "Ausgabe {outputNumber}: {label}"
 msgid "Output files"
 msgstr "Ausgabedateien"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:82
+#: src/features/workflow/components/nodes/background-removal-node.tsx:75
 msgid "Output Format"
 msgstr "Ausgabeformat"
 
@@ -19827,8 +19827,8 @@ msgstr "Paraguay"
 msgid "Parallel"
 msgstr "Parallel"
 
-#: src/features/workflow/types/index.ts:597
-#: src/features/workflow/types/index.ts:601
+#: src/features/workflow/types/index.ts:598
+#: src/features/workflow/types/index.ts:602
 msgid "Parallel Compare"
 msgstr "Paralleler Vergleich"
 
@@ -19995,7 +19995,7 @@ msgstr "Als Webhook-URL im Tab Messaging API deines LINE-Kanals einfügen."
 msgid "Paste cells"
 msgstr "Zellen einfügen"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:123
+#: src/features/workflow/components/nodes/style-ref-node.tsx:115
 msgid "Paste content image URL to stylize..."
 msgstr "URL des Inhaltsbilds zum Stilisieren einfügen..."
 
@@ -20003,7 +20003,7 @@ msgstr "URL des Inhaltsbilds zum Stilisieren einfügen..."
 msgid "Paste image URL"
 msgstr "Bild-URL einfügen"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:197
+#: src/features/workflow/components/nodes/character-ref-node.tsx:190
 msgid "Paste image URL..."
 msgstr "Bild-URL einfügen..."
 
@@ -20015,7 +20015,7 @@ msgstr "Nur einfügen, was in die vorhandenen Zeilen passt"
 msgid "Paste or write a system prompt to optimize..."
 msgstr "Füge einen System-Prompt zum Optimieren ein oder schreib einen..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:108
+#: src/features/workflow/components/nodes/style-ref-node.tsx:100
 msgid "Paste style reference image URL..."
 msgstr "URL des Stil-Referenzbilds einfügen..."
 
@@ -20410,7 +20410,7 @@ msgstr "Bitte bestätige deine neue E-Mail-Adresse"
 msgid "Plug in your own tools"
 msgstr "Binde deine eigenen Tools ein"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:21
+#: src/features/workflow/components/nodes/background-removal-node.tsx:23
 msgid "PNG (Transparent)"
 msgstr "PNG (transparent)"
 
@@ -20505,7 +20505,7 @@ msgstr "Portugiesisch (Brasilien)"
 msgid "Portuguese (Portugal)"
 msgstr "Portugiesisch (Portugal)"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:21
+#: src/features/workflow/components/nodes/controlnet-node.tsx:23
 msgid "Pose Detection"
 msgstr "Posenerkennung"
 
@@ -20632,7 +20632,7 @@ msgstr "Import wird vorbereitet…"
 msgid "Preparing..."
 msgstr "Wird vorbereitet..."
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:150
+#: src/features/workflow/components/nodes/controlnet-node.tsx:144
 msgid "Preprocessor"
 msgstr "Präprozessor"
 
@@ -20643,12 +20643,12 @@ msgstr "Präprozessor"
 msgid "Presentation"
 msgstr "Präsentation"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:154
-#: src/features/workflow/components/nodes/style-ref-node.tsx:161
+#: src/features/workflow/components/nodes/style-ref-node.tsx:146
+#: src/features/workflow/components/nodes/style-ref-node.tsx:153
 msgid "Preserve Content"
 msgstr "Inhalt beibehalten"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:23
+#: src/features/workflow/components/nodes/character-ref-node.tsx:25
 msgid "Preserve facial features"
 msgstr "Gesichtszüge beibehalten"
 
@@ -20887,13 +20887,18 @@ msgstr "Standardmäßig privat"
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:553
-#: src/features/workflow/components/nodes/video-model-options.tsx:86
+#: src/features/workflow/components/nodes/pro-badge.tsx:6
 msgid "Pro"
 msgstr "Pro"
 
 #: src/features/billing/components/personal-plan-card.tsx:20
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro ist dein eigener Plan: jedes Modell und 1.000 Nachrichten pro Tag."
+
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:92
+#: src/features/workflow/components/nodes/video-node.tsx:138
+msgid "Pro models need a Pro plan. On a free plan the run stops before it starts."
+msgstr "Pro-Modelle erfordern einen Pro-Tarif. Im kostenlosen Tarif wird der Lauf gestoppt, bevor er beginnt."
 
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:29
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
@@ -20903,11 +20908,11 @@ msgstr "Eine Textdatei mit KI verarbeiten, um Kernpunkte zu extrahieren, und dan
 msgid "Process each message independently with only the system prompt and current input. No chat history context."
 msgstr "Jede Nachricht unabhängig verarbeiten, nur mit dem System-Prompt und der aktuellen Eingabe. Ohne Kontext aus dem Chatverlauf."
 
-#: src/features/workflow/templates/index.ts:481
+#: src/features/workflow/templates/index.ts:482
 msgid "Process text through an AI language model"
 msgstr "Text mit einem KI-Sprachmodell verarbeiten"
 
-#: src/features/workflow/types/index.ts:384
+#: src/features/workflow/types/index.ts:385
 msgid "Process with AI model"
 msgstr "Mit KI-Modell verarbeiten"
 
@@ -21079,8 +21084,8 @@ msgstr "Zum Administrator befördern"
 
 #: ../../packages/ui/src/components/image-gallery.tsx:409
 #: src/features/chat/thread/media-gallery-view.tsx:433
-#: src/features/workflow/templates/index.ts:95
-#: src/features/workflow/templates/index.ts:229
+#: src/features/workflow/templates/index.ts:96
+#: src/features/workflow/templates/index.ts:230
 msgid "Prompt"
 msgstr "Prompt"
 
@@ -21147,7 +21152,7 @@ msgstr "Prompt geladen"
 msgid "Prompt optimized successfully"
 msgstr "Prompt erfolgreich optimiert"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:159
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:160
 msgid "Prompt to run on all models..."
 msgstr "Prompt für alle Modelle..."
 
@@ -21842,7 +21847,7 @@ msgstr "Wiederholen"
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr "Wiederholen (Strg+Shift+Z)"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:181
+#: src/features/workflow/components/nodes/controlnet-node.tsx:175
 msgid "Reference"
 msgstr "Referenz"
 
@@ -21850,7 +21855,7 @@ msgstr "Referenz"
 msgid "Reference {ordinal}"
 msgstr "Referenz {ordinal}"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:170
+#: src/features/workflow/components/nodes/controlnet-node.tsx:164
 msgid "Reference Image (optional)"
 msgstr "Referenzbild (optional)"
 
@@ -21872,23 +21877,23 @@ msgstr "Referenzbilder"
 msgid "Reference images"
 msgstr "Referenzbilder"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:163
+#: src/features/workflow/components/nodes/character-ref-node.tsx:156
 msgid "Reference Images ({referenceCount}/{maxImages})"
 msgstr "Referenzbilder ({referenceCount}/{maxImages})"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:139
+#: src/features/workflow/components/nodes/video-model-options.tsx:136
 msgid "Reference mode"
 msgstr "Referenzmodus"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:225
+#: src/features/workflow/components/nodes/character-ref-node.tsx:218
 msgid "Reference Mode"
 msgstr "Referenzmodus"
 
-#: src/features/workflow/templates/index.ts:270
+#: src/features/workflow/templates/index.ts:271
 msgid "Reference Photo"
 msgstr "Referenzfoto"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:247
+#: src/features/workflow/components/nodes/character-ref-node.tsx:240
 msgid "Reference Strength"
 msgstr "Referenzstärke"
 
@@ -21901,7 +21906,7 @@ msgstr "Referenzvideo"
 msgid "Reference videos together must be at least {0} seconds."
 msgstr "Referenzvideos müssen zusammen mindestens {0} Sekunden lang sein."
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:155
+#: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "References"
 msgstr "Referenzen"
 
@@ -21912,7 +21917,7 @@ msgstr "Referenzen"
 msgid "Refine"
 msgstr "Verfeinern"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:100
+#: src/features/workflow/components/nodes/background-removal-node.tsx:93
 msgid "Refine Edge Detection"
 msgstr "Kantenerkennung verfeinern"
 
@@ -22178,19 +22183,19 @@ msgstr "Alle entfernen"
 msgid "Remove All Files"
 msgstr "Alle Dateien entfernen"
 
-#: src/features/workflow/types/index.ts:408
+#: src/features/workflow/types/index.ts:409
 msgid "Remove Background"
 msgstr "Hintergrund entfernen"
 
-#: src/features/workflow/types/index.ts:409
+#: src/features/workflow/types/index.ts:410
 msgid "Remove background and extract subject"
 msgstr "Hintergrund entfernen und Motiv freistellen"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
 msgid "Remove BG"
 msgstr "Hintergrund weg"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:539
 msgid "Remove bookmark"
 msgstr "Lesezeichen entfernen"
 
@@ -22247,15 +22252,15 @@ msgstr "Schlüssel entfernen"
 msgid "Remove Member"
 msgstr "Mitglied entfernen"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:130
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:131
 msgid "Remove model"
 msgstr "Modell entfernen"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:23
+#: src/features/workflow/components/nodes/object-editor-node.tsx:25
 msgid "Remove Object"
 msgstr "Objekt entfernen"
 
-#: src/features/workflow/types/index.ts:559
+#: src/features/workflow/types/index.ts:560
 msgid "Remove or add objects in an image"
 msgstr "Objekte in einem Bild entfernen oder hinzufügen"
 
@@ -22267,7 +22272,7 @@ msgstr "Anbieter entfernen?"
 msgid "Remove queued message {position}"
 msgstr "Eingereihte Nachricht {position} entfernen"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:175
+#: src/features/workflow/components/nodes/character-ref-node.tsx:168
 msgid "Remove reference image"
 msgstr "Referenzbild entfernen"
 
@@ -22548,7 +22553,7 @@ msgstr "Zoom zurücksetzen (aktuell {zoomPercent} %)"
 msgid "Resize {label} column"
 msgstr "Spalte {label} in der Größe ändern"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:63
+#: src/features/workflow/components/nodes/video-model-options.tsx:64
 msgid "Resolution"
 msgstr "Auflösung"
 
@@ -22564,7 +22569,7 @@ msgstr "Ressource"
 msgid "Resources"
 msgstr "Ressourcen"
 
-#: src/features/workflow/templates/index.ts:475
+#: src/features/workflow/templates/index.ts:476
 msgid "Response"
 msgstr "Antwort"
 
@@ -22615,7 +22620,7 @@ msgstr "Beschränke, in welchen Regionen Modelle gehostet werden dürfen. Nützl
 
 #: src/features/evals/components/run-detail.tsx:223
 #: src/features/workflow/components/nodes/output-node.tsx:97
-#: src/features/workflow/templates/index.ts:115
+#: src/features/workflow/templates/index.ts:116
 msgid "Result"
 msgstr "Ergebnis"
 
@@ -22784,7 +22789,7 @@ msgid "RIFF (WAV/AVI/WebP)"
 msgstr "RIFF (WAV/AVI/WebP)"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:399
-#: src/features/workflow/components/nodes/outpaint-node.tsx:24
+#: src/features/workflow/components/nodes/outpaint-node.tsx:26
 msgid "Right"
 msgstr "Rechts"
 
@@ -23242,7 +23247,7 @@ msgstr "Wird gespeichert..."
 msgid "Saving…"
 msgstr "Wird gespeichert…"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:107
+#: src/features/workflow/components/nodes/upscale-node.tsx:100
 msgid "Scale Factor"
 msgstr "Skalierungsfaktor"
 
@@ -23262,7 +23267,7 @@ msgstr "Scanne diesen QR-Code. Er generiert einen 6-stelligen Code, den du unten
 msgid "Scanning..."
 msgstr "Wird gescannt..."
 
-#: src/features/workflow/templates/index.ts:279
+#: src/features/workflow/templates/index.ts:280
 msgid "Scene Description"
 msgstr "Szenenbeschreibung"
 
@@ -23329,7 +23334,7 @@ msgstr "Nach unten scrollen"
 msgid "Scroll up one page"
 msgstr "Eine Seite nach oben scrollen"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:169
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:163
 msgid "Seamless Loop"
 msgstr "Nahtlose Schleife"
 
@@ -23699,17 +23704,17 @@ msgstr "Modell auswählen (optional)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
 #: src/components/model-picker/model-picker-button.tsx:94
-#: src/features/workflow/components/nodes/background-removal-node.tsx:67
-#: src/features/workflow/components/nodes/character-ref-node.tsx:148
-#: src/features/workflow/components/nodes/controlnet-node.tsx:133
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:93
+#: src/features/workflow/components/nodes/background-removal-node.tsx:68
+#: src/features/workflow/components/nodes/character-ref-node.tsx:149
+#: src/features/workflow/components/nodes/controlnet-node.tsx:135
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:95
 #: src/features/workflow/components/nodes/img2img-node.tsx:60
 #: src/features/workflow/components/nodes/inpaint-node.tsx:72
-#: src/features/workflow/components/nodes/object-editor-node.tsx:109
-#: src/features/workflow/components/nodes/outpaint-node.tsx:87
+#: src/features/workflow/components/nodes/object-editor-node.tsx:111
+#: src/features/workflow/components/nodes/outpaint-node.tsx:88
 #: src/features/workflow/components/nodes/style-ref-node.tsx:88
-#: src/features/workflow/components/nodes/upscale-node.tsx:92
-#: src/features/workflow/components/nodes/video-node.tsx:138
+#: src/features/workflow/components/nodes/upscale-node.tsx:93
+#: src/features/workflow/components/nodes/video-node.tsx:141
 msgid "Select model..."
 msgstr "Modell auswählen..."
 
@@ -24070,7 +24075,7 @@ msgstr "Freigegebene Ordner und lokale Server …"
 msgid "Shared page"
 msgstr "Geteilte Seite"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:153
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:154
 msgid "Shared Prompt"
 msgstr "Geteilter Prompt"
 
@@ -24156,8 +24161,8 @@ msgstr "Installierte Modelle in der Auswahl anzeigen"
 msgid "Show keyboard shortcuts"
 msgstr "Tastenkürzel anzeigen"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:171
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:177
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:172
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:178
 msgid "Show Labels"
 msgstr "Beschriftungen anzeigen"
 
@@ -24658,11 +24663,11 @@ msgstr "Social-Media-Ankündigung"
 msgid "Social Media"
 msgstr "Social Media"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:25
+#: src/features/workflow/components/nodes/controlnet-node.tsx:27
 msgid "Soft Edge"
 msgstr "Weiche Kante"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:25
+#: src/features/workflow/components/nodes/controlnet-node.tsx:27
 msgid "Soft edge detection"
 msgstr "Weiche Kantenerkennung"
 
@@ -24789,7 +24794,7 @@ msgstr "Ursprungs-Chat"
 msgid "Source Code Pro"
 msgstr "Source Code Pro"
 
-#: src/features/workflow/templates/index.ts:322
+#: src/features/workflow/templates/index.ts:323
 msgid "Source Image"
 msgstr "Quellbild"
 
@@ -24936,7 +24941,7 @@ msgstr "Spracherkennung wird von deinem Browser nicht unterstützt"
 msgid "Speech synthesis and transcription"
 msgstr "Sprachsynthese und Transkription"
 
-#: src/features/workflow/types/index.ts:632
+#: src/features/workflow/types/index.ts:633
 msgid "Speech to Text"
 msgstr "Sprache zu Text"
 
@@ -25061,7 +25066,7 @@ msgstr "Stern"
 msgid "Starred"
 msgstr "Markiert"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:206
+#: src/features/workflow/components/nodes/controlnet-node.tsx:200
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:170
 msgid "Start"
 msgstr "Starten"
@@ -25129,7 +25134,7 @@ msgid "Start editing cell"
 msgstr "Zelle bearbeiten"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:39
-#: src/features/workflow/components/nodes/video-model-options.tsx:155
+#: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
 msgstr "Startbild"
 
@@ -25373,7 +25378,7 @@ msgstr "Streaming"
 msgid "Streaming..."
 msgstr "Wird gestreamt..."
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:90
+#: src/features/workflow/components/nodes/img2img-node.tsx:82
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:140
 msgid "Strength"
 msgstr "Stärke"
@@ -25658,13 +25663,13 @@ msgstr "Starkes visuelles Reasoning und Verständnis"
 msgid "Strongest reasoning in the GLM family"
 msgstr "Das stärkste Reasoning der GLM-Familie"
 
-#: src/features/workflow/templates/index.ts:216
+#: src/features/workflow/templates/index.ts:217
 msgid "style"
 msgstr "Stil"
 
 #: src/features/chat/thread/composer-image-settings.tsx:205
 #: src/features/chat/thread/media-gallery-view.tsx:494
-#: src/features/workflow/components/nodes/character-ref-node.tsx:24
+#: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Style"
 msgstr "Stil"
 
@@ -25676,24 +25681,24 @@ msgstr "Stilanpassung"
 msgid "style consistency"
 msgstr "Stilkonsistenz"
 
-#: src/features/workflow/templates/index.ts:179
+#: src/features/workflow/templates/index.ts:180
 msgid "Style Image"
 msgstr "Stilbild"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:103
+#: src/features/workflow/components/nodes/style-ref-node.tsx:95
 msgid "Style Image URL"
 msgstr "Stilbild-URL"
 
-#: src/features/workflow/types/index.ts:612
-#: src/features/workflow/types/index.ts:616
+#: src/features/workflow/types/index.ts:613
+#: src/features/workflow/types/index.ts:617
 msgid "Style Reference"
 msgstr "Stilreferenz"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:134
+#: src/features/workflow/components/nodes/style-ref-node.tsx:126
 msgid "Style Strength"
 msgstr "Stilstärke"
 
-#: src/features/workflow/templates/index.ts:215
+#: src/features/workflow/templates/index.ts:216
 msgid "Style Transfer"
 msgstr "Stilübertragung"
 
@@ -25710,7 +25715,7 @@ msgstr "Stilkonsistente Videogenerierung, gesteuert durch Referenzbilder für vi
 msgid "Style: {0}"
 msgstr "Stil: {0}"
 
-#: src/features/workflow/templates/index.ts:206
+#: src/features/workflow/templates/index.ts:207
 msgid "Styled Result"
 msgstr "Stilisiertes Ergebnis"
 
@@ -25859,7 +25864,7 @@ msgstr "Unterstützt Videolängen von 10 Sekunden"
 msgid "Supports 20+ languages with vision and PDF"
 msgstr "Unterstützt über 20 Sprachen mit Bild- und PDF-Verständnis"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:24
+#: src/features/workflow/components/nodes/controlnet-node.tsx:26
 msgid "Surface normals"
 msgstr "Oberflächennormalen"
 
@@ -26366,7 +26371,7 @@ msgstr "Trigger testweise ausführen"
 msgid "Test your agents, models and knowledge base against a fixed set of cases, score every answer, and catch regressions between runs."
 msgstr "Teste deine Agenten, Modelle und deine Wissensdatenbank mit einem festen Satz von Testfällen, bewerte jede Antwort und erkenne Verschlechterungen zwischen Durchläufen."
 
-#: src/features/workflow/templates/index.ts:258
+#: src/features/workflow/templates/index.ts:259
 msgid "testing"
 msgstr "Testen"
 
@@ -26387,8 +26392,8 @@ msgstr "Text"
 #: src/features/workflow/components/nodes/output-node.tsx:16
 #: src/features/workflow/components/nodes/text-node.tsx:167
 #: src/features/workflow/components/template-picker.tsx:21
-#: src/features/workflow/types/index.ts:622
-#: src/features/workflow/types/index.ts:626
+#: src/features/workflow/types/index.ts:623
+#: src/features/workflow/types/index.ts:627
 #: src/routes/(chat)/workflow/gallery.tsx:22
 msgid "Text"
 msgstr "Text"
@@ -26445,7 +26450,7 @@ msgstr "Textgenerierung mit Streaming-Unterstützung"
 msgid "Text only: no web search, tools, or file and image input."
 msgstr "Nur Text: keine Websuche, keine Tools, keine Datei- oder Bildeingabe."
 
-#: src/features/workflow/templates/index.ts:485
+#: src/features/workflow/templates/index.ts:486
 msgid "text processing"
 msgstr "Textverarbeitung"
 
@@ -26470,7 +26475,7 @@ msgstr "Text, den die Antwort nicht enthalten darf"
 msgid "Text to image"
 msgstr "Text zu Bild"
 
-#: src/features/workflow/templates/index.ts:124
+#: src/features/workflow/templates/index.ts:125
 msgid "Text to Image"
 msgstr "Text zu Bild"
 
@@ -26478,7 +26483,7 @@ msgstr "Text zu Bild"
 msgid "Text to Speak"
 msgstr "Text zu Sprache"
 
-#: src/features/workflow/types/index.ts:393
+#: src/features/workflow/types/index.ts:394
 msgid "Text to Speech"
 msgstr "Text zu Sprache"
 
@@ -26490,8 +26495,8 @@ msgstr "Text zu Text"
 msgid "Text to video"
 msgstr "Text zu Video"
 
-#: src/features/workflow/components/nodes/video-node.tsx:123
-#: src/features/workflow/templates/index.ts:442
+#: src/features/workflow/components/nodes/video-node.tsx:124
+#: src/features/workflow/templates/index.ts:443
 msgid "Text to Video"
 msgstr "Text zu Video"
 
@@ -27644,7 +27649,7 @@ msgstr "Tool-Anbieterschlüssel"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:445
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:447
 msgid "Tools"
 msgstr "Tools"
 
@@ -27656,7 +27661,7 @@ msgstr "Tools, die der Assistent nicht verwenden darf, während dieser Skill lä
 msgid "Tools the skill needs even when the current chat mode would not load them."
 msgstr "Tools, die der Skill braucht, auch wenn der aktuelle Chat-Modus sie nicht laden würde."
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:25
+#: src/features/workflow/components/nodes/outpaint-node.tsx:27
 msgid "Top"
 msgstr "Oben"
 
@@ -27741,13 +27746,13 @@ msgstr "Mit RL auf Reasoning-Verläufen trainiert"
 msgid "Transcribe an audio file, summarize the text with AI, then convert back to speech"
 msgstr "Eine Audiodatei transkribieren, den Text mit KI zusammenfassen und dann wieder in Sprache umwandeln"
 
-#: src/features/workflow/types/index.ts:636
+#: src/features/workflow/types/index.ts:637
 msgid "Transcription"
 msgstr "Transkription"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:290
 #: src/features/canvas/canvas-panel.tsx:124
-#: src/features/workflow/templates/index.ts:330
+#: src/features/workflow/templates/index.ts:331
 msgid "Transform"
 msgstr "Transformieren"
 
@@ -27755,27 +27760,27 @@ msgstr "Transformieren"
 msgid "Transform (Template)"
 msgstr "Transformieren (Vorlage)"
 
-#: src/features/workflow/templates/index.ts:347
+#: src/features/workflow/templates/index.ts:348
 msgid "Transform an image with AI guidance"
 msgstr "Ein Bild mit KI-Unterstützung umwandeln"
 
-#: src/features/workflow/types/index.ts:535
+#: src/features/workflow/types/index.ts:536
 msgid "Transform images with AI guidance"
 msgstr "Bilder mit KI-Unterstützung umwandeln"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:90
 msgid "Transform with AI"
 msgstr "Mit KI umwandeln"
 
-#: src/features/workflow/templates/index.ts:351
+#: src/features/workflow/templates/index.ts:352
 msgid "transformation"
 msgstr "Umwandlung"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:75
+#: src/features/workflow/components/nodes/img2img-node.tsx:67
 msgid "Transformation Prompt"
 msgstr "Umwandlungs-Prompt"
 
-#: src/features/workflow/templates/index.ts:341
+#: src/features/workflow/templates/index.ts:342
 msgid "Transformed Image"
 msgstr "Umgewandeltes Bild"
 
@@ -27803,7 +27808,7 @@ msgstr "Übersetzung fehlgeschlagen."
 msgid "Translation to {languageName}"
 msgstr "Übersetzung: {languageName}"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:121
+#: src/features/workflow/components/nodes/background-removal-node.tsx:114
 msgid "Transparent"
 msgstr "Transparent"
 
@@ -28320,7 +28325,7 @@ msgstr "Verknüpfung aufheben"
 msgid "Unlock group"
 msgstr "Gruppe entsperren"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:531
 msgid "Unlock node"
 msgstr "Knoten entsperren"
 
@@ -28576,7 +28581,7 @@ msgstr "Ein Profilbild für dein Konto hochladen"
 msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown."
 msgstr "Lade eine SKILL.md oder ein Skill-.zip hoch (wie von Claude und anderen Agent-Skills-Tools verwendet) oder füge das Markdown ein."
 
-#: src/features/workflow/templates/index.ts:163
+#: src/features/workflow/templates/index.ts:164
 msgid "Upload an image and upscale it with AI enhancement"
 msgstr "Lade ein Bild hoch und skaliere es mit KI-Verbesserung hoch"
 
@@ -28625,7 +28630,7 @@ msgstr "Ordner hochladen"
 msgid "Upload Image"
 msgstr "Bild hochladen"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:503
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:505
 msgid "Upload image / video"
 msgstr "Bild / Video hochladen"
 
@@ -28670,21 +28675,21 @@ msgstr "Daten für Import von {0} werden hochgeladen..."
 msgid "Uploading..."
 msgstr "Wird hochgeladen..."
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:85
-#: src/features/workflow/types/index.ts:642
-#: src/features/workflow/types/index.ts:646
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
+#: src/features/workflow/types/index.ts:643
+#: src/features/workflow/types/index.ts:647
 msgid "Upscale"
 msgstr "Hochskalieren"
 
-#: src/features/workflow/templates/index.ts:166
+#: src/features/workflow/templates/index.ts:167
 msgid "Upscale & Enhance"
 msgstr "Hochskalieren & verbessern"
 
-#: src/features/workflow/templates/index.ts:147
+#: src/features/workflow/templates/index.ts:148
 msgid "Upscale 4x"
 msgstr "4x hochskalieren"
 
-#: src/features/workflow/templates/index.ts:167
+#: src/features/workflow/templates/index.ts:168
 msgid "upscaling"
 msgstr "Hochskalierung"
 
@@ -28912,7 +28917,7 @@ msgstr "Benutzer wurde entsperrt"
 msgid "User information"
 msgstr "Nutzerinformationen"
 
-#: src/features/workflow/templates/index.ts:456
+#: src/features/workflow/templates/index.ts:457
 msgid "User Input"
 msgstr "Nutzereingabe"
 
@@ -29271,7 +29276,7 @@ msgstr "Sehr intelligentes Modell. Ideal für Logos"
 msgid "Very low cost per generation"
 msgstr "Sehr niedrige Kosten pro Generierung"
 
-#: src/features/workflow/templates/index.ts:443
+#: src/features/workflow/templates/index.ts:444
 msgid "video"
 msgstr "Video"
 
@@ -29286,8 +29291,8 @@ msgstr "Video"
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
 #: src/features/workflow/components/gallery/publish-dialog.tsx:30
 #: src/features/workflow/components/template-picker.tsx:22
-#: src/features/workflow/types/index.ts:652
-#: src/features/workflow/types/index.ts:656
+#: src/features/workflow/types/index.ts:660
+#: src/features/workflow/types/index.ts:664
 #: src/routes/(chat)/workflow/gallery.tsx:23
 msgid "Video"
 msgstr "Video"
@@ -29310,7 +29315,7 @@ msgstr "Videoerstellung"
 msgid "Video creators who need expressive motion with flexible visual style adaptation and next-gen quality"
 msgstr "Video-Creator, die ausdrucksstarke Bewegungen mit flexibler Stilanpassung und Qualität der nächsten Generation brauchen"
 
-#: src/features/workflow/templates/index.ts:412
+#: src/features/workflow/templates/index.ts:413
 msgid "Video Description"
 msgstr "Videobeschreibung"
 
@@ -29341,11 +29346,11 @@ msgstr "Modell zur Videogenerierung"
 msgid "Video LoRA support for custom styles"
 msgstr "Video-LoRA-Unterstützung für eigene Stile"
 
-#: src/features/workflow/components/nodes/video-node.tsx:153
+#: src/features/workflow/components/nodes/video-node.tsx:148
 msgid "Video Prompt"
 msgstr "Video-Prompt"
 
-#: src/features/workflow/templates/index.ts:433
+#: src/features/workflow/templates/index.ts:434
 msgid "Video Result"
 msgstr "Videoergebnis"
 
@@ -29805,7 +29810,7 @@ msgstr "Webhook-URL"
 msgid "Webhook URL copied to clipboard"
 msgstr "Webhook-URL in die Zwischenablage kopiert"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:22
+#: src/features/workflow/components/nodes/background-removal-node.tsx:24
 msgid "WebP (Smaller)"
 msgstr "WebP (kleiner)"
 
@@ -29951,13 +29956,13 @@ msgstr "Was der Agent in den letzten 30 Tagen von deinen Geräten verlangt hat."
 msgid "What this variable represents..."
 msgstr "Was diese Variable darstellt..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:126
-#: src/features/workflow/components/nodes/object-editor-node.tsx:165
-#: src/features/workflow/components/nodes/outpaint-node.tsx:150
+#: src/features/workflow/components/nodes/inpaint-node.tsx:118
+#: src/features/workflow/components/nodes/object-editor-node.tsx:159
+#: src/features/workflow/components/nodes/outpaint-node.tsx:143
 msgid "What to avoid..."
 msgstr "Was vermieden werden soll..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:93
+#: src/features/workflow/components/nodes/inpaint-node.tsx:85
 msgid "What to generate in the masked area..."
 msgstr "Was im maskierten Bereich generiert werden soll..."
 

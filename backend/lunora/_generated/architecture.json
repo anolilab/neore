@@ -1601,11 +1601,6 @@
       "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
     },
     {
-      "from": "function:chat_functions:generateImageToVideo",
-      "kind": "call",
-      "to": "function:auth_functions:getUserRunPlanQuery"
-    },
-    {
       "from": "function:chat_functions:generateSummary",
       "kind": "call",
       "to": "function:agent_threads:getThreadInternal"
@@ -1614,11 +1609,6 @@
       "from": "function:chat_functions:generateSummary",
       "kind": "schedule",
       "to": "function:chat_functions:createSummarizeChat"
-    },
-    {
-      "from": "function:chat_functions:generateVideo",
-      "kind": "call",
-      "to": "function:auth_functions:getUserRunPlanQuery"
     },
     {
       "from": "function:chat_functions:getAllThreadRelationships",
@@ -6123,11 +6113,6 @@
     {
       "from": "function:workflow_executor:executeWorkflow",
       "kind": "call",
-      "to": "function:chat_functions:generateImageToVideo"
-    },
-    {
-      "from": "function:workflow_executor:executeWorkflow",
-      "kind": "call",
       "to": "function:chat_functions:generateImg2Img"
     },
     {
@@ -6164,11 +6149,6 @@
       "from": "function:workflow_executor:executeWorkflow",
       "kind": "call",
       "to": "function:chat_functions:generateUpscale"
-    },
-    {
-      "from": "function:workflow_executor:executeWorkflow",
-      "kind": "call",
-      "to": "function:chat_functions:generateVideo"
     },
     {
       "from": "function:workflow_executor:executeWorkflow",
@@ -7700,6 +7680,13 @@
       "module": "auth"
     },
     {
+      "detail": "query",
+      "id": "function:auth_billing:creditsLeftQuery",
+      "kind": "function",
+      "name": "auth.billing.creditsLeftQuery",
+      "module": "auth"
+    },
+    {
       "detail": "mutation",
       "id": "function:auth_billing:deductCreditsFromGateway",
       "kind": "function",
@@ -7718,6 +7705,13 @@
       "id": "function:auth_billing:getMemberCredits",
       "kind": "function",
       "name": "auth.billing.getMemberCredits",
+      "module": "auth"
+    },
+    {
+      "detail": "query",
+      "id": "function:auth_billing:getRunPlanForOrganizationQuery",
+      "kind": "function",
+      "name": "auth.billing.getRunPlanForOrganizationQuery",
       "module": "auth"
     },
     {
@@ -16293,114 +16287,120 @@
       "file": "chat/lib/agent-run",
       "kind": "call",
       "line": 107,
+      "reason": "\"readRunPlan\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 108,
+      "reason": "\"readRunPlan\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 157,
       "reason": "\"resolveRunModel\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 127,
-      "reason": "\"resolveRunModel\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 178,
+      "line": 208,
       "reason": "\"loadUserProviderKeys\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 264,
+      "line": 294,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 298,
+      "line": 328,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 299,
+      "line": 329,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 307,
+      "line": 337,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 418,
+      "line": 448,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 430,
-      "reason": "\"afterRun\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "schedule",
-      "line": 439,
-      "reason": "\"afterRun\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "schedule",
-      "line": 451,
+      "line": 460,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
       "line": 469,
+      "reason": "\"afterRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "schedule",
+      "line": 481,
+      "reason": "\"afterRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "schedule",
+      "line": 499,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 560,
+      "line": 590,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 568,
+      "line": 598,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 579,
+      "line": 609,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 649,
+      "line": 679,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 742,
+      "line": 772,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 760,
+      "line": 790,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 766,
+      "line": 796,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -16652,19 +16652,19 @@
     {
       "file": "chat/tools/canvas-ai",
       "kind": "call",
-      "line": 63,
+      "line": 64,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "chat/tools/canvas-ai",
       "kind": "call",
-      "line": 95,
+      "line": 96,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "chat/tools/canvas-ai",
       "kind": "call",
-      "line": 111,
+      "line": 112,
       "reason": "the default export is not a registered function"
     },
     {
@@ -16784,7 +16784,7 @@
     {
       "file": "chat/tools/image-generation",
       "kind": "call",
-      "line": 66,
+      "line": 67,
       "reason": "the default export is not a registered function"
     },
     {
@@ -16868,7 +16868,7 @@
     {
       "file": "chat/tools/video-generation",
       "kind": "call",
-      "line": 62,
+      "line": 63,
       "reason": "the default export is not a registered function"
     },
     {
@@ -18734,164 +18734,188 @@
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 112,
+      "line": 102,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 131,
+      "line": 122,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 133,
+      "line": 124,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 166,
+      "line": 153,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 185,
+      "line": 172,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 402,
+      "line": 383,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 414,
+      "line": 395,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 426,
+      "line": 407,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 444,
+      "line": 425,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 559,
+      "line": 540,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 601,
+      "line": 578,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 609,
+      "line": 612,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 632,
+      "line": 648,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 666,
+      "line": 699,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 702,
+      "line": 747,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 753,
+      "line": 800,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 801,
+      "line": 845,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 854,
+      "line": 881,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 899,
+      "line": 918,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 935,
+      "line": 965,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 972,
+      "line": 1007,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1019,
-      "reason": "the default export is not a registered function"
-    },
-    {
-      "file": "workflow/http",
-      "kind": "call",
-      "line": 1058,
-      "reason": "the default export is not a registered function"
-    },
-    {
-      "file": "workflow/http",
-      "kind": "call",
-      "line": 1094,
-      "reason": "the default export is not a registered function"
-    },
-    {
-      "file": "workflow/http",
-      "kind": "call",
-      "line": 1131,
+      "line": 1044,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 27,
+      "line": 37,
       "reason": "\"videoInputArgs\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 45,
+      "line": 55,
       "reason": "\"videoInputArgs\" is not a registered function"
+    },
+    {
+      "file": "workflow/media-args",
+      "kind": "call",
+      "line": 280,
+      "reason": "\"runVideoNode\" is not a registered function"
+    },
+    {
+      "file": "workflow/media-args",
+      "kind": "call",
+      "line": 289,
+      "reason": "\"runVideoNode\" is not a registered function"
+    },
+    {
+      "file": "workflow/run-setup",
+      "kind": "call",
+      "line": 34,
+      "reason": "\"resolveRunAccount\" is not a registered function"
+    },
+    {
+      "file": "workflow/run-setup",
+      "kind": "call",
+      "line": 35,
+      "reason": "\"resolveRunAccount\" is not a registered function"
+    },
+    {
+      "file": "workflow/video-billing",
+      "kind": "call",
+      "line": 61,
+      "reason": "\"runBilledVideo\" is not a registered function"
+    },
+    {
+      "file": "workflow/video-billing",
+      "kind": "call",
+      "line": 72,
+      "reason": "\"runBilledVideo\" is not a registered function"
+    },
+    {
+      "file": "workflow/video-billing",
+      "kind": "call",
+      "line": 90,
+      "reason": "\"runBilledVideo\" is not a registered function"
     }
   ],
   "version": 1

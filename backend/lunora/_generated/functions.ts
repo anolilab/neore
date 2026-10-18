@@ -427,9 +427,11 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "auth_api_keys:createScopedApiKey": lunora_auth_api_keys_21.createScopedApiKey as unknown as RegisteredLunoraFunction,
     "auth_api_keys:getApiKeyCreationState": lunora_auth_api_keys_21.getApiKeyCreationState as unknown as RegisteredLunoraFunction,
     "auth_billing:applyCreemSubscription": lunora_auth_billing_22.applyCreemSubscription as unknown as RegisteredLunoraFunction,
+    "auth_billing:creditsLeftQuery": lunora_auth_billing_22.creditsLeftQuery as unknown as RegisteredLunoraFunction,
     "auth_billing:deductCreditsFromGateway": lunora_auth_billing_22.deductCreditsFromGateway as unknown as RegisteredLunoraFunction,
     "auth_billing:getBillingInfo": lunora_auth_billing_22.getBillingInfo as unknown as RegisteredLunoraFunction,
     "auth_billing:getMemberCredits": lunora_auth_billing_22.getMemberCredits as unknown as RegisteredLunoraFunction,
+    "auth_billing:getRunPlanForOrganizationQuery": lunora_auth_billing_22.getRunPlanForOrganizationQuery as unknown as RegisteredLunoraFunction,
     "auth_billing:listMemberCredits": lunora_auth_billing_22.listMemberCredits as unknown as RegisteredLunoraFunction,
     "auth_billing:setMemberCreditOverride": lunora_auth_billing_22.setMemberCreditOverride as unknown as RegisteredLunoraFunction,
     "auth_billing:setOrganizationBillingTier": lunora_auth_billing_22.setOrganizationBillingTier as unknown as RegisteredLunoraFunction,
@@ -8186,9 +8188,11 @@ export interface Caller {
         };
         billing: {
             applyCreemSubscription: (args: { baseTier: "free" | "pro"; creemCustomerId?: string; creemPurchaserId?: string; creemSubscriptionId: string; referenceId: string; subject: "organization" | "user" }) => Promise<null>;
+            creditsLeftQuery: (args: { orgId: string; userId: string }) => Promise<{ creditsLeft: number | null }>;
             deductCreditsFromGateway: (args: { billingMode?: "custom" | "platform" | "byok"; byokFeeRate?: number; costMicrodollars: number; modelId: string; orgId?: string; requestId: string; userId: string }) => Promise<void>;
             getBillingInfo: (args?: {}) => Promise<{ allowedModels: Array<string>; baseTier: "free" | "pro" | "enterprise"; billingEmail: string | null; creditsPerUser: number; creemCustomerId?: string | null; creemSubscriptionId?: string | null } | null>;
             getMemberCredits: (args: { userId?: string }) => Promise<({} & { creditOverride: number | null; effectiveCredits: number; orgDefault: number; resetAt: number | null; usedCredits: number; userId: string; }) | null>;
+            getRunPlanForOrganizationQuery: (args: { organizationId: string | null; userId: string }) => Promise<{ isAdmin: boolean; plan: "premium" | null }>;
             listMemberCredits: (args?: {}) => Promise<({} & { creditOverride: number | null; effectiveCredits: number; role: string; usedCredits: number; userEmail: string | null; userId: string; userName: string | null; })[]>;
             setMemberCreditOverride: (args: { creditOverride: number | null; organizationId: string; userId: string }) => Promise<void>;
             setOrganizationBillingTier: (args: { baseTier?: "free" | "pro" | "enterprise"; creditsPerUser?: number; organizationId: string }) => Promise<null>;
@@ -8331,7 +8335,7 @@ export interface Caller {
             saveCustomProvider: (args: { accessKeyId?: string; apiKey?: string; apiVersion?: string; baseUrl: string; enabled: boolean; id?: string; models: Array<{ id: string; name?: string }>; name: string; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" }) => Promise<{ id: string }>;
         };
         daily_charge: {
-            chargeDailyUnit: (args: { kind: "Audio" | "Text"; organizationId?: string; userId: string }) => Promise<boolean>;
+            chargeDailyUnit: (args: { kind: "Audio" | "Text" | "Video"; organizationId?: string; userId: string }) => Promise<boolean>;
         };
         edit_abandon: {
             failAbandonedEditReply: (args: { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }) => Promise<{ added: boolean; failed: number }>;
@@ -8363,7 +8367,7 @@ export interface Caller {
             generateControlNet: (args: { controlType: string; endPercent?: number; imageUrl: string; model?: string; preprocessor?: string; prompt?: string; startPercent?: number; strength?: number; threadId: string; userId: string }) => Promise<{ controlType: string; imageUrl: string; mimeType: string; model: string }>;
             generateFollowupSuggestionsForThread: (args: { threadId: string; userId: string }) => Promise<void>;
             generateImage: (args: { cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; imageSize: string; jobId?: string; model: string; negativePrompt?: string; numImages?: number; prompt: string; promptMessageId?: Id<"messages">; referenceImages?: Array<string>; seed?: number; threadId: string; userId: string }) => Promise<{ assets: Array<{ imageSize: string; imageUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
-            generateImageToVideo: (args: { generateAudio?: boolean; resolution?: string; duration?: number; fps?: number; imageUrl: string; loop?: boolean; model?: string; motionStrength?: number; prompt?: string; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; threadId: string; userId: string }) => Promise<{ fileId: string; mimeType: string; model: string; videoUrl: string }>;
+            generateImageToVideo: (args: { generateAudio?: boolean; resolution?: string; duration?: number; fps?: number; imageUrl: string; loop?: boolean; model?: string; motionStrength?: number; organizationId?: string | null; prompt?: string; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; threadId: string; userId: string }) => Promise<{ fileId: string; mimeType: string; model: string; videoUrl: string }>;
             generateImg2Img: (args: { imageUrl: string; model?: string; negativePrompt?: string; prompt?: string; strength?: number; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string }>;
             generateInpaint: (args: { imageUrl: string; maskUrl: string; model?: string; negativePrompt?: string; prompt: string; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string }>;
             generateMusic: (args: { duration?: number; model: string; negativePrompt?: string; prompt: string; threadId: string; userId: string }) => Promise<{ assets: Array<{ audioUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
@@ -8374,7 +8378,7 @@ export interface Caller {
             generateSummary: (args: { threadId: Id<"threads"> }) => Promise<{ success: boolean }>;
             generateTranscription: (args: { audioUrl: string; language?: string; model?: string; threadId: string; userId: string }) => Promise<{ chunks: Array<{ text: string; timestamp: Array<number> }>; model: string; text: string }>;
             generateUpscale: (args: { enhanceDetails?: boolean; enhanceFace?: boolean; imageUrl: string; model?: string; scale?: number; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string; scale: number }>;
-            generateVideo: (args: { generateAudio?: boolean; resolution?: string; aspectRatio?: string; cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; duration?: number; jobId?: string; model: string; prompt: string; promptMessageId?: Id<"messages">; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; startFrameUrl?: string; threadId: string; userId: string }) => Promise<{ assets: Array<{ mimeType: string; videoUrl: string }>; modelId: string; prompt: string }>;
+            generateVideo: (args: { generateAudio?: boolean; resolution?: string; aspectRatio?: string; cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; duration?: number; jobId?: string; model: string; organizationId?: string | null; prompt: string; promptMessageId?: Id<"messages">; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; startFrameUrl?: string; threadId: string; userId: string }) => Promise<{ assets: Array<{ mimeType: string; videoUrl: string }>; modelId: string; prompt: string }>;
             getAllThreadRelationships: (args?: {}) => Promise<{ _creationTime: number; _id: Id<"threadRelationships">; branchPoint?: number; branchType?: "branch" | "continuation" | "comparison" | "subagent"; createdAt: number; parentThreadId: Id<"threads">; threadId: Id<"threads">; }[]>;
             getAnonymousMessageLimit: (args: { now: number }) => Promise<{ limit: number; remaining: number } | null>;
             getBrowserActions: (args: { sessionId: string }) => Promise<Array<{ _id: Id<"browserActions">; action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; durationMs?: number; errorMessage?: string; success: boolean; target?: string; timestamp: number; value?: string }>>;
@@ -9446,7 +9450,7 @@ export interface Caller {
             updateGalleryMeta: (args: { category?: "image" | "text" | "video" | "audio" | "automation"; description?: string; projectId: Id<"projects">; tags?: Array<string> }) => Promise<{ success: boolean }>;
         };
         generate: {
-            generateWorkflowFromPrompt: (args: { prompt: string }) => Promise<{ edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "output" | "image" | "text" | "file" | "code" | "branch" | "video" | "audio" | "ai" | "img2img" | "upscale" | "inpaint" | "outpaint" | "background-removal" | "image-to-video" | "transcription"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+            generateWorkflowFromPrompt: (args: { prompt: string }) => Promise<{ edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "output" | "image" | "text" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
         };
         media_ops: {
             extractVideoFrame: (args: { frame: "start" | "end"; threadId: string; userId: string; videoUrl: string }) => Promise<{ fileId: string; mimeType: string }>;
@@ -9744,9 +9748,11 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         billing: {
             applyCreemSubscription: (args) => callRegistered(context, "auth_billing:applyCreemSubscription", args),
+            creditsLeftQuery: (args) => callRegistered(context, "auth_billing:creditsLeftQuery", args),
             deductCreditsFromGateway: (args) => callRegistered(context, "auth_billing:deductCreditsFromGateway", args),
             getBillingInfo: (args) => callRegistered(context, "auth_billing:getBillingInfo", args),
             getMemberCredits: (args) => callRegistered(context, "auth_billing:getMemberCredits", args),
+            getRunPlanForOrganizationQuery: (args) => callRegistered(context, "auth_billing:getRunPlanForOrganizationQuery", args),
             listMemberCredits: (args) => callRegistered(context, "auth_billing:listMemberCredits", args),
             setMemberCreditOverride: (args) => callRegistered(context, "auth_billing:setMemberCreditOverride", args),
             setOrganizationBillingTier: (args) => callRegistered(context, "auth_billing:setOrganizationBillingTier", args),

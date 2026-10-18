@@ -750,8 +750,8 @@ msgstr "{fileCount, plural, other {変更（# ファイル）}}"
 msgid "{fileCount, plural, one {Failed to upload # file} other {Failed to upload # files}}"
 msgstr "{fileCount, plural, other {# 個のファイルをアップロードできませんでした}}"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:160
-#: src/features/workflow/components/nodes/video-node.tsx:236
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:154
+#: src/features/workflow/components/nodes/video-node.tsx:238
 msgid "{fps} fps"
 msgstr "{fps} fps"
 
@@ -1139,7 +1139,7 @@ msgstr "1日1,000メッセージ"
 msgid "1,000 requests/day"
 msgstr "1 日 1,000 リクエスト"
 
-#: src/features/workflow/components/nodes/video-node.tsx:25
+#: src/features/workflow/components/nodes/video-node.tsx:27
 msgid "1:1 (Square)"
 msgstr "1:1（正方形）"
 
@@ -1167,7 +1167,7 @@ msgstr "1080p"
 msgid "12 seconds"
 msgstr "12 秒"
 
-#: src/features/workflow/components/nodes/video-node.tsx:23
+#: src/features/workflow/components/nodes/video-node.tsx:25
 msgid "16:9 (Landscape)"
 msgstr "16:9（横長）"
 
@@ -1183,7 +1183,7 @@ msgstr "1970 年代のレンズ、夢のような描写"
 msgid "20 free messages a day to start. No credit card required. Upgrade when you're ready, cancel anytime."
 msgstr "まずは1日20メッセージまで無料。クレジットカードは不要です。準備ができたらアップグレードでき、いつでも解約できます。"
 
-#: src/features/workflow/components/nodes/video-node.tsx:28
+#: src/features/workflow/components/nodes/video-node.tsx:30
 msgid "21:9 (Ultrawide)"
 msgstr "21:9（ウルトラワイド）"
 
@@ -1227,7 +1227,7 @@ msgstr "高速推論を備えた 2M トークンのコンテキストウィン�
 msgid "2x squeeze, blue flares"
 msgstr "2 倍スクイーズ、青いフレア"
 
-#: src/features/workflow/components/nodes/video-node.tsx:27
+#: src/features/workflow/components/nodes/video-node.tsx:29
 msgid "3:4"
 msgstr "3:4"
 
@@ -1259,11 +1259,11 @@ msgstr "300 DPI"
 msgid "30d"
 msgstr "30日"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:22
+#: src/features/workflow/components/nodes/controlnet-node.tsx:24
 msgid "3D depth estimation"
 msgstr "3D 深度推定"
 
-#: src/features/workflow/components/nodes/video-node.tsx:26
+#: src/features/workflow/components/nodes/video-node.tsx:28
 msgid "4:3"
 msgstr "4:3"
 
@@ -1307,7 +1307,7 @@ msgstr "長文ドキュメント分析向けの 80K トークンコンテキス�
 msgid "8K digital, punchy saturation"
 msgstr "8K デジタル、鮮やかな彩度"
 
-#: src/features/workflow/components/nodes/video-node.tsx:24
+#: src/features/workflow/components/nodes/video-node.tsx:26
 msgid "9:16 (Portrait)"
 msgstr "9:16（縦長）"
 
@@ -1455,7 +1455,7 @@ msgstr "{0} について（新しいタブで開きます）"
 msgid "About You"
 msgstr "あなたについて"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:95
+#: src/features/workflow/components/nodes/video-model-options.tsx:92
 msgid "Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p."
 msgstr "{FREE_PLAN_MAX_HEIGHT}p を超えるには Pro プランが必要です。それ以外は {FREE_PLAN_MAX_HEIGHT}p で動画が生成されます。"
 
@@ -1775,7 +1775,7 @@ msgstr "メンバーを追加"
 #~ msgid "Add Member Directly"
 #~ msgstr "メンバーを直接追加"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:145
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:146
 msgid "Add Model"
 msgstr "モデルを追加"
 
@@ -1788,7 +1788,7 @@ msgstr "行を追加"
 msgid "Add node"
 msgstr "ノードを追加"
 
-#: src/features/workflow/types/index.ts:461
+#: src/features/workflow/types/index.ts:462
 msgid "Add notes and annotations to the canvas"
 msgstr "キャンバスにメモや注釈を追加"
 
@@ -1818,7 +1818,7 @@ msgstr "プロバイダーを追加"
 msgid "Add Rectangle"
 msgstr "長方形を追加"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:200
+#: src/features/workflow/components/nodes/character-ref-node.tsx:193
 msgid "Add reference image"
 msgstr "参照画像を追加"
 
@@ -1830,7 +1830,7 @@ msgstr "参照画像を追加"
 msgid "Add reference images (up to {maxReferenceImages})"
 msgstr "参照画像を追加（最大 {maxReferenceImages} 枚）"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:219
+#: src/features/workflow/components/nodes/character-ref-node.tsx:212
 msgid "Add reference images to maintain consistency"
 msgstr "一貫性を保つために参照画像を追加"
 
@@ -1896,7 +1896,7 @@ msgstr "お気に入りに追加"
 msgid "Add to starred"
 msgstr "スターを付ける"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:24
+#: src/features/workflow/components/nodes/object-editor-node.tsx:26
 msgid "Add/Replace Object"
 msgstr "オブジェクトを追加/置換"
 
@@ -2022,8 +2022,8 @@ msgstr "高度なカメラワーク制御"
 msgid "Advanced coding tasks requiring OpenAI's refined Codex capabilities"
 msgstr "OpenAI の洗練された Codex 機能を必要とする高度なコーディングタスク"
 
-#: src/features/workflow/types/index.ts:373
-#: src/features/workflow/types/index.ts:377
+#: src/features/workflow/types/index.ts:374
+#: src/features/workflow/types/index.ts:378
 msgid "Advanced Controls"
 msgstr "高度なコントロール"
 
@@ -2246,7 +2246,7 @@ msgid "Aggregate scores of both runs"
 msgstr "両方の実行の集計スコア"
 
 #: src/features/chat/pins/pin-item.tsx:228
-#: src/features/workflow/types/index.ts:383
+#: src/features/workflow/types/index.ts:384
 msgid "AI"
 msgstr "AI"
 
@@ -2255,7 +2255,7 @@ msgstr "AI"
 msgid "AI Chat"
 msgstr "AI チャット"
 
-#: src/features/workflow/templates/index.ts:484
+#: src/features/workflow/templates/index.ts:485
 msgid "AI Chat Pipeline"
 msgstr "AI チャットパイプライン"
 
@@ -2280,7 +2280,7 @@ msgstr "AI 画像生成"
 msgid "AI Memory System"
 msgstr "AI メモリシステム"
 
-#: src/features/workflow/types/index.ts:387
+#: src/features/workflow/types/index.ts:388
 msgid "AI Model"
 msgstr "AI モデル"
 
@@ -2300,7 +2300,7 @@ msgstr "AI 最適化済み"
 msgid "AI Provider Keys"
 msgstr "AI プロバイダーキー"
 
-#: src/features/workflow/templates/index.ts:465
+#: src/features/workflow/templates/index.ts:466
 msgid "AI Response"
 msgstr "AI の応答"
 
@@ -2501,7 +2501,7 @@ msgstr "すべての変更を保存しました"
 msgid "All chats"
 msgstr "すべてのチャット"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:22
+#: src/features/workflow/components/nodes/outpaint-node.tsx:24
 msgid "All Directions"
 msgstr "全方向"
 
@@ -2759,7 +2759,7 @@ msgstr "アナリティクス"
 msgid "Angle"
 msgstr "角度"
 
-#: src/features/workflow/types/index.ts:525
+#: src/features/workflow/types/index.ts:526
 msgid "Animate static images with AI"
 msgstr "AI で静止画像をアニメーション化"
 
@@ -2991,11 +2991,11 @@ msgstr "アプリケーションエラー"
 msgid "Apply"
 msgstr "適用"
 
-#: src/features/workflow/templates/index.ts:212
+#: src/features/workflow/templates/index.ts:213
 msgid "Apply an artistic style to any image"
 msgstr "任意の画像に芸術的なスタイルを適用"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:24
+#: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Apply artistic style"
 msgstr "芸術的なスタイルを適用"
 
@@ -3007,7 +3007,7 @@ msgstr "ベストプラクティス、パターン、分野固有のガイドラ
 msgid "Apply changes"
 msgstr "変更を適用"
 
-#: src/features/workflow/types/index.ts:613
+#: src/features/workflow/types/index.ts:614
 msgid "Apply consistent artistic style across generations"
 msgstr "生成全体で一貫した芸術的スタイルを適用"
 
@@ -3019,7 +3019,7 @@ msgstr "切り抜きを適用"
 msgid "Apply Mask"
 msgstr "マスクを適用"
 
-#: src/features/workflow/templates/index.ts:195
+#: src/features/workflow/templates/index.ts:196
 msgid "Apply Style"
 msgstr "スタイルを適用"
 
@@ -3211,7 +3211,7 @@ msgstr "人工知能"
 
 #: src/features/marketing/data/models-data.ts:98
 #: src/features/marketing/data/models-data.ts:200
-#: src/features/workflow/templates/index.ts:216
+#: src/features/workflow/templates/index.ts:217
 msgid "artistic"
 msgstr "芸術的"
 
@@ -3259,7 +3259,7 @@ msgstr "アスペクト比"
 
 #: src/features/chat/thread/media-gallery-view.tsx:448
 #: src/features/chat/thread/media-gallery-view.tsx:533
-#: src/features/workflow/components/nodes/video-node.tsx:178
+#: src/features/workflow/components/nodes/video-node.tsx:180
 msgid "Aspect Ratio"
 msgstr "アスペクト比"
 
@@ -3331,7 +3331,7 @@ msgstr "オークランド"
 msgid "Audio"
 msgstr "音声"
 
-#: src/features/workflow/types/index.ts:397
+#: src/features/workflow/types/index.ts:398
 msgid "Audio (TTS)"
 msgstr "音声（TTS）"
 
@@ -3410,7 +3410,7 @@ msgstr "自動保存を有効にしました"
 msgid "Auto-Delete Active"
 msgstr "自動削除が有効"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:154
+#: src/features/workflow/components/nodes/controlnet-node.tsx:148
 #: src/features/workflow/components/nodes/transcription-node.tsx:16
 msgid "Auto-detect"
 msgstr "自動検出"
@@ -3579,11 +3579,11 @@ msgstr "ギャラリーに戻る"
 msgid "Back to workflows"
 msgstr "ワークフローに戻る"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:107
+#: src/features/workflow/components/nodes/background-removal-node.tsx:100
 msgid "Background Color (optional)"
 msgstr "背景色（任意）"
 
-#: src/features/workflow/types/index.ts:412
+#: src/features/workflow/types/index.ts:413
 msgid "Background Removal"
 msgstr "背景除去"
 
@@ -3728,7 +3728,7 @@ msgstr "Bedrock コンソール → API キー。暗号化して保存され、�
 msgid "Before"
 msgstr "変更前"
 
-#: src/features/workflow/templates/index.ts:125
+#: src/features/workflow/templates/index.ts:126
 msgid "beginner"
 msgstr "初級"
 
@@ -3973,7 +3973,7 @@ msgstr "中央揃えの太字テキスト"
 msgid "Bolivia"
 msgstr "ボリビア"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:539
 msgid "Bookmark node"
 msgstr "ノードをブックマーク"
 
@@ -4001,7 +4001,7 @@ msgstr "@BotFather から取得した Telegram ボットのトークン"
 msgid "Bot token from the Discord Developer Portal"
 msgstr "Discord Developer Portal で取得したボットトークン"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:26
+#: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
 msgstr "下"
 
@@ -4027,8 +4027,8 @@ msgstr "ブレインストーミング"
 #: src/features/chat/core/hooks/use-thread-manager.ts:134
 #: src/features/chat/core/hooks/use-thread-manager.ts:147
 #: src/features/tasks/components/task-form-dialog.tsx:281
-#: src/features/workflow/types/index.ts:424
-#: src/features/workflow/types/index.ts:428
+#: src/features/workflow/types/index.ts:425
+#: src/features/workflow/types/index.ts:429
 msgid "Branch"
 msgstr "ブランチ"
 
@@ -4554,7 +4554,7 @@ msgstr "候補"
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "プロンプトを使用できません：{errorMessages}"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:23
+#: src/features/workflow/components/nodes/controlnet-node.tsx:25
 msgid "Canny Edge"
 msgstr "Canny エッジ"
 
@@ -4757,7 +4757,7 @@ msgstr "「Basic settings」タブにある Channel secret（X-Line-Signature �
 msgid "Channels"
 msgstr "チャンネル"
 
-#: src/features/workflow/templates/index.ts:310
+#: src/features/workflow/templates/index.ts:311
 msgid "character"
 msgstr "キャラクター"
 
@@ -4765,7 +4765,7 @@ msgstr "キャラクター"
 msgid "character consistency"
 msgstr "キャラクターの一貫性"
 
-#: src/features/workflow/templates/index.ts:309
+#: src/features/workflow/templates/index.ts:310
 msgid "Character Consistency"
 msgstr "キャラクターの一貫性"
 
@@ -4773,9 +4773,9 @@ msgstr "キャラクターの一貫性"
 msgid "Character performance"
 msgstr "キャラクターの演技"
 
-#: src/features/workflow/templates/index.ts:288
-#: src/features/workflow/types/index.ts:440
-#: src/features/workflow/types/index.ts:444
+#: src/features/workflow/templates/index.ts:289
+#: src/features/workflow/types/index.ts:441
+#: src/features/workflow/types/index.ts:445
 msgid "Character Reference"
 msgstr "キャラクター参照"
 
@@ -4784,7 +4784,7 @@ msgid "chars"
 msgstr "文字"
 
 #: src/features/marketing/data/models-data.ts:778
-#: src/features/workflow/templates/index.ts:485
+#: src/features/workflow/templates/index.ts:486
 msgid "chat"
 msgstr "チャット"
 
@@ -5325,8 +5325,8 @@ msgstr "クラウドプロバイダーアカウント"
 #: src/features/canvas/canvas-panel.tsx:735
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/workflow/components/nodes/code-node.tsx:60
-#: src/features/workflow/types/index.ts:450
-#: src/features/workflow/types/index.ts:454
+#: src/features/workflow/types/index.ts:451
+#: src/features/workflow/types/index.ts:455
 msgid "Code"
 msgstr "コード"
 
@@ -5564,8 +5564,8 @@ msgstr "コマンド"
 #: src/features/pages/components/page-comments-panel.tsx:146
 #: src/features/pages/components/page-view.tsx:429
 #: src/features/workflow/components/nodes/comment-node.tsx:95
-#: src/features/workflow/types/index.ts:460
-#: src/features/workflow/types/index.ts:464
+#: src/features/workflow/types/index.ts:461
+#: src/features/workflow/types/index.ts:465
 msgid "Comment"
 msgstr "コメント"
 
@@ -5670,15 +5670,15 @@ msgstr "さまざまな AI モデルが初心者に量子コンピューティ�
 msgid "Compare models"
 msgstr "モデルを比較"
 
-#: src/features/workflow/templates/index.ts:238
+#: src/features/workflow/templates/index.ts:239
 msgid "Compare Models"
 msgstr "モデルを比較"
 
-#: src/features/workflow/templates/index.ts:254
+#: src/features/workflow/templates/index.ts:255
 msgid "Compare outputs from multiple image models side-by-side"
 msgstr "複数の画像モデルの出力を並べて比較"
 
-#: src/features/workflow/types/index.ts:598
+#: src/features/workflow/types/index.ts:599
 msgid "Compare outputs from multiple models side-by-side"
 msgstr "複数のモデルの出力を並べて比較"
 
@@ -5692,11 +5692,11 @@ msgstr "再生可能エネルギー源のメリットとデメリットを比較
 msgid "Comparing \"{0}\" (baseline) with \"{1}\""
 msgstr "「{0}」（ベースライン）と「{1}」を比較中"
 
-#: src/features/workflow/templates/index.ts:258
+#: src/features/workflow/templates/index.ts:259
 msgid "comparison"
 msgstr "比較"
 
-#: src/features/workflow/templates/index.ts:248
+#: src/features/workflow/templates/index.ts:249
 msgid "Comparison Results"
 msgstr "比較結果"
 
@@ -5823,7 +5823,7 @@ msgstr "視覚入力に対する透明な思考を必要とする複雑な視覚
 msgid "composition"
 msgstr "構図"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:25
+#: src/features/workflow/components/nodes/character-ref-node.tsx:27
 msgid "Composition"
 msgstr "構図"
 
@@ -5839,7 +5839,7 @@ msgstr "コンテキストを圧縮しています..."
 msgid "Condition (JavaScript expression)"
 msgstr "条件（JavaScript の式）"
 
-#: src/features/workflow/types/index.ts:425
+#: src/features/workflow/types/index.ts:426
 msgid "Conditional branching"
 msgstr "条件分岐"
 
@@ -5959,10 +5959,10 @@ msgstr "Messaging API を通じて LINE 公式アカウントを接続します�
 msgid "Connect an audio/file node as input"
 msgstr "音声/ファイルノードを入力として接続してください"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:131
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:176
-#: src/features/workflow/components/nodes/outpaint-node.tsx:157
-#: src/features/workflow/components/nodes/video-node.tsx:165
+#: src/features/workflow/components/nodes/background-removal-node.tsx:124
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:170
+#: src/features/workflow/components/nodes/outpaint-node.tsx:150
+#: src/features/workflow/components/nodes/video-node.tsx:160
 msgid "Connect an image node as input"
 msgstr "画像ノードを入力として接続してください"
 
@@ -5994,8 +5994,8 @@ msgstr "Feishu / Lark を接続"
 msgid "Connect LINE"
 msgstr "LINE を接続"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:111
-#: src/features/workflow/components/nodes/object-editor-node.tsx:172
+#: src/features/workflow/components/nodes/inpaint-node.tsx:103
+#: src/features/workflow/components/nodes/object-editor-node.tsx:166
 msgid "Connect mask from upstream node or provide URL"
 msgstr "上流ノードからマスクを接続するか、URL を指定してください"
 
@@ -6154,7 +6154,7 @@ msgid "Consent Preferences"
 msgstr "同意設定"
 
 #: src/features/marketing/data/models-data.ts:332
-#: src/features/workflow/templates/index.ts:310
+#: src/features/workflow/templates/index.ts:311
 msgid "consistency"
 msgstr "一貫性"
 
@@ -6205,7 +6205,7 @@ msgstr "営業に問い合わせる"
 msgid "Contact support"
 msgstr "サポートに問い合わせる"
 
-#: src/features/workflow/types/index.ts:498
+#: src/features/workflow/types/index.ts:499
 msgid "Container for organizing workflow nodes"
 msgstr "ワークフローのノードを整理するためのコンテナー"
 
@@ -6223,11 +6223,11 @@ msgstr "コンテンツ"
 msgid "Content Creation"
 msgstr "コンテンツ制作"
 
-#: src/features/workflow/templates/index.ts:187
+#: src/features/workflow/templates/index.ts:188
 msgid "Content Image"
 msgstr "コンテンツ画像"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:118
+#: src/features/workflow/components/nodes/style-ref-node.tsx:110
 msgid "Content Image URL (optional)"
 msgstr "コンテンツ画像の URL（任意）"
 
@@ -6333,19 +6333,19 @@ msgstr "絞り設定で被写界深度を調整します"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "UI での個人情報の表示方法を管理します。"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:190
+#: src/features/workflow/components/nodes/controlnet-node.tsx:184
 msgid "Control Strength"
 msgstr "制御の強さ"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:200
+#: src/features/workflow/components/nodes/controlnet-node.tsx:194
 msgid "Control Timing"
 msgstr "制御のタイミング"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:107
+#: src/features/workflow/components/nodes/controlnet-node.tsx:108
 msgid "Control Type"
 msgstr "制御の種類"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:223
+#: src/features/workflow/components/nodes/controlnet-node.tsx:217
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "生成中に ControlNet の影響を適用するタイミングを制御します"
 
@@ -6361,12 +6361,12 @@ msgstr "リクエストを処理できる AI プロバイダーを管理しま�
 msgid "controlled"
 msgstr "制御性"
 
-#: src/features/workflow/types/index.ts:477
-#: src/features/workflow/types/index.ts:481
+#: src/features/workflow/types/index.ts:478
+#: src/features/workflow/types/index.ts:482
 msgid "ControlNet"
 msgstr "ControlNet"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:129
+#: src/features/workflow/components/nodes/controlnet-node.tsx:130
 msgid "ControlNet Model"
 msgstr "ControlNet モデル"
 
@@ -6396,11 +6396,11 @@ msgstr "変換"
 msgid "Convert Account"
 msgstr "アカウントを変換"
 
-#: src/features/workflow/types/index.ts:633
+#: src/features/workflow/types/index.ts:634
 msgid "Convert speech to text"
 msgstr "音声をテキストに変換"
 
-#: src/features/workflow/types/index.ts:394
+#: src/features/workflow/types/index.ts:395
 msgid "Convert text to speech"
 msgstr "テキストを音声に変換"
 
@@ -7543,7 +7543,7 @@ msgstr "エラーのデバッグやコードレビューなど..."
 msgid "Decompose the goal into an actionable plan."
 msgstr "目標を実行可能な計画に分解します。"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:413
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:415
 msgid "Decrease number of images"
 msgstr "画像の枚数を減らす"
 
@@ -8113,7 +8113,7 @@ msgstr "デプロイ、エッジ関数、フロントエンドインフラ"
 msgid "Depth"
 msgstr "深さ"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:22
+#: src/features/workflow/components/nodes/controlnet-node.tsx:24
 msgid "Depth Map"
 msgstr "深度マップ"
 
@@ -8133,11 +8133,11 @@ msgstr "降順"
 msgid "Describe a change. You review the result before anything is saved; applying it creates a version you can restore."
 msgstr "変更内容を説明してください。保存前に結果を確認でき、適用すると復元可能なバージョンが作成されます。"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:121
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:115
 msgid "Describe how the image should animate"
 msgstr "画像をどのように動かすかを説明してください"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:81
+#: src/features/workflow/components/nodes/img2img-node.tsx:73
 msgid "Describe how to transform the image..."
 msgstr "画像をどのように変換するかを説明してください..."
 
@@ -8149,20 +8149,20 @@ msgstr "生成する画像を説明してください..."
 msgid "Describe the image you want to create..."
 msgstr "作成したい画像を説明してください..."
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:116
-#: src/features/workflow/components/nodes/video-node.tsx:159
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:110
+#: src/features/workflow/components/nodes/video-node.tsx:154
 msgid "Describe the motion/animation..."
 msgstr "動き/アニメーションを説明してください..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:176
+#: src/features/workflow/components/nodes/style-ref-node.tsx:168
 msgid "Describe the scene or add style modifiers..."
 msgstr "シーンを説明するか、スタイル修飾子を追加してください..."
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:265
+#: src/features/workflow/components/nodes/character-ref-node.tsx:258
 msgid "Describe the scene or context..."
 msgstr "シーンやコンテキストを説明してください..."
 
-#: src/features/workflow/components/nodes/video-node.tsx:159
+#: src/features/workflow/components/nodes/video-node.tsx:154
 msgid "Describe the video to generate..."
 msgstr "生成する動画を説明してください..."
 
@@ -8178,11 +8178,11 @@ msgstr "スキルに何をさせたいかを説明してください。下のフ
 msgid "Describe what this workflow does..."
 msgstr "このワークフローの内容を説明してください..."
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:131
+#: src/features/workflow/components/nodes/object-editor-node.tsx:125
 msgid "Describe what to add or replace..."
 msgstr "追加または置換する内容を説明してください..."
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:108
+#: src/features/workflow/components/nodes/outpaint-node.tsx:101
 msgid "Describe what to generate in expanded areas..."
 msgstr "拡張領域に生成する内容を説明してください..."
 
@@ -8256,7 +8256,7 @@ msgstr "テキストとレイアウトの精度が最も重要な、ロゴ、ア
 msgid "destructive"
 msgstr "破壊的"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:515
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:517
 msgid "Detach from group"
 msgstr "グループから切り離す"
 
@@ -8377,7 +8377,7 @@ msgstr "デジタル"
 msgid "Digital Art"
 msgstr "デジタルアート"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:117
+#: src/features/workflow/components/nodes/outpaint-node.tsx:110
 msgid "Direction"
 msgstr "方向"
 
@@ -8492,11 +8492,11 @@ msgstr ""
 msgid "Dismissed — continuing without an answer"
 msgstr "閉じました — 回答なしで続行中"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:174
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:175
 msgid "Display model names on results"
 msgstr "結果にモデル名を表示"
 
-#: src/features/workflow/types/index.ts:584
+#: src/features/workflow/types/index.ts:585
 msgid "Display results"
 msgstr "結果を表示"
 
@@ -8658,7 +8658,7 @@ msgstr "CSV としてダウンロード"
 msgid "Download as XLSX"
 msgstr "XLSX としてダウンロード"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:549
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:551
 msgid "Download content"
 msgstr "コンテンツをダウンロード"
 
@@ -8823,8 +8823,8 @@ msgstr "選択項目を複製（{selectedNonGroupCount}）"
 msgid "Duration"
 msgstr "長さ"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:130
-#: src/features/workflow/components/nodes/video-node.tsx:197
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:124
+#: src/features/workflow/components/nodes/video-node.tsx:199
 msgid "Duration: {duration}s"
 msgstr "長さ: {duration} 秒"
 
@@ -8974,7 +8974,7 @@ msgstr "Mistral の最小マルチモーダルモデルを必要とするエッ�
 msgid "Edge deployed"
 msgstr "エッジにデプロイ"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:23
+#: src/features/workflow/components/nodes/controlnet-node.tsx:25
 msgid "Edge detection"
 msgstr "エッジ検出"
 
@@ -9074,7 +9074,7 @@ msgstr "編集してください"
 msgid "Edit memory"
 msgstr "メモリを編集"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:87
+#: src/features/workflow/components/nodes/object-editor-node.tsx:88
 msgid "Edit Mode"
 msgstr "編集モード"
 
@@ -9104,15 +9104,15 @@ msgstr "スキルを編集"
 msgid "Edit Slide {slideNumber}"
 msgstr "スライド {slideNumber} を編集"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
 msgid "Edit specific regions"
 msgstr "特定の領域を編集"
 
-#: src/features/workflow/types/index.ts:545
+#: src/features/workflow/types/index.ts:546
 msgid "Edit specific regions of an image"
 msgstr "画像の特定の領域を編集"
 
-#: src/features/workflow/templates/index.ts:395
+#: src/features/workflow/templates/index.ts:396
 msgid "Edit specific regions of an image with AI"
 msgstr "AI で画像の特定の領域を編集"
 
@@ -9136,12 +9136,12 @@ msgstr "メッセージを編集..."
 msgid "edited"
 msgstr "編集済み"
 
-#: src/features/workflow/templates/index.ts:389
+#: src/features/workflow/templates/index.ts:390
 msgid "Edited Image"
 msgstr "編集済みの画像"
 
 #: src/features/marketing/data/models-data.ts:155
-#: src/features/workflow/templates/index.ts:399
+#: src/features/workflow/templates/index.ts:400
 msgid "editing"
 msgstr "編集"
 
@@ -9494,7 +9494,7 @@ msgstr "「Events & Callbacks > Encryption Strategy」にある Encrypt Key（�
 msgid "Encrypted at rest and never shown again. Local servers such as Ollama usually need none."
 msgstr "保存時に暗号化され、再表示されることはありません。Ollama などのローカルサーバーでは通常不要です。"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:215
+#: src/features/workflow/components/nodes/controlnet-node.tsx:209
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:188
 msgid "End"
 msgstr "終了"
@@ -9566,25 +9566,25 @@ msgstr "英語（英国）"
 msgid "English (US)"
 msgstr "英語（米国）"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:139
-#: src/features/workflow/components/nodes/upscale-node.tsx:142
+#: src/features/workflow/components/nodes/upscale-node.tsx:132
+#: src/features/workflow/components/nodes/upscale-node.tsx:135
 msgid "Enhance Details"
 msgstr "ディテールを強化"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:126
-#: src/features/workflow/components/nodes/upscale-node.tsx:129
+#: src/features/workflow/components/nodes/upscale-node.tsx:119
+#: src/features/workflow/components/nodes/upscale-node.tsx:122
 msgid "Enhance Faces"
 msgstr "顔を補正"
 
-#: src/features/workflow/types/index.ts:643
+#: src/features/workflow/types/index.ts:644
 msgid "Enhance image resolution"
 msgstr "画像の解像度を向上"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:85
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
 msgid "Enhance resolution"
 msgstr "解像度を向上"
 
-#: src/features/workflow/templates/index.ts:157
+#: src/features/workflow/templates/index.ts:158
 msgid "Enhanced Image"
 msgstr "補正済みの画像"
 
@@ -9608,7 +9608,7 @@ msgstr "GLM 4.5v を上回るビジョン理解"
 msgid "Enhanced visual style adaptation"
 msgstr "強化された視覚スタイルへの適応"
 
-#: src/features/workflow/templates/index.ts:167
+#: src/features/workflow/templates/index.ts:168
 msgid "enhancement"
 msgstr "補正"
 
@@ -10157,7 +10157,7 @@ msgstr "実行"
 msgid "Execute cleanup"
 msgstr "クリーンアップを実行"
 
-#: src/features/workflow/types/index.ts:451
+#: src/features/workflow/types/index.ts:452
 msgid "Execute code"
 msgstr "コードを実行"
 
@@ -10210,7 +10210,7 @@ msgstr "{title} を展開"
 msgid "Expand browser panel"
 msgstr "ブラウザーパネルを展開"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
 msgid "Expand canvas"
 msgstr "キャンバスを拡張"
 
@@ -10230,7 +10230,7 @@ msgstr "グループを展開"
 msgid "Expand group to show children"
 msgstr "グループを展開して子要素を表示"
 
-#: src/features/workflow/types/index.ts:574
+#: src/features/workflow/types/index.ts:575
 msgid "Expand image canvas beyond original borders"
 msgstr "画像のキャンバスを元の境界を超えて拡張"
 
@@ -10242,11 +10242,11 @@ msgstr "テキストエリアを展開"
 msgid "Expand thinking"
 msgstr "思考を展開"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:554
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:556
 msgid "Expand to fullscreen"
 msgstr "全画面表示に展開"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:135
+#: src/features/workflow/components/nodes/outpaint-node.tsx:128
 msgid "Expand: {expandPixels}px"
 msgstr "拡張: {expandPixels}px"
 
@@ -10254,7 +10254,7 @@ msgstr "拡張: {expandPixels}px"
 msgid "Expanded Editor"
 msgstr "拡張エディター"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:102
+#: src/features/workflow/components/nodes/outpaint-node.tsx:95
 msgid "Expansion Prompt"
 msgstr "拡張プロンプト"
 
@@ -10497,7 +10497,7 @@ msgstr "「{selector}」を抽出"
 msgid "Extract page"
 msgstr "ページを抽出"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
 msgid "Extract subject"
 msgstr "被写体を抽出"
 
@@ -10525,7 +10525,7 @@ msgstr "極端な歪み"
 msgid "Fable (British)"
 msgstr "Fable（イギリス英語）"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:23
+#: src/features/workflow/components/nodes/character-ref-node.tsx:25
 msgid "Face"
 msgstr "顔"
 
@@ -11689,8 +11689,8 @@ msgstr "モデルを取得"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:26
 #: src/features/evals/components/import-cases-dialog.tsx:81
-#: src/features/workflow/types/index.ts:487
-#: src/features/workflow/types/index.ts:491
+#: src/features/workflow/types/index.ts:488
+#: src/features/workflow/types/index.ts:492
 msgid "File"
 msgstr "ファイル"
 
@@ -11702,7 +11702,7 @@ msgstr "ファイル「{fileName}」を削除しました"
 msgid "File access and AI-powered universal search across work apps"
 msgstr "仕事用アプリ全体のファイルアクセスと AI によるユニバーサル検索"
 
-#: src/features/workflow/types/index.ts:488
+#: src/features/workflow/types/index.ts:489
 msgid "File input"
 msgstr "ファイル入力"
 
@@ -11772,7 +11772,7 @@ msgstr "塗りつぶしの色"
 msgid "Fill in a name, a valid command, a description and instructions before saving."
 msgstr "保存する前に、名前、有効なコマンド、説明、指示を入力してください。"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:87
+#: src/features/workflow/components/nodes/inpaint-node.tsx:79
 msgid "Fill Prompt"
 msgstr "塗りつぶしプロンプト"
 
@@ -11880,7 +11880,7 @@ msgstr "近くのおすすめイタリアンレストランを探す"
 msgid "Find tutorials on how to learn Python programming"
 msgstr "Python プログラミングを学ぶためのチュートリアルを探す"
 
-#: src/features/workflow/types/index.ts:374
+#: src/features/workflow/types/index.ts:375
 msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
 msgstr "CFG スケール、サンプラー、スケジューラー、シードを微調整"
 
@@ -12565,7 +12565,7 @@ msgstr "異なるモデルで 4 枚の画像を生成し、並べて比較する
 msgid "Generate a storyboard for a short documentary"
 msgstr "短編ドキュメンタリーの絵コンテを作成する"
 
-#: src/features/workflow/templates/index.ts:439
+#: src/features/workflow/templates/index.ts:440
 msgid "Generate a video from a text description"
 msgstr "テキストの説明から動画を生成"
 
@@ -12573,7 +12573,7 @@ msgstr "テキストの説明から動画を生成"
 msgid "Generate an image"
 msgstr "画像を生成"
 
-#: src/features/workflow/templates/index.ts:121
+#: src/features/workflow/templates/index.ts:122
 msgid "Generate an image from a text prompt"
 msgstr "テキストプロンプトから画像を生成"
 
@@ -12589,7 +12589,7 @@ msgstr "暖かい照明と植物に囲まれた居心地のよい読書スペー
 msgid "Generate an image or video..."
 msgstr "画像または動画を生成..."
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:49
+#: src/features/workflow/components/nodes/video-model-options.tsx:50
 msgid "Generate audio"
 msgstr "音声を生成"
 
@@ -12606,11 +12606,11 @@ msgid "Generate image"
 msgstr "画像を生成"
 
 #: src/features/chat/thread/media-gallery-view.tsx:612
-#: src/features/workflow/templates/index.ts:105
+#: src/features/workflow/templates/index.ts:106
 msgid "Generate Image"
 msgstr "画像を生成"
 
-#: src/features/workflow/templates/index.ts:306
+#: src/features/workflow/templates/index.ts:307
 msgid "Generate images with consistent character appearance"
 msgstr "キャラクターの外見を一貫させて画像を生成"
 
@@ -12632,11 +12632,11 @@ msgid "Generate video"
 msgstr "動画を生成"
 
 #: src/features/chat/thread/media-gallery-view.tsx:612
-#: src/features/workflow/templates/index.ts:423
+#: src/features/workflow/templates/index.ts:424
 msgid "Generate Video"
 msgstr "動画を生成"
 
-#: src/features/workflow/types/index.ts:653
+#: src/features/workflow/types/index.ts:661
 msgid "Generate videos from text or images"
 msgstr "テキストや画像から動画を生成"
 
@@ -12657,7 +12657,7 @@ msgstr "AI でワークフローを生成"
 msgid "Generated image"
 msgstr "生成された画像"
 
-#: src/features/workflow/templates/index.ts:300
+#: src/features/workflow/templates/index.ts:301
 msgid "Generated Image"
 msgstr "生成された画像"
 
@@ -12710,7 +12710,7 @@ msgstr "生成しています..."
 msgid "Generating…"
 msgstr "生成中…"
 
-#: src/features/workflow/templates/index.ts:443
+#: src/features/workflow/templates/index.ts:444
 msgid "generation"
 msgstr "生成"
 
@@ -12718,8 +12718,8 @@ msgstr "生成"
 msgid "Generation Prompt"
 msgstr "生成プロンプト"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:259
-#: src/features/workflow/components/nodes/style-ref-node.tsx:170
+#: src/features/workflow/components/nodes/character-ref-node.tsx:252
+#: src/features/workflow/components/nodes/style-ref-node.tsx:162
 msgid "Generation Prompt (optional)"
 msgstr "生成プロンプト（任意）"
 
@@ -13248,8 +13248,8 @@ msgstr "リアルタイムの Web アクセスに対応した xAI の Grok モ�
 #: src/features/workflow/components/nodes/group-node.tsx:299
 #: src/features/workflow/components/nodes/group-node.tsx:317
 #: src/features/workflow/hooks/use-workflow-shortcuts.ts:181
-#: src/features/workflow/types/index.ts:497
-#: src/features/workflow/types/index.ts:501
+#: src/features/workflow/types/index.ts:498
+#: src/features/workflow/types/index.ts:502
 msgid "Group"
 msgstr "グループ化"
 
@@ -13302,7 +13302,7 @@ msgstr "ゲストアカウントでは無料モデルのみ利用できます。
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "ゲストアカウントでは無料モデルのみ使用できます。サインアップするとすべてのモデルが利用できます。"
 
-#: src/features/workflow/types/index.ts:478
+#: src/features/workflow/types/index.ts:479
 msgid "Guide generation with pose, depth, or edge detection"
 msgstr "ポーズ、深度、エッジ検出で生成をガイド"
 
@@ -13592,7 +13592,7 @@ msgstr "OpenAI の最小かつ最速のモデルを必要とする大量の軽�
 msgid "High-volume, time-sensitive workflows where generation speed is the top priority"
 msgstr "生成速度が最優先となる、大量かつ時間的制約のあるワークフロー"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:253
+#: src/features/workflow/components/nodes/character-ref-node.tsx:246
 msgid "Higher = closer match to reference"
 msgstr "高いほど参照に近くなる"
 
@@ -13600,7 +13600,7 @@ msgstr "高いほど参照に近くなる"
 msgid "Higher = more prompt adherence, Lower = more creativity"
 msgstr "高いほどプロンプトに忠実、低いほど創造的"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:147
+#: src/features/workflow/components/nodes/style-ref-node.tsx:139
 msgid "Higher = stronger style influence"
 msgstr "高いほどスタイルの影響が強くなる"
 
@@ -13730,15 +13730,15 @@ msgstr "HTTPS のみ。ANTHROPIC_BASE_URL と同じくサーバーのルート�
 msgid "HTTPS only. Usually ends in /v1."
 msgstr "HTTPS のみ。通常は /v1 で終わります。"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:146
+#: src/features/workflow/components/nodes/object-editor-node.tsx:140
 msgid "https://... (white = edit area)"
 msgstr "https://...（白 = 編集領域）"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:107
+#: src/features/workflow/components/nodes/inpaint-node.tsx:99
 msgid "https://... (white = edit, black = keep)"
 msgstr "https://...（白 = 編集、黒 = 保持）"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:176
+#: src/features/workflow/components/nodes/controlnet-node.tsx:170
 msgid "https://... or from input"
 msgstr "https://... または入力から"
 
@@ -13750,7 +13750,7 @@ msgstr "色相回転"
 msgid "Human Creativity"
 msgstr "人間の創造性"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:21
+#: src/features/workflow/components/nodes/controlnet-node.tsx:23
 msgid "Human pose & skeleton"
 msgstr "人物のポーズと骨格"
 
@@ -13840,9 +13840,9 @@ msgstr "イラスト"
 #: src/features/workflow/components/gallery/gallery-card.tsx:27
 #: src/features/workflow/components/nodes/output-node.tsx:19
 #: src/features/workflow/components/template-picker.tsx:20
-#: src/features/workflow/templates/index.ts:363
-#: src/features/workflow/types/index.ts:507
-#: src/features/workflow/types/index.ts:511
+#: src/features/workflow/templates/index.ts:364
+#: src/features/workflow/types/index.ts:508
+#: src/features/workflow/types/index.ts:512
 #: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Image"
 msgstr "画像"
@@ -13875,7 +13875,7 @@ msgid "Image Gen"
 msgstr "画像生成"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:91
-#: src/features/workflow/templates/index.ts:125
+#: src/features/workflow/templates/index.ts:126
 msgid "image generation"
 msgstr "画像生成"
 
@@ -13905,7 +13905,7 @@ msgstr "画像生成モデル"
 #~ msgid "Image is too large. Choose one under 300 KB."
 #~ msgstr ""
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:127
+#: src/features/workflow/components/nodes/style-ref-node.tsx:119
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "スタイルを適用する画像（または前のノードの入力を使用）"
 
@@ -13921,17 +13921,17 @@ msgstr "画像からテキスト"
 msgid "Image to video"
 msgstr "画像から動画"
 
-#: src/features/workflow/components/nodes/video-node.tsx:126
-#: src/features/workflow/types/index.ts:524
-#: src/features/workflow/types/index.ts:528
+#: src/features/workflow/components/nodes/video-node.tsx:127
+#: src/features/workflow/types/index.ts:525
+#: src/features/workflow/types/index.ts:529
 msgid "Image to Video"
 msgstr "画像から動画"
 
-#: src/features/workflow/templates/index.ts:350
+#: src/features/workflow/templates/index.ts:351
 msgid "Image Transform"
 msgstr "画像変換"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:308
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:309
 msgid "Image upload failed. Try again."
 msgstr ""
 
@@ -13948,12 +13948,12 @@ msgstr "画像の URL またはアップロードした画像が必要です"
 msgid "Image variation & editing"
 msgstr "画像のバリエーションと編集"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:112
+#: src/features/workflow/components/nodes/style-ref-node.tsx:104
 msgid "Image whose artistic style will be applied"
 msgstr "芸術的スタイルを適用する元の画像"
 
-#: src/features/workflow/types/index.ts:534
-#: src/features/workflow/types/index.ts:538
+#: src/features/workflow/types/index.ts:535
+#: src/features/workflow/types/index.ts:539
 msgid "Image-to-Image"
 msgstr "画像から画像"
 
@@ -13973,11 +13973,11 @@ msgstr "複数画像から画像"
 msgid "Images to video"
 msgstr "複数画像から動画"
 
-#: src/features/workflow/templates/index.ts:351
+#: src/features/workflow/templates/index.ts:352
 msgid "img2img"
 msgstr "img2img"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:90
 msgid "Img2Img"
 msgstr "Img2Img"
 
@@ -14254,7 +14254,7 @@ msgstr "Inception の拡散ベースの言語モデル"
 msgid "Includes audio generation"
 msgstr "音声生成を含む"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:422
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:424
 msgid "Increase number of images"
 msgstr "画像の枚数を増やす"
 
@@ -14290,18 +14290,18 @@ msgstr "組織の設定を継承"
 #~ msgid "Initial state"
 #~ msgstr "初期状態"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
-#: src/features/workflow/templates/index.ts:379
-#: src/features/workflow/types/index.ts:544
-#: src/features/workflow/types/index.ts:548
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
+#: src/features/workflow/templates/index.ts:380
+#: src/features/workflow/types/index.ts:545
+#: src/features/workflow/types/index.ts:549
 msgid "Inpaint"
 msgstr "インペイント"
 
-#: src/features/workflow/templates/index.ts:398
+#: src/features/workflow/templates/index.ts:399
 msgid "Inpaint Edit"
 msgstr "インペイント編集"
 
-#: src/features/workflow/templates/index.ts:399
+#: src/features/workflow/templates/index.ts:400
 msgid "inpainting"
 msgstr "インペインティング"
 
@@ -14323,7 +14323,7 @@ msgstr "入力（リッチテキスト）"
 msgid "Input (URL)"
 msgstr "入力（URL）"
 
-#: src/features/workflow/templates/index.ts:137
+#: src/features/workflow/templates/index.ts:138
 msgid "Input Image"
 msgstr "入力画像"
 
@@ -14331,11 +14331,11 @@ msgstr "入力画像"
 msgid "Input is required"
 msgstr "入力は必須です"
 
-#: src/features/workflow/types/index.ts:508
+#: src/features/workflow/types/index.ts:509
 msgid "Input or generate images"
 msgstr "画像を入力または生成"
 
-#: src/features/workflow/types/index.ts:623
+#: src/features/workflow/types/index.ts:624
 msgid "Input or transform text"
 msgstr "テキストを入力または変換"
 
@@ -14613,7 +14613,7 @@ msgstr "スキルを呼び出す"
 msgid "Invoke Skill"
 msgstr "スキルを呼び出す"
 
-#: src/features/workflow/templates/index.ts:310
+#: src/features/workflow/templates/index.ts:311
 msgid "ip-adapter"
 msgstr "ip-adapter"
 
@@ -14975,7 +14975,7 @@ msgstr "キルギス"
 msgid "Label"
 msgstr "ラベル"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:172
+#: src/features/workflow/components/nodes/object-editor-node.tsx:166
 msgid "LAMA uses AI to seamlessly remove objects"
 msgstr "LAMA は AI を使ってオブジェクトを自然に除去します"
 
@@ -15315,7 +15315,7 @@ msgstr "インデックス済みのすべてのファイルを検索するには
 msgid "Leave empty for \"any model\"."
 msgstr "「任意のモデル」にする場合は空欄のままにしてください。"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:126
+#: src/features/workflow/components/nodes/background-removal-node.tsx:119
 msgid "Leave empty for transparent background"
 msgstr "透明な背景にする場合は空欄のままにしてください"
 
@@ -15336,7 +15336,7 @@ msgid "Leave Team"
 msgstr "チームから退出"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:397
-#: src/features/workflow/components/nodes/outpaint-node.tsx:23
+#: src/features/workflow/components/nodes/outpaint-node.tsx:25
 msgid "Left"
 msgstr "左"
 
@@ -15546,7 +15546,7 @@ msgstr "ライブプレビュー — アーティファクトのストリーミ�
 msgid "LLaMA, Mixtral, Gemma — fastest inference"
 msgstr "LLaMA、Mixtral、Gemma — 最速の推論"
 
-#: src/features/workflow/templates/index.ts:485
+#: src/features/workflow/templates/index.ts:486
 msgid "llm"
 msgstr "llm"
 
@@ -15800,7 +15800,7 @@ msgstr "所在地を更新しました"
 msgid "Lock group"
 msgstr "グループをロック"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:531
 msgid "Lock node"
 msgstr "ノードをロック"
 
@@ -15921,7 +15921,7 @@ msgstr "低"
 msgid "Low latency text-to-video"
 msgstr "低レイテンシのテキストから動画生成"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:96
+#: src/features/workflow/components/nodes/img2img-node.tsx:88
 msgid "Lower = subtle changes, Higher = major transformation"
 msgstr "低い = 控えめな変化、高い = 大幅な変換"
 
@@ -16002,11 +16002,11 @@ msgstr "メインフォント"
 msgid "Main font updated"
 msgstr "メインフォントを更新しました"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:157
+#: src/features/workflow/components/nodes/style-ref-node.tsx:149
 msgid "Maintain original structure"
 msgstr "元の構造を維持"
 
-#: src/features/workflow/types/index.ts:441
+#: src/features/workflow/types/index.ts:442
 msgid "Maintain subject consistency across generations"
 msgstr "生成間で被写体の一貫性を維持"
 
@@ -16182,11 +16182,11 @@ msgstr "すべて既読にする"
 msgid "Mark as favorite"
 msgstr "お気に入りにする"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:150
+#: src/features/workflow/components/nodes/object-editor-node.tsx:144
 msgid "Mark the area to edit in white"
 msgstr "編集する領域を白でマークしてください"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:150
+#: src/features/workflow/components/nodes/object-editor-node.tsx:144
 msgid "Mark the object to remove in white"
 msgstr "削除するオブジェクトを白でマークしてください"
 
@@ -16219,7 +16219,7 @@ msgstr "マーケティング"
 msgid "Marketplace"
 msgstr "マーケットプレイス"
 
-#: src/features/workflow/templates/index.ts:371
+#: src/features/workflow/templates/index.ts:372
 msgid "Mask"
 msgstr "マスク"
 
@@ -16227,11 +16227,11 @@ msgstr "マスク"
 msgid "Mask preview"
 msgstr "マスクのプレビュー"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:140
+#: src/features/workflow/components/nodes/object-editor-node.tsx:134
 msgid "Mask URL"
 msgstr "マスク URL"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:101
+#: src/features/workflow/components/nodes/inpaint-node.tsx:93
 msgid "Mask URL (optional)"
 msgstr "マスク URL (任意)"
 
@@ -16248,7 +16248,7 @@ msgstr "Alibaba の大規模 235B MoE モデル"
 msgid "Match input"
 msgstr "入力に合わせる"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:25
+#: src/features/workflow/components/nodes/character-ref-node.tsx:27
 msgid "Match layout and structure"
 msgstr "レイアウトと構造を合わせる"
 
@@ -16798,7 +16798,7 @@ msgstr "モバイルアプリアイコン"
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
-#: src/features/workflow/components/nodes/video-node.tsx:115
+#: src/features/workflow/components/nodes/video-node.tsx:116
 msgid "Mode"
 msgstr "モード"
 
@@ -16815,15 +16815,15 @@ msgstr "モード:"
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
 #: src/features/workflow/components/nodes/character-ref-node.tsx:144
 #: src/features/workflow/components/nodes/image-to-video-node.tsx:89
-#: src/features/workflow/components/nodes/img2img-node.tsx:56
-#: src/features/workflow/components/nodes/inpaint-node.tsx:68
+#: src/features/workflow/components/nodes/img2img-node.tsx:55
+#: src/features/workflow/components/nodes/inpaint-node.tsx:67
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:126
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:215
-#: src/features/workflow/components/nodes/object-editor-node.tsx:105
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:216
+#: src/features/workflow/components/nodes/object-editor-node.tsx:106
 #: src/features/workflow/components/nodes/outpaint-node.tsx:83
-#: src/features/workflow/components/nodes/style-ref-node.tsx:84
+#: src/features/workflow/components/nodes/style-ref-node.tsx:83
 #: src/features/workflow/components/nodes/upscale-node.tsx:88
-#: src/features/workflow/components/nodes/video-node.tsx:134
+#: src/features/workflow/components/nodes/video-node.tsx:135
 #: src/routes/admin/gateway/index.tsx:83
 msgid "Model"
 msgstr "モデル"
@@ -16841,7 +16841,7 @@ msgid "Model comparison"
 msgstr "モデル比較"
 
 #: src/features/chat/core/hooks/use-comparison-chat.ts:108
-#: src/features/workflow/templates/index.ts:257
+#: src/features/workflow/templates/index.ts:258
 msgid "Model Comparison"
 msgstr "モデル比較"
 
@@ -16935,7 +16935,7 @@ msgstr "組織から継承したモデル："
 msgid "Models support tool calling"
 msgstr "モデルがツール呼び出しに対応"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:96
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:97
 msgid "Models to Compare"
 msgstr "比較するモデル"
 
@@ -17103,13 +17103,13 @@ msgstr "最も汎用性の高いインテリジェントモデル"
 msgid "motion fluidity"
 msgstr "滑らかな動き"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:110
-#: src/features/workflow/components/nodes/video-node.tsx:153
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:104
+#: src/features/workflow/components/nodes/video-node.tsx:148
 msgid "Motion Prompt"
 msgstr "モーションプロンプト"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:144
-#: src/features/workflow/components/nodes/video-node.tsx:212
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:138
+#: src/features/workflow/components/nodes/video-node.tsx:214
 msgid "Motion: {motionPercent}%"
 msgstr "モーション: {motionPercent}%"
 
@@ -17494,9 +17494,9 @@ msgstr "対応が必要"
 msgid "Negative prompt — what to exclude"
 msgstr "ネガティブプロンプト — 除外したい要素"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:120
-#: src/features/workflow/components/nodes/object-editor-node.tsx:159
-#: src/features/workflow/components/nodes/outpaint-node.tsx:144
+#: src/features/workflow/components/nodes/inpaint-node.tsx:112
+#: src/features/workflow/components/nodes/object-editor-node.tsx:153
+#: src/features/workflow/components/nodes/outpaint-node.tsx:137
 msgid "Negative Prompt (optional)"
 msgstr "ネガティブプロンプト (任意)"
 
@@ -18499,7 +18499,7 @@ msgstr "なし（最上位のタスク）"
 msgid "Normal"
 msgstr "標準"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:24
+#: src/features/workflow/components/nodes/controlnet-node.tsx:26
 msgid "Normal Map"
 msgstr "法線マップ"
 
@@ -18679,12 +18679,12 @@ msgstr "画像の枚数"
 msgid "Number of messages"
 msgstr "メッセージ数"
 
-#: src/features/workflow/types/index.ts:558
-#: src/features/workflow/types/index.ts:562
+#: src/features/workflow/types/index.ts:559
+#: src/features/workflow/types/index.ts:563
 msgid "Object Editor"
 msgstr "オブジェクトエディター"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:125
+#: src/features/workflow/components/nodes/object-editor-node.tsx:119
 msgid "Object Prompt"
 msgstr "オブジェクトプロンプト"
 
@@ -19511,7 +19511,7 @@ msgstr "または"
 msgid "or click to browse"
 msgstr "またはクリックして参照"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:164
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:165
 msgid "Or connect a Text node to provide the prompt"
 msgstr "または Text ノードを接続してプロンプトを指定"
 
@@ -19654,9 +19654,9 @@ msgstr "プライバシーポリシーでは、GDPR およびその他の適用�
 msgid "Outcome of every case per model"
 msgstr ""
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
-#: src/features/workflow/types/index.ts:573
-#: src/features/workflow/types/index.ts:577
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
+#: src/features/workflow/types/index.ts:574
+#: src/features/workflow/types/index.ts:578
 msgid "Outpaint"
 msgstr "アウトペイント"
 
@@ -19664,8 +19664,8 @@ msgstr "アウトペイント"
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
-#: src/features/workflow/types/index.ts:583
-#: src/features/workflow/types/index.ts:587
+#: src/features/workflow/types/index.ts:584
+#: src/features/workflow/types/index.ts:588
 msgid "Output"
 msgstr "出力"
 
@@ -19677,7 +19677,7 @@ msgstr "出力 {outputNumber}: {label}"
 msgid "Output files"
 msgstr "出力ファイル"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:82
+#: src/features/workflow/components/nodes/background-removal-node.tsx:75
 msgid "Output Format"
 msgstr "出力形式"
 
@@ -19827,8 +19827,8 @@ msgstr "パラグアイ"
 msgid "Parallel"
 msgstr "並列"
 
-#: src/features/workflow/types/index.ts:597
-#: src/features/workflow/types/index.ts:601
+#: src/features/workflow/types/index.ts:598
+#: src/features/workflow/types/index.ts:602
 msgid "Parallel Compare"
 msgstr "並列比較"
 
@@ -19995,7 +19995,7 @@ msgstr "LINE チャネルの Messaging API タブで Webhook URL に貼り付け
 msgid "Paste cells"
 msgstr "セルを貼り付け"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:123
+#: src/features/workflow/components/nodes/style-ref-node.tsx:115
 msgid "Paste content image URL to stylize..."
 msgstr "スタイルを適用するコンテンツ画像の URL を貼り付け..."
 
@@ -20003,7 +20003,7 @@ msgstr "スタイルを適用するコンテンツ画像の URL を貼り付け.
 msgid "Paste image URL"
 msgstr "画像 URL を貼り付け"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:197
+#: src/features/workflow/components/nodes/character-ref-node.tsx:190
 msgid "Paste image URL..."
 msgstr "画像 URL を貼り付け..."
 
@@ -20015,7 +20015,7 @@ msgstr "既存の行に収まる分だけ貼り付け"
 msgid "Paste or write a system prompt to optimize..."
 msgstr "最適化するシステムプロンプトを貼り付けるか入力してください..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:108
+#: src/features/workflow/components/nodes/style-ref-node.tsx:100
 msgid "Paste style reference image URL..."
 msgstr "スタイル参照画像の URL を貼り付け..."
 
@@ -20410,7 +20410,7 @@ msgstr "新しいメールアドレスを認証してください"
 msgid "Plug in your own tools"
 msgstr "独自のツールを接続"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:21
+#: src/features/workflow/components/nodes/background-removal-node.tsx:23
 msgid "PNG (Transparent)"
 msgstr "PNG (透過)"
 
@@ -20505,7 +20505,7 @@ msgstr "ポルトガル語（ブラジル）"
 msgid "Portuguese (Portugal)"
 msgstr "ポルトガル語（ポルトガル）"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:21
+#: src/features/workflow/components/nodes/controlnet-node.tsx:23
 msgid "Pose Detection"
 msgstr "ポーズ検出"
 
@@ -20632,7 +20632,7 @@ msgstr "インポートを準備しています…"
 msgid "Preparing..."
 msgstr "準備しています..."
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:150
+#: src/features/workflow/components/nodes/controlnet-node.tsx:144
 msgid "Preprocessor"
 msgstr "プリプロセッサ"
 
@@ -20643,12 +20643,12 @@ msgstr "プリプロセッサ"
 msgid "Presentation"
 msgstr "プレゼンテーション"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:154
-#: src/features/workflow/components/nodes/style-ref-node.tsx:161
+#: src/features/workflow/components/nodes/style-ref-node.tsx:146
+#: src/features/workflow/components/nodes/style-ref-node.tsx:153
 msgid "Preserve Content"
 msgstr "コンテンツを保持"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:23
+#: src/features/workflow/components/nodes/character-ref-node.tsx:25
 msgid "Preserve facial features"
 msgstr "顔の特徴を保持"
 
@@ -20887,13 +20887,18 @@ msgstr "デフォルトでプライベート"
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:553
-#: src/features/workflow/components/nodes/video-model-options.tsx:86
+#: src/features/workflow/components/nodes/pro-badge.tsx:6
 msgid "Pro"
 msgstr "Pro"
 
 #: src/features/billing/components/personal-plan-card.tsx:20
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro はあなた個人のプランです。すべてのモデルと1日1,000メッセージ。"
+
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:92
+#: src/features/workflow/components/nodes/video-node.tsx:138
+msgid "Pro models need a Pro plan. On a free plan the run stops before it starts."
+msgstr "Pro モデルには Pro プランが必要です。無料プランでは、実行は開始前に停止します。"
 
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:29
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
@@ -20903,11 +20908,11 @@ msgstr "AI でテキストファイルを処理して要点を抽出し、その
 msgid "Process each message independently with only the system prompt and current input. No chat history context."
 msgstr "各メッセージを、システムプロンプトと現在の入力のみで個別に処理します。チャット履歴のコンテキストは使いません。"
 
-#: src/features/workflow/templates/index.ts:481
+#: src/features/workflow/templates/index.ts:482
 msgid "Process text through an AI language model"
 msgstr "AI 言語モデルでテキストを処理"
 
-#: src/features/workflow/types/index.ts:384
+#: src/features/workflow/types/index.ts:385
 msgid "Process with AI model"
 msgstr "AI モデルで処理"
 
@@ -21079,8 +21084,8 @@ msgstr "管理者に昇格"
 
 #: ../../packages/ui/src/components/image-gallery.tsx:409
 #: src/features/chat/thread/media-gallery-view.tsx:433
-#: src/features/workflow/templates/index.ts:95
-#: src/features/workflow/templates/index.ts:229
+#: src/features/workflow/templates/index.ts:96
+#: src/features/workflow/templates/index.ts:230
 msgid "Prompt"
 msgstr "プロンプト"
 
@@ -21147,7 +21152,7 @@ msgstr "プロンプトを読み込みました"
 msgid "Prompt optimized successfully"
 msgstr "プロンプトを最適化しました"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:159
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:160
 msgid "Prompt to run on all models..."
 msgstr "すべてのモデルで実行するプロンプト..."
 
@@ -21842,7 +21847,7 @@ msgstr "やり直す"
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr "やり直し (Ctrl+Shift+Z)"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:181
+#: src/features/workflow/components/nodes/controlnet-node.tsx:175
 msgid "Reference"
 msgstr "参照"
 
@@ -21850,7 +21855,7 @@ msgstr "参照"
 msgid "Reference {ordinal}"
 msgstr "参照 {ordinal}"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:170
+#: src/features/workflow/components/nodes/controlnet-node.tsx:164
 msgid "Reference Image (optional)"
 msgstr "参照画像 (任意)"
 
@@ -21872,23 +21877,23 @@ msgstr "参照画像"
 msgid "Reference images"
 msgstr "参照画像"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:163
+#: src/features/workflow/components/nodes/character-ref-node.tsx:156
 msgid "Reference Images ({referenceCount}/{maxImages})"
 msgstr "参照画像 ({referenceCount}/{maxImages})"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:139
+#: src/features/workflow/components/nodes/video-model-options.tsx:136
 msgid "Reference mode"
 msgstr "参照モード"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:225
+#: src/features/workflow/components/nodes/character-ref-node.tsx:218
 msgid "Reference Mode"
 msgstr "参照モード"
 
-#: src/features/workflow/templates/index.ts:270
+#: src/features/workflow/templates/index.ts:271
 msgid "Reference Photo"
 msgstr "参照写真"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:247
+#: src/features/workflow/components/nodes/character-ref-node.tsx:240
 msgid "Reference Strength"
 msgstr "参照の強さ"
 
@@ -21901,7 +21906,7 @@ msgstr "参照動画"
 msgid "Reference videos together must be at least {0} seconds."
 msgstr "参照動画の合計は {0} 秒以上にしてください。"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:155
+#: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "References"
 msgstr "参照"
 
@@ -21912,7 +21917,7 @@ msgstr "参照"
 msgid "Refine"
 msgstr "改善"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:100
+#: src/features/workflow/components/nodes/background-removal-node.tsx:93
 msgid "Refine Edge Detection"
 msgstr "エッジ検出を精緻化"
 
@@ -22178,19 +22183,19 @@ msgstr "すべて削除"
 msgid "Remove All Files"
 msgstr "すべてのファイルを削除"
 
-#: src/features/workflow/types/index.ts:408
+#: src/features/workflow/types/index.ts:409
 msgid "Remove Background"
 msgstr "背景を削除"
 
-#: src/features/workflow/types/index.ts:409
+#: src/features/workflow/types/index.ts:410
 msgid "Remove background and extract subject"
 msgstr "背景を削除して被写体を抽出"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
 msgid "Remove BG"
 msgstr "背景削除"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:539
 msgid "Remove bookmark"
 msgstr "ブックマークを削除"
 
@@ -22247,15 +22252,15 @@ msgstr "キーを削除"
 msgid "Remove Member"
 msgstr "メンバーを削除"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:130
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:131
 msgid "Remove model"
 msgstr "モデルを削除"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:23
+#: src/features/workflow/components/nodes/object-editor-node.tsx:25
 msgid "Remove Object"
 msgstr "オブジェクトを削除"
 
-#: src/features/workflow/types/index.ts:559
+#: src/features/workflow/types/index.ts:560
 msgid "Remove or add objects in an image"
 msgstr "画像内のオブジェクトを削除または追加"
 
@@ -22267,7 +22272,7 @@ msgstr "プロバイダーを削除しますか？"
 msgid "Remove queued message {position}"
 msgstr "待機中のメッセージ {position} を削除"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:175
+#: src/features/workflow/components/nodes/character-ref-node.tsx:168
 msgid "Remove reference image"
 msgstr "参照画像を削除"
 
@@ -22548,7 +22553,7 @@ msgstr "ズームをリセット (現在 {zoomPercent}%)"
 msgid "Resize {label} column"
 msgstr "{label} 列のサイズを変更"
 
-#: src/features/workflow/components/nodes/video-model-options.tsx:63
+#: src/features/workflow/components/nodes/video-model-options.tsx:64
 msgid "Resolution"
 msgstr "解像度"
 
@@ -22564,7 +22569,7 @@ msgstr "リソース"
 msgid "Resources"
 msgstr "リソース"
 
-#: src/features/workflow/templates/index.ts:475
+#: src/features/workflow/templates/index.ts:476
 msgid "Response"
 msgstr "応答"
 
@@ -22615,7 +22620,7 @@ msgstr "モデルをホストできるリージョンを制限します。GDPR�
 
 #: src/features/evals/components/run-detail.tsx:223
 #: src/features/workflow/components/nodes/output-node.tsx:97
-#: src/features/workflow/templates/index.ts:115
+#: src/features/workflow/templates/index.ts:116
 msgid "Result"
 msgstr "結果"
 
@@ -22784,7 +22789,7 @@ msgid "RIFF (WAV/AVI/WebP)"
 msgstr "RIFF (WAV/AVI/WebP)"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:399
-#: src/features/workflow/components/nodes/outpaint-node.tsx:24
+#: src/features/workflow/components/nodes/outpaint-node.tsx:26
 msgid "Right"
 msgstr "右"
 
@@ -23242,7 +23247,7 @@ msgstr "保存しています..."
 msgid "Saving…"
 msgstr "保存しています…"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:107
+#: src/features/workflow/components/nodes/upscale-node.tsx:100
 msgid "Scale Factor"
 msgstr "拡大倍率"
 
@@ -23262,7 +23267,7 @@ msgstr "この QR コードをスキャンしてください。下に入力す�
 msgid "Scanning..."
 msgstr "スキャンしています..."
 
-#: src/features/workflow/templates/index.ts:279
+#: src/features/workflow/templates/index.ts:280
 msgid "Scene Description"
 msgstr "シーンの説明"
 
@@ -23329,7 +23334,7 @@ msgstr "一番下までスクロール"
 msgid "Scroll up one page"
 msgstr "1 ページ上にスクロール"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:169
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:163
 msgid "Seamless Loop"
 msgstr "シームレスループ"
 
@@ -23699,17 +23704,17 @@ msgstr "モデルを選択 (任意)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
 #: src/components/model-picker/model-picker-button.tsx:94
-#: src/features/workflow/components/nodes/background-removal-node.tsx:67
-#: src/features/workflow/components/nodes/character-ref-node.tsx:148
-#: src/features/workflow/components/nodes/controlnet-node.tsx:133
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:93
+#: src/features/workflow/components/nodes/background-removal-node.tsx:68
+#: src/features/workflow/components/nodes/character-ref-node.tsx:149
+#: src/features/workflow/components/nodes/controlnet-node.tsx:135
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:95
 #: src/features/workflow/components/nodes/img2img-node.tsx:60
 #: src/features/workflow/components/nodes/inpaint-node.tsx:72
-#: src/features/workflow/components/nodes/object-editor-node.tsx:109
-#: src/features/workflow/components/nodes/outpaint-node.tsx:87
+#: src/features/workflow/components/nodes/object-editor-node.tsx:111
+#: src/features/workflow/components/nodes/outpaint-node.tsx:88
 #: src/features/workflow/components/nodes/style-ref-node.tsx:88
-#: src/features/workflow/components/nodes/upscale-node.tsx:92
-#: src/features/workflow/components/nodes/video-node.tsx:138
+#: src/features/workflow/components/nodes/upscale-node.tsx:93
+#: src/features/workflow/components/nodes/video-node.tsx:141
 msgid "Select model..."
 msgstr "モデルを選択..."
 
@@ -24070,7 +24075,7 @@ msgstr "共有フォルダーとローカルサーバー…"
 msgid "Shared page"
 msgstr "共有されたページ"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:153
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:154
 msgid "Shared Prompt"
 msgstr "共有プロンプト"
 
@@ -24156,8 +24161,8 @@ msgstr "インストール済みのモデルをモデル選択に表示"
 msgid "Show keyboard shortcuts"
 msgstr "キーボードショートカットを表示"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:171
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:177
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:172
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:178
 msgid "Show Labels"
 msgstr "ラベルを表示"
 
@@ -24658,11 +24663,11 @@ msgstr "SNS 告知"
 msgid "Social Media"
 msgstr "ソーシャルメディア"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:25
+#: src/features/workflow/components/nodes/controlnet-node.tsx:27
 msgid "Soft Edge"
 msgstr "ソフトエッジ"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:25
+#: src/features/workflow/components/nodes/controlnet-node.tsx:27
 msgid "Soft edge detection"
 msgstr "ソフトエッジ検出"
 
@@ -24789,7 +24794,7 @@ msgstr "元のチャット"
 msgid "Source Code Pro"
 msgstr "Source Code Pro"
 
-#: src/features/workflow/templates/index.ts:322
+#: src/features/workflow/templates/index.ts:323
 msgid "Source Image"
 msgstr "ソース画像"
 
@@ -24936,7 +24941,7 @@ msgstr "お使いのブラウザーは音声認識に対応していません"
 msgid "Speech synthesis and transcription"
 msgstr "音声合成と文字起こし"
 
-#: src/features/workflow/types/index.ts:632
+#: src/features/workflow/types/index.ts:633
 msgid "Speech to Text"
 msgstr "音声からテキスト"
 
@@ -25061,7 +25066,7 @@ msgstr "星"
 msgid "Starred"
 msgstr "スター付き"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:206
+#: src/features/workflow/components/nodes/controlnet-node.tsx:200
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:170
 msgid "Start"
 msgstr "開始"
@@ -25129,7 +25134,7 @@ msgid "Start editing cell"
 msgstr "セルの編集を開始"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:39
-#: src/features/workflow/components/nodes/video-model-options.tsx:155
+#: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
 msgstr "開始フレーム"
 
@@ -25373,7 +25378,7 @@ msgstr "ストリーミング"
 msgid "Streaming..."
 msgstr "ストリーミング中..."
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:90
+#: src/features/workflow/components/nodes/img2img-node.tsx:82
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:140
 msgid "Strength"
 msgstr "強度"
@@ -25658,13 +25663,13 @@ msgstr "優れた視覚的推論と理解"
 msgid "Strongest reasoning in the GLM family"
 msgstr "GLM ファミリーで最強の推論"
 
-#: src/features/workflow/templates/index.ts:216
+#: src/features/workflow/templates/index.ts:217
 msgid "style"
 msgstr "スタイル"
 
 #: src/features/chat/thread/composer-image-settings.tsx:205
 #: src/features/chat/thread/media-gallery-view.tsx:494
-#: src/features/workflow/components/nodes/character-ref-node.tsx:24
+#: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Style"
 msgstr "スタイル"
 
@@ -25676,24 +25681,24 @@ msgstr "スタイル適応"
 msgid "style consistency"
 msgstr "スタイルの一貫性"
 
-#: src/features/workflow/templates/index.ts:179
+#: src/features/workflow/templates/index.ts:180
 msgid "Style Image"
 msgstr "スタイル画像"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:103
+#: src/features/workflow/components/nodes/style-ref-node.tsx:95
 msgid "Style Image URL"
 msgstr "スタイル画像 URL"
 
-#: src/features/workflow/types/index.ts:612
-#: src/features/workflow/types/index.ts:616
+#: src/features/workflow/types/index.ts:613
+#: src/features/workflow/types/index.ts:617
 msgid "Style Reference"
 msgstr "スタイル参照"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:134
+#: src/features/workflow/components/nodes/style-ref-node.tsx:126
 msgid "Style Strength"
 msgstr "スタイルの強さ"
 
-#: src/features/workflow/templates/index.ts:215
+#: src/features/workflow/templates/index.ts:216
 msgid "Style Transfer"
 msgstr "スタイル転送"
 
@@ -25710,7 +25715,7 @@ msgstr "参照画像に基づいて視覚的な一貫性を保つ、スタイル
 msgid "Style: {0}"
 msgstr "スタイル：{0}"
 
-#: src/features/workflow/templates/index.ts:206
+#: src/features/workflow/templates/index.ts:207
 msgid "Styled Result"
 msgstr "スタイル適用結果"
 
@@ -25859,7 +25864,7 @@ msgstr "10 秒の動画に対応"
 msgid "Supports 20+ languages with vision and PDF"
 msgstr "ビジョンと PDF に対応し、20 以上の言語をサポート"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:24
+#: src/features/workflow/components/nodes/controlnet-node.tsx:26
 msgid "Surface normals"
 msgstr "表面法線"
 
@@ -26366,7 +26371,7 @@ msgstr "トリガーをテスト実行"
 msgid "Test your agents, models and knowledge base against a fixed set of cases, score every answer, and catch regressions between runs."
 msgstr "エージェント、モデル、ナレッジベースを固定のケースセットでテストし、すべての回答を採点して、実行間の性能低下を検出します。"
 
-#: src/features/workflow/templates/index.ts:258
+#: src/features/workflow/templates/index.ts:259
 msgid "testing"
 msgstr "テスト"
 
@@ -26387,8 +26392,8 @@ msgstr "テキスト"
 #: src/features/workflow/components/nodes/output-node.tsx:16
 #: src/features/workflow/components/nodes/text-node.tsx:167
 #: src/features/workflow/components/template-picker.tsx:21
-#: src/features/workflow/types/index.ts:622
-#: src/features/workflow/types/index.ts:626
+#: src/features/workflow/types/index.ts:623
+#: src/features/workflow/types/index.ts:627
 #: src/routes/(chat)/workflow/gallery.tsx:22
 msgid "Text"
 msgstr "テキスト"
@@ -26445,7 +26450,7 @@ msgstr "ストリーミング対応のテキスト生成"
 msgid "Text only: no web search, tools, or file and image input."
 msgstr "テキストのみ：Web 検索、ツール、ファイルや画像の入力には対応していません。"
 
-#: src/features/workflow/templates/index.ts:485
+#: src/features/workflow/templates/index.ts:486
 msgid "text processing"
 msgstr "テキスト処理"
 
@@ -26470,7 +26475,7 @@ msgstr "回答に含まれてはいけないテキスト"
 msgid "Text to image"
 msgstr "テキストから画像"
 
-#: src/features/workflow/templates/index.ts:124
+#: src/features/workflow/templates/index.ts:125
 msgid "Text to Image"
 msgstr "テキストから画像"
 
@@ -26478,7 +26483,7 @@ msgstr "テキストから画像"
 msgid "Text to Speak"
 msgstr "読み上げるテキスト"
 
-#: src/features/workflow/types/index.ts:393
+#: src/features/workflow/types/index.ts:394
 msgid "Text to Speech"
 msgstr "テキスト読み上げ"
 
@@ -26490,8 +26495,8 @@ msgstr "テキストからテキスト"
 msgid "Text to video"
 msgstr "テキストから動画"
 
-#: src/features/workflow/components/nodes/video-node.tsx:123
-#: src/features/workflow/templates/index.ts:442
+#: src/features/workflow/components/nodes/video-node.tsx:124
+#: src/features/workflow/templates/index.ts:443
 msgid "Text to Video"
 msgstr "テキストから動画"
 
@@ -27644,7 +27649,7 @@ msgstr "ツールプロバイダーキー"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:445
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:447
 msgid "Tools"
 msgstr "ツール"
 
@@ -27656,7 +27661,7 @@ msgstr "このスキルの実行中にアシスタントが使ってはいけな
 msgid "Tools the skill needs even when the current chat mode would not load them."
 msgstr "現在のチャットモードでは読み込まれない場合でも、スキルに必要なツール。"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:25
+#: src/features/workflow/components/nodes/outpaint-node.tsx:27
 msgid "Top"
 msgstr "上"
 
@@ -27741,13 +27746,13 @@ msgstr "推論トレースを使った強化学習でトレーニング"
 msgid "Transcribe an audio file, summarize the text with AI, then convert back to speech"
 msgstr "音声ファイルを文字起こしし、AI でテキストを要約してから音声に戻す"
 
-#: src/features/workflow/types/index.ts:636
+#: src/features/workflow/types/index.ts:637
 msgid "Transcription"
 msgstr "文字起こし"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:290
 #: src/features/canvas/canvas-panel.tsx:124
-#: src/features/workflow/templates/index.ts:330
+#: src/features/workflow/templates/index.ts:331
 msgid "Transform"
 msgstr "変形"
 
@@ -27755,27 +27760,27 @@ msgstr "変形"
 msgid "Transform (Template)"
 msgstr "変換 (テンプレート)"
 
-#: src/features/workflow/templates/index.ts:347
+#: src/features/workflow/templates/index.ts:348
 msgid "Transform an image with AI guidance"
 msgstr "AI のガイドで画像を変換"
 
-#: src/features/workflow/types/index.ts:535
+#: src/features/workflow/types/index.ts:536
 msgid "Transform images with AI guidance"
 msgstr "AI のガイドで画像を変換"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:90
 msgid "Transform with AI"
 msgstr "AI で変換"
 
-#: src/features/workflow/templates/index.ts:351
+#: src/features/workflow/templates/index.ts:352
 msgid "transformation"
 msgstr "変換"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:75
+#: src/features/workflow/components/nodes/img2img-node.tsx:67
 msgid "Transformation Prompt"
 msgstr "変換プロンプト"
 
-#: src/features/workflow/templates/index.ts:341
+#: src/features/workflow/templates/index.ts:342
 msgid "Transformed Image"
 msgstr "変換後の画像"
 
@@ -27803,7 +27808,7 @@ msgstr "翻訳に失敗しました。"
 msgid "Translation to {languageName}"
 msgstr "{languageName}への翻訳"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:121
+#: src/features/workflow/components/nodes/background-removal-node.tsx:114
 msgid "Transparent"
 msgstr "透過"
 
@@ -28320,7 +28325,7 @@ msgstr "リンク解除"
 msgid "Unlock group"
 msgstr "グループのロックを解除"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:531
 msgid "Unlock node"
 msgstr "ノードのロックを解除"
 
@@ -28576,7 +28581,7 @@ msgstr "アカウントのプロフィール画像をアップロードします
 msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown."
 msgstr "SKILL.md またはスキルの .zip（Claude などの Agent Skills ツールで使われる形式）をアップロードするか、Markdown を貼り付けてください。"
 
-#: src/features/workflow/templates/index.ts:163
+#: src/features/workflow/templates/index.ts:164
 msgid "Upload an image and upscale it with AI enhancement"
 msgstr "画像をアップロードし、AI で高画質化してアップスケール"
 
@@ -28625,7 +28630,7 @@ msgstr "フォルダーをアップロード"
 msgid "Upload Image"
 msgstr "画像をアップロード"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:503
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:505
 msgid "Upload image / video"
 msgstr "画像 / 動画をアップロード"
 
@@ -28670,21 +28675,21 @@ msgstr "{0} からのインポート用データをアップロードしてい�
 msgid "Uploading..."
 msgstr "アップロードしています..."
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:85
-#: src/features/workflow/types/index.ts:642
-#: src/features/workflow/types/index.ts:646
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
+#: src/features/workflow/types/index.ts:643
+#: src/features/workflow/types/index.ts:647
 msgid "Upscale"
 msgstr "アップスケール"
 
-#: src/features/workflow/templates/index.ts:166
+#: src/features/workflow/templates/index.ts:167
 msgid "Upscale & Enhance"
 msgstr "アップスケールと高画質化"
 
-#: src/features/workflow/templates/index.ts:147
+#: src/features/workflow/templates/index.ts:148
 msgid "Upscale 4x"
 msgstr "4 倍アップスケール"
 
-#: src/features/workflow/templates/index.ts:167
+#: src/features/workflow/templates/index.ts:168
 msgid "upscaling"
 msgstr "アップスケール"
 
@@ -28912,7 +28917,7 @@ msgstr "ユーザーの利用停止を解除しました"
 msgid "User information"
 msgstr "ユーザー情報"
 
-#: src/features/workflow/templates/index.ts:456
+#: src/features/workflow/templates/index.ts:457
 msgid "User Input"
 msgstr "ユーザー入力"
 
@@ -29271,7 +29276,7 @@ msgstr "非常に賢いモデル。ロゴに最適"
 msgid "Very low cost per generation"
 msgstr "生成あたりの非常に低いコスト"
 
-#: src/features/workflow/templates/index.ts:443
+#: src/features/workflow/templates/index.ts:444
 msgid "video"
 msgstr "動画"
 
@@ -29286,8 +29291,8 @@ msgstr "動画"
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
 #: src/features/workflow/components/gallery/publish-dialog.tsx:30
 #: src/features/workflow/components/template-picker.tsx:22
-#: src/features/workflow/types/index.ts:652
-#: src/features/workflow/types/index.ts:656
+#: src/features/workflow/types/index.ts:660
+#: src/features/workflow/types/index.ts:664
 #: src/routes/(chat)/workflow/gallery.tsx:23
 msgid "Video"
 msgstr "動画"
@@ -29310,7 +29315,7 @@ msgstr "動画制作"
 msgid "Video creators who need expressive motion with flexible visual style adaptation and next-gen quality"
 msgstr "柔軟なビジュアルスタイルと次世代の品質で表現力豊かな動きを求める動画クリエイター"
 
-#: src/features/workflow/templates/index.ts:412
+#: src/features/workflow/templates/index.ts:413
 msgid "Video Description"
 msgstr "動画の説明"
 
@@ -29341,11 +29346,11 @@ msgstr "動画生成モデル"
 msgid "Video LoRA support for custom styles"
 msgstr "カスタムスタイル向けの動画 LoRA サポート"
 
-#: src/features/workflow/components/nodes/video-node.tsx:153
+#: src/features/workflow/components/nodes/video-node.tsx:148
 msgid "Video Prompt"
 msgstr "動画プロンプト"
 
-#: src/features/workflow/templates/index.ts:433
+#: src/features/workflow/templates/index.ts:434
 msgid "Video Result"
 msgstr "動画の結果"
 
@@ -29805,7 +29810,7 @@ msgstr "Webhook URL"
 msgid "Webhook URL copied to clipboard"
 msgstr "Webhook URL をクリップボードにコピーしました"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:22
+#: src/features/workflow/components/nodes/background-removal-node.tsx:24
 msgid "WebP (Smaller)"
 msgstr "WebP (小サイズ)"
 
@@ -29951,13 +29956,13 @@ msgstr "過去 30 日間にエージェントがあなたのデバイスに依�
 msgid "What this variable represents..."
 msgstr "この変数が表すもの..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:126
-#: src/features/workflow/components/nodes/object-editor-node.tsx:165
-#: src/features/workflow/components/nodes/outpaint-node.tsx:150
+#: src/features/workflow/components/nodes/inpaint-node.tsx:118
+#: src/features/workflow/components/nodes/object-editor-node.tsx:159
+#: src/features/workflow/components/nodes/outpaint-node.tsx:143
 msgid "What to avoid..."
 msgstr "避けたい要素..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:93
+#: src/features/workflow/components/nodes/inpaint-node.tsx:85
 msgid "What to generate in the masked area..."
 msgstr "マスク領域に生成する内容..."
 
