@@ -182,8 +182,10 @@ export const runStreamingAgent = internalAction
 
             const invokedSkill = skillRun.invocation;
 
-            // A bot thread keeps the bot's model (pinned at `/chat/start`); a skill's preferred model does not replace it.
-            model = thread?.botId
+            // A live bot keeps its pinned model (`/chat/start`); a skill's preferred model does not replace it.
+            const liveBot = thread?.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: thread.botId, userId }) : null;
+
+            model = liveBot
                 ? requestedModel
                 : resolveSkillModel(requestedModel, invokedSkill?.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), isAnonymous === true);
 

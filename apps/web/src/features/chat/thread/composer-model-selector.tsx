@@ -24,14 +24,14 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
 
     // A bot's thread always runs on the bot's model (the server enforces it), so the picker is locked.
     const botId = thread?.botId ?? null;
-    // Lock only while the bot still exists: a deleted bot leaves its chats behind, as plain chats. The
-    // bot list is read only for a bot thread, so ordinary threads add no query.
+    // Lock while the bot exists: a deleted bot leaves its chats behind, as plain chats. The bot list is read
+    // only for a bot thread, and a bot thread stays locked until that list has loaded.
     const crpc = useCRPC();
-    const { data: bots = [] } = useQuery({
+    const { data: bots = [], isSuccess: botsLoaded } = useQuery({
         ...crpc.bots.functions.listBots.queryOptions({}, { live: false }),
         enabled: typeof botId === "string" && botId.length > 0,
     });
-    const isBotThread = typeof botId === "string" && bots.some((bot) => bot._id === botId);
+    const isBotThread = typeof botId === "string" && (!botsLoaded || bots.some((bot) => bot._id === botId));
 
     // Get current composer mode to show mode-appropriate model for anonymous users
     const storeNewThreadMode = useModelStore((state) => state.newThreadMode);

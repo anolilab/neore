@@ -269,7 +269,10 @@ export const updateTrigger = authMutation
 
         // Clearing the bot clears its computer flag too: a routine without a bot has no computer.
         const nextBotId = args.botId === undefined ? trigger.botId : (args.botId ?? undefined);
-        const nextComputer = nextBotId === undefined ? undefined : (args.botComputer ?? trigger.botComputer);
+        // A different bot starts without the computer permission the previous bot had: the owner grants it again.
+        const botChanged = args.botId !== undefined && args.botId !== trigger.botId;
+        const keptComputer = botChanged ? undefined : trigger.botComputer;
+        const nextComputer = nextBotId === undefined ? undefined : (args.botComputer ?? keptComputer);
 
         // An unchanged bot is not re-checked, so a routine whose bot was deleted stays editable.
         if (args.botId && args.botId !== trigger.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
@@ -539,7 +542,9 @@ export const admitTriggerRun = internalMutation
         }
 
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
-        const model = trigger.model || DEFAULT_CHAT_MODEL;
+        // The model the run uses (`execute.ts`): a bot's current model first, so the check and the run agree.
+        const bot = trigger.botId ? await ctx.db.get(trigger.botId) : null;
+        const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
             return `The model '${model}' is no longer available for triggers. Pick another model and enable the trigger again.`;

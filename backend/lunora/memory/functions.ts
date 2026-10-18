@@ -486,32 +486,31 @@ export const getActiveMemoriesForUser = internalQuery
             ),
         );
 
-        // Merge the scopes in the order each index yields: type descending, then newest first.
-        const memories = perScope.flat().toSorted((a, b) => {
-            if (a.type !== b.type) {
-                return a.type < b.type ? 1 : -1;
-            }
+        // Each scope keeps up to `limit` of its own, so a busy bot cannot push the user's memories out. Merged in
+        // the order each index yields: type descending, then newest first.
+        const memories = perScope
+            .flatMap((rows) => rows.filter((m) => !m.supersededBy).slice(0, limit))
+            .toSorted((a, b) => {
+                if (a.type !== b.type) {
+                    return a.type < b.type ? 1 : -1;
+                }
 
-            return b._creationTime - a._creationTime;
-        });
-
-        // Filter out superseded memories and limit
-        return memories
-            .filter((m) => !m.supersededBy)
-            .slice(0, limit)
-            .map((m) => {
-                return {
-                    _id: m._id,
-                    confidence: m.confidence,
-                    createdAt: m._creationTime,
-                    embeddingId: m.embeddingId ?? undefined,
-                    importance: m.importance,
-                    lastConfirmedAt: lastConfirmedOf(m),
-                    memory: m.memory,
-                    pinned: m.pinned === true,
-                    type: m.type,
-                };
+                return b._creationTime - a._creationTime;
             });
+
+        return memories.map((m) => {
+            return {
+                _id: m._id,
+                confidence: m.confidence,
+                createdAt: m._creationTime,
+                embeddingId: m.embeddingId ?? undefined,
+                importance: m.importance,
+                lastConfirmedAt: lastConfirmedOf(m),
+                memory: m.memory,
+                pinned: m.pinned === true,
+                type: m.type,
+            };
+        });
     });
 
 export const getMemoryByEmbeddingId = internalQuery.input({ embeddingId: v.string() }).query(async ({ args, ctx }) => {

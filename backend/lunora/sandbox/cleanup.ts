@@ -52,6 +52,9 @@ export const checkAndTerminateSandbox = internalAction
     });
 
 /** Kill a sandbox by id, for a retired bot computer. Best-effort: it may have timed out already. */
+/** A scheduled kill must not hang the cleanup action when E2B stalls. */
+const KILL_REQUEST_TIMEOUT_MS = 15_000;
+
 export const killSandboxById = internalAction
     .input({
         sandboxId: v.string(),
@@ -64,7 +67,7 @@ export const killSandboxById = internalAction
         try {
             const { Sandbox } = await import("e2b");
 
-            await Sandbox.kill(sandboxId, { apiKey: E2B_API_KEY });
+            await Sandbox.kill(sandboxId, { apiKey: E2B_API_KEY, requestTimeoutMs: KILL_REQUEST_TIMEOUT_MS });
         } catch {
             // Already gone — nothing to kill.
         }
