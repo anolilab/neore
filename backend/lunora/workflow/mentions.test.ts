@@ -2,7 +2,16 @@ import { REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
 import type { MentionTarget, MentionableNode } from "./mentions";
-import { expandTemplate, FRAME_KINDS, frameHandleId, MAX_WORKFLOW_REFERENCE_IMAGES, mentionableSources, parseFrameHandle, referenceImageIds } from "./mentions";
+import {
+    expandTemplate,
+    FRAME_KINDS,
+    frameHandleId,
+    isFrameHandleId,
+    MAX_WORKFLOW_REFERENCE_IMAGES,
+    mentionableSources,
+    parseFrameHandle,
+    referenceImageIds,
+} from "./mentions";
 
 const noVariables = () => undefined;
 
@@ -54,6 +63,12 @@ describe("frame handles", () => {
         expect(parseFrameHandle("frame-last")).toBeUndefined();
         expect(parseFrameHandle("output-0")).toBeUndefined();
         expect(parseFrameHandle(undefined)).toBeUndefined();
+    });
+
+    it("recognises a saved picked-frame handle as a frame, though it is no longer one it reads", () => {
+        expect(isFrameHandleId("frame-picked")).toBe(true);
+        expect(parseFrameHandle("frame-picked")).toBeUndefined();
+        expect(isFrameHandleId("output-0")).toBe(false);
     });
 });
 

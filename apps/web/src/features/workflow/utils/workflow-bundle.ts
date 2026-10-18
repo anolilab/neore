@@ -16,7 +16,7 @@ import { chatAttachmentLimit } from "@neore/backend/document-limits";
 
 import type { JsZipLike, JsZipWriter, LoadZip } from "@/lib/zip";
 
-import type { FrameKind, WorkflowContent, WorkflowNode } from "../types";
+import type { VideoFrameFileIds, WorkflowContent, WorkflowNode } from "../types";
 import NODE_CONFIGS from "../types";
 
 export const WORKFLOW_BUNDLE_FORMAT = "neore-workflow";
@@ -113,8 +113,8 @@ interface AssetReference {
     urlPath?: string;
 }
 
-/** A captured video frame. The kinds are checked against `FrameKind`, so a renamed kind fails the build instead of dropping its frame. */
-const frameReference = (kind: FrameKind): AssetReference => {
+/** A frame file from an earlier build. The kinds are checked against `VideoFrameFileIds`, so a renamed kind fails the build instead of dropping its frame. */
+const frameReference = (kind: keyof VideoFrameFileIds): AssetReference => {
     return { idPath: ["frameFileIds", kind] };
 };
 
@@ -122,7 +122,7 @@ const frameReference = (kind: FrameKind): AssetReference => {
 const ASSET_REFERENCES: ReadonlyArray<AssetReference> = [
     { idPath: ["imageFileId"], inlinePath: "imageUrl" },
     { idPath: ["fileId"], urlPath: "fileUrl" },
-    ...(["start", "end", "picked"] as const satisfies ReadonlyArray<FrameKind>).map((kind) => frameReference(kind)),
+    ...(["start", "end", "picked"] as const satisfies ReadonlyArray<keyof VideoFrameFileIds>).map((kind) => frameReference(kind)),
 ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);

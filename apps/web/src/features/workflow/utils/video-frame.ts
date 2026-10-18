@@ -7,8 +7,6 @@
  * without CORS, so the video must be served with `Access-Control-Allow-Origin`
  * (the backend's signed storage URLs are).
  */
-import type { FrameKind, ImageToVideoNodeData, VideoFrameFileIds, VideoNodeData, WorkflowNode } from "../types";
-
 /** The end frame is taken this far before the duration: the final sample often cannot be decoded. */
 const LAST_FRAME_INSET_SECONDS = 1 / 24;
 
@@ -27,17 +25,9 @@ export class FrameCaptureError extends Error {
     }
 }
 
-/** Seconds into the clip a frame is taken at. */
-export const frameTimeFor = (kind: FrameKind, duration: number, pickedTime = 0): number => {
-    if (kind === "start") {
-        return 0;
-    }
-
+/** Seconds into the clip the picked frame is taken at: the requested time, clamped into the clip and off its final sample. */
+export const pickedFrameTime = (duration: number, pickedTime: number): number => {
     const last = Math.max(0, duration - LAST_FRAME_INSET_SECONDS);
-
-    if (kind === "end") {
-        return last;
-    }
 
     return Math.min(Math.max(0, pickedTime), last);
 };
@@ -122,14 +112,6 @@ export const captureVideoFrame = async (videoUrl: string, timeFor: (duration: nu
     });
 };
 
-/** The captured frames of a video or image-to-video node; every other node has none. */
-export const frameFileIdsOf = (node: WorkflowNode | undefined): VideoFrameFileIds | undefined => {
-    if (node?.type !== "video" && node?.type !== "image-to-video") return undefined;
-
-    // The node type is checked above; WorkflowNode itself does not narrow its data by type.
-    return (node.data as VideoNodeData | ImageToVideoNodeData).frameFileIds;
-};
-
 /**
  * The URL of the clip a video node generated: `assets[0].videoUrl`, the one shape a run stores, or a
  * top-level `videoUrl` saved by an older run.
@@ -140,16 +122,4 @@ export const videoUrlOfOutput = (output: unknown): string | undefined => {
     const url = typeof first?.videoUrl === "string" ? first.videoUrl : object?.videoUrl;
 
     return typeof url === "string" && url.startsWith("http") ? url : undefined;
-};
-
-/** Which clip a URL names, without its query: a signed URL changes its query on each read, the clip does not. */
-export const clipIdentity = (url: string): string => {
-    try {
-        const { origin, pathname } = new URL(url);
-
-        return `${origin}${pathname}`;
-    } catch {
-        // Not a parseable URL: compare it whole.
-        return url;
-    }
 };

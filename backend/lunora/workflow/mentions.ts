@@ -38,25 +38,28 @@ export const IMAGE_OUTPUT_NODE_TYPES: ReadonlyArray<string> = [
 /** Most reference images a generation takes. Equal to `REFERENCE_MEDIA_CAPS.images` (a test pins it). */
 export const MAX_WORKFLOW_REFERENCE_IMAGES = 4;
 
-/** A frame a video node exposes as a source handle. */
-export const FRAME_KINDS = ["start", "end", "picked"] as const;
+/**
+ * A frame a video node exposes as a source handle. The run extracts it from the node's clip.
+ * A `picked` frame (any time in the clip) was a handle once; it is now an image node, so a saved
+ * `frame-picked` edge is reported by preflight rather than read.
+ */
+export const FRAME_KINDS = ["start", "end"] as const;
 
 export type FrameKind = (typeof FRAME_KINDS)[number];
 
 const FRAME_HANDLE_PREFIX = "frame-";
 
-/** The source handle id for a captured frame. Saved graphs store these ids, so they must not change. */
+/** The source handle id for a frame. Saved graphs store these ids, so they must not change. */
 export const frameHandleId = (kind: FrameKind): string => `${FRAME_HANDLE_PREFIX}${kind}`;
 
-/** The frame a source handle id names, or `undefined` when it is not a frame handle. */
+/** Whether a source handle id is a frame handle of any kind, supported or not. */
+export const isFrameHandleId = (handleId: string | null | undefined): boolean => handleId?.startsWith(FRAME_HANDLE_PREFIX) === true;
+
+/** The frame a source handle id names, or `undefined` when it is not a supported frame handle. */
 export const parseFrameHandle = (handleId: string | null | undefined): FrameKind | undefined => {
-    if (!handleId?.startsWith(FRAME_HANDLE_PREFIX)) {
-        return undefined;
-    }
+    const kind = isFrameHandleId(handleId) ? handleId?.slice(FRAME_HANDLE_PREFIX.length) : undefined;
 
-    const kind = handleId.slice(FRAME_HANDLE_PREFIX.length);
-
-    return (FRAME_KINDS as ReadonlyArray<string>).includes(kind) ? (kind as FrameKind) : undefined;
+    return kind !== undefined && (FRAME_KINDS as ReadonlyArray<string>).includes(kind) ? (kind as FrameKind) : undefined;
 };
 
 /** A node as the mention rules read it: its id, type and the label it is named by. */

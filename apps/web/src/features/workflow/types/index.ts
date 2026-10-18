@@ -154,21 +154,22 @@ export interface ParallelCompareNodeData extends BaseNodeData {
 export type { FrameKind } from "@neore/backend/workflow/mentions";
 
 /**
- * Frames captured from a video node's output, as `chatFiles` ids (a PNG each). The
- * backend reads these when a frame handle is wired into another node.
+ * Frame files a video node may still carry from an earlier build, as `chatFiles` ids. Nothing writes
+ * them now: a run extracts a wired frame from its clip. A saved graph keeps them, so export and
+ * import still carry them. `picked` was a frame kind once.
  */
-export type VideoFrameFileIds = Partial<Record<FrameKind, string>>;
+export type VideoFrameFileIds = Partial<Record<FrameKind | "picked", string>>;
 
 // Video node - generate videos from text/image
 export interface VideoNodeData extends BaseNodeData {
     aspectRatio?: string; // 16:9, 9:16, 1:1, etc.
     duration?: number; // 1-10 seconds
     fps?: number; // Frames per second (24, 30, 60)
-    frameFileIds?: VideoFrameFileIds; // Captured start/end/picked frames
+    frameFileIds?: VideoFrameFileIds; // Frame files from an earlier build (see VideoFrameFileIds)
     mode: "text-to-video" | "image-to-video";
     model?: string; // fal:mochi-v1, fal:minimax-video, fal:kling-video
     motionStrength?: number; // 0-1, how much motion in the video
-    pickedTime?: number; // Seconds into the clip for the picked frame
+    pickedTime?: number; // Seconds into the clip for the picked frame the "add as image node" button takes
     prompt?: string;
 }
 
@@ -176,11 +177,11 @@ export interface VideoNodeData extends BaseNodeData {
 export interface ImageToVideoNodeData extends BaseNodeData {
     duration?: number; // 1-10 seconds
     fps?: number; // Frames per second
-    frameFileIds?: VideoFrameFileIds; // Captured start/end/picked frames
+    frameFileIds?: VideoFrameFileIds; // Frame files from an earlier build (see VideoFrameFileIds)
     loop?: boolean; // Whether to create seamless loop
     model?: string; // fal:kling-image-to-video, fal:runway-gen3
     motionStrength?: number; // 0-1, intensity of motion
-    pickedTime?: number; // Seconds into the clip for the picked frame
+    pickedTime?: number; // Seconds into the clip for the picked frame the "add as image node" button takes
     prompt?: string; // Motion prompt - describe the animation
 }
 

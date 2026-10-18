@@ -171,7 +171,7 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
                     <Trans>Connect an image node as input</Trans>
                 </div>
 
-                <VideoFramesSection frameFileIds={data.frameFileIds} nodeId={id} pickedTime={data.pickedTime} />
+                <VideoFramesSection nodeId={id} pickedTime={data.pickedTime} />
             </div>
         </BaseNode>
     );

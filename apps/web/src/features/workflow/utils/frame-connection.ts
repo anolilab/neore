@@ -1,14 +1,14 @@
-import { parseFrameHandle } from "@neore/backend/workflow/mentions";
+import { isFrameHandleId, parseFrameHandle } from "@neore/backend/workflow/mentions";
 
 /**
- * Which edges a captured video frame may feed. A `frame-<kind>` source handle carries a frame
- * the backend reads only in a video or image-to-video node, so any other target is refused.
+ * Which edges a video frame may feed. A `frame-<kind>` source handle is a frame the run extracts
+ * from its clip, and the backend reads it only into a video or image-to-video node, so any other
+ * target is refused. A frame handle the backend no longer supports (a saved `frame-picked`) is
+ * refused too: it is shown on its node so the wire can be removed, but nothing new is drawn to it.
  */
 
 /** Node types that read a frame from a `frame-<kind>` handle. */
 const FRAME_CONSUMER_TYPES: ReadonlySet<string> = new Set(["image-to-video", "video"]);
 
-export const isFrameHandle = (handleId: string | null | undefined): boolean => parseFrameHandle(handleId) !== undefined;
-
 export const canConnectFrom = (sourceHandle: string | null | undefined, targetType: string | undefined): boolean =>
-    !isFrameHandle(sourceHandle) || FRAME_CONSUMER_TYPES.has(targetType ?? "");
+    !isFrameHandleId(sourceHandle) || (parseFrameHandle(sourceHandle) !== undefined && FRAME_CONSUMER_TYPES.has(targetType ?? ""));

@@ -7,14 +7,14 @@ import type { ModelDefinition } from "@neore/ai/models";
 
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
 import { sourceNodesOf } from "./core";
-import { parseFrameHandle, type FrameKind } from "./mentions";
+import { isFrameHandleId, parseFrameHandle, type FrameKind } from "./mentions";
 import { referenceVideoLimitSeconds } from "../chat/lib/fal-reference-mapping";
 
 /** Media a video node reads, before it is turned into URLs. */
 export type MediaRef = { fileId: string } | { url: string };
 
 export interface VideoInputs {
-    /** The start image: a wired frame handle's file, or `undefined` when no frame is wired. */
+    /** The start image: the extracted frame of a wired frame handle, or `undefined` when no frame is wired. */
     image?: MediaRef;
     referenceAudios: MediaRef[];
     referenceVideos: MediaRef[];
@@ -54,28 +54,44 @@ export const mediaOf = (output: unknown): MediaOutput | undefined => {
     return url === undefined ? undefined : { mimeType, ref: { url } };
 };
 
+/** The frame a video node takes from its clip: the last frame wire into it, and the clip that wire reads. */
+export interface FrameSource {
+    clip: MediaOutput | undefined;
+    kind: FrameKind;
+    sourceId: string;
+}
+
+/**
+ * The frame wire a video node reads, or `undefined` when none is wired. Only the last one counts,
+ * the one `resolveVideoInputs` takes as the start image, so a second wire is never extracted.
+ */
+export const frameSourceOf = (node: WorkflowNode, context: ExecutionContext): FrameSource | undefined => {
+    let found: { kind: FrameKind; source: WorkflowNode } | undefined;
+
+    for (const { edge, node: source } of sourceNodesOf(node, context)) {
+        const kind = parseFrameHandle(edge.sourceHandle);
+
+        if (kind !== undefined) {
+            found = { kind, source };
+        }
+    }
+
+    return found && { clip: mediaOf(context.nodeOutputs[found.source.id]), kind: found.kind, sourceId: found.source.id };
+};
+
 /**
  * What a video node reads from its incoming edges, by handle, not by execution order.
  *
- * A wire from a frame handle names a frame the node's source video already has, and it
- * is the image input: when that frame is missing the run fails rather than falling back
- * to some other input. Any other wire contributes its output as a reference video or
- * audio by MIME type; anything that is neither is ignored. Throws for a missing frame.
+ * A frame wire is the image input, and `frame` is the stored frame extracted for it (see
+ * `frameSourceOf`). Any other wire contributes its output as a reference video or audio by MIME
+ * type; anything that is neither is ignored.
  */
-export const resolveVideoInputs = (node: WorkflowNode, context: ExecutionContext): VideoInputs => {
+export const resolveVideoInputs = (node: WorkflowNode, context: ExecutionContext, frame?: MediaRef): VideoInputs => {
     const inputs: VideoInputs = { referenceAudios: [], referenceVideos: [] };
 
     for (const { edge, node: source } of sourceNodesOf(node, context)) {
-        const frame = parseFrameHandle(edge.sourceHandle);
-
-        if (frame) {
-            const fileId = (source.data.frameFileIds as Partial<Record<FrameKind, unknown>> | undefined)?.[frame];
-
-            if (typeof fileId !== "string") {
-                throw new TypeError(`Capture the ${frame} frame on the video node before running`);
-            }
-
-            inputs.image = { fileId };
+        if (isFrameHandleId(edge.sourceHandle)) {
+            inputs.image = frame;
 
             continue;
         }
@@ -145,8 +161,9 @@ export const resolveVideoInputUrls = async (
     context: ExecutionContext,
     signFile: (fileId: string) => Promise<string | null>,
     model: ModelDefinition | undefined,
+    frame?: MediaRef,
 ) => {
-    const inputs = resolveVideoInputs(node, context);
+    const inputs = resolveVideoInputs(node, context, frame);
     const [image] = inputs.image ? await resolveMediaUrls([inputs.image], signFile) : [undefined];
     const videoCap = model?.maxReferenceVideos ?? 0;
     const audioCap = model?.maxReferenceAudios ?? 0;
@@ -174,13 +191,49 @@ const knownDurationOf = (source: WorkflowNode): number => {
 
 /**
  * Checks that need only the graph, run before any node so a doomed run never bills a clip:
- * - a frame handle must feed a video or image-to-video node, name a real frame, and that frame
- *   must be captured on its source;
+ * - a frame wire must name a supported frame (`start` or `end`), run from a video or
+ *   image-to-video node into one, and feed a node whose model takes an image (with a prompt when
+ *   it is text-to-video);
  * - the upstream clips with a known duration must fit the model's reference-video budget
  *   (see `referenceVideoLimitSeconds`). Unknown durations (an uploaded file) are not checked.
  *
  * Returns one message per problem, empty when the graph can run.
  */
+/**
+ * What a video node fed by a frame needs before its paid call: a model that takes an image input
+ * (the registry's `supportsImageToVideo`), and a prompt when it runs text-to-video. A prompt wired
+ * as text counts here; the run checks the text it actually gets before it extracts the frame.
+ */
+const frameTargetErrors = (
+    target: WorkflowNode,
+    kind: FrameKind,
+    edges: ReadonlyArray<WorkflowEdge>,
+    modelOf: (modelId: string) => ModelDefinition | undefined,
+): string[] => {
+    const errors: string[] = [];
+    const modelId = modelIdFor(target);
+
+    const model = modelId === undefined ? undefined : modelOf(modelId);
+
+    if (model?.supportsImageToVideo !== true) {
+        errors.push(
+            modelId === undefined
+                ? `The ${kind} frame needs a model that takes an image input, and no model is selected`
+                : `The ${kind} frame needs a model that takes an image input; ${modelId} does not`,
+        );
+    }
+
+    const hasPrompt =
+        (typeof target.data.prompt === "string" && target.data.prompt.length > 0) ||
+        edges.some((edge) => edge.target === target.id && !isFrameHandleId(edge.sourceHandle));
+
+    if (target.type === "video" && target.data.mode !== "image-to-video" && !hasPrompt) {
+        errors.push(`The ${kind} frame feeds a text-to-video node with no prompt; give it a prompt or wire a text node into it`);
+    }
+
+    return errors;
+};
+
 export const videoInputErrors = (
     nodes: ReadonlyArray<WorkflowNode>,
     edges: ReadonlyArray<WorkflowEdge>,
@@ -188,26 +241,35 @@ export const videoInputErrors = (
 ): string[] => {
     const errors: string[] = [];
     const byId = new Map(nodes.map((node) => [node.id, node]));
+    const frameFed = new Map<string, FrameKind>();
 
     for (const edge of edges) {
-        const frame = parseFrameHandle(edge.sourceHandle);
         const source = byId.get(edge.source);
         const target = byId.get(edge.target);
+        const frame = parseFrameHandle(edge.sourceHandle);
 
-        if (!frame || !source || !target) {
+        if (!isFrameHandleId(edge.sourceHandle) || !source || !target) {
             continue;
         }
 
-        if (!VIDEO_OUTPUT_NODE_TYPES.has(target.type)) {
-            errors.push(`The ${frame} frame can only feed a video or image-to-video node`);
-        } else if (typeof (source.data.frameFileIds as Partial<Record<FrameKind, unknown>> | undefined)?.[frame] !== "string") {
-            errors.push(`Capture the ${frame} frame on the video node before running`);
+        if (frame === undefined) {
+            errors.push(`The ${edge.sourceHandle} handle is no longer supported: add the frame as an image node and wire that instead`);
+        } else if (!VIDEO_OUTPUT_NODE_TYPES.has(source.type) || !VIDEO_OUTPUT_NODE_TYPES.has(target.type)) {
+            errors.push(`The ${frame} frame must go from a video or image-to-video node into a video or image-to-video node`);
+        } else {
+            frameFed.set(target.id, frame);
         }
     }
 
     for (const target of nodes) {
         if (target.type !== "video" && target.type !== "image-to-video") {
             continue;
+        }
+
+        const frame = frameFed.get(target.id);
+
+        if (frame !== undefined) {
+            errors.push(...frameTargetErrors(target, frame, edges, modelOf));
         }
 
         const modelId = modelIdFor(target);
@@ -219,7 +281,7 @@ export const videoInputErrors = (
 
         // Only plain wires are reference clips; a frame wire is an image.
         const total = edges
-            .filter((edge) => edge.target === target.id && parseFrameHandle(edge.sourceHandle) === undefined)
+            .filter((edge) => edge.target === target.id && !isFrameHandleId(edge.sourceHandle))
             .map((edge) => byId.get(edge.source))
             .filter((source): source is WorkflowNode => source !== undefined && VIDEO_OUTPUT_NODE_TYPES.has(source.type))
             .reduce((sum, source) => sum + knownDurationOf(source), 0);

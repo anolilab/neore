@@ -32,7 +32,7 @@ import {
     type WorkflowContent,
     type WorkflowNode,
 } from "./core";
-import { imageRequestArgs, systemPromptFor, videoInputArgs, videoNodeOutput, workflowInputErrors } from "./media-args";
+import { imageRequestArgs, systemPromptFor, videoInputArgs, videoNodeOutput, videoPromptOf, videoRunInputError, workflowInputErrors } from "./media-args";
 import { executeTextNode } from "./mention-targets";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -499,7 +499,14 @@ const executeVideoNode = async (node: WorkflowNode, context: ExecutionContext, a
     const inputValue = getLastOutput(context);
 
     try {
-        const inputs = await videoInputArgs(node, context, actionContext);
+        // Before the frame is extracted, so a node that cannot run bills nothing.
+        const inputError = videoRunInputError(node, context);
+
+        if (inputError) {
+            return { error: inputError, success: false };
+        }
+
+        const inputs = await videoInputArgs(node, context, actionContext, userId);
 
         // If mode is image-to-video, dispatch to the image-to-video action
         if (data.mode === "image-to-video") {
@@ -526,12 +533,7 @@ const executeVideoNode = async (node: WorkflowNode, context: ExecutionContext, a
         }
 
         // Default: text-to-video mode
-        const prompt = data.prompt ?? (typeof inputValue === "string" ? inputValue : "");
-
-        if (!prompt) {
-            return { error: "No prompt provided for video generation", success: false };
-        }
-
+        const prompt = videoPromptOf(node, context);
         const result = await actionContext.runAction(internal.chat.functions.generateVideo, {
             aspectRatio: data.aspectRatio ?? "16:9",
             duration: data.duration ?? 5,
@@ -794,7 +796,13 @@ const executeImageToVideoNode = async (
     const inputValue = getLastOutput(context);
 
     try {
-        const inputs = await videoInputArgs(node, context, actionContext);
+        const inputError = videoRunInputError(node, context);
+
+        if (inputError) {
+            return { error: inputError, success: false };
+        }
+
+        const inputs = await videoInputArgs(node, context, actionContext, userId);
         const imageUrl = inputs.frameUrl ?? extractUrl(inputValue, "imageUrl");
 
         if (!imageUrl) {

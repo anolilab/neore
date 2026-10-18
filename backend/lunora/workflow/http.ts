@@ -33,7 +33,7 @@ import {
     type WorkflowContent,
     type WorkflowNode,
 } from "./core";
-import { imageRequestArgs, systemPromptFor, videoInputArgs, videoNodeOutput, workflowInputErrors } from "./media-args";
+import { imageRequestArgs, systemPromptFor, videoInputArgs, videoNodeOutput, videoPromptOf, videoRunInputError, workflowInputErrors } from "./media-args";
 import { executeTextNode } from "./mention-targets";
 
 let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
@@ -577,7 +577,14 @@ const executeVideoNodeStreaming = async (
     };
 
     const inputValue = getLastOutput(context);
-    const inputs = await videoInputArgs(node, context, actionContext);
+    // Before the frame is extracted, so a node that cannot run bills nothing.
+    const inputError = videoRunInputError(node, context);
+
+    if (inputError) {
+        throw new Error(inputError);
+    }
+
+    const inputs = await videoInputArgs(node, context, actionContext, userId);
 
     // If mode is image-to-video, dispatch to the image-to-video action
     if (data.mode === "image-to-video") {
@@ -604,7 +611,7 @@ const executeVideoNodeStreaming = async (
     }
 
     // Default: text-to-video mode
-    const genPrompt = data.prompt ?? (typeof inputValue === "string" ? inputValue : "");
+    const genPrompt = videoPromptOf(node, context);
 
     const result = await actionContext.runAction(internal.chat.functions.generateVideo, {
         aspectRatio: data.aspectRatio ?? "16:9",
@@ -1059,7 +1066,13 @@ const executeImageToVideoNodeStreaming = async (
     };
 
     const inputValue = getLastOutput(context);
-    const inputs = await videoInputArgs(node, context, actionContext);
+    const inputError = videoRunInputError(node, context);
+
+    if (inputError) {
+        throw new Error(inputError);
+    }
+
+    const inputs = await videoInputArgs(node, context, actionContext, userId);
     const imageUrl = inputs.frameUrl ?? extractUrl(inputValue, "imageUrl");
 
     if (!imageUrl) {

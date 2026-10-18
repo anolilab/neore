@@ -162,7 +162,7 @@ const WorkflowCanvasInner = ({
         setConnectionDropMenu(null);
     };
 
-    // A captured frame may only feed a video or image-to-video node (its handle is `frame-<kind>`).
+    // A frame may only feed a video or image-to-video node (its handle is `frame-<kind>`).
     const isValidConnection = (connection: Edge | Connection) => {
         const target = useWorkflowStore.getState().nodes.find((node) => node.id === connection.target);
 

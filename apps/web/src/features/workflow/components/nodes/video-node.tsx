@@ -236,7 +236,7 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                     </div>
                 </div>
 
-                <VideoFramesSection frameFileIds={data.frameFileIds} nodeId={id} pickedTime={data.pickedTime} />
+                <VideoFramesSection nodeId={id} pickedTime={data.pickedTime} />
             </div>
         </BaseNode>
     );

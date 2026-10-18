@@ -62,6 +62,11 @@ export interface WorkflowContent {
 export interface ExecutionContext {
     /** Current data being passed through the workflow */
     data?: Record<string, unknown>;
+    /**
+     * The frame extractions of this run, keyed by `<source node id>:<frame kind>`, each the stored
+     * file id. A frame wired into two nodes is extracted once, so it is billed once.
+     */
+    frames?: Map<string, Promise<string>>;
     /** The workflow graph, for inputs that are wired by handle (`resolveVideoInputs`) */
     graph: { edges: WorkflowEdge[]; nodes: WorkflowNode[] };
     /** Outputs from each node, keyed by node ID */

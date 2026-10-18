@@ -1,67 +1,65 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import type { FrameKind } from "@neore/backend/workflow/mentions";
 import { frameHandleId } from "@neore/backend/workflow/mentions";
 import { Button } from "@ui/components/button";
 import { Input } from "@ui/components/input";
 import { Label } from "@ui/components/label";
 import { Handle, Position } from "@xyflow/react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { useLunora } from "@/lib/lunora/crpc";
 
 import { useWorkflowStore } from "../../stores/workflow-store";
-import type { FrameKind, VideoFrameFileIds } from "../../types";
-import { captureVideoFrame, clipIdentity, FrameCaptureError, frameFileIdsOf, frameTimeFor, videoUrlOfOutput } from "../../utils/video-frame";
+import NODE_CONFIGS from "../../types";
+import { captureVideoFrame, FrameCaptureError, pickedFrameTime, videoUrlOfOutput } from "../../utils/video-frame";
 import { storeWorkflowImage } from "../../utils/workflow-image";
 
+/** Where the picked-frame image node lands, to the right of its video node (the connect button's offset). */
+const IMAGE_NODE_OFFSET_X = 360;
+
 interface VideoFramesSectionProps {
-    frameFileIds?: VideoFrameFileIds;
     nodeId: string;
     pickedTime?: number;
 }
 
 /**
- * Captures start, end and picked frames of a node's clip, so they can be wired into
- * another node. Each row has its own source handle (`frame-<kind>`), rendered
- * unconditionally so React Flow never needs its internals refreshed.
+ * The frames a node's clip can hand to another video node. Start and last frames are extracted by
+ * the run from the clip, so each is only a source handle here. A picked frame (any second of the
+ * clip) is captured in the browser into an image node, which the user wires like any other image.
  */
-export const VideoFramesSection = ({ frameFileIds, nodeId, pickedTime }: VideoFramesSectionProps) => {
-    const { t } = useLingui();
+export const VideoFramesSection = ({ nodeId, pickedTime }: VideoFramesSectionProps) => {
+    const { i18n, t } = useLingui();
     const lunora = useLunora();
+    const addNode = useWorkflowStore((state) => state.addNode);
     const updateNode = useWorkflowStore((state) => state.updateNode);
     const videoUrl = useWorkflowStore((state) => videoUrlOfOutput(state.execution.nodeStates[nodeId]?.output));
-    const [busy, setBusy] = useState<FrameKind | null>(null);
+    // A saved `frame-picked` wire is no longer a handle. Its handle stays drawn, so the wire can be removed.
+    const hasLegacyPickedWire = useWorkflowStore((state) => state.edges.some((edge) => edge.source === nodeId && edge.sourceHandle === "frame-picked"));
+    const frameRows: { kind: FrameKind; label: string }[] = [
+        { kind: "start", label: t`Start frame` },
+        { kind: "end", label: t`Last frame` },
+    ];
+    const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // The clip the frames were captured from. Starts at the mounted clip, so a remount keeps its frames.
-    const clip = videoUrl === undefined ? undefined : clipIdentity(videoUrl);
-    const clipRef = useRef(clip);
-    const hasFrames = frameFileIds !== undefined && Object.keys(frameFileIds).length > 0;
 
-    // A new clip makes the captured frames stale: clear them so a run never seeds from the previous clip.
-    useEffect(() => {
-        if (clip === clipRef.current) return;
-
-        clipRef.current = clip;
-
-        if (clip && hasFrames) {
-            updateNode(nodeId, { frameFileIds: undefined });
-        }
-    }, [clip, hasFrames, nodeId, updateNode]);
-
-    const capture = async (kind: FrameKind) => {
+    const addPickedFrame = async () => {
         if (!videoUrl) {
             return;
         }
 
-        setBusy(kind);
+        setBusy(true);
         setError(null);
 
         try {
-            const blob = await captureVideoFrame(videoUrl, (duration) => frameTimeFor(kind, duration, pickedTime));
-            const fileId = await storeWorkflowImage(lunora, new File([blob], `${kind}-frame.png`, { type: "image/png" }));
-            // Read the current map: the capture took a while, and another frame may have landed meanwhile.
-            const current = frameFileIdsOf(useWorkflowStore.getState().nodes.find((node) => node.id === nodeId));
+            const blob = await captureVideoFrame(videoUrl, (duration) => pickedFrameTime(duration, pickedTime ?? 0));
+            const imageFileId = await storeWorkflowImage(lunora, new File([blob], "picked-frame.png", { type: "image/png" }));
+            const video = useWorkflowStore.getState().nodes.find((node) => node.id === nodeId);
 
-            updateNode(nodeId, { frameFileIds: { ...current, [kind]: fileId } });
+            addNode(
+                "image",
+                { x: (video?.position.x ?? 0) + IMAGE_NODE_OFFSET_X, y: video?.position.y ?? 0 },
+                { imageFileId, imageUrl: undefined, label: i18n._(NODE_CONFIGS.image.defaultLabel), mode: "input" },
+            );
         } catch (error_) {
             setError(
                 error_ instanceof FrameCaptureError && error_.reason === "cors"
@@ -69,15 +67,9 @@ export const VideoFramesSection = ({ frameFileIds, nodeId, pickedTime }: VideoFr
                     : t`Frame capture failed`,
             );
         } finally {
-            setBusy(null);
+            setBusy(false);
         }
     };
-
-    const rows: { kind: FrameKind; label: string }[] = [
-        { kind: "start", label: t`Start frame` },
-        { kind: "end", label: t`Last frame` },
-        { kind: "picked", label: t`Picked frame` },
-    ];
 
     return (
         <div className="nodrag space-y-1.5">
@@ -85,25 +77,28 @@ export const VideoFramesSection = ({ frameFileIds, nodeId, pickedTime }: VideoFr
                 <Trans>Frames</Trans>
             </Label>
 
-            {rows.map(({ kind, label }) => (
+            {/* Always mounted, one handle per frame kind: React Flow needs each handle to exist before a wire can attach to it. */}
+            {frameRows.map(({ kind, label }) => (
                 <div className="relative flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-xs" key={kind}>
-                    <span className="truncate">
-                        {label}
-                        {frameFileIds?.[kind] && <span className="text-muted-foreground"> · {t`captured`}</span>}
-                    </span>
-                    <Button
-                        aria-label={t`Capture ${label}`}
-                        disabled={!videoUrl || busy !== null}
-                        onClick={() => capture(kind)}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                    >
-                        {busy === kind ? <Trans>Capturing…</Trans> : <Trans>Capture</Trans>}
-                    </Button>
+                    <span className="truncate">{label}</span>
                     <Handle className="!bg-muted-foreground !border-background !h-3 !w-3" id={frameHandleId(kind)} position={Position.Right} type="source" />
                 </div>
             ))}
+
+            {hasLegacyPickedWire && (
+                <div className="relative flex items-center justify-between gap-2 rounded-md border border-dashed px-2 py-1 text-xs">
+                    <span className="text-muted-foreground truncate">
+                        <Trans>Picked frame wire (remove it)</Trans>
+                    </span>
+                    <Handle
+                        className="!bg-muted-foreground !border-background !h-3 !w-3"
+                        id="frame-picked"
+                        isConnectable={false}
+                        position={Position.Right}
+                        type="source"
+                    />
+                </div>
+            )}
 
             <div className="flex items-center gap-2">
                 <Label className="text-muted-foreground text-xs" htmlFor={`${nodeId}-picked-time`}>
@@ -120,9 +115,13 @@ export const VideoFramesSection = ({ frameFileIds, nodeId, pickedTime }: VideoFr
                 />
             </div>
 
+            <Button className="w-full" disabled={!videoUrl || busy} onClick={addPickedFrame} size="sm" type="button" variant="outline">
+                {busy ? <Trans>Capturing…</Trans> : <Trans>Add picked frame as image node</Trans>}
+            </Button>
+
             {!videoUrl && (
                 <p className="text-muted-foreground text-xs">
-                    <Trans>Run the node to capture its frames</Trans>
+                    <Trans>Run the node first to pick a frame</Trans>
                 </p>
             )}
             {/* Always mounted: a live region that appears together with its text is often not announced. */}

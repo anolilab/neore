@@ -2,13 +2,13 @@ import type { ModelDefinition } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
-import { mediaOf, modelIdFor, resolveMediaUrls, resolveVideoInputs, resolveVideoInputUrls, videoInputErrors } from "./video-inputs";
+import { frameSourceOf, mediaOf, modelIdFor, resolveMediaUrls, resolveVideoInputs, resolveVideoInputUrls, videoInputErrors } from "./video-inputs";
 
 const node = (id: string, type: string, data: Record<string, unknown> = {}): WorkflowNode => {
     return { data, id, position: { x: 0, y: 0 }, type };
 };
 
-const videoNode = node("video", "video", { frameFileIds: { end: "file-end" } });
+const videoNode = node("video", "video", {});
 const genNode = node("gen", "video", { mode: "text-to-video" });
 
 const context = (edges: WorkflowEdge[], nodeOutputs: Record<string, unknown> = {}, nodes: WorkflowNode[] = [videoNode, genNode]): ExecutionContext => {
@@ -22,6 +22,7 @@ const referenceModel = (caps: { audios?: number; videos?: number }): ModelDefini
         maxReferenceImages: 4,
         maxReferenceVideos: caps.videos,
         modelApiId: "bytedance/seedance-2.0/reference-to-video",
+        supportsImageToVideo: true,
     }) as unknown as ModelDefinition;
 
 const signAll = async (fileId: string) => `https://signed.example/${fileId}`;
@@ -29,15 +30,34 @@ const signAll = async (fileId: string) => `https://signed.example/${fileId}`;
 describe("resolveVideoInputs", () => {
     it("takes the image from a wired frame handle, not from the last output", () => {
         const edges: WorkflowEdge[] = [{ id: "e1", source: "video", sourceHandle: "frame-end", target: "gen" }];
-        const inputs = resolveVideoInputs(genNode, context(edges, { other: { url: "https://x.example/other.png" } }));
+        const inputs = resolveVideoInputs(genNode, context(edges, { other: { url: "https://x.example/other.png" } }), { fileId: "file-end" });
 
         expect(inputs.image).toStrictEqual({ fileId: "file-end" });
     });
 
-    it("throws when the wired frame has not been captured", () => {
-        const edges: WorkflowEdge[] = [{ id: "e1", source: "video", sourceHandle: "frame-start", target: "gen" }];
+    it("reads no reference from a frame wire, even one it cannot use", () => {
+        const edges: WorkflowEdge[] = [{ id: "e1", source: "video", sourceHandle: "frame-picked", target: "gen" }];
+        const outputs = { video: { assets: [{ mimeType: "video/mp4", videoUrl: "https://x.example/v.mp4" }] } };
+        const inputs = resolveVideoInputs(genNode, context(edges, outputs));
 
-        expect(() => resolveVideoInputs(genNode, context(edges))).toThrow("Capture the start frame");
+        expect(inputs).toStrictEqual({ image: undefined, referenceAudios: [], referenceVideos: [] });
+    });
+
+    it("names the last frame wire, and the clip that wire reads", () => {
+        const clip = { assets: [{ mimeType: "video/mp4", videoUrl: "https://x.example/v.mp4" }] };
+        const edges: WorkflowEdge[] = [
+            { id: "e1", source: "video", sourceHandle: "frame-start", target: "gen" },
+            { id: "e2", source: "other", sourceHandle: "frame-end", target: "gen" },
+        ];
+        const nodes = [videoNode, genNode, node("other", "image-to-video")];
+
+        expect(frameSourceOf(genNode, context(edges, { other: clip, video: clip }, nodes))).toStrictEqual({
+            clip: { mimeType: "video/mp4", ref: { url: "https://x.example/v.mp4" } },
+            kind: "end",
+            sourceId: "other",
+        });
+        expect(frameSourceOf(genNode, context([edges[0]!], { video: clip }))).toMatchObject({ kind: "start", sourceId: "video" });
+        expect(frameSourceOf(genNode, context([]))).toBeUndefined();
     });
 
     it("sorts wired file outputs into reference videos and audios by MIME type", () => {
@@ -141,6 +161,7 @@ describe("resolveVideoInputUrls", () => {
             context([{ id: "e1", source: "video", sourceHandle: "frame-end", target: "gen" }]),
             signAll,
             undefined,
+            { fileId: "file-end" },
         );
 
         expect(inputs.image).toBe("https://signed.example/file-end");
@@ -168,22 +189,59 @@ describe("modelIdFor", () => {
 describe("videoInputErrors", () => {
     const modelOf = (modelId: string) => (modelId === "seedance" ? referenceModel({ audios: 3, videos: 3 }) : undefined);
 
-    it("rejects a frame that is not captured on its source, before any clip is generated", () => {
-        const nodes = [node("src", "video", { label: "Clip" }), node("gen", "video", { mode: "image-to-video" })];
-        const edges: WorkflowEdge[] = [{ id: "e1", source: "src", sourceHandle: "frame-end", target: "gen" }];
+    it("accepts a frame from a video node into a video node, with no capture step", () => {
+        const nodes = [node("src", "video", { label: "Clip" }), node("gen", "image-to-video", { mode: "image-to-video", model: "seedance" })];
 
-        expect(videoInputErrors(nodes, edges, modelOf)).toStrictEqual(["Capture the end frame on the video node before running"]);
+        expect(videoInputErrors(nodes, [{ id: "e1", source: "src", sourceHandle: "frame-end", target: "gen" }], modelOf)).toStrictEqual([]);
     });
 
-    it("accepts a captured frame, and rejects a frame wired into a node that does not read it", () => {
-        const captured = node("src", "video", { frameFileIds: { end: "f" } });
-        const wrongTarget = node("img", "text", {});
+    it("rejects a frame into a model that cannot take an image, before any extraction is paid for", () => {
+        const nodes = [node("src", "video", {}), node("gen", "video", { mode: "text-to-video", model: "fal:mochi-v1", prompt: "a fox" })];
 
+        expect(videoInputErrors(nodes, [{ id: "e", source: "src", sourceHandle: "frame-start", target: "gen" }], modelOf)).toStrictEqual([
+            "The start frame needs a model that takes an image input; fal:mochi-v1 does not",
+        ]);
+    });
+
+    it("rejects a frame into an image-to-video node with no model selected", () => {
+        const nodes = [node("src", "video", {}), node("gen", "image-to-video", { mode: "image-to-video" })];
+
+        expect(videoInputErrors(nodes, [{ id: "e", source: "src", sourceHandle: "frame-end", target: "gen" }], modelOf)).toStrictEqual([
+            "The end frame needs a model that takes an image input, and no model is selected",
+        ]);
+    });
+
+    it("rejects a frame into a text-to-video node that has no prompt and no text wired in", () => {
+        const nodes = [node("src", "video", {}), node("gen", "video", { mode: "text-to-video", model: "seedance" })];
+        const edges: WorkflowEdge[] = [{ id: "e", source: "src", sourceHandle: "frame-start", target: "gen" }];
+
+        expect(videoInputErrors(nodes, edges, modelOf)).toStrictEqual([
+            "The start frame feeds a text-to-video node with no prompt; give it a prompt or wire a text node into it",
+        ]);
         expect(
-            videoInputErrors([captured, node("gen", "video")], [{ id: "e", source: "src", sourceHandle: "frame-end", target: "gen" }], modelOf),
+            videoInputErrors([...nodes.slice(0, 1), node("gen", "video", { mode: "text-to-video", model: "seedance", prompt: "a fox" })], edges, modelOf),
         ).toStrictEqual([]);
-        expect(videoInputErrors([captured, wrongTarget], [{ id: "e", source: "src", sourceHandle: "frame-end", target: "img" }], modelOf)).toStrictEqual([
-            "The end frame can only feed a video or image-to-video node",
+        expect(videoInputErrors([...nodes, node("txt", "text", {})], [...edges, { id: "t", source: "txt", target: "gen" }], modelOf)).toStrictEqual([]);
+    });
+
+    it("rejects a frame that runs into a node that does not read it, or out of a node with no clip", () => {
+        const source = node("src", "video", {});
+        const wrongTarget = node("img", "text", {});
+        const imageSource = node("pic", "image", {});
+
+        expect(videoInputErrors([source, wrongTarget], [{ id: "e", source: "src", sourceHandle: "frame-end", target: "img" }], modelOf)).toStrictEqual([
+            "The end frame must go from a video or image-to-video node into a video or image-to-video node",
+        ]);
+        expect(
+            videoInputErrors([imageSource, node("gen", "video")], [{ id: "e", source: "pic", sourceHandle: "frame-start", target: "gen" }], modelOf),
+        ).toStrictEqual(["The start frame must go from a video or image-to-video node into a video or image-to-video node"]);
+    });
+
+    it("reports a saved picked-frame wire, which is no longer a handle", () => {
+        const nodes = [node("src", "video", {}), node("gen", "video", {})];
+
+        expect(videoInputErrors(nodes, [{ id: "e", source: "src", sourceHandle: "frame-picked", target: "gen" }], modelOf)).toStrictEqual([
+            "The frame-picked handle is no longer supported: add the frame as an image node and wire that instead",
         ]);
     });
 
