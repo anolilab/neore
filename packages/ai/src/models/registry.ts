@@ -3173,7 +3173,7 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
     {
         aspectRatios: ["16:9", "9:16", "1:1"],
         avgLatencyMs: 120_000,
-        enabled: true,
+        enabled: false,
         filterCapabilities: ["image_to_video"],
         id: "fal-ai/veo3.1/first-last-frame-to-video",
         isPremium: true,
@@ -3191,6 +3191,7 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         filterCapabilities: ["image_to_video"],
         id: "fal-ai/veo3.1/reference-to-video",
         isPremium: true,
+        maxReferenceImages: 3,
         maxVideoDuration: 8,
         mode: "video",
         modelApiId: "fal-ai/veo3.1/reference-to-video",
@@ -3287,6 +3288,7 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         filterCapabilities: ["image_to_video"],
         id: "fal-ai/veo3.1/fast/reference-to-video",
         isPremium: true,
+        maxReferenceImages: 3,
         maxVideoDuration: 8,
         mode: "video",
         modelApiId: "fal-ai/veo3.1/fast/reference-to-video",
@@ -3297,7 +3299,7 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
     {
         aspectRatios: ["16:9", "9:16", "1:1"],
         avgLatencyMs: 90_000,
-        enabled: true,
+        enabled: false,
         filterCapabilities: ["image_to_video"],
         id: "fal-ai/veo3.1/fast/first-last-frame-to-video",
         isPremium: true,

@@ -71,7 +71,13 @@ import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
-import { buildFalReferenceImageInput, buildFalReferenceVideoInput, falAcceptsAspectRatio, falDurationInput } from "./lib/fal-reference-mapping";
+import {
+    buildFalReferenceImageInput,
+    buildFalReferenceVideoInput,
+    falAcceptsAspectRatio,
+    falDurationInput,
+    falVideoOptionInput,
+} from "./lib/fal-reference-mapping";
 import { getAgentForUser, validateThreadAccess, validateThreadAccessWithData } from "./lib/thread-helpers";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
@@ -4075,8 +4081,28 @@ export const generateAudio = internalAction
         }
     });
 
+/** The options both video actions take. Each is sent only when the endpoint has the input (`fal-video-inputs.ts`). */
+const videoOptionFields = {
+    /** Sent only when the endpoint has a `generate_audio` input. */
+    generateAudio: v.optional(v.boolean()),
+    /** Sent only when the endpoint has a `resolution` input and accepts the value. */
+    resolution: v.optional(v.string().max(MAX_LENGTH.short)),
+};
+
+/**
+ * Whether a video run may render above 1080p: a platform admin or a paid plan. Read only for an
+ * explicit resolution, since no endpoint defaults above 1080p. Workflow runs have only a user id, so
+ * this reads the plan rather than trusting the caller.
+ */
+const canRenderAboveFullHd = async (context: ActionContext, userId: string): Promise<boolean> => {
+    const { isAdmin, plan } = await context.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId });
+
+    return isAdmin || plan === "premium";
+};
+
 export const generateVideo = internalAction
     .input({
+        ...videoOptionFields,
         aspectRatio: v.optional(v.string()),
         cinemaSettings: v.optional(vCinemaSettings),
         duration: v.optional(v.number()),
@@ -4108,250 +4134,247 @@ export const generateVideo = internalAction
             prompt: v.string(),
         }),
     )
-    .action(
-        async ({
-            args: {
-                aspectRatio,
-                cinemaSettings,
-                duration,
-                jobId,
-                model,
-                prompt,
-                promptMessageId,
-                referenceAudioUrls,
-                referenceVideoUrls,
-                startFrameUrl,
-                threadId,
-                userId,
+    .action(async ({ args, ctx: context }) => {
+        const {
+            aspectRatio,
+            cinemaSettings,
+            duration,
+            jobId,
+            model,
+            prompt,
+            promptMessageId,
+            referenceAudioUrls,
+            referenceVideoUrls,
+            startFrameUrl,
+            threadId,
+            userId,
+        } = args;
+        const modelDefinition = MODEL_LOOKUP.get(model);
+
+        if (!modelDefinition || modelDefinition.mode !== "video") {
+            throw new LunoraError("BAD_REQUEST", `Model ${model} is not a video generation model`);
+        }
+
+        if (startFrameUrl && !modelDefinition.supportsImageToVideo) {
+            throw new LunoraError(
+                "BAD_REQUEST",
+                `Model ${model} does not support image-to-video. Pick an I2V model (e.g. fal-ai/kling-video/v1.5/pro/image-to-video).`,
+            );
+        }
+
+        const agent = await getAgentForUser(context, userId, model);
+
+        // Create pending message to show user that generation is in progress
+        const { messageId: pendingMessageId } = await savePendingMediaMessage(agent, context, {
+            message: {
+                content: [{ text: "__VIDEO_GENERATING__", type: "text" }],
+                role: "assistant",
             },
-            ctx: context,
-        }) => {
-            const modelDefinition = MODEL_LOOKUP.get(model);
+            metadata: {
+                model,
+                providerMetadata: mediaJobStamp(jobId),
+                status: "pending",
+            },
+            promptMessageId,
+            threadId,
+        });
 
-            if (!modelDefinition || modelDefinition.mode !== "video") {
-                throw new LunoraError("BAD_REQUEST", `Model ${model} is not a video generation model`);
+        try {
+            // Enhance prompt with cinema settings if provided
+            const enhancedPrompt = buildCinemaPrompt(prompt, cinemaSettings);
+
+            let videoData: { mimeType?: string; uint8Array: Uint8Array } | null = null;
+            let warnings: any[] | undefined;
+            let providerMetadata: any;
+
+            if (modelDefinition.provider === "fal") {
+                const falApiKey = process.env.FAL_API_KEY;
+
+                if (!falApiKey) {
+                    throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
+                }
+
+                const endpoint = modelDefinition.modelApiId ?? model;
+                const premium = args.resolution !== undefined && (await canRenderAboveFullHd(context, userId));
+                const referenceInput = buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl });
+                const falInput: FalRequestInput = { prompt: enhancedPrompt, ...referenceInput, ...falVideoOptionInput(modelDefinition, args, premium) };
+
+                // An image-only endpoint needs the start frame, whichever field it takes it under.
+                const startFrameSent = startFrameUrl !== undefined && Object.values(referenceInput).flat().includes(startFrameUrl);
+
+                if (modelDefinition.supportsImageToVideo && !modelDefinition.supportsTextToVideo && !startFrameSent) {
+                    throw new LunoraError("BAD_REQUEST", `Model ${model} requires a startFrameUrl or reference image (image-to-video only).`);
+                }
+
+                if (aspectRatio && aspectRatio !== "auto" && falAcceptsAspectRatio(modelDefinition)) {
+                    falInput.aspect_ratio = aspectRatio;
+                }
+
+                const falDuration = falDurationInput(modelDefinition, duration);
+
+                if (falDuration !== undefined) {
+                    falInput.duration = falDuration;
+                }
+
+                const falResult = await callFalApi<Parameters<typeof resolveFalVideoUrl>[0]>(endpoint, falInput, falApiKey);
+
+                const resolvedVideo = resolveFalVideoUrl(falResult);
+
+                if (!resolvedVideo) {
+                    throw new LunoraError("BAD_REQUEST", "FAL response did not include a video URL");
+                }
+
+                const videoResponse = await fetchWithDeadline(resolvedVideo.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
+
+                if (!videoResponse.ok) {
+                    await videoResponse.body?.cancel();
+
+                    throw new LunoraError("BAD_REQUEST", `Failed to download generated video: ${videoResponse.status}`);
+                }
+
+                const videoBuffer = await videoResponse.arrayBuffer();
+
+                videoData = {
+                    mimeType: resolvedVideo.contentType,
+                    uint8Array: new Uint8Array(videoBuffer),
+                };
+                providerMetadata = { fal: { endpoint } };
+            } else if (modelDefinition.provider === "openrouter") {
+                const { languageModel } = agent.options;
+
+                if (!languageModel || typeof languageModel !== "object" || !("provider" in languageModel) || !("modelId" in languageModel)) {
+                    throw new LunoraError("BAD_REQUEST", "Agent languageModel must have provider and modelId properties");
+                }
+
+                const baseProviderOptions = {};
+                const videoConfig: { aspect_ratio?: typeof aspectRatio; duration?: typeof duration } = {};
+
+                if (aspectRatio) {
+                    videoConfig.aspect_ratio = aspectRatio;
+                }
+
+                if (duration !== undefined) {
+                    videoConfig.duration = duration;
+                }
+
+                const result = await generateText({
+                    model: languageModel as LanguageModel,
+                    prompt: enhancedPrompt,
+                    providerOptions: {
+                        openrouter: {
+                            ...baseProviderOptions,
+                            modalities: ["video", "text"],
+                            ...(Object.keys(videoConfig).length > 0 && { video_config: videoConfig }),
+                        },
+                    },
+                });
+
+                // Extract video from response (similar to image extraction)
+                const assistantMessage = result.response.messages.at(-1);
+                const responseContent = assistantMessage?.content;
+
+                if (Array.isArray(responseContent)) {
+                    for (const part of responseContent) {
+                        if (part.type !== "file") {
+                            continue;
+                        }
+
+                        // AI SDK v5+ renamed `FilePart.mimeType` to `mediaType`; still
+                        // accept the legacy key so a provider passthrough keeps working.
+                        const mediaType = part.mediaType ?? (part as { mimeType?: string }).mimeType;
+
+                        // Only inline base64 payloads can be decoded here; a URL/binary
+                        // part is handled by the FAL path below.
+                        if (!mediaType?.startsWith("video/") || typeof part.data !== "string") {
+                            continue;
+                        }
+
+                        const uint8Array = Uint8Array.from(atob(part.data), (c) => c.codePointAt(0) ?? 0);
+
+                        videoData = { mimeType: mediaType, uint8Array };
+                        break;
+                    }
+                }
+
+                warnings = result.warnings;
+                providerMetadata = result.providerMetadata;
+            } else {
+                throw new LunoraError("BAD_REQUEST", `Video generation not supported for provider: ${modelDefinition.provider}`);
             }
 
-            if (startFrameUrl && !modelDefinition.supportsImageToVideo) {
-                throw new LunoraError(
-                    "BAD_REQUEST",
-                    `Model ${model} does not support image-to-video. Pick an I2V model (e.g. fal-ai/kling-video/v1.5/pro/image-to-video).`,
-                );
+            if (!videoData) {
+                throw new LunoraError("BAD_REQUEST", "No video generated");
             }
 
-            const agent = await getAgentForUser(context, userId, model);
+            const mimeType = videoData.mimeType || "video/mp4";
+            const blob = bytesToBlob(videoData.uint8Array, mimeType);
+            const { file, filePart } = await storeFile(context, blob, { threadId, userId });
 
-            // Create pending message to show user that generation is in progress
-            const { messageId: pendingMessageId } = await savePendingMediaMessage(agent, context, {
+            // Serialize warnings
+            const serializedWarnings = warnings?.map((warning: any) => {
+                if (warning.type === "unsupported-setting") {
+                    return {
+                        details: warning.details,
+                        setting: String(warning.setting),
+                        type: "unsupported-setting" as const,
+                    };
+                }
+
+                return warning;
+            });
+
+            // Update the pending message with the final result
+            await agent.saveMessage(context, {
                 message: {
-                    content: [{ text: "__VIDEO_GENERATING__", type: "text" }],
+                    content: [filePart],
                     role: "assistant",
                 },
                 metadata: {
+                    fileIds: [file.fileId],
                     model,
-                    providerMetadata: mediaJobStamp(jobId),
-                    status: "pending",
+                    providerMetadata,
+                    warnings: serializedWarnings,
                 },
-                promptMessageId,
+                pendingMessageId,
                 threadId,
             });
 
-            try {
-                // Enhance prompt with cinema settings if provided
-                const enhancedPrompt = buildCinemaPrompt(prompt, cinemaSettings);
+            context.log.event("chat.generate_video", { mimeType, model });
 
-                let videoData: { mimeType?: string; uint8Array: Uint8Array } | null = null;
-                let warnings: any[] | undefined;
-                let providerMetadata: any;
+            return {
+                assets: [
+                    {
+                        mimeType,
+                        videoUrl: file.url,
+                    },
+                ],
+                modelId: model,
+                prompt,
+            };
+        } catch (error) {
+            // Mark pending message as failed
+            if (pendingMessageId) {
+                const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-                if (modelDefinition.provider === "fal") {
-                    const falApiKey = process.env.FAL_API_KEY;
-
-                    if (!falApiKey) {
-                        throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
-                    }
-
-                    const endpoint = modelDefinition.modelApiId ?? model;
-                    const falInput: FalRequestInput = {
-                        prompt: enhancedPrompt,
-                        ...buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl }),
-                    };
-
-                    // The start frame, or a reference image the endpoint takes, satisfies an image-only endpoint.
-                    if (modelDefinition.supportsImageToVideo && !modelDefinition.supportsTextToVideo && !falInput.image_url && !falInput.image_urls) {
-                        throw new LunoraError("BAD_REQUEST", `Model ${model} requires a startFrameUrl or reference image (image-to-video only).`);
-                    }
-
-                    if (aspectRatio && aspectRatio !== "auto" && falAcceptsAspectRatio(modelDefinition)) {
-                        falInput.aspect_ratio = aspectRatio;
-                    }
-
-                    const falDuration = falDurationInput(modelDefinition, duration);
-
-                    if (falDuration !== undefined) {
-                        falInput.duration = falDuration;
-                    }
-
-                    const falResult = await callFalApi<Parameters<typeof resolveFalVideoUrl>[0]>(endpoint, falInput, falApiKey);
-
-                    const resolvedVideo = resolveFalVideoUrl(falResult);
-
-                    if (!resolvedVideo) {
-                        throw new LunoraError("BAD_REQUEST", "FAL response did not include a video URL");
-                    }
-
-                    const videoResponse = await fetchWithDeadline(resolvedVideo.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
-
-                    if (!videoResponse.ok) {
-                        await videoResponse.body?.cancel();
-
-                        throw new LunoraError("BAD_REQUEST", `Failed to download generated video: ${videoResponse.status}`);
-                    }
-
-                    const videoBuffer = await videoResponse.arrayBuffer();
-
-                    videoData = {
-                        mimeType: resolvedVideo.contentType,
-                        uint8Array: new Uint8Array(videoBuffer),
-                    };
-                    providerMetadata = { fal: { endpoint } };
-                } else if (modelDefinition.provider === "openrouter") {
-                    const { languageModel } = agent.options;
-
-                    if (!languageModel || typeof languageModel !== "object" || !("provider" in languageModel) || !("modelId" in languageModel)) {
-                        throw new LunoraError("BAD_REQUEST", "Agent languageModel must have provider and modelId properties");
-                    }
-
-                    const baseProviderOptions = {};
-                    const videoConfig: { aspect_ratio?: typeof aspectRatio; duration?: typeof duration } = {};
-
-                    if (aspectRatio) {
-                        videoConfig.aspect_ratio = aspectRatio;
-                    }
-
-                    if (duration !== undefined) {
-                        videoConfig.duration = duration;
-                    }
-
-                    const result = await generateText({
-                        model: languageModel as LanguageModel,
-                        prompt: enhancedPrompt,
-                        providerOptions: {
-                            openrouter: {
-                                ...baseProviderOptions,
-                                modalities: ["video", "text"],
-                                ...(Object.keys(videoConfig).length > 0 && { video_config: videoConfig }),
-                            },
-                        },
-                    });
-
-                    // Extract video from response (similar to image extraction)
-                    const assistantMessage = result.response.messages.at(-1);
-                    const responseContent = assistantMessage?.content;
-
-                    if (Array.isArray(responseContent)) {
-                        for (const part of responseContent) {
-                            if (part.type !== "file") {
-                                continue;
-                            }
-
-                            // AI SDK v5+ renamed `FilePart.mimeType` to `mediaType`; still
-                            // accept the legacy key so a provider passthrough keeps working.
-                            const mediaType = part.mediaType ?? (part as { mimeType?: string }).mimeType;
-
-                            // Only inline base64 payloads can be decoded here; a URL/binary
-                            // part is handled by the FAL path below.
-                            if (!mediaType?.startsWith("video/") || typeof part.data !== "string") {
-                                continue;
-                            }
-
-                            const uint8Array = Uint8Array.from(atob(part.data), (c) => c.codePointAt(0) ?? 0);
-
-                            videoData = { mimeType: mediaType, uint8Array };
-                            break;
-                        }
-                    }
-
-                    warnings = result.warnings;
-                    providerMetadata = result.providerMetadata;
-                } else {
-                    throw new LunoraError("BAD_REQUEST", `Video generation not supported for provider: ${modelDefinition.provider}`);
-                }
-
-                if (!videoData) {
-                    throw new LunoraError("BAD_REQUEST", "No video generated");
-                }
-
-                const mimeType = videoData.mimeType || "video/mp4";
-                const blob = bytesToBlob(videoData.uint8Array, mimeType);
-                const { file, filePart } = await storeFile(context, blob, { threadId, userId });
-
-                // Serialize warnings
-                const serializedWarnings = warnings?.map((warning: any) => {
-                    if (warning.type === "unsupported-setting") {
-                        return {
-                            details: warning.details,
-                            setting: String(warning.setting),
-                            type: "unsupported-setting" as const,
-                        };
-                    }
-
-                    return warning;
-                });
-
-                // Update the pending message with the final result
                 await agent.saveMessage(context, {
                     message: {
-                        content: [filePart],
+                        content: [{ text: `*Video generation failed: ${errorMessage}*`, type: "text" }],
                         role: "assistant",
                     },
                     metadata: {
-                        fileIds: [file.fileId],
+                        error: errorMessage,
                         model,
-                        providerMetadata,
-                        warnings: serializedWarnings,
+                        status: "failed",
                     },
                     pendingMessageId,
                     threadId,
                 });
-
-                context.log.event("chat.generate_video", { mimeType, model });
-
-                return {
-                    assets: [
-                        {
-                            mimeType,
-                            videoUrl: file.url,
-                        },
-                    ],
-                    modelId: model,
-                    prompt,
-                };
-            } catch (error) {
-                // Mark pending message as failed
-                if (pendingMessageId) {
-                    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-                    await agent.saveMessage(context, {
-                        message: {
-                            content: [{ text: `*Video generation failed: ${errorMessage}*`, type: "text" }],
-                            role: "assistant",
-                        },
-                        metadata: {
-                            error: errorMessage,
-                            model,
-                            status: "failed",
-                        },
-                        pendingMessageId,
-                        threadId,
-                    });
-                }
-
-                chatLogger.error("[cvx][video_generation] Error generating video:", error);
-                throw new LunoraError("BAD_REQUEST", `Failed to generate video: ${error instanceof Error ? error.message : "Unknown error"}`);
             }
-        },
-    );
+
+            chatLogger.error("[cvx][video_generation] Error generating video:", error);
+            throw new LunoraError("BAD_REQUEST", `Failed to generate video: ${error instanceof Error ? error.message : "Unknown error"}`);
+        }
+    });
 
 // ============================================================================
 // Music Generation Action (fal.ai)
@@ -5479,6 +5502,7 @@ export const generateObjectEdit = internalAction
 
 export const generateImageToVideo = internalAction
     .input({
+        ...videoOptionFields,
         duration: v.optional(v.number()),
         fps: v.optional(v.number()),
         imageUrl: v.string(),
@@ -5504,68 +5528,68 @@ export const generateImageToVideo = internalAction
             videoUrl: v.string(),
         }),
     )
-    .action(
-        async ({
-            args: { duration, fps, imageUrl, loop, model, motionStrength, prompt, referenceAudioUrls, referenceVideoUrls, threadId, userId },
-            ctx: context,
-        }) => {
-            const falApiKey = process.env.FAL_API_KEY;
+    .action(async ({ args, ctx: context }) => {
+        const { duration, fps, imageUrl, loop, model, motionStrength, prompt, referenceAudioUrls, referenceVideoUrls, threadId, userId } = args;
+        const falApiKey = process.env.FAL_API_KEY;
 
-            if (!falApiKey) {
-                throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
+        if (!falApiKey) {
+            throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
+        }
+
+        // Registry ids are not FAL endpoints for every model: the reference mapping is keyed by `modelApiId`.
+        const modelDefinition = model ? MODEL_LOOKUP.get(model) : undefined;
+        const endpoint = modelDefinition?.modelApiId ?? model ?? "fal-ai/kling-video/v2.1/standard/image-to-video";
+
+        chatLogger.debug("[cvx][img2video] Starting image-to-video", { duration, endpoint });
+
+        const premium = args.resolution !== undefined && (await canRenderAboveFullHd(context, userId));
+        const input: FalRequestInput = {
+            ...buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl: imageUrl }),
+            ...falVideoOptionInput(modelDefinition, args, premium),
+        };
+
+        if (prompt) {
+            input.prompt = prompt;
+        }
+
+        if (duration) {
+            const falDuration = falDurationInput(modelDefinition, duration);
+
+            if (falDuration !== undefined) {
+                input.duration = falDuration;
             }
+        }
 
-            // Registry ids are not FAL endpoints for every model: the reference mapping is keyed by `modelApiId`.
-            const modelDefinition = model ? MODEL_LOOKUP.get(model) : undefined;
-            const endpoint = modelDefinition?.modelApiId ?? model ?? "fal-ai/kling-video/v2.1/standard/image-to-video";
+        if (motionStrength !== undefined) {
+            input.motion_strength = motionStrength;
+        }
 
-            chatLogger.debug("[cvx][img2video] Starting image-to-video", { duration, endpoint });
+        if (fps) {
+            input.fps = fps;
+        }
 
-            const input: FalRequestInput = buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl: imageUrl });
+        if (loop !== undefined) {
+            input.loop = loop;
+        }
 
-            if (prompt) {
-                input.prompt = prompt;
-            }
+        const result = await callFalApi<Parameters<typeof resolveFalVideoUrl>[0]>(endpoint, input, falApiKey);
+        const resolvedVideo = resolveFalVideoUrl(result);
 
-            if (duration) {
-                const falDuration = falDurationInput(modelDefinition, duration);
+        if (!resolvedVideo) {
+            throw new LunoraError("BAD_REQUEST", "No video generated from image");
+        }
 
-                if (falDuration !== undefined) {
-                    input.duration = falDuration;
-                }
-            }
+        const videoResponse = await fetchOk(resolvedVideo.url, { errorPrefix: "Failed to download generated video", timeoutMs: FETCH_TIMEOUT_LONG_MS });
+        const mimeType = resolvedVideo.contentType;
+        const { file } = await storeFile(context, bytesToBlob(new Uint8Array(await videoResponse.arrayBuffer()), mimeType), { threadId, userId });
 
-            if (motionStrength !== undefined) {
-                input.motion_strength = motionStrength;
-            }
-
-            if (fps) {
-                input.fps = fps;
-            }
-
-            if (loop !== undefined) {
-                input.loop = loop;
-            }
-
-            const result = await callFalApi<Parameters<typeof resolveFalVideoUrl>[0]>(endpoint, input, falApiKey);
-            const resolvedVideo = resolveFalVideoUrl(result);
-
-            if (!resolvedVideo) {
-                throw new LunoraError("BAD_REQUEST", "No video generated from image");
-            }
-
-            const videoResponse = await fetchOk(resolvedVideo.url, { errorPrefix: "Failed to download generated video", timeoutMs: FETCH_TIMEOUT_LONG_MS });
-            const mimeType = resolvedVideo.contentType;
-            const { file } = await storeFile(context, bytesToBlob(new Uint8Array(await videoResponse.arrayBuffer()), mimeType), { threadId, userId });
-
-            return {
-                fileId: file.fileId,
-                mimeType,
-                model: endpoint,
-                videoUrl: file.url,
-            };
-        },
-    );
+        return {
+            fileId: file.fileId,
+            mimeType,
+            model: endpoint,
+            videoUrl: file.url,
+        };
+    });
 
 export const generateControlNet = internalAction
     .input({

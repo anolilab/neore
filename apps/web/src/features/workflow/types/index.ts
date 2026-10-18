@@ -45,6 +45,8 @@ export interface BaseNodeData {
 // Text node - input or transform text
 export interface TextNodeData extends BaseNodeData {
     content?: string; // For input mode
+    /** Editing aid for the transform template: highlighting and a JSON check. What runs is the text as typed. */
+    format?: "text" | "json" | "yaml";
     mode: "input" | "transform";
     template?: string; // For transform mode (with {{variable}} support)
 }
@@ -166,11 +168,13 @@ export interface VideoNodeData extends BaseNodeData {
     duration?: number; // 1-10 seconds
     fps?: number; // Frames per second (24, 30, 60)
     frameFileIds?: VideoFrameFileIds; // Frame files from an earlier build (see VideoFrameFileIds)
+    generateAudio?: boolean; // Generate a soundtrack; unset means the endpoint's own default
     mode: "text-to-video" | "image-to-video";
     model?: string; // fal:mochi-v1, fal:minimax-video, fal:kling-video
     motionStrength?: number; // 0-1, how much motion in the video
     pickedTime?: number; // Seconds into the clip for the picked frame the "add as image node" button takes
     prompt?: string;
+    resolution?: string; // One of the model's resolutions; unset means the endpoint's own default
 }
 
 // Image-to-Video node - animate static images
@@ -178,11 +182,13 @@ export interface ImageToVideoNodeData extends BaseNodeData {
     duration?: number; // 1-10 seconds
     fps?: number; // Frames per second
     frameFileIds?: VideoFrameFileIds; // Frame files from an earlier build (see VideoFrameFileIds)
+    generateAudio?: boolean; // Generate a soundtrack; unset means the endpoint's own default
     loop?: boolean; // Whether to create seamless loop
     model?: string; // fal:kling-image-to-video, fal:runway-gen3
     motionStrength?: number; // 0-1, intensity of motion
     pickedTime?: number; // Seconds into the clip for the picked frame the "add as image node" button takes
     prompt?: string; // Motion prompt - describe the animation
+    resolution?: string; // One of the model's resolutions; unset means the endpoint's own default
 }
 
 // ControlNet node - guide image generation with pose/depth/edge detection

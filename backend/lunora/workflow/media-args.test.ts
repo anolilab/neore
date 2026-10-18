@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
-import { imageRequestArgs, type WorkflowFileContext, videoInputArgs, videoNodeOutput, videoRunInputError, workflowInputErrors } from "./media-args";
+import {
+    imageRequestArgs,
+    imageToVideoArgs,
+    textToVideoArgs,
+    type WorkflowFileContext,
+    videoInputArgs,
+    videoNodeOutput,
+    videoRunInputError,
+    workflowInputErrors,
+} from "./media-args";
 
 const node = (id: string, type: string, data: Record<string, unknown> = {}): WorkflowNode => {
     return { data, id, position: { x: 0, y: 0 }, type };
@@ -66,6 +75,38 @@ describe("imageRequestArgs", () => {
         const ctx = context([{ id: "e", source: "pic", target: "gen" }], [gen, pic], { pic: { assets: [{ imageUrl: "https://x.example/p.png" }] } });
 
         expect(imageRequestArgs(gen, ctx)).toStrictEqual({ prompt: "match image 1", referenceImages: ["https://x.example/p.png"] });
+    });
+});
+
+describe("video action arguments", () => {
+    const noInputs = { frameUrl: undefined, referenceAudioUrls: [], referenceVideoUrls: [] };
+
+    it("sends the stored options, and ignores a stored value of the wrong type", () => {
+        expect(textToVideoArgs(node("v", "video", { generateAudio: false, resolution: "1080p" }), "a fox", noInputs, "u")).toMatchObject({
+            generateAudio: false,
+            resolution: "1080p",
+        });
+        expect(imageToVideoArgs(node("v", "video", { generateAudio: "yes", resolution: 1080 }), "https://x.example/i.png", noInputs, "u")).toMatchObject({
+            generateAudio: undefined,
+            resolution: undefined,
+        });
+    });
+
+    it("gives text-to-video its defaults and passes the start frame, while image-to-video passes the node's prompt and loop", () => {
+        expect(textToVideoArgs(node("v", "video", {}), "a fox", { ...noInputs, frameUrl: "https://x.example/f.png" }, "u")).toMatchObject({
+            aspectRatio: "16:9",
+            duration: 5,
+            model: "fal:mochi-v1",
+            prompt: "a fox",
+            startFrameUrl: "https://x.example/f.png",
+        });
+        expect(imageToVideoArgs(node("v", "video", { loop: true, prompt: "spin" }), "https://x.example/i.png", noInputs, "u")).toMatchObject({
+            imageUrl: "https://x.example/i.png",
+            loop: true,
+            prompt: "spin",
+            threadId: "workflow",
+            userId: "u",
+        });
     });
 });
 

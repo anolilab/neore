@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 import {
     buildFalReferenceImageInput,
     buildFalReferenceVideoInput,
-    FAL_VIDEO_INPUTS,
     falAcceptsAspectRatio,
     falDurationInput,
+    falVideoOptionInput,
     referenceVideoLimitSeconds,
 } from "./fal-reference-mapping";
 
@@ -222,16 +222,38 @@ describe("falAcceptsAspectRatio", () => {
     });
 });
 
-describe("FAL_VIDEO_INPUTS", () => {
-    it("has an entry for every enabled fal video row, so a new row cannot skip its schema", () => {
-        const keys = Object.keys(FAL_VIDEO_INPUTS);
+describe("falVideoOptionInput", () => {
+    const model = (modelApiId: string) => ({ modelApiId }) as unknown as ModelDefinition;
 
-        for (const definition of MODEL_REGISTRY) {
-            if (definition.mode !== "video" || definition.provider !== "fal" || definition.enabled === false) {
-                continue;
-            }
+    it("sends generate_audio and resolution under their FAL names, only to an endpoint that takes them", () => {
+        expect(falVideoOptionInput(model("fal-ai/veo3.1/image-to-video"), { generateAudio: false, resolution: "720p" }, true)).toEqual({
+            generate_audio: false,
+            resolution: "720p",
+        });
+        expect(falVideoOptionInput(model("fal-ai/kling-video/v1.5/pro/image-to-video"), { generateAudio: true, resolution: "720p" }, true)).toEqual({});
+        expect(falVideoOptionInput(undefined, { generateAudio: true, resolution: "720p" }, true)).toEqual({});
+    });
 
-            expect(keys, definition.id).toContain(definition.modelApiId);
-        }
+    it("holds a free plan to 1080p, and leaves a premium plan's resolution alone", () => {
+        expect(falVideoOptionInput(model("fal-ai/veo3.1/image-to-video"), { resolution: "4k" }, false)).toEqual({ resolution: "1080p" });
+        expect(falVideoOptionInput(model("fal-ai/veo3.1/image-to-video"), { resolution: "4k" }, true)).toEqual({ resolution: "4k" });
+    });
+});
+
+describe("start frame field", () => {
+    const model = (modelApiId: string, maxReferenceImages?: number) => ({ maxReferenceImages, modelApiId }) as unknown as ModelDefinition;
+
+    it("sends the start frame as start_image_url on the Kling v3 and o3 endpoints that name it so", () => {
+        expect(buildFalReferenceVideoInput(model("fal-ai/kling-video/v3/pro/image-to-video"), { startFrameUrl: URL_A })).toEqual({
+            start_image_url: URL_A,
+        });
+        expect(buildFalReferenceVideoInput(model("fal-ai/kling-video/o3/4k/reference-to-video", 4), { startFrameUrl: URL_A })).toEqual({
+            start_image_url: URL_A,
+        });
+    });
+
+    it("sends the start frame into the Veo reference array, and nothing when there is no start frame", () => {
+        expect(buildFalReferenceVideoInput(model("fal-ai/veo3.1/reference-to-video", 3), { startFrameUrl: URL_A })).toEqual({ image_urls: [URL_A] });
+        expect(buildFalReferenceVideoInput(model("fal-ai/veo3.1/reference-to-video", 3), {})).toEqual({});
     });
 });

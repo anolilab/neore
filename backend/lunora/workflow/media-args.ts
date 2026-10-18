@@ -107,6 +107,66 @@ export const videoPromptOf = (node: WorkflowNode, context: ExecutionContext): st
     return data.prompt ?? (typeof inputValue === "string" ? inputValue : "");
 };
 
+/** The fields a video node's run reads: its generation settings, and the prompt and mode it stores. */
+export interface VideoNodeRunData {
+    aspectRatio?: string;
+    duration?: number;
+    fps?: number;
+    generateAudio?: boolean;
+    loop?: boolean;
+    mode?: "text-to-video" | "image-to-video";
+    model?: string;
+    motionStrength?: number;
+    prompt?: string;
+    resolution?: string;
+}
+
+export type VideoInputArgs = Awaited<ReturnType<typeof videoInputArgs>>;
+
+/**
+ * The arguments of the image-to-video action for a video node. The options are sent only when the
+ * stored value has the type the action takes; the action keeps only the ones the model accepts
+ * (`fal-video-inputs.ts`), so a value left over from an earlier model is dropped there.
+ */
+export const imageToVideoArgs = (node: WorkflowNode, imageUrl: string, inputs: VideoInputArgs, userId: string) => {
+    const data = node.data as VideoNodeRunData;
+
+    return {
+        duration: data.duration,
+        fps: data.fps,
+        generateAudio: typeof data.generateAudio === "boolean" ? data.generateAudio : undefined,
+        imageUrl,
+        loop: data.loop,
+        model: data.model,
+        motionStrength: data.motionStrength,
+        prompt: data.prompt,
+        referenceAudioUrls: inputs.referenceAudioUrls,
+        referenceVideoUrls: inputs.referenceVideoUrls,
+        resolution: typeof data.resolution === "string" ? data.resolution : undefined,
+        threadId: "workflow",
+        userId,
+    };
+};
+
+/** The arguments of the text-to-video action for a video node, with the node's defaults for what it leaves unset. */
+export const textToVideoArgs = (node: WorkflowNode, prompt: string, inputs: VideoInputArgs, userId: string) => {
+    const data = node.data as VideoNodeRunData;
+
+    return {
+        aspectRatio: data.aspectRatio ?? "16:9",
+        duration: data.duration ?? 5,
+        generateAudio: typeof data.generateAudio === "boolean" ? data.generateAudio : undefined,
+        model: data.model ?? "fal:mochi-v1",
+        prompt,
+        referenceAudioUrls: inputs.referenceAudioUrls,
+        referenceVideoUrls: inputs.referenceVideoUrls,
+        resolution: typeof data.resolution === "string" ? data.resolution : undefined,
+        startFrameUrl: inputs.frameUrl,
+        threadId: "workflow",
+        userId,
+    };
+};
+
 /**
  * What a video node needs before it pays for anything: a prompt in text-to-video mode, a start image
  * (a frame wire, or an upstream image) in image-to-video mode. Checked before any frame is extracted,

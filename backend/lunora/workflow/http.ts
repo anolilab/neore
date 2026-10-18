@@ -33,7 +33,18 @@ import {
     type WorkflowContent,
     type WorkflowNode,
 } from "./core";
-import { imageRequestArgs, systemPromptFor, videoInputArgs, videoNodeOutput, videoPromptOf, videoRunInputError, workflowInputErrors } from "./media-args";
+import {
+    imageRequestArgs,
+    imageToVideoArgs,
+    systemPromptFor,
+    textToVideoArgs,
+    type VideoNodeRunData,
+    videoInputArgs,
+    videoNodeOutput,
+    videoPromptOf,
+    videoRunInputError,
+    workflowInputErrors,
+} from "./media-args";
 import { executeTextNode } from "./mention-targets";
 
 let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
@@ -566,15 +577,7 @@ const executeVideoNodeStreaming = async (
     actionContext: HttpActionCtx,
     userId: string,
 ): Promise<{ output: unknown }> => {
-    const data = node.data as {
-        aspectRatio?: string;
-        duration?: number;
-        fps?: number;
-        mode?: "text-to-video" | "image-to-video";
-        model?: string;
-        motionStrength?: number;
-        prompt?: string;
-    };
+    const data = node.data as VideoNodeRunData;
 
     const inputValue = getLastOutput(context);
     // Before the frame is extracted, so a node that cannot run bills nothing.
@@ -594,18 +597,7 @@ const executeVideoNodeStreaming = async (
             throw new Error("No image input provided for image-to-video mode");
         }
 
-        const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
-            duration: data.duration,
-            fps: data.fps,
-            imageUrl,
-            model: data.model,
-            motionStrength: data.motionStrength,
-            prompt: data.prompt,
-            referenceAudioUrls: inputs.referenceAudioUrls,
-            referenceVideoUrls: inputs.referenceVideoUrls,
-            threadId: "workflow",
-            userId,
-        });
+        const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, imageToVideoArgs(node, imageUrl, inputs, userId));
 
         return { output: videoNodeOutput(result, data.prompt ?? "") };
     }
@@ -613,17 +605,7 @@ const executeVideoNodeStreaming = async (
     // Default: text-to-video mode
     const genPrompt = videoPromptOf(node, context);
 
-    const result = await actionContext.runAction(internal.chat.functions.generateVideo, {
-        aspectRatio: data.aspectRatio ?? "16:9",
-        duration: data.duration ?? 5,
-        model: data.model ?? "fal:mochi-v1",
-        prompt: genPrompt,
-        referenceAudioUrls: inputs.referenceAudioUrls,
-        referenceVideoUrls: inputs.referenceVideoUrls,
-        startFrameUrl: inputs.frameUrl,
-        threadId: "workflow",
-        userId,
-    });
+    const result = await actionContext.runAction(internal.chat.functions.generateVideo, textToVideoArgs(node, genPrompt, inputs, userId));
 
     return { output: videoNodeOutput(result, genPrompt) };
 };
@@ -1056,14 +1038,7 @@ const executeImageToVideoNodeStreaming = async (
     actionContext: HttpActionCtx,
     userId: string,
 ): Promise<{ output: unknown }> => {
-    const data = node.data as {
-        duration?: number;
-        fps?: number;
-        loop?: boolean;
-        model?: string;
-        motionStrength?: number;
-        prompt?: string;
-    };
+    const data = node.data as VideoNodeRunData;
 
     const inputValue = getLastOutput(context);
     const inputError = videoRunInputError(node, context);
@@ -1079,19 +1054,7 @@ const executeImageToVideoNodeStreaming = async (
         throw new Error("No image input provided for image-to-video");
     }
 
-    const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
-        duration: data.duration,
-        fps: data.fps,
-        imageUrl,
-        loop: data.loop,
-        model: data.model,
-        motionStrength: data.motionStrength,
-        prompt: data.prompt,
-        referenceAudioUrls: inputs.referenceAudioUrls,
-        referenceVideoUrls: inputs.referenceVideoUrls,
-        threadId: "workflow",
-        userId,
-    });
+    const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, imageToVideoArgs(node, imageUrl, inputs, userId));
 
     return { output: videoNodeOutput(result, data.prompt ?? "") };
 };

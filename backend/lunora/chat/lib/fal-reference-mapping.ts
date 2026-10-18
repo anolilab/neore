@@ -1,4 +1,4 @@
-import type { ModelDefinition } from "@neore/ai/models";
+import { falVideoInputsOf, type ModelDefinition, resolutionWithinFreePlan, snapVideoOptions, type VideoOptions } from "@neore/ai/models";
 
 /**
  * FAL endpoint -> reference-media field mapping for the reference picker and the workflow's
@@ -63,129 +63,6 @@ export const buildFalReferenceImageInput = (modelDefinition: ModelDefinition, re
     return result;
 };
 
-interface FalReferenceField {
-    name: string;
-    /** Endpoint takes one URL under `name` instead of an array. */
-    singular?: boolean;
-}
-
-interface FalVideoReferenceSpec {
-    audios?: FalReferenceField;
-    /** Fixed fields the endpoint requires alongside the references. */
-    extra?: Record<string, string>;
-    images?: FalReferenceField;
-    /** Combined length, in seconds, of the reference videos the endpoint accepts. */
-    totalSeconds?: number;
-    videos?: FalReferenceField;
-}
-
-/**
- * Per-endpoint FAL field names for reference video/audio, keyed by the
- * registry's `modelApiId`. Each name is copied from the endpoint's OpenAPI
- * input schema. An endpoint with no entry takes no reference media.
- */
-const FAL_VIDEO_REFERENCE_FIELDS: Record<string, FalVideoReferenceSpec> = {
-    "bytedance/seedance-2.0/fast/reference-to-video": {
-        audios: { name: "audio_urls" },
-        images: { name: "image_urls" },
-        totalSeconds: 15,
-        videos: { name: "video_urls" },
-    },
-    "bytedance/seedance-2.0/reference-to-video": {
-        audios: { name: "audio_urls" },
-        images: { name: "image_urls" },
-        totalSeconds: 15,
-        videos: { name: "video_urls" },
-    },
-    "google/gemini-omni-flash/v1.1/reference-to-video": {
-        images: { name: "image_urls" },
-        videos: { name: "reference_video_urls" },
-    },
-};
-
-const range = (min: number, max: number): number[] => Array.from({ length: max - min + 1 }, (_, index) => min + index);
-
-/** How an endpoint takes `duration`: `int` is a JSON number, `text` a numeric string ("5"), `seconds` a string with an s ("5s"). */
-interface FalDurationSpec {
-    format: "int" | "seconds" | "text";
-    /** Seconds the endpoint accepts. The schema's `"auto"` is left out: a duration here is always a number. */
-    values: ReadonlyArray<number>;
-}
-
-interface FalVideoInputSpec {
-    /** Whether the endpoint takes `aspect_ratio` at all. */
-    aspectRatio: boolean;
-    /** `null` when the endpoint has no `duration` input, so its length is fixed and nothing is sent. */
-    duration: FalDurationSpec | null;
-}
-
-/**
- * FAL video inputs from each endpoint's OpenAPI input schema, keyed by the registry's `modelApiId`.
- * `"unverified"` marks an endpoint whose schema could not be fetched: its row keeps the behaviour
- * it had before this table (the number as given, `aspect_ratio` when set). Every enabled fal video
- * row must have an entry (`fal-reference-mapping.test.ts` checks).
- */
-export const FAL_VIDEO_INPUTS: Record<string, FalVideoInputSpec | "unverified"> = {
-    "bytedance/seedance-2.0/fast/image-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
-    "bytedance/seedance-2.0/fast/reference-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
-    "bytedance/seedance-2.0/fast/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
-    "bytedance/seedance-2.0/image-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
-    "bytedance/seedance-2.0/reference-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
-    "bytedance/seedance-2.0/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 15) } },
-    "fal-ai/bytedance/seedance/v1.5/lite/image-to-video": "unverified",
-    "fal-ai/bytedance/seedance/v1.5/lite/text-to-video": "unverified",
-    "fal-ai/bytedance/seedance/v1.5/pro/image-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 12) } },
-    "fal-ai/bytedance/seedance/v1.5/pro/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(4, 12) } },
-    "fal-ai/kling-video/o1/standard/video-to-video/edit": { aspectRatio: false, duration: null },
-    "fal-ai/kling-video/o3/4k/image-to-video": { aspectRatio: false, duration: { format: "text", values: range(3, 15) } },
-    "fal-ai/kling-video/o3/4k/reference-to-video": { aspectRatio: true, duration: { format: "text", values: range(3, 15) } },
-    "fal-ai/kling-video/o3/4k/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(3, 15) } },
-    "fal-ai/kling-video/o3/standard/image-to-video": { aspectRatio: false, duration: { format: "text", values: range(3, 15) } },
-    "fal-ai/kling-video/v1.5/pro/image-to-video": { aspectRatio: true, duration: { format: "text", values: [5, 10] } },
-    "fal-ai/kling-video/v1.5/pro/text-to-video": { aspectRatio: true, duration: { format: "text", values: [5, 10] } },
-    "fal-ai/kling-video/v2.5-turbo/pro/image-to-video": { aspectRatio: false, duration: { format: "text", values: [5, 10] } },
-    "fal-ai/kling-video/v2.5-turbo/pro/text-to-video": { aspectRatio: true, duration: { format: "text", values: [5, 10] } },
-    "fal-ai/kling-video/v3/4k/image-to-video": { aspectRatio: false, duration: { format: "text", values: range(3, 15) } },
-    "fal-ai/kling-video/v3/4k/text-to-video": { aspectRatio: true, duration: { format: "text", values: range(3, 15) } },
-    "fal-ai/kling-video/v3/pro/image-to-video": { aspectRatio: false, duration: { format: "text", values: range(3, 15) } },
-    "fal-ai/ltx-video": { aspectRatio: false, duration: null },
-    "fal-ai/luma-dream-machine": { aspectRatio: true, duration: null },
-    "fal-ai/luma-dream-machine/image-to-video": { aspectRatio: true, duration: null },
-    "fal-ai/luma-dream-machine/ray-2": { aspectRatio: true, duration: { format: "seconds", values: [5, 9] } },
-    "fal-ai/minimax/hailuo-02/pro/image-to-video": { aspectRatio: false, duration: null },
-    "fal-ai/minimax/hailuo-02/pro/text-to-video": { aspectRatio: false, duration: null },
-    "fal-ai/minimax/hailuo-02/standard/image-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
-    "fal-ai/minimax/hailuo-02/standard/text-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
-    "fal-ai/minimax/hailuo-2.3-fast/standard/image-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
-    "fal-ai/minimax/hailuo-2.3-fast/standard/text-to-video": "unverified",
-    "fal-ai/minimax/hailuo-2.3/pro/image-to-video": { aspectRatio: false, duration: null },
-    "fal-ai/minimax/hailuo-2.3/pro/text-to-video": { aspectRatio: false, duration: null },
-    "fal-ai/minimax/hailuo-2.3/standard/image-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
-    "fal-ai/minimax/hailuo-2.3/standard/text-to-video": { aspectRatio: false, duration: { format: "text", values: [6, 10] } },
-    "fal-ai/minimax/video-01": { aspectRatio: false, duration: null },
-    "fal-ai/minimax/video-01-live": { aspectRatio: false, duration: null },
-    "fal-ai/minimax/video-01-live/image-to-video": { aspectRatio: false, duration: null },
-    "fal-ai/pika/v2.2/image-to-video": { aspectRatio: false, duration: { format: "int", values: [5, 10] } },
-    "fal-ai/pika/v2.2/text-to-video": { aspectRatio: true, duration: { format: "int", values: [5, 10] } },
-    "fal-ai/stable-video": { aspectRatio: false, duration: null },
-    "fal-ai/veo2": { aspectRatio: true, duration: { format: "seconds", values: range(5, 8) } },
-    "fal-ai/veo2/image-to-video": { aspectRatio: false, duration: { format: "seconds", values: range(5, 8) } },
-    "fal-ai/veo3": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "fal-ai/veo3.1": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "fal-ai/veo3.1/fast": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "fal-ai/veo3.1/fast/first-last-frame-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "fal-ai/veo3.1/fast/image-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "fal-ai/veo3.1/fast/reference-to-video": { aspectRatio: true, duration: { format: "seconds", values: [8] } },
-    "fal-ai/veo3.1/first-last-frame-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "fal-ai/veo3.1/image-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "fal-ai/veo3.1/reference-to-video": { aspectRatio: true, duration: { format: "seconds", values: [8] } },
-    "fal-ai/veo3/fast": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "fal-ai/veo3/fast/image-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "fal-ai/veo3/image-to-video": { aspectRatio: true, duration: { format: "seconds", values: [4, 6, 8] } },
-    "google/gemini-omni-flash/v1.1/reference-to-video": { aspectRatio: true, duration: { format: "int", values: range(3, 10) } },
-    "xai/grok-imagine-video/v1.5/image-to-video": { aspectRatio: false, duration: { format: "int", values: range(1, 15) } },
-};
-
 /**
  * The `duration` to send for an endpoint: the number snapped to the nearest value the endpoint
  * accepts, in the format its schema names. `undefined` when the endpoint has no `duration` input
@@ -196,9 +73,9 @@ export const falDurationInput = (modelDefinition: ModelDefinition | undefined, d
         return undefined;
     }
 
-    const spec = modelDefinition && FAL_VIDEO_INPUTS[modelDefinition.modelApiId];
+    const spec = falVideoInputsOf(modelDefinition?.modelApiId);
 
-    if (!spec || spec === "unverified") {
+    if (!spec) {
         return duration;
     }
 
@@ -223,10 +100,27 @@ export const falDurationInput = (modelDefinition: ModelDefinition | undefined, d
 };
 
 /** Whether `aspect_ratio` goes to the endpoint. An unverified endpoint is sent it, as before. */
-export const falAcceptsAspectRatio = (modelDefinition: ModelDefinition | undefined): boolean => {
-    const spec = modelDefinition && FAL_VIDEO_INPUTS[modelDefinition.modelApiId];
+export const falAcceptsAspectRatio = (modelDefinition: ModelDefinition | undefined): boolean =>
+    falVideoInputsOf(modelDefinition?.modelApiId)?.aspectRatio ?? true;
 
-    return !spec || spec === "unverified" || spec.aspectRatio;
+/**
+ * The `generate_audio` and `resolution` fields to send for an endpoint, snapped by
+ * `snapVideoOptions`. A free plan (`premium` false) is held to 1080p. Empty when the endpoint takes
+ * neither, so it can be spread unconditionally.
+ */
+export const falVideoOptionInput = (
+    modelDefinition: ModelDefinition | undefined,
+    options: VideoOptions,
+    premium: boolean,
+): { generate_audio?: boolean; resolution?: string } => {
+    const snapped = snapVideoOptions(modelDefinition?.modelApiId, options);
+    const resolution =
+        snapped.resolution === undefined || premium ? snapped.resolution : resolutionWithinFreePlan(modelDefinition?.modelApiId, snapped.resolution);
+
+    return {
+        ...(snapped.generateAudio !== undefined && { generate_audio: snapped.generateAudio }),
+        ...(resolution !== undefined && { resolution }),
+    };
 };
 
 /**
@@ -238,14 +132,16 @@ export const referenceVideoLimitSeconds = (modelDefinition: ModelDefinition | un
         return undefined;
     }
 
-    return FAL_VIDEO_REFERENCE_FIELDS[modelDefinition.modelApiId]?.totalSeconds;
+    return falVideoInputsOf(modelDefinition.modelApiId)?.references?.totalSeconds;
 };
 
 /**
  * Build the FAL input fragment for the start frame and reference videos and audio, clamped to
  * the model's `maxReferenceImages` / `maxReferenceVideos` / `maxReferenceAudios`. Modalities the
- * endpoint cannot take are dropped, as the image helper does. With no model (an unknown id) only
- * the start frame is sent, as `image_url`.
+ * endpoint cannot take are dropped, as the image helper does. The start frame leads the image
+ * array when the endpoint has one and the registry allows images; otherwise it goes to the
+ * endpoint's start-image field (`image_url` unless the table names another). With no model (an
+ * unknown id) only the start frame is sent, as `image_url`.
  * @returns object to spread into the FAL input. Empty when nothing applies.
  */
 export const buildFalReferenceVideoInput = (
@@ -253,36 +149,32 @@ export const buildFalReferenceVideoInput = (
     references: {
         referenceAudioUrls?: ReadonlyArray<string>;
         referenceVideoUrls?: ReadonlyArray<string>;
-        /** Image-to-video start frame. Becomes the image array's first entry when the endpoint has one. */
+        /** Image-to-video start frame. */
         startFrameUrl?: string;
     },
 ): Record<string, string | string[]> => {
-    const spec: FalVideoReferenceSpec = (modelDefinition && FAL_VIDEO_REFERENCE_FIELDS[modelDefinition.modelApiId]) ?? {};
-    const result: Record<string, string | string[]> = { ...spec.extra };
+    const spec = falVideoInputsOf(modelDefinition?.modelApiId);
+    const fields = spec?.references ?? {};
+    const result: Record<string, string | string[]> = {};
 
-    // An endpoint without an image array takes the start frame as `image_url`.
-    if (references.startFrameUrl && !spec.images) {
-        result.image_url = references.startFrameUrl;
+    if (references.startFrameUrl) {
+        if (fields.images && (modelDefinition?.maxReferenceImages ?? 0) > 0) {
+            result[fields.images] = [references.startFrameUrl];
+        } else {
+            result[spec?.startImage ?? "image_url"] = references.startFrameUrl;
+        }
     }
 
-    const place = (field: FalReferenceField | undefined, urls: ReadonlyArray<string> | undefined, cap: number | undefined) => {
+    const place = (field: string | undefined, urls: ReadonlyArray<string> | undefined, cap: number | undefined) => {
         if (!field || !urls || urls.length === 0 || !cap || cap <= 0) {
             return;
         }
 
-        const clamped = urls.slice(0, cap);
-        const [first] = clamped;
-
-        if (!first) {
-            return;
-        }
-
-        result[field.name] = field.singular ? first : [...clamped];
+        result[field] = urls.slice(0, cap);
     };
 
-    place(spec.images, references.startFrameUrl ? [references.startFrameUrl] : undefined, modelDefinition?.maxReferenceImages);
-    place(spec.videos, references.referenceVideoUrls, modelDefinition?.maxReferenceVideos);
-    place(spec.audios, references.referenceAudioUrls, modelDefinition?.maxReferenceAudios);
+    place(fields.videos, references.referenceVideoUrls, modelDefinition?.maxReferenceVideos);
+    place(fields.audios, references.referenceAudioUrls, modelDefinition?.maxReferenceAudios);
 
     return result;
 };

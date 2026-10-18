@@ -12,9 +12,10 @@ import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { ImageToVideoNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
-import { toBaseOption } from "../../utils/model-options";
+import { toBaseOption, videoModelPatch } from "../../utils/model-options";
 import BaseNode from "./base-node";
 import { VideoFramesSection } from "./video-frames-section";
+import { ReferenceMode, VideoModelOptions } from "./video-model-options";
 
 const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
     const { data, id } = props;
@@ -48,7 +49,7 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
 
     const handleModelChange = (model: string | null) => {
         if (model) {
-            updateNode(id, { model });
+            updateNode(id, videoModelPatch(model, data));
         }
     };
 
@@ -102,6 +103,8 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
                     </Select>
                 </div>
 
+                <ReferenceMode data={data} id={id} modelId={data.model ?? defaultModel} models={models} />
+
                 <div className="space-y-1.5">
                     <Label className="text-muted-foreground text-xs" htmlFor={`${id}-prompt`}>
                         <Trans>Motion Prompt</Trans>
@@ -120,6 +123,8 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
+                    <VideoModelOptions data={data} id={id} modelId={data.model ?? defaultModel} />
+
                     <div className="space-y-1.5">
                         <Label className="text-muted-foreground text-xs">
                             <Trans>Duration: {duration}s</Trans>

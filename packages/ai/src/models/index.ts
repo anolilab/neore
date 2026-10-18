@@ -22,6 +22,16 @@ export {
     parseCustomModelId,
     type ParsedCustomModelId,
 } from "./custom-model-id";
+export {
+    FAL_VIDEO_INPUTS,
+    falVideoInputsOf,
+    type FalVideoInputSpec,
+    FREE_PLAN_MAX_HEIGHT,
+    resolutionWithinFreePlan,
+    snapVideoOptions,
+    type VideoOptions,
+    videoOptionsOf,
+} from "./fal-video-inputs";
 export { FREE_TIER_TEXT_MODELS, requiresPaidPlan } from "./free-tier";
 export {
     DEFAULT_SPEECH_MODEL,

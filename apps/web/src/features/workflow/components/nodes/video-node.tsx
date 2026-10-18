@@ -14,9 +14,10 @@ import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { VideoNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
-import { toBaseOption } from "../../utils/model-options";
+import { toBaseOption, videoModelPatch } from "../../utils/model-options";
 import BaseNode from "./base-node";
 import { VideoFramesSection } from "./video-frames-section";
+import { ReferenceMode, VideoModelOptions } from "./video-model-options";
 
 const ASPECT_RATIOS: { label: MessageDescriptor; value: string }[] = [
     { label: msg`16:9 (Landscape)`, value: "16:9" },
@@ -65,12 +66,12 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
         // Reset model when switching modes
         const newDefaultModel = mode === "image-to-video" ? "fal-ai/kling-video/v1.5/pro/image-to-video" : "fal-ai/mochi-v1";
 
-        updateNode(id, { mode: mode as VideoNodeData["mode"], model: newDefaultModel });
+        updateNode(id, { mode: mode as VideoNodeData["mode"], ...videoModelPatch(newDefaultModel, data) });
     };
 
     const handleModelChange = (model: string | null) => {
         if (model) {
-            updateNode(id, { model });
+            updateNode(id, videoModelPatch(model, data));
         }
     };
 
@@ -166,7 +167,11 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                     )}
                 </div>
 
+                {isImageToVideo && <ReferenceMode data={data} id={id} modelId={data.model ?? defaultModel} models={allModels} />}
+
                 <div className="grid grid-cols-2 gap-3">
+                    <VideoModelOptions data={data} id={id} modelId={data.model ?? defaultModel} />
+
                     {!isImageToVideo && (
                         <div className="space-y-1.5">
                             <Label className="text-muted-foreground text-xs">
