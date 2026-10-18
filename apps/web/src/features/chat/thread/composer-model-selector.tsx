@@ -31,7 +31,8 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
         ...crpc.bots.functions.listBots.queryOptions({}, { live: false }),
         enabled: typeof botId === "string" && botId.length > 0,
     });
-    const isBotThread = typeof botId === "string" && (!botsLoaded || bots.some((bot) => bot._id === botId));
+    const liveBot = bots.find((bot) => bot._id === botId);
+    const isBotThread = typeof botId === "string" && (!botsLoaded || liveBot !== undefined);
 
     // Get current composer mode to show mode-appropriate model for anonymous users
     const storeNewThreadMode = useModelStore((state) => state.newThreadMode);
@@ -41,7 +42,8 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
     // For anonymous users: only show the free router model in text mode.
     // In image/video/audio modes, show the actual model selected by the mode switch
     // so the picker button reflects the correct mode-appropriate model.
-    const effectiveModelId = isAnonymous && currentMode === "text" ? ANONYMOUS_FREE_MODEL : model;
+    // A bot chat shows the bot's current model: runs use it, while the thread may still store an older one.
+    const effectiveModelId = liveBot?.model ?? (isAnonymous && currentMode === "text" ? ANONYMOUS_FREE_MODEL : model);
     const comparisonMode = useModelStore((state) => state.comparisonMode);
     const selectedModelsForComparison = useModelStore((state) => state.selectedModelsForComparison);
     const setComparisonMode = useModelStore((state) => state.setComparisonMode);
