@@ -98,29 +98,77 @@ describe("countedWorkflowFileIds", () => {
     });
 });
 
-describe("grantWorkflowFiles", () => {
-    it("grants a fork's author-held files, file nodes included, and never a foreign one", async () => {
-        const { db } = fakeDb();
-        const inserted: { fileId: string; userId: string }[] = [];
-        const writer = {
-            ...(db as Record<string, unknown>),
-            insert: async (_table: string, row: { fileId: string; userId: string }) => {
-                inserted.push(row);
+/** A `db` for a fork's author: `owner` holds a grant for every file given; the forker holds none yet. */
+const grantDb = (files: { _id: string; mediaType: string }[]) => {
+    const inserted: { fileId: string; userId: string }[] = [];
+    const db = {
+        chatFileAccess: {
+            findMany: async ({ where }: { where: { fileId: { in: string[] }; userId: string } }) => {
+                return {
+                    page:
+                        where.userId === "owner"
+                            ? files
+                                  .filter((file) => where.fileId.in.includes(file._id))
+                                  .map((file) => {
+                                      return { fileId: file._id, userId: "owner" };
+                                  })
+                            : [],
+                };
             },
+        },
+        chatFiles: {
+            findMany: async ({ where }: { where: { _id: { in: string[] } } }) => {
+                return { page: files.filter((file) => where._id.in.includes(file._id)) };
+            },
+        },
+        insert: async (_table: string, row: { fileId: string; userId: string }) => {
+            inserted.push(row);
+        },
+    };
+
+    return { db: db as never, inserted };
+};
+
+describe("grantWorkflowFiles", () => {
+    const files = [
+        { _id: "img", mediaType: "image/png" },
+        { _id: "clip", mediaType: "video/mp4" },
+        { _id: "song", mediaType: "audio/mpeg" },
+        { _id: "doc", mediaType: "application/pdf" },
+    ];
+
+    it("grants a fork the image files and the reference media, and never a document", async () => {
+        const { db, inserted } = grantDb(files);
+        const graph = {
+            nodes: [{ data: { imageFileId: "img" } }, { data: { fileId: "clip" } }, { data: { fileId: "song" } }, { data: { fileId: "doc" } }],
         };
 
-        await grantWorkflowFiles(writer as never, "owner", "forker", {
-            nodes: [{ data: { fileId: "a" } }, { data: { imageFileId: "b" } }, { data: { fileId: "c" } }],
-        });
+        await grantWorkflowFiles(db, "owner", "forker", graph);
 
-        expect(inserted.map((row) => [row.fileId, row.userId]).toSorted((a, b) => a[0]!.localeCompare(b[0]!))).toStrictEqual([
-            ["a", "forker"],
-            ["b", "forker"],
-        ]);
+        expect(inserted.map((row) => row.fileId).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["clip", "img", "song"]);
+        expect(inserted.every((row) => row.userId === "forker")).toBe(true);
+    });
+
+    it("grants a file node's document to nobody, even when the author holds it", async () => {
+        const { db, inserted } = grantDb(files);
+
+        await grantWorkflowFiles(db, "owner", "forker", { nodes: [{ data: { fileId: "doc" } }] });
+
+        expect(inserted).toStrictEqual([]);
     });
 });
 
 describe("signWorkflowImages", () => {
+    it("signs no file-node file, because only an image node's file is given a URL", async () => {
+        const { db, reads } = fakeDb();
+        const getSignedUrl = async (key: string) => `https://signed/${key}`;
+
+        const signed = await signWorkflowImages({ db, storage: { getSignedUrl } as never }, "owner", { nodes: [{ data: { fileId: "a" } }] });
+
+        expect(signed.nodes).toStrictEqual([{ data: { fileId: "a" } }]);
+        expect(reads).toStrictEqual([]);
+    });
+
     it("signs owner-granted files in two batched reads", async () => {
         const { db, reads } = fakeDb();
         const storage = { getSignedUrl: async (key: string) => `https://signed/${key}` };

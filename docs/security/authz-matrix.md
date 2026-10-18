@@ -615,7 +615,7 @@ for a schema table that is neither policed nor listed:
 | `workflow_functions.updateNodeExecution` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `workflow_functions.updateWorkflowContent` | mutation | authMutation + RL | projects | row.userId == caller | ok |
 | `workflow_gallery.browseGallery` | query | publicQuery | projects | none (public rows) | **fixed** (low) — explicit projection without owner id; page size clamped to 50 |
-| `workflow_fork.forkWorkflow` | action | authAction + RL | projects, files (author shard) → files, projects (caller shard) | row.userId == caller | ok — reads only the author's vault rows the public graph names, on the author's shard |
+| `workflow_fork.forkWorkflow` | action | authAction + RL | projects, files (author shard) → files, projects (caller shard) | row.userId == caller | ok — reads only the author's vault rows the public graph names, on the author's shard. Chat-file grants go to the forker for the author's image files and for a file node's reference video or audio only (`workflow/images.ts#grantWorkflowFiles`); a document a file node names is never granted, so its extracted text cannot reach the forker's prompts |
 | `workflow_gallery.getFeaturedWorkflows` | query | publicQuery | projects | none (public rows) | **fixed** (low) — explicit projection without owner id |
 | `workflow_gallery.getPublicWorkflow` | action | publicAction | projects → files (author shard) | share token | **fixed** (low) — explicit projection without owner id or fork lineage. An action: signs on the author's shard |
 | `workflow_gallery.publishWorkflow` | mutation | authMutation + RL | projects | row.userId == caller | ok |

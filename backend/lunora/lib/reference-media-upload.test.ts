@@ -14,7 +14,7 @@ import { CHAT_UPLOAD_CONTENT_MISMATCH, CHAT_UPLOAD_EXPIRED, CHAT_UPLOAD_TOO_LARG
 import { finalizeStagedUpload } from "./chat-upload";
 import type { UploadPurpose } from "./chat-upload-staging";
 import { stagingKeyFor } from "./chat-upload-staging";
-import { finalizeStagedReferenceMedia, isMpegFrameHeader, mpegFrameOffset, referenceMediaMatches } from "./reference-media-upload";
+import { findMpegFrame, finalizeStagedReferenceMedia, isMpegFrameHeader, mpegFrameOffset, referenceMediaMatches } from "./reference-media-upload";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -207,11 +207,11 @@ afterEach(() => {
 
 describe(referenceMediaMatches, () => {
     it("accepts the MP4 and QuickTime brands it knows, and refuses the rest", () => {
-        for (const brand of ["isom", "iso2", "avc1", "mp42", "M4V ", "MSNV"]) {
+        for (const brand of ["isom", "iso2", "iso3", "iso8", "avc1", "mp42", "mp71", "M4V ", "M4VP", "MSNV", "dash", "3gp4", "3gp5"]) {
             expect(referenceMediaMatches(mp4Head(brand), "video/mp4")).toBe(true);
         }
 
-        for (const brand of ["heic", "avif", "M4A ", "qt  "]) {
+        for (const brand of ["heic", "heix", "mif1", "msf1", "avif", "avis", "M4A ", "qt  "]) {
             expect(referenceMediaMatches(mp4Head(brand), "video/mp4")).toBe(false);
         }
 
@@ -239,6 +239,14 @@ describe(referenceMediaMatches, () => {
         expect(referenceMediaMatches(id3, "audio/mpeg", layerThree)).toBe(true);
         expect(referenceMediaMatches(id3, "audio/mpeg")).toBe(false);
         expect(referenceMediaMatches(new Uint8Array([0xff, 0xe0, 0, 0]), "audio/mpeg", new Uint8Array([0xff, 0xe0, 0, 0]))).toBe(false);
+    });
+});
+
+describe(findMpegFrame, () => {
+    it("returns the index of the first valid frame header, or -1", () => {
+        expect(findMpegFrame(new Uint8Array([0, 0, 0xff, 0xfb, 0x90, 0x00]))).toBe(2);
+        expect(findMpegFrame(new Uint8Array([0, 0, 0xff, 0xe0, 0, 0]))).toBe(-1);
+        expect(findMpegFrame(new Uint8Array([0xff, 0xfb]))).toBe(-1);
     });
 });
 
@@ -359,6 +367,22 @@ describe(finalizeStagedReferenceMedia, () => {
 
         expect(await codeOf(finalizeStagedUpload(ctx as never, ALICE, { filename: "clip.mp4", uploadId: UPLOAD }))).toBe(CHAT_UPLOAD_UNSUPPORTED_TYPE);
         expect(objects.has(key)).toBe(false);
+    });
+
+    it("finds an MP3 frame past zero padding after the tag, and refuses one beyond the scan window", async () => {
+        const ctx = actionContext();
+        const frame = [0xff, 0xfb, 0x90, 0x00];
+        const tag = [...ascii("ID3"), 4, 0, 0, 0, 0, 0, 5, 1, 2, 3, 4, 5];
+        const padded = new Uint8Array([...tag, ...new Uint8Array(100), ...frame, ...new Uint8Array(4000)]);
+        const far = new Uint8Array([...tag, ...new Uint8Array(5000), ...frame, ...new Uint8Array(4000)]);
+        const nearId = "ccccccccccccccccccccc";
+        const farId = "ddddddddddddddddddddd";
+
+        stage(ALICE, padded, "audio/mpeg", { uploadId: nearId });
+        await expect(finalize(ctx, ALICE, nearId)).resolves.toHaveProperty("fileId");
+
+        stage(ALICE, far, "audio/mpeg", { uploadId: farId });
+        expect(await codeOf(finalize(ctx, ALICE, farId))).toBe(CHAT_UPLOAD_CONTENT_MISMATCH);
     });
 
     it("stores an MP3 whose ID3 tag leads to a valid frame, and refuses one whose frame is not valid", async () => {

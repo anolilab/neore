@@ -17782,13 +17782,13 @@
     {
       "file": "lib/reference-media-upload",
       "kind": "call",
-      "line": 282,
+      "line": 320,
       "reason": "\"finalizeStagedReferenceMedia\" is not a registered function"
     },
     {
       "file": "lib/reference-media-upload",
       "kind": "call",
-      "line": 292,
+      "line": 330,
       "reason": "\"finalizeStagedReferenceMedia\" is not a registered function"
     },
     {

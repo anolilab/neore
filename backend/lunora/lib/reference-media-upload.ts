@@ -38,8 +38,33 @@ import { signedReadUrl } from "./storage-read";
 /** The leading bytes the type check reads: the brand and the WAVE form sit at 8-11, the MPEG header is 4 bytes. */
 const HEAD_BYTES = 16;
 
-/** The major brands an MP4 may declare (bytes 8-11): ISO base media and the MP4 profiles. HEIC, AVIF and M4A are not video. */
-const MP4_BRANDS: ReadonlySet<string> = new Set(["avc1", "iso2", "iso4", "iso5", "iso6", "isom", "M4V ", "mp41", "mp42", "MSNV"]);
+/**
+ * The major brands an MP4 may declare (bytes 8-11): ISO base media, the MP4
+ * profiles and the 3GPP and DASH forms. HEIC/HEIX/MIF1/MSF1 (images), AVIF/AVIS
+ * (AV1 images) and M4A (audio) are deliberately absent.
+ */
+const MP4_BRANDS: ReadonlySet<string> = new Set([
+    "3gp4",
+    "3gp5",
+    "avc1",
+    "dash",
+    "iso2",
+    "iso3",
+    "iso4",
+    "iso5",
+    "iso6",
+    "iso8",
+    "isom",
+    "M4V ",
+    "M4VP",
+    "mp41",
+    "mp42",
+    "mp71",
+    "MSNV",
+]);
+
+/** How far past the start of the audio (after any ID3 tag) the first MPEG frame header may sit: zero padding and a short run of junk, never a whole file. */
+export const MPEG_SCAN_BYTES = 4096;
 
 /** The QuickTime major brand, `qt` and two spaces. */
 const QUICKTIME_BRAND = "qt  ";
@@ -74,9 +99,19 @@ export const isMpegFrameHeader = (bytes: Uint8Array): boolean => {
     return first === 0xff && (second & 0xe0) === 0xe0 && version !== 0b01 && layer === 0b01 && bitrate !== 0b1111 && sampleRate !== 0b11;
 };
 
+/** The index of the first valid MPEG frame header in `bytes`, or `-1`. */
+export const findMpegFrame = (bytes: Uint8Array): number => {
+    for (let index = 0; index + 4 <= bytes.length; index += 1) {
+        if (isMpegFrameHeader(bytes.subarray(index, index + 4))) {
+            return index;
+        }
+    }
+
+    return -1;
+};
+
 /**
- * Where the first MPEG frame header of a file starts: after an ID3v2 tag when
- * it has one. The tag's size is a syncsafe integer in bytes 6-9, and a footer
+ * Where the audio of a file starts: after an ID3v2 tag when it has one. The tag's size is a syncsafe integer in bytes 6-9, and a footer
  * (flag 0x10) adds ten more bytes.
  */
 export const mpegFrameOffset = (head: Uint8Array): number => {
@@ -94,14 +129,15 @@ export const mpegFrameOffset = (head: Uint8Array): number => {
  * Whether the leading bytes are a `contentType` this path accepts. A container
  * or stream signature, not a parser. MP4 has `ftyp` at 4 and an MP4 major brand
  * at 8; QuickTime has `ftyp` at 4 and `qt  ` at 8 (a QuickTime file that starts
- * with `moov` is refused, which the upload form says). MP3 needs the header of
- * its first frame, passed in as `frameHeader` (see {@link mpegFrameOffset}).
+ * with `moov` is refused, which the upload form says). MP3 needs a valid MPEG
+ * frame header within {@link MPEG_SCAN_BYTES} of the audio's start, passed in as
+ * `mpegWindow`: the bytes from {@link mpegFrameOffset} on (see {@link findMpegFrame}).
  * WAV is `RIFF` at 0 and `WAVE` at 8.
  */
-export const referenceMediaMatches = (head: Uint8Array, contentType: string, frameHeader?: Uint8Array): boolean => {
+export const referenceMediaMatches = (head: Uint8Array, contentType: string, mpegWindow?: Uint8Array): boolean => {
     switch (contentType) {
         case "audio/mpeg": {
-            return frameHeader !== undefined && isMpegFrameHeader(frameHeader);
+            return mpegWindow !== undefined && findMpegFrame(mpegWindow) !== -1;
         }
         case "audio/wav":
         case "audio/x-wav": {
@@ -270,11 +306,13 @@ export const finalizeStagedReferenceMedia = async (
         }
 
         const head = await readRange(ctx, key, 0, Math.min(HEAD_BYTES, metadata.size));
-        const frameOffset = mpegFrameOffset(head);
-        // Only an MP3 needs its frame header: one more small range, when the file holds it.
-        const frameHeader = contentType === "audio/mpeg" && frameOffset + 4 <= metadata.size ? await readRange(ctx, key, frameOffset, 4) : undefined;
+        // Only an MP3 needs its frames: one more range, from the audio's start, bounded
+        // to the scan window, and only when the file holds a frame header there at all.
+        const audioOffset = mpegFrameOffset(head);
+        const windowLength = Math.min(MPEG_SCAN_BYTES + 4, metadata.size - audioOffset);
+        const mpegWindow = contentType === "audio/mpeg" && windowLength >= 4 ? await readRange(ctx, key, audioOffset, windowLength) : undefined;
 
-        if (!referenceMediaMatches(head, contentType, frameHeader)) {
+        if (!referenceMediaMatches(head, contentType, mpegWindow)) {
             throw new LunoraError("BAD_REQUEST", "The file's contents do not match its type.", { data: { code: CHAT_UPLOAD_CONTENT_MISMATCH } });
         }
 

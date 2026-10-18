@@ -116,8 +116,9 @@ export const completeFork = internalMutation
             const keys = new Set(storageKeysInUrlFields(source.workflowContent));
             const granted = await grantOwnedChatFiles(context.db, source.userId, userId, keys);
 
-            // Image and file nodes name their file by id, not by key: grant the ones the
-            // author holds too, before `createProject` counts the fork's images.
+            // Image nodes and reference-media file nodes name their file by id, not by key:
+            // grant the ones the author holds too, before `createProject` counts the fork's
+            // files. A document a file node names is never granted (`images.ts#grantWorkflowFiles`).
             await grantWorkflowFiles(context.db, source.userId, userId, source.workflowContent);
 
             // A guest account gets its fork without the vault copies: a copy costs

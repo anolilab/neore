@@ -6,7 +6,7 @@ const QUEUE = `https://queue.fal.run/${FRAME_EXTRACT_ENDPOINT}`;
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 /** A fake fal queue: submit, then one status poll that is COMPLETED, then the result, then the image. */
-const falQueue = (overrides: { images?: unknown; status?: unknown; submit?: Response } = {}) => {
+const falQueue = (overrides: { images?: unknown; status?: unknown; statusResponse?: Response; submit?: Response } = {}) => {
     const calls: { init?: RequestInit; url: string }[] = [];
     const fake = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
@@ -18,7 +18,7 @@ const falQueue = (overrides: { images?: unknown; status?: unknown; submit?: Resp
         }
 
         if (url.endsWith("/status")) {
-            return json(overrides.status ?? { status: "COMPLETED" });
+            return overrides.statusResponse ?? json(overrides.status ?? { status: "COMPLETED" });
         }
 
         if (url.endsWith("/result")) {
@@ -156,5 +156,22 @@ describe("extractFrameImage", () => {
         expect((error as Error).message).toBe("fal.ai frame extraction timed out");
         expect(polls).toBeGreaterThan(0);
         expect(polls).toBeLessThanOrEqual(EXTRACT_DEADLINE_MS / 1000 + 1);
+    });
+
+    it("refuses a redirect on every request that carries the key, so a 3xx never sends the key onward", async () => {
+        const redirect = new Response(null, { headers: { Location: "https://attacker.example/collect" }, status: 302 });
+        const { calls, fake } = falQueue({ statusResponse: redirect });
+
+        await expect(extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0)).rejects.toThrow("fal.ai frame status failed: 302");
+
+        const keyed = calls.filter((call) => call.url !== "https://v3.fal.media/frame.jpg");
+
+        expect(keyed.map((call) => call.url)).toStrictEqual([QUEUE, "https://queue.fal.run/r/status"]);
+
+        for (const call of keyed) {
+            expect(call.init?.redirect).toBe("error");
+        }
+
+        expect(fake.mock.calls.some(([input]) => String(input).includes("attacker.example"))).toBe(false);
     });
 });

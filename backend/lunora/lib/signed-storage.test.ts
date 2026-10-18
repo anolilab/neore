@@ -2,7 +2,7 @@ import { buildSignedUrl } from "@lunora/storage";
 import type { HttpActionCtx } from "lunorash/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { downloadHeaders, handleSignedGet, keyFromPath, parseRange } from "./signed-storage";
+import { downloadHeaders, handleSignedGet, isInvalidRangeError, keyFromPath, parseRange } from "./signed-storage";
 
 const SECRET = "test-storage-signing-secret-0123456789";
 const ORIGIN = "http://localhost:8788";
@@ -198,7 +198,7 @@ describe("signed GET reads", () => {
         const context = {
             storage: {
                 download: vi.fn(async () => {
-                    throw new Error("range not satisfiable");
+                    throw Object.assign(new Error("The requested range is not satisfiable"), { code: 10_039 });
                 }),
                 getMetadata: vi.fn(async () => {
                     return { key: KEY, size: 10 };
@@ -212,6 +212,41 @@ describe("signed GET reads", () => {
         );
 
         expect(response?.status).toBe(416);
+    });
+
+    it("surfaces a transient R2 failure as an error, not as a 416 or 404", async () => {
+        const context = {
+            storage: {
+                download: vi.fn(async () => {
+                    throw new Error("socket reset");
+                }),
+                getMetadata: vi.fn(async () => {
+                    return { key: KEY, size: 10 };
+                }),
+            },
+        };
+
+        await expect(
+            handleSignedGet(context as unknown as HttpActionCtx, new Request(await sign("GET"), { headers: { Range: "bytes=0-1" } }), OPTIONS),
+        ).rejects.toThrow("socket reset");
+        expect(context.storage.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it("recognises R2's invalid-range error by its code or its message, and nothing else", () => {
+        expect(isInvalidRangeError(Object.assign(new Error("x"), { code: 10_039 }))).toBe(true);
+        expect(isInvalidRangeError(new Error("The requested range is not satisfiable"))).toBe(true);
+        expect(isInvalidRangeError(new Error("socket reset"))).toBe(false);
+        expect(isInvalidRangeError(undefined)).toBe(false);
+    });
+
+    it("reads an end too large to be exact as open-ended, and serves the rest of the object", async () => {
+        const { context, download } = contextWith({ contentType: "video/mp4", text: "0123456789" });
+        const response = await handleSignedGet(context, new Request(await sign("GET"), { headers: { Range: "bytes=0-99999999999999999999" } }), OPTIONS);
+
+        expect(download).toHaveBeenCalledWith(KEY, { range: { offset: 0 } });
+        expect(response?.status).toBe(206);
+        expect(response?.headers.get("Content-Range")).toBe("bytes 0-9/10");
+        expect(await response?.text()).toBe("0123456789");
     });
 
     it("answers 404 when R2 gives back nothing for an object that is gone", async () => {

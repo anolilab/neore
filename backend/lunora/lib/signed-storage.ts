@@ -143,16 +143,37 @@ const readFor = (header: string | null): R2Range | "all" => {
 
     const [, first = "", last = ""] = match;
 
+    // A suffix or an end too large to be an exact integer means "to the end", which is the
+    // open-ended read: R2 then clamps nothing it needs and the object's size settles the rest.
     if (first === "") {
-        return { suffix: Number(last) };
+        return Number.isSafeInteger(Number(last)) ? { suffix: Number(last) } : { offset: 0 };
     }
 
-    if (last !== "" && Number(last) < Number(first)) {
+    const start = Number(first);
+
+    if (last !== "" && Number(last) < start) {
         return "all";
     }
 
-    return last === "" ? { offset: Number(first) } : { length: Number(last) - Number(first) + 1, offset: Number(first) };
+    if (last === "" || !Number.isSafeInteger(start) || !Number.isSafeInteger(Number(last) + 1)) {
+        return { offset: start };
+    }
+
+    return { length: Number(last) - start + 1, offset: start };
 };
+
+/**
+ * R2's own refusal of a span past the end: its `R2Error` carries code 10039
+ * (`The requested range is not satisfiable`). Anything else (a timeout, a reset,
+ * a server fault) is NOT a range answer, and must surface as a failure.
+ */
+const R2_INVALID_RANGE_CODE = 10_039;
+
+export const isInvalidRangeError = (error: unknown): boolean =>
+    typeof error === "object" &&
+    error !== null &&
+    (("code" in error && error.code === R2_INVALID_RANGE_CODE) ||
+        ("message" in error && typeof error.message === "string" && error.message.includes("not satisfiable")));
 
 /**
  * Serves a verified GET or HEAD. A `Range` of one span is answered 206 (the
@@ -207,7 +228,13 @@ export const handleSignedGet = async (context: HttpActionCtx, request: Request, 
 
     // R2 refuses some spans past the end by throwing or answering nothing; the
     // metadata then says whether the object is missing or the span unsatisfiable.
-    const object = await storage.download(key, { range: read }).catch(() => null);
+    const object = await storage.download(key, { range: read }).catch((error: unknown) => {
+        if (isInvalidRangeError(error)) {
+            return null;
+        }
+
+        throw error;
+    });
 
     if (!object) {
         const metadata = await storage.getMetadata(key);

@@ -57,6 +57,8 @@ const assertFalQueueUrl = (value: string | undefined, name: string): string => {
  * whole run pays for the frame again, which is the price of a fresh run, not of this helper.
  */
 export const extractFrameImage = async (videoUrl: string, frame: FrameKind, apiKey: string, pollIntervalMs = POLL_INTERVAL_MS): Promise<Blob> => {
+    // Every request that carries the key refuses a redirect: a 3xx would otherwise be
+    // followed to whatever host it names, with the `Authorization` header.
     const headers = { Authorization: `Key ${apiKey}` };
     const submit = await fetchOk(`https://${FAL_QUEUE_HOST}/${FRAME_EXTRACT_ENDPOINT}`, {
         body: JSON.stringify({ frame_type: FAL_FRAME_TYPE[frame], video_url: videoUrl }),
@@ -64,6 +66,7 @@ export const extractFrameImage = async (videoUrl: string, frame: FrameKind, apiK
         headers: { ...headers, "Content-Type": "application/json" },
         includeBody: true,
         method: "POST",
+        redirect: "error",
     });
     const queued = (await submit.json()) as { response_url?: string; status_url?: string };
 
@@ -77,11 +80,11 @@ export const extractFrameImage = async (videoUrl: string, frame: FrameKind, apiK
     const deadline = Date.now() + EXTRACT_DEADLINE_MS;
 
     while (Date.now() < deadline) {
-        const statusResponse = await fetchOk(statusUrl, { errorPrefix: "fal.ai frame status failed", headers });
+        const statusResponse = await fetchOk(statusUrl, { errorPrefix: "fal.ai frame status failed", headers, redirect: "error" });
         const status = (await statusResponse.json()) as { error?: string; status?: string };
 
         if (status.status === "COMPLETED") {
-            const resultResponse = await fetchOk(resultUrl, { errorPrefix: "fal.ai frame result failed", headers });
+            const resultResponse = await fetchOk(resultUrl, { errorPrefix: "fal.ai frame result failed", headers, redirect: "error" });
             const result = (await resultResponse.json()) as FalExtractResult;
             const image = result.images?.[0];
 

@@ -41,11 +41,32 @@ export const STAGING_TTL_MS = 60 * 60 * 1000;
 /** `@visulima/storage`'s generated ids: nanoid's 21 URL-safe characters. */
 const UPLOAD_ID = /^[\w-]{21}$/u;
 
+/**
+ * The invariant every key in this module rests on: a user id is ONE non-empty
+ * path segment, with no `/`. {@link purposeOfStagingKey} reads the purpose from
+ * the segment count, and a key with an extra slash in the id would otherwise
+ * name another user's prefix. An id that breaks it is a bug, so it throws here
+ * rather than being spelled into a key.
+ */
+export const assertKeySafeUserId = (userId: string): void => {
+    if (userId === "" || userId.includes("/")) {
+        throw new Error("A staging key's user id must be a non-empty path segment without '/'");
+    }
+};
+
 /** The prefix one user's staging objects live under. */
-export const stagingPrefixFor = (userId: string): string => `${STAGING_PREFIX}${userId}/`;
+export const stagingPrefixFor = (userId: string): string => {
+    assertKeySafeUserId(userId);
+
+    return `${STAGING_PREFIX}${userId}/`;
+};
 
 /** The prefix one user's resumable-upload state lives under. */
-export const uploadStatePrefixFor = (userId: string): string => `${UPLOAD_STATE_PREFIX}${userId}/`;
+export const uploadStatePrefixFor = (userId: string): string => {
+    assertKeySafeUserId(userId);
+
+    return `${UPLOAD_STATE_PREFIX}${userId}/`;
+};
 
 /**
  * What an upload is for. Chat is the default and what every object without a
