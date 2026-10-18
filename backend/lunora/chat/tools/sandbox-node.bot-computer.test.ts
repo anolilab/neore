@@ -8,13 +8,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "../../_generated/internal";
 import { getOrCreateBotComputer } from "./sandbox-node";
 
-const { connectSandbox, createSandbox } = vi.hoisted(() => {return {
-    connectSandbox: vi.fn(async (_id: string, _options: unknown) => {return { sandboxId: "sbx-resumed" }}),
-    createSandbox: vi.fn(async (_options: unknown) => {return { sandboxId: "sbx-new" }}),
-}});
+const { connectSandbox, createSandbox } = vi.hoisted(() => {
+    return {
+        connectSandbox: vi.fn(async (_id: string, _options: unknown) => {
+            return { sandboxId: "sbx-resumed" };
+        }),
+        createSandbox: vi.fn(async (_options: unknown) => {
+            return { sandboxId: "sbx-new" };
+        }),
+    };
+});
 
-vi.mock("e2b", () => {return { Sandbox: { connect: connectSandbox, create: createSandbox } }});
-vi.mock("../../env", () => {return { E2B_API_KEY: "test-key" }});
+vi.mock("e2b", () => {
+    return { Sandbox: { connect: connectSandbox, create: createSandbox } };
+});
+vi.mock("../../env", () => {
+    return { E2B_API_KEY: "test-key" };
+});
 
 const LIFETIME_MS = 60 * 60_000;
 
