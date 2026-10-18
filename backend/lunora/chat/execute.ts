@@ -360,6 +360,7 @@ export const runStreamingAgent = internalAction
 
             // Post-stream work: timing and memory extraction, then follow-ups.
             afterRun(ctx, {
+                botId: runContext.botId,
                 extractMemory: runContext.memoryEnabled,
                 firstTokenTime,
                 knowledgeSources: runContext.knowledgeSources,

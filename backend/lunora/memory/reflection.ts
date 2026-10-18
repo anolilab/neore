@@ -31,7 +31,7 @@ import z from "zod/v4";
 
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import type { ActionCtx, MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
@@ -195,7 +195,7 @@ export const claimReflectionRun = internalMutation
 // ============================================================================
 
 export const loadReflectionInputs = internalQuery
-    .input({ now: v.number(), userId: v.string() })
+    .input({ botId: v.optional(v.string()), now: v.number(), userId: v.string() })
     .output(
         v.object({
             memories: v.array(
@@ -215,10 +215,12 @@ export const loadReflectionInputs = internalQuery
             threadTitles: v.array(v.string()),
         }),
     )
-    .query(async ({ args: { now, userId }, ctx }) => {
+    .query(async ({ args: { botId, now, userId }, ctx }) => {
+        // One scope per call: the user's own memories (no bot), or one bot's. Merging, decay and
+        // promotion never cross a scope, so one bot's memory never merges into another's or the user's.
         const rows = await ctx.db
             .query("memories")
-            .withIndex("by_userId_type", (q) => q.eq("userId", userId))
+            .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", (botId ?? null) as Id<"bots"> | null))
             .take(REFLECTION_READ_CAP);
         const memories = rows
             .filter((m) => !m.supersededBy)
@@ -244,9 +246,13 @@ export const loadReflectionInputs = internalQuery
             REFLECTION_LIMITS.maxThreads,
         );
         const threads = await Promise.all(threadIds.map((id) => ctx.db.get(id as Id<"threads">)));
-        const threadTitles = threads
-            .filter((t): t is Doc<"threads"> => t !== null && t.userId === userId && t.isTemporary !== true && t.deleted !== true && !!t.title)
-            .map((t) => t.title!);
+        // Titles only feed the user's digest, so a bot scope reads none.
+        const threadTitles =
+            botId === undefined
+                ? threads
+                      .filter((t): t is Doc<"threads"> => t !== null && t.userId === userId && t.isTemporary !== true && t.deleted !== true && !!t.title)
+                      .map((t) => t.title!)
+                : [];
 
         return { memories, threadTitles };
     });
@@ -277,18 +283,19 @@ const vReflectionOp = v.union(
  * — that a pinned row is never superseded.
  */
 export const applyReflectionOps = internalMutation
-    .input({ ops: v.array(vReflectionOp), userId: v.string() })
+    .input({ botId: v.optional(v.string()), ops: v.array(vReflectionOp), userId: v.string() })
     .output(v.object({ applied: v.number(), promotedIds: v.array(v.string()), textChangedIds: v.array(v.string()) }))
-    .mutation(async ({ args: { ops, userId }, ctx }) => {
+    .mutation(async ({ args: { botId, ops, userId }, ctx }) => {
         const { now } = ctx;
         const promotedIds: string[] = [];
         const textChangedIds: string[] = [];
         let applied = 0;
 
+        // A row outside this scope is refused, so one scope's ops can never write another's rows.
         const active = async (id: string): Promise<Doc<"memories"> | null> => {
             const row = await ctx.db.get(id as Id<"memories">);
 
-            return row?.userId === userId && !row.supersededBy ? row : null;
+            return row?.userId === userId && (row.botId as string | undefined) === botId && !row.supersededBy ? row : null;
         };
 
         for (const op of ops) {
@@ -329,6 +336,7 @@ export const applyReflectionOps = internalMutation
                     }
 
                     const promotedId = await ctx.db.insert("memories", {
+                        botId: botId as Id<"bots"> | undefined,
                         confidence: op.confidence,
                         importance: op.importance,
                         lastConfirmedAt: now,
@@ -411,6 +419,155 @@ const synthesisSchema = z.object({
     summary: z.string(),
 });
 
+type UtilityModel = Awaited<ReturnType<typeof getUtilityModel>>;
+type ReflectionBudget = ReturnType<typeof createReflectionBudget>;
+
+interface ScopeOutcome {
+    applied: number;
+    learned: { memory: string; memoryId: string; type: string }[];
+    stats: { contradictionsResolved: number; decayed: number; merged: number; newMemories: number; promoted: number; retired: number };
+    summary: string;
+}
+
+/**
+ * One scope of the nightly reflection: the user's own memories (`botId` unset) or
+ * one bot's. Each scope is planned, synthesised and written on its own, so no
+ * merge, decay, promotion or contradiction ever crosses a scope. The LLM budget is
+ * the caller's, shared across scopes.
+ */
+const reflectScope = async (
+    ctx: ActionCtx,
+    scope: { botId: string | undefined; budget: ReflectionBudget; model: UtilityModel | undefined; now: number; userId: string },
+): Promise<ScopeOutcome> => {
+    const { botId, budget, model, now, userId } = scope;
+    const inputs = await ctx.runQuery(internal.memory.reflection.loadReflectionInputs, { botId, now, userId });
+    const memories: ReflectionMemory[] = selectReflectionInputs(inputs.memories, now, REFLECTION_LIMITS);
+    const byId = new Map(memories.map((m) => [m.id, m]));
+    const plan = planReflection(memories, now);
+    const learnedToday = memories.filter((m) => m.createdAt >= now - DAY_MS);
+    const ops: ReflectionOp[] = decayToOps(plan);
+
+    // 1. One synthesis call: merge wording, promotion decisions, the digest.
+    let synthesis: z.infer<typeof synthesisSchema> | undefined;
+    const needsSynthesis = plan.merges.length > 0 || plan.promotions.length > 0 || learnedToday.length > 0;
+
+    if (model && needsSynthesis) {
+        const prompt = buildReflectionPrompt({
+            learnedToday: learnedToday.map((m) => m.text),
+            merges: plan.merges,
+            promotions: plan.promotions,
+            threadTitles: inputs.threadTitles,
+        });
+
+        if (budget.tryReserve(estimateTokens(REFLECTION_SYSTEM_PROMPT + prompt))) {
+            try {
+                const result = await generateText({
+                    maxOutputTokens: REFLECTION_LIMITS.maxOutputTokensPerCall,
+                    model,
+                    output: Output.object({ schema: synthesisSchema }),
+                    prompt,
+                    system: REFLECTION_SYSTEM_PROMPT,
+                });
+
+                synthesis = result.output ?? undefined;
+            } catch (error) {
+                console.warn("[memory/reflection] Synthesis call failed, keeping survivor wording:", error);
+            }
+        }
+    }
+
+    const mergedText = new Map((synthesis?.merges ?? []).map((m) => [m.id, m.text.slice(0, REFLECTION_LIMITS.maxMemoryChars)]));
+
+    for (const [index, merge] of plan.merges.entries()) {
+        ops.push(...mergeToOps(merge, byId, now, mergedText.get(index)));
+    }
+
+    const promotionDecisions = synthesis?.promotions ?? [];
+
+    for (const decision of promotionDecisions) {
+        const candidate = plan.promotions[decision.id];
+
+        if (!candidate || decision.type === "none") {
+            continue;
+        }
+
+        const op = promotionToOp(candidate, byId, { memory: decision.text.slice(0, REFLECTION_LIMITS.maxMemoryChars), type: decision.type });
+
+        if (op) {
+            ops.push(op);
+        }
+    }
+
+    // 2. Contradictions, through the extractor's own belief revision.
+    let contradictionsResolved = 0;
+
+    for (const pair of plan.contradictions) {
+        if (!model || !budget.tryReserve(estimateTokens(pair.olderText + pair.newerText) + 200)) {
+            break;
+        }
+
+        try {
+            const decision = await runBeliefRevision(model, pair.olderText, pair.newerText, REFLECTION_LIMITS.maxOutputTokensPerCall);
+            const revisionOps = revisionToOps(pair, decision, now);
+
+            if (revisionOps.length > 0) {
+                contradictionsResolved += 1;
+                ops.push(...revisionOps);
+            }
+        } catch (error) {
+            console.warn("[memory/reflection] Belief revision failed:", error);
+        }
+    }
+
+    // 3. Write, then re-embed whatever changed wording.
+    const result =
+        ops.length > 0
+            ? await ctx.runMutation(internal.memory.reflection.applyReflectionOps, { botId, ops, userId })
+            : { applied: 0, promotedIds: [] as string[], textChangedIds: [] as string[] };
+
+    for (const memoryId of result.textChangedIds) {
+        await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: memoryId as Id<"memories">, userId });
+    }
+
+    // 4. What the digest says about this scope.
+    const superseded = new Set(
+        ops.flatMap((op) => {
+            if (op.kind === "supersede") {
+                return [op.memoryId];
+            }
+
+            return op.kind === "promote" ? op.sourceIds : [];
+        }),
+    );
+    const promoteOps = ops.filter((op): op is Extract<ReflectionOp, { kind: "promote" }> => op.kind === "promote");
+    const learned = [
+        ...promoteOps.flatMap((op, index) => {
+            const memoryId = result.promotedIds[index];
+
+            return memoryId ? [{ memory: op.memory, memoryId, type: op.type as string }] : [];
+        }),
+        ...learnedToday
+            .filter((m) => !superseded.has(m.id))
+            .map((m) => {
+                return { memory: m.text, memoryId: m.id, type: m.type as string };
+            }),
+    ].slice(0, REFLECTION_LIMITS.maxDigestItems);
+
+    return {
+        applied: result.applied,
+        learned,
+        stats: {
+            contradictionsResolved,
+            decayed: plan.decay.length,
+            merged: plan.merges.length,
+            newMemories: learnedToday.length,
+            promoted: result.promotedIds.length,
+            retired: plan.retire.length,
+        },
+        summary: (synthesis?.summary ?? "").trim().slice(0, REFLECTION_LIMITS.maxSummaryChars),
+    };
+};
+
 export const runMemoryReflection = internalAction
     .input({ userId: v.string() })
     .output(v.null())
@@ -424,15 +581,9 @@ export const runMemoryReflection = internalAction
         }
 
         const now = Date.now();
-        const inputs = await ctx.runQuery(internal.memory.reflection.loadReflectionInputs, { now, userId });
-        const memories: ReflectionMemory[] = selectReflectionInputs(inputs.memories, now, REFLECTION_LIMITS);
-        const byId = new Map(memories.map((m) => [m.id, m]));
-        const plan = planReflection(memories, now);
-        const learnedToday = memories.filter((m) => m.createdAt >= now - DAY_MS);
+        // One budget and one model for the whole run: 100 bots must not mean 100 times the LLM calls.
         const budget = createReflectionBudget(REFLECTION_LIMITS);
-        const ops: ReflectionOp[] = decayToOps(plan);
-
-        let model: Awaited<ReturnType<typeof getUtilityModel>> | undefined;
+        let model: UtilityModel | undefined;
 
         try {
             model = await getUtilityModel(gatewayFetch(ctx), { userId });
@@ -440,132 +591,34 @@ export const runMemoryReflection = internalAction
             console.warn("[memory/reflection] Utility model unavailable, applying the deterministic plan only:", error);
         }
 
-        // 1. One synthesis call: merge wording, promotion decisions, the digest.
-        let synthesis: z.infer<typeof synthesisSchema> | undefined;
-        const needsSynthesis = plan.merges.length > 0 || plan.promotions.length > 0 || learnedToday.length > 0;
+        // The user's own memories first, then each bot's, each planned on its own.
+        const botIds = await ctx.runQuery(internal.bots.functions.listBotIdsForUser, { userId });
+        const userScope = await reflectScope(ctx, { botId: undefined, budget, model, now, userId });
+        const botScopes: ScopeOutcome[] = [];
 
-        if (model && needsSynthesis) {
-            const prompt = buildReflectionPrompt({
-                learnedToday: learnedToday.map((m) => m.text),
-                merges: plan.merges,
-                promotions: plan.promotions,
-                threadTitles: inputs.threadTitles,
-            });
-
-            if (budget.tryReserve(estimateTokens(REFLECTION_SYSTEM_PROMPT + prompt))) {
-                try {
-                    const result = await generateText({
-                        maxOutputTokens: REFLECTION_LIMITS.maxOutputTokensPerCall,
-                        model,
-                        output: Output.object({ schema: synthesisSchema }),
-                        prompt,
-                        system: REFLECTION_SYSTEM_PROMPT,
-                    });
-
-                    synthesis = result.output ?? undefined;
-                } catch (error) {
-                    console.warn("[memory/reflection] Synthesis call failed, keeping survivor wording:", error);
-                }
-            }
+        for (const botId of botIds) {
+            botScopes.push(await reflectScope(ctx, { botId, budget, model, now, userId }));
         }
 
-        const mergedText = new Map((synthesis?.merges ?? []).map((m) => [m.id, m.text.slice(0, REFLECTION_LIMITS.maxMemoryChars)]));
+        const applied = userScope.applied + botScopes.reduce((total, scope) => total + scope.applied, 0);
 
-        for (const [index, merge] of plan.merges.entries()) {
-            ops.push(...mergeToOps(merge, byId, now, mergedText.get(index)));
-        }
-
-        const promotionDecisions = synthesis?.promotions ?? [];
-
-        for (const decision of promotionDecisions) {
-            const candidate = plan.promotions[decision.id];
-
-            if (!candidate || decision.type === "none") {
-                continue;
-            }
-
-            const op = promotionToOp(candidate, byId, { memory: decision.text.slice(0, REFLECTION_LIMITS.maxMemoryChars), type: decision.type });
-
-            if (op) {
-                ops.push(op);
-            }
-        }
-
-        // 2. Contradictions, through the extractor's own belief revision.
-        let contradictionsResolved = 0;
-
-        for (const pair of plan.contradictions) {
-            if (!model || !budget.tryReserve(estimateTokens(pair.olderText + pair.newerText) + 200)) {
-                break;
-            }
-
-            try {
-                const decision = await runBeliefRevision(model, pair.olderText, pair.newerText, REFLECTION_LIMITS.maxOutputTokensPerCall);
-                const revisionOps = revisionToOps(pair, decision, now);
-
-                if (revisionOps.length > 0) {
-                    contradictionsResolved += 1;
-                    ops.push(...revisionOps);
-                }
-            } catch (error) {
-                console.warn("[memory/reflection] Belief revision failed:", error);
-            }
-        }
-
-        // 3. Write, then re-embed whatever changed wording.
-        const result =
-            ops.length > 0
-                ? await ctx.runMutation(internal.memory.reflection.applyReflectionOps, { ops, userId })
-                : { applied: 0, promotedIds: [] as string[], textChangedIds: [] as string[] };
-
-        for (const memoryId of result.textChangedIds) {
-            await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: memoryId as Id<"memories">, userId });
-        }
-
-        // 4. The digest.
-        const superseded = new Set(
-            ops.flatMap((op) => {
-                if (op.kind === "supersede") {
-                    return [op.memoryId];
-                }
-
-                return op.kind === "promote" ? op.sourceIds : [];
-            }),
-        );
-        const promoteOps = ops.filter((op): op is Extract<ReflectionOp, { kind: "promote" }> => op.kind === "promote");
-        const learned = [
-            ...promoteOps.flatMap((op, index) => {
-                const memoryId = result.promotedIds[index];
-
-                return memoryId ? [{ memory: op.memory, memoryId, type: op.type as string }] : [];
-            }),
-            ...learnedToday
-                .filter((m) => !superseded.has(m.id))
-                .map((m) => {
-                    return { memory: m.text, memoryId: m.id, type: m.type as string };
-                }),
-        ].slice(0, REFLECTION_LIMITS.maxDigestItems);
-        const stats = {
-            contradictionsResolved,
-            decayed: plan.decay.length,
-            merged: plan.merges.length,
-            newMemories: learnedToday.length,
-            promoted: result.promotedIds.length,
-            retired: plan.retire.length,
-        };
+        // The digest describes the user's own memories. A bot's changes are logged, not summarised.
+        // ponytail: a bot has no digest of its own; add one per bot when someone asks for it.
+        const { learned, stats, summary } = userScope;
 
         if (learned.length > 0 || Object.values(stats).some((count) => count > 0)) {
             await ctx.runMutation(internal.memory.reflection.saveMemoryDigest, {
                 learned,
                 localDay: digestDayOf(now, claim.timeZone),
                 stats,
-                summary: (synthesis?.summary ?? "").trim().slice(0, REFLECTION_LIMITS.maxSummaryChars),
+                summary,
                 userId,
             });
         }
 
         ctx.log.event(REFLECTION_EVENT, {
-            applied: result.applied,
+            applied,
+            botScopes: botIds.length,
             llmCalls: budget.callsUsed,
             outcome: "ran",
             tokensReserved: budget.tokensUsed,

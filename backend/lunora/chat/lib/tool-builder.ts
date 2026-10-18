@@ -123,8 +123,9 @@ const DOCUMENT_TOOLS = [ToolName.CreateDocument, ToolName.UpdateDocument, ToolNa
 const MEMORY_TOOLS = [ToolName.SearchMemory];
 // Knowledge base search is available in all modes
 const KNOWLEDGE_TOOLS = [ToolName.KnowledgeSearch];
+
 // Sandbox tools (shell + file ops) for agentic modes
-const SANDBOX_TOOLS = [ToolName.ShellExecution, ToolName.FileOperations];
+export const SANDBOX_TOOLS = [ToolName.ShellExecution, ToolName.FileOperations];
 // Delegation to an external coding agent (Claude Code / Codex); asks before every run by default
 const CODING_AGENT_TOOLS = [ToolName.DelegateToCodingAgent];
 // Asking the user mid-run: every mode, since any conversation can hit an ambiguity.

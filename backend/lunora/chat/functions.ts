@@ -412,6 +412,7 @@ const vCinemaSettings = v.object({
 export const createThread = authMutation
     .use(rateLimit("chat/create"))
     .input({
+        botId: v.optional(v.string().max(MAX_LENGTH.id)),
         branchName: v.optional(v.string().max(MAX_LENGTH.short)),
         customSystemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         enabledFeatures: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
@@ -431,6 +432,7 @@ export const createThread = authMutation
     .mutation(
         async ({
             args: {
+                botId,
                 branchName,
                 customSystemPrompt,
                 enabledFeatures,
@@ -478,7 +480,15 @@ export const createThread = authMutation
                 }
             }
 
-            const effectiveModel = model || projectDefaults.defaultModel || "gemini-1.5-flash";
+            // A bot chat runs on the bot's model. A bot the caller does not own is a
+            // refusal here, not a silent plain chat.
+            const bot = botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId, userId }) : null;
+
+            if (botId && !bot) {
+                throw new LunoraError("NOT_FOUND", "Bot not found");
+            }
+
+            const effectiveModel = bot?.model || model || projectDefaults.defaultModel || "gemini-1.5-flash";
             const effectiveReasoningEffort = reasoningEffort ?? projectDefaults.defaultReasoningEffort;
             const effectiveEnabledFeatures = enabledFeatures || projectDefaults.defaultEnabledFeatures || [];
 
@@ -502,6 +512,7 @@ export const createThread = authMutation
 
             await context.runMutation(internal.agent.threads.updateThread, {
                 patch: {
+                    botId: botId && bot ? botId : undefined,
                     createdBy: userId,
                     customSystemPrompt: temporary ? undefined : customSystemPrompt,
                     enabledFeatures: temporary ? [] : effectiveEnabledFeatures,
@@ -1051,6 +1062,7 @@ export const getThreadsWithTemporaryFilter = internalQuery
                 v.object({
                     _creationTime: v.number(),
                     _id: v.string(),
+                    botId: v.optional(v.string()),
                     createdAt: v.optional(v.number()),
                     createdBy: v.optional(v.string()),
                     customSystemPrompt: v.optional(v.string()),
@@ -1121,6 +1133,7 @@ export const getThreadSettings = internalQuery
     .output(
         v.union(
             v.object({
+                botId: v.optional(v.string()),
                 customSystemPrompt: v.optional(v.string()),
                 dictationLanguage: v.optional(v.string()),
                 enabledFeatures: v.optional(v.array(v.string())),
@@ -1144,6 +1157,7 @@ export const getThreadSettings = internalQuery
         }
 
         return {
+            botId: thread.botId,
             customSystemPrompt: thread.customSystemPrompt,
             dictationLanguage: thread.dictationLanguage,
             enabledFeatures: thread.enabledFeatures,
@@ -1971,6 +1985,7 @@ export const getPinnedThreads = authQuery
             v.object({
                 _creationTime: v.number(),
                 _id: v.string(),
+                botId: v.optional(v.string()),
                 createdAt: v.optional(v.number()),
                 createdBy: v.optional(v.string()),
                 customSystemPrompt: v.optional(v.string()),
@@ -2045,6 +2060,7 @@ export const getThreadOrders = authQuery
             v.object({
                 _creationTime: v.number(),
                 _id: v.string(),
+                botId: v.optional(v.string()),
                 createdAt: v.optional(v.number()),
                 createdBy: v.optional(v.string()),
                 customSystemPrompt: v.optional(v.string()),

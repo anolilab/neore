@@ -110,6 +110,7 @@ export const tryStartCompression = internalMutation
 
 export const getThreadMemoriesForCompression = internalQuery
     .input({
+        botId: v.optional(v.string()),
         threadId: v.id("threads"),
         userId: v.string(),
     })
@@ -120,20 +121,23 @@ export const getThreadMemoriesForCompression = internalQuery
             .take(500); // safety cap — prevents OOM on very long threads
 
         // Only active (non-superseded) memories from this thread
-        return memories
-            .filter((m) => m.userId === args.userId && !m.supersededBy)
-            .map((m) => {
-                return {
-                    _id: m._id,
-                    confidence: m.confidence,
-                    importance: m.importance,
-                    memory: m.memory,
-                    pinned: m.pinned === true,
-                    source: m.source,
-                    type: m.type as string,
-                    updatedAt: m.updatedAt,
-                };
-            });
+        return (
+            memories
+                // Only the same scope compresses together: a bot's memories with that bot's, the user's with the user's.
+                .filter((m) => m.userId === args.userId && !m.supersededBy && (m.botId as string | undefined) === args.botId)
+                .map((m) => {
+                    return {
+                        _id: m._id,
+                        confidence: m.confidence,
+                        importance: m.importance,
+                        memory: m.memory,
+                        pinned: m.pinned === true,
+                        source: m.source,
+                        type: m.type as string,
+                        updatedAt: m.updatedAt,
+                    };
+                })
+        );
     });
 
 // ============================================================================
@@ -142,11 +146,13 @@ export const getThreadMemoriesForCompression = internalQuery
 
 export const maybeCompressThreadMemories = internalAction
     .input({
+        botId: v.optional(v.string()),
         threadId: v.id("threads"),
         userId: v.string(),
     })
     .action(async ({ args, ctx }) => {
         const threadMemories = (await ctx.runQuery(internal.memory.compress.getThreadMemoriesForCompression, {
+            botId: args.botId,
             threadId: args.threadId,
             userId: args.userId,
         })) as ThreadMemory[];
@@ -169,6 +175,7 @@ export const maybeCompressThreadMemories = internalAction
         }
 
         await ctx.runAction(internal.memory.compress.compressThreadMemories, {
+            botId: args.botId,
             threadId: args.threadId,
             userId: args.userId,
         });
@@ -176,6 +183,7 @@ export const maybeCompressThreadMemories = internalAction
 
 export const compressThreadMemories = internalAction
     .input({
+        botId: v.optional(v.string()),
         threadId: v.id("threads"),
         userId: v.string(),
     })
@@ -191,6 +199,7 @@ export const compressThreadMemories = internalAction
         }
 
         const threadMemories = (await ctx.runQuery(internal.memory.compress.getThreadMemoriesForCompression, {
+            botId: args.botId,
             threadId: args.threadId,
             userId: args.userId,
         })) as ThreadMemory[];
@@ -254,6 +263,7 @@ export const compressThreadMemories = internalAction
             // renders as a required key.
             memories: synthesizedFacts.map((f) => {
                 return {
+                    botId: args.botId,
                     confidence: f.confidence,
                     importance: f.importance,
                     memory: f.memory,

@@ -500,6 +500,13 @@ export const RATE_LIMIT_CONFIGS = {
     "team/updateRole:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/updateSettings:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/updateSettings:premium": Ratelimit.fixedWindow(30, MINUTE),
+    // Bot limits
+    "bots/create:free": Ratelimit.fixedWindow(5, MINUTE),
+    "bots/create:premium": Ratelimit.fixedWindow(20, MINUTE),
+    "bots/delete:free": Ratelimit.fixedWindow(5, MINUTE),
+    "bots/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
+    "bots/update:free": Ratelimit.fixedWindow(10, MINUTE),
+    "bots/update:premium": Ratelimit.fixedWindow(30, MINUTE),
     // Trigger limits
     "triggers/create:free": Ratelimit.fixedWindow(5, MINUTE),
     "triggers/create:premium": Ratelimit.fixedWindow(20, MINUTE),

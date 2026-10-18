@@ -336,6 +336,7 @@ export const getMessageMemoryUsage = authQuery
 // ============================================================================
 
 const vMemoryInsertFields = {
+    botId: v.optional(v.string()),
     confidence: v.optional(v.number()),
     importance: v.optional(v.number()),
     memory: v.string(),
@@ -347,6 +348,7 @@ const vMemoryInsertFields = {
 };
 
 type MemoryInsert = {
+    botId?: string;
     confidence?: number;
     importance?: number;
     memory: string;
@@ -361,6 +363,7 @@ type MemoryInsert = {
 const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now: number): Promise<Id<"memories">> => {
     // `insert` drops `undefined` keys itself — only patches need `withoutUndefined`.
     const memoryId = await ctx.db.insert("memories", {
+        botId: mem.botId as Id<"bots"> | undefined,
         confidence: mem.confidence,
         importance: mem.importance,
         lastConfirmedAt: now,
@@ -446,20 +449,51 @@ export const confirmMemories = internalMutation
         return null;
     });
 
+/**
+ * Memories a run may read or dedupe against. Without `botId` only the user's own
+ * memories (no bot). With `botId`, that bot's memories, plus the user's own ones
+ * when `includeUserWide` (a bot chat reads what the user already knows). Writes
+ * pass `botId` WITHOUT `includeUserWide`: a bot's extraction never matches or
+ * edits a user memory.
+ */
 export const getActiveMemoriesForUser = internalQuery
     .input({
+        botId: v.optional(v.string()),
+        includeUserWide: v.optional(v.boolean()),
         limit: v.optional(v.number()),
         userId: v.string(),
     })
     .query(async ({ args, ctx }) => {
         const limit = args.limit ?? 50;
 
-        // Over-fetch to account for superseded entries being filtered out
-        const memories = await ctx.db
-            .query("memories")
-            .withIndex("by_userId_type", (q) => q.eq("userId", args.userId))
-            .order("desc")
-            .take(limit * 3);
+        // Each scope is read through its own index, so one scope's rows never use up
+        // another's window. A null `botId` is the user's own memories.
+        const scopes: (string | null)[] = [args.botId ?? null];
+
+        if (args.botId !== undefined && args.includeUserWide === true) {
+            scopes.push(null);
+        }
+
+        // Over-fetch to account for superseded entries being filtered out.
+        const perScope = await Promise.all(
+            scopes.map(
+                async (scope) =>
+                    await ctx.db
+                        .query("memories")
+                        .withIndex("by_userId_botId", (q) => q.eq("userId", args.userId).eq("botId", scope as Id<"bots"> | null))
+                        .order("desc")
+                        .take(limit * 3),
+            ),
+        );
+
+        // Merge the scopes in the order each index yields: type descending, then newest first.
+        const memories = perScope.flat().toSorted((a, b) => {
+            if (a.type !== b.type) {
+                return a.type < b.type ? 1 : -1;
+            }
+
+            return b._creationTime - a._creationTime;
+        });
 
         // Filter out superseded memories and limit
         return memories

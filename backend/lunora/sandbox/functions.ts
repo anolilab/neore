@@ -7,6 +7,7 @@
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
+import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
 
@@ -130,15 +131,103 @@ export const checkAndTerminateIdle = internalMutation
         const idleMs = ctx.now - session.lastActivityAt;
         const timeoutMs = session.timeoutMs ?? 300_000;
 
-        if (idleMs >= timeoutMs) {
-            await ctx.db.patch(sessionId, {
-                completedAt: ctx.now,
-                lastActivityAt: ctx.now,
-                status: "terminated",
-            });
-
-            return { sandboxId: session.sandboxId, shouldTerminate: true };
+        if (idleMs < timeoutMs) {
+            // Not idle yet: the cleanup action checks again once the idle window has run out.
+            return { recheckInMs: timeoutMs - idleMs, shouldTerminate: false };
         }
 
-        return { shouldTerminate: false };
+        // A bot's computer keeps its filesystem and memory: it is paused, not killed,
+        // and the next call resumes it (`sandbox-node.ts#getOrCreateBotComputer`).
+        const pause = session.botId !== undefined;
+
+        await ctx.db.patch(
+            sessionId,
+            pause ? { lastActivityAt: ctx.now, status: "paused" } : { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" },
+        );
+
+        return { pause, sandboxId: session.sandboxId, shouldTerminate: true };
+    });
+
+/** A `starting` claim older than this was abandoned mid-create, so the next caller may take over. */
+const STALE_STARTING_MS = 2 * 60_000;
+
+/**
+ * Find-or-create a bot's computer in ONE mutation, so two chats or routines
+ * cannot each create one. The loser sees the winner's row (`created: false`).
+ */
+export const claimBotComputer = internalMutation
+    .input({
+        botId: v.id("bots"),
+        timeoutMs: v.number(),
+        userId: v.string(),
+    })
+    .output(
+        v.object({
+            created: v.boolean(),
+            sandboxId: v.optional(v.string()),
+            sessionId: v.id("sandboxSessions"),
+            status: v.string(),
+        }),
+    )
+    .mutation(async ({ args: { botId, timeoutMs, userId }, ctx }) => {
+        for (const status of ["active", "paused"] as const) {
+            const live = await ctx.db
+                .query("sandboxSessions")
+                .withIndex("by_botId_status", (q) => q.eq("botId", botId).eq("status", status))
+                .first();
+
+            if (live) {
+                return { created: false, sandboxId: live.sandboxId, sessionId: live._id, status };
+            }
+        }
+
+        const starting = await ctx.db
+            .query("sandboxSessions")
+            .withIndex("by_botId_status", (q) => q.eq("botId", botId).eq("status", "starting"))
+            .first();
+
+        if (starting && ctx.now - starting.startedAt < STALE_STARTING_MS) {
+            return { created: false, sessionId: starting._id, status: "starting" };
+        }
+
+        if (starting) {
+            await ctx.db.patch(starting._id, { completedAt: ctx.now, errorMessage: "Abandoned while starting", status: "failed" });
+        }
+
+        const sessionId = await ctx.db.insert("sandboxSessions", {
+            botId,
+            lastActivityAt: ctx.now,
+            startedAt: ctx.now,
+            status: "starting",
+            timeoutMs,
+            userId,
+        });
+
+        return { created: true, sessionId, status: "starting" };
+    });
+
+/**
+ * Retire every computer a bot owns, for bot deletion: mark each session
+ * terminated and schedule its sandbox kill (the kill needs an action).
+ */
+export const retireBotComputers = internalMutation
+    .input({ botId: v.id("bots") })
+    .output(v.null())
+    .mutation(async ({ args: { botId }, ctx }) => {
+        for (const status of ["active", "paused", "starting"] as const) {
+            const sessions = await ctx.db
+                .query("sandboxSessions")
+                .withIndex("by_botId_status", (q) => q.eq("botId", botId).eq("status", status))
+                .take(50);
+
+            for (const session of sessions) {
+                await ctx.db.patch(session._id, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
+
+                if (session.sandboxId) {
+                    await ctx.scheduler.runAfter(0, internal.sandbox.cleanup.killSandboxById, { sandboxId: session.sandboxId });
+                }
+            }
+        }
+
+        return null;
     });

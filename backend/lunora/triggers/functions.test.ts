@@ -10,7 +10,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { createTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import { assertComputerRoutine, createTrigger, updateTrigger, updateTriggerStats } from "./functions";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
 // session is read straight off the harness identity.
@@ -114,5 +114,39 @@ describe("trigger schedules", () => {
         await expect(as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)).resolves.toMatchObject({
             triggerId: expect.any(String),
         });
+    });
+});
+describe("a routine's bot computer", () => {
+    it("needs a bot and a schedule", () => {
+        expect(() => assertComputerRoutine({ botComputer: true, botId: undefined, type: "schedule" })).toThrow("Only a routine with a bot");
+        expect(() => assertComputerRoutine({ botComputer: true, botId: "bot-a", type: "webhook" })).toThrow("Only a scheduled routine");
+        expect(() => assertComputerRoutine({ botComputer: true, botId: "bot-a", type: "schedule" })).not.toThrow();
+        expect(() => assertComputerRoutine({ botComputer: false, botId: undefined, type: "webhook" })).not.toThrow();
+    });
+
+    it("is cleared with the bot, so a routine with no bot has no computer", async () => {
+        const triggerId = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("triggers", {
+                    botComputer: true,
+                    botId: "bot-a",
+                    createdAt: 1,
+                    cronExpression: "0 9 * * 1",
+                    enabled: false,
+                    model: "m",
+                    name: "Daily",
+                    triggerCount: 0,
+                    type: "schedule",
+                    updatedAt: 1,
+                    userId: "user-a",
+                }),
+        )) as string;
+
+        await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { botId: null, triggerId } as never);
+
+        const cleared = await readTrigger(triggerId);
+
+        expect(cleared.botId).toBeUndefined();
+        expect(cleared.botComputer).toBeUndefined();
     });
 });

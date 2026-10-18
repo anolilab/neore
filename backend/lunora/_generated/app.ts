@@ -567,6 +567,7 @@ class AppBuilder<Env extends object> {
             ["aiUserPreferences", { mode: { field: "userId", kind: "shardBy" } }],
             ["apikey", { mode: { kind: "global" } }],
             ["auditLog", { mode: { kind: "global" } }],
+            ["bots", { mode: { field: "userId", kind: "shardBy" } }],
             ["browserActions", { mode: { kind: "root" } }],
             ["browserExtensions", { mode: { field: "userId", kind: "shardBy" } }],
             ["browserSessions", { mode: { field: "userId", kind: "shardBy" } }],

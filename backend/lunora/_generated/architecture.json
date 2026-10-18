@@ -1231,6 +1231,41 @@
       "to": "function:auth_billing:applyCreemSubscription"
     },
     {
+      "from": "function:bots_functions:createBot",
+      "kind": "read",
+      "to": "table:bots"
+    },
+    {
+      "from": "function:bots_functions:createBot",
+      "kind": "write",
+      "to": "table:bots"
+    },
+    {
+      "from": "function:bots_functions:deleteBot",
+      "kind": "call",
+      "to": "function:sandbox_functions:retireBotComputers"
+    },
+    {
+      "from": "function:bots_functions:deleteBot",
+      "kind": "write",
+      "to": "table:bots"
+    },
+    {
+      "from": "function:bots_functions:listBotIdsForUser",
+      "kind": "read",
+      "to": "table:bots"
+    },
+    {
+      "from": "function:bots_functions:listBots",
+      "kind": "read",
+      "to": "table:bots"
+    },
+    {
+      "from": "function:bots_gdpr:collectBotsForExport",
+      "kind": "read",
+      "to": "table:bots"
+    },
+    {
       "from": "function:browser_functions:closeSession",
       "kind": "write",
       "to": "table:browserSessions"
@@ -1494,6 +1529,11 @@
       "from": "function:chat_functions:createThread",
       "kind": "call",
       "to": "function:agent_threads:updateThread"
+    },
+    {
+      "from": "function:chat_functions:createThread",
+      "kind": "call",
+      "to": "function:bots_functions:getBotForRun"
     },
     {
       "from": "function:chat_functions:createThread",
@@ -2483,47 +2523,7 @@
     {
       "from": "function:chat_tools_sandbox_node:executeCode",
       "kind": "call",
-      "to": "function:sandbox_functions:closeSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeCode",
-      "kind": "call",
-      "to": "function:sandbox_functions:createSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeCode",
-      "kind": "call",
-      "to": "function:sandbox_functions:getActiveSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeCode",
-      "kind": "call",
       "to": "function:sandbox_functions:logAction"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeCode",
-      "kind": "call",
-      "to": "function:sandbox_functions:updateSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeCode",
-      "kind": "schedule",
-      "to": "function:sandbox_cleanup:checkAndTerminateSandbox"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeFileOperation",
-      "kind": "call",
-      "to": "function:sandbox_functions:closeSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeFileOperation",
-      "kind": "call",
-      "to": "function:sandbox_functions:createSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeFileOperation",
-      "kind": "call",
-      "to": "function:sandbox_functions:getActiveSession"
     },
     {
       "from": "function:chat_tools_sandbox_node:executeFileOperation",
@@ -2531,44 +2531,9 @@
       "to": "function:sandbox_functions:logAction"
     },
     {
-      "from": "function:chat_tools_sandbox_node:executeFileOperation",
-      "kind": "call",
-      "to": "function:sandbox_functions:updateSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeFileOperation",
-      "kind": "schedule",
-      "to": "function:sandbox_cleanup:checkAndTerminateSandbox"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeShellCommand",
-      "kind": "call",
-      "to": "function:sandbox_functions:closeSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeShellCommand",
-      "kind": "call",
-      "to": "function:sandbox_functions:createSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeShellCommand",
-      "kind": "call",
-      "to": "function:sandbox_functions:getActiveSession"
-    },
-    {
       "from": "function:chat_tools_sandbox_node:executeShellCommand",
       "kind": "call",
       "to": "function:sandbox_functions:logAction"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeShellCommand",
-      "kind": "call",
-      "to": "function:sandbox_functions:updateSession"
-    },
-    {
-      "from": "function:chat_tools_sandbox_node:executeShellCommand",
-      "kind": "schedule",
-      "to": "function:sandbox_cleanup:checkAndTerminateSandbox"
     },
     {
       "from": "function:chat_translate:translateMessage",
@@ -4448,6 +4413,11 @@
     {
       "from": "function:memory_reflection:runMemoryReflection",
       "kind": "call",
+      "to": "function:bots_functions:listBotIdsForUser"
+    },
+    {
+      "from": "function:memory_reflection:runMemoryReflection",
+      "kind": "call",
       "to": "function:memory_reflection:applyReflectionOps"
     },
     {
@@ -5221,7 +5191,22 @@
       "to": "function:sandbox_functions:checkAndTerminateIdle"
     },
     {
+      "from": "function:sandbox_cleanup:checkAndTerminateSandbox",
+      "kind": "schedule",
+      "to": "function:sandbox_cleanup:checkAndTerminateSandbox"
+    },
+    {
       "from": "function:sandbox_functions:checkAndTerminateIdle",
+      "kind": "write",
+      "to": "table:sandboxSessions"
+    },
+    {
+      "from": "function:sandbox_functions:claimBotComputer",
+      "kind": "read",
+      "to": "table:sandboxSessions"
+    },
+    {
+      "from": "function:sandbox_functions:claimBotComputer",
       "kind": "write",
       "to": "table:sandboxSessions"
     },
@@ -5244,6 +5229,21 @@
       "from": "function:sandbox_functions:logAction",
       "kind": "write",
       "to": "table:sandboxActions"
+    },
+    {
+      "from": "function:sandbox_functions:retireBotComputers",
+      "kind": "read",
+      "to": "table:sandboxSessions"
+    },
+    {
+      "from": "function:sandbox_functions:retireBotComputers",
+      "kind": "schedule",
+      "to": "function:sandbox_cleanup:killSandboxById"
+    },
+    {
+      "from": "function:sandbox_functions:retireBotComputers",
+      "kind": "write",
+      "to": "table:sandboxSessions"
     },
     {
       "from": "function:sandbox_functions:updateSession",
@@ -5294,11 +5294,6 @@
       "from": "function:sandbox_pool:replenishPool",
       "kind": "call",
       "to": "function:sandbox_pool:createWarmSandbox"
-    },
-    {
-      "from": "function:sandbox_pty:default",
-      "kind": "call",
-      "to": "function:sandbox_functions:logAction"
     },
     {
       "from": "function:sandbox_workspace_sync_functions:getWorkspaceMetadata",
@@ -5808,6 +5803,11 @@
     {
       "from": "function:triggers_execute:default",
       "kind": "call",
+      "to": "function:bots_functions:getBotForRun"
+    },
+    {
+      "from": "function:triggers_execute:default",
+      "kind": "call",
       "to": "function:triggers_functions:admitTriggerRun"
     },
     {
@@ -5834,6 +5834,11 @@
       "from": "function:triggers_functions:createExecution",
       "kind": "write",
       "to": "table:triggerExecutions"
+    },
+    {
+      "from": "function:triggers_functions:createTrigger",
+      "kind": "call",
+      "to": "function:bots_functions:getBotForRun"
     },
     {
       "from": "function:triggers_functions:createTrigger",
@@ -5902,8 +5907,8 @@
     },
     {
       "from": "function:triggers_functions:updateTrigger",
-      "kind": "write",
-      "to": "table:triggers"
+      "kind": "call",
+      "to": "function:bots_functions:getBotForRun"
     },
     {
       "from": "function:triggers_schedule:checkDueTriggers",
@@ -8231,6 +8236,55 @@
       "kind": "function",
       "name": "billing.webhook.processCreemWebhook",
       "module": "billing"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:bots_functions:createBot",
+      "kind": "function",
+      "name": "bots.functions.createBot",
+      "module": "bots"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:bots_functions:deleteBot",
+      "kind": "function",
+      "name": "bots.functions.deleteBot",
+      "module": "bots"
+    },
+    {
+      "detail": "query",
+      "id": "function:bots_functions:getBotForRun",
+      "kind": "function",
+      "name": "bots.functions.getBotForRun",
+      "module": "bots"
+    },
+    {
+      "detail": "query",
+      "id": "function:bots_functions:listBotIdsForUser",
+      "kind": "function",
+      "name": "bots.functions.listBotIdsForUser",
+      "module": "bots"
+    },
+    {
+      "detail": "query",
+      "id": "function:bots_functions:listBots",
+      "kind": "function",
+      "name": "bots.functions.listBots",
+      "module": "bots"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:bots_functions:updateBot",
+      "kind": "function",
+      "name": "bots.functions.updateBot",
+      "module": "bots"
+    },
+    {
+      "detail": "query",
+      "id": "function:bots_gdpr:collectBotsForExport",
+      "kind": "function",
+      "name": "bots.gdpr.collectBotsForExport",
+      "module": "bots"
     },
     {
       "detail": "mutation",
@@ -12707,10 +12761,24 @@
       "module": "sandbox"
     },
     {
+      "detail": "action",
+      "id": "function:sandbox_cleanup:killSandboxById",
+      "kind": "function",
+      "name": "sandbox.cleanup.killSandboxById",
+      "module": "sandbox"
+    },
+    {
       "detail": "mutation",
       "id": "function:sandbox_functions:checkAndTerminateIdle",
       "kind": "function",
       "name": "sandbox.functions.checkAndTerminateIdle",
+      "module": "sandbox"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:sandbox_functions:claimBotComputer",
+      "kind": "function",
+      "name": "sandbox.functions.claimBotComputer",
       "module": "sandbox"
     },
     {
@@ -12739,6 +12807,13 @@
       "id": "function:sandbox_functions:logAction",
       "kind": "function",
       "name": "sandbox.functions.logAction",
+      "module": "sandbox"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:sandbox_functions:retireBotComputers",
+      "kind": "function",
+      "name": "sandbox.functions.retireBotComputers",
       "module": "sandbox"
     },
     {
@@ -13953,6 +14028,12 @@
       "module": "admin"
     },
     {
+      "id": "table:bots",
+      "kind": "table",
+      "name": "bots",
+      "module": "bots"
+    },
+    {
       "id": "table:browserActions",
       "kind": "table",
       "name": "browserActions",
@@ -14811,6 +14892,13 @@
         "payment_sessions",
         "payment_subscriptions",
         "payment_usageEvents"
+      ]
+    },
+    {
+      "description": "Persistent bots: a named persona with its own routines, memory and computer, owned by one user.",
+      "name": "bots",
+      "tables": [
+        "bots"
       ]
     },
     {
@@ -15710,7 +15798,7 @@
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1381,
+      "line": 1382,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -15934,6 +16022,18 @@
       "kind": "call",
       "line": 120,
       "reason": "\"handleCreemWebhook\" is not a registered function"
+    },
+    {
+      "file": "bots/gdpr",
+      "kind": "read",
+      "line": 13,
+      "reason": "\"eraseBotsForUser\" is not a registered function"
+    },
+    {
+      "file": "bots/gdpr",
+      "kind": "write",
+      "line": 20,
+      "reason": "\"eraseBotsForUser\" is not a registered function"
     },
     {
       "file": "browser/gdpr",
@@ -16208,79 +16308,91 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 458,
+      "line": 459,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 492,
+      "line": 493,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 620,
+      "line": 557,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 621,
+      "line": 567,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 630,
+      "line": 645,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 667,
+      "line": 646,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 694,
+      "line": 655,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 806,
+      "line": 692,
+      "reason": "\"runChatStart\" is not a registered function"
+    },
+    {
+      "file": "chat/http",
+      "kind": "call",
+      "line": 719,
+      "reason": "\"runChatStart\" is not a registered function"
+    },
+    {
+      "file": "chat/http",
+      "kind": "call",
+      "line": 831,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 821,
+      "line": 846,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 932,
+      "line": 957,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 940,
+      "line": 965,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1079,
+      "line": 1104,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1105,
+      "line": 1130,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
@@ -16310,97 +16422,103 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 294,
+      "line": 299,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 328,
+      "line": 333,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 329,
+      "line": 334,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 337,
+      "line": 342,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 448,
+      "line": 355,
+      "reason": "\"loadRunContext\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 475,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 460,
+      "line": 487,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 469,
+      "line": 496,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 481,
+      "line": 508,
       "reason": "\"afterRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "schedule",
-      "line": 499,
+      "line": 526,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 590,
+      "line": 618,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 598,
+      "line": 626,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 609,
+      "line": 637,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 679,
+      "line": 707,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 772,
+      "line": 800,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 790,
+      "line": 818,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 796,
+      "line": 824,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -16454,19 +16572,25 @@
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 118,
+      "line": 120,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 186,
+      "line": 181,
+      "reason": "\"runHeadlessAgent\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/headless-run",
+      "kind": "call",
+      "line": 194,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "schedule",
-      "line": 192,
+      "line": 200,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
@@ -16818,9 +16942,111 @@
       "reason": "the default export is not a registered function"
     },
     {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 59,
+      "reason": "\"getOrCreateBotComputer\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 76,
+      "reason": "\"getOrCreateBotComputer\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 81,
+      "reason": "\"getOrCreateBotComputer\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 99,
+      "reason": "\"getOrCreateBotComputer\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 108,
+      "reason": "\"getOrCreateBotComputer\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "schedule",
+      "line": 120,
+      "reason": "\"getOrCreateBotComputer\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 122,
+      "reason": "\"getOrCreateBotComputer\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 142,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 145,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 153,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 165,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 172,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 181,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 194,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "schedule",
+      "line": 201,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 203,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
       "file": "chat/tools/search-memory",
       "kind": "call",
-      "line": 36,
+      "line": 38,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "chat/tools/search-memory",
+      "kind": "call",
+      "line": 42,
       "reason": "the default export is not a registered function"
     },
     {
@@ -17402,19 +17628,19 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 72,
+      "line": 70,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 77,
+      "line": 73,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 79,
+      "line": 78,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
@@ -17432,31 +17658,37 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 92,
+      "line": 82,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 118,
+      "line": 93,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 138,
+      "line": 120,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 147,
+      "line": 140,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 152,
+      "line": 149,
+      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/export-workflow",
+      "kind": "call",
+      "line": 154,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
@@ -17774,19 +18006,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 764,
+      "line": 771,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 853,
+      "line": 860,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 895,
+      "line": 902,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
@@ -18328,6 +18560,24 @@
       "kind": "write",
       "line": 31,
       "reason": "\"eraseSandboxSessionsForUser\" is not a registered function"
+    },
+    {
+      "file": "sandbox/pty",
+      "kind": "call",
+      "line": 79,
+      "reason": "\"runPtyCommand\" is not a registered function"
+    },
+    {
+      "file": "sandbox/pty",
+      "kind": "call",
+      "line": 135,
+      "reason": "\"runPtyCommand\" is not a registered function"
+    },
+    {
+      "file": "sandbox/pty",
+      "kind": "call",
+      "line": 153,
+      "reason": "\"runPtyCommand\" is not a registered function"
     },
     {
       "file": "skills/agent-creation",

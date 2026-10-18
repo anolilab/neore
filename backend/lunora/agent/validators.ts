@@ -671,6 +671,8 @@ export const vThreadDocFields = {
     // Written only by `agent/branches.ts` (the switcher, regenerate, edit), so
     // deliberately not a create field.
     activeLeafMessageId: v.optional(v.string()),
+    // Written once by `chat/functions.ts#createThread`, which checks the bot belongs to the caller.
+    botId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.

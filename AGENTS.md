@@ -813,7 +813,9 @@ The same window shipped [#1030](https://github.com/anolilab/lunora/pull/1030):
 `lint:types` showed it. After a codegen bump, compare
 `cat backend/lunora/_generated/{api,internal}.ts | grep -c "unknown>"` with the
 previous count (35 on codegen 214, 235, 246 and 279 — the GDPR export
-collectors' untyped arrays; 31 on 207, against 157 on 205). Run codegen twice
+collectors' untyped arrays; 36 once the bots export collector joined them, its
+`v.array(v.any())` kept on purpose so a new bot column cannot fail the export;
+31 on 207, against 157 on 205). Run codegen twice
 after a change that renames references: inference reads the source, and a
 reference codegen cannot resolve yet types its caller's output `unknown`. When probing
 generated output, run `tsc` per project: `vis run lint:types` re-runs the

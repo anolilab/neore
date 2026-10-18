@@ -1,5 +1,6 @@
 import z from "zod/v4";
 
+import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 
 /**
@@ -31,7 +32,12 @@ const searchMemoryTool = createTool<{ limit?: number; query: string }, { memorie
         try {
             // In a thread shared with them, this user's memories are on their own
             // shard, not the owner's this turn runs on (`servesUser`).
-            const memoryArgs = { searchText: query, userId: context.userId };
+            // On a bot thread the bot's memories are searched too. A collaborator's own memories never
+            // carry the owner's bot id, so this adds nothing for them.
+            const thread = context.threadId
+                ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: context.threadId as Id<"threads"> })
+                : null;
+            const memoryArgs = { botId: thread?.botId, searchText: query, userId: context.userId };
             const memories = servesUser(context.userId)
                 ? await context.runAction(internal.memory.retrieve.retrieveRelevantMemories, memoryArgs)
                 : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, memoryArgs, { shardKey: context.userId });

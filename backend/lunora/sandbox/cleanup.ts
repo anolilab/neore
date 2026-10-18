@@ -1,8 +1,10 @@
 /**
  * Sandbox Cleanup
  *
- * Scheduled function that checks if a sandbox session is idle
- * and terminates it if it has exceeded its timeout.
+ * Scheduled function that checks if a sandbox session is idle. An idle thread
+ * sandbox is killed; an idle bot computer is paused, so its state survives until
+ * the next call resumes it. A session that is not idle yet is checked again when
+ * its idle window runs out.
  */
 import { v } from "lunorash/server";
 
@@ -21,7 +23,15 @@ export const checkAndTerminateSandbox = internalAction
             sessionId,
         });
 
-        if (result.shouldTerminate && result.sandboxId && E2B_API_KEY) {
+        if (!result.shouldTerminate) {
+            if (result.recheckInMs !== undefined) {
+                await ctx.scheduler.runAfter(result.recheckInMs + 1000, internal.sandbox.cleanup.checkAndTerminateSandbox, { sessionId });
+            }
+
+            return;
+        }
+
+        if (result.sandboxId && E2B_API_KEY) {
             // Loaded on use, like every e2b import — see `sandbox/pty.ts`.
             const { Sandbox } = await import("e2b");
 
@@ -30,10 +40,33 @@ export const checkAndTerminateSandbox = internalAction
                     apiKey: E2B_API_KEY,
                 });
 
-                await sandbox.kill();
+                if (result.pause) {
+                    await sandbox.pause();
+                } else {
+                    await sandbox.kill();
+                }
             } catch {
                 // Sandbox may already be gone — that's fine
             }
+        }
+    });
+
+/** Kill a sandbox by id, for a retired bot computer. Best-effort: it may have timed out already. */
+export const killSandboxById = internalAction
+    .input({
+        sandboxId: v.string(),
+    })
+    .action(async ({ args: { sandboxId } }) => {
+        if (!E2B_API_KEY) {
+            return;
+        }
+
+        try {
+            const { Sandbox } = await import("e2b");
+
+            await Sandbox.kill(sandboxId, { apiKey: E2B_API_KEY });
+        } catch {
+            // Already gone — nothing to kill.
         }
     });
 

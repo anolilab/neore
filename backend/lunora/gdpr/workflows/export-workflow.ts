@@ -67,6 +67,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         const tasks = await context.step.do("collect-tasks", async () => await context.run(internal.tasks.gdpr.collectTasksForExport, { userId }));
         const memories = await context.step.do("collect-memories", async () => await context.run(internal.memory.gdpr.collectMemoriesForExport, { userId }));
         const evals = await context.step.do("collect-evals", async () => await context.run(internal.evals.gdpr.collectEvalsForExport, { userId }));
+        const bots = await context.step.do("collect-bots", async () => await context.run(internal.bots.gdpr.collectBotsForExport, { userId }));
         const codingAgentRuns = await context.step.do(
             "collect-coding-agent-runs",
             async () => await context.run(internal.coding_agents.gdpr.collectCodingAgentRunsForExport, { userId }),
@@ -91,6 +92,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             async () =>
                 await context.run(internal.gdpr.steps.generateExportFile, {
                     activity,
+                    bots,
                     codingAgentRuns,
                     conversations,
                     devices,

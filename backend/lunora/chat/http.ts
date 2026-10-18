@@ -429,7 +429,8 @@ const runChatStartOnShard = async (
 ): Promise<Response> => {
     // Force anonymous users onto free model
     const isAnonymous = user.isAnonymous === true;
-    const effectiveModel = isAnonymous ? ANONYMOUS_FREE_MODEL : body.model;
+    // Reassigned once, below, when the thread belongs to a bot.
+    let effectiveModel = isAnonymous ? ANONYMOUS_FREE_MODEL : body.model;
 
     // Determine content type
     const modelDefinition = MODEL_LOOKUP.get(effectiveModel);
@@ -544,6 +545,30 @@ const runChatStartOnShard = async (
 
     if (access && !access.hasAccess) {
         return Response.json({ error: "Thread not found" }, { status: 404 });
+    }
+
+    // A bot thread always runs on its bot's model, whatever the composer sent. It is
+    // set here, before any write, so the stream config and the agent both see it.
+    // Bots chat in text only, so a media model is refused rather than swapped.
+    // A regenerate skips the access check above, so it reads the thread itself.
+    let threadBotId = access?.thread?.botId;
+
+    if (!threadBotId && validThreadId && body.regenerate && body.parentId) {
+        const ownThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
+
+        threadBotId = ownThread?.botId;
+    }
+
+    if (threadBotId) {
+        if (contentType !== "text") {
+            return Response.json({ error: "A bot chats in text only." }, { status: 400 });
+        }
+
+        const bot = await context.runQuery(internal.bots.functions.getBotForRun, { botId: threadBotId, userId });
+
+        if (bot) {
+            effectiveModel = bot.model;
+        }
     }
 
     // Build streaming config

@@ -9,6 +9,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
+import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 
@@ -35,8 +36,10 @@ export const executeTrigger = internalAction
 
         const { userId } = trigger;
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
-        const model = trigger.model || DEFAULT_CHAT_MODEL;
-        const { systemPrompt } = trigger;
+        // A bot routine runs on the bot's model, with the bot's instructions ahead of the routine's own.
+        const bot = trigger.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: trigger.botId, userId }) : null;
+        const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
+        const systemPrompt = [bot?.instructions, trigger.systemPrompt].filter(Boolean).join("\n\n") || undefined;
         const triggerType = trigger.type;
 
         // 2. Create execution log entry
@@ -92,14 +95,20 @@ export const executeTrigger = internalAction
             }
 
             // 4. Run the agent in a new thread (auto-continue: up to 25 steps)
+            // A scheduled bot routine may use the bot's shell and file tools, and only those.
+            // Headless runs drop `ask` tools, so each one still needs the owner's `auto` setting.
+            // A bot with its computer off gets no computer here: the sandbox lookup would fall back to a throwaway one.
+            const useComputer = bot?.computerEnabled === true && trigger.botComputer === true && trigger.type === "schedule";
             const { text: responseText, threadId } = await runHeadlessAgent(ctx, {
+                botId: bot ? trigger.botId : undefined,
                 memory: true,
                 model,
                 personalization: "full",
                 prompt: inputMessage,
                 system: systemPrompt,
                 thread: { title: `Trigger: ${trigger.name}` },
-                tools: "none",
+                toolAllowlist: useComputer ? SANDBOX_TOOLS : undefined,
+                tools: useComputer ? "headless" : "none",
                 userId,
             });
 

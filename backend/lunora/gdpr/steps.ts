@@ -410,6 +410,9 @@ export const generateExportFile = internalAction
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
         conversations: v.any(),
+        // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        bots: v.optional(v.any()),
         // Paired devices and their call audit (`devices/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         devices: v.optional(v.any()),
@@ -452,6 +455,7 @@ export const generateExportFile = internalAction
                 email: args.userEmail,
                 id: args.userId,
             },
+            bots: args.bots ?? { bots: [] },
             devices: args.devices ?? { calls: [], devices: [] },
             evals: args.evals ?? { datasets: [] },
             exportDate: new Date().toISOString(),

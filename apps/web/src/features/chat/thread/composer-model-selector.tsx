@@ -1,6 +1,8 @@
 "use client";
 
+import { useLingui } from "@lingui/react/macro";
 import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
+import { useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
 
 import { ModelPickerButton } from "@/components/model-picker";
@@ -8,15 +10,28 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/stores/model-store";
 import useModelCombobox from "@/features/chat/model-settings/use-model-combobox";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 interface ComposerModelSelectorProps {
     className?: string;
 }
 
 const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) => {
-    const { model, threadId } = useChatThread();
+    const { t } = useLingui();
+    const { model, thread, threadId } = useChatThread();
     const { changeModel } = useModelCombobox({ threadId });
     const { isAnonymous } = useIsAnonymous();
+
+    // A bot's thread always runs on the bot's model (the server enforces it), so the picker is locked.
+    const botId = thread?.botId ?? null;
+    // Lock only while the bot still exists: a deleted bot leaves its chats behind, as plain chats. The
+    // bot list is read only for a bot thread, so ordinary threads add no query.
+    const crpc = useCRPC();
+    const { data: bots = [] } = useQuery({
+        ...crpc.bots.functions.listBots.queryOptions({}, { live: false }),
+        enabled: typeof botId === "string" && botId.length > 0,
+    });
+    const isBotThread = typeof botId === "string" && bots.some((bot) => bot._id === botId);
 
     // Get current composer mode to show mode-appropriate model for anonymous users
     const storeNewThreadMode = useModelStore((state) => state.newThreadMode);
@@ -52,17 +67,21 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
         "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 w-[200px] dark:text-white";
 
     return (
-        <ModelPickerButton
-            className={baseClassName}
-            includeCustomModels
-            modelId={effectiveModelId}
-            onSelect={handleSelect}
-            onSelectMultiple={handleSelectMultiple}
-            selectedModelIds={
-                !isAnonymous && comparisonMode && selectedModelsForComparison.length >= MIN_COMPARISON_MODELS ? selectedModelsForComparison : undefined
-            }
-            size="sm"
-        />
+        <>
+            <ModelPickerButton
+                className={baseClassName}
+                disabled={isBotThread}
+                includeCustomModels
+                modelId={effectiveModelId}
+                onSelect={handleSelect}
+                onSelectMultiple={handleSelectMultiple}
+                selectedModelIds={
+                    !isAnonymous && comparisonMode && selectedModelsForComparison.length >= MIN_COMPARISON_MODELS ? selectedModelsForComparison : undefined
+                }
+                size="sm"
+            />
+            {isBotThread && <span className="text-muted-foreground text-xs">{t`The bot sets the model for this chat.`}</span>}
+        </>
     );
 };
 

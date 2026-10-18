@@ -168,6 +168,7 @@ const orgShared = (options: { orgAdminWrites: boolean }): TableRules => {
 const OWNER_TABLES = [
     "account",
     "aiUserPreferences",
+    "bots",
     "browserExtensions",
     "browserSessions",
     "chatImportJobs",
