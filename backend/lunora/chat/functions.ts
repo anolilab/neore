@@ -2602,9 +2602,10 @@ export const branchThread = authAction
         });
         const newThreadId: string = newThread._id;
 
-        if (branchName) {
+        // A fork of a bot chat stays that bot's chat: its runs need the bot's persona and scoped memory.
+        if (branchName || parentThread.botId) {
             await context.runMutation(internal.agent.threads.updateThread, {
-                patch: { title: branchName },
+                patch: { ...(branchName && { title: branchName }), ...(parentThread.botId && { botId: parentThread.botId }) },
                 threadId: newThreadId as Id<"threads">,
             });
         }

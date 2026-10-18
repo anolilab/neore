@@ -2818,19 +2818,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["botId"] !== "string") return DEFER;
 return { "botId": source["botId"] };
 });
-installCompiledValidatorMap(lunora_bots_functions_34.getBotForRun.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["botId"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "botId": source["botId"], "userId": source["userId"] };
-});
-installCompiledValidatorMap(lunora_bots_functions_34.listBotIdsForUser.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "userId": source["userId"] };
-});
 installCompiledValidatorMap(lunora_bots_gdpr_35.collectBotsForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -7028,26 +7015,11 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["sandboxId"] !== "string") return DEFER;
 return { "sandboxId": source["sandboxId"] };
 });
-installCompiledValidatorMap(lunora_sandbox_functions_141.activateBotComputer.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["sandboxId"] !== "string") return DEFER;
-if (typeof source["sessionId"] !== "string") return DEFER;
-return { "sandboxId": source["sandboxId"], "sessionId": source["sessionId"] };
-});
 installCompiledValidatorMap(lunora_sandbox_functions_141.checkAndTerminateIdle.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sessionId"] !== "string") return DEFER;
 return { "sessionId": source["sessionId"] };
-});
-installCompiledValidatorMap(lunora_sandbox_functions_141.claimBotComputer.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["botId"] !== "string") return DEFER;
-if (typeof source["timeoutMs"] !== "number" || !Number.isFinite(source["timeoutMs"])) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "botId": source["botId"], "timeoutMs": source["timeoutMs"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_sandbox_functions_141.closeSession.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

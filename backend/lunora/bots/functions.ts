@@ -142,7 +142,7 @@ export const deleteBot = authMutation
 
 /** Every bot id a user owns, for a run that works through each bot's own memories (`memory/reflection.ts`). */
 export const listBotIdsForUser = internalQuery
-    .input({ userId: v.string() })
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(v.array(v.string()))
     .query(async ({ args: { userId }, ctx }) => {
         const bots = await ctx.db
@@ -159,7 +159,7 @@ export const listBotIdsForUser = internalQuery
  * `chat/lib/agent-run.ts` (a missing bot reads as a plain chat).
  */
 export const getBotForRun = internalQuery
-    .input({ botId: v.string(), userId: v.string() })
+    .input({ botId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.object({ computerEnabled: v.boolean(), instructions: v.string(), model: v.string(), name: v.string() }), v.null()))
     .query(async ({ args: { botId, userId }, ctx }) => {
         const bot = await ctx.db.get(botId as Id<"bots">);

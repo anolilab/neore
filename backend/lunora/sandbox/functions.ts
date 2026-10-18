@@ -11,6 +11,7 @@ import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
+import { MAX_LENGTH } from "../lib/validators";
 
 export const getActiveSession = internalQuery
     .input({
@@ -160,7 +161,7 @@ export const claimBotComputer = internalMutation
     .input({
         botId: v.id("bots"),
         timeoutMs: v.number(),
-        userId: v.string(),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(
         v.object({
@@ -248,7 +249,7 @@ export const retireBotComputers = internalMutation
  * other state means it was replaced or retired meanwhile, and the caller must kill its sandbox.
  */
 export const activateBotComputer = internalMutation
-    .input({ sandboxId: v.string(), sessionId: v.id("sandboxSessions") })
+    .input({ sandboxId: v.string().max(MAX_LENGTH.id), sessionId: v.id("sandboxSessions") })
     .output(v.boolean())
     .mutation(async ({ args: { sandboxId, sessionId }, ctx }) => {
         const session = await ctx.db.get(sessionId);

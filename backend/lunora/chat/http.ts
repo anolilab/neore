@@ -559,15 +559,16 @@ const runChatStartOnShard = async (
         threadBotId = ownThread?.botId;
     }
 
-    if (threadBotId) {
+    // A chat whose bot was deleted is a plain chat again, so the bot rules apply only to a bot that still exists.
+    const bot = threadBotId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: threadBotId, userId }) : null;
+
+    if (bot) {
         if (contentType !== "text") {
             return Response.json({ error: "A bot chats in text only." }, { status: 400 });
         }
 
-        const bot = await context.runQuery(internal.bots.functions.getBotForRun, { botId: threadBotId, userId });
-
         // Anonymous callers stay on the free model, as they always do: the bot's model does not lift that.
-        if (bot && !isAnonymous) {
+        if (!isAnonymous) {
             effectiveModel = bot.model;
         }
     }

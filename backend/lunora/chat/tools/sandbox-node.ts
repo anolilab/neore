@@ -93,19 +93,19 @@ export const getOrCreateBotComputer = async (
         }
     }
 
+    let sandbox: Sandbox | undefined;
+
     try {
         // At its lifetime cap E2B pauses the computer rather than killing it, so its files survive for the next call.
-        const sandbox = await Sandbox.create({
+        sandbox = await Sandbox.create({
             apiKey: E2B_API_KEY,
             lifecycle: { autoResume: false, onTimeout: "pause" },
             timeoutMs: BOT_COMPUTER_LIFETIME_MS,
         });
 
         // Refused when the bot's computer was retired, or this claim went stale and was replaced, while
-        // the sandbox was starting: then this sandbox is the extra one, so it is killed.
+        // the sandbox was starting: then this sandbox is the extra one, and the catch below kills it.
         if (!(await context.runMutation(internal.sandbox.functions.activateBotComputer, { sandboxId: sandbox.sandboxId, sessionId: claim.sessionId }))) {
-            await sandbox.kill();
-
             throw new Error("Your computer was retired while it was starting.");
         }
 
@@ -113,6 +113,10 @@ export const getOrCreateBotComputer = async (
 
         return { isNew: true, sandbox, sessionId: claim.sessionId };
     } catch (error) {
+        // A sandbox made but not adopted by its session must not run on outside the session. Its kill
+        // is best effort: a failed kill still leaves the sandbox to E2B's own lifetime cap.
+        await sandbox?.kill().catch(() => undefined);
+
         await context.runMutation(internal.sandbox.functions.closeSession, {
             errorMessage: error instanceof Error ? error.message : String(error),
             sessionId: claim.sessionId,
