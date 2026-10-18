@@ -519,7 +519,7 @@ const NODE_CONFIGS: Record<WorkflowNodeType, NodeConfig> = {
             fps: 24,
             label: "Image to Video",
             loop: false,
-            model: "fal-ai/kling-video/v1.5/pro/image-to-video",
+            model: MEDIA_DEFAULT_MODELS.imageToVideo,
             motionStrength: 0.5,
         } as ImageToVideoNodeData,
         defaultLabel: msg`Image to Video`,

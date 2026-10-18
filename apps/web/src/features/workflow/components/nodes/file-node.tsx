@@ -39,11 +39,11 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [trimCandidate, setTrimCandidate] = useState<{ file: File; url: string } | null>(null);
-    const [canTrim, setCanTrim] = useState(false);
     const lunora = useLunora();
 
     useEffect(() => {
-        void canTrimVideo().then(setCanTrim);
+        // Start the support probe early (it is answered once per page); a video drop waits for it.
+        void canTrimVideo();
     }, []);
 
     // The preview url is a blob of the whole video (up to 50 MB): revoke it when the node goes away with the dialog open.
@@ -114,8 +114,9 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
                 return;
             }
 
-            // A video is trimmed first, so its size limit applies to the kept part, not the source.
-            if (canTrim && referenceMediaTypeOf(file.name, file.type)?.startsWith("video/")) {
+            // A video is trimmed first, so its size limit applies to the kept part, not the source. The support
+            // probe is answered once per page; wait for it so an early drop is not sent down the plain upload.
+            if (referenceMediaTypeOf(file.name, file.type)?.startsWith("video/") && (await canTrimVideo())) {
                 setTrimCandidate({ file, url: URL.createObjectURL(file) });
 
                 return;
@@ -123,7 +124,7 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
 
             await upload(file);
         },
-        [canTrim, upload],
+        [upload],
     );
 
     const { getInputProps, getRootProps, isDragActive } = useDropzone({

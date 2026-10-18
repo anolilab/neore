@@ -35,7 +35,7 @@ const LAST_USED_KEYS: Partial<Record<WorkflowNodeType, ReadonlyArray<string>>> =
     "character-ref": ["model", "strength"] satisfies ReadonlyArray<keyof CharacterRefNodeData>,
     controlnet: ["model", "controlType", "strength", "startPercent", "endPercent", "preprocessor"] satisfies ReadonlyArray<keyof ControlNetNodeData>,
     image: ["model", "aspectRatio", "numImages"] satisfies ReadonlyArray<keyof ImageNodeData>,
-    "image-to-video": ["model", "duration", "fps", "motionStrength", "loop"] satisfies ReadonlyArray<keyof ImageToVideoNodeData>,
+    "image-to-video": ["model", "duration", "fps", "motionStrength", "loop", "generateAudio", "resolution"] satisfies ReadonlyArray<keyof ImageToVideoNodeData>,
     img2img: ["model", "strength"] satisfies ReadonlyArray<keyof Img2ImgNodeData>,
     inpaint: ["model"] satisfies ReadonlyArray<keyof InpaintNodeData>,
     "object-editor": ["model"] satisfies ReadonlyArray<keyof ObjectEditorNodeData>,
@@ -44,7 +44,7 @@ const LAST_USED_KEYS: Partial<Record<WorkflowNodeType, ReadonlyArray<string>>> =
     "style-ref": ["model", "strength", "preserveContent"] satisfies ReadonlyArray<keyof StyleRefNodeData>,
     transcription: ["model", "language"] satisfies ReadonlyArray<keyof TranscriptionNodeData>,
     upscale: ["model", "scale", "enhanceDetails", "enhanceFace"] satisfies ReadonlyArray<keyof UpscaleNodeData>,
-    video: ["model", "aspectRatio", "duration", "fps", "motionStrength"] satisfies ReadonlyArray<keyof VideoNodeData>,
+    video: ["model", "aspectRatio", "duration", "fps", "motionStrength", "generateAudio", "resolution"] satisfies ReadonlyArray<keyof VideoNodeData>,
 };
 
 /**

@@ -8756,11 +8756,11 @@ msgstr "Narysuj maskę"
 msgid "Drawing tools"
 msgstr "Narzędzia do rysowania"
 
-#: src/features/workflow/components/nodes/file-node.tsx:181
+#: src/features/workflow/components/nodes/file-node.tsx:182
 msgid "Drop file here"
 msgstr "Upuść plik tutaj"
 
-#: src/features/workflow/components/nodes/file-node.tsx:181
+#: src/features/workflow/components/nodes/file-node.tsx:182
 msgid "Drop file or click to upload"
 msgstr "Upuść plik lub kliknij, aby przesłać"
 
@@ -22209,7 +22209,7 @@ msgid "Remove endpoint?"
 msgstr "Usunąć endpoint?"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:158
+#: src/features/workflow/components/nodes/file-node.tsx:159
 msgid "Remove file"
 msgstr "Usuń plik"
 
@@ -28671,7 +28671,7 @@ msgstr "Przesyłanie danych do importu z {0}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:174
+#: src/features/workflow/components/nodes/file-node.tsx:175
 msgid "Uploading..."
 msgstr "Przesyłanie..."
 

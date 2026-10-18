@@ -15380,7 +15380,7 @@
     {
       "file": "agent/files",
       "kind": "write",
-      "line": 329,
+      "line": 333,
       "reason": "\"copyFileHandler\" is not a registered function"
     },
     {
@@ -17792,13 +17792,13 @@
     {
       "file": "lib/reference-media-upload",
       "kind": "call",
-      "line": 328,
+      "line": 330,
       "reason": "\"finalizeStagedReferenceMedia\" is not a registered function"
     },
     {
       "file": "lib/reference-media-upload",
       "kind": "call",
-      "line": 338,
+      "line": 340,
       "reason": "\"finalizeStagedReferenceMedia\" is not a registered function"
     },
     {
@@ -17882,13 +17882,13 @@
     {
       "file": "lib/upload-route",
       "kind": "call",
-      "line": 217,
+      "line": 220,
       "reason": "\"handleUploadRequest\" is not a registered function"
     },
     {
       "file": "lib/upload-route",
       "kind": "schedule",
-      "line": 227,
+      "line": 230,
       "reason": "\"handleUploadRequest\" is not a registered function"
     },
     {

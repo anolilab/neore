@@ -8756,11 +8756,11 @@ msgstr "Disegna maschera"
 msgid "Drawing tools"
 msgstr "Strumenti di disegno"
 
-#: src/features/workflow/components/nodes/file-node.tsx:181
+#: src/features/workflow/components/nodes/file-node.tsx:182
 msgid "Drop file here"
 msgstr "Rilascia qui il file"
 
-#: src/features/workflow/components/nodes/file-node.tsx:181
+#: src/features/workflow/components/nodes/file-node.tsx:182
 msgid "Drop file or click to upload"
 msgstr "Rilascia un file o fai clic per caricarlo"
 
@@ -22209,7 +22209,7 @@ msgid "Remove endpoint?"
 msgstr "Rimuovere l'endpoint?"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:158
+#: src/features/workflow/components/nodes/file-node.tsx:159
 msgid "Remove file"
 msgstr "Rimuovi file"
 
@@ -28671,7 +28671,7 @@ msgstr "Caricamento dei dati da importare da {0}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:174
+#: src/features/workflow/components/nodes/file-node.tsx:175
 msgid "Uploading..."
 msgstr "Caricamento..."
 

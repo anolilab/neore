@@ -8756,11 +8756,11 @@ msgstr "Maske zeichnen"
 msgid "Drawing tools"
 msgstr "Zeichenwerkzeuge"
 
-#: src/features/workflow/components/nodes/file-node.tsx:181
+#: src/features/workflow/components/nodes/file-node.tsx:182
 msgid "Drop file here"
 msgstr "Datei hier ablegen"
 
-#: src/features/workflow/components/nodes/file-node.tsx:181
+#: src/features/workflow/components/nodes/file-node.tsx:182
 msgid "Drop file or click to upload"
 msgstr "Datei ablegen oder zum Hochladen klicken"
 
@@ -22209,7 +22209,7 @@ msgid "Remove endpoint?"
 msgstr "Endpunkt entfernen?"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:158
+#: src/features/workflow/components/nodes/file-node.tsx:159
 msgid "Remove file"
 msgstr "Datei entfernen"
 
@@ -28671,7 +28671,7 @@ msgstr "Daten für Import von {0} werden hochgeladen..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:174
+#: src/features/workflow/components/nodes/file-node.tsx:175
 msgid "Uploading..."
 msgstr "Wird hochgeladen..."
 

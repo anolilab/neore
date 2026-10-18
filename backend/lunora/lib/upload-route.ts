@@ -193,6 +193,9 @@ export const handleUploadRequest = async (
     }
 
     const creating = request.method === "POST";
+    // Only the create names the object (and so its purpose): the provider keeps that name in the upload's state, and
+    // PATCH/HEAD/DELETE address the upload by id, so a continuation writes to the key chosen here. The test
+    // "a reference-media upload, from its create to finalize" drives the real handler through PATCH to prove it.
     const purpose = creating ? declaredPurpose(request) : undefined;
 
     if (creating && purpose === undefined) {

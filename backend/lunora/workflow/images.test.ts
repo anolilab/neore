@@ -11,7 +11,19 @@ const content = (...ids: string[]) => {
     };
 };
 
-/** A `db` holding chat files `a`–`d`, with `owner` granted all but `c`, and `d` gone (grant left behind). */
+/** A workflow whose file nodes name `ids` by `fileId`: a reference-media node, or a legacy document node. */
+const fileNodes = (...ids: string[]) => {
+    return {
+        nodes: ids.map((fileId) => {
+            return { data: { fileId } };
+        }),
+    };
+};
+
+/**
+ * A `db` holding chat files: `a` a document, `b` an image, `v` a video and `m` audio, all granted to `owner`;
+ * `c` a video granted to someone else only; `d` granted to `owner` but gone.
+ */
 const fakeDb = () => {
     const reads: string[] = [];
     const grants = [
@@ -19,11 +31,15 @@ const fakeDb = () => {
         { fileId: "b", userId: "owner" },
         { fileId: "c", userId: "someone-else" },
         { fileId: "d", userId: "owner" },
+        { fileId: "v", userId: "owner" },
+        { fileId: "m", userId: "owner" },
     ];
     const files = [
-        { _id: "a", storageId: "agent-files/a" },
-        { _id: "b", storageId: "agent-files/b" },
-        { _id: "c", storageId: "agent-files/c" },
+        { _id: "a", mediaType: "application/pdf", storageId: "agent-files/a" },
+        { _id: "b", mediaType: "image/png", storageId: "agent-files/b" },
+        { _id: "c", mediaType: "video/mp4", storageId: "agent-files/c" },
+        { _id: "v", mediaType: "video/mp4", storageId: "agent-files/v" },
+        { _id: "m", mediaType: "audio/mpeg", storageId: "agent-files/m" },
     ];
 
     const db = {
@@ -53,7 +69,7 @@ describe("workflowFileIds", () => {
         expect(workflowFileIds({ nodes: "nope" })).toStrictEqual([]);
     });
 
-    it("includes a file node's reference media, so a saved workflow keeps it from the unused-file sweep", () => {
+    it("lists a file node's file as a candidate; countedWorkflowFileIds decides whether it counts", () => {
         expect(workflowFileIds({ nodes: [{ data: { fileId: "v", fileName: "clip.mp4", fileType: "video/mp4" } }, { data: { fileId: "a" } }] })).toStrictEqual([
             "v",
             "a",
@@ -77,17 +93,43 @@ describe("countedWorkflowFileIds", () => {
     it("counts only existing files the owner holds a grant for, before and after", async () => {
         const { db } = fakeDb();
 
-        await expect(countedWorkflowFileIds(db, "owner", content("a", "c"), content("a", "b", "c", "d"))).resolves.toStrictEqual({
-            next: ["a", "b"],
-            previous: ["a"],
+        await expect(countedWorkflowFileIds(db, "owner", content("b", "c"), content("b", "d", "c", "a"))).resolves.toStrictEqual({
+            next: ["b", "a"],
+            previous: ["b"],
         });
     });
 
-    it("counts a file node's file for its owner, and nothing for a foreign file id", async () => {
+    it("counts a reference video or audio file node for its owner, once on add and once on release", async () => {
         const { db } = fakeDb();
-        const fileNodes = { nodes: [{ data: { fileId: "a" } }, { data: { fileId: "c" } }] };
 
-        await expect(countedWorkflowFileIds(db, "owner", undefined, fileNodes)).resolves.toStrictEqual({ next: ["a"], previous: [] });
+        await expect(countedWorkflowFileIds(db, "owner", undefined, fileNodes("v", "m"))).resolves.toStrictEqual({ next: ["v", "m"], previous: [] });
+        await expect(countedWorkflowFileIds(db, "owner", fileNodes("v"), undefined)).resolves.toStrictEqual({ next: [], previous: ["v"] });
+    });
+
+    it("releases the old file and counts the new one when a node swaps its file", async () => {
+        const { db } = fakeDb();
+
+        await expect(countedWorkflowFileIds(db, "owner", fileNodes("v"), fileNodes("m"))).resolves.toStrictEqual({ next: ["m"], previous: ["v"] });
+    });
+
+    it("never counts a document a file node names, so a legacy workflow releases nothing it never added", async () => {
+        const { db } = fakeDb();
+
+        await expect(countedWorkflowFileIds(db, "owner", fileNodes("a"), undefined)).resolves.toStrictEqual({ next: [], previous: [] });
+        await expect(countedWorkflowFileIds(db, "owner", undefined, fileNodes("a"))).resolves.toStrictEqual({ next: [], previous: [] });
+    });
+
+    it("counts a document while an image node names it, and not once it only sits in a file node", async () => {
+        const { db } = fakeDb();
+
+        await expect(countedWorkflowFileIds(db, "owner", content("a"), fileNodes("a"))).resolves.toStrictEqual({ next: [], previous: ["a"] });
+    });
+
+    it("keeps nothing alive for a foreign or missing file id, and never decrements it", async () => {
+        const { db } = fakeDb();
+
+        await expect(countedWorkflowFileIds(db, "owner", fileNodes("c", "missing"), undefined)).resolves.toStrictEqual({ next: [], previous: [] });
+        await expect(countedWorkflowFileIds(db, "owner", undefined, fileNodes("c", "missing"))).resolves.toStrictEqual({ next: [], previous: [] });
     });
 
     it("reads nothing for content without files", async () => {
@@ -163,9 +205,9 @@ describe("signWorkflowImages", () => {
         const { db, reads } = fakeDb();
         const getSignedUrl = async (key: string) => `https://signed/${key}`;
 
-        const signed = await signWorkflowImages({ db, storage: { getSignedUrl } as never }, "owner", { nodes: [{ data: { fileId: "a" } }] });
+        const signed = await signWorkflowImages({ db, storage: { getSignedUrl } as never }, "owner", { nodes: [{ data: { fileId: "v" } }] });
 
-        expect(signed.nodes).toStrictEqual([{ data: { fileId: "a" } }]);
+        expect(signed.nodes).toStrictEqual([{ data: { fileId: "v" } }]);
         expect(reads).toStrictEqual([]);
     });
 
@@ -173,12 +215,12 @@ describe("signWorkflowImages", () => {
         const { db, reads } = fakeDb();
         const storage = { getSignedUrl: async (key: string) => `https://signed/${key}` };
 
-        const signed = await signWorkflowImages({ db, storage: storage as never }, "owner", content("a", "c", "a"));
+        const signed = await signWorkflowImages({ db, storage: storage as never }, "owner", content("b", "c", "b"));
 
         expect(signed.nodes.map((node) => (node.data as { imageUrl?: string }).imageUrl)).toStrictEqual([
-            "https://signed/agent-files/a",
+            "https://signed/agent-files/b",
             undefined,
-            "https://signed/agent-files/a",
+            "https://signed/agent-files/b",
         ]);
         expect(reads).toStrictEqual(["chatFileAccess", "chatFiles"]);
     });

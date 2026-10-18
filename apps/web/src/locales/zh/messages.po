@@ -8756,11 +8756,11 @@ msgstr "绘制蒙版"
 msgid "Drawing tools"
 msgstr "绘图工具"
 
-#: src/features/workflow/components/nodes/file-node.tsx:181
+#: src/features/workflow/components/nodes/file-node.tsx:182
 msgid "Drop file here"
 msgstr "将文件拖放到此处"
 
-#: src/features/workflow/components/nodes/file-node.tsx:181
+#: src/features/workflow/components/nodes/file-node.tsx:182
 msgid "Drop file or click to upload"
 msgstr "拖放文件或点击上传"
 
@@ -22209,7 +22209,7 @@ msgid "Remove endpoint?"
 msgstr "移除端点？"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:158
+#: src/features/workflow/components/nodes/file-node.tsx:159
 msgid "Remove file"
 msgstr "移除文件"
 
@@ -28671,7 +28671,7 @@ msgstr "正在上传来自 {0} 的数据以便导入..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:174
+#: src/features/workflow/components/nodes/file-node.tsx:175
 msgid "Uploading..."
 msgstr "正在上传..."
 

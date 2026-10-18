@@ -6,6 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
+import { countedWorkflowFileIds } from "../workflow/images";
 import { addFile, changeRefcount, isUnusedFileDue, UNREFERENCED_FILE_GRACE_MS, UNTOUCHED_FILE_RETENTION_MS } from "./files";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -84,5 +85,85 @@ describe("changeRefcount", () => {
         expect(restored.refcount).toBe(1);
         expect(restored).not.toHaveProperty("unreferencedSince");
         expect(isUnusedFileDue(restored, Date.now() + UNTOUCHED_FILE_RETENTION_MS + UNREFERENCED_FILE_GRACE_MS)).toBe(false);
+    });
+
+    it("never takes a refcount below zero, and leaves a never-referenced upload unstamped", async () => {
+        const { fileId } = await store();
+
+        await reference([fileId], []);
+
+        const released = await row(fileId);
+
+        expect(released.refcount).toBe(0);
+        expect(released).not.toHaveProperty("unreferencedSince");
+    });
+});
+
+const storeAs = async (filename: string, mediaType: string, userId = "user-owner") =>
+    (await harness.run(
+        async (ctx: any) => await ctx.runMutation(addFile, { filename, hash: filename, mediaType, storageId: `agent-files/${filename}`, userId }),
+    )) as { fileId: string };
+
+const refcountOf = async (fileId: string): Promise<number> => {
+    const file = await row(fileId);
+
+    return file.refcount;
+};
+
+/** What a workflow write does to the refcount: the same pair `recountWorkflowImages` feeds `changeRefcount`. */
+const workflowWrite = async (previousContent: unknown, nextContent: unknown) => {
+    await harness.run(async (ctx: any) => {
+        const { next, previous } = await countedWorkflowFileIds(ctx.db, "user-owner", previousContent, nextContent);
+
+        await changeRefcount(ctx, previous, next);
+    });
+};
+
+const fileNode = (fileId: string) => {
+    return { nodes: [{ data: { fileId } }] };
+};
+
+describe("a workflow's file nodes against the refcount", () => {
+    it("a legacy document file node does not release the reference a chat message holds", async () => {
+        const { fileId } = await storeAs("notes.pdf", "application/pdf");
+
+        await reference([], [fileId]);
+        await workflowWrite(fileNode(fileId), undefined);
+
+        expect(await refcountOf(fileId)).toBe(1);
+    });
+
+    it("counts a reference video when a node adds it, and releases it once when the node is removed", async () => {
+        const { fileId } = await storeAs("clip.mp4", "video/mp4");
+
+        await workflowWrite(undefined, fileNode(fileId));
+        expect(await refcountOf(fileId)).toBe(1);
+
+        await workflowWrite(fileNode(fileId), undefined);
+        expect(await refcountOf(fileId)).toBe(0);
+        expect(await row(fileId)).toHaveProperty("unreferencedSince");
+
+        await workflowWrite(fileNode(fileId), undefined);
+        expect(await refcountOf(fileId)).toBe(0);
+    });
+
+    it("releases the old video and counts the new one when a node swaps its file", async () => {
+        const video = await storeAs("a.mp4", "video/mp4");
+        const audio = await storeAs("b.mp3", "audio/mpeg");
+
+        await workflowWrite(undefined, fileNode(video.fileId));
+        await workflowWrite(fileNode(video.fileId), fileNode(audio.fileId));
+
+        expect(await refcountOf(video.fileId)).toBe(0);
+        expect(await refcountOf(audio.fileId)).toBe(1);
+    });
+
+    it("a foreign video keeps nothing alive and is not decremented", async () => {
+        const { fileId } = await storeAs("theirs.mp4", "video/mp4", "user-other");
+
+        await workflowWrite(undefined, fileNode(fileId));
+        await workflowWrite(fileNode(fileId), undefined);
+
+        expect(await refcountOf(fileId)).toBe(0);
     });
 });

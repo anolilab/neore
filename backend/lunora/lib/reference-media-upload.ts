@@ -14,8 +14,10 @@
  * `agent-files/<sha256>`, identical bytes dedupe through
  * `agent.files.useExistingFile` / `addFile`, and the caller gets a
  * `chatFileAccess` grant. The file's `refcount` counts a saved workflow that
- * names it (`workflow/images.ts` counts a file node's `fileId`), so an upload
- * no workflow names is swept after a day, as an unattached chat file is. The
+ * names it (`workflow/images.ts` counts a file node's `fileId` only for
+ * video or audio: this purpose is the only way a workflow gets one, so a
+ * workflow saved before it can never have added a count it would later release),
+ * so an upload no workflow names is swept after a day, as an unattached chat file is. The
  * staging object is deleted whatever the outcome. Extraction is not scheduled:
  * media is not a document.
  *

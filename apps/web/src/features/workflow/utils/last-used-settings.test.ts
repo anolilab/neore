@@ -46,4 +46,14 @@ describe("lastUsedSettings", () => {
         expect(copied).toEqual(["a", "b"]);
         expect(copied).not.toBe(models);
     });
+
+    it("carries the audio and resolution choice of the last video and image-to-video node", () => {
+        const nodes = [
+            node("t2v", "video", { generateAudio: false, model: "fal:m", prompt: "p", resolution: "720p" }),
+            node("i2v", "image-to-video", { generateAudio: true, loop: false, model: "fal:i", resolution: "1080p" }),
+        ];
+
+        expect(lastUsedSettings(nodes, "video")).toEqual({ generateAudio: false, model: "fal:m", resolution: "720p" });
+        expect(lastUsedSettings(nodes, "image-to-video")).toEqual({ generateAudio: true, loop: false, model: "fal:i", resolution: "1080p" });
+    });
 });
