@@ -299,7 +299,7 @@ export const systemPromptFor = (node: WorkflowNode, context: ExecutionContext) =
 
 /** What the video actions return: a text-to-video result already has `assets`, an image-to-video one is a single clip. */
 export type VideoActionResult =
-    | { assets: { mimeType: string; videoUrl: string }[]; modelId: string; prompt: string }
+    | { assets: { fileId?: string; mimeType: string; videoUrl: string }[]; modelId: string; prompt: string }
     | { fileId: string; mimeType: string; model: string; videoUrl: string };
 
 /**

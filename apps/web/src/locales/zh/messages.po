@@ -750,8 +750,8 @@ msgstr "{fileCount, plural, other {更改（# 个文件）}}"
 msgid "{fileCount, plural, one {Failed to upload # file} other {Failed to upload # files}}"
 msgstr "{fileCount, plural, other {# 个文件上传失败}}"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:154
-#: src/features/workflow/components/nodes/video-node.tsx:238
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:152
+#: src/features/workflow/components/nodes/video-node.tsx:236
 msgid "{fps} fps"
 msgstr "{fps} fps"
 
@@ -1805,7 +1805,7 @@ msgstr "添加网页"
 msgid "Add Passkey"
 msgstr "添加通行密钥"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:121
+#: src/features/workflow/components/nodes/video-frames-section.tsx:130
 msgid "Add picked frame as image node"
 msgstr "将选取的帧添加为图片节点"
 
@@ -1818,7 +1818,7 @@ msgstr "添加提供商"
 msgid "Add Rectangle"
 msgstr "添加矩形"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:193
+#: src/features/workflow/components/nodes/character-ref-node.tsx:191
 msgid "Add reference image"
 msgstr "添加参考图"
 
@@ -1830,7 +1830,7 @@ msgstr "添加参考图"
 msgid "Add reference images (up to {maxReferenceImages})"
 msgstr "添加参考图（最多 {maxReferenceImages} 张）"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:212
+#: src/features/workflow/components/nodes/character-ref-node.tsx:210
 msgid "Add reference images to maintain consistency"
 msgstr "添加参考图以保持一致性"
 
@@ -3259,7 +3259,7 @@ msgstr "宽高比"
 
 #: src/features/chat/thread/media-gallery-view.tsx:448
 #: src/features/chat/thread/media-gallery-view.tsx:533
-#: src/features/workflow/components/nodes/video-node.tsx:180
+#: src/features/workflow/components/nodes/video-node.tsx:178
 msgid "Aspect Ratio"
 msgstr "宽高比"
 
@@ -3410,7 +3410,7 @@ msgstr "已开启自动保存"
 msgid "Auto-Delete Active"
 msgstr "自动删除已启用"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:148
+#: src/features/workflow/components/nodes/controlnet-node.tsx:146
 #: src/features/workflow/components/nodes/transcription-node.tsx:16
 msgid "Auto-detect"
 msgstr "自动检测"
@@ -3579,7 +3579,7 @@ msgstr "返回图库"
 msgid "Back to workflows"
 msgstr "返回工作流"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:100
+#: src/features/workflow/components/nodes/background-removal-node.tsx:98
 msgid "Background Color (optional)"
 msgstr "背景颜色（可选）"
 
@@ -4622,7 +4622,7 @@ msgstr "截取屏幕"
 #~ msgid "captured"
 #~ msgstr "已截取"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:121
+#: src/features/workflow/components/nodes/video-frames-section.tsx:130
 msgid "Capturing…"
 msgstr "正在截取…"
 
@@ -5959,10 +5959,10 @@ msgstr "通过 Messaging API 连接 LINE 官方账号。每个聊天或群组都
 msgid "Connect an audio/file node as input"
 msgstr "连接一个音频/文件节点作为输入"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:124
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:170
-#: src/features/workflow/components/nodes/outpaint-node.tsx:150
-#: src/features/workflow/components/nodes/video-node.tsx:160
+#: src/features/workflow/components/nodes/background-removal-node.tsx:122
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:168
+#: src/features/workflow/components/nodes/outpaint-node.tsx:148
+#: src/features/workflow/components/nodes/video-node.tsx:158
 msgid "Connect an image node as input"
 msgstr "连接一个图像节点作为输入"
 
@@ -5994,8 +5994,8 @@ msgstr "连接 Feishu / Lark"
 msgid "Connect LINE"
 msgstr "连接 LINE"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:103
-#: src/features/workflow/components/nodes/object-editor-node.tsx:166
+#: src/features/workflow/components/nodes/inpaint-node.tsx:101
+#: src/features/workflow/components/nodes/object-editor-node.tsx:164
 msgid "Connect mask from upstream node or provide URL"
 msgstr "从上游节点连接蒙版或提供 URL"
 
@@ -6227,7 +6227,7 @@ msgstr "内容创作"
 msgid "Content Image"
 msgstr "内容图像"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:110
+#: src/features/workflow/components/nodes/style-ref-node.tsx:108
 msgid "Content Image URL (optional)"
 msgstr "内容图像 URL（可选）"
 
@@ -6333,11 +6333,11 @@ msgstr "通过光圈设置控制景深"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:184
+#: src/features/workflow/components/nodes/controlnet-node.tsx:182
 msgid "Control Strength"
 msgstr "控制强度"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:194
+#: src/features/workflow/components/nodes/controlnet-node.tsx:192
 msgid "Control Timing"
 msgstr "控制时机"
 
@@ -6345,7 +6345,7 @@ msgstr "控制时机"
 msgid "Control Type"
 msgstr "控制类型"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:217
+#: src/features/workflow/components/nodes/controlnet-node.tsx:215
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "控制 ControlNet 在生成过程中何时生效"
 
@@ -8133,11 +8133,11 @@ msgstr "降序"
 msgid "Describe a change. You review the result before anything is saved; applying it creates a version you can restore."
 msgstr "描述一处修改。保存前你会先审阅结果；应用后会创建一个可恢复的版本。"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:115
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:113
 msgid "Describe how the image should animate"
 msgstr "描述图片应如何动起来"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:73
+#: src/features/workflow/components/nodes/img2img-node.tsx:71
 msgid "Describe how to transform the image..."
 msgstr "描述如何转换这张图片..."
 
@@ -8149,20 +8149,20 @@ msgstr "描述要生成的图片..."
 msgid "Describe the image you want to create..."
 msgstr "描述你想创建的图像..."
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:110
-#: src/features/workflow/components/nodes/video-node.tsx:154
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:108
+#: src/features/workflow/components/nodes/video-node.tsx:152
 msgid "Describe the motion/animation..."
 msgstr "描述动作/动画效果..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:168
+#: src/features/workflow/components/nodes/style-ref-node.tsx:166
 msgid "Describe the scene or add style modifiers..."
 msgstr "描述场景或添加风格修饰词..."
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:258
+#: src/features/workflow/components/nodes/character-ref-node.tsx:256
 msgid "Describe the scene or context..."
 msgstr "描述场景或上下文..."
 
-#: src/features/workflow/components/nodes/video-node.tsx:154
+#: src/features/workflow/components/nodes/video-node.tsx:152
 msgid "Describe the video to generate..."
 msgstr "描述要生成的视频..."
 
@@ -8178,11 +8178,11 @@ msgstr "描述这个技能应该做什么。下方字段会自动填好供你审
 msgid "Describe what this workflow does..."
 msgstr "描述这个工作流的作用..."
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:125
+#: src/features/workflow/components/nodes/object-editor-node.tsx:123
 msgid "Describe what to add or replace..."
 msgstr "描述要添加或替换的内容..."
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:101
+#: src/features/workflow/components/nodes/outpaint-node.tsx:99
 msgid "Describe what to generate in expanded areas..."
 msgstr "描述要在扩展区域中生成的内容..."
 
@@ -8377,7 +8377,7 @@ msgstr "数字"
 msgid "Digital Art"
 msgstr "数字艺术"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:110
+#: src/features/workflow/components/nodes/outpaint-node.tsx:108
 msgid "Direction"
 msgstr "方向"
 
@@ -8823,8 +8823,8 @@ msgstr "复制所选（{selectedNonGroupCount}）"
 msgid "Duration"
 msgstr "时长"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:124
-#: src/features/workflow/components/nodes/video-node.tsx:199
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:122
+#: src/features/workflow/components/nodes/video-node.tsx:197
 msgid "Duration: {duration}s"
 msgstr "时长：{duration} 秒"
 
@@ -9494,7 +9494,7 @@ msgstr "“事件与回调 > 加密策略”中的 Encrypt Key（必填——用
 msgid "Encrypted at rest and never shown again. Local servers such as Ollama usually need none."
 msgstr "加密存储，且不会再次显示。Ollama 等本地服务器通常不需要。"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:209
+#: src/features/workflow/components/nodes/controlnet-node.tsx:207
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:188
 msgid "End"
 msgstr "结束"
@@ -9566,13 +9566,13 @@ msgstr "英语（英国）"
 msgid "English (US)"
 msgstr "英语（美国）"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:132
-#: src/features/workflow/components/nodes/upscale-node.tsx:135
+#: src/features/workflow/components/nodes/upscale-node.tsx:130
+#: src/features/workflow/components/nodes/upscale-node.tsx:133
 msgid "Enhance Details"
 msgstr "增强细节"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:119
-#: src/features/workflow/components/nodes/upscale-node.tsx:122
+#: src/features/workflow/components/nodes/upscale-node.tsx:117
+#: src/features/workflow/components/nodes/upscale-node.tsx:120
 msgid "Enhance Faces"
 msgstr "增强面部"
 
@@ -10246,7 +10246,7 @@ msgstr "展开思考过程"
 msgid "Expand to fullscreen"
 msgstr "全屏展开"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:128
+#: src/features/workflow/components/nodes/outpaint-node.tsx:126
 msgid "Expand: {expandPixels}px"
 msgstr "扩展：{expandPixels}px"
 
@@ -10254,7 +10254,7 @@ msgstr "扩展：{expandPixels}px"
 msgid "Expanded Editor"
 msgstr "扩展编辑器"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:95
+#: src/features/workflow/components/nodes/outpaint-node.tsx:93
 msgid "Expansion Prompt"
 msgstr "扩展提示词"
 
@@ -11772,7 +11772,7 @@ msgstr "填充颜色"
 msgid "Fill in a name, a valid command, a description and instructions before saving."
 msgstr "保存前请填写名称、有效的命令、描述和指令。"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:79
+#: src/features/workflow/components/nodes/inpaint-node.tsx:77
 msgid "Fill Prompt"
 msgstr "填充提示词"
 
@@ -12148,11 +12148,11 @@ msgstr "Google 领先的 Veo 3.x 系列的基础模型"
 msgid "FPS"
 msgstr "FPS"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:69
+#: src/features/workflow/components/nodes/video-frames-section.tsx:78
 msgid "Frame capture failed"
 msgstr "截取帧失败"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:79
+#: src/features/workflow/components/nodes/video-frames-section.tsx:88
 msgid "Frames"
 msgstr "帧"
 
@@ -12718,8 +12718,8 @@ msgstr "生成"
 msgid "Generation Prompt"
 msgstr "生成提示词"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:252
-#: src/features/workflow/components/nodes/style-ref-node.tsx:162
+#: src/features/workflow/components/nodes/character-ref-node.tsx:250
+#: src/features/workflow/components/nodes/style-ref-node.tsx:160
 msgid "Generation Prompt (optional)"
 msgstr "生成提示词（可选）"
 
@@ -13592,7 +13592,7 @@ msgstr "需要 OpenAI 最小、最快模型的大规模轻量任务"
 msgid "High-volume, time-sensitive workflows where generation speed is the top priority"
 msgstr "生成速度最优先的大规模、时效敏感工作流"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:246
+#: src/features/workflow/components/nodes/character-ref-node.tsx:244
 msgid "Higher = closer match to reference"
 msgstr "越高 = 越贴近参考图"
 
@@ -13600,7 +13600,7 @@ msgstr "越高 = 越贴近参考图"
 msgid "Higher = more prompt adherence, Lower = more creativity"
 msgstr "越高 = 越遵循提示词，越低 = 越有创意"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:139
+#: src/features/workflow/components/nodes/style-ref-node.tsx:137
 msgid "Higher = stronger style influence"
 msgstr "越高 = 风格影响越强"
 
@@ -13730,15 +13730,15 @@ msgstr "仅支持 HTTPS。服务器根地址，与 ANTHROPIC_BASE_URL 相同—�
 msgid "HTTPS only. Usually ends in /v1."
 msgstr "仅支持 HTTPS。通常以 /v1 结尾。"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:140
+#: src/features/workflow/components/nodes/object-editor-node.tsx:138
 msgid "https://... (white = edit area)"
 msgstr "https://...（白色 = 编辑区域）"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:99
+#: src/features/workflow/components/nodes/inpaint-node.tsx:97
 msgid "https://... (white = edit, black = keep)"
 msgstr "https://...（白色 = 编辑，黑色 = 保留）"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:170
+#: src/features/workflow/components/nodes/controlnet-node.tsx:168
 msgid "https://... or from input"
 msgstr "https://... 或来自输入"
 
@@ -13905,7 +13905,7 @@ msgstr "图像生成模型"
 #~ msgid "Image is too large. Choose one under 300 KB."
 #~ msgstr ""
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:119
+#: src/features/workflow/components/nodes/style-ref-node.tsx:117
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "要应用风格的图像（或使用上一个节点的输入）"
 
@@ -13948,7 +13948,7 @@ msgstr "需要图片 URL 或已上传的图片"
 msgid "Image variation & editing"
 msgstr "图像变体与编辑"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:104
+#: src/features/workflow/components/nodes/style-ref-node.tsx:102
 msgid "Image whose artistic style will be applied"
 msgstr "将应用其艺术风格的图像"
 
@@ -14975,7 +14975,7 @@ msgstr "吉尔吉斯斯坦"
 msgid "Label"
 msgstr "标签"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:166
+#: src/features/workflow/components/nodes/object-editor-node.tsx:164
 msgid "LAMA uses AI to seamlessly remove objects"
 msgstr "LAMA 使用 AI 无缝移除物体"
 
@@ -15315,7 +15315,7 @@ msgstr "全部不勾选则搜索所有已索引的文件。"
 msgid "Leave empty for \"any model\"."
 msgstr "留空表示“任意模型”。"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:119
+#: src/features/workflow/components/nodes/background-removal-node.tsx:117
 msgid "Leave empty for transparent background"
 msgstr "留空则使用透明背景"
 
@@ -15921,7 +15921,7 @@ msgstr "低"
 msgid "Low latency text-to-video"
 msgstr "低延迟文生视频"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:88
+#: src/features/workflow/components/nodes/img2img-node.tsx:86
 msgid "Lower = subtle changes, Higher = major transformation"
 msgstr "越低 = 细微变化，越高 = 大幅转换"
 
@@ -16002,7 +16002,7 @@ msgstr "主字体"
 msgid "Main font updated"
 msgstr "主字体已更新"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:149
+#: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
 msgstr "保持原始结构"
 
@@ -16182,11 +16182,11 @@ msgstr "全部标为已读"
 msgid "Mark as favorite"
 msgstr "标记为收藏"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:144
+#: src/features/workflow/components/nodes/object-editor-node.tsx:142
 msgid "Mark the area to edit in white"
 msgstr "用白色标记要编辑的区域"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:144
+#: src/features/workflow/components/nodes/object-editor-node.tsx:142
 msgid "Mark the object to remove in white"
 msgstr "用白色标记要移除的物体"
 
@@ -16227,11 +16227,11 @@ msgstr "蒙版"
 msgid "Mask preview"
 msgstr "蒙版预览"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:134
+#: src/features/workflow/components/nodes/object-editor-node.tsx:132
 msgid "Mask URL"
 msgstr "蒙版 URL"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:93
+#: src/features/workflow/components/nodes/inpaint-node.tsx:91
 msgid "Mask URL (optional)"
 msgstr "蒙版 URL（可选）"
 
@@ -17103,13 +17103,13 @@ msgstr "最通用的智能模型"
 msgid "motion fluidity"
 msgstr "运动流畅度"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:104
-#: src/features/workflow/components/nodes/video-node.tsx:148
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:102
+#: src/features/workflow/components/nodes/video-node.tsx:146
 msgid "Motion Prompt"
 msgstr "运动提示词"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:138
-#: src/features/workflow/components/nodes/video-node.tsx:214
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:136
+#: src/features/workflow/components/nodes/video-node.tsx:212
 msgid "Motion: {motionPercent}%"
 msgstr "运动：{motionPercent}%"
 
@@ -17494,9 +17494,9 @@ msgstr "待你处理"
 msgid "Negative prompt — what to exclude"
 msgstr "反向提示词——要排除的内容"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:112
-#: src/features/workflow/components/nodes/object-editor-node.tsx:153
-#: src/features/workflow/components/nodes/outpaint-node.tsx:137
+#: src/features/workflow/components/nodes/inpaint-node.tsx:110
+#: src/features/workflow/components/nodes/object-editor-node.tsx:151
+#: src/features/workflow/components/nodes/outpaint-node.tsx:135
 msgid "Negative Prompt (optional)"
 msgstr "反向提示词（可选）"
 
@@ -18684,7 +18684,7 @@ msgstr "消息数量"
 msgid "Object Editor"
 msgstr "物体编辑器"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:119
+#: src/features/workflow/components/nodes/object-editor-node.tsx:117
 msgid "Object Prompt"
 msgstr "物体提示词"
 
@@ -19677,7 +19677,7 @@ msgstr "输出 {outputNumber}：{label}"
 msgid "Output files"
 msgstr "输出文件"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:75
+#: src/features/workflow/components/nodes/background-removal-node.tsx:73
 msgid "Output Format"
 msgstr "输出格式"
 
@@ -19995,7 +19995,7 @@ msgstr "粘贴到 LINE 频道 Messaging API 标签页中的 Webhook URL。"
 msgid "Paste cells"
 msgstr "粘贴单元格"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:115
+#: src/features/workflow/components/nodes/style-ref-node.tsx:113
 msgid "Paste content image URL to stylize..."
 msgstr "粘贴要风格化的内容图片 URL..."
 
@@ -20003,7 +20003,7 @@ msgstr "粘贴要风格化的内容图片 URL..."
 msgid "Paste image URL"
 msgstr "粘贴图片 URL"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:190
+#: src/features/workflow/components/nodes/character-ref-node.tsx:188
 msgid "Paste image URL..."
 msgstr "粘贴图片 URL..."
 
@@ -20015,7 +20015,7 @@ msgstr "只粘贴现有行能容纳的内容"
 msgid "Paste or write a system prompt to optimize..."
 msgstr "粘贴或编写要优化的系统提示词..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:100
+#: src/features/workflow/components/nodes/style-ref-node.tsx:98
 msgid "Paste style reference image URL..."
 msgstr "粘贴风格参考图片 URL..."
 
@@ -20218,7 +20218,7 @@ msgstr "选择颜色"
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "最多选择 {maxReferences} 张图片。你选择的顺序就是模型看到它们的顺序。"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:107
+#: src/features/workflow/components/nodes/video-frames-section.tsx:116
 msgid "Picked at (s)"
 msgstr "选取位置（秒）"
 
@@ -20226,7 +20226,7 @@ msgstr "选取位置（秒）"
 #~ msgid "Picked frame"
 #~ msgstr "选取的帧"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:93
+#: src/features/workflow/components/nodes/video-frames-section.tsx:102
 msgid "Picked frame wire (remove it)"
 msgstr "选取帧的连线（移除）"
 
@@ -20632,7 +20632,7 @@ msgstr "正在准备导入…"
 msgid "Preparing..."
 msgstr "正在准备..."
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:144
+#: src/features/workflow/components/nodes/controlnet-node.tsx:142
 msgid "Preprocessor"
 msgstr "预处理器"
 
@@ -20643,8 +20643,8 @@ msgstr "预处理器"
 msgid "Presentation"
 msgstr "演示文稿"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:146
-#: src/features/workflow/components/nodes/style-ref-node.tsx:153
+#: src/features/workflow/components/nodes/style-ref-node.tsx:144
+#: src/features/workflow/components/nodes/style-ref-node.tsx:151
 msgid "Preserve Content"
 msgstr "保留内容"
 
@@ -20895,8 +20895,8 @@ msgstr "Pro"
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro 是你的个人方案：所有模型，每天 1,000 条消息。"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:92
-#: src/features/workflow/components/nodes/video-node.tsx:138
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:90
+#: src/features/workflow/components/nodes/video-node.tsx:136
 msgid "Pro models need a Pro plan. On a free plan the run stops before it starts."
 msgstr "Pro 模型需要 Pro 套餐。免费套餐下，运行会在开始前停止。"
 
@@ -21847,7 +21847,7 @@ msgstr "重做"
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr "重做（Ctrl+Shift+Z）"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:175
+#: src/features/workflow/components/nodes/controlnet-node.tsx:173
 msgid "Reference"
 msgstr "参考"
 
@@ -21855,7 +21855,7 @@ msgstr "参考"
 msgid "Reference {ordinal}"
 msgstr "参考图 {ordinal}"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:164
+#: src/features/workflow/components/nodes/controlnet-node.tsx:162
 msgid "Reference Image (optional)"
 msgstr "参考图像（可选）"
 
@@ -21877,7 +21877,7 @@ msgstr "参考图像"
 msgid "Reference images"
 msgstr "参考图"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:156
+#: src/features/workflow/components/nodes/character-ref-node.tsx:154
 msgid "Reference Images ({referenceCount}/{maxImages})"
 msgstr "参考图像（{referenceCount}/{maxImages}）"
 
@@ -21885,7 +21885,7 @@ msgstr "参考图像（{referenceCount}/{maxImages}）"
 msgid "Reference mode"
 msgstr "参考模式"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:218
+#: src/features/workflow/components/nodes/character-ref-node.tsx:216
 msgid "Reference Mode"
 msgstr "参考模式"
 
@@ -21893,7 +21893,7 @@ msgstr "参考模式"
 msgid "Reference Photo"
 msgstr "参考照片"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:240
+#: src/features/workflow/components/nodes/character-ref-node.tsx:238
 msgid "Reference Strength"
 msgstr "参考强度"
 
@@ -21917,7 +21917,7 @@ msgstr "参考"
 msgid "Refine"
 msgstr "改进"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:93
+#: src/features/workflow/components/nodes/background-removal-node.tsx:91
 msgid "Refine Edge Detection"
 msgstr "精细边缘检测"
 
@@ -22272,7 +22272,7 @@ msgstr "要移除提供商吗？"
 msgid "Remove queued message {position}"
 msgstr "移除排队消息 {position}"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:168
+#: src/features/workflow/components/nodes/character-ref-node.tsx:166
 msgid "Remove reference image"
 msgstr "移除参考图像"
 
@@ -22953,7 +22953,7 @@ msgstr "运行进度"
 msgid "Run Python, see charts and images instantly"
 msgstr "运行 Python，即时查看图表和图像"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:126
+#: src/features/workflow/components/nodes/video-frames-section.tsx:135
 msgid "Run the node first to pick a frame"
 msgstr "请先运行该节点再选取帧"
 
@@ -23247,7 +23247,7 @@ msgstr "正在保存..."
 msgid "Saving…"
 msgstr "正在保存…"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:100
+#: src/features/workflow/components/nodes/upscale-node.tsx:98
 msgid "Scale Factor"
 msgstr "缩放倍数"
 
@@ -23334,7 +23334,7 @@ msgstr "滚动到底部"
 msgid "Scroll up one page"
 msgstr "向上滚动一页"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:163
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:161
 msgid "Seamless Loop"
 msgstr "无缝循环"
 
@@ -23704,17 +23704,17 @@ msgstr "选择模型（可选）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
 #: src/components/model-picker/model-picker-button.tsx:94
-#: src/features/workflow/components/nodes/background-removal-node.tsx:68
-#: src/features/workflow/components/nodes/character-ref-node.tsx:149
-#: src/features/workflow/components/nodes/controlnet-node.tsx:135
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:95
-#: src/features/workflow/components/nodes/img2img-node.tsx:60
-#: src/features/workflow/components/nodes/inpaint-node.tsx:72
-#: src/features/workflow/components/nodes/object-editor-node.tsx:111
-#: src/features/workflow/components/nodes/outpaint-node.tsx:88
-#: src/features/workflow/components/nodes/style-ref-node.tsx:88
-#: src/features/workflow/components/nodes/upscale-node.tsx:93
-#: src/features/workflow/components/nodes/video-node.tsx:141
+#: src/features/workflow/components/nodes/background-removal-node.tsx:66
+#: src/features/workflow/components/nodes/character-ref-node.tsx:147
+#: src/features/workflow/components/nodes/controlnet-node.tsx:133
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:93
+#: src/features/workflow/components/nodes/img2img-node.tsx:58
+#: src/features/workflow/components/nodes/inpaint-node.tsx:70
+#: src/features/workflow/components/nodes/object-editor-node.tsx:109
+#: src/features/workflow/components/nodes/outpaint-node.tsx:86
+#: src/features/workflow/components/nodes/style-ref-node.tsx:86
+#: src/features/workflow/components/nodes/upscale-node.tsx:91
+#: src/features/workflow/components/nodes/video-node.tsx:139
 msgid "Select model..."
 msgstr "选择模型..."
 
@@ -25066,7 +25066,7 @@ msgstr "星形"
 msgid "Starred"
 msgstr "星标"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:200
+#: src/features/workflow/components/nodes/controlnet-node.tsx:198
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:170
 msgid "Start"
 msgstr "开始"
@@ -25378,7 +25378,7 @@ msgstr "流式输出中"
 msgid "Streaming..."
 msgstr "流式输出中..."
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:82
+#: src/features/workflow/components/nodes/img2img-node.tsx:80
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:140
 msgid "Strength"
 msgstr "强度"
@@ -25685,7 +25685,7 @@ msgstr "风格一致性"
 msgid "Style Image"
 msgstr "风格图像"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:95
+#: src/features/workflow/components/nodes/style-ref-node.tsx:93
 msgid "Style Image URL"
 msgstr "风格图像 URL"
 
@@ -25694,7 +25694,7 @@ msgstr "风格图像 URL"
 msgid "Style Reference"
 msgstr "风格参考"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:126
+#: src/features/workflow/components/nodes/style-ref-node.tsx:124
 msgid "Style Strength"
 msgstr "风格强度"
 
@@ -26570,7 +26570,7 @@ msgstr "压缩包中的文件过多。"
 msgid "The assistant has a question"
 msgstr "助手有一个问题"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:68
+#: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
 msgstr "浏览器无法读取此视频，因此无法截取帧"
 
@@ -27776,7 +27776,7 @@ msgstr "用 AI 转换"
 msgid "transformation"
 msgstr "转换"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:67
+#: src/features/workflow/components/nodes/img2img-node.tsx:65
 msgid "Transformation Prompt"
 msgstr "转换提示词"
 
@@ -27808,7 +27808,7 @@ msgstr "翻译失败。"
 msgid "Translation to {languageName}"
 msgstr "翻译为{languageName}"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:114
+#: src/features/workflow/components/nodes/background-removal-node.tsx:112
 msgid "Transparent"
 msgstr "透明"
 
@@ -29346,7 +29346,7 @@ msgstr "视频生成模型"
 msgid "Video LoRA support for custom styles"
 msgstr "视频 LoRA 支持，可用于自定义风格"
 
-#: src/features/workflow/components/nodes/video-node.tsx:148
+#: src/features/workflow/components/nodes/video-node.tsx:146
 msgid "Video Prompt"
 msgstr "视频提示词"
 
@@ -29956,13 +29956,13 @@ msgstr "过去 30 天内智能体请求你的设备执行的操作。"
 msgid "What this variable represents..."
 msgstr "此变量代表什么..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:118
-#: src/features/workflow/components/nodes/object-editor-node.tsx:159
-#: src/features/workflow/components/nodes/outpaint-node.tsx:143
+#: src/features/workflow/components/nodes/inpaint-node.tsx:116
+#: src/features/workflow/components/nodes/object-editor-node.tsx:157
+#: src/features/workflow/components/nodes/outpaint-node.tsx:141
 msgid "What to avoid..."
 msgstr "要避免的内容..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:85
+#: src/features/workflow/components/nodes/inpaint-node.tsx:83
 msgid "What to generate in the masked area..."
 msgstr "要在蒙版区域生成的内容..."
 

@@ -12,7 +12,7 @@ import { useLunora } from "@/lib/lunora/crpc";
 import { useWorkflowStore } from "../../stores/workflow-store";
 import NODE_CONFIGS from "../../types";
 import { absolutePositionOf } from "../../utils/node-position";
-import { captureVideoFrame, FrameCaptureError, pickedFrameTime, videoUrlOfOutput } from "../../utils/video-frame";
+import { captureVideoFrame, FrameCaptureError, isCaptureTargetLoaded, pickedFrameTime, videoUrlOfOutput } from "../../utils/video-frame";
 import { storeWorkflowImage } from "../../utils/workflow-image";
 
 /** Where the picked-frame image node lands, to the right of its video node (the connect button's offset). */
@@ -48,12 +48,21 @@ export const VideoFramesSection = ({ nodeId, pickedTime }: VideoFramesSectionPro
             return;
         }
 
+        // Where the capture began. The upload takes seconds, and the workflow may be changed or replaced meanwhile.
+        const start = { nodeId, projectId: useWorkflowStore.getState().projectId };
+
         setBusy(true);
         setError(null);
 
         try {
             const blob = await captureVideoFrame(videoUrl, (duration) => pickedFrameTime(duration, pickedTime ?? 0));
             const imageFileId = await storeWorkflowImage(lunora, new File([blob], "picked-frame.png", { type: "image/png" }));
+
+            // Nothing is added to a different workflow, or for a video node that is gone: the frame is simply not placed.
+            if (!isCaptureTargetLoaded(useWorkflowStore.getState(), start)) {
+                return;
+            }
+
             // The new node is top level, so a video inside a group is placed by its canvas position, not the group-relative one.
             const origin = absolutePositionOf(useWorkflowStore.getState().nodes, nodeId);
 

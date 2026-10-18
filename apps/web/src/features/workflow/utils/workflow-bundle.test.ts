@@ -2,7 +2,7 @@ import { chatAttachmentLimit } from "@neore/backend/document-limits";
 import JSZip from "jszip";
 import { describe, expect, it, vi } from "vitest";
 
-import type { JsZipLike } from "@/lib/zip";
+import type { JsZipLike, JsZipWriter } from "@/lib/zip";
 import { createJsZip, loadJsZip } from "@/lib/zip";
 
 import type { WorkflowContent, WorkflowNode } from "../types";
@@ -10,6 +10,7 @@ import {
     ASSET_BYTE_BUDGET,
     exportWorkflowBundle,
     importWorkflowBundle,
+    MAX_BUNDLE_BYTES,
     MAX_BUNDLE_ENTRIES,
     readWorkflowBundle,
     WORKFLOW_BUNDLE_FORMAT,
@@ -32,6 +33,7 @@ const PDF_ASSET = /^assets\/[\da-f]{64}\.pdf$/u;
 const STORED_PNG = /^stored:[\da-f]{64}\.png$/u;
 const STORED_PDF = /^stored:[\da-f]{64}\.pdf$/u;
 const STORAGE_URL = /^https:\/\/storage\.test\//u;
+const FILE_INDEX = /\/f(\d+)\?/u;
 
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 const PNG_BASE64 = btoa(String.fromCodePoint(...PNG_BYTES));
@@ -354,6 +356,46 @@ describe("workflow bundle", () => {
 
         expect(exported.skipped).toBe(1);
         expect(Object.keys(archive.files).filter((name) => PNG_ASSET.test(name))).toHaveLength(1);
+    });
+
+    it("reserves the zip's own headers out of the budget, and an asset near it still exports an importable bundle", async () => {
+        // A 17 MiB cap: the 16 MiB manifest reserve leaves about 1 MiB. Two 520 KB images are 1,040,000 bytes, which fits
+        // 1 MiB on their data alone but not with each entry's headers counted, so the second is skipped.
+        const archiveBytes = 17 * 1024 * 1024;
+        const images = Array.from({ length: 2 }, (_, index) => {
+            const bytes = new Uint8Array(520_000).fill(index + 1);
+
+            bytes.set(PNG_BYTES);
+
+            return bytes;
+        });
+        const nodes = images.map((_, index) => node(`n${index}`, "image", { imageFileId: `f${index}`, mode: "input" }));
+        const imageBytes = async (url: string) => {
+            const index = Number(FILE_INDEX.exec(url)?.[1]);
+
+            return { bytes: images[index]!, contentType: "image/png" };
+        };
+
+        const exported = await exportWorkflowBundle(content(nodes), { archiveBytes, createZip: createJsZip, fetchBytes: imageBytes, signUrl: sign });
+
+        expect(exported.skipped).toBe(1);
+        expect(exported.blob.size).toBeLessThanOrEqual(archiveBytes);
+
+        const bundle = await readWorkflowBundle(await asFile(exported.blob, "workflow.zip"), OPTIONS);
+        const imported = await importWorkflowBundle(bundle, store);
+        const stored = (imported.content.nodes as WorkflowNode[]).filter((entry) => (entry.data as { imageFileId?: string }).imageFileId !== undefined);
+
+        expect(imported.skipped).toBe(0);
+        expect(stored).toHaveLength(1);
+    });
+
+    it("refuses to return an archive the import would refuse, whatever the budget said", async () => {
+        const oversized = Object.defineProperty(new Blob(["x"]), "size", { value: MAX_BUNDLE_BYTES + 1 });
+        const writer = { file: vi.fn(), generateAsync: vi.fn(async () => oversized) };
+
+        await expect(
+            exportWorkflowBundle(content([]), { createZip: async () => writer as unknown as JsZipWriter, fetchBytes, signUrl: sign }),
+        ).rejects.toMatchObject({ code: "too-large" });
     });
 
     it("loads a legacy plain workflow JSON without assets", async () => {

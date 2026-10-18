@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { EXTRACT_DEADLINE_MS, extractFrameImage, FRAME_EXTRACT_ENDPOINT } from "./media-ops";
+import { EXTRACT_DEADLINE_MS, extractFrameImage, FRAME_EXTRACT_ENDPOINT, FRAME_MAX_BYTES } from "./media-ops";
 
 const QUEUE = `https://queue.fal.run/${FRAME_EXTRACT_ENDPOINT}`;
 const json = (body: unknown, status = 200) => Response.json(body, { status });
+
+// The leading bytes each stored type is sniffed by; the rest is filler.
+const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
+const WEBP_BYTES = new Uint8Array([0x52, 0x49, 0x46, 0x46, 4, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 1, 2]);
+const MIB = 1024 * 1024;
 
 /** A fake fal queue: submit, then one status poll that is COMPLETED, then the result, then the image. */
 const falQueue = (overrides: { download?: Response; images?: unknown; status?: unknown; statusResponse?: Response; submit?: Response } = {}) => {
@@ -25,7 +31,7 @@ const falQueue = (overrides: { download?: Response; images?: unknown; status?: u
             return json({ images: overrides.images ?? [{ content_type: "image/jpeg", url: "https://v3.fal.media/frame.jpg" }] });
         }
 
-        return overrides.download ?? new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/jpeg" } });
+        return overrides.download ?? new Response(JPEG_BYTES, { headers: { "content-type": "image/jpeg" } });
     });
 
     vi.stubGlobal("fetch", fake);
@@ -47,7 +53,7 @@ describe("extractFrameImage", () => {
         expect(JSON.parse(String(calls[0]?.init?.body))).toStrictEqual({ frame_type: "last", video_url: "https://x.example/clip.mp4" });
         expect((calls[0]?.init?.headers as Record<string, string>).Authorization).toBe("Key key-1");
         expect(frame.type).toBe("image/jpeg");
-        expect(frame.size).toBe(3);
+        expect(frame.size).toBe(JPEG_BYTES.byteLength);
     });
 
     it("gives every request a deadline, so a stalled fal call cannot hold the run", async () => {
@@ -76,10 +82,10 @@ describe("extractFrameImage", () => {
             }
 
             if (url.endsWith("/result")) {
-                return json({ images: [{ url: "https://v3.fal.media/frame.png" }] });
+                return json({ images: [{ content_type: "image/png", url: "https://v3.fal.media/frame.png" }] });
             }
 
-            return new Response(new Uint8Array([9]));
+            return new Response(PNG_BYTES);
         });
 
         vi.stubGlobal("fetch", fake);
@@ -214,7 +220,10 @@ describe("extractFrameImage", () => {
     });
 
     it("downloads the frame from fal's media host with no key and no redirect", async () => {
-        const { calls } = falQueue({ images: [{ content_type: "image/png", url: "https://v3.fal.media/files/frame.png" }] });
+        const { calls } = falQueue({
+            download: new Response(PNG_BYTES),
+            images: [{ content_type: "image/png", url: "https://v3.fal.media/files/frame.png" }],
+        });
 
         await extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0);
 
@@ -230,5 +239,83 @@ describe("extractFrameImage", () => {
 
         await expect(extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0)).rejects.toThrow("Frame download failed: 302");
         expect(fake.mock.calls.some(([input]) => String(input).includes("attacker.example"))).toBe(false);
+    });
+
+    it.each([
+        ["image/jpeg", JPEG_BYTES],
+        ["image/png", PNG_BYTES],
+        ["image/webp", WEBP_BYTES],
+    ])("stores a %s frame whose leading bytes match its declared type", async (type, bytes) => {
+        falQueue({ download: new Response(bytes), images: [{ content_type: type, url: "https://v3.fal.media/frame" }] });
+
+        const frame = await extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0);
+
+        expect(frame.type).toBe(type);
+        expect(new Uint8Array(await frame.arrayBuffer())).toStrictEqual(bytes);
+    });
+
+    it("refuses a declared length over the cap before reading any of the body", async () => {
+        const download = new Response(JPEG_BYTES, { headers: { "content-length": String(FRAME_MAX_BYTES + 1) } });
+
+        falQueue({ download, images: [{ content_type: "image/jpeg", url: "https://v3.fal.media/frame.jpg" }] });
+
+        await expect(extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0)).rejects.toThrow("exceeds");
+        expect(download.bodyUsed).toBe(true);
+    });
+
+    it("cuts off an undeclared-length body once it passes the cap, and cancels it", async () => {
+        let cancelled = false;
+        let sent = 0;
+        // An endless frame with no declared length: only the stream can say it is too large, and the cap must cut it off.
+        const chunk = new Uint8Array(MIB);
+
+        chunk.set(JPEG_BYTES);
+
+        const stream = new ReadableStream<Uint8Array>({
+            cancel() {
+                cancelled = true;
+            },
+            pull(controller) {
+                sent += 1;
+                controller.enqueue(chunk);
+            },
+        });
+
+        falQueue({ download: new Response(stream), images: [{ content_type: "image/jpeg", url: "https://v3.fal.media/frame.jpg" }] });
+
+        await expect(extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0)).rejects.toThrow("exceeds");
+        expect(cancelled).toBe(true);
+        // The cap is 20 MiB, so the read stops at the 21st one-MiB chunk, not after the stream is drained.
+        expect(sent).toBeLessThanOrEqual(22);
+    });
+
+    it("refuses a declared type that is not a still image, and downloads nothing", async () => {
+        const { fake } = falQueue({ images: [{ content_type: "image/gif", url: "https://v3.fal.media/frame.gif" }] });
+
+        await expect(extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0)).rejects.toThrow("only JPEG, PNG and WebP");
+        expect(fake.mock.calls.some(([input]) => String(input) === "https://v3.fal.media/frame.gif")).toBe(false);
+    });
+
+    it("refuses a frame whose leading bytes are not the type it declared", async () => {
+        falQueue({ download: new Response(JPEG_BYTES), images: [{ content_type: "image/png", url: "https://v3.fal.media/frame.png" }] });
+
+        await expect(extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0)).rejects.toThrow("do not match the declared type image/png");
+    });
+
+    it("stores a frame fal leaves untyped as the PNG its download says it is", async () => {
+        falQueue({ download: new Response(PNG_BYTES, { headers: { "content-type": "image/png" } }), images: [{ url: "https://v3.fal.media/frame" }] });
+
+        const frame = await extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0);
+
+        expect(frame.type).toBe("image/png");
+    });
+
+    it("refuses a frame with no usable type from fal or its download", async () => {
+        const download = new Response(JPEG_BYTES, { headers: { "content-type": "application/octet-stream" } });
+
+        falQueue({ download, images: [{ url: "https://v3.fal.media/frame" }] });
+
+        await expect(extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0)).rejects.toThrow("only JPEG, PNG and WebP");
+        expect(download.bodyUsed).toBe(true);
     });
 });

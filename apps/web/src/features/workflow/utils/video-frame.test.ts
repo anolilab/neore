@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pickedFrameTime, videoUrlOfOutput } from "./video-frame";
+import { isCaptureTargetLoaded, pickedFrameTime, videoUrlOfOutput } from "./video-frame";
 
 describe("pickedFrameTime", () => {
     it("takes the requested time, clamped into the clip and off its final sample", () => {
@@ -28,5 +28,22 @@ describe("videoUrlOfOutput", () => {
         expect(videoUrlOfOutput({ videoUrl: "httpx://a" })).toBeUndefined();
         expect(videoUrlOfOutput({ videoUrl: "not a url" })).toBeUndefined();
         expect(videoUrlOfOutput(undefined)).toBeUndefined();
+    });
+});
+
+describe("isCaptureTargetLoaded", () => {
+    const start = { nodeId: "video-1", projectId: "wf-a" };
+
+    it("admits the capture while the same workflow is loaded and its video node is still in it", () => {
+        expect(isCaptureTargetLoaded({ nodes: [{ id: "video-1" }], projectId: "wf-a" }, start)).toBe(true);
+    });
+
+    it("drops the capture once another workflow is loaded, even when a node has the same id", () => {
+        expect(isCaptureTargetLoaded({ nodes: [{ id: "video-1" }], projectId: "wf-b" }, start)).toBe(false);
+        expect(isCaptureTargetLoaded({ nodes: [{ id: "video-1" }], projectId: null }, start)).toBe(false);
+    });
+
+    it("drops the capture when the video node was deleted meanwhile", () => {
+        expect(isCaptureTargetLoaded({ nodes: [{ id: "other" }], projectId: "wf-a" }, start)).toBe(false);
     });
 });

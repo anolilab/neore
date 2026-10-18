@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CanaryConfig } from "../routing/canary.js";
 import { getCanaryModel, loadCanaryConfigs, saveCanaryConfigs } from "../routing/canary.js";
@@ -179,26 +179,37 @@ describe("getCanaryModel", () => {
         expect(result).not.toBeNull();
     });
 
-    it.each([{ splitPercent: 10 }, { splitPercent: 50 }, { splitPercent: 90 }])(
-        "statistical distribution: splitPercent:$splitPercent routes ~$splitPercent% over 1000 calls (±5%)",
-        async ({ splitPercent }) => {
-            const config = makeConfig({ splitPercent });
-            const kv = makeKv([config]);
+    // The roll is crypto-random, so a sampled test would fail by chance now and then (a ±5 point band over 1000 draws is
+    // about 3 sigma at a 50% split). Feeding the roll evenly spaced values instead makes the share exact and the test stable.
+    describe("split share", () => {
+        afterEach(() => {
+            vi.restoreAllMocks();
+        });
 
-            const SAMPLES = 1000;
-            let canaryCount = 0;
+        it.each([{ splitPercent: 10 }, { splitPercent: 50 }, { splitPercent: 90 }])(
+            "splitPercent:$splitPercent routes exactly that share of an even spread of rolls",
+            async ({ splitPercent }) => {
+                const SAMPLES = 1000;
+                let call = 0;
 
-            for (let i = 0; i < SAMPLES; i++) {
-                const result = await getCanaryModel("gpt-4o", "user-1", undefined, kv);
+                vi.spyOn(crypto, "getRandomValues").mockImplementation(<T extends ArrayBufferView | null>(array: T): T => {
+                    // Midpoints of SAMPLES equal slices of the uint32 range: roll i is (i + 0.5) / SAMPLES of the way through [0, 100).
+                    const words = array as unknown as Uint32Array;
 
-                if (result !== null) canaryCount++;
-            }
+                    words[0] = Math.floor(((call++ + 0.5) / SAMPLES) * 2 ** 32);
 
-            const actualPercent = (canaryCount / SAMPLES) * 100;
+                    return array;
+                });
 
-            // Expect within ±5 percentage points of the configured split.
-            expect(actualPercent).toBeGreaterThanOrEqual(splitPercent - 5);
-            expect(actualPercent).toBeLessThanOrEqual(splitPercent + 5);
-        },
-    );
+                const kv = makeKv([makeConfig({ splitPercent })]);
+                let canaryCount = 0;
+
+                for (let i = 0; i < SAMPLES; i++) {
+                    if ((await getCanaryModel("gpt-4o", "user-1", undefined, kv)) !== null) canaryCount++;
+                }
+
+                expect((canaryCount / SAMPLES) * 100).toBe(splitPercent);
+            },
+        );
+    });
 });

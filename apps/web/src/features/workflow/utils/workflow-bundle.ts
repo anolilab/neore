@@ -27,8 +27,8 @@ const ASSET_PATH = /^assets\/[\da-f]{64}\.[a-z\d]{1,5}$/u;
 const DATA_URL = /^data:([^;,]+);base64,(.*)$/su;
 const WINDOWS_DRIVE = /^[a-z]:/iu;
 
-/** The archive as a whole, read or written. */
-const MAX_BUNDLE_BYTES = 256 * 1024 * 1024;
+/** The archive as a whole, read or written. Exported for the export's own check against it. */
+export const MAX_BUNDLE_BYTES = 256 * 1024 * 1024;
 /** ponytail: the upload rate limit (`chat/attachmentUpload`, 30 burst on free, 90 on premium) bounds a real import; assets past it are reported as skipped. */
 const MAX_BUNDLE_ASSETS = 100;
 
@@ -39,6 +39,11 @@ const MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
 
 /** The inflated bytes all of a bundle's assets may total; the archive is read against this, and export writes within it. */
 export const ASSET_BYTE_BUDGET = MAX_BUNDLE_BYTES - MAX_MANIFEST_BYTES;
+
+/** The bytes a zip spends per entry beyond its data: a local header and a central record, each with the name (at most 77 bytes here). */
+const ZIP_ENTRY_OVERHEAD_BYTES = 512;
+/** The end-of-central-directory record, and slack beyond the entries. */
+const ZIP_ARCHIVE_OVERHEAD_BYTES = 64 * 1024;
 
 /**
  * The image and PDF types a bundle carries. A deliberate mirror of the image and PDF entries in
@@ -539,13 +544,19 @@ export const importWorkflowBundle = async (
 export const exportWorkflowBundle = async (
     content: WorkflowContent,
     dependencies: {
+        /** The archive cap the export writes within. Defaults to the import cap; a test lowers it to reach the budget. */
+        archiveBytes?: number;
         createZip: () => Promise<JsZipWriter>;
         fetchBytes: (url: string) => Promise<BundleSource | undefined>;
         signUrl: (fileId: string) => Promise<string | null>;
     },
 ): Promise<{ blob: Blob; skipped: number }> => {
+    const archiveBytes = dependencies.archiveBytes ?? MAX_BUNDLE_BYTES;
+    // The manifest's reserve, the zip's headers for the manifest and the `assets/` folder, and the archive's own
+    // overhead come out of the same cap the import reads against, so an asset is only admitted within what is left.
+    const assetBudget = archiveBytes - MAX_MANIFEST_BYTES - 2 * ZIP_ENTRY_OVERHEAD_BYTES - ZIP_ARCHIVE_OVERHEAD_BYTES;
     const assets = new Map<string, Uint8Array<ArrayBuffer>>();
-    let totalBytes = 0;
+    let reservedBytes = 0;
     let skipped = 0;
 
     // Records the bytes under their digest and answers the path, or undefined when the type or limits
@@ -560,13 +571,14 @@ export const exportWorkflowBundle = async (
         const path = `assets/${await sha256Hex(source.bytes)}.${extension}`;
 
         if (!assets.has(path)) {
-            // The manifest and the zip's own headers come out of the same archive cap import reads against.
-            if (assets.size >= MAX_BUNDLE_ASSETS || totalBytes + source.bytes.byteLength > ASSET_BYTE_BUDGET) {
+            const entryBytes = source.bytes.byteLength + ZIP_ENTRY_OVERHEAD_BYTES;
+
+            if (assets.size >= MAX_BUNDLE_ASSETS || reservedBytes + entryBytes > assetBudget) {
                 return undefined;
             }
 
             assets.set(path, source.bytes);
-            totalBytes += source.bytes.byteLength;
+            reservedBytes += entryBytes;
         }
 
         return path;
@@ -656,5 +668,14 @@ export const exportWorkflowBundle = async (
         zip.file(path, bytes);
     }
 
-    return { blob: await zip.generateAsync({ type: "blob" }), skipped };
+    const blob = await zip.generateAsync({ type: "blob" });
+
+    // The import refuses an archive past its cap, so an export must not write one. The budget above keeps every
+    // archive within it, so this is the backstop: the manifest is already written, and dropping an asset now would
+    // mean rewriting the nodes that name it.
+    if (blob.size > archiveBytes) {
+        throw new WorkflowBundleError("too-large");
+    }
+
+    return { blob, skipped };
 };

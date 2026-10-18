@@ -32,6 +32,15 @@ export const pickedFrameTime = (duration: number, pickedTime: number): number =>
     return Math.min(Math.max(0, pickedTime), last);
 };
 
+/**
+ * Whether a frame capture that began in the workflow `start` names may still add its node to the workflow loaded
+ * now: the same workflow, and the source video node still in it. Otherwise the captured frame is dropped.
+ */
+export const isCaptureTargetLoaded = (
+    loaded: { nodes: ReadonlyArray<{ id: string }>; projectId: string | null },
+    start: { nodeId: string; projectId: string | null },
+): boolean => loaded.projectId === start.projectId && loaded.nodes.some((node) => node.id === start.nodeId);
+
 const settle = (video: HTMLVideoElement, event: "loadeddata" | "seeked"): Promise<void> =>
     new Promise((resolve, reject) => {
         // One abort removes both listeners, so the handlers need no names to remove them by.

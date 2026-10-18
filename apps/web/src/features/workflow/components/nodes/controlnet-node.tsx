@@ -126,10 +126,8 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
 
                 {/* ControlNet Model */}
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>ControlNet Model</Trans>
-                    </Label>
                     <ModelSelect
+                        label={<Trans>ControlNet Model</Trans>}
                         onChange={handleModelChange}
                         options={controlNetModels}
                         placeholder={t`Select model...`}

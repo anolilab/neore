@@ -85,10 +85,8 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
         <BaseNode {...props} color={config.color} icon={<Film className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>Model</Trans>
-                    </Label>
                     <ModelSelect
+                        label={<Trans>Model</Trans>}
                         note={<Trans>Pro models need a Pro plan. On a free plan the run stops before it starts.</Trans>}
                         onChange={handleModelChange}
                         options={modelOptions}

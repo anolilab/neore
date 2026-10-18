@@ -131,10 +131,8 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>Model</Trans>
-                    </Label>
                     <ModelSelect
+                        label={<Trans>Model</Trans>}
                         note={<Trans>Pro models need a Pro plan. On a free plan the run stops before it starts.</Trans>}
                         onChange={handleModelChange}
                         options={modelOptions}

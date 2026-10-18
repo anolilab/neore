@@ -7,6 +7,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { storeFile } from "../agent/client";
 import { internalAction } from "../_generated/server";
+import { contentMatchesType, SNIFF_BYTES } from "../lib/content-sniff";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk } from "../lib/fetch-timeout";
 import { MAX_LENGTH } from "../lib/validators";
 import type { FrameKind } from "./mentions";
@@ -27,6 +28,17 @@ export const EXTRACT_DEADLINE_MS = 3 * 60 * 1000;
 
 /** fal's queue host. The platform key is sent to the URLs fal returns, so only this host is followed. */
 const FAL_QUEUE_HOST = "queue.fal.run";
+
+/** The types a frame is stored as. A frame is a still image, so a video or a document is refused. */
+const FRAME_TYPES: ReadonlySet<string> = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** A `Content-Type` value's bare, lowercased type; empty when there is none. */
+const frameTypeOf = (value: string | null | undefined): string => value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+
+const unsupportedFrameMessage = (type: string): string => `fal.ai returned a frame of type ${type || "unknown"}; only JPEG, PNG and WebP frames are stored`;
+
+/** The most bytes a frame may be. A frame is a single decoded image; anything larger is not one we asked for. */
+export const FRAME_MAX_BYTES = 20 * 1024 * 1024;
 
 interface FalExtractResult {
     images?: { content_type?: string; url?: string }[];
@@ -72,6 +84,85 @@ const assertFalMediaUrl = (value: string | undefined): string => {
     }
 
     return url.href;
+};
+
+/**
+ * The body's bytes, read against `maxBytes` as they arrive. A declared length over the cap is refused
+ * before any byte is read; an undeclared one is cut off once it passes the cap. Either way the body is
+ * cancelled rather than left open.
+ */
+const readFrameBytes = async (response: Response, maxBytes: number): Promise<Uint8Array> => {
+    const tooLarge = `fal.ai frame exceeds ${FRAME_MAX_BYTES} bytes`;
+    const declared = Number(response.headers.get("content-length"));
+
+    if (Number.isFinite(declared) && declared > maxBytes) {
+        await response.body?.cancel();
+        throw new Error(tooLarge);
+    }
+
+    const reader = response.body?.getReader();
+
+    if (!reader) {
+        return new Uint8Array();
+    }
+
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+
+    for (;;) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+            break;
+        }
+
+        total += value.byteLength;
+
+        if (total > maxBytes) {
+            await reader.cancel();
+            throw new Error(tooLarge);
+        }
+
+        chunks.push(value);
+    }
+
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+
+    return bytes;
+};
+
+/**
+ * The frame's bytes from fal's media host, typed and sniffed before they are stored. The download follows no redirect, and
+ * `falType` (fal's own type, possibly empty) is checked before it. Without it, the download's Content-Type stands in.
+ */
+const downloadFrame = async (url: string, falType: string): Promise<Blob> => {
+    // Checked before the download: a 3xx would name a host fal did not.
+    const download = await fetchOk(assertFalMediaUrl(url), {
+        errorPrefix: "Frame download failed",
+        redirect: "error",
+        timeoutMs: FETCH_TIMEOUT_LONG_MS,
+    });
+    const declaredType = falType || frameTypeOf(download.headers.get("content-type"));
+
+    if (!FRAME_TYPES.has(declaredType)) {
+        await download.body?.cancel();
+        throw new Error(unsupportedFrameMessage(declaredType));
+    }
+
+    const bytes = await readFrameBytes(download, FRAME_MAX_BYTES);
+
+    // The leading bytes must agree with the type the frame is stored as.
+    if (!contentMatchesType(bytes.subarray(0, SNIFF_BYTES), declaredType)) {
+        throw new Error(`fal.ai returned frame bytes that do not match the declared type ${declaredType}`);
+    }
+
+    return new Blob([bytes], { type: declaredType });
 };
 
 /**
@@ -125,14 +216,14 @@ export const extractFrameImage = async (
                 throw new Error("fal.ai returned no frame image");
             }
 
-            // Checked before the download, and the download follows no redirect: a 3xx would name a host fal did not.
-            const download = await fetchOk(assertFalMediaUrl(image.url), {
-                errorPrefix: "Frame download failed",
-                redirect: "error",
-                timeoutMs: FETCH_TIMEOUT_LONG_MS,
-            });
+            // fal's type is optional. One it names that is not a still image is refused before anything is downloaded.
+            const falType = frameTypeOf(image.content_type);
 
-            return new Blob([await download.arrayBuffer()], { type: image.content_type ?? "image/png" });
+            if (falType !== "" && !FRAME_TYPES.has(falType)) {
+                throw new Error(unsupportedFrameMessage(falType));
+            }
+
+            return await downloadFrame(image.url, falType);
         }
 
         if (status.status !== "IN_QUEUE" && status.status !== "IN_PROGRESS") {

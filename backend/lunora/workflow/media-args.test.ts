@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { internal } from "../_generated/internal";
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
 import { executionContextOf } from "./test-execution-context";
-import { videoInputErrors } from "./video-inputs";
+import { mediaOf, videoInputErrors } from "./video-inputs";
 import {
     imageRequestArgs,
     imageToVideoArgs,
@@ -32,6 +32,18 @@ describe("videoNodeOutput", () => {
             modelId: "fal-ai/kling",
             prompt: "a fox",
         });
+    });
+
+    it("keeps a text-to-video clip's stored file id, so a persisted output is read by id once its URL expires", () => {
+        const result = {
+            assets: [{ fileId: "f2", mimeType: "video/mp4", videoUrl: "https://x.example/expired.mp4" }],
+            modelId: "fal:mochi-v1",
+            prompt: "a fox",
+        };
+        const stored = videoNodeOutput(result, "ignored");
+
+        expect(stored.assets[0]?.fileId).toBe("f2");
+        expect(mediaOf(stored)).toStrictEqual({ mimeType: "video/mp4", ref: { fileId: "f2" } });
     });
 
     it("passes a text-to-video result through unchanged", () => {

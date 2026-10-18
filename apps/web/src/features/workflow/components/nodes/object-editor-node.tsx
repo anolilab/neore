@@ -102,10 +102,8 @@ const ObjectEditorNodeComponent = (props: NodeProps<Node<ObjectEditorNodeData>>)
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>Model</Trans>
-                    </Label>
                     <ModelSelect
+                        label={<Trans>Model</Trans>}
                         onChange={handleModelChange}
                         options={modelOptions}
                         placeholder={t`Select model...`}

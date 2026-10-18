@@ -4144,6 +4144,8 @@ export const generateVideo = internalAction
         v.object({
             assets: v.array(
                 v.object({
+                    /** The stored clip (`chatFiles`): a persisted run output re-signs it by id after the URL expires. */
+                    fileId: v.optional(v.string()),
                     mimeType: v.string(),
                     videoUrl: v.string(),
                 }),
@@ -4366,6 +4368,7 @@ export const generateVideo = internalAction
             return {
                 assets: [
                     {
+                        fileId: file.fileId,
                         mimeType,
                         videoUrl: file.url,
                     },

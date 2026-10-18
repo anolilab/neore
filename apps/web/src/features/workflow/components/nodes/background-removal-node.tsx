@@ -59,10 +59,8 @@ const BackgroundRemovalNodeComponent = (props: NodeProps<Node<BackgroundRemovalN
         <BaseNode {...props} color={config.color} icon={<Scissors className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>Model</Trans>
-                    </Label>
                     <ModelSelect
+                        label={<Trans>Model</Trans>}
                         onChange={handleModelChange}
                         options={modelOptions}
                         placeholder={t`Select model...`}

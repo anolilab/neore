@@ -750,8 +750,8 @@ msgstr "{fileCount, plural, other {変更（# ファイル）}}"
 msgid "{fileCount, plural, one {Failed to upload # file} other {Failed to upload # files}}"
 msgstr "{fileCount, plural, other {# 個のファイルをアップロードできませんでした}}"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:154
-#: src/features/workflow/components/nodes/video-node.tsx:238
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:152
+#: src/features/workflow/components/nodes/video-node.tsx:236
 msgid "{fps} fps"
 msgstr "{fps} fps"
 
@@ -1805,7 +1805,7 @@ msgstr "ページを追加"
 msgid "Add Passkey"
 msgstr "パスキーを追加"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:121
+#: src/features/workflow/components/nodes/video-frames-section.tsx:130
 msgid "Add picked frame as image node"
 msgstr "選択したフレームを画像ノードとして追加"
 
@@ -1818,7 +1818,7 @@ msgstr "プロバイダーを追加"
 msgid "Add Rectangle"
 msgstr "長方形を追加"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:193
+#: src/features/workflow/components/nodes/character-ref-node.tsx:191
 msgid "Add reference image"
 msgstr "参照画像を追加"
 
@@ -1830,7 +1830,7 @@ msgstr "参照画像を追加"
 msgid "Add reference images (up to {maxReferenceImages})"
 msgstr "参照画像を追加（最大 {maxReferenceImages} 枚）"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:212
+#: src/features/workflow/components/nodes/character-ref-node.tsx:210
 msgid "Add reference images to maintain consistency"
 msgstr "一貫性を保つために参照画像を追加"
 
@@ -3259,7 +3259,7 @@ msgstr "アスペクト比"
 
 #: src/features/chat/thread/media-gallery-view.tsx:448
 #: src/features/chat/thread/media-gallery-view.tsx:533
-#: src/features/workflow/components/nodes/video-node.tsx:180
+#: src/features/workflow/components/nodes/video-node.tsx:178
 msgid "Aspect Ratio"
 msgstr "アスペクト比"
 
@@ -3410,7 +3410,7 @@ msgstr "自動保存を有効にしました"
 msgid "Auto-Delete Active"
 msgstr "自動削除が有効"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:148
+#: src/features/workflow/components/nodes/controlnet-node.tsx:146
 #: src/features/workflow/components/nodes/transcription-node.tsx:16
 msgid "Auto-detect"
 msgstr "自動検出"
@@ -3579,7 +3579,7 @@ msgstr "ギャラリーに戻る"
 msgid "Back to workflows"
 msgstr "ワークフローに戻る"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:100
+#: src/features/workflow/components/nodes/background-removal-node.tsx:98
 msgid "Background Color (optional)"
 msgstr "背景色（任意）"
 
@@ -4622,7 +4622,7 @@ msgstr "画面をキャプチャ"
 #~ msgid "captured"
 #~ msgstr "キャプチャ済み"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:121
+#: src/features/workflow/components/nodes/video-frames-section.tsx:130
 msgid "Capturing…"
 msgstr "キャプチャ中…"
 
@@ -5959,10 +5959,10 @@ msgstr "Messaging API を通じて LINE 公式アカウントを接続します�
 msgid "Connect an audio/file node as input"
 msgstr "音声/ファイルノードを入力として接続してください"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:124
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:170
-#: src/features/workflow/components/nodes/outpaint-node.tsx:150
-#: src/features/workflow/components/nodes/video-node.tsx:160
+#: src/features/workflow/components/nodes/background-removal-node.tsx:122
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:168
+#: src/features/workflow/components/nodes/outpaint-node.tsx:148
+#: src/features/workflow/components/nodes/video-node.tsx:158
 msgid "Connect an image node as input"
 msgstr "画像ノードを入力として接続してください"
 
@@ -5994,8 +5994,8 @@ msgstr "Feishu / Lark を接続"
 msgid "Connect LINE"
 msgstr "LINE を接続"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:103
-#: src/features/workflow/components/nodes/object-editor-node.tsx:166
+#: src/features/workflow/components/nodes/inpaint-node.tsx:101
+#: src/features/workflow/components/nodes/object-editor-node.tsx:164
 msgid "Connect mask from upstream node or provide URL"
 msgstr "上流ノードからマスクを接続するか、URL を指定してください"
 
@@ -6227,7 +6227,7 @@ msgstr "コンテンツ制作"
 msgid "Content Image"
 msgstr "コンテンツ画像"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:110
+#: src/features/workflow/components/nodes/style-ref-node.tsx:108
 msgid "Content Image URL (optional)"
 msgstr "コンテンツ画像の URL（任意）"
 
@@ -6333,11 +6333,11 @@ msgstr "絞り設定で被写界深度を調整します"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "UI での個人情報の表示方法を管理します。"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:184
+#: src/features/workflow/components/nodes/controlnet-node.tsx:182
 msgid "Control Strength"
 msgstr "制御の強さ"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:194
+#: src/features/workflow/components/nodes/controlnet-node.tsx:192
 msgid "Control Timing"
 msgstr "制御のタイミング"
 
@@ -6345,7 +6345,7 @@ msgstr "制御のタイミング"
 msgid "Control Type"
 msgstr "制御の種類"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:217
+#: src/features/workflow/components/nodes/controlnet-node.tsx:215
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "生成中に ControlNet の影響を適用するタイミングを制御します"
 
@@ -8133,11 +8133,11 @@ msgstr "降順"
 msgid "Describe a change. You review the result before anything is saved; applying it creates a version you can restore."
 msgstr "変更内容を説明してください。保存前に結果を確認でき、適用すると復元可能なバージョンが作成されます。"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:115
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:113
 msgid "Describe how the image should animate"
 msgstr "画像をどのように動かすかを説明してください"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:73
+#: src/features/workflow/components/nodes/img2img-node.tsx:71
 msgid "Describe how to transform the image..."
 msgstr "画像をどのように変換するかを説明してください..."
 
@@ -8149,20 +8149,20 @@ msgstr "生成する画像を説明してください..."
 msgid "Describe the image you want to create..."
 msgstr "作成したい画像を説明してください..."
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:110
-#: src/features/workflow/components/nodes/video-node.tsx:154
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:108
+#: src/features/workflow/components/nodes/video-node.tsx:152
 msgid "Describe the motion/animation..."
 msgstr "動き/アニメーションを説明してください..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:168
+#: src/features/workflow/components/nodes/style-ref-node.tsx:166
 msgid "Describe the scene or add style modifiers..."
 msgstr "シーンを説明するか、スタイル修飾子を追加してください..."
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:258
+#: src/features/workflow/components/nodes/character-ref-node.tsx:256
 msgid "Describe the scene or context..."
 msgstr "シーンやコンテキストを説明してください..."
 
-#: src/features/workflow/components/nodes/video-node.tsx:154
+#: src/features/workflow/components/nodes/video-node.tsx:152
 msgid "Describe the video to generate..."
 msgstr "生成する動画を説明してください..."
 
@@ -8178,11 +8178,11 @@ msgstr "スキルに何をさせたいかを説明してください。下のフ
 msgid "Describe what this workflow does..."
 msgstr "このワークフローの内容を説明してください..."
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:125
+#: src/features/workflow/components/nodes/object-editor-node.tsx:123
 msgid "Describe what to add or replace..."
 msgstr "追加または置換する内容を説明してください..."
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:101
+#: src/features/workflow/components/nodes/outpaint-node.tsx:99
 msgid "Describe what to generate in expanded areas..."
 msgstr "拡張領域に生成する内容を説明してください..."
 
@@ -8377,7 +8377,7 @@ msgstr "デジタル"
 msgid "Digital Art"
 msgstr "デジタルアート"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:110
+#: src/features/workflow/components/nodes/outpaint-node.tsx:108
 msgid "Direction"
 msgstr "方向"
 
@@ -8823,8 +8823,8 @@ msgstr "選択項目を複製（{selectedNonGroupCount}）"
 msgid "Duration"
 msgstr "長さ"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:124
-#: src/features/workflow/components/nodes/video-node.tsx:199
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:122
+#: src/features/workflow/components/nodes/video-node.tsx:197
 msgid "Duration: {duration}s"
 msgstr "長さ: {duration} 秒"
 
@@ -9494,7 +9494,7 @@ msgstr "「Events & Callbacks > Encryption Strategy」にある Encrypt Key（�
 msgid "Encrypted at rest and never shown again. Local servers such as Ollama usually need none."
 msgstr "保存時に暗号化され、再表示されることはありません。Ollama などのローカルサーバーでは通常不要です。"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:209
+#: src/features/workflow/components/nodes/controlnet-node.tsx:207
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:188
 msgid "End"
 msgstr "終了"
@@ -9566,13 +9566,13 @@ msgstr "英語（英国）"
 msgid "English (US)"
 msgstr "英語（米国）"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:132
-#: src/features/workflow/components/nodes/upscale-node.tsx:135
+#: src/features/workflow/components/nodes/upscale-node.tsx:130
+#: src/features/workflow/components/nodes/upscale-node.tsx:133
 msgid "Enhance Details"
 msgstr "ディテールを強化"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:119
-#: src/features/workflow/components/nodes/upscale-node.tsx:122
+#: src/features/workflow/components/nodes/upscale-node.tsx:117
+#: src/features/workflow/components/nodes/upscale-node.tsx:120
 msgid "Enhance Faces"
 msgstr "顔を補正"
 
@@ -10246,7 +10246,7 @@ msgstr "思考を展開"
 msgid "Expand to fullscreen"
 msgstr "全画面表示に展開"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:128
+#: src/features/workflow/components/nodes/outpaint-node.tsx:126
 msgid "Expand: {expandPixels}px"
 msgstr "拡張: {expandPixels}px"
 
@@ -10254,7 +10254,7 @@ msgstr "拡張: {expandPixels}px"
 msgid "Expanded Editor"
 msgstr "拡張エディター"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:95
+#: src/features/workflow/components/nodes/outpaint-node.tsx:93
 msgid "Expansion Prompt"
 msgstr "拡張プロンプト"
 
@@ -11772,7 +11772,7 @@ msgstr "塗りつぶしの色"
 msgid "Fill in a name, a valid command, a description and instructions before saving."
 msgstr "保存する前に、名前、有効なコマンド、説明、指示を入力してください。"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:79
+#: src/features/workflow/components/nodes/inpaint-node.tsx:77
 msgid "Fill Prompt"
 msgstr "塗りつぶしプロンプト"
 
@@ -12148,11 +12148,11 @@ msgstr "Google をリードする Veo 3.x シリーズの基盤"
 msgid "FPS"
 msgstr "FPS"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:69
+#: src/features/workflow/components/nodes/video-frames-section.tsx:78
 msgid "Frame capture failed"
 msgstr "フレームのキャプチャに失敗しました"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:79
+#: src/features/workflow/components/nodes/video-frames-section.tsx:88
 msgid "Frames"
 msgstr "フレーム"
 
@@ -12718,8 +12718,8 @@ msgstr "生成"
 msgid "Generation Prompt"
 msgstr "生成プロンプト"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:252
-#: src/features/workflow/components/nodes/style-ref-node.tsx:162
+#: src/features/workflow/components/nodes/character-ref-node.tsx:250
+#: src/features/workflow/components/nodes/style-ref-node.tsx:160
 msgid "Generation Prompt (optional)"
 msgstr "生成プロンプト（任意）"
 
@@ -13592,7 +13592,7 @@ msgstr "OpenAI の最小かつ最速のモデルを必要とする大量の軽�
 msgid "High-volume, time-sensitive workflows where generation speed is the top priority"
 msgstr "生成速度が最優先となる、大量かつ時間的制約のあるワークフロー"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:246
+#: src/features/workflow/components/nodes/character-ref-node.tsx:244
 msgid "Higher = closer match to reference"
 msgstr "高いほど参照に近くなる"
 
@@ -13600,7 +13600,7 @@ msgstr "高いほど参照に近くなる"
 msgid "Higher = more prompt adherence, Lower = more creativity"
 msgstr "高いほどプロンプトに忠実、低いほど創造的"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:139
+#: src/features/workflow/components/nodes/style-ref-node.tsx:137
 msgid "Higher = stronger style influence"
 msgstr "高いほどスタイルの影響が強くなる"
 
@@ -13730,15 +13730,15 @@ msgstr "HTTPS のみ。ANTHROPIC_BASE_URL と同じくサーバーのルート�
 msgid "HTTPS only. Usually ends in /v1."
 msgstr "HTTPS のみ。通常は /v1 で終わります。"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:140
+#: src/features/workflow/components/nodes/object-editor-node.tsx:138
 msgid "https://... (white = edit area)"
 msgstr "https://...（白 = 編集領域）"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:99
+#: src/features/workflow/components/nodes/inpaint-node.tsx:97
 msgid "https://... (white = edit, black = keep)"
 msgstr "https://...（白 = 編集、黒 = 保持）"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:170
+#: src/features/workflow/components/nodes/controlnet-node.tsx:168
 msgid "https://... or from input"
 msgstr "https://... または入力から"
 
@@ -13905,7 +13905,7 @@ msgstr "画像生成モデル"
 #~ msgid "Image is too large. Choose one under 300 KB."
 #~ msgstr ""
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:119
+#: src/features/workflow/components/nodes/style-ref-node.tsx:117
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "スタイルを適用する画像（または前のノードの入力を使用）"
 
@@ -13948,7 +13948,7 @@ msgstr "画像の URL またはアップロードした画像が必要です"
 msgid "Image variation & editing"
 msgstr "画像のバリエーションと編集"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:104
+#: src/features/workflow/components/nodes/style-ref-node.tsx:102
 msgid "Image whose artistic style will be applied"
 msgstr "芸術的スタイルを適用する元の画像"
 
@@ -14975,7 +14975,7 @@ msgstr "キルギス"
 msgid "Label"
 msgstr "ラベル"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:166
+#: src/features/workflow/components/nodes/object-editor-node.tsx:164
 msgid "LAMA uses AI to seamlessly remove objects"
 msgstr "LAMA は AI を使ってオブジェクトを自然に除去します"
 
@@ -15315,7 +15315,7 @@ msgstr "インデックス済みのすべてのファイルを検索するには
 msgid "Leave empty for \"any model\"."
 msgstr "「任意のモデル」にする場合は空欄のままにしてください。"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:119
+#: src/features/workflow/components/nodes/background-removal-node.tsx:117
 msgid "Leave empty for transparent background"
 msgstr "透明な背景にする場合は空欄のままにしてください"
 
@@ -15921,7 +15921,7 @@ msgstr "低"
 msgid "Low latency text-to-video"
 msgstr "低レイテンシのテキストから動画生成"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:88
+#: src/features/workflow/components/nodes/img2img-node.tsx:86
 msgid "Lower = subtle changes, Higher = major transformation"
 msgstr "低い = 控えめな変化、高い = 大幅な変換"
 
@@ -16002,7 +16002,7 @@ msgstr "メインフォント"
 msgid "Main font updated"
 msgstr "メインフォントを更新しました"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:149
+#: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
 msgstr "元の構造を維持"
 
@@ -16182,11 +16182,11 @@ msgstr "すべて既読にする"
 msgid "Mark as favorite"
 msgstr "お気に入りにする"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:144
+#: src/features/workflow/components/nodes/object-editor-node.tsx:142
 msgid "Mark the area to edit in white"
 msgstr "編集する領域を白でマークしてください"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:144
+#: src/features/workflow/components/nodes/object-editor-node.tsx:142
 msgid "Mark the object to remove in white"
 msgstr "削除するオブジェクトを白でマークしてください"
 
@@ -16227,11 +16227,11 @@ msgstr "マスク"
 msgid "Mask preview"
 msgstr "マスクのプレビュー"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:134
+#: src/features/workflow/components/nodes/object-editor-node.tsx:132
 msgid "Mask URL"
 msgstr "マスク URL"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:93
+#: src/features/workflow/components/nodes/inpaint-node.tsx:91
 msgid "Mask URL (optional)"
 msgstr "マスク URL (任意)"
 
@@ -17103,13 +17103,13 @@ msgstr "最も汎用性の高いインテリジェントモデル"
 msgid "motion fluidity"
 msgstr "滑らかな動き"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:104
-#: src/features/workflow/components/nodes/video-node.tsx:148
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:102
+#: src/features/workflow/components/nodes/video-node.tsx:146
 msgid "Motion Prompt"
 msgstr "モーションプロンプト"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:138
-#: src/features/workflow/components/nodes/video-node.tsx:214
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:136
+#: src/features/workflow/components/nodes/video-node.tsx:212
 msgid "Motion: {motionPercent}%"
 msgstr "モーション: {motionPercent}%"
 
@@ -17494,9 +17494,9 @@ msgstr "対応が必要"
 msgid "Negative prompt — what to exclude"
 msgstr "ネガティブプロンプト — 除外したい要素"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:112
-#: src/features/workflow/components/nodes/object-editor-node.tsx:153
-#: src/features/workflow/components/nodes/outpaint-node.tsx:137
+#: src/features/workflow/components/nodes/inpaint-node.tsx:110
+#: src/features/workflow/components/nodes/object-editor-node.tsx:151
+#: src/features/workflow/components/nodes/outpaint-node.tsx:135
 msgid "Negative Prompt (optional)"
 msgstr "ネガティブプロンプト (任意)"
 
@@ -18684,7 +18684,7 @@ msgstr "メッセージ数"
 msgid "Object Editor"
 msgstr "オブジェクトエディター"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:119
+#: src/features/workflow/components/nodes/object-editor-node.tsx:117
 msgid "Object Prompt"
 msgstr "オブジェクトプロンプト"
 
@@ -19677,7 +19677,7 @@ msgstr "出力 {outputNumber}: {label}"
 msgid "Output files"
 msgstr "出力ファイル"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:75
+#: src/features/workflow/components/nodes/background-removal-node.tsx:73
 msgid "Output Format"
 msgstr "出力形式"
 
@@ -19995,7 +19995,7 @@ msgstr "LINE チャネルの Messaging API タブで Webhook URL に貼り付け
 msgid "Paste cells"
 msgstr "セルを貼り付け"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:115
+#: src/features/workflow/components/nodes/style-ref-node.tsx:113
 msgid "Paste content image URL to stylize..."
 msgstr "スタイルを適用するコンテンツ画像の URL を貼り付け..."
 
@@ -20003,7 +20003,7 @@ msgstr "スタイルを適用するコンテンツ画像の URL を貼り付け.
 msgid "Paste image URL"
 msgstr "画像 URL を貼り付け"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:190
+#: src/features/workflow/components/nodes/character-ref-node.tsx:188
 msgid "Paste image URL..."
 msgstr "画像 URL を貼り付け..."
 
@@ -20015,7 +20015,7 @@ msgstr "既存の行に収まる分だけ貼り付け"
 msgid "Paste or write a system prompt to optimize..."
 msgstr "最適化するシステムプロンプトを貼り付けるか入力してください..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:100
+#: src/features/workflow/components/nodes/style-ref-node.tsx:98
 msgid "Paste style reference image URL..."
 msgstr "スタイル参照画像の URL を貼り付け..."
 
@@ -20218,7 +20218,7 @@ msgstr "色を選択"
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "画像を最大 {maxReferences} 枚選択してください。選択した順番でモデルに渡されます。"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:107
+#: src/features/workflow/components/nodes/video-frames-section.tsx:116
 msgid "Picked at (s)"
 msgstr "選択位置 (秒)"
 
@@ -20226,7 +20226,7 @@ msgstr "選択位置 (秒)"
 #~ msgid "Picked frame"
 #~ msgstr "選択したフレーム"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:93
+#: src/features/workflow/components/nodes/video-frames-section.tsx:102
 msgid "Picked frame wire (remove it)"
 msgstr "選択フレームの接続（削除）"
 
@@ -20632,7 +20632,7 @@ msgstr "インポートを準備しています…"
 msgid "Preparing..."
 msgstr "準備しています..."
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:144
+#: src/features/workflow/components/nodes/controlnet-node.tsx:142
 msgid "Preprocessor"
 msgstr "プリプロセッサ"
 
@@ -20643,8 +20643,8 @@ msgstr "プリプロセッサ"
 msgid "Presentation"
 msgstr "プレゼンテーション"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:146
-#: src/features/workflow/components/nodes/style-ref-node.tsx:153
+#: src/features/workflow/components/nodes/style-ref-node.tsx:144
+#: src/features/workflow/components/nodes/style-ref-node.tsx:151
 msgid "Preserve Content"
 msgstr "コンテンツを保持"
 
@@ -20895,8 +20895,8 @@ msgstr "Pro"
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro はあなた個人のプランです。すべてのモデルと1日1,000メッセージ。"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:92
-#: src/features/workflow/components/nodes/video-node.tsx:138
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:90
+#: src/features/workflow/components/nodes/video-node.tsx:136
 msgid "Pro models need a Pro plan. On a free plan the run stops before it starts."
 msgstr "Pro モデルには Pro プランが必要です。無料プランでは、実行は開始前に停止します。"
 
@@ -21847,7 +21847,7 @@ msgstr "やり直す"
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr "やり直し (Ctrl+Shift+Z)"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:175
+#: src/features/workflow/components/nodes/controlnet-node.tsx:173
 msgid "Reference"
 msgstr "参照"
 
@@ -21855,7 +21855,7 @@ msgstr "参照"
 msgid "Reference {ordinal}"
 msgstr "参照 {ordinal}"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:164
+#: src/features/workflow/components/nodes/controlnet-node.tsx:162
 msgid "Reference Image (optional)"
 msgstr "参照画像 (任意)"
 
@@ -21877,7 +21877,7 @@ msgstr "参照画像"
 msgid "Reference images"
 msgstr "参照画像"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:156
+#: src/features/workflow/components/nodes/character-ref-node.tsx:154
 msgid "Reference Images ({referenceCount}/{maxImages})"
 msgstr "参照画像 ({referenceCount}/{maxImages})"
 
@@ -21885,7 +21885,7 @@ msgstr "参照画像 ({referenceCount}/{maxImages})"
 msgid "Reference mode"
 msgstr "参照モード"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:218
+#: src/features/workflow/components/nodes/character-ref-node.tsx:216
 msgid "Reference Mode"
 msgstr "参照モード"
 
@@ -21893,7 +21893,7 @@ msgstr "参照モード"
 msgid "Reference Photo"
 msgstr "参照写真"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:240
+#: src/features/workflow/components/nodes/character-ref-node.tsx:238
 msgid "Reference Strength"
 msgstr "参照の強さ"
 
@@ -21917,7 +21917,7 @@ msgstr "参照"
 msgid "Refine"
 msgstr "改善"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:93
+#: src/features/workflow/components/nodes/background-removal-node.tsx:91
 msgid "Refine Edge Detection"
 msgstr "エッジ検出を精緻化"
 
@@ -22272,7 +22272,7 @@ msgstr "プロバイダーを削除しますか？"
 msgid "Remove queued message {position}"
 msgstr "待機中のメッセージ {position} を削除"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:168
+#: src/features/workflow/components/nodes/character-ref-node.tsx:166
 msgid "Remove reference image"
 msgstr "参照画像を削除"
 
@@ -22953,7 +22953,7 @@ msgstr "実行の進捗"
 msgid "Run Python, see charts and images instantly"
 msgstr "Python を実行して、グラフや画像をすぐに確認"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:126
+#: src/features/workflow/components/nodes/video-frames-section.tsx:135
 msgid "Run the node first to pick a frame"
 msgstr "フレームを選ぶには、先にノードを実行してください"
 
@@ -23247,7 +23247,7 @@ msgstr "保存しています..."
 msgid "Saving…"
 msgstr "保存しています…"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:100
+#: src/features/workflow/components/nodes/upscale-node.tsx:98
 msgid "Scale Factor"
 msgstr "拡大倍率"
 
@@ -23334,7 +23334,7 @@ msgstr "一番下までスクロール"
 msgid "Scroll up one page"
 msgstr "1 ページ上にスクロール"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:163
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:161
 msgid "Seamless Loop"
 msgstr "シームレスループ"
 
@@ -23704,17 +23704,17 @@ msgstr "モデルを選択 (任意)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
 #: src/components/model-picker/model-picker-button.tsx:94
-#: src/features/workflow/components/nodes/background-removal-node.tsx:68
-#: src/features/workflow/components/nodes/character-ref-node.tsx:149
-#: src/features/workflow/components/nodes/controlnet-node.tsx:135
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:95
-#: src/features/workflow/components/nodes/img2img-node.tsx:60
-#: src/features/workflow/components/nodes/inpaint-node.tsx:72
-#: src/features/workflow/components/nodes/object-editor-node.tsx:111
-#: src/features/workflow/components/nodes/outpaint-node.tsx:88
-#: src/features/workflow/components/nodes/style-ref-node.tsx:88
-#: src/features/workflow/components/nodes/upscale-node.tsx:93
-#: src/features/workflow/components/nodes/video-node.tsx:141
+#: src/features/workflow/components/nodes/background-removal-node.tsx:66
+#: src/features/workflow/components/nodes/character-ref-node.tsx:147
+#: src/features/workflow/components/nodes/controlnet-node.tsx:133
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:93
+#: src/features/workflow/components/nodes/img2img-node.tsx:58
+#: src/features/workflow/components/nodes/inpaint-node.tsx:70
+#: src/features/workflow/components/nodes/object-editor-node.tsx:109
+#: src/features/workflow/components/nodes/outpaint-node.tsx:86
+#: src/features/workflow/components/nodes/style-ref-node.tsx:86
+#: src/features/workflow/components/nodes/upscale-node.tsx:91
+#: src/features/workflow/components/nodes/video-node.tsx:139
 msgid "Select model..."
 msgstr "モデルを選択..."
 
@@ -25066,7 +25066,7 @@ msgstr "星"
 msgid "Starred"
 msgstr "スター付き"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:200
+#: src/features/workflow/components/nodes/controlnet-node.tsx:198
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:170
 msgid "Start"
 msgstr "開始"
@@ -25378,7 +25378,7 @@ msgstr "ストリーミング"
 msgid "Streaming..."
 msgstr "ストリーミング中..."
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:82
+#: src/features/workflow/components/nodes/img2img-node.tsx:80
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:140
 msgid "Strength"
 msgstr "強度"
@@ -25685,7 +25685,7 @@ msgstr "スタイルの一貫性"
 msgid "Style Image"
 msgstr "スタイル画像"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:95
+#: src/features/workflow/components/nodes/style-ref-node.tsx:93
 msgid "Style Image URL"
 msgstr "スタイル画像 URL"
 
@@ -25694,7 +25694,7 @@ msgstr "スタイル画像 URL"
 msgid "Style Reference"
 msgstr "スタイル参照"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:126
+#: src/features/workflow/components/nodes/style-ref-node.tsx:124
 msgid "Style Strength"
 msgstr "スタイルの強さ"
 
@@ -26570,7 +26570,7 @@ msgstr "アーカイブに含まれるファイルが多すぎます。"
 msgid "The assistant has a question"
 msgstr "アシスタントから質問があります"
 
-#: src/features/workflow/components/nodes/video-frames-section.tsx:68
+#: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
 msgstr "ブラウザーがこの動画を読み取れないため、フレームをキャプチャできません"
 
@@ -27776,7 +27776,7 @@ msgstr "AI で変換"
 msgid "transformation"
 msgstr "変換"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:67
+#: src/features/workflow/components/nodes/img2img-node.tsx:65
 msgid "Transformation Prompt"
 msgstr "変換プロンプト"
 
@@ -27808,7 +27808,7 @@ msgstr "翻訳に失敗しました。"
 msgid "Translation to {languageName}"
 msgstr "{languageName}への翻訳"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:114
+#: src/features/workflow/components/nodes/background-removal-node.tsx:112
 msgid "Transparent"
 msgstr "透過"
 
@@ -29346,7 +29346,7 @@ msgstr "動画生成モデル"
 msgid "Video LoRA support for custom styles"
 msgstr "カスタムスタイル向けの動画 LoRA サポート"
 
-#: src/features/workflow/components/nodes/video-node.tsx:148
+#: src/features/workflow/components/nodes/video-node.tsx:146
 msgid "Video Prompt"
 msgstr "動画プロンプト"
 
@@ -29956,13 +29956,13 @@ msgstr "過去 30 日間にエージェントがあなたのデバイスに依�
 msgid "What this variable represents..."
 msgstr "この変数が表すもの..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:118
-#: src/features/workflow/components/nodes/object-editor-node.tsx:159
-#: src/features/workflow/components/nodes/outpaint-node.tsx:143
+#: src/features/workflow/components/nodes/inpaint-node.tsx:116
+#: src/features/workflow/components/nodes/object-editor-node.tsx:157
+#: src/features/workflow/components/nodes/outpaint-node.tsx:141
 msgid "What to avoid..."
 msgstr "避けたい要素..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:85
+#: src/features/workflow/components/nodes/inpaint-node.tsx:83
 msgid "What to generate in the masked area..."
 msgstr "マスク領域に生成する内容..."
 

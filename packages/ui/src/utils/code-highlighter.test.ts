@@ -96,8 +96,8 @@ describe("code highlighter plugin", () => {
 
         run(block, "ts", undefined, true);
 
-        // A budget, not a benchmark: it takes ~50 ms on a laptop and CI runs this beside the other
-        // suites, so the ceiling only has to catch a quadratic regression (seconds), not jitter.
-        expect(performance.now() - start).toBeLessThan(2500);
+        // A budget, not a benchmark: it takes ~50 ms on a laptop, and a starved 2-core runner has taken over 5 s,
+        // so the ceiling only has to catch a quadratic regression (minutes at this size), not a slow machine.
+        expect(performance.now() - start).toBeLessThan(15_000);
     });
 });

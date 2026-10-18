@@ -1,3 +1,4 @@
+import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
 import type { ReactNode } from "react";
 import { useId } from "react";
@@ -11,6 +12,8 @@ export interface ModelSelectOption {
 }
 
 interface ModelSelectProps {
+    /** The visible label. It is also the trigger's accessible name, so every picker says what it chooses. */
+    label: ReactNode;
     /** Shown under the select while a Pro row is selected, and linked to the trigger for screen readers. */
     note?: ReactNode;
     onChange: (value: string) => void;
@@ -21,13 +24,17 @@ interface ModelSelectProps {
 }
 
 /** A node's model picker: the registry rows, a Pro marker on the paid ones, and the plan note. */
-const ModelSelect = ({ note, onChange, options, placeholder, value }: ModelSelectProps) => {
+const ModelSelect = ({ label, note, onChange, options, placeholder, value }: ModelSelectProps) => {
+    const labelId = useId();
     const noteId = useId();
     const selectedIsPremium = options.find((option) => option.value === value)?.isPremium === true;
     const showNote = selectedIsPremium && note !== undefined;
 
     return (
         <>
+            <Label className="text-muted-foreground text-xs" id={labelId}>
+                {label}
+            </Label>
             <Select
                 onValueChange={(next) => {
                     if (next) {
@@ -36,7 +43,7 @@ const ModelSelect = ({ note, onChange, options, placeholder, value }: ModelSelec
                 }}
                 value={value}
             >
-                <SelectTrigger aria-describedby={showNote ? noteId : undefined} className="nodrag h-8 text-sm">
+                <SelectTrigger aria-describedby={showNote ? noteId : undefined} aria-labelledby={labelId} className="nodrag h-8 text-sm">
                     <SelectValue placeholder={placeholder} />
                 </SelectTrigger>
                 <SelectContent>

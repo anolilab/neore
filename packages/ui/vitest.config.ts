@@ -11,5 +11,7 @@ export default defineConfig({
     test: {
         globals: true,
         include: ["src/**/*.{test,spec}.{ts,tsx}"],
+        // A loaded CI runner can take far longer than a laptop for a test that does almost nothing.
+        testTimeout: 30_000,
     },
 });
