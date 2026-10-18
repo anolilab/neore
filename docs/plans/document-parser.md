@@ -70,6 +70,27 @@ text has landed.
 The body is read into a buffer sized from `Content-Length` up front (a doubling
 `Vec` peaked at ~1.5 × a 25 MB body while it copied).
 
+## Layout: what the Worker does and does not do (checked against xberg 1.3.2)
+
+- **Running headers, footers, footnotes, watermarks and text repeated on most
+  pages are dropped by default.** `config()` leaves `content_filter` at `None`;
+  for PDFs, xberg reads `None` as `strip_repeating_text = true` and
+  `include_headers/footers/footnotes/watermarks = false` (checked in
+  `extractors/pdf/extraction.rs`, and the margin stripping in `pdf/native/text.rs`
+  only switches off when `include_*` is set), the same as
+  `ContentFilterConfig::default()`. Set the `include_*` flags only if a feature
+  needs page furniture. Not asserted by a test here: no fixture PDF has a running
+  header.
+- **Multi-column reading order and the repair of rotated text need
+  `pdf_options.reading_order`, which requires xberg's `layout-detection`
+  feature** (an ONNX layout model). It is not compiled into the Worker, and
+  turning it on without the feature is a validation error. Like OCR, it is a
+  container-only capability: PDFs with several columns come out in the PDF's own
+  content-stream order, which is usually reading order for single-column text
+  and not guaranteed otherwise.
+- Pages are not kept: only `tables[].page_number` survives, so a citation cannot
+  point at a page.
+
 ## Follow-up: a Cloudflare Container for documents above 25 MB
 
 To support documents above 25 MB, move extraction to a **Cloudflare Container**
@@ -77,7 +98,7 @@ running xberg natively (its server binary / Docker image). A Worker isolate has
 128 MB and PDF parsing needs ~3× the file size; a container has gigabytes, real
 threads and no CPU-time cap of the same kind.
 
-A container is also the **only route to OCR**: xberg's OCR backends (Tesseract,
+A container is also the **only route to OCR** (and to layout-detected reading order, above): xberg's OCR backends (Tesseract,
 ONNX/Paddle models) need native libraries and model files that cannot run in a
 Worker isolate. Scanned PDFs and images-of-text stay unreadable until then.
 
