@@ -11,6 +11,7 @@ import { useWorkflowStore } from "../../stores/workflow-store";
 import type { VideoNodeData } from "../../types";
 import type { ReferenceModeVariant } from "../../utils/model-options";
 import { referenceModeVariants, registryApiIdOf, videoModelPatch } from "../../utils/model-options";
+import ProBadge from "./pro-badge";
 
 /** The two fields a video node stores for its endpoint options. */
 export type VideoOptionsData = Pick<VideoNodeData, "generateAudio" | "resolution">;
@@ -81,11 +82,7 @@ export const VideoModelOptions = ({ data, id, modelId }: VideoModelOptionsProps)
                             {options.resolution.values.map((value) => (
                                 <SelectItem key={value} value={value}>
                                     {value}
-                                    {aboveFreePlan(value) && (
-                                        <span className="ml-1 text-xs text-amber-500">
-                                            <Trans>Pro</Trans>
-                                        </span>
-                                    )}
+                                    {aboveFreePlan(value) && <ProBadge />}
                                 </SelectItem>
                             ))}
                         </SelectContent>

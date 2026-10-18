@@ -11,7 +11,7 @@ import {
     DEFAULT_USER_PROMPT_OPTIMIZATION_MODEL,
 } from "@neore/ai/constants";
 import type { ImageSize, ModelDefinition } from "@neore/ai/models";
-import { exceedsFreePlanCap, MODEL_LOOKUP, REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
+import { exceedsFreePlanCap, FAL_IMAGE, FAL_VIDEO, MODEL_LOOKUP, REFERENCE_MEDIA_CAPS, resolveWorkflowModel, WORKFLOW_KIND_ACCEPTS } from "@neore/ai/models";
 import { getFollowupSuggestionsPrompt, getThreadTitlePrompt } from "@neore/ai/prompts";
 import { buildCinemaPrompt } from "@neore/ai/prompts/cinema";
 import {
@@ -66,17 +66,21 @@ import { checkRateLimit, createRatelimit, getRateLimitKey, getUserTier } from ".
 import { mediaJobStamp } from "./media-abandon";
 import type { FalAudioResponse } from "./lib/fal-media-parsing";
 import { extractFalAudioUrl, resolveFalVideoUrl } from "./lib/fal-media-parsing";
-import { INTERNAL_PREFIX_RE } from "./lib/agent-run";
+import { canRunPaidModel, INTERNAL_PREFIX_RE, readRunPlan } from "./lib/agent-run";
+import { byokPaysFor, paidModelRefusal } from "./lib/paid-model";
+import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
+import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
 import {
     buildFalReferenceImageInput,
     buildFalReferenceVideoInput,
-    falVideoTargetOf,
+    controlNetImageField,
     falAcceptsAspectRatio,
     falDurationInput,
+    falMaskField,
     falVideoOptionInput,
 } from "./lib/fal-reference-mapping";
 import { getAgentForUser, validateThreadAccess, validateThreadAccessWithData } from "./lib/thread-helpers";
@@ -3720,17 +3724,16 @@ export const generateImage = internalAction
                 }
             }
 
+            // Before getAgentForUser: an unknown or hidden id would otherwise fall back to the chat model.
+            const modelDefinition = requireEnabledModel(model, { mode: "image" }, "image generation");
+
+            await assertPaidModel(context, userId, modelDefinition);
+
             const agent = await getAgentForUser(context, userId, model);
             const { languageModel } = agent.options;
 
             if (!languageModel || typeof languageModel !== "object" || !("provider" in languageModel) || !("modelId" in languageModel)) {
                 throw new LunoraError("BAD_REQUEST", "Agent languageModel must have provider and modelId properties");
-            }
-
-            const modelDefinition = MODEL_LOOKUP.get(model);
-
-            if (!modelDefinition || modelDefinition.mode !== "image") {
-                throw new LunoraError("BAD_REQUEST", `Model ${model} is not an image generation model`);
             }
 
             const normalizedImageSize = normalizeImageSize(imageSize, modelDefinition);
@@ -3979,6 +3982,7 @@ export const generateAudio = internalAction
         }),
     )
     .action(async ({ args: { jobId, model, prompt, promptMessageId, threadId, userId, voice }, ctx: context }) => {
+        requireEnabledModel(model, WORKFLOW_KIND_ACCEPTS.tts, "text-to-speech");
         const agent = await getAgentForUser(context, userId, model);
         const { languageModel } = agent.options;
 
@@ -4091,14 +4095,25 @@ const videoOptionFields = {
 };
 
 /**
- * Whether a video run may render above 1080p: a platform admin or a paid plan. Callers read it only
- * when the snapped resolution is above the free cap (`exceedsFreePlanCap`). Workflow runs have only a
- * user id, so this reads the plan rather than trusting the caller.
+ * The video actions' paid-plan gate, shared by both. Reads the run's plan once: `organizationId` is the
+ * workflow run's account (the active organization, or `null` for a personal run), omitted for a run with no
+ * session (chat, the chat video tool), which counts the user's plan in any organization. Returns whether the
+ * plan is paid, which also lifts the free resolution cap. Enforced here, not only where runs start, because
+ * chat, the chat video tool and workflows all reach these actions.
  */
-const canRenderAboveFullHd = async (context: ActionContext, userId: string): Promise<boolean> => {
-    const { isAdmin, plan } = await context.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId });
+const gateVideoPlan = async (
+    context: ActionContext,
+    definition: ModelDefinition,
+    userId: string,
+    organizationId: string | null | undefined,
+): Promise<boolean> => {
+    const plan = await readRunPlan(context, userId, organizationId);
 
-    return isAdmin || plan === "premium";
+    if (!(await canRunPaidModel(context, userId, definition, plan))) {
+        throw new LunoraError("FORBIDDEN", paidModelRefusal(definition.name ?? definition.id, byokPaysFor(definition)));
+    }
+
+    return plan.isAdmin || plan.plan === "premium";
 };
 
 export const generateVideo = internalAction
@@ -4110,6 +4125,8 @@ export const generateVideo = internalAction
         /** Set by `lib/job-once.ts:runJobOnce` on the jobs queue; stamped on the pending row so a dead delivery's row can be failed (`chat/media-abandon.ts`). */
         jobId: v.optional(v.string()),
         model: v.string(),
+        /** The workflow run's account: its active organization, or `null` for a personal run. Omitted: any organization (`gateVideoPlan`). */
+        organizationId: v.optional(v.union(v.string().max(MAX_LENGTH.id), v.null())),
         prompt: v.string(),
         /** The prompt this is a reply to. Set by `/chat/media`, so a regenerate becomes a sibling reply (`agent/branch-tree.ts`). */
         promptMessageId: v.optional(v.id("messages")),
@@ -4142,6 +4159,7 @@ export const generateVideo = internalAction
             duration,
             jobId,
             model,
+            organizationId,
             prompt,
             promptMessageId,
             referenceAudioUrls,
@@ -4150,10 +4168,10 @@ export const generateVideo = internalAction
             threadId,
             userId,
         } = args;
-        const modelDefinition = MODEL_LOOKUP.get(model);
+        const modelDefinition = requireEnabledModel(model, { mode: "video" }, "video generation");
 
-        if (!modelDefinition || modelDefinition.mode !== "video" || modelDefinition.enabled === false) {
-            throw new LunoraError("BAD_REQUEST", `Model ${model} is not an enabled video generation model`);
+        if (!TEXT_TO_VIDEO_PROVIDERS.includes(modelDefinition.provider)) {
+            throw new LunoraError("BAD_REQUEST", `Video generation not supported for provider: ${modelDefinition.provider}`);
         }
 
         if (startFrameUrl && !modelDefinition.supportsImageToVideo) {
@@ -4181,6 +4199,9 @@ export const generateVideo = internalAction
         });
 
         try {
+            // Inside the try so the pending row above is marked failed with the reason, not left spinning.
+            const paidPlan = await gateVideoPlan(context, modelDefinition, userId, organizationId);
+
             // Enhance prompt with cinema settings if provided
             const enhancedPrompt = buildCinemaPrompt(prompt, cinemaSettings);
 
@@ -4196,7 +4217,7 @@ export const generateVideo = internalAction
                 }
 
                 const endpoint = modelDefinition.modelApiId ?? model;
-                const premium = exceedsFreePlanCap(modelDefinition.modelApiId, args.resolution) && (await canRenderAboveFullHd(context, userId));
+                const premium = exceedsFreePlanCap(modelDefinition.modelApiId, args.resolution) && paidPlan;
                 const referenceInput = buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl });
                 const falInput: FalRequestInput = { prompt: enhancedPrompt, ...referenceInput, ...falVideoOptionInput(modelDefinition, args, premium) };
 
@@ -4497,11 +4518,7 @@ export const generateMusic = internalAction
         }),
     )
     .action(async ({ args: { duration, model, negativePrompt, prompt, threadId, userId }, ctx: context }) => {
-        const modelDefinition = MODEL_LOOKUP.get(model);
-
-        if (!modelDefinition || modelDefinition.mode !== "music") {
-            throw new LunoraError("BAD_REQUEST", `Model ${model} is not a music generation model`);
-        }
+        const modelDefinition = requireEnabledModel(model, { mode: "music" }, "music generation");
 
         if (modelDefinition.provider !== "fal") {
             throw new LunoraError("BAD_REQUEST", `Music generation not supported for provider: ${modelDefinition.provider}`);
@@ -4685,17 +4702,11 @@ export const generateImg2Img = internalAction
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        // Look up model in registry, default to flux-dev-img2img
-        const modelId = model ?? "fal-ai/flux-dev-img2img";
-        const modelDefinition = MODEL_LOOKUP.get(modelId);
+        // The node's model, or its kind's default when unset. Refused before any FAL call.
+        const modelId = resolveWorkflowModel("img2img", model);
+        const modelDefinition = requireEnabledModel(modelId, WORKFLOW_KIND_ACCEPTS.img2img, "image-to-image");
 
-        if (!modelDefinition) {
-            throw new LunoraError("BAD_REQUEST", `Unknown model: ${modelId}`);
-        }
-
-        if (!modelDefinition.supportsImg2Img) {
-            throw new LunoraError("BAD_REQUEST", `Model ${modelId} does not support image-to-image transformation`);
-        }
+        await assertPaidModel(context, userId, modelDefinition);
 
         // Use modelApiId as the actual fal.ai endpoint
         const endpoint = modelDefinition.modelApiId ?? modelId;
@@ -4763,17 +4774,11 @@ export const generateUpscale = internalAction
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        // Look up model in registry, default to creative-upscaler
-        const modelId = model ?? "fal-ai/creative-upscaler";
-        const modelDefinition = MODEL_LOOKUP.get(modelId);
+        // The node's model, or its kind's default when unset. Refused before any FAL call.
+        const modelId = resolveWorkflowModel("upscale", model);
+        const modelDefinition = requireEnabledModel(modelId, WORKFLOW_KIND_ACCEPTS.upscale, "upscale");
 
-        if (!modelDefinition) {
-            throw new LunoraError("BAD_REQUEST", `Unknown model: ${modelId}`);
-        }
-
-        if (!modelDefinition.supportsUpscale) {
-            throw new LunoraError("BAD_REQUEST", `Model ${modelId} does not support upscaling`);
-        }
+        await assertPaidModel(context, userId, modelDefinition);
 
         // Validate scale factor against model capabilities
         const requestedScale = scale ?? 2;
@@ -4852,17 +4857,11 @@ export const generateInpaint = internalAction
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        // Look up model in registry, default to flux-pro-fill
-        const modelId = model ?? "fal-ai/flux-pro-fill";
-        const modelDefinition = MODEL_LOOKUP.get(modelId);
+        // The node's model, or its kind's default when unset. Refused before any FAL call.
+        const modelId = resolveWorkflowModel("inpaint", model);
+        const modelDefinition = requireEnabledModel(modelId, WORKFLOW_KIND_ACCEPTS.inpaint, "inpaint");
 
-        if (!modelDefinition) {
-            throw new LunoraError("BAD_REQUEST", `Unknown model: ${modelId}`);
-        }
-
-        if (!modelDefinition.supportsInpaint) {
-            throw new LunoraError("BAD_REQUEST", `Model ${modelId} does not support inpainting`);
-        }
+        await assertPaidModel(context, userId, modelDefinition);
 
         // Use modelApiId as the actual fal.ai endpoint
         const endpoint = modelDefinition.modelApiId ?? modelId;
@@ -4931,17 +4930,11 @@ export const generateCharacterRef = internalAction
             throw new LunoraError("BAD_REQUEST", "At least one reference image is required");
         }
 
-        // Look up model in registry, default to flux-pro-redux
-        const modelId = model ?? "fal-ai/flux-pro-redux";
-        const modelDefinition = MODEL_LOOKUP.get(modelId);
+        // The node's model, or its kind's default when unset. Refused before any FAL call.
+        const modelId = resolveWorkflowModel("characterRef", model);
+        const modelDefinition = requireEnabledModel(modelId, WORKFLOW_KIND_ACCEPTS.characterRef, "character reference");
 
-        if (!modelDefinition) {
-            throw new LunoraError("BAD_REQUEST", `Unknown model: ${modelId}`);
-        }
-
-        if (!modelDefinition.supportsCharacterRef) {
-            throw new LunoraError("BAD_REQUEST", `Model ${modelId} does not support character reference`);
-        }
+        await assertPaidModel(context, userId, modelDefinition);
 
         // Validate reference image count
         const maxImages = modelDefinition.maxReferenceImages ?? 4;
@@ -5051,17 +5044,11 @@ export const generateStyleRef = internalAction
             throw new LunoraError("BAD_REQUEST", "Style image URL is required");
         }
 
-        // Look up model in registry, default to flux-redux-style
-        const modelId = model ?? "fal-ai/flux-redux-style";
-        const modelDefinition = MODEL_LOOKUP.get(modelId);
+        // The node's model, or its kind's default when unset. Refused before any FAL call.
+        const modelId = resolveWorkflowModel("styleRef", model);
+        const modelDefinition = requireEnabledModel(modelId, WORKFLOW_KIND_ACCEPTS.styleRef, "style reference");
 
-        if (!modelDefinition) {
-            throw new LunoraError("BAD_REQUEST", `Unknown model: ${modelId}`);
-        }
-
-        if (!modelDefinition.supportsStyleRef) {
-            throw new LunoraError("BAD_REQUEST", `Model ${modelId} does not support style reference`);
-        }
+        await assertPaidModel(context, userId, modelDefinition);
 
         // Use modelApiId as the actual fal.ai endpoint
         const endpoint = modelDefinition.modelApiId ?? modelId;
@@ -5191,14 +5178,22 @@ export const generateParallelCompare = internalAction
             numModels: models.length,
         });
 
+        // A stored id is resolved per entry and repeats collapse, so legacy ids still run the node's other models.
+        const modelIds = [...new Set(models.map((modelId) => resolveWorkflowModel("image", modelId)))];
+
+        if (modelIds.length < 2) {
+            throw new LunoraError("BAD_REQUEST", "At least 2 different models required for comparison");
+        }
+
+        // Every id is checked, and paid rows cleared, before the first FAL call, so one hidden id refuses the whole comparison.
+        const definitions = modelIds.map((modelId) => requireEnabledModel(modelId, FAL_IMAGE, "image generation"));
+
+        await Promise.all(definitions.map((modelDefinition) => assertPaidModel(context, userId, modelDefinition)));
+
         // Run all models in parallel
         const results = await Promise.allSettled(
-            models.map(async (modelId) => {
-                const modelDefinition = MODEL_LOOKUP.get(modelId);
-
-                if (!modelDefinition) {
-                    throw new LunoraError("BAD_REQUEST", `Unknown model: ${modelId}`);
-                }
+            definitions.map(async (modelDefinition) => {
+                const modelId = modelDefinition.id;
 
                 const endpoint = modelDefinition.modelApiId ?? modelId;
                 const input: FalRequestInput = {
@@ -5249,12 +5244,12 @@ export const generateParallelCompare = internalAction
                 error: result.reason instanceof Error ? result.reason.message : "Generation failed",
                 imageUrl: null,
                 mimeType: null,
-                // `results` is `Promise.allSettled(models.map(...))`, so it is
-                // index-aligned with `models` and this is always in range. The
+                // `results` is `Promise.allSettled(definitions.map(...))`, so it is
+                // index-aligned with `modelIds` and this is always in range. The
                 // `| undefined` is noUncheckedIndexedAccess, not a real case —
                 // and the declared output types both as required strings.
-                modelId: models[index]!,
-                modelName: models[index]!,
+                modelId: modelIds[index]!,
+                modelName: modelIds[index]!,
                 success: false,
             };
         });
@@ -5263,7 +5258,7 @@ export const generateParallelCompare = internalAction
             prompt,
             results: processedResults,
             successCount: processedResults.filter((r) => r.success).length,
-            totalModels: models.length,
+            totalModels: modelIds.length,
         };
     });
 
@@ -5290,24 +5285,25 @@ export const generateOutpaint = internalAction
         }),
     )
     .action(async ({ args: { expandDirection, expandPixels, imageUrl, model, negativePrompt, prompt, threadId, userId }, ctx: context }) => {
+        const modelDefinition = requireEnabledModel(resolveWorkflowModel("outpaint", model), WORKFLOW_KIND_ACCEPTS.outpaint, "outpaint");
+
+        await assertPaidModel(context, userId, modelDefinition);
         const falApiKey = process.env.FAL_API_KEY;
 
         if (!falApiKey) {
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        const endpoint = model ?? "fal-ai/flux-pro/v1.1/outpaint";
+        // The endpoint takes `expand_*` pixels and a required prompt, so an empty prompt is sent when none was given.
+        const endpoint = modelDefinition.modelApiId;
 
         chatLogger.debug("[cvx][outpaint] Starting outpaint", { endpoint, expandDirection, expandPixels });
 
         const pixels = expandPixels ?? 256;
         const input: FalRequestInput = {
             image_url: imageUrl,
+            prompt: prompt ?? "",
         };
-
-        if (prompt) {
-            input.prompt = prompt;
-        }
 
         if (negativePrompt) {
             input.negative_prompt = negativePrompt;
@@ -5316,30 +5312,30 @@ export const generateOutpaint = internalAction
         // Set expand dimensions based on direction
         switch (expandDirection) {
             case "all": {
-                input.top = pixels;
-                input.bottom = pixels;
-                input.left = pixels;
-                input.right = pixels;
+                input.expand_top = pixels;
+                input.expand_bottom = pixels;
+                input.expand_left = pixels;
+                input.expand_right = pixels;
 
                 break;
             }
             case "bottom": {
-                input.bottom = pixels;
+                input.expand_bottom = pixels;
 
                 break;
             }
             case "left": {
-                input.left = pixels;
+                input.expand_left = pixels;
 
                 break;
             }
             case "right": {
-                input.right = pixels;
+                input.expand_right = pixels;
 
                 break;
             }
             case "top": {
-                input.top = pixels;
+                input.expand_top = pixels;
 
                 break;
             }
@@ -5386,14 +5382,21 @@ export const generateBackgroundRemoval = internalAction
             model: v.string(),
         }),
     )
-    .action(async ({ args: { backgroundColor, imageUrl, model, outputFormat, refineMask, threadId, userId }, ctx: context }) => {
+    .action(async ({ args: { imageUrl, model, outputFormat, refineMask, threadId, userId }, ctx: context }) => {
+        const modelDefinition = requireEnabledModel(
+            resolveWorkflowModel("backgroundRemoval", model),
+            WORKFLOW_KIND_ACCEPTS.backgroundRemoval,
+            "background removal",
+        );
+
+        await assertPaidModel(context, userId, modelDefinition);
         const falApiKey = process.env.FAL_API_KEY;
 
         if (!falApiKey) {
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        const endpoint = model ?? "fal-ai/birefnet/v2";
+        const endpoint = modelDefinition.modelApiId;
 
         chatLogger.debug("[cvx][bg-removal] Starting background removal", { endpoint });
 
@@ -5402,12 +5405,9 @@ export const generateBackgroundRemoval = internalAction
             output_format: outputFormat ?? "png",
         };
 
+        // birefnet takes no replacement colour, so the node's backgroundColor is not sent.
         if (refineMask !== undefined) {
-            input.refine_mask = refineMask;
-        }
-
-        if (backgroundColor) {
-            input.bg_color = backgroundColor;
+            input.refine_foreground = refineMask;
         }
 
         const result = await callFalApi<{ image: { content_type?: string; url: string } }>(endpoint, input, falApiKey);
@@ -5448,21 +5448,26 @@ export const generateObjectEdit = internalAction
         }),
     )
     .action(async ({ args: { imageUrl, maskUrl, mode, model, negativePrompt, prompt, threadId, userId }, ctx: context }) => {
+        // LaMa for removal, an inpaint row for adding. The kind decides which capability the row must carry.
+        const kind = mode === "remove" ? "objectRemove" : "inpaint";
+        const objectModel = requireEnabledModel(
+            resolveWorkflowModel(kind, model),
+            WORKFLOW_KIND_ACCEPTS[kind],
+            mode === "remove" ? "object removal" : "inpaint",
+        );
+
+        await assertPaidModel(context, userId, objectModel);
         const falApiKey = process.env.FAL_API_KEY;
 
         if (!falApiKey) {
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        // Use LaMa for removal (no prompt needed), inpaint model for adding
-        const endpoint = mode === "remove" ? (model ?? "fal-ai/lama") : (model ?? "fal-ai/flux-pro/v1.1/fill");
+        const endpoint = objectModel.modelApiId;
 
         chatLogger.debug("[cvx][object-edit] Starting object edit", { endpoint, mode });
 
-        const input: FalRequestInput = {
-            image_url: imageUrl,
-            mask_url: maskUrl,
-        };
+        const input: FalRequestInput = { [falMaskField(endpoint)]: maskUrl, image_url: imageUrl };
 
         if (mode === "add") {
             if (!prompt) {
@@ -5510,6 +5515,8 @@ export const generateImageToVideo = internalAction
         loop: v.optional(v.boolean()),
         model: v.optional(v.string()),
         motionStrength: v.optional(v.number()),
+        /** See `generateVideo`. */
+        organizationId: v.optional(v.union(v.string().max(MAX_LENGTH.id), v.null())),
         prompt: v.optional(v.string()),
         referenceAudioUrls: v.optional(
             v.array(v.string().max(MAX_LENGTH.url)).check((value) => value.length <= REFERENCE_MEDIA_CAPS.audios, { message: "Too many reference files" }),
@@ -5530,25 +5537,21 @@ export const generateImageToVideo = internalAction
         }),
     )
     .action(async ({ args, ctx: context }) => {
-        const { duration, fps, imageUrl, loop, model, motionStrength, prompt, referenceAudioUrls, referenceVideoUrls, threadId, userId } = args;
+        const { duration, fps, imageUrl, loop, model, motionStrength, organizationId, prompt, referenceAudioUrls, referenceVideoUrls, threadId, userId } = args;
         const falApiKey = process.env.FAL_API_KEY;
 
         if (!falApiKey) {
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        // A set model must be an enabled fal video row: its endpoint is the registry's, never one a stored node names.
-        const target = falVideoTargetOf(model);
-
-        if (!target) {
-            throw new LunoraError("BAD_REQUEST", `Model ${model} is not an enabled fal video model`);
-        }
-
-        const { definition: modelDefinition, endpoint } = target;
+        // Unset is the workflow's default; a set model must be an enabled fal video row, and its endpoint is the registry's.
+        const modelDefinition = requireEnabledModel(resolveWorkflowModel("imageToVideo", model), FAL_VIDEO, "image-to-video");
+        const endpoint = modelDefinition.modelApiId;
+        const paidPlan = await gateVideoPlan(context, modelDefinition, userId, organizationId);
 
         chatLogger.debug("[cvx][img2video] Starting image-to-video", { duration, endpoint });
 
-        const premium = exceedsFreePlanCap(modelDefinition?.modelApiId, args.resolution) && (await canRenderAboveFullHd(context, userId));
+        const premium = exceedsFreePlanCap(modelDefinition.modelApiId, args.resolution) && paidPlan;
         const input: FalRequestInput = {
             ...buildFalReferenceVideoInput(modelDefinition, { referenceAudioUrls, referenceVideoUrls, startFrameUrl: imageUrl }),
             ...falVideoOptionInput(modelDefinition, args, premium),
@@ -5618,45 +5621,33 @@ export const generateControlNet = internalAction
             model: v.string(),
         }),
     )
-    .action(async ({ args: { controlType, endPercent, imageUrl, model, preprocessor, prompt, startPercent, strength, threadId, userId }, ctx: context }) => {
+    .action(async ({ args: { controlType, imageUrl, model, prompt, strength, threadId, userId }, ctx: context }) => {
+        const controlNetModel = requireEnabledModel(resolveWorkflowModel("controlnet", model), WORKFLOW_KIND_ACCEPTS.controlnet, "ControlNet");
+
+        await assertPaidModel(context, userId, controlNetModel);
         const falApiKey = process.env.FAL_API_KEY;
 
         if (!falApiKey) {
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        const endpoint = model ?? "fal-ai/flux-general/image-to-image";
+        const endpoint = controlNetModel.modelApiId;
+
+        // The endpoint takes the control image in one field per control type. A type it has no field for is refused,
+        // not sent unconditioned. Its guidance window and the node's preprocessor have no field, so they are not sent.
+        const imageField = controlNetImageField(endpoint, controlType);
+
+        if (!imageField) {
+            throw new LunoraError("BAD_REQUEST", `${controlType} control is not supported by ${controlNetModel.name ?? controlNetModel.id}`);
+        }
 
         chatLogger.debug("[cvx][controlnet] Starting ControlNet generation", { controlType, endpoint });
 
         const input: FalRequestInput = {
-            control_image_url: imageUrl,
             controlnet_conditioning_scale: strength ?? 0.8,
+            [imageField]: imageUrl,
+            prompt: prompt ?? "",
         };
-
-        if (prompt) {
-            input.prompt = prompt;
-        }
-
-        // Map control type to preprocessor
-        const preprocessorMap: Record<string, string> = {
-            canny: "canny",
-            depth: "depth_anything_v2",
-            normal: "normal_bae",
-            pose: "openpose",
-            softedge: "hed",
-        };
-
-        input.controlnet_type = controlType;
-        input.preprocessor = preprocessor ?? preprocessorMap[controlType] ?? controlType;
-
-        if (startPercent !== undefined) {
-            input.control_guidance_start = startPercent;
-        }
-
-        if (endPercent !== undefined) {
-            input.control_guidance_end = endPercent;
-        }
 
         const result = await callFalApi<{ images: { content_type?: string; url: string }[] }>(endpoint, input, falApiKey);
 
@@ -5700,13 +5691,14 @@ export const generateTranscription = internalAction
         }),
     )
     .action(async ({ args: { audioUrl, language, model, threadId: _threadId, userId: _userId }, ctx: _context }) => {
+        const transcriptionModel = requireEnabledModel(resolveWorkflowModel("transcription", model), WORKFLOW_KIND_ACCEPTS.transcription, "speech-to-text");
         const falApiKey = process.env.FAL_API_KEY;
 
         if (!falApiKey) {
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        const endpoint = model ?? "fal-ai/whisper";
+        const endpoint = transcriptionModel.id;
 
         chatLogger.debug("[cvx][transcription] Starting transcription", { endpoint });
 

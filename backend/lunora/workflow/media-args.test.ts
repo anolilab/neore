@@ -1,9 +1,12 @@
+import { MEDIA_DEFAULT_MODELS } from "@neore/ai/models";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
+import { executionContextOf } from "./test-execution-context";
 import {
     imageRequestArgs,
     imageToVideoArgs,
+    runVideoNode,
     textToVideoArgs,
     type WorkflowFileContext,
     videoInputArgs,
@@ -34,9 +37,8 @@ describe("videoNodeOutput", () => {
     });
 });
 
-const context = (edges: WorkflowEdge[], nodes: WorkflowNode[], nodeOutputs: Record<string, unknown>): ExecutionContext => {
-    return { graph: { edges, nodes }, nodeOutputs, variables: {} };
-};
+const context = (edges: WorkflowEdge[], nodes: WorkflowNode[], nodeOutputs: Record<string, unknown>): ExecutionContext =>
+    executionContextOf({ graph: { edges, nodes }, nodeOutputs });
 
 describe("imageRequestArgs", () => {
     it("takes the last output of the run as the prompt when it is a string", () => {
@@ -96,14 +98,22 @@ describe("video action arguments", () => {
         expect(textToVideoArgs(node("v", "video", {}), "a fox", { ...noInputs, frameUrl: "https://x.example/f.png" }, "u")).toMatchObject({
             aspectRatio: "16:9",
             duration: 5,
-            model: "fal:mochi-v1",
+            model: MEDIA_DEFAULT_MODELS.textToVideo,
             prompt: "a fox",
             startFrameUrl: "https://x.example/f.png",
         });
         const args = imageToVideoArgs(node("v", "video", { loop: true, prompt: "spin" }), "https://x.example/i.png", noInputs, "u");
 
         expect(args).toMatchObject({ imageUrl: "https://x.example/i.png", prompt: "spin", threadId: "workflow", userId: "u" });
-        expect(args).not.toHaveProperty("loop");
+        expect(args.loop).toBeUndefined();
+        expect(imageToVideoArgs(node("v", "image-to-video", { loop: true }), "https://x.example/i.png", noInputs, "u").loop).toBe(true);
+    });
+
+    it("sends the length the run bills: the default when none is set, and the row's maximum when more is asked", () => {
+        const ray2 = "fal-ai/luma-dream-machine/ray-2";
+
+        expect(imageToVideoArgs(node("i", "image-to-video", { model: ray2 }), "https://x.example/i.png", noInputs, "u").duration).toBe(5);
+        expect(imageToVideoArgs(node("i", "image-to-video", { duration: 30, model: ray2 }), "https://x.example/i.png", noInputs, "u").duration).toBe(9);
     });
 });
 
@@ -189,5 +199,17 @@ describe("videoRunInputError", () => {
 
         expect(videoRunInputError(gen, context([], [gen], {}))).toBe("No image input provided for image-to-video mode");
         expect(videoRunInputError(gen, context(frame, [gen, node("src", "video", {})], {}))).toBeUndefined();
+    });
+});
+
+describe("runVideoNode", () => {
+    it("refuses a node with no input before any billing read or quota charge", async () => {
+        const actionContext = { runAction: vi.fn(), runMutation: vi.fn(), runQuery: vi.fn() };
+        const gen = node("gen", "image-to-video", { label: "Still" });
+
+        await expect(runVideoNode(gen, context([], [gen], {}), actionContext as never, "u")).rejects.toThrow("No image input provided for image-to-video mode");
+        expect(actionContext.runQuery).not.toHaveBeenCalled();
+        expect(actionContext.runMutation).not.toHaveBeenCalled();
+        expect(actionContext.runAction).not.toHaveBeenCalled();
     });
 });

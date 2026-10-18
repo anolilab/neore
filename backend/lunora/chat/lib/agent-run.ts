@@ -12,7 +12,7 @@
  * and flushes the stream, the post-run bookkeeping (`afterRun`), resuming an
  * approved run (`resumeApprovedRun`) and the error cleanup.
  */
-import { MODEL_LOOKUP, parseCustomModelId, requiresPaidPlan } from "@neore/ai/models";
+import { MODEL_LOOKUP, type ModelDefinition, parseCustomModelId, requiresPaidPlan } from "@neore/ai/models";
 import type { UserPersonalization } from "@neore/ai/prompts";
 import { buildMemoryContext } from "@neore/ai/prompts";
 
@@ -25,6 +25,7 @@ import type { ResearchDepth } from "../../agent/client/create-tool";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
+import { byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getMaxSteps, getModelContextWindow } from "./auto-continue";
 import { isLocalBrowserProvider, toGatewayFormat } from "./custom-providers";
 import type { GatewayCustomProviderConfig } from "./gateway-language-model";
@@ -90,29 +91,58 @@ export interface RunModel {
  * so a deleted/disabled endpoint fails loudly instead of silently falling back
  * to a platform model the user did not pick.
  */
+/** What a run's gate reads of the user's plan: admins run any model, and a paid tier opens the paid ones. */
+export interface RunPlan {
+    isAdmin: boolean;
+    plan: "premium" | null;
+}
+
 /**
- * Refuses a model outside the free tier (`requiresPaidPlan`) unless the user is
- * on a paid plan, is an admin, or brings their own key for the model's provider
- * — the platform pays for every other run. Every run (chat, trigger, workflow,
- * group turn) resolves its model here, so this is the one gate.
+ * The plan a run is gated on. Omit `organizationId` for the user's plan in ANY organization they belong
+ * to (a run with no session, such as a trigger). Pass one for the run's own account: its tier when the
+ * user is still a member, the user's own Pro otherwise, `null` for a personal run.
  */
+export const readRunPlan = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, organizationId?: string | null): Promise<RunPlan> =>
+    organizationId === undefined
+        ? await ctx.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId })
+        : await ctx.runQuery(internal.auth.billing.getRunPlanForOrganizationQuery, { organizationId, userId });
+
+/**
+ * Whether a run may use `definition`: the one paid-model rule, for every run path. A model outside the
+ * free tier (`requiresPaidPlan`) needs an admin, a paid plan, or the user's own key for the provider.
+ *
+ * A key exempts only where `byokPaysFor` says the user's key pays for the call. `plan` is the run's
+ * pre-resolved plan (see `readRunPlan`).
+ */
+export const canRunPaidModel = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, definition: ModelDefinition, plan?: RunPlan): Promise<boolean> => {
+    if (!requiresPaidPlan(definition)) {
+        return true;
+    }
+
+    const resolved = plan ?? (await readRunPlan(ctx, userId));
+
+    if (resolved.isAdmin || resolved.plan === "premium") {
+        return true;
+    }
+
+    if (!byokPaysFor(definition)) {
+        return false;
+    }
+
+    const userProviderKeys = await loadUserProviderKeys(ctx, userId);
+
+    return Boolean(userProviderKeys?.[definition.provider]);
+};
+
+/** Refuses a paid-plan model for a run that cannot pay for it (`canRunPaidModel`). Every run resolves its model here. */
 const assertModelAllowed = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string): Promise<void> => {
     const definition = MODEL_LOOKUP.get(model);
 
-    if (!definition || !requiresPaidPlan(definition)) {
+    if (!definition || (await canRunPaidModel(ctx, userId, definition))) {
         return;
     }
 
-    const [{ isAdmin, plan }, userProviderKeys] = await Promise.all([
-        ctx.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId }),
-        loadUserProviderKeys(ctx, userId),
-    ]);
-
-    if (isAdmin || plan === "premium" || userProviderKeys?.[definition.provider]) {
-        return;
-    }
-
-    throw new AgentRunError("plan-required", "This model needs a Pro plan. Pick a free model, upgrade, or add your own API key for this provider in Settings.");
+    throw new AgentRunError("plan-required", paidModelRefusal(definition.name ?? definition.id, byokPaysFor(definition)));
 };
 
 export const resolveRunModel = async (ctx: Pick<ActionCtx, "runQuery">, model: string, userId: string): Promise<RunModel> => {

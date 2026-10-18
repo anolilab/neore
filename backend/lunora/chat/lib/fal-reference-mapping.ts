@@ -1,4 +1,4 @@
-import { falVideoInputsOf, MODEL_LOOKUP, type ModelDefinition, resolutionWithinFreePlan, snapVideoOptions, type VideoOptions } from "@neore/ai/models";
+import { falVideoInputsOf, type ModelDefinition, resolutionWithinFreePlan, snapVideoOptions, type VideoOptions } from "@neore/ai/models";
 
 /**
  * FAL endpoint -> reference-media field mapping for the reference picker and the workflow's
@@ -63,28 +63,27 @@ export const buildFalReferenceImageInput = (modelDefinition: ModelDefinition, re
     return result;
 };
 
-/** The FAL endpoint an image-to-video call uses when its node names no model. */
-const DEFAULT_IMAGE_TO_VIDEO_ENDPOINT = "fal-ai/kling-video/v2.1/standard/image-to-video";
+/** The control-image field each ControlNet endpoint takes for each control type, keyed by the registry's `modelApiId`. */
+const CONTROLNET_IMAGE_FIELDS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([
+    [
+        "fal-ai/sdxl-controlnet-union",
+        new Map([
+            ["canny", "canny_image_url"],
+            ["depth", "depth_image_url"],
+            ["normal", "normal_image_url"],
+            ["pose", "openpose_image_url"],
+            ["softedge", "teed_image_url"],
+        ]),
+    ],
+]);
 
-/**
- * The FAL call a video action makes for a `model` argument. Unset keeps the default endpoint. A set
- * model must be an enabled fal video row, and its endpoint is the registry's `modelApiId`, so a stored
- * node cannot name an endpoint the registry does not offer. `undefined` for any other model: the
- * action rejects it before any FAL call.
- */
-export const falVideoTargetOf = (model: string | undefined): { definition: ModelDefinition | undefined; endpoint: string } | undefined => {
-    if (!model) {
-        return { definition: undefined, endpoint: DEFAULT_IMAGE_TO_VIDEO_ENDPOINT };
-    }
+/** The control image field for a control type on an endpoint, or `undefined` when the endpoint has none for it. */
+export const controlNetImageField = (endpoint: string, controlType: string): string | undefined => CONTROLNET_IMAGE_FIELDS.get(endpoint)?.get(controlType);
 
-    const definition = MODEL_LOOKUP.get(model);
+/** The mask input an endpoint takes. LaMa names it `mask_image_url`; the inpainting endpoints name it `mask_url`. */
+const MASK_FIELDS: ReadonlyMap<string, string> = new Map([["fal-ai/lama", "mask_image_url"]]);
 
-    if (definition?.mode !== "video" || definition.provider !== "fal" || definition.enabled === false) {
-        return undefined;
-    }
-
-    return { definition, endpoint: definition.modelApiId };
-};
+export const falMaskField = (endpoint: string): string => MASK_FIELDS.get(endpoint) ?? "mask_url";
 
 /**
  * The `duration` to send for an endpoint: the number snapped to the nearest value the endpoint

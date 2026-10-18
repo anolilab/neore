@@ -1,4 +1,5 @@
 import z from "zod/v4";
+import { MEDIA_DEFAULT_MODELS } from "@neore/ai/models";
 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
@@ -62,7 +63,7 @@ For generate_element, add the result as a FabricImage object in the canvas JSON 
                 // Use image generation internal action
                 const result = await context.runAction(internal.chat.functions.generateImage, {
                     imageSize: "1:1",
-                    model: "fal:flux-dev",
+                    model: MEDIA_DEFAULT_MODELS.image,
                     numImages: 1,
                     prompt,
                     threadId: context.threadId,

@@ -602,7 +602,7 @@ for a schema table that is neither policed nor listed:
 | `vault_functions.syncMetadata` | action | authAction | — | caller-scoped (ctx.user) | **fixed** (low) — patches only the caller's row |
 | `voice_functions.authorizeScribeToken` | mutation | authMutation + RL | user | caller-scoped (ctx.user) | ok |
 | `voice_speech.synthesizeSpeech` | action | authAction + RL | — (rate limits, gateway) | caller-scoped (ctx.user); no id in args, nothing persisted; guests refused; text capped per call, charged by length to `voice/dailySpeechChars` before the gateway call, and the gateway deducts the per-character cost from the caller's credits (BYOK FAL key → `byok`) | ok |
-| `workflow_executor.executeWorkflow` | action | authAction + RL | projects | caller-scoped (ctx.user) | ok |
+| `workflow_executor.executeWorkflow` | action | authAction + RL | projects | caller-scoped (ctx.user); video nodes: guests refused, paid-plan video models need a paid plan or admin of the run's account (the session's active organization, or personal), and that same account is checked for credits and charged; the daily video quota is checked before each clip (`workflow/run-setup.ts`, `workflow/video-billing.ts`) | ok |
 | `workflow_functions.createExecution` | mutation | authMutation + RL | projects | row.userId == caller | ok |
 | `workflow_functions.createNodeExecution` | mutation | authMutation + RL | workflowExecutions | row.userId == caller | ok |
 | `workflow_functions.createWorkflow` | mutation | authMutation + RL | — | org membership/role | **fixed** (medium) — organizationId must be the active org |
@@ -650,7 +650,7 @@ else the better-auth cookie). No route takes identity from a header.
 | `POST /chat/edit` | JWT / cookie | thread owner; `getFile(userId, threadId)` | **fixed** (medium) — every edit regenerates; now charged to `chat/dailyText` |
 | `POST /chat/improve-prompt`, `/chat/optimize-system-prompt`, `/chat/iterate-prompt` | JWT / cookie | `runOptimizer` checks thread read access | **fixed** (high) — a body `threadId` loaded a stranger's recent messages into the prompt whose rewrite came back to the caller |
 | `POST /prompts/optimize` | JWT / cookie, resolved on the route | no ids | **fixed** (functional) — the internal action read `identity.subject`, which `resolveIdentity` never sets, so every caller got "unauthorized"; the route now resolves the caller and passes `userId` |
-| `POST /workflow/stream` | JWT / cookie | `getWorkflow` owner check | **fixed** (low) — rate-limited with `workflow/execute`, the budget `executeWorkflow` already had |
+| `POST /workflow/stream` | JWT / cookie | `getWorkflow` owner check | **fixed** (low) — rate-limited with `workflow/execute`, the budget `executeWorkflow` already had; video nodes gated and charged exactly as `executeWorkflow`, from the same session-derived account (`workflow/run-setup.ts`) |
 | `POST /mcp/resource`, `/mcp/tool` | JWT / cookie | server looked up by caller; tool permission modes | ok |
 | `POST /chat/chunks`, `/gateway/usage-report` | gateway HMAC, constant-time, 30 s window | stream id vouched for by the gateway's stream token | ok |
 | `POST /email/resend/webhook` | Svix HMAC, 5 min window | — | ok |

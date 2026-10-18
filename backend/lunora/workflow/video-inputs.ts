@@ -3,7 +3,7 @@
  *
  * Pure apart from the signing callback the executors pass in: no action context is needed here.
  */
-import type { ModelDefinition } from "@neore/ai/models";
+import { MODEL_LOOKUP, type ModelDefinition, resolveWorkflowModel } from "@neore/ai/models";
 
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
 import { sourceNodesOf } from "./core";
@@ -136,19 +136,27 @@ export const resolveMediaUrls = async (refs: MediaRef[], signFile: (fileId: stri
         }),
     );
 
-/**
- * The model a video node's action will call. A text-to-video node falls back to the same default
- * the executor uses; an image-to-video node with no model calls no registry entry at all.
- */
-export const modelIdFor = (node: WorkflowNode): string | undefined => {
-    const data = node.data as { mode?: string; model?: string };
+/** Whether a node runs a video model, the two node types the executor sends to the video actions. */
+export const isVideoNode = (node: WorkflowNode): boolean => node.type === "video" || node.type === "image-to-video";
 
-    if (node.type === "video" && data.mode !== "image-to-video") {
-        return data.model ?? "fal:mochi-v1";
+/** What a video node does: a text-to-video clip, or an image-to-video one (by its type or its mode). */
+export type VideoKind = "textToVideo" | "imageToVideo";
+
+/** The video kind a node runs, as the executor dispatches it. `undefined` for a node that is not a video node. */
+export const videoKindOf = (node: WorkflowNode): VideoKind | undefined => {
+    if (!isVideoNode(node)) {
+        return undefined;
     }
 
-    return data.model;
+    return node.type === "image-to-video" || node.data.mode === "image-to-video" ? "imageToVideo" : "textToVideo";
 };
+
+/**
+ * The model id a video node of `kind` runs: the stored id, or the workflow default for the kind
+ * (`resolveWorkflowModel`). Every video check and the billing read go through here, so a node is gated and
+ * charged for the model it actually runs.
+ */
+export const modelIdFor = (node: WorkflowNode, kind: VideoKind): string => resolveWorkflowModel(kind, (node.data as { model?: string }).model);
 
 /**
  * The provider-readable URLs of a video node's inputs: the start image (a wired frame handle,
@@ -176,17 +184,13 @@ export const resolveVideoInputUrls = async (
 };
 
 /**
- * A clip's length in seconds as the graph fixes it: its requested `duration`, or the 5 s the
- * executor asks a text-to-video node for. Unknown counts as 0, so it never trips the check.
+ * A video node's clip length in seconds, as the graph fixes it: its requested `duration`, or the default
+ * the run bills when it sets none (`DEFAULT_VIDEO_SECONDS`, kept in step by `video-policy.ts`).
  */
 const knownDurationOf = (source: WorkflowNode): number => {
-    const data = source.data as { duration?: unknown; mode?: string };
+    const { duration } = source.data as { duration?: unknown };
 
-    if (typeof data.duration === "number") {
-        return data.duration;
-    }
-
-    return source.type === "video" && data.mode !== "image-to-video" ? 5 : 0;
+    return typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? duration : 5;
 };
 
 /**
@@ -204,23 +208,12 @@ const knownDurationOf = (source: WorkflowNode): number => {
  * (the registry's `supportsImageToVideo`), and a prompt when it runs text-to-video. A prompt wired
  * as text counts here; the run checks the text it actually gets before it extracts the frame.
  */
-const frameTargetErrors = (
-    target: WorkflowNode,
-    kind: FrameKind,
-    edges: ReadonlyArray<WorkflowEdge>,
-    modelOf: (modelId: string) => ModelDefinition | undefined,
-): string[] => {
+const frameTargetErrors = (target: WorkflowNode, kind: FrameKind, edges: ReadonlyArray<WorkflowEdge>): string[] => {
     const errors: string[] = [];
-    const modelId = modelIdFor(target);
+    const modelId = modelIdFor(target, videoKindOf(target) ?? "textToVideo");
 
-    const model = modelId === undefined ? undefined : modelOf(modelId);
-
-    if (model?.supportsImageToVideo !== true) {
-        errors.push(
-            modelId === undefined
-                ? `The ${kind} frame needs a model that takes an image input, and no model is selected`
-                : `The ${kind} frame needs a model that takes an image input; ${modelId} does not`,
-        );
+    if (MODEL_LOOKUP.get(modelId)?.supportsImageToVideo !== true) {
+        errors.push(`The ${kind} frame needs a model that takes an image input; ${modelId} does not`);
     }
 
     const hasPrompt =
@@ -234,11 +227,7 @@ const frameTargetErrors = (
     return errors;
 };
 
-export const videoInputErrors = (
-    nodes: ReadonlyArray<WorkflowNode>,
-    edges: ReadonlyArray<WorkflowEdge>,
-    modelOf: (modelId: string) => ModelDefinition | undefined,
-): string[] => {
+export const videoInputErrors = (nodes: ReadonlyArray<WorkflowNode>, edges: ReadonlyArray<WorkflowEdge>): string[] => {
     const errors: string[] = [];
     const byId = new Map(nodes.map((node) => [node.id, node]));
     const frameFed = new Map<string, FrameKind>();
@@ -269,11 +258,11 @@ export const videoInputErrors = (
         const frame = frameFed.get(target.id);
 
         if (frame !== undefined) {
-            errors.push(...frameTargetErrors(target, frame, edges, modelOf));
+            errors.push(...frameTargetErrors(target, frame, edges));
         }
 
-        const modelId = modelIdFor(target);
-        const limit = referenceVideoLimitSeconds(modelId === undefined ? undefined : modelOf(modelId));
+        const modelId = modelIdFor(target, videoKindOf(target) ?? "textToVideo");
+        const limit = referenceVideoLimitSeconds(MODEL_LOOKUP.get(modelId));
 
         if (limit === undefined) {
             continue;

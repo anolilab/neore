@@ -1,5 +1,6 @@
 import type { I18n, MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
+import { MEDIA_DEFAULT_MODELS } from "@neore/ai/models";
 
 import type { WorkflowContent, WorkflowEdge, WorkflowNode, WorkflowNodeData, WorkflowNodeType } from "../types";
 
@@ -104,7 +105,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                         aspectRatio: "16:9",
                         label: msg`Generate Image`,
                         mode: "generate",
-                        model: "fal:flux-dev",
+                        model: MEDIA_DEFAULT_MODELS.image,
                     },
                 ),
                 createNode(
@@ -236,7 +237,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                     { x: 400, y: 200 },
                     {
                         label: msg`Compare Models`,
-                        models: ["fal:flux-dev", "fal:flux-schnell", "fal:sdxl-lightning"],
+                        models: ["fal-ai/recraft/v3/text-to-image", "fal-ai/nano-banana", "fal-ai/nano-banana-2"],
                         showLabels: true,
                     },
                 ),
@@ -328,7 +329,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                     { x: 400, y: 200 },
                     {
                         label: msg`Transform`,
-                        model: "fal-ai/flux-dev-img2img",
+                        model: MEDIA_DEFAULT_MODELS.img2img,
                         prompt: "in the style of studio ghibli anime",
                         strength: 0.7,
                     },
@@ -422,7 +423,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                         duration: 5,
                         label: msg`Generate Video`,
                         mode: "text-to-video",
-                        model: "fal:mochi-v1",
+                        model: MEDIA_DEFAULT_MODELS.textToVideo,
                     },
                 ),
                 createNode(

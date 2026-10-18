@@ -3862,7 +3862,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
     {
         id: "fal-ai/flux-outpaint",
         provider: "fal",
-        modelApiId: "fal-ai/flux-pro/v1/fill",
+        modelApiId: "fal-ai/flux-pro/v1/outpaint",
         regions: ["US"],
         mode: "image",
         enabled: true,
@@ -3921,7 +3921,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
     {
         id: "fal-ai/bria-rmbg",
         provider: "fal",
-        modelApiId: "fal-ai/bria/background-removal",
+        modelApiId: "fal-ai/bria/background/remove",
         regions: ["US"],
         mode: "image",
         enabled: true,
@@ -4183,7 +4183,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
     {
         id: "fal-ai/controlnet-union",
         provider: "fal",
-        modelApiId: "fal-ai/controlnet-union-sdxl",
+        modelApiId: "fal-ai/sdxl-controlnet-union",
         regions: ["US"],
         mode: "image",
         enabled: true,
@@ -4193,7 +4193,7 @@ export const GATEWAY_MODELS: GatewayModelDefinition[] = [
         avgLatencyMs: 8000,
         supportsNegativePrompt: true,
         supportsControlNet: true,
-        controlNetTypes: ["pose", "depth", "canny", "normal", "softedge", "lineart", "scribble"],
+        controlNetTypes: ["pose", "depth", "canny", "normal", "softedge"],
         filterCapabilities: ["controlnet"],
     },
     {

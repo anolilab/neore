@@ -22,6 +22,7 @@ export {
     parseCustomModelId,
     type ParsedCustomModelId,
 } from "./custom-model-id";
+export { enabledModelOf, FAL_IMAGE, FAL_VIDEO, type ModelAccepts } from "./enabled-model";
 export {
     exceedsFreePlanCap,
     FAL_VIDEO_INPUTS,
@@ -95,3 +96,4 @@ export {
     VIDEO_CATALOG,
 } from "./registry";
 export type { AgentConfig, ContextOptions, ModelDefinition, ProviderKind, StorageOptions, UsageHandler } from "./types";
+export { LEGACY_WORKFLOW_MODELS, MEDIA_DEFAULT_MODELS, resolveWorkflowModel, WORKFLOW_KIND_ACCEPTS, type WorkflowModelKind } from "./workflow-defaults";

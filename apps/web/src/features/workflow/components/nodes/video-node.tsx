@@ -1,6 +1,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { MEDIA_DEFAULT_MODELS, resolveWorkflowModel } from "@neore/ai/models";
 import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
 import { Slider } from "@ui/components/slider";
@@ -16,6 +17,7 @@ import type { VideoNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { toBaseOption, videoModelPatch } from "../../utils/model-options";
 import BaseNode from "./base-node";
+import ModelSelect from "./model-select";
 import { VideoFramesSection } from "./video-frames-section";
 import { ReferenceMode, VideoModelOptions } from "./video-model-options";
 
@@ -42,17 +44,16 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
     const filteredModels = isImageToVideo
         ? allModels.filter((m) => m.enabled && m.supportsImageToVideo)
         : allModels.filter((m) => m.enabled && m.supportsTextToVideo);
-    const modelOptions = (isImageToVideo ? filteredModels : [{ id: "fal-ai/mochi-v1", isPremium: false, maxVideoDuration: 10 }, ...filteredModels]).map((m) => {
+    // The default is a registry row, so it is in `filteredModels` with its own paid-plan flag and note.
+    const modelOptions = filteredModels.map((m) => {
         return {
             ...toBaseOption(m),
             maxDuration: ("maxVideoDuration" in m ? m.maxVideoDuration : undefined) ?? 10,
         };
     });
 
-    const defaultModel = isImageToVideo ? "fal-ai/kling-video/v1.5/pro/image-to-video" : "fal-ai/mochi-v1";
-
     // Get current model capabilities
-    const currentModelDefinition = allModels.find((m) => m.id === (data.model ?? defaultModel));
+    const currentModelDefinition = allModels.find((m) => m.id === resolveWorkflowModel(isImageToVideo ? "imageToVideo" : "textToVideo", data.model));
     const currentModelInfo = {
         maxDuration: currentModelDefinition?.maxVideoDuration ?? 10,
         supportedFps: currentModelDefinition?.supportedFps ?? [24],
@@ -64,7 +65,7 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
         }
 
         // Reset model when switching modes
-        const newDefaultModel = mode === "image-to-video" ? "fal-ai/kling-video/v1.5/pro/image-to-video" : "fal-ai/mochi-v1";
+        const newDefaultModel = mode === "image-to-video" ? MEDIA_DEFAULT_MODELS.imageToVideo : MEDIA_DEFAULT_MODELS.textToVideo;
 
         updateNode(id, { mode: mode as VideoNodeData["mode"], ...videoModelPatch(newDefaultModel, data) });
     };
@@ -133,19 +134,13 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                     <Label className="text-muted-foreground text-xs">
                         <Trans>Model</Trans>
                     </Label>
-                    <Select onValueChange={handleModelChange} value={data.model ?? defaultModel}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
-                            <SelectValue placeholder={t`Select model...`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {modelOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    <span className="block max-w-[180px] truncate">{option.label}</span>
-                                    {option.isPremium && <span className="ml-1 text-xs text-amber-500">★</span>}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <ModelSelect
+                        note={<Trans>Pro models need a Pro plan. On a free plan the run stops before it starts.</Trans>}
+                        onChange={handleModelChange}
+                        options={modelOptions}
+                        placeholder={t`Select model...`}
+                        value={resolveWorkflowModel(isImageToVideo ? "imageToVideo" : "textToVideo", data.model)}
+                    />
                 </div>
 
                 <div className="space-y-1.5">
@@ -167,10 +162,17 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                     )}
                 </div>
 
-                {isImageToVideo && <ReferenceMode data={data} id={id} modelId={data.model ?? defaultModel} models={allModels} />}
+                {isImageToVideo && (
+                    <ReferenceMode
+                        data={data}
+                        id={id}
+                        modelId={resolveWorkflowModel(isImageToVideo ? "imageToVideo" : "textToVideo", data.model)}
+                        models={allModels}
+                    />
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
-                    <VideoModelOptions data={data} id={id} modelId={data.model ?? defaultModel} />
+                    <VideoModelOptions data={data} id={id} modelId={resolveWorkflowModel(isImageToVideo ? "imageToVideo" : "textToVideo", data.model)} />
 
                     {!isImageToVideo && (
                         <div className="space-y-1.5">

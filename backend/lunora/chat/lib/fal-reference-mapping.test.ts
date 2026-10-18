@@ -5,9 +5,10 @@ import { describe, expect, it } from "vitest";
 import {
     buildFalReferenceImageInput,
     buildFalReferenceVideoInput,
-    falVideoTargetOf,
+    controlNetImageField,
     falAcceptsAspectRatio,
     falDurationInput,
+    falMaskField,
     falVideoOptionInput,
     referenceVideoLimitSeconds,
 } from "./fal-reference-mapping";
@@ -259,24 +260,22 @@ describe("start frame field", () => {
     });
 });
 
-describe("falVideoTargetOf", () => {
-    it("keeps the default endpoint when the node names no model", () => {
-        expect(falVideoTargetOf(undefined)).toEqual({ definition: undefined, endpoint: "fal-ai/kling-video/v2.1/standard/image-to-video" });
+describe("controlNetImageField", () => {
+    it("maps each control type to the field the sdxl union endpoint takes it in", () => {
+        expect(controlNetImageField("fal-ai/sdxl-controlnet-union", "pose")).toBe("openpose_image_url");
+        expect(controlNetImageField("fal-ai/sdxl-controlnet-union", "softedge")).toBe("teed_image_url");
     });
 
-    it("sends an enabled fal video row to its registry endpoint", () => {
-        expect(falVideoTargetOf("fal-ai/veo3.1/image-to-video")?.endpoint).toBe("fal-ai/veo3.1/image-to-video");
+    it("has no field for a control type or endpoint it does not know, so the action refuses it", () => {
+        expect(controlNetImageField("fal-ai/sdxl-controlnet-union", "lineart")).toBeUndefined();
+        expect(controlNetImageField("fal-ai/some-other-endpoint", "canny")).toBeUndefined();
+        expect(controlNetImageField("fal-ai/sdxl-controlnet-union", "constructor")).toBeUndefined();
     });
+});
 
-    it("rejects a registry row that is disabled", () => {
-        expect(falVideoTargetOf("fal-ai/mochi-v1")).toBeUndefined();
-    });
-
-    it("rejects a video row from another provider", () => {
-        expect(falVideoTargetOf("replicate/minimax-video-01")).toBeUndefined();
-    });
-
-    it("rejects an id the registry does not offer, so it never becomes a FAL endpoint", () => {
-        expect(falVideoTargetOf("fal-ai/some-endpoint-nobody-registered")).toBeUndefined();
+describe("falMaskField", () => {
+    it("names LaMa's mask `mask_image_url` and every other endpoint's `mask_url`", () => {
+        expect(falMaskField("fal-ai/lama")).toBe("mask_image_url");
+        expect(falMaskField("fal-ai/flux-pro/v1/fill")).toBe("mask_url");
     });
 });

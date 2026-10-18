@@ -4,14 +4,24 @@
  * system prompt, and the one shape a video node stores. Both entry points read these, so the two
  * cannot disagree on what a node sends.
  */
-import { MODEL_LOOKUP } from "@neore/ai/models";
-
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
+import type { ActionCtx } from "../_generated/server";
 import { type ExecutionContext, extractUrl, getLastOutput, type WorkflowContent, type WorkflowNode } from "./core";
 import { expandNodeMentions, referenceImageUrls } from "./mention-targets";
-import { type FrameSource, frameSourceOf, type MediaRef, modelIdFor, resolveMediaUrls, resolveVideoInputUrls, videoInputErrors } from "./video-inputs";
+import { runBilledVideo } from "./video-billing";
+import {
+    type FrameSource,
+    frameSourceOf,
+    type MediaRef,
+    modelIdFor,
+    resolveMediaUrls,
+    resolveVideoInputUrls,
+    videoInputErrors,
+    videoKindOf,
+} from "./video-inputs";
+import { videoDefinitionOf, videoDurationOf } from "./video-policy";
 
 /** The part of an action or HTTP action context the workflow reads stored files through, and extracts frames with. */
 export interface WorkflowFileContext {
@@ -83,8 +93,7 @@ const frameRefOf = async (
  * whether an upstream image may stand in for it, since text-to-video never used one.
  */
 export const videoInputArgs = async (node: WorkflowNode, context: ExecutionContext, files: WorkflowFileContext, userId: string) => {
-    const modelId = modelIdFor(node);
-    const model = modelId === undefined ? undefined : MODEL_LOOKUP.get(modelId);
+    const model = videoDefinitionOf(node);
     const sign = (fileId: string) => signChatFile(files, fileId);
     const frame = await frameRefOf(node, context, files, userId, sign);
     const inputs = await resolveVideoInputUrls(node, context, sign, model, frame);
@@ -130,17 +139,20 @@ export type VideoInputArgs = Awaited<ReturnType<typeof videoInputArgs>>;
 /**
  * The arguments of the image-to-video action for a video node. The options are sent only when the
  * stored value has the type the action takes; the action keeps only the ones the model accepts
- * (`fal-video-inputs.ts`), so a value left over from an earlier model is dropped there.
+ * (`fal-video-inputs.ts`), so a value left over from an earlier model is dropped there. The duration is
+ * the run's billed length (`videoDurationOf`), so the endpoint is sent the length the run pays for.
  */
 export const imageToVideoArgs = (node: WorkflowNode, imageUrl: string, inputs: VideoInputArgs, userId: string) => {
-    const data = node.data as VideoNodeRunData;
+    const data = node.data as ImageToVideoNodeRunData;
 
     return {
-        duration: data.duration,
+        duration: videoDurationOf(node, videoDefinitionOf(node)).requested,
         fps: data.fps,
         generateAudio: typeof data.generateAudio === "boolean" ? data.generateAudio : undefined,
         imageUrl,
-        model: data.model,
+        // Only the image-to-video node type has a loop option; a video node's stored value never reaches the action.
+        loop: node.type === "image-to-video" ? data.loop : undefined,
+        model: modelIdFor(node, "imageToVideo"),
         motionStrength: data.motionStrength,
         prompt: data.prompt,
         referenceAudioUrls: inputs.referenceAudioUrls,
@@ -157,9 +169,9 @@ export const textToVideoArgs = (node: WorkflowNode, prompt: string, inputs: Vide
 
     return {
         aspectRatio: data.aspectRatio ?? "16:9",
-        duration: data.duration ?? 5,
+        duration: videoDurationOf(node, videoDefinitionOf(node)).requested,
         generateAudio: typeof data.generateAudio === "boolean" ? data.generateAudio : undefined,
-        model: data.model ?? "fal:mochi-v1",
+        model: modelIdFor(node, "textToVideo"),
         prompt,
         referenceAudioUrls: inputs.referenceAudioUrls,
         referenceVideoUrls: inputs.referenceVideoUrls,
@@ -176,9 +188,7 @@ export const textToVideoArgs = (node: WorkflowNode, prompt: string, inputs: Vide
  * so a node that cannot run never bills its extraction. Returns the error, or `undefined` to run.
  */
 export const videoRunInputError = (node: WorkflowNode, context: ExecutionContext): string | undefined => {
-    const data = node.data as { mode?: string };
-
-    if (node.type === "image-to-video" || data.mode === "image-to-video") {
+    if (videoKindOf(node) === "imageToVideo") {
         const hasImage = frameSourceOf(node, context) !== undefined || Boolean(extractUrl(getLastOutput(context), "imageUrl"));
 
         return hasImage ? undefined : "No image input provided for image-to-video mode";
@@ -232,5 +242,57 @@ export const videoNodeOutput = (result: VideoActionResult, prompt: string) => {
 };
 
 /** The input errors that need only the graph. Run before any node, so a doomed run bills nothing. */
-export const workflowInputErrors = (content: Pick<WorkflowContent, "edges" | "nodes">): string[] =>
-    videoInputErrors(content.nodes, content.edges, (modelId) => MODEL_LOOKUP.get(modelId));
+export const workflowInputErrors = (content: Pick<WorkflowContent, "edges" | "nodes">): string[] => videoInputErrors(content.nodes, content.edges);
+
+/** The context a video node runs through: the actions it calls, and the mutations that bill it. */
+export type VideoRunContext = Pick<ActionCtx, "runAction" | "runMutation" | "runQuery">;
+
+/**
+ * One video node, end to end: the input check, then the billed run (`runBilledVideo`: credits and quota,
+ * the frame extraction and the paid call, the charge). Both run paths call this and differ only in how
+ * they report a failure, so a node cannot skip its charge or its checks. Throws the message the run reports.
+ */
+export const runVideoNode = async (
+    node: WorkflowNode,
+    context: ExecutionContext,
+    actionContext: VideoRunContext,
+    userId: string,
+): Promise<{ output: ReturnType<typeof videoNodeOutput> }> => {
+    // Before any frame is extracted, so a node that cannot run bills nothing.
+    const inputError = videoRunInputError(node, context);
+
+    if (inputError) {
+        throw new Error(inputError);
+    }
+
+    const kind = videoKindOf(node);
+
+    const output = await runBilledVideo(actionContext, context, node, userId, async () => {
+        const inputs = await videoInputArgs(node, context, actionContext, userId);
+
+        if (kind === "imageToVideo") {
+            const imageUrl = inputs.frameUrl ?? extractUrl(getLastOutput(context), "imageUrl");
+
+            if (!imageUrl) {
+                throw new Error("No image input provided for image-to-video mode");
+            }
+
+            const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
+                ...imageToVideoArgs(node, imageUrl, inputs, userId),
+                organizationId: context.orgId ?? null,
+            });
+
+            return videoNodeOutput(result, (node.data as { prompt?: string }).prompt ?? "");
+        }
+
+        const prompt = videoPromptOf(node, context);
+        const result = await actionContext.runAction(internal.chat.functions.generateVideo, {
+            ...textToVideoArgs(node, prompt, inputs, userId),
+            organizationId: context.orgId ?? null,
+        });
+
+        return videoNodeOutput(result, prompt);
+    });
+
+    return { output };
+};

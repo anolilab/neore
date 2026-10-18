@@ -16,7 +16,7 @@ describe("mentions in a text template", () => {
             return { id: `e-${source.id}`, source: source.id, target: "tpl" };
         });
 
-        return { context: { graph: { edges, nodes: [target, ...sources] }, nodeOutputs: outputs, variables: {} }, node: target };
+        return { context: { graph: { edges, nodes: [target, ...sources] }, nodeOutputs: outputs, runId: "run", variables: {} }, node: target };
     };
 
     it("substitutes a connected text node's output and leaves an ambiguous label literal", () => {
@@ -32,6 +32,7 @@ describe("mentions in a text template", () => {
         const ctx = {
             graph: { edges: [{ id: "e", source: "a", target: "tpl" }], nodes: [target, ...sources] },
             nodeOutputs: { a: 'He said "hi"\nbye' },
+            runId: "run",
             variables: {},
         };
 
@@ -48,7 +49,7 @@ describe("mentions in a text template", () => {
             { id: "e3", source: "pic", target: "gen" },
             { id: "e4", source: "pic", target: "gen", targetHandle: "second" },
         ];
-        const ctx = { graph: { edges, nodes: [gen, ...sources] }, nodeOutputs: outputs, variables: {} };
+        const ctx = { graph: { edges, nodes: [gen, ...sources] }, nodeOutputs: outputs, runId: "run", variables: {} };
 
         expect(referenceImageSourceIds(gen, ctx)).toStrictEqual(["ref", "pic"]);
         expect(mentionTargetsFor(gen, ctx, ["image"]).map((target) => [target.label, target.replacement])).toStrictEqual([
@@ -69,7 +70,7 @@ describe("image-node prompts and reference images", () => {
             { id: "e3", source: "pic", target: "gen" },
         ];
         const outputs = { blank: {}, pic: "https://x.example/p.png", ref: { imageUrl: "https://x.example/r.png" } };
-        const ctx = { graph: { edges, nodes: [gen, ...sources] }, nodeOutputs: outputs, variables: {} };
+        const ctx = { graph: { edges, nodes: [gen, ...sources] }, nodeOutputs: outputs, runId: "run", variables: {} };
 
         expect(referenceImageUrls(gen, ctx)).toStrictEqual(["https://x.example/r.png", "https://x.example/p.png"]);
         expect(referenceImageSourceIds(gen, ctx)).toStrictEqual(["ref", "pic"]);
@@ -84,6 +85,7 @@ describe("image-node prompts and reference images", () => {
         const ctx = {
             graph: { edges, nodes: [hero, restyle] },
             nodeOutputs: { hero: { assets: [{ imageSize: "1:1", imageUrl: "https://x.example/hero.png", mimeType: "image/png" }], modelId: "m", prompt: "p" } },
+            runId: "run",
             variables: {},
         };
 
@@ -98,7 +100,7 @@ describe("image-node prompts and reference images", () => {
             return { id: `e-${source.id}`, source: source.id, target: "gen" };
         });
         const outputs = Object.fromEntries(sources.map((source) => [source.id, `https://x.example/${source.id}.png`]));
-        const ctx = { graph: { edges, nodes: [gen, ...sources] }, nodeOutputs: outputs, variables: {} };
+        const ctx = { graph: { edges, nodes: [gen, ...sources] }, nodeOutputs: outputs, runId: "run", variables: {} };
 
         expect(referenceImageSourceIds(gen, ctx)).toStrictEqual(["a", "b", "c", "d"]);
         expect(mentionTargetsFor(gen, ctx, ["image"]).map((target) => target.label)).toStrictEqual(["A", "B", "C", "D"]);

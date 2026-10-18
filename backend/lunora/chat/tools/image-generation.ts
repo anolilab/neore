@@ -1,4 +1,5 @@
 import z from "zod/v4";
+import { MEDIA_DEFAULT_MODELS } from "@neore/ai/models";
 
 import { internal } from "../../_generated/internal";
 
@@ -33,13 +34,13 @@ const imageGenerationTool = createTool<
 >({
     description: `Generate images from text descriptions using AI.
 Available models include:
-- FAL.ai: fal:flux-dev (fast, free), fal:flux-pro (premium), fal:sdxl-lightning (fastest)
+- FAL.ai: fal-ai/recraft/v3/text-to-image (default), fal-ai/nano-banana, fal-ai/flux-pro (premium: needs a Pro plan; a free user is refused it)
 - Google: google/gemini-2.5-flash-image (via OpenRouter)
 - More providers supported - check model registry
 Supports aspect ratios: auto, 1:1, 16:9, 9:16, 4:3, 3:4, 2:3, 3:2, 2:1, 1:2, 19.5:9, 9:19.5, 20:9, 9:20, 21:9.
 Use 'auto' to automatically match input image's aspect ratio. Premium users can generate up to 4 images at once.`,
     execute: async (context, input) => {
-        const { aspectRatio = "1:1", model = "fal:flux-dev", numImages: numberImages = 1, prompt } = input;
+        const { aspectRatio = "1:1", model = MEDIA_DEFAULT_MODELS.image, numImages: numberImages = 1, prompt } = input;
 
         if (!context.userId) {
             return { error: "Authentication required", images: [] };
@@ -104,7 +105,11 @@ Use 'auto' to automatically match input image's aspect ratio. Premium users can 
                 .optional()
                 .default("1:1")
                 .meta({ description: "Image aspect ratio" }),
-            model: z.string().optional().default("fal:flux-dev").meta({ description: "AI model to use (e.g., fal:flux-dev, google/gemini-2.5-flash-image)" }),
+            model: z
+                .string()
+                .optional()
+                .default(MEDIA_DEFAULT_MODELS.image)
+                .meta({ description: "AI model to use (e.g., fal-ai/recraft/v3/text-to-image, google/gemini-2.5-flash-image)" }),
             negativePrompt: z.string().optional().meta({ description: "What to avoid in the image" }),
             numImages: z.number().min(1).max(4).optional().default(1).meta({ description: "Number of images to generate (1-4)" }),
             prompt: z.string().min(1).max(2000).meta({ description: "Detailed image description" }),

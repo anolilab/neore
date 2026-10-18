@@ -71,6 +71,10 @@ export interface ExecutionContext {
     graph: { edges: WorkflowEdge[]; nodes: WorkflowNode[] };
     /** Outputs from each node, keyed by node ID */
     nodeOutputs: Record<string, unknown>;
+    /** The organization whose credits a run's paid clips draw on (`auth/billing.ts`); absent when the user has none. */
+    orgId?: string;
+    /** This execution's id: a node's charge is keyed on it, so a retried node is charged once. */
+    runId: string;
     /** Variables available for template substitution */
     variables: Record<string, string>;
 }

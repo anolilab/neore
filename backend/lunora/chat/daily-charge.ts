@@ -22,7 +22,7 @@ import { dailyLimitKeyOf, dailyLimitTierOf } from "./lib/daily-limit";
  * caller stops there. Platform admins are exempt, as on the HTTP routes.
  */
 export const chargeDailyUnit = internalMutation
-    .input({ kind: v.union(v.literal("Audio"), v.literal("Text")), organizationId: v.optional(v.string()), userId: v.string() })
+    .input({ kind: v.union(v.literal("Audio"), v.literal("Text"), v.literal("Video")), organizationId: v.optional(v.string()), userId: v.string() })
     .output(v.boolean())
     .mutation(async ({ args: { kind, organizationId, userId }, ctx }) => {
         const user = await getUser(ctx, userId);

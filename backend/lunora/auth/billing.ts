@@ -11,9 +11,11 @@ import type { Infer } from "lunorash/server";
 import { LunoraError } from "lunorash/server";
 import { v } from "lunorash/server";
 
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { adminMutation, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { getMemberByOrganizationAndUser, getOrganization, getUser } from "./lib/better-auth-queries";
+import { getUserEffectiveSettings } from "./lib/settings-resolver";
+import { resolveUserPlan } from "./lib/plan";
 import { vBillingMode } from "./lib/gateway-credits";
 import { applyGatewayDeduction } from "./lib/gateway-deduction";
 import { creemTierPatch } from "../billing/plans";
@@ -340,6 +342,42 @@ export const setMemberCreditOverride = adminMutation
         }
 
         context.log.event("billing.set_member_credit_override", { cleared: creditOverride === null, organizationId: orgId, userId });
+    });
+
+/**
+ * The credits a member has left for an organization, or `null` when they have no record. No record is
+ * not charged (`applyGatewayDeduction`), so there is no balance to refuse on. Read by the workflow's video
+ * pre-check, which must agree with what the deduction will do.
+ */
+export const creditsLeftQuery = internalQuery
+    .input({ orgId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ creditsLeft: v.union(v.number(), v.null()) }))
+    .query(async ({ args: { orgId, userId }, ctx: context }) => {
+        const record = await context.db.memberCredits.findFirst({ where: { organizationId: orgId, userId } });
+
+        if (!record) {
+            return { creditsLeft: null };
+        }
+
+        const settings = await getUserEffectiveSettings(context, userId, orgId);
+
+        return { creditsLeft: settings.credits - (record.usedCredits ?? 0) };
+    });
+
+/**
+ * The run plan for a run acting in one organization: its paid tier when the user is still a member, or the
+ * user's own Pro, or `null` for a personal run (`organizationId: null`). Admins run any model. The same
+ * organization decides the gate, the quota and the credits, so none of them can disagree.
+ */
+export const getRunPlanForOrganizationQuery = internalQuery
+    .input({ organizationId: v.union(v.string().max(MAX_LENGTH.id), v.null()), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ isAdmin: v.boolean(), plan: v.union(v.literal("premium"), v.null()) }))
+    .query(async ({ args: { organizationId, userId }, ctx: context }) => {
+        const user = await getUser(context, userId);
+        const membership = organizationId ? await getMemberByOrganizationAndUser(context, organizationId, userId) : null;
+        const organization = membership && organizationId ? await getOrganization(context, organizationId) : null;
+
+        return { isAdmin: user?.role === "admin", plan: resolveUserPlan(user, [organization]) };
     });
 
 export const deductCreditsFromGateway = internalMutation

@@ -15,6 +15,7 @@ import type { ParallelCompareNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { toBaseOption } from "../../utils/model-options";
 import BaseNode from "./base-node";
+import ProBadge from "./pro-badge";
 
 const MAX_MODELS = 4;
 const MIN_MODELS = 2;
@@ -107,20 +108,20 @@ const ParallelCompareNodeComponent = (props: NodeProps<Node<ParallelCompareNodeD
                                     <SelectTrigger className="nodrag h-8 flex-1 text-sm">
                                         <SelectValue>
                                             {getModelLabel(modelId)}
-                                            {getModelPremium(modelId) && <span className="ml-1 text-xs text-amber-500">★</span>}
+                                            {getModelPremium(modelId) && <ProBadge />}
                                         </SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
                                         {/* Show current selection */}
                                         <SelectItem value={modelId}>
                                             {getModelLabel(modelId)}
-                                            {getModelPremium(modelId) && <span className="ml-1 text-xs text-amber-500">★</span>}
+                                            {getModelPremium(modelId) && <ProBadge />}
                                         </SelectItem>
                                         {/* Show available models */}
                                         {availableModels.map((option) => (
                                             <SelectItem key={option.value} value={option.value}>
                                                 {option.label}
-                                                {option.isPremium && <span className="ml-1 text-xs text-amber-500">★</span>}
+                                                {option.isPremium && <ProBadge />}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

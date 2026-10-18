@@ -71,7 +71,7 @@ const SYSTEM_PROMPT = `You are a workflow generator. Given a natural language de
 Available node types and their purposes:
 - "text": Text input or text template transform. Data: { label, mode: "input"|"transform", content?: string, template?: string }
 - "ai": AI language model processing. Data: { label, model?: string, systemPrompt?: string, temperature?: number, maxTokens?: number }
-- "image": Image input or generation. Data: { label, mode: "input"|"generate", model?: "fal:flux-dev"|"fal:flux-pro", prompt?: string, aspectRatio?: "1:1"|"16:9"|"9:16"|"4:3" }
+- "image": Image input or generation. Data: { label, mode: "input"|"generate", model?: "fal-ai/recraft/v3/text-to-image"|"fal-ai/nano-banana", prompt?: string, aspectRatio?: "1:1"|"16:9"|"9:16"|"4:3" }
 - "img2img": Image-to-image transform. Data: { label, model?: string, prompt?: string, strength?: number }
 - "upscale": Image upscaling. Data: { label, scale?: 2|4, enhanceDetails?: boolean }
 - "inpaint": Edit image regions. Data: { label, prompt: string }

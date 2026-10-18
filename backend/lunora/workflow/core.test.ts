@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { executionContextOf } from "./test-execution-context";
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
 import { extractUrl, getNodeInput, sourceNodesOf } from "./core";
 
@@ -7,9 +8,8 @@ const node = (id: string, type: string, data: Record<string, unknown> = {}): Wor
     return { data, id, position: { x: 0, y: 0 }, type };
 };
 
-const context = (edges: WorkflowEdge[], nodes: WorkflowNode[], nodeOutputs: Record<string, unknown> = {}): ExecutionContext => {
-    return { graph: { edges, nodes }, nodeOutputs, variables: {} };
-};
+const context = (edges: WorkflowEdge[], nodes: WorkflowNode[], nodeOutputs: Record<string, unknown> = {}): ExecutionContext =>
+    executionContextOf({ graph: { edges, nodes }, nodeOutputs });
 
 describe("extractUrl", () => {
     it("reads a string as the URL itself", () => {

@@ -1,5 +1,6 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
+import { MEDIA_DEFAULT_MODELS } from "@neore/ai/models";
 import type { FrameKind } from "@neore/backend/workflow/mentions";
 import type { Edge, Node, Viewport } from "@xyflow/react";
 
@@ -67,14 +68,14 @@ export interface ImageNodeData extends BaseNodeData {
     imageFileId?: string; // Stored chat file for an input image too large to inline; imageUrl is resolved from it
     imageUrl?: string; // For input mode
     mode: "input" | "generate";
-    model?: string; // For generation (fal:flux-dev, fal:flux-pro, fal:sdxl-lightning)
+    model?: string; // For generation (a registry image id; the default is MEDIA_DEFAULT_MODELS.image)
     numImages?: number; // 1-4
     prompt?: string; // For generation
 }
 
 // Image-to-Image node - transform images with AI
 export interface Img2ImgNodeData extends BaseNodeData {
-    model?: string; // fal-ai/flux/dev/image-to-image
+    model?: string; // a registry img2img id
     negativePrompt?: string;
     prompt?: string; // Guide the transformation
     strength?: number; // 0-1, how much to change (default 0.75)
@@ -170,7 +171,7 @@ export interface VideoNodeData extends BaseNodeData {
     frameFileIds?: VideoFrameFileIds; // Frame files from an earlier build (see VideoFrameFileIds)
     generateAudio?: boolean; // Generate a soundtrack; unset means the endpoint's own default
     mode: "text-to-video" | "image-to-video";
-    model?: string; // fal:mochi-v1, fal:minimax-video, fal:kling-video
+    model?: string; // a registry video id
     motionStrength?: number; // 0-1, how much motion in the video
     pickedTime?: number; // Seconds into the clip for the picked frame the "add as image node" button takes
     prompt?: string;
@@ -470,7 +471,7 @@ const NODE_CONFIGS: Record<WorkflowNodeType, NodeConfig> = {
             controlType: "pose",
             endPercent: 1,
             label: "ControlNet",
-            model: "fal-ai/controlnet-sdxl",
+            model: MEDIA_DEFAULT_MODELS.controlnet,
             startPercent: 0,
             strength: 0.8,
         } as ControlNetNodeData,
@@ -503,7 +504,7 @@ const NODE_CONFIGS: Record<WorkflowNodeType, NodeConfig> = {
     },
     image: {
         color: "#ec4899",
-        defaultData: { aspectRatio: "1:1", label: "Image", mode: "input", model: "fal:flux-dev" } as ImageNodeData,
+        defaultData: { aspectRatio: "1:1", label: "Image", mode: "input", model: MEDIA_DEFAULT_MODELS.image } as ImageNodeData,
         defaultLabel: msg`Image`,
         description: msg`Input or generate images`,
         handles: { inputs: 1, outputs: 1 },
@@ -530,7 +531,7 @@ const NODE_CONFIGS: Record<WorkflowNodeType, NodeConfig> = {
     },
     img2img: {
         color: "#d946ef",
-        defaultData: { label: "Image-to-Image", model: "fal-ai/flux/dev/image-to-image", strength: 0.75 } as Img2ImgNodeData,
+        defaultData: { label: "Image-to-Image", model: MEDIA_DEFAULT_MODELS.img2img, strength: 0.75 } as Img2ImgNodeData,
         defaultLabel: msg`Image-to-Image`,
         description: msg`Transform images with AI guidance`,
         handles: { inputs: 1, outputs: 1 },
@@ -628,7 +629,7 @@ const NODE_CONFIGS: Record<WorkflowNodeType, NodeConfig> = {
     },
     transcription: {
         color: "#3b82f6",
-        defaultData: { label: "Speech to Text", model: "whisper" } as TranscriptionNodeData,
+        defaultData: { label: "Speech to Text", model: MEDIA_DEFAULT_MODELS.transcription } as TranscriptionNodeData,
         defaultLabel: msg`Speech to Text`,
         description: msg`Convert speech to text`,
         handles: { inputs: 1, outputs: 1 },
@@ -648,7 +649,14 @@ const NODE_CONFIGS: Record<WorkflowNodeType, NodeConfig> = {
     },
     video: {
         color: "#ef4444",
-        defaultData: { aspectRatio: "16:9", duration: 5, fps: 24, label: "Video", mode: "text-to-video", model: "fal-ai/mochi-v1" } as VideoNodeData,
+        defaultData: {
+            aspectRatio: "16:9",
+            duration: 5,
+            fps: 24,
+            label: "Video",
+            mode: "text-to-video",
+            model: MEDIA_DEFAULT_MODELS.textToVideo,
+        } as VideoNodeData,
         defaultLabel: msg`Video`,
         description: msg`Generate videos from text or images`,
         handles: { inputs: 1, outputs: 1 },

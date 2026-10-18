@@ -1,7 +1,8 @@
-import type { ModelDefinition } from "@neore/ai/models";
+import { MEDIA_DEFAULT_MODELS, type ModelDefinition } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
+import { executionContextOf } from "./test-execution-context";
 import { frameSourceOf, mediaOf, modelIdFor, resolveMediaUrls, resolveVideoInputs, resolveVideoInputUrls, videoInputErrors } from "./video-inputs";
 
 const node = (id: string, type: string, data: Record<string, unknown> = {}): WorkflowNode => {
@@ -11,9 +12,11 @@ const node = (id: string, type: string, data: Record<string, unknown> = {}): Wor
 const videoNode = node("video", "video", {});
 const genNode = node("gen", "video", { mode: "text-to-video" });
 
-const context = (edges: WorkflowEdge[], nodeOutputs: Record<string, unknown> = {}, nodes: WorkflowNode[] = [videoNode, genNode]): ExecutionContext => {
-    return { graph: { edges, nodes }, nodeOutputs, variables: {} };
-};
+/** A registry row that takes a start image and up to 3 reference clips of 15 s in total. */
+const SEEDANCE = "fal-ai/bytedance/seedance-2.0/reference-to-video";
+
+const context = (edges: WorkflowEdge[], nodeOutputs: Record<string, unknown> = {}, nodes: WorkflowNode[] = [videoNode, genNode]): ExecutionContext =>
+    executionContextOf({ graph: { edges, nodes }, nodeOutputs });
 
 /** A reference-capable model, shaped like a registry row. */
 const referenceModel = (caps: { audios?: number; videos?: number }): ModelDefinition =>
@@ -179,49 +182,47 @@ describe("resolveMediaUrls", () => {
 });
 
 describe("modelIdFor", () => {
-    it("gives a text-to-video node the executor's default model, and an image-to-video node only its own", () => {
-        expect(modelIdFor(node("v", "video", { mode: "text-to-video" }))).toBe("fal:mochi-v1");
-        expect(modelIdFor(node("v", "video", { mode: "image-to-video" }))).toBeUndefined();
-        expect(modelIdFor(node("i", "image-to-video", { model: "fal:kling" }))).toBe("fal:kling");
+    it("gives a video node its kind's workflow default when it names none, and a stored id as given", () => {
+        expect(modelIdFor(node("v", "video", { mode: "text-to-video" }), "textToVideo")).toBe(MEDIA_DEFAULT_MODELS.textToVideo);
+        expect(modelIdFor(node("v", "video", { mode: "image-to-video" }), "imageToVideo")).toBe(MEDIA_DEFAULT_MODELS.imageToVideo);
+        expect(modelIdFor(node("i", "image-to-video", { model: SEEDANCE }), "imageToVideo")).toBe(SEEDANCE);
+        expect(modelIdFor(node("v", "video", { mode: "text-to-video", model: "fal:mochi-v1" }), "textToVideo")).toBe(MEDIA_DEFAULT_MODELS.textToVideo);
     });
 });
 
 describe("videoInputErrors", () => {
-    const modelOf = (modelId: string) => (modelId === "seedance" ? referenceModel({ audios: 3, videos: 3 }) : undefined);
-
     it("accepts a frame from a video node into a video node, with no capture step", () => {
-        const nodes = [node("src", "video", { label: "Clip" }), node("gen", "image-to-video", { mode: "image-to-video", model: "seedance" })];
+        const nodes = [node("src", "video", { label: "Clip" }), node("gen", "image-to-video", { mode: "image-to-video", model: SEEDANCE })];
 
-        expect(videoInputErrors(nodes, [{ id: "e1", source: "src", sourceHandle: "frame-end", target: "gen" }], modelOf)).toStrictEqual([]);
+        expect(videoInputErrors(nodes, [{ id: "e1", source: "src", sourceHandle: "frame-end", target: "gen" }])).toStrictEqual([]);
     });
 
     it("rejects a frame into a model that cannot take an image, before any extraction is paid for", () => {
         const nodes = [node("src", "video", {}), node("gen", "video", { mode: "text-to-video", model: "fal:mochi-v1", prompt: "a fox" })];
 
-        expect(videoInputErrors(nodes, [{ id: "e", source: "src", sourceHandle: "frame-start", target: "gen" }], modelOf)).toStrictEqual([
-            "The start frame needs a model that takes an image input; fal:mochi-v1 does not",
+        expect(videoInputErrors(nodes, [{ id: "e", source: "src", sourceHandle: "frame-start", target: "gen" }])).toStrictEqual([
+            "The start frame needs a model that takes an image input; fal-ai/ltx-video does not",
         ]);
     });
 
-    it("rejects a frame into an image-to-video node with no model selected", () => {
+    it("accepts an image-to-video node that sets no model, since the workflow default takes an image", () => {
         const nodes = [node("src", "video", {}), node("gen", "image-to-video", { mode: "image-to-video" })];
 
-        expect(videoInputErrors(nodes, [{ id: "e", source: "src", sourceHandle: "frame-end", target: "gen" }], modelOf)).toStrictEqual([
-            "The end frame needs a model that takes an image input, and no model is selected",
-        ]);
+        expect(MEDIA_DEFAULT_MODELS.imageToVideo).toBeDefined();
+        expect(videoInputErrors(nodes, [{ id: "e", source: "src", sourceHandle: "frame-end", target: "gen" }])).toStrictEqual([]);
     });
 
     it("rejects a frame into a text-to-video node that has no prompt and no text wired in", () => {
-        const nodes = [node("src", "video", {}), node("gen", "video", { mode: "text-to-video", model: "seedance" })];
+        const nodes = [node("src", "video", {}), node("gen", "video", { mode: "text-to-video", model: SEEDANCE })];
         const edges: WorkflowEdge[] = [{ id: "e", source: "src", sourceHandle: "frame-start", target: "gen" }];
 
-        expect(videoInputErrors(nodes, edges, modelOf)).toStrictEqual([
+        expect(videoInputErrors(nodes, edges)).toStrictEqual([
             "The start frame feeds a text-to-video node with no prompt; give it a prompt or wire a text node into it",
         ]);
         expect(
-            videoInputErrors([...nodes.slice(0, 1), node("gen", "video", { mode: "text-to-video", model: "seedance", prompt: "a fox" })], edges, modelOf),
+            videoInputErrors([...nodes.slice(0, 1), node("gen", "video", { mode: "text-to-video", model: SEEDANCE, prompt: "a fox" })], edges),
         ).toStrictEqual([]);
-        expect(videoInputErrors([...nodes, node("txt", "text", {})], [...edges, { id: "t", source: "txt", target: "gen" }], modelOf)).toStrictEqual([]);
+        expect(videoInputErrors([...nodes, node("txt", "text", {})], [...edges, { id: "t", source: "txt", target: "gen" }])).toStrictEqual([]);
     });
 
     it("rejects a frame that runs into a node that does not read it, or out of a node with no clip", () => {
@@ -229,18 +230,18 @@ describe("videoInputErrors", () => {
         const wrongTarget = node("img", "text", {});
         const imageSource = node("pic", "image", {});
 
-        expect(videoInputErrors([source, wrongTarget], [{ id: "e", source: "src", sourceHandle: "frame-end", target: "img" }], modelOf)).toStrictEqual([
+        expect(videoInputErrors([source, wrongTarget], [{ id: "e", source: "src", sourceHandle: "frame-end", target: "img" }])).toStrictEqual([
             "The end frame must go from a video or image-to-video node into a video or image-to-video node",
         ]);
-        expect(
-            videoInputErrors([imageSource, node("gen", "video")], [{ id: "e", source: "pic", sourceHandle: "frame-start", target: "gen" }], modelOf),
-        ).toStrictEqual(["The start frame must go from a video or image-to-video node into a video or image-to-video node"]);
+        expect(videoInputErrors([imageSource, node("gen", "video")], [{ id: "e", source: "pic", sourceHandle: "frame-start", target: "gen" }])).toStrictEqual([
+            "The start frame must go from a video or image-to-video node into a video or image-to-video node",
+        ]);
     });
 
     it("reports a saved picked-frame wire, which is no longer a handle", () => {
         const nodes = [node("src", "video", {}), node("gen", "video", {})];
 
-        expect(videoInputErrors(nodes, [{ id: "e", source: "src", sourceHandle: "frame-picked", target: "gen" }], modelOf)).toStrictEqual([
+        expect(videoInputErrors(nodes, [{ id: "e", source: "src", sourceHandle: "frame-picked", target: "gen" }])).toStrictEqual([
             "The frame-picked handle is no longer supported: add the frame as an image node and wire that instead",
         ]);
     });
@@ -249,26 +250,26 @@ describe("videoInputErrors", () => {
         const long = node("long", "video", { duration: 10 });
         const alsoLong = node("long2", "video", { duration: 8 });
         const upload = node("upload", "file", {});
-        const target = node("gen", "video", { mode: "text-to-video", model: "seedance" });
+        const target = node("gen", "video", { mode: "text-to-video", model: SEEDANCE });
         const over = [long, alsoLong, target];
         const overEdges: WorkflowEdge[] = [
             { id: "e1", source: "long", target: "gen" },
             { id: "e2", source: "long2", target: "gen" },
         ];
 
-        expect(videoInputErrors(over, overEdges, modelOf)).toStrictEqual(["The reference clips total 18s; seedance accepts at most 15s of reference video"]);
+        expect(videoInputErrors(over, overEdges)).toStrictEqual([`The reference clips total 18s; ${SEEDANCE} accepts at most 15s of reference video`]);
 
         const underEdges: WorkflowEdge[] = [
             { id: "e1", source: "long", target: "gen" },
             { id: "e3", source: "upload", target: "gen" },
         ];
 
-        expect(videoInputErrors([long, upload, target], underEdges, modelOf)).toStrictEqual([]);
+        expect(videoInputErrors([long, upload, target], underEdges)).toStrictEqual([]);
     });
 
     it("counts a text-to-video source with no duration as the 5 s the executor requests", () => {
         const defaultClip = node("default", "video", { mode: "text-to-video" });
-        const target = node("gen", "video", { mode: "text-to-video", model: "seedance" });
+        const target = node("gen", "video", { mode: "text-to-video", model: SEEDANCE });
         const edges: WorkflowEdge[] = [
             { id: "e1", source: "default", target: "gen" },
             { id: "e2", source: "default", target: "gen" },
@@ -276,8 +277,8 @@ describe("videoInputErrors", () => {
         ];
 
         // Three wires, each 5 s, is 15 s: within the budget.
-        expect(videoInputErrors([defaultClip, target], edges, modelOf)).toStrictEqual([]);
+        expect(videoInputErrors([defaultClip, target], edges)).toStrictEqual([]);
         // A fourth reference over the budget is caught.
-        expect(videoInputErrors([defaultClip, target], [...edges, { id: "e4", source: "default", target: "gen" }], modelOf)).toHaveLength(1);
+        expect(videoInputErrors([defaultClip, target], [...edges, { id: "e4", source: "default", target: "gen" }])).toHaveLength(1);
     });
 });
