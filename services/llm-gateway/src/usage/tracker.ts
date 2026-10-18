@@ -4,6 +4,7 @@
  */
 import type { AppEnv } from "../env.js";
 import type { RequestTelemetry } from "../lib/otel/index.js";
+import { SpanKind } from "../lib/otel/index.js";
 import { buildEvent, deliverEvent } from "../lib/webhook-delivery.js";
 import type { NotificationEvent } from "./notifications.js";
 import { evaluateRules } from "./notifications.js";
@@ -25,6 +26,8 @@ export interface UsageLogEntry {
     latencyMs: number;
     modelApiId: string;
     modelId: string;
+    /** What the call was, as OpenTelemetry's GenAI conventions name it. Set it and the call also exports as a GenAI span. */
+    operation?: "chat" | "embeddings";
     orgId?: string;
     promptTokens: number;
     provider: string;
@@ -62,6 +65,10 @@ export class UsageTracker {
             streaming: entry.isStreaming,
         };
 
+        if (entry.operation) {
+            this.recordGenAiSpan(telemetry, entry, entry.operation);
+        }
+
         telemetry.recordCounter("gateway.tokens_total", entry.promptTokens, { ...labels, kind: "prompt" }, "1");
         telemetry.recordCounter("gateway.tokens_total", entry.completionTokens, { ...labels, kind: "completion" }, "1");
 
@@ -87,6 +94,33 @@ export class UsageTracker {
         if (entry.errorCode) {
             telemetry.recordCounter("gateway.errors_total", 1, { ...labels, error_code: entry.errorCode }, "1");
         }
+    }
+
+    /**
+     * One span per model call in OpenTelemetry's GenAI conventions
+     * (`gen_ai.*`), which LLM-aware backends read to show a call as a
+     * generation, with its model, token counts and latency. The caller's user
+     * id and the prompt are NOT attached: spans go to an operator-chosen
+     * collector, and neither is needed to read a trace.
+     */
+    private static recordGenAiSpan(telemetry: RequestTelemetry, entry: UsageLogEntry, operation: "chat" | "embeddings"): void {
+        telemetry.recordSpan(`${operation} ${entry.modelApiId}`, {
+            attributes: {
+                "gateway.cost_microdollars": entry.costMicrodollars,
+                "gateway.finish_reason": entry.finishReason,
+                "gateway.request_id": entry.requestId,
+                "gen_ai.operation.name": operation,
+                "gen_ai.provider.name": entry.provider,
+                "gen_ai.request.model": entry.modelApiId,
+                "gen_ai.response.model": entry.routedModelId ?? entry.modelApiId,
+                "gen_ai.system": entry.provider,
+                "gen_ai.usage.input_tokens": entry.promptTokens,
+                ...(operation === "chat" && { "gen_ai.usage.output_tokens": entry.completionTokens }),
+            },
+            durationMs: entry.latencyMs,
+            error: entry.errorCode ? new Error(entry.errorCode) : undefined,
+            kind: SpanKind.CLIENT,
+        });
     }
 
     private db: D1Database;

@@ -267,7 +267,18 @@ When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, every request is wrapped in a SERVER 
 | ----------------------------- | --------------------------------------------------------------------------------- |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Base URL of OTLP/HTTP collector (`https://api.honeycomb.io`, etc). HTTP(S) only.  |
 | `OTEL_EXPORTER_OTLP_HEADERS`  | Comma-separated `key=value` headers (e.g. `x-honeycomb-team=...,x-dataset=prod`). |
-| `OTEL_SERVICE_NAME`           | Override `service.name` resource attribute. Falls back to `APP_NAME`.             |
+
+### Daily caps
+
+Optional per-tier caps on the public chat route (`/v1/chat/completions`, and `/v1/responses` through it), counted from `usage_log` for the UTC day. Unset means no cap; a tier without an entry is uncapped.
+
+| Variable               | Meaning                                                     |
+| ---------------------- | ----------------------------------------------------------- |
+| `DAILY_REQUEST_LIMITS` | Finished public-API calls per day, e.g. `free=200,pro=5000` |
+| `DAILY_TOKEN_LIMITS`   | Prompt + completion tokens per day, e.g. `free=100000`      |
+
+Over the cap the route answers `429` with code `DAILY_LIMIT_EXCEEDED` and a `Retry-After` to 00:00 UTC. Locally, set them in `.dev.vars`.
+| `OTEL_SERVICE_NAME` | Override `service.name` resource attribute. Falls back to `APP_NAME`. |
 
 ## API Reference
 

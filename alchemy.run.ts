@@ -713,6 +713,8 @@ const llmGatewayEnv = (siteOrigins: Output.Output<string | undefined>) => ({
         "BFL_API_KEY",
         "CLOUDFLARE_ACCOUNT_ID",
         "CLOUDFLARE_API_KEY",
+        "DAILY_REQUEST_LIMITS",
+        "DAILY_TOKEN_LIMITS",
         "FAL_API_KEY",
         "GATEWAY_ADMIN_USER_IDS",
         "GOOGLE_API_KEY",

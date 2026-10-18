@@ -20,6 +20,7 @@ import { estimateMessageTokens } from "../../lib/token-estimator.js";
 import { openAIToolsToToolSet } from "../../lib/tool-set.js";
 import { buildEvent, deliverEvent } from "../../lib/webhook-delivery.js";
 import { bearerAuth } from "../../middleware/auth.js";
+import { dailyLimitMiddleware } from "../../middleware/daily-limit.js";
 import { idempotencyMiddleware } from "../../middleware/idempotency.js";
 import { rateLimitMiddleware } from "../../middleware/rate-limit.js";
 import { GATEWAY_MODELS, MODEL_MAP } from "../../models.js";
@@ -131,6 +132,7 @@ const convertMessages = (messages: z.infer<typeof requestSchema>["messages"]): M
 // available for the per-user KV counter check.
 completionsRouter.use("/v1/chat/completions", bearerAuth);
 completionsRouter.use("/v1/chat/completions", rateLimitMiddleware);
+completionsRouter.use("/v1/chat/completions", dailyLimitMiddleware);
 // Idempotency must run after auth (needs userId) and before the route handler
 completionsRouter.use("/v1/chat/completions", idempotencyMiddleware);
 completionsRouter.post("/v1/chat/completions", async (c) => {
@@ -433,6 +435,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                         latencyMs,
                                         modelApiId,
                                         modelId,
+                                        operation: "chat",
                                         orgId,
                                         promptTokens: tokens.promptTokens,
                                         provider,
@@ -627,6 +630,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                         latencyMs,
                         modelApiId,
                         modelId,
+                        operation: "chat",
                         orgId,
                         promptTokens: tokens.promptTokens,
                         provider,
@@ -794,6 +798,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                                 latencyMs,
                                                 modelApiId: fallbackCandidate.modelApiId,
                                                 modelId: fallbackCandidate.modelId,
+                                                operation: "chat",
                                                 orgId,
                                                 promptTokens: tokens.promptTokens,
                                                 provider: fallbackCandidate.provider,
@@ -871,6 +876,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                 latencyMs,
                                 modelApiId: fallbackCandidate.modelApiId,
                                 modelId: fallbackCandidate.modelId,
+                                operation: "chat",
                                 orgId,
                                 promptTokens: tokens.promptTokens,
                                 provider: fallbackCandidate.provider,

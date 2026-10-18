@@ -126,6 +126,25 @@ export class RequestTelemetry {
         }
     }
 
+    /**
+     * Records a span for work that has already finished: it ended now and took
+     * `durationMs`. For call sites that only learn the outcome at the end (a
+     * model call's tokens and latency), where {@link startSpan} would have to be
+     * held open across the whole call. The parent defaults to the request's first
+     * span, which is the root `SERVER` span of an HTTP request.
+     */
+    recordSpan(name: string, options: { attributes?: Attributes; durationMs: number; error?: unknown; kind?: SpanKindValue; parent?: Span }): Span {
+        const span = this.startSpan(name, { attributes: options.attributes, kind: options.kind, parent: options.parent ?? this.spans[0] });
+
+        this.endSpan(span, { error: options.error });
+
+        if (span.endTimeNs !== undefined) {
+            span.startTimeNs = span.endTimeNs - BigInt(Math.max(0, Math.round(options.durationMs))) * 1_000_000n;
+        }
+
+        return span;
+    }
+
     /** Add an event to a span (e.g., retry attempts, fallback transitions). */
     addEvent(span: Span, name: string, attributes?: Attributes): void {
         if (!this.enabled) return;

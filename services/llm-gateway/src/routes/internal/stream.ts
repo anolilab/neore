@@ -501,6 +501,7 @@ streamRouter.openapi(
                                         latencyMs,
                                         modelApiId: body.modelApiId,
                                         modelId: body.modelId,
+                                        operation: "chat",
                                         orgId: body.orgId,
                                         promptTokens: tokens.promptTokens,
                                         provider: body.provider,
