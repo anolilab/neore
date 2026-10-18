@@ -33,6 +33,7 @@ catalog:
   "@lunora/workflow": 1.0.0-alpha.78
   '@visulima/vis': 4.2.0
   "@visulima/yaml": 1.0.0
+  mediabunny: 1.61.6
 catalogMode: prefer
 
 catalogs:
