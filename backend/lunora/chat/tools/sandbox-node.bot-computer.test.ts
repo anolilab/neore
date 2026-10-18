@@ -19,10 +19,14 @@ vi.mock("../../env", () => ({ E2B_API_KEY: "test-key" }));
 const LIFETIME_MS = 60 * 60_000;
 
 /** A context whose claim answers `claim`, and that records every mutation it is asked to run. */
-const fakeContext = (claim: { created: boolean; sandboxId?: string; status: string }) => {
+const fakeContext = (claim: { created: boolean; sandboxId?: string; status: string }, activated = true) => {
     const runMutation = vi.fn(async (ref: unknown) => {
         if (ref === internal.sandbox.functions.claimBotComputer) {
             return { ...claim, sessionId: "session-1" };
+        }
+
+        if (ref === internal.sandbox.functions.activateBotComputer) {
+            return activated;
         }
 
         return null;
@@ -63,5 +67,18 @@ describe("getOrCreateBotComputer sandbox options", () => {
 
         expect(connectSandbox).toHaveBeenCalledWith("sbx-old", { apiKey: "test-key", timeoutMs: LIFETIME_MS });
         expect(createSandbox).not.toHaveBeenCalled();
+    });
+});
+
+describe("getOrCreateBotComputer when the claim was retired", () => {
+    it("kills the new sandbox and refuses, so no second computer keeps running", async () => {
+        const kill = vi.fn(async () => undefined);
+
+        createSandbox.mockResolvedValueOnce({ kill, sandboxId: "sbx-extra" } as never);
+
+        const context = fakeContext({ created: true, status: "starting" }, false);
+
+        await expect(getOrCreateBotComputer(context, "user-1", "bot-1" as never)).rejects.toThrow("retired while it was starting");
+        expect(kill).toHaveBeenCalledTimes(1);
     });
 });

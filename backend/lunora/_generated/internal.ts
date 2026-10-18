@@ -819,6 +819,7 @@ export interface InternalApiTypes {
             killSandboxById: FunctionReference<"action", { sandboxId: string }, void>;
         };
         functions: {
+            activateBotComputer: FunctionReference<"mutation", { sandboxId: string; sessionId: Id<"sandboxSessions"> }, boolean>;
             checkAndTerminateIdle: FunctionReference<"mutation", { sessionId: Id<"sandboxSessions"> }, { shouldTerminate: boolean; recheckInMs?: undefined; pause?: undefined; sandboxId?: undefined; } | { recheckInMs: number; shouldTerminate: boolean; pause?: undefined; sandboxId?: undefined; } | { pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; recheckInMs?: undefined; }>;
             claimBotComputer: FunctionReference<"mutation", { botId: Id<"bots">; timeoutMs: number; userId: string }, { created: boolean; sandboxId?: string; sessionId: Id<"sandboxSessions">; status: string }>;
             closeSession: FunctionReference<"mutation", { errorMessage?: string; sessionId: Id<"sandboxSessions">; status?: string }, void>;
@@ -1783,6 +1784,7 @@ export const internal: InternalApiTypes = {
             killSandboxById: { __lunoraRef: "sandbox_cleanup:killSandboxById" },
         },
         functions: {
+            activateBotComputer: { __lunoraRef: "sandbox_functions:activateBotComputer" },
             checkAndTerminateIdle: { __lunoraRef: "sandbox_functions:checkAndTerminateIdle" },
             claimBotComputer: { __lunoraRef: "sandbox_functions:claimBotComputer" },
             closeSession: { __lunoraRef: "sandbox_functions:closeSession" },

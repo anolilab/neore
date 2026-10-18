@@ -597,7 +597,12 @@ export const runMemoryReflection = internalAction
         const botScopes: ScopeOutcome[] = [];
 
         for (const botId of botIds) {
-            botScopes.push(await reflectScope(ctx, { botId, budget, model, now, userId }));
+            try {
+                botScopes.push(await reflectScope(ctx, { botId, budget, model, now, userId }));
+            } catch (error) {
+                // One bot's failure must not skip the other bots or the user's digest.
+                console.warn("[memory/reflection] A bot's reflection failed, continuing:", error);
+            }
         }
 
         const applied = userScope.applied + botScopes.reduce((total, scope) => total + scope.applied, 0);

@@ -8,6 +8,7 @@ import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
+import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
 
@@ -210,24 +211,59 @@ export const claimBotComputer = internalMutation
  * Retire every computer a bot owns, for bot deletion: mark each session
  * terminated and schedule its sandbox kill (the kill needs an action).
  */
+/**
+ * Retire every computer a bot owns: mark each session terminated and schedule its sandbox kill
+ * (the kill needs an action). Shared by bot deletion and account erasure, so an erased bot's
+ * computer is destroyed, not left running.
+ */
+export const retireBotComputersIn = async (ctx: MutationCtx, botId: Id<"bots">): Promise<void> => {
+    for (const status of ["active", "paused", "starting"] as const) {
+        const sessions = await ctx.db
+            .query("sandboxSessions")
+            .withIndex("by_botId_status", (q) => q.eq("botId", botId).eq("status", status))
+            .take(50);
+
+        for (const session of sessions) {
+            await ctx.db.patch(session._id, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
+
+            if (session.sandboxId) {
+                await ctx.scheduler.runAfter(0, internal.sandbox.cleanup.killSandboxById, { sandboxId: session.sandboxId });
+            }
+        }
+    }
+};
+
 export const retireBotComputers = internalMutation
     .input({ botId: v.id("bots") })
     .output(v.null())
     .mutation(async ({ args: { botId }, ctx }) => {
-        for (const status of ["active", "paused", "starting"] as const) {
-            const sessions = await ctx.db
-                .query("sandboxSessions")
-                .withIndex("by_botId_status", (q) => q.eq("botId", botId).eq("status", status))
-                .take(50);
-
-            for (const session of sessions) {
-                await ctx.db.patch(session._id, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
-
-                if (session.sandboxId) {
-                    await ctx.scheduler.runAfter(0, internal.sandbox.cleanup.killSandboxById, { sandboxId: session.sandboxId });
-                }
-            }
-        }
+        await retireBotComputersIn(ctx, botId);
 
         return null;
+    });
+
+/**
+ * Marks a bot's computer active once its sandbox exists or has resumed. Accepts only a session
+ * still holding that claim: `starting`, `paused`, or already active on the same sandbox. Any
+ * other state means it was replaced or retired meanwhile, and the caller must kill its sandbox.
+ */
+export const activateBotComputer = internalMutation
+    .input({ sandboxId: v.string(), sessionId: v.id("sandboxSessions") })
+    .output(v.boolean())
+    .mutation(async ({ args: { sandboxId, sessionId }, ctx }) => {
+        const session = await ctx.db.get(sessionId);
+
+        if (!session) {
+            return false;
+        }
+
+        const stillOurs = session.status === "starting" || session.status === "paused" || (session.status === "active" && session.sandboxId === sandboxId);
+
+        if (!stillOurs) {
+            return false;
+        }
+
+        await ctx.db.patch(sessionId, { lastActivityAt: ctx.now, sandboxId, status: "active" });
+
+        return true;
     });

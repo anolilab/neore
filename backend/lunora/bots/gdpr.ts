@@ -8,6 +8,7 @@ import { v } from "lunorash/server";
 
 import { internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
+import { retireBotComputersIn } from "../sandbox/functions";
 
 export const eraseBotsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
     const bots = await ctx.db
@@ -17,6 +18,8 @@ export const eraseBotsForUser = async (ctx: MutationCtx, userId: string): Promis
 
     // One delete at a time: every write to a table in `lib/audit-triggers.ts` fires a trigger.
     for (const bot of bots) {
+        // The external computer is killed, not just forgotten: its sandbox id dies with the session row.
+        await retireBotComputersIn(ctx, bot._id);
         await ctx.db.delete(bot._id);
     }
 

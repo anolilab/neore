@@ -35,6 +35,10 @@ const botContext = () => {
             return { created: false, sandboxId: "sbx-old", sessionId: "session-1", status: "paused" };
         }
 
+        if (ref === internal.sandbox.functions.activateBotComputer) {
+            return true;
+        }
+
         return null;
     });
 

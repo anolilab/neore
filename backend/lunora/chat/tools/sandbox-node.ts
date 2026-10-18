@@ -73,7 +73,12 @@ export const getOrCreateBotComputer = async (
             // `connect` resumes a paused computer; without its own timeout E2B would keep it only for the 300 s default.
             const sandbox = await Sandbox.connect(claim.sandboxId, { apiKey: E2B_API_KEY, timeoutMs: BOT_COMPUTER_LIFETIME_MS });
 
-            await context.runMutation(internal.sandbox.functions.updateSession, { sessionId: claim.sessionId, status: "active" });
+            if (!(await context.runMutation(internal.sandbox.functions.activateBotComputer, { sandboxId: claim.sandboxId, sessionId: claim.sessionId }))) {
+                await sandbox.kill();
+
+                throw new Error("Your computer was retired while it was resuming.");
+            }
+
             await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000);
 
             return { isNew: false, sandbox, sessionId: claim.sessionId };
@@ -96,11 +101,14 @@ export const getOrCreateBotComputer = async (
             timeoutMs: BOT_COMPUTER_LIFETIME_MS,
         });
 
-        await context.runMutation(internal.sandbox.functions.updateSession, {
-            sandboxId: sandbox.sandboxId,
-            sessionId: claim.sessionId,
-            status: "active",
-        });
+        // Refused when the bot's computer was retired, or this claim went stale and was replaced, while
+        // the sandbox was starting: then this sandbox is the extra one, so it is killed.
+        if (!(await context.runMutation(internal.sandbox.functions.activateBotComputer, { sandboxId: sandbox.sandboxId, sessionId: claim.sessionId }))) {
+            await sandbox.kill();
+
+            throw new Error("Your computer was retired while it was starting.");
+        }
+
         await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000);
 
         return { isNew: true, sandbox, sessionId: claim.sessionId };

@@ -271,7 +271,8 @@ export const updateTrigger = authMutation
         const nextBotId = args.botId === undefined ? trigger.botId : (args.botId ?? undefined);
         const nextComputer = nextBotId === undefined ? undefined : (args.botComputer ?? trigger.botComputer);
 
-        if (args.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
+        // An unchanged bot is not re-checked, so a routine whose bot was deleted stays editable.
+        if (args.botId && args.botId !== trigger.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
         }
 

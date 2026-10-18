@@ -182,7 +182,10 @@ export const runStreamingAgent = internalAction
 
             const invokedSkill = skillRun.invocation;
 
-            model = resolveSkillModel(requestedModel, invokedSkill?.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), isAnonymous === true);
+            // A bot thread keeps the bot's model (pinned at `/chat/start`); a skill's preferred model does not replace it.
+            model = thread?.botId
+                ? requestedModel
+                : resolveSkillModel(requestedModel, invokedSkill?.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), isAnonymous === true);
 
             // Auto-detect task complexity
             let taskAnalysis: TaskAnalysis | undefined;

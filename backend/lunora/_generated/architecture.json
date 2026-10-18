@@ -5196,6 +5196,11 @@
       "to": "function:sandbox_cleanup:checkAndTerminateSandbox"
     },
     {
+      "from": "function:sandbox_functions:activateBotComputer",
+      "kind": "write",
+      "to": "table:sandboxSessions"
+    },
+    {
       "from": "function:sandbox_functions:checkAndTerminateIdle",
       "kind": "write",
       "to": "table:sandboxSessions"
@@ -5229,21 +5234,6 @@
       "from": "function:sandbox_functions:logAction",
       "kind": "write",
       "to": "table:sandboxActions"
-    },
-    {
-      "from": "function:sandbox_functions:retireBotComputers",
-      "kind": "read",
-      "to": "table:sandboxSessions"
-    },
-    {
-      "from": "function:sandbox_functions:retireBotComputers",
-      "kind": "schedule",
-      "to": "function:sandbox_cleanup:killSandboxById"
-    },
-    {
-      "from": "function:sandbox_functions:retireBotComputers",
-      "kind": "write",
-      "to": "table:sandboxSessions"
     },
     {
       "from": "function:sandbox_functions:updateSession",
@@ -12769,6 +12759,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:sandbox_functions:activateBotComputer",
+      "kind": "function",
+      "name": "sandbox.functions.activateBotComputer",
+      "module": "sandbox"
+    },
+    {
+      "detail": "mutation",
       "id": "function:sandbox_functions:checkAndTerminateIdle",
       "kind": "function",
       "name": "sandbox.functions.checkAndTerminateIdle",
@@ -16026,13 +16023,13 @@
     {
       "file": "bots/gdpr",
       "kind": "read",
-      "line": 13,
+      "line": 14,
       "reason": "\"eraseBotsForUser\" is not a registered function"
     },
     {
       "file": "bots/gdpr",
       "kind": "write",
-      "line": 20,
+      "line": 23,
       "reason": "\"eraseBotsForUser\" is not a registered function"
     },
     {
@@ -16332,67 +16329,67 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 645,
-      "reason": "\"runChatStart\" is not a registered function"
-    },
-    {
-      "file": "chat/http",
-      "kind": "call",
       "line": 646,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 655,
+      "line": 647,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 692,
+      "line": 656,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 719,
+      "line": 693,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 831,
+      "line": 720,
+      "reason": "\"runChatStart\" is not a registered function"
+    },
+    {
+      "file": "chat/http",
+      "kind": "call",
+      "line": 832,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 846,
+      "line": 847,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 957,
+      "line": 958,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 965,
+      "line": 966,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1104,
+      "line": 1105,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1130,
+      "line": 1131,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
@@ -16956,43 +16953,37 @@
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 81,
+      "line": 86,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 99,
+      "line": 106,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 108,
+      "line": 116,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "schedule",
-      "line": 120,
+      "line": 128,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 122,
+      "line": 130,
       "reason": "\"getOrCreateBotComputer\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 142,
-      "reason": "\"getOrCreateSandbox\" is not a registered function"
-    },
-    {
-      "file": "chat/tools/sandbox-node",
-      "kind": "call",
-      "line": 145,
+      "line": 150,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
@@ -17004,37 +16995,43 @@
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 165,
+      "line": 161,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 172,
+      "line": 173,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 181,
+      "line": 180,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 194,
+      "line": 189,
+      "reason": "\"getOrCreateSandbox\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/sandbox-node",
+      "kind": "call",
+      "line": 202,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "schedule",
-      "line": 201,
+      "line": 209,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
       "file": "chat/tools/sandbox-node",
       "kind": "call",
-      "line": 203,
+      "line": 211,
       "reason": "\"getOrCreateSandbox\" is not a registered function"
     },
     {
@@ -17046,7 +17043,13 @@
     {
       "file": "chat/tools/search-memory",
       "kind": "call",
-      "line": 42,
+      "line": 41,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "chat/tools/search-memory",
+      "kind": "call",
+      "line": 44,
       "reason": "the default export is not a registered function"
     },
     {
@@ -18536,6 +18539,24 @@
       "kind": "write",
       "line": 97,
       "reason": "the written table is not a string literal"
+    },
+    {
+      "file": "sandbox/functions",
+      "kind": "read",
+      "line": 221,
+      "reason": "\"retireBotComputersIn\" is not a registered function"
+    },
+    {
+      "file": "sandbox/functions",
+      "kind": "write",
+      "line": 227,
+      "reason": "\"retireBotComputersIn\" is not a registered function"
+    },
+    {
+      "file": "sandbox/functions",
+      "kind": "schedule",
+      "line": 230,
+      "reason": "\"retireBotComputersIn\" is not a registered function"
     },
     {
       "file": "sandbox/gdpr",

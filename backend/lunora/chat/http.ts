@@ -566,7 +566,8 @@ const runChatStartOnShard = async (
 
         const bot = await context.runQuery(internal.bots.functions.getBotForRun, { botId: threadBotId, userId });
 
-        if (bot) {
+        // Anonymous callers stay on the free model, as they always do: the bot's model does not lift that.
+        if (bot && !isAnonymous) {
             effectiveModel = bot.model;
         }
     }

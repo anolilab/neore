@@ -1162,6 +1162,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "sandbox_cleanup:checkAndTerminateSandbox": lunora_sandbox_cleanup_140.checkAndTerminateSandbox as unknown as RegisteredLunoraFunction,
     "sandbox_cleanup:default": lunora_sandbox_cleanup_140.default as unknown as RegisteredLunoraFunction,
     "sandbox_cleanup:killSandboxById": lunora_sandbox_cleanup_140.killSandboxById as unknown as RegisteredLunoraFunction,
+    "sandbox_functions:activateBotComputer": lunora_sandbox_functions_141.activateBotComputer as unknown as RegisteredLunoraFunction,
     "sandbox_functions:checkAndTerminateIdle": lunora_sandbox_functions_141.checkAndTerminateIdle as unknown as RegisteredLunoraFunction,
     "sandbox_functions:claimBotComputer": lunora_sandbox_functions_141.claimBotComputer as unknown as RegisteredLunoraFunction,
     "sandbox_functions:closeSession": lunora_sandbox_functions_141.closeSession as unknown as RegisteredLunoraFunction,
@@ -7027,6 +7028,13 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["sandboxId"] !== "string") return DEFER;
 return { "sandboxId": source["sandboxId"] };
 });
+installCompiledValidatorMap(lunora_sandbox_functions_141.activateBotComputer.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["sandboxId"] !== "string") return DEFER;
+if (typeof source["sessionId"] !== "string") return DEFER;
+return { "sandboxId": source["sandboxId"], "sessionId": source["sessionId"] };
+});
 installCompiledValidatorMap(lunora_sandbox_functions_141.checkAndTerminateIdle.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -9343,6 +9351,7 @@ export interface Caller {
             killSandboxById: (args: { sandboxId: string }) => Promise<void>;
         };
         functions: {
+            activateBotComputer: (args: { sandboxId: string; sessionId: Id<"sandboxSessions"> }) => Promise<boolean>;
             checkAndTerminateIdle: (args: { sessionId: Id<"sandboxSessions"> }) => Promise<{ shouldTerminate: boolean; recheckInMs?: undefined; pause?: undefined; sandboxId?: undefined; } | { recheckInMs: number; shouldTerminate: boolean; pause?: undefined; sandboxId?: undefined; } | { pause: boolean; sandboxId: string | undefined; shouldTerminate: boolean; recheckInMs?: undefined; }>;
             claimBotComputer: (args: { botId: Id<"bots">; timeoutMs: number; userId: string }) => Promise<{ created: boolean; sandboxId?: string; sessionId: Id<"sandboxSessions">; status: string }>;
             closeSession: (args: { errorMessage?: string; sessionId: Id<"sandboxSessions">; status?: string }) => Promise<void>;
@@ -9590,7 +9599,7 @@ export interface Caller {
             updateGalleryMeta: (args: { category?: "image" | "text" | "video" | "audio" | "automation"; description?: string; projectId: Id<"projects">; tags?: Array<string> }) => Promise<{ success: boolean }>;
         };
         generate: {
-            generateWorkflowFromPrompt: (args: { prompt: string }) => Promise<{ edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "output" | "image" | "text" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "upscale" | "inpaint" | "ai" | "outpaint" | "background-removal" | "image-to-video" | "transcription"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+            generateWorkflowFromPrompt: (args: { prompt: string }) => Promise<{ edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "output" | "image" | "text" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
         };
         media_ops: {
             extractVideoFrame: (args: { charge?: { costMicrodollars: number; orgId: string; requestId: string }; frame: "start" | "end"; threadId: string; userId: string; videoUrl: string }) => Promise<{ fileId: string; mimeType: string }>;
@@ -10919,6 +10928,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             killSandboxById: (args) => callRegistered(context, "sandbox_cleanup:killSandboxById", args),
         },
         functions: {
+            activateBotComputer: (args) => callRegistered(context, "sandbox_functions:activateBotComputer", args),
             checkAndTerminateIdle: (args) => callRegistered(context, "sandbox_functions:checkAndTerminateIdle", args),
             claimBotComputer: (args) => callRegistered(context, "sandbox_functions:claimBotComputer", args),
             closeSession: (args) => callRegistered(context, "sandbox_functions:closeSession", args),

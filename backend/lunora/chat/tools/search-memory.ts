@@ -37,7 +37,9 @@ const searchMemoryTool = createTool<{ limit?: number; query: string }, { memorie
             const thread = context.threadId
                 ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: context.threadId as Id<"threads"> })
                 : null;
-            const memoryArgs = { botId: thread?.botId, searchText: query, userId: context.userId };
+            // A deleted bot's memories are not searched: the bot must still be the caller's.
+            const bot = thread?.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: thread.botId, userId: context.userId }) : null;
+            const memoryArgs = { botId: bot ? thread?.botId : undefined, searchText: query, userId: context.userId };
             const memories = servesUser(context.userId)
                 ? await context.runAction(internal.memory.retrieve.retrieveRelevantMemories, memoryArgs)
                 : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, memoryArgs, { shardKey: context.userId });
