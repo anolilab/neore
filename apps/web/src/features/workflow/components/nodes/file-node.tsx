@@ -1,17 +1,35 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { api } from "@neore/backend/api";
+import { MAX_REFERENCE_AUDIO_BYTES, MAX_REFERENCE_VIDEO_BYTES, referenceMediaLimitFor, referenceMediaTypeOf } from "@neore/backend/document-limits";
 import { Button } from "@ui/components/button";
 import type { Node, NodeProps } from "@xyflow/react";
 import { File, Loader2, Upload, X } from "lucide-react";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 
 import { uploadChatAttachment } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import { useLunora } from "@/lib/lunora/crpc";
+import { uploadFile } from "@/lib/upload/upload-file";
 
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { FileNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
+import { canTrimVideo } from "../../utils/video-trim";
 import BaseNode from "./base-node";
+import VideoTrimDialog from "./video-trim-dialog";
+
+const MEGABYTE = 1024 * 1024;
+
+/**
+ * A workflow's video or audio: the same TUS upload, declared for the
+ * reference-media purpose, then its own finalize (a chat file a media node can
+ * point at by `fileId`).
+ */
+const uploadReferenceMedia = async (lunora: ReturnType<typeof useLunora>, file: File, contentType: string): Promise<{ fileId: string; url: string }> => {
+    const uploadId = await uploadFile(file, { contentType, purpose: "reference-media" });
+
+    return await lunora.action(api.file.finalizeReferenceMedia, { filename: file.name, uploadId });
+};
 
 const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
     const { data, id } = props;
@@ -19,7 +37,80 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
     const config = NODE_CONFIGS.file;
     const { t } = useLingui();
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [trimCandidate, setTrimCandidate] = useState<{ file: File; url: string } | null>(null);
+    // The file of a failed upload, kept so Retry sends the same bytes (a confirmed trim is not redone) until it
+    // uploads, is dismissed, or a new file is dropped.
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
     const lunora = useLunora();
+
+    useEffect(() => {
+        // Start the support probe early (it is answered once per page); a video drop waits for it.
+        void canTrimVideo();
+    }, []);
+
+    // The preview url is a blob of the whole video (up to 50 MB): revoke it when the node goes away with the dialog open.
+    const trimUrlRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        trimUrlRef.current = trimCandidate?.url ?? null;
+    }, [trimCandidate]);
+
+    useEffect(
+        () => () => {
+            if (trimUrlRef.current) {
+                URL.revokeObjectURL(trimUrlRef.current);
+            }
+        },
+        [],
+    );
+
+    const closeTrim = () => {
+        if (trimCandidate) {
+            URL.revokeObjectURL(trimCandidate.url);
+        }
+
+        setTrimCandidate(null);
+    };
+
+    const upload = useCallback(
+        async (file: File) => {
+            // Video and audio a media node can reference take their own caps; everything else is a chat attachment.
+            const referenceType = referenceMediaTypeOf(file.name, file.type);
+            const limit = referenceType ? referenceMediaLimitFor(referenceType) : undefined;
+
+            if (limit !== undefined && file.size > limit) {
+                setPendingFile(null);
+                setUploadError(
+                    t`Video can be at most ${String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)} MB and audio at most ${String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)} MB.`,
+                );
+
+                return;
+            }
+
+            setIsUploading(true);
+            setUploadError(null);
+
+            try {
+                const result = referenceType ? await uploadReferenceMedia(lunora, file, referenceType) : await uploadChatAttachment(lunora, file);
+
+                setPendingFile(null);
+                updateNode(id, {
+                    fileId: result.fileId,
+                    fileName: file.name,
+                    fileType: referenceType ?? file.type,
+                    fileUrl: result.url,
+                });
+            } catch {
+                // No local fallback: a blob URL is not reachable from another node or a later run.
+                setPendingFile(file);
+                setUploadError(t`This file could not be uploaded. Check its type and size, then try again.`);
+            } finally {
+                setIsUploading(false);
+            }
+        },
+        [id, lunora, t, updateNode],
+    );
 
     const onDrop = useCallback(
         async (acceptedFiles: File[]) => {
@@ -29,30 +120,20 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
                 return;
             }
 
-            setIsUploading(true);
+            setPendingFile(null);
+            setUploadError(null);
 
-            try {
-                // The same signed-URL upload as a chat attachment, with its limits.
-                const result = await uploadChatAttachment(lunora, file);
+            // A video is trimmed first, so its size limit applies to the kept part, not the source. The support
+            // probe is answered once per page; wait for it so an early drop is not sent down the plain upload.
+            if (referenceMediaTypeOf(file.name, file.type)?.startsWith("video/") && (await canTrimVideo())) {
+                setTrimCandidate({ file, url: URL.createObjectURL(file) });
 
-                updateNode(id, {
-                    fileId: result.fileId,
-                    fileName: file.name,
-                    fileType: file.type,
-                    fileUrl: result.url,
-                });
-            } catch {
-                // Fallback to blob URL if upload fails
-                updateNode(id, {
-                    fileName: file.name,
-                    fileType: file.type,
-                    fileUrl: URL.createObjectURL(file),
-                });
+                return;
             }
 
-            setIsUploading(false);
+            await upload(file);
         },
-        [id, lunora, updateNode],
+        [upload],
     );
 
     const { getInputProps, getRootProps, isDragActive } = useDropzone({
@@ -111,6 +192,44 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
                                 </p>
                             </>
                         )}
+                    </div>
+                )}
+                {trimCandidate && (
+                    <VideoTrimDialog
+                        file={trimCandidate.file}
+                        onCancel={closeTrim}
+                        onConfirm={(file) => {
+                            closeTrim();
+                            void upload(file);
+                        }}
+                        src={trimCandidate.url}
+                    />
+                )}
+                {/* Always mounted, so the error is announced when it appears. */}
+                <p aria-live="polite" className="text-destructive mt-1 text-xs" role="status">
+                    {uploadError}
+                </p>
+                {pendingFile && !isUploading && (
+                    <div className="mt-1 flex gap-2">
+                        <Button
+                            onClick={() => {
+                                void upload(pendingFile);
+                            }}
+                            size="sm"
+                            variant="outline"
+                        >
+                            <Trans>Retry</Trans>
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                setPendingFile(null);
+                                setUploadError(null);
+                            }}
+                            size="sm"
+                            variant="ghost"
+                        >
+                            <Trans>Dismiss</Trans>
+                        </Button>
                     </div>
                 )}
             </div>

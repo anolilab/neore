@@ -9,6 +9,7 @@
  *
  * Applied before route-specific Zod validation to reject obviously bad requests early.
  */
+import { REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { createMiddleware } from "hono/factory";
 
 import type { HonoEnv } from "../env.js";
@@ -18,8 +19,32 @@ const MAX_MODEL_ID_LENGTH = 200;
 const MAX_PROMPT_LENGTH = 100_000;
 const MAX_SYSTEM_PROMPT_LENGTH = 4000;
 const LUNORA_ID_PATTERN = /^[\w-]+$/;
-// Mirrors the picker cap and the backend's `generateImage` validator.
-const MAX_REFERENCE_IMAGES = 4;
+
+/** Returns the error message for a reference URL array, or undefined when it is absent or valid. */
+const invalidReferenceUrls = (value: unknown, name: string, max: number): string | undefined => {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    if (!Array.isArray(value) || value.length > max) {
+        return `Invalid ${name} payload`;
+    }
+
+    for (const url of value) {
+        if (typeof url !== "string") {
+            return `Invalid ${name} payload`;
+        }
+
+        try {
+            // eslint-disable-next-line no-new
+            new URL(url);
+        } catch {
+            return `${name} contains a malformed URL`;
+        }
+    }
+
+    return undefined;
+};
 
 /**
  * The fields each middleware inspects. Every value stays `unknown` because the
@@ -205,26 +230,11 @@ export const chatInputValidationMiddleware = createMiddleware<HonoEnv>(async (c,
         return c.json({ error: "Invalid cinemaSettings format" }, 400);
     }
 
-    // Reference-image array (multi-ref picker on media routes).
-    const { referenceImages } = payload;
+    // Multi-ref picker images on media routes.
+    const referenceError = invalidReferenceUrls(payload.referenceImages, "referenceImages", REFERENCE_MEDIA_CAPS.images);
 
-    if (referenceImages !== undefined) {
-        if (!Array.isArray(referenceImages) || referenceImages.length > MAX_REFERENCE_IMAGES) {
-            return c.json({ error: "Invalid referenceImages payload" }, 400);
-        }
-
-        for (const url of referenceImages) {
-            if (typeof url !== "string") {
-                return c.json({ error: "Invalid referenceImages payload" }, 400);
-            }
-
-            try {
-                // eslint-disable-next-line no-new
-                new URL(url);
-            } catch {
-                return c.json({ error: "referenceImages contains a malformed URL" }, 400);
-            }
-        }
+    if (referenceError) {
+        return c.json({ error: referenceError }, 400);
     }
 
     return next();

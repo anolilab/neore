@@ -1,6 +1,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveWorkflowModel } from "@neore/ai/models";
 import { Button } from "@ui/components/button";
 import { Input } from "@ui/components/input";
 import { Label } from "@ui/components/label";
@@ -18,6 +19,7 @@ import type { CharacterRefNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { toBaseOption } from "../../utils/model-options";
 import BaseNode from "./base-node";
+import ModelSelect from "./model-select";
 
 const MODE_OPTIONS = [
     { description: msg`Preserve facial features`, label: msg`Face`, value: "face" },
@@ -49,11 +51,9 @@ const CharacterRefNodeComponent = (props: NodeProps<Node<CharacterRefNodeData>>)
         return options;
     }, [models]);
 
-    const defaultModel = modelOptions[0]?.value ?? "fal-ai/flux-pro-redux";
-
     // Get current model's capabilities
     const currentModel = useMemo(() => {
-        const modelId = data.model ?? defaultModel;
+        const modelId = resolveWorkflowModel("characterRef", data.model);
         const modelDefinition = models.find((m) => m.id === modelId);
 
         return {
@@ -61,7 +61,7 @@ const CharacterRefNodeComponent = (props: NodeProps<Node<CharacterRefNodeData>>)
             modes: modelDefinition?.characterRefModes ?? ["face", "style", "composition"],
             supportsNegativePrompt: modelDefinition?.supportsNegativePrompt ?? false,
         };
-    }, [data.model, defaultModel, models]);
+    }, [data.model, models]);
 
     const { maxImages } = currentModel;
 
@@ -140,22 +140,13 @@ const CharacterRefNodeComponent = (props: NodeProps<Node<CharacterRefNodeData>>)
         <BaseNode {...props} color={config.color} icon={<User className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>Model</Trans>
-                    </Label>
-                    <Select onValueChange={handleModelChange} value={data.model ?? defaultModel}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
-                            <SelectValue placeholder={t`Select model...`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {modelOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                    {option.isPremium && <span className="ml-1 text-xs text-amber-500">★</span>}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <ModelSelect
+                        label={<Trans>Model</Trans>}
+                        onChange={handleModelChange}
+                        options={modelOptions}
+                        placeholder={t`Select model...`}
+                        value={resolveWorkflowModel("characterRef", data.model)}
+                    />
                 </div>
 
                 <div className="space-y-1.5">

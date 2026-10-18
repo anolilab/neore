@@ -187,7 +187,9 @@ export interface InternalApiTypes {
         };
         billing: {
             applyCreemSubscription: FunctionReference<"mutation", { baseTier: "free" | "pro"; creemCustomerId?: string; creemPurchaserId?: string; creemSubscriptionId: string; referenceId: string; subject: "organization" | "user" }, null>;
+            creditsLeftQuery: FunctionReference<"query", { orgId: string; userId: string }, { creditsLeft: number | null }>;
             deductCreditsFromGateway: FunctionReference<"mutation", { billingMode?: "custom" | "platform" | "byok"; byokFeeRate?: number; costMicrodollars: number; modelId: string; orgId?: string; requestId: string; userId: string }, void>;
+            getRunPlanForOrganizationQuery: FunctionReference<"query", { organizationId: string | null; userId: string }, { isAdmin: boolean; plan: "premium" | null }>;
         };
         functions: {
             getActiveOrganizationQuery: FunctionReference<"query", { organizationId: string; userId: string }, { id: string; name: string; role: string; slug: string | null } | null>;
@@ -258,7 +260,7 @@ export interface InternalApiTypes {
             getDecryptedCustomProvider: FunctionReference<"query", { providerId: string; userId: string }, { accessKeyId?: string; apiKey: string; apiVersion?: string; baseUrl: string; id: string; models: Array<{ id: string; name?: string }>; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" } | null>;
         };
         daily_charge: {
-            chargeDailyUnit: FunctionReference<"mutation", { kind: "Audio" | "Text"; organizationId?: string; userId: string }, boolean>;
+            chargeDailyUnit: FunctionReference<"mutation", { kind: "Audio" | "Text" | "Video"; organizationId?: string; requestId?: string; userId: string }, boolean>;
         };
         edit_abandon: {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
@@ -281,7 +283,7 @@ export interface InternalApiTypes {
             generateControlNet: FunctionReference<"action", { controlType: string; endPercent?: number; imageUrl: string; model?: string; preprocessor?: string; prompt?: string; startPercent?: number; strength?: number; threadId: string; userId: string }, { controlType: string; imageUrl: string; mimeType: string; model: string }>;
             generateFollowupSuggestionsForThread: FunctionReference<"action", { threadId: string; userId: string }, void>;
             generateImage: FunctionReference<"action", { cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; imageSize: string; jobId?: string; model: string; negativePrompt?: string; numImages?: number; prompt: string; promptMessageId?: Id<"messages">; referenceImages?: Array<string>; seed?: number; threadId: string; userId: string }, { assets: Array<{ imageSize: string; imageUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
-            generateImageToVideo: FunctionReference<"action", { duration?: number; fps?: number; imageUrl: string; loop?: boolean; model?: string; motionStrength?: number; prompt?: string; threadId: string; userId: string }, { mimeType: string; model: string; videoUrl: string }>;
+            generateImageToVideo: FunctionReference<"action", { generateAudio?: boolean; resolution?: string; duration?: number; fps?: number; imageUrl: string; loop?: boolean; model?: string; motionStrength?: number; organizationId?: string | null; prompt?: string; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; threadId: string; userId: string }, { fileId: string; mimeType: string; model: string; videoUrl: string }>;
             generateImg2Img: FunctionReference<"action", { imageUrl: string; model?: string; negativePrompt?: string; prompt?: string; strength?: number; threadId: string; userId: string }, { imageUrl: string; mimeType: string; model: string }>;
             generateInpaint: FunctionReference<"action", { imageUrl: string; maskUrl: string; model?: string; negativePrompt?: string; prompt: string; threadId: string; userId: string }, { imageUrl: string; mimeType: string; model: string }>;
             generateMusic: FunctionReference<"action", { duration?: number; model: string; negativePrompt?: string; prompt: string; threadId: string; userId: string }, { assets: Array<{ audioUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
@@ -291,7 +293,7 @@ export interface InternalApiTypes {
             generateStyleRef: FunctionReference<"action", { contentImageUrl?: string; model?: string; negativePrompt?: string; preserveContent?: boolean; prompt?: string; strength?: number; styleImageUrl: string; threadId: string; userId: string }, { imageUrl: string; mimeType: string; model: string }>;
             generateTranscription: FunctionReference<"action", { audioUrl: string; language?: string; model?: string; threadId: string; userId: string }, { chunks: Array<{ text: string; timestamp: Array<number> }>; model: string; text: string }>;
             generateUpscale: FunctionReference<"action", { enhanceDetails?: boolean; enhanceFace?: boolean; imageUrl: string; model?: string; scale?: number; threadId: string; userId: string }, { imageUrl: string; mimeType: string; model: string; scale: number }>;
-            generateVideo: FunctionReference<"action", { aspectRatio?: string; cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; duration?: number; jobId?: string; model: string; prompt: string; promptMessageId?: Id<"messages">; startFrameUrl?: string; threadId: string; userId: string }, { assets: Array<{ mimeType: string; videoUrl: string }>; modelId: string; prompt: string }>;
+            generateVideo: FunctionReference<"action", { generateAudio?: boolean; resolution?: string; aspectRatio?: string; cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; duration?: number; jobId?: string; model: string; organizationId?: string | null; prompt: string; promptMessageId?: Id<"messages">; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; startFrameUrl?: string; threadId: string; userId: string }, { assets: Array<{ fileId?: string; mimeType: string; videoUrl: string }>; modelId: string; prompt: string }>;
             getThreadRelationship: FunctionReference<"query", { threadId: string }, { _creationTime: number; _id: Id<"threadRelationships">; branchPoint?: number; branchType?: "branch" | "continuation" | "comparison" | "subagent"; createdAt: number; parentThreadId: Id<"threads">; threadId: Id<"threads">; userId?: string; } | null>;
             getThreadSettings: FunctionReference<"query", { threadId: string }, { customSystemPrompt?: string; dictationLanguage?: string; enabledFeatures?: Array<string>; language?: string; mode?: string; model?: string; projectId?: string; reasoningEffort?: number; statelessMode?: boolean } | null>;
             getThreadsWithTemporaryFilter: FunctionReference<"query", { excludeTemporary: boolean; organizationId?: string | null; paginationOpts?: { cursor: unknown; endCursor?: unknown; id?: number; maximumRowsRead?: number; numItems: number }; status?: string; teamId?: string; userId: string }, { continueCursor: string | null; isDone: boolean; page: Array<{ _creationTime: number; _id: string; createdAt?: number; createdBy?: string; customSystemPrompt?: string; deleted?: boolean; deletedAt?: number; dictationLanguage?: string; enabledFeatures?: Array<string>; isPublic?: boolean; isTemporary?: boolean; language?: string; mode?: string; model?: string; multiChat?: boolean; order?: number; organizationId?: string; pinnedAt?: number; projectId?: string; publicAccessToken?: string; reasoningEffort?: number; statelessMode?: boolean; status: string; summary?: string; tags?: Array<string>; teamId?: string; title?: string; updatedAt?: number; userId?: string }> }>;
@@ -947,6 +949,9 @@ export interface InternalApiTypes {
             getPublicWorkflowOwner: FunctionReference<"query", { publicAccessToken: string }, string | null>;
             readPublicWorkflow: FunctionReference<"query", { publicAccessToken: string }, { _id: Id<"projects">; color: string | undefined; description: string | undefined; galleryCategory: "image" | "text" | "video" | "audio" | "automation" | undefined; galleryFeatured: boolean; galleryForkCount: number; galleryPublishedAt: number | undefined; galleryTags: string[]; galleryViewCount: number; icon: string | undefined; title: string; workflowContent: { edges: Array<{ id: string; source: string; sourceHandle?: string; target: string; targetHandle?: string; type?: string; }>; nodes: Array<{ data?: unknown; id: string; position: { x: number; y: number; }; type: string; }>; viewport?: { x: number; y: number; zoom: number; }; } | undefined; } | null>;
         };
+        media_ops: {
+            extractVideoFrame: FunctionReference<"action", { charge?: { costMicrodollars: number; orgId: string; requestId: string }; frame: "start" | "end"; threadId: string; userId: string; videoUrl: string }, { fileId: string; mimeType: string }>;
+        };
         presence: {
             cleanupStalePresence: FunctionReference<"mutation", {}, { cleaned: number }>;
         };
@@ -1134,7 +1139,9 @@ export const internal: InternalApiTypes = {
         },
         billing: {
             applyCreemSubscription: { __lunoraRef: "auth_billing:applyCreemSubscription" },
+            creditsLeftQuery: { __lunoraRef: "auth_billing:creditsLeftQuery" },
             deductCreditsFromGateway: { __lunoraRef: "auth_billing:deductCreditsFromGateway" },
+            getRunPlanForOrganizationQuery: { __lunoraRef: "auth_billing:getRunPlanForOrganizationQuery" },
         },
         functions: {
             getActiveOrganizationQuery: { __lunoraRef: "auth_functions:getActiveOrganizationQuery" },
@@ -1893,6 +1900,9 @@ export const internal: InternalApiTypes = {
         gallery: {
             getPublicWorkflowOwner: { __lunoraRef: "workflow_gallery:getPublicWorkflowOwner" },
             readPublicWorkflow: { __lunoraRef: "workflow_gallery:readPublicWorkflow" },
+        },
+        media_ops: {
+            extractVideoFrame: { __lunoraRef: "workflow_media_ops:extractVideoFrame" },
         },
         presence: {
             cleanupStalePresence: { __lunoraRef: "workflow_presence:cleanupStalePresence" },

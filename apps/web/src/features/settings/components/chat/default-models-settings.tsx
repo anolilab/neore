@@ -2,7 +2,6 @@
 
 import { useLingui } from "@lingui/react/macro";
 import {
-    DEFAULT_FIRST_LAST_FRAME_TO_VIDEO_MODEL,
     DEFAULT_IMAGE_TO_IMAGE_MODEL,
     DEFAULT_IMAGE_TO_TEXT_MODEL,
     DEFAULT_IMAGE_TO_VIDEO_MODEL,
@@ -30,7 +29,6 @@ import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 type DefaultModels = {
-    firstLastFrameToVideo?: string;
     imagesToImage?: string;
     imagesToVideo?: string;
     imageToImage?: string;
@@ -287,17 +285,6 @@ const DefaultModelsSettings: FC = () => {
                         onChange={handleChange}
                         systemDefaultId={DEFAULT_IMAGE_TO_VIDEO_MODEL}
                         value={defaults.imageToVideo}
-                    />
-                    <Separator />
-                    <ModelSelect
-                        description={t`Default model for video generation with start and end frames`}
-                        disabled={isPending}
-                        field="firstLastFrameToVideo"
-                        label={t`First frame / last frame`}
-                        models={videoModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_FIRST_LAST_FRAME_TO_VIDEO_MODEL}
-                        value={defaults.firstLastFrameToVideo}
                     />
                     <Separator />
                     <ModelSelect

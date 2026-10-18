@@ -6,6 +6,7 @@ import type { AgentConfig } from "@neore/ai/providers";
  * Executes workflow nodes in topological order, passing data between nodes
  * via a shared execution context.
  */
+import { resolveWorkflowModel } from "@neore/ai/models";
 import { generateText, type LanguageModel } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
@@ -21,7 +22,6 @@ import {
     executeCodeNode,
     executeFileNode,
     executeOutputNode,
-    executeTextNode,
     type ExecutionContext,
     extractUrl,
     getExecutionOrder,
@@ -33,6 +33,10 @@ import {
     type WorkflowContent,
     type WorkflowNode,
 } from "./core";
+import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext } from "./media-args";
+import { executeTextNode } from "./mention-targets";
+import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
+import { videoKindOf } from "./video-inputs";
 import { MAX_LENGTH } from "../lib/validators";
 
 // ============================================================================
@@ -100,7 +104,7 @@ const executeAINode = async (node: WorkflowNode, context: ExecutionContext, user
             maxOutputTokens: data.maxTokens,
             model: languageModel,
             prompt,
-            system: data.systemPrompt,
+            system: systemPromptFor(node, context),
             temperature: data.temperature,
         });
 
@@ -149,8 +153,7 @@ const executeImageNode = async (node: WorkflowNode, context: ExecutionContext, a
         return { output: data.imageUrl ?? "", success: true };
     }
 
-    const inputPrompt = getLastOutput(context);
-    const prompt = typeof inputPrompt === "string" ? inputPrompt : data.prompt;
+    const { prompt, referenceImages } = imageRequestArgs(node, context);
 
     if (!prompt) {
         return { error: "No prompt provided for image generation", success: false };
@@ -159,11 +162,12 @@ const executeImageNode = async (node: WorkflowNode, context: ExecutionContext, a
     try {
         const result = await actionContext.runAction(internal.chat.functions.generateImage, {
             imageSize: data.aspectRatio ?? "1:1",
-            model: data.model ?? "fal:flux-dev",
+            model: resolveWorkflowModel("image", data.model),
             numImages: data.numImages ?? 1,
             prompt,
             threadId: "workflow",
             userId,
+            ...(referenceImages.length > 0 && { referenceImages }),
         });
 
         return { output: result, success: true };
@@ -201,7 +205,7 @@ const executeImg2ImgNode = async (
     try {
         const result = await actionContext.runAction(internal.chat.functions.generateImg2Img, {
             imageUrl,
-            model: data.model,
+            model: resolveWorkflowModel("img2img", data.model),
             negativePrompt: data.negativePrompt,
             prompt: data.prompt,
             strength: data.strength ?? 0.75,
@@ -244,7 +248,7 @@ const executeUpscaleNode = async (
             enhanceDetails: data.enhanceDetails ?? true,
             enhanceFace: data.enhanceFace ?? false,
             imageUrl,
-            model: data.model,
+            model: resolveWorkflowModel("upscale", data.model),
             scale: data.scale ?? 2,
             threadId: "workflow",
             userId,
@@ -299,7 +303,7 @@ const executeInpaintNode = async (
         const result = await actionContext.runAction(internal.chat.functions.generateInpaint, {
             imageUrl,
             maskUrl,
-            model: data.model,
+            model: resolveWorkflowModel("inpaint", data.model),
             negativePrompt: data.negativePrompt,
             prompt: data.prompt,
             threadId: "workflow",
@@ -482,73 +486,23 @@ const executeParallelCompareNode = async (
 };
 
 /**
- * Execute a video node.
+ * Execute a video node, text-to-video or image-to-video. `runVideoNode` does the checks, the billed run
+ * and the charge; this only reports a failure as a node error.
  */
-const executeVideoNode = async (node: WorkflowNode, context: ExecutionContext, actionContext: ActionContext, userId: string): Promise<NodeExecutionResult> => {
-    const data = node.data as {
-        aspectRatio?: string;
-        duration?: number;
-        fps?: number;
-        mode?: "text-to-video" | "image-to-video";
-        model?: string;
-        motionStrength?: number;
-        prompt?: string;
-    };
-
-    const inputValue = getLastOutput(context);
-
-    // If mode is image-to-video, dispatch to the image-to-video action
-    if (data.mode === "image-to-video") {
-        const imageUrl = extractUrl(inputValue, "imageUrl");
-
-        if (!imageUrl) {
-            return { error: "No image input provided for image-to-video mode", success: false };
-        }
-
-        try {
-            const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
-                duration: data.duration,
-                fps: data.fps,
-                imageUrl,
-                model: data.model,
-                motionStrength: data.motionStrength,
-                prompt: data.prompt,
-                threadId: "workflow",
-                userId,
-            });
-
-            return { output: result, success: true };
-        } catch (error) {
-            return {
-                error: error instanceof Error ? error.message : "Image-to-video generation failed",
-                success: false,
-            };
-        }
-    }
-
-    // Default: text-to-video mode
-    const prompt = data.prompt ?? (typeof inputValue === "string" ? inputValue : "");
-
-    if (!prompt) {
-        return { error: "No prompt provided for video generation", success: false };
-    }
-
+const executeVideoNode = async (
+    node: WorkflowNode,
+    context: ExecutionContext,
+    actionContext: VideoRunContext,
+    userId: string,
+): Promise<NodeExecutionResult> => {
     try {
-        const result = await actionContext.runAction(internal.chat.functions.generateVideo, {
-            aspectRatio: data.aspectRatio ?? "16:9",
-            duration: data.duration ?? 5,
-            model: data.model ?? "fal:mochi-v1",
-            prompt,
-            threadId: "workflow",
-            userId,
-        });
+        const { output } = await runVideoNode(node, context, actionContext, userId);
 
-        return { output: result, success: true };
+        return { output, success: true };
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : "Video generation failed",
-            success: false,
-        };
+        const fallback = videoKindOf(node) === "imageToVideo" ? "Image-to-video generation failed" : "Video generation failed";
+
+        return { error: error instanceof Error ? error.message : fallback, success: false };
     }
 };
 
@@ -571,7 +525,7 @@ const executeAudioNode = async (node: WorkflowNode, context: ExecutionContext, a
 
     try {
         const result = await actionContext.runAction(internal.chat.functions.generateAudio, {
-            model: data.model ?? "openai:tts-1",
+            model: resolveWorkflowModel("tts", data.model),
             prompt: text,
             threadId: "workflow",
             userId,
@@ -617,7 +571,7 @@ const executeTranscriptionNode = async (
         const result = await actionContext.runAction(internal.chat.functions.generateTranscription, {
             audioUrl,
             language: data.language,
-            model: data.model,
+            model: resolveWorkflowModel("transcription", data.model),
             threadId: "workflow",
             userId,
         });
@@ -758,7 +712,7 @@ const executeObjectEditorNode = async (
             imageUrl,
             maskUrl,
             mode: data.mode ?? "remove",
-            model: data.model,
+            model: resolveWorkflowModel(data.mode === "add" ? "inpaint" : "objectRemove", data.model),
             negativePrompt: data.negativePrompt,
             prompt: data.prompt,
             threadId: "workflow",
@@ -769,51 +723,6 @@ const executeObjectEditorNode = async (
     } catch (error) {
         return {
             error: error instanceof Error ? error.message : "Object editing failed",
-            success: false,
-        };
-    }
-};
-
-/** Image-to-video node: animates the upstream image and returns the video URL. */
-const executeImageToVideoNode = async (
-    node: WorkflowNode,
-    context: ExecutionContext,
-    actionContext: ActionContext,
-    userId: string,
-): Promise<NodeExecutionResult> => {
-    const data = node.data as {
-        duration?: number;
-        fps?: number;
-        loop?: boolean;
-        model?: string;
-        motionStrength?: number;
-        prompt?: string;
-    };
-
-    const inputValue = getLastOutput(context);
-    const imageUrl = extractUrl(inputValue, "imageUrl");
-
-    if (!imageUrl) {
-        return { error: "No image input provided for image-to-video", success: false };
-    }
-
-    try {
-        const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
-            duration: data.duration,
-            fps: data.fps,
-            imageUrl,
-            loop: data.loop,
-            model: data.model,
-            motionStrength: data.motionStrength,
-            prompt: data.prompt,
-            threadId: "workflow",
-            userId,
-        });
-
-        return { output: result, success: true };
-    } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : "Image-to-video generation failed",
             success: false,
         };
     }
@@ -854,7 +763,7 @@ const executeControlNetNode = async (
             controlType: data.controlType ?? "pose",
             endPercent: data.endPercent,
             imageUrl,
-            model: data.model,
+            model: resolveWorkflowModel("controlnet", data.model),
             preprocessor: data.preprocessor,
             prompt,
             startPercent: data.startPercent,
@@ -959,6 +868,16 @@ export const executeWorkflow = authAction
             throw new LunoraError("BAD_REQUEST", "Workflow has no nodes");
         }
 
+        // The account is read before the checks, so the gate and the charge use the same organization.
+        const account = await resolveRunAccount(context, userId);
+
+        // Checked before any node runs, so a run that cannot finish never bills an earlier clip.
+        const inputErrors = workflowRunErrors(account, workflowContent);
+
+        if (inputErrors.length > 0) {
+            throw new LunoraError("BAD_REQUEST", inputErrors.join("; "));
+        }
+
         const userProviderKeys = await context.runQuery(internal.auth.functions.getDecryptedProviderKeysQuery, { userId });
 
         const execution = await context.runMutation(internal.agent.workflow_executions.create, {
@@ -977,11 +896,7 @@ export const executeWorkflow = authAction
                 status: "running",
             });
 
-            const executionContext: ExecutionContext = {
-                data: {},
-                nodeOutputs: {},
-                variables: variables ?? {},
-            };
+            const executionContext = buildExecutionContext({ account, content: workflowContent, runId: executionId, variables });
 
             const executionOrder = getExecutionOrder(workflowContent.nodes, workflowContent.edges);
             const totalUsage = createEmptyUsage();
@@ -995,7 +910,7 @@ export const executeWorkflow = authAction
 
                 const nodeExecution = await context.runMutation(internal.agent.node_executions.create, {
                     executionId,
-                    input: getNodeInput(nodeId, workflowContent.edges, executionContext),
+                    input: getNodeInput(nodeId, executionContext),
                     nodeId,
                     nodeType: node.type,
                     startedAt: Date.now(),
@@ -1047,7 +962,7 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "image-to-video": {
-                            result = await executeImageToVideoNode(node, executionContext, context, userId);
+                            result = await executeVideoNode(node, executionContext, context, userId);
                             break;
                         }
                         case "img2img": {

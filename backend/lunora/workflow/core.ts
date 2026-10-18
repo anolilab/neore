@@ -62,8 +62,19 @@ export interface WorkflowContent {
 export interface ExecutionContext {
     /** Current data being passed through the workflow */
     data?: Record<string, unknown>;
+    /**
+     * The frame extractions of this run, keyed by `<source node id>:<frame kind>`, each the stored
+     * file id. A frame wired into two nodes is extracted once, so it is billed once.
+     */
+    frames?: Map<string, Promise<string>>;
+    /** The workflow graph, for inputs that are wired by handle (`resolveVideoInputs`) */
+    graph: { edges: WorkflowEdge[]; nodes: WorkflowNode[] };
     /** Outputs from each node, keyed by node ID */
     nodeOutputs: Record<string, unknown>;
+    /** The organization whose credits a run's paid clips draw on (`auth/billing.ts`); absent when the user has none. */
+    orgId?: string;
+    /** This execution's id: a node's charge is keyed on it, so a retried node is charged once. */
+    runId: string;
     /** Variables available for template substitution */
     variables: Record<string, string>;
 }
@@ -112,7 +123,10 @@ export const getLastOutputAsString = (context: ExecutionContext): string => {
 };
 
 /**
- * Extract a URL from an input value (handles string or object with url/audioUrl/videoUrl).
+ * Extract a URL from an input value: a string, or an object's `url` or one of `keys`.
+ *
+ * Generation nodes answer `{ assets: [{ imageUrl, mimeType }], modelId, prompt }`, so when the
+ * object itself carries no URL the first asset is read the same way.
  */
 export const extractUrl = (value: unknown, ...keys: string[]): string | undefined => {
     if (typeof value === "string") {
@@ -126,6 +140,12 @@ export const extractUrl = (value: unknown, ...keys: string[]): string | undefine
             if (typeof object[key] === "string") {
                 return object[key] as string;
             }
+        }
+
+        const [first] = Array.isArray(object.assets) ? (object.assets as unknown[]) : [];
+
+        if (first !== undefined) {
+            return extractUrl(first, ...keys);
         }
     }
 
@@ -229,8 +249,8 @@ export const getSourceNodes = (nodeId: string, edges: WorkflowEdge[]): string[] 
 /**
  * Get input for a node from its source nodes.
  */
-export const getNodeInput = (nodeId: string, edges: WorkflowEdge[], context: ExecutionContext): unknown => {
-    const sourceIds = getSourceNodes(nodeId, edges);
+export const getNodeInput = (nodeId: string, context: ExecutionContext): unknown => {
+    const sourceIds = getSourceNodes(nodeId, context.graph.edges);
 
     if (sourceIds.length === 0) {
         return undefined;
@@ -244,72 +264,27 @@ export const getNodeInput = (nodeId: string, edges: WorkflowEdge[], context: Exe
     return sourceIds.map((id) => context.nodeOutputs[id]);
 };
 
+/**
+ * The upstream node of each edge that feeds `node`, in edge order. The edge is kept because
+ * a frame handle is a property of the edge, not of its source node.
+ */
+export const sourceNodesOf = (node: WorkflowNode, context: ExecutionContext): { edge: WorkflowEdge; node: WorkflowNode }[] => {
+    const pairs: { edge: WorkflowEdge; node: WorkflowNode }[] = [];
+
+    for (const edge of context.graph.edges) {
+        const source = edge.target === node.id ? context.graph.nodes.find((candidate) => candidate.id === edge.source) : undefined;
+
+        if (source) {
+            pairs.push({ edge, node: source });
+        }
+    }
+
+    return pairs;
+};
+
 // ============================================================================
 // Synchronous Node Executors
 // ============================================================================
-
-/**
- * Execute a text node
- * - Input mode: returns the static content
- * - Transform mode: applies template substitution using {{variable}} syntax.
- */
-export const executeTextNode = (node: WorkflowNode, context: ExecutionContext): NodeExecutionResult => {
-    const data = node.data as {
-        content?: string;
-        mode: "input" | "transform";
-        template?: string;
-    };
-
-    if (data.mode === "input") {
-        return { output: data.content ?? "", success: true };
-    }
-
-    // Transform mode: apply template substitution
-    let template = data.template ?? "";
-
-    // Replace {{variable}} with values from context
-    template = template.replaceAll(/\{\{(\w+)\}\}/g, (_, variableName: string) => {
-        // First check explicit variables. `?? …` rather than an `in` guard: a
-        // present-but-undefined entry would otherwise return undefined from a
-        // replacer that must return a string, which stringifies as "undefined"
-        // into the prompt. Falling through to the node-output lookup is right.
-        const variable = context.variables[variableName];
-
-        if (variable !== undefined) {
-            return variable;
-        }
-
-        // Then check node outputs
-        if (Object.hasOwn(context.nodeOutputs, variableName)) {
-            const value = context.nodeOutputs[variableName];
-
-            return typeof value === "string" ? value : JSON.stringify(value);
-        }
-
-        // Check if it's a node ID reference
-        for (const [nodeId, output] of Object.entries(context.nodeOutputs)) {
-            if (nodeId.includes(variableName) || variableName.includes(nodeId)) {
-                return typeof output === "string" ? output : JSON.stringify(output);
-            }
-        }
-
-        return `{{${variableName}}}`; // Keep unresolved
-    });
-
-    // Also support {{input}} to get the most recent input
-    if (template.includes("{{input}}")) {
-        const lastInput = getLastOutput(context);
-
-        // Function replacement — `lastInput` is a previous node's output and
-        // may contain `$&`/`` $` ``/`$'`, which a string replacement would
-        // expand against the template rather than inserting literally.
-        const resolvedInput = typeof lastInput === "string" ? lastInput : JSON.stringify(lastInput);
-
-        template = template.replaceAll("{{input}}", () => resolvedInput);
-    }
-
-    return { output: template, success: true };
-};
 
 /**
  * Execute a code node asynchronously.
@@ -435,8 +410,10 @@ export const executeFileNode = (node: WorkflowNode): NodeExecutionResult => {
     };
 
     if (data.fileUrl) {
+        // The stored url is signed and expires; keep the file id beside it so a later run signs the file again
+        // (`mediaOf` prefers the id) instead of sending an expired link.
         return {
-            output: { name: data.fileName, type: data.fileType, url: data.fileUrl },
+            output: { ...(data.fileId && { fileId: data.fileId }), name: data.fileName, type: data.fileType, url: data.fileUrl },
             success: true,
         };
     }

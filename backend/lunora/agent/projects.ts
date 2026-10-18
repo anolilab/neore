@@ -23,21 +23,22 @@ import {
     vThreadDoc as vThreadDocument,
 } from "./validators";
 import { admitOrganization } from "../lib/rls/scope";
-import { countedWorkflowImageIds } from "../workflow/images";
+import { countedWorkflowFileIds } from "../workflow/images";
 import { changeRefcount } from "./files";
 
 /**
- * A workflow keeps its images as chat-file references (`imageFileId`), and a
- * chat file nothing counts is deleted by the unused-file sweep. So every write
- * of `workflowContent` retains the owner-granted files it adds and releases
- * the ones it drops — as message `fileIds` do.
+ * A workflow keeps its images and reference media as chat-file references
+ * (`imageFileId`, a file node's `fileId`), and a chat file nothing counts is
+ * deleted by the unused-file sweep. So every write of `workflowContent` retains
+ * the owner-granted files it adds and releases the ones it drops — as message
+ * `fileIds` do.
  */
 const recountWorkflowImages = async (ctx: MutationCtx, ownerId: string | undefined, previousContent: unknown, nextContent: unknown): Promise<void> => {
     if (!ownerId) {
         return;
     }
 
-    const { next, previous } = await countedWorkflowImageIds(ctx.db, ownerId, previousContent, nextContent);
+    const { next, previous } = await countedWorkflowFileIds(ctx.db, ownerId, previousContent, nextContent);
 
     await changeRefcount(ctx, previous, next);
 };

@@ -89,7 +89,7 @@ msgstr "（{jobFailed} 个失败）"
 msgid "(attachments only)"
 msgstr "（仅附件）"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:100
+#: src/features/settings/components/chat/default-models-settings.tsx:98
 msgid "(default)"
 msgstr "（默认）"
 
@@ -186,7 +186,7 @@ msgid "{0, plural, one {# image} other {# images}}"
 msgstr "{0, plural, other {# 张图片}}"
 
 #. placeholder {0}: validationErrors.length
-#: src/features/workflow/components/canvas/workflow-controls.tsx:633
+#: src/features/workflow/components/canvas/workflow-controls.tsx:650
 msgid "{0, plural, one {# issue found} other {# issues found}}"
 msgstr "{0, plural, other {发现 # 个问题}}"
 
@@ -276,7 +276,7 @@ msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, other {# 位用户}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:148
+#: src/components/model-picker/model-picker-button.tsx:149
 msgid "{0, plural, one {1 model} other {# models}}"
 msgstr "{0, plural, other {# 个模型}}"
 
@@ -750,8 +750,8 @@ msgstr "{fileCount, plural, other {更改（# 个文件）}}"
 msgid "{fileCount, plural, one {Failed to upload # file} other {Failed to upload # files}}"
 msgstr "{fileCount, plural, other {# 个文件上传失败}}"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:154
-#: src/features/workflow/components/nodes/video-node.tsx:230
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:152
+#: src/features/workflow/components/nodes/video-node.tsx:236
 msgid "{fps} fps"
 msgstr "{fps} fps"
 
@@ -979,6 +979,22 @@ msgstr "{selectedCount, plural, other {已选中 # 个对话}}"
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "已选择 {selectedCount}/{MAX_PARALLEL}"
 
+#: src/features/workflow/components/canvas/workflow-controls.tsx:168
+#~ msgid "{skipped, plural, one {# file could not be imported and was left out} other {# files could not be imported and were left out}}"
+#~ msgstr "{skipped, plural, other {有 # 个文件无法导入，已被跳过}}"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:77
+msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
+msgstr "{skipped, plural, other {有 # 个文件无法导入，已被跳过}}"
+
+#: src/features/workflow/components/canvas/workflow-controls.tsx:134
+#~ msgid "{skipped, plural, one {# file could not be included in the export} other {# files could not be included in the export}}"
+#~ msgstr "{skipped, plural, other {有 # 个文件无法包含在导出中}}"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:55
+msgid "{skipped, plural, one {# file} other {# files}} could not be included in the export"
+msgstr "{skipped, plural, other {有 # 个文件无法包含在导出中}}"
+
 #: ../../packages/chat-ui/src/chat/presentation-artifact.tsx:51
 msgid "{slideCount, plural, one {# slide} other {# slides}}"
 msgstr "{slideCount, plural, other {# 张幻灯片}}"
@@ -1019,7 +1035,7 @@ msgstr "{wordCount, plural, other {# 个词}}"
 msgid "{years}y ago"
 msgstr "{years} 年前"
 
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:184
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:187
 msgid "// Empty"
 msgstr "// 空"
 
@@ -1123,7 +1139,7 @@ msgstr "每天 1,000 条消息"
 msgid "1,000 requests/day"
 msgstr "每天 1,000 次请求"
 
-#: src/features/workflow/components/nodes/video-node.tsx:23
+#: src/features/workflow/components/nodes/video-node.tsx:27
 msgid "1:1 (Square)"
 msgstr "1:1（正方形）"
 
@@ -1151,7 +1167,7 @@ msgstr "1080p"
 msgid "12 seconds"
 msgstr "12 秒"
 
-#: src/features/workflow/components/nodes/video-node.tsx:21
+#: src/features/workflow/components/nodes/video-node.tsx:25
 msgid "16:9 (Landscape)"
 msgstr "16:9（横屏）"
 
@@ -1167,7 +1183,7 @@ msgstr "1970 年代镜头，梦幻感"
 msgid "20 free messages a day to start. No credit card required. Upgrade when you're ready, cancel anytime."
 msgstr "起步每天 20 条免费消息，无需信用卡。准备好后再升级，随时可取消。"
 
-#: src/features/workflow/components/nodes/video-node.tsx:26
+#: src/features/workflow/components/nodes/video-node.tsx:30
 msgid "21:9 (Ultrawide)"
 msgstr "21:9（超宽屏）"
 
@@ -1211,7 +1227,7 @@ msgstr "2M token 上下文窗口，推理快速"
 msgid "2x squeeze, blue flares"
 msgstr "2 倍压缩，蓝色光晕"
 
-#: src/features/workflow/components/nodes/video-node.tsx:25
+#: src/features/workflow/components/nodes/video-node.tsx:29
 msgid "3:4"
 msgstr "3:4"
 
@@ -1243,11 +1259,11 @@ msgstr "300 DPI"
 msgid "30d"
 msgstr "30 天"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:22
+#: src/features/workflow/components/nodes/controlnet-node.tsx:24
 msgid "3D depth estimation"
 msgstr "3D 深度估计"
 
-#: src/features/workflow/components/nodes/video-node.tsx:24
+#: src/features/workflow/components/nodes/video-node.tsx:28
 msgid "4:3"
 msgstr "4:3"
 
@@ -1291,7 +1307,7 @@ msgstr "80K token 上下文，适合长文档分析"
 msgid "8K digital, punchy saturation"
 msgstr "8K 数字，饱和度鲜明"
 
-#: src/features/workflow/components/nodes/video-node.tsx:22
+#: src/features/workflow/components/nodes/video-node.tsx:26
 msgid "9:16 (Portrait)"
 msgstr "9:16（竖屏）"
 
@@ -1371,9 +1387,18 @@ msgstr "应用有新版本可用。"
 msgid "A page shared from Neore."
 msgstr "来自 Neore 的分享页面。"
 
+#: src/features/workflow/components/nodes/text-node.tsx:218
+msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
+msgstr "引号外的占位符或 @提及 在此处会被读作 null，因此在运行填入之前，此错误可能由它引起"
+
 #: src/features/notifications/lib/notification-labels.ts:27
 msgid "A question is waiting for you"
 msgstr "有一个问题在等你回答"
+
+#. placeholder {0}: String(REFERENCE_VIDEO_MAX_SECONDS)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:218
+msgid "A reference video can be at most {0} seconds."
+msgstr "参考视频最长 {0} 秒。"
 
 #: src/features/evals/components/case-fields.tsx:30
 msgid "A regular expression the answer must match"
@@ -1429,6 +1454,10 @@ msgstr "关于 {0}（在新标签页中打开）"
 #: src/features/settings/components/personalization/personalization-settings.tsx:147
 msgid "About You"
 msgstr "关于你"
+
+#: src/features/workflow/components/nodes/video-model-options.tsx:92
+msgid "Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p."
+msgstr "超过 {FREE_PLAN_MAX_HEIGHT}p 需要 Pro 套餐。否则视频将以 {FREE_PLAN_MAX_HEIGHT}p 生成。"
 
 #: src/features/chat/thread/composer-search-mode.tsx:50
 msgid "Academic"
@@ -1746,7 +1775,7 @@ msgstr "添加成员"
 #~ msgid "Add Member Directly"
 #~ msgstr "直接添加成员"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:145
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:146
 msgid "Add Model"
 msgstr "添加模型"
 
@@ -1759,7 +1788,7 @@ msgstr "添加更多行"
 msgid "Add node"
 msgstr "添加节点"
 
-#: src/features/workflow/types/index.ts:440
+#: src/features/workflow/types/index.ts:462
 msgid "Add notes and annotations to the canvas"
 msgstr "在画布上添加备注和注释"
 
@@ -1776,6 +1805,10 @@ msgstr "添加网页"
 msgid "Add Passkey"
 msgstr "添加通行密钥"
 
+#: src/features/workflow/components/nodes/video-frames-section.tsx:130
+msgid "Add picked frame as image node"
+msgstr "将选取的帧添加为图片节点"
+
 #: src/features/settings/components/chat/native-providers-settings.tsx:390
 #: src/features/settings/components/chat/native-providers-settings.tsx:461
 msgid "Add Provider"
@@ -1785,7 +1818,7 @@ msgstr "添加提供商"
 msgid "Add Rectangle"
 msgstr "添加矩形"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:200
+#: src/features/workflow/components/nodes/character-ref-node.tsx:191
 msgid "Add reference image"
 msgstr "添加参考图"
 
@@ -1797,7 +1830,7 @@ msgstr "添加参考图"
 msgid "Add reference images (up to {maxReferenceImages})"
 msgstr "添加参考图（最多 {maxReferenceImages} 张）"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:219
+#: src/features/workflow/components/nodes/character-ref-node.tsx:210
 msgid "Add reference images to maintain consistency"
 msgstr "添加参考图以保持一致性"
 
@@ -1863,7 +1896,7 @@ msgstr "添加到收藏"
 msgid "Add to starred"
 msgstr "添加到星标"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:24
+#: src/features/workflow/components/nodes/object-editor-node.tsx:26
 msgid "Add/Replace Object"
 msgstr "添加/替换对象"
 
@@ -1989,8 +2022,8 @@ msgstr "先进的运镜控制"
 msgid "Advanced coding tasks requiring OpenAI's refined Codex capabilities"
 msgstr "需要 OpenAI 精炼 Codex 能力的高级编程任务"
 
-#: src/features/workflow/types/index.ts:352
-#: src/features/workflow/types/index.ts:356
+#: src/features/workflow/types/index.ts:374
+#: src/features/workflow/types/index.ts:378
 msgid "Advanced Controls"
 msgstr "高级控制"
 
@@ -2213,7 +2246,7 @@ msgid "Aggregate scores of both runs"
 msgstr "两次运行的汇总得分"
 
 #: src/features/chat/pins/pin-item.tsx:228
-#: src/features/workflow/types/index.ts:362
+#: src/features/workflow/types/index.ts:384
 msgid "AI"
 msgstr "AI"
 
@@ -2222,7 +2255,7 @@ msgstr "AI"
 msgid "AI Chat"
 msgstr "AI 聊天"
 
-#: src/features/workflow/templates/index.ts:484
+#: src/features/workflow/templates/index.ts:485
 msgid "AI Chat Pipeline"
 msgstr "AI 聊天流水线"
 
@@ -2247,7 +2280,7 @@ msgstr "AI 图像生成"
 msgid "AI Memory System"
 msgstr "AI 记忆系统"
 
-#: src/features/workflow/types/index.ts:366
+#: src/features/workflow/types/index.ts:388
 msgid "AI Model"
 msgstr "AI 模型"
 
@@ -2267,7 +2300,7 @@ msgstr "AI 优化"
 msgid "AI Provider Keys"
 msgstr "AI 提供商密钥"
 
-#: src/features/workflow/templates/index.ts:465
+#: src/features/workflow/templates/index.ts:466
 msgid "AI Response"
 msgstr "AI 回复"
 
@@ -2397,19 +2430,19 @@ msgstr "阿里巴巴最小、最快的 Qwen3 模型"
 msgid "Align"
 msgstr "对齐"
 
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:49
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:50
 msgid "Align horizontally"
 msgstr "水平对齐"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:485
+#: src/features/workflow/components/canvas/workflow-controls.tsx:476
 msgid "Align horizontally (H)"
 msgstr "水平对齐（H）"
 
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:50
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:51
 msgid "Align vertically"
 msgstr "垂直对齐"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:501
+#: src/features/workflow/components/canvas/workflow-controls.tsx:492
 msgid "Align vertically (V)"
 msgstr "垂直对齐（V）"
 
@@ -2460,7 +2493,7 @@ msgstr "所有分类"
 msgid "All Categories"
 msgstr "所有分类"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:414
+#: src/features/workflow/components/canvas/workflow-controls.tsx:403
 msgid "All changes saved"
 msgstr "所有更改已保存"
 
@@ -2468,7 +2501,7 @@ msgstr "所有更改已保存"
 msgid "All chats"
 msgstr "全部对话"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:22
+#: src/features/workflow/components/nodes/outpaint-node.tsx:24
 msgid "All Directions"
 msgstr "所有方向"
 
@@ -2692,6 +2725,10 @@ msgstr "加载 {routeName} 页面时出错。"
 msgid "An IAM user's secret access key with bedrock:InvokeModel. Encrypted at rest and never shown again."
 msgstr "具有 bedrock:InvokeModel 权限的 IAM 用户的秘密访问密钥。加密存储，不会再次显示。"
 
+#: src/features/workflow/hooks/use-workflow-transfer.ts:20
+msgid "An image in the file is corrupt."
+msgstr "文件中的某张图片已损坏。"
+
 #: src/lib/errors/index.ts:192
 msgid "An unexpected error occurred."
 msgstr "发生意外错误。"
@@ -2722,7 +2759,7 @@ msgstr "分析"
 msgid "Angle"
 msgstr "角度"
 
-#: src/features/workflow/types/index.ts:504
+#: src/features/workflow/types/index.ts:526
 msgid "Animate static images with AI"
 msgstr "用 AI 让静态图片动起来"
 
@@ -2954,11 +2991,11 @@ msgstr "应用错误"
 msgid "Apply"
 msgstr "应用"
 
-#: src/features/workflow/templates/index.ts:212
+#: src/features/workflow/templates/index.ts:213
 msgid "Apply an artistic style to any image"
 msgstr "为任意图片应用艺术风格"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:24
+#: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Apply artistic style"
 msgstr "应用艺术风格"
 
@@ -2970,7 +3007,7 @@ msgstr "运用最佳实践、模式和领域专属指南，以专家知识和成
 msgid "Apply changes"
 msgstr "应用更改"
 
-#: src/features/workflow/types/index.ts:592
+#: src/features/workflow/types/index.ts:614
 msgid "Apply consistent artistic style across generations"
 msgstr "在多次生成中保持一致的艺术风格"
 
@@ -2982,7 +3019,7 @@ msgstr "应用裁剪"
 msgid "Apply Mask"
 msgstr "应用蒙版"
 
-#: src/features/workflow/templates/index.ts:195
+#: src/features/workflow/templates/index.ts:196
 msgid "Apply Style"
 msgstr "应用风格"
 
@@ -3139,6 +3176,15 @@ msgstr "亚美尼亚语"
 msgid "Armenian (Armenia)"
 msgstr "亚美尼亚语（亚美尼亚）"
 
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:53
+#: src/features/workflow/components/canvas/workflow-controls.tsx:523
+msgid "Arrange selection in a grid"
+msgstr "将所选内容排列成网格"
+
+#: src/features/workflow/components/canvas/workflow-controls.tsx:535
+msgid "Arrange selection in a grid (G)"
+msgstr "将所选内容排列成网格 (G)"
+
 #: src/features/chat/thread/widgets/flight-widget.tsx:151
 msgid "Arrive:"
 msgstr "到达："
@@ -3165,7 +3211,7 @@ msgstr "人工智能"
 
 #: src/features/marketing/data/models-data.ts:98
 #: src/features/marketing/data/models-data.ts:200
-#: src/features/workflow/templates/index.ts:216
+#: src/features/workflow/templates/index.ts:217
 msgid "artistic"
 msgstr "艺术"
 
@@ -3207,13 +3253,13 @@ msgstr "问我任何问题..."
 
 #: src/features/chat/thread/composer-image-settings.tsx:152
 #: src/features/chat/thread/composer-video-settings.tsx:108
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:125
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:128
 msgid "Aspect ratio"
 msgstr "宽高比"
 
 #: src/features/chat/thread/media-gallery-view.tsx:448
 #: src/features/chat/thread/media-gallery-view.tsx:533
-#: src/features/workflow/components/nodes/video-node.tsx:172
+#: src/features/workflow/components/nodes/video-node.tsx:178
 msgid "Aspect Ratio"
 msgstr "宽高比"
 
@@ -3285,7 +3331,7 @@ msgstr "奥克兰"
 msgid "Audio"
 msgstr "音频"
 
-#: src/features/workflow/types/index.ts:376
+#: src/features/workflow/types/index.ts:398
 msgid "Audio (TTS)"
 msgstr "音频（TTS）"
 
@@ -3364,7 +3410,7 @@ msgstr "已开启自动保存"
 msgid "Auto-Delete Active"
 msgstr "自动删除已启用"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:154
+#: src/features/workflow/components/nodes/controlnet-node.tsx:146
 #: src/features/workflow/components/nodes/transcription-node.tsx:16
 msgid "Auto-detect"
 msgstr "自动检测"
@@ -3373,11 +3419,11 @@ msgstr "自动检测"
 msgid "Auto-Detect Task Complexity"
 msgstr "自动检测任务复杂度"
 
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:53
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:55
 msgid "Auto-layout"
 msgstr "自动布局"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:372
+#: src/features/workflow/components/canvas/workflow-controls.tsx:361
 msgid "Auto-layout (L)"
 msgstr "自动布局（L）"
 
@@ -3533,11 +3579,11 @@ msgstr "返回图库"
 msgid "Back to workflows"
 msgstr "返回工作流"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:107
+#: src/features/workflow/components/nodes/background-removal-node.tsx:98
 msgid "Background Color (optional)"
 msgstr "背景颜色（可选）"
 
-#: src/features/workflow/types/index.ts:391
+#: src/features/workflow/types/index.ts:413
 msgid "Background Removal"
 msgstr "背景移除"
 
@@ -3576,15 +3622,15 @@ msgstr "均衡"
 msgid "Balanced"
 msgstr "均衡"
 
-#: src/lib/model-descriptions.ts:37
+#: src/lib/model-descriptions.ts:42
 msgid "Balanced 32B model from Alibaba"
 msgstr "Alibaba 的均衡型 32B 模型"
 
-#: src/lib/model-descriptions.ts:38
+#: src/lib/model-descriptions.ts:43
 msgid "Balanced frontier model from Anthropic"
 msgstr "Anthropic 的均衡型前沿模型"
 
-#: src/lib/model-descriptions.ts:39
+#: src/lib/model-descriptions.ts:44
 msgid "Balanced GPT-5 family model from OpenAI"
 msgstr "OpenAI 的均衡型 GPT-5 系列模型"
 
@@ -3682,7 +3728,7 @@ msgstr "Bedrock 控制台 → API 密钥。加密存储，不会再次显示。"
 msgid "Before"
 msgstr "之前"
 
-#: src/features/workflow/templates/index.ts:125
+#: src/features/workflow/templates/index.ts:126
 msgid "beginner"
 msgstr "入门"
 
@@ -3795,31 +3841,31 @@ msgstr "更好地遵循提示词"
 msgid "Better speed-to-quality ratio than the full GPT-5"
 msgstr "速度与质量之比优于完整版 GPT-5"
 
-#: src/lib/model-descriptions.ts:40
+#: src/lib/model-descriptions.ts:45
 msgid "BFL's frontier model for image editing"
 msgstr "BFL 用于图像编辑的前沿模型"
 
-#: src/lib/model-descriptions.ts:41
+#: src/lib/model-descriptions.ts:46
 msgid "BFL's highest quality FLUX model via direct API"
 msgstr "通过直接 API 提供的 BFL 最高质量 FLUX 模型"
 
-#: src/lib/model-descriptions.ts:42
+#: src/lib/model-descriptions.ts:47
 msgid "BFL's highest quality model via Replicate"
 msgstr "通过 Replicate 提供的 BFL 最高质量模型"
 
-#: src/lib/model-descriptions.ts:43
+#: src/lib/model-descriptions.ts:48
 msgid "BFL's highest quality text-to-image model — up to 2K resolution with improved photorealism"
 msgstr "BFL 最高质量的文生图模型 — 最高 2K 分辨率，照片级真实感更强"
 
-#: src/lib/model-descriptions.ts:44
+#: src/lib/model-descriptions.ts:49
 msgid "BFL's latest generation model via Replicate"
 msgstr "通过 Replicate 提供的 BFL 最新一代模型"
 
-#: src/lib/model-descriptions.ts:45
+#: src/lib/model-descriptions.ts:50
 msgid "BFL's maximum quality FLUX Kontext model"
 msgstr "BFL 最高质量的 FLUX Kontext 模型"
 
-#: src/lib/model-descriptions.ts:46
+#: src/lib/model-descriptions.ts:51
 msgid "BFL's professional FLUX model via direct API"
 msgstr "通过直接 API 提供的 BFL 专业版 FLUX 模型"
 
@@ -3927,7 +3973,7 @@ msgstr "居中粗体文字"
 msgid "Bolivia"
 msgstr "玻利维亚"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:539
 msgid "Bookmark node"
 msgstr "收藏节点"
 
@@ -3955,7 +4001,7 @@ msgstr "来自 @BotFather 的 Telegram 机器人 token"
 msgid "Bot token from the Discord Developer Portal"
 msgstr "来自 Discord Developer Portal 的机器人 token"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:26
+#: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
 msgstr "底部"
 
@@ -3981,8 +4027,8 @@ msgstr "头脑风暴"
 #: src/features/chat/core/hooks/use-thread-manager.ts:134
 #: src/features/chat/core/hooks/use-thread-manager.ts:147
 #: src/features/tasks/components/task-form-dialog.tsx:281
-#: src/features/workflow/types/index.ts:403
-#: src/features/workflow/types/index.ts:407
+#: src/features/workflow/types/index.ts:425
+#: src/features/workflow/types/index.ts:429
 msgid "Branch"
 msgstr "分支"
 
@@ -4255,7 +4301,7 @@ msgstr "ByteDance"
 msgid "ByteDance medium-pro quality tier"
 msgstr "字节跳动中高端品质档"
 
-#: src/lib/model-descriptions.ts:47
+#: src/lib/model-descriptions.ts:52
 msgid "ByteDance Seedance 2.0 — next-gen high-quality video with end-frame and reference support"
 msgstr "ByteDance Seedance 2.0 — 支持尾帧和参考的新一代高质量视频"
 
@@ -4271,7 +4317,7 @@ msgstr "字节跳动的实惠图像模型"
 msgid "ByteDance's capable vision reasoning model"
 msgstr "字节跳动能力出色的视觉推理模型"
 
-#: src/lib/model-descriptions.ts:48
+#: src/lib/model-descriptions.ts:53
 msgid "ByteDance's compact and efficient reasoning model"
 msgstr "ByteDance 紧凑高效的推理模型"
 
@@ -4279,7 +4325,7 @@ msgstr "ByteDance 紧凑高效的推理模型"
 msgid "ByteDance's compact reasoning model"
 msgstr "字节跳动的紧凑型推理模型"
 
-#: src/lib/model-descriptions.ts:49
+#: src/lib/model-descriptions.ts:54
 msgid "ByteDance's fast vision reasoning model"
 msgstr "ByteDance 的快速视觉推理模型"
 
@@ -4295,13 +4341,17 @@ msgstr "字节跳动的高品质 Seedance 档"
 msgid "ByteDance's latest and most capable reasoning model"
 msgstr "字节跳动最新、能力最强的推理模型"
 
-#: src/lib/model-descriptions.ts:50
+#: src/lib/model-descriptions.ts:55
 msgid "ByteDance's latest reasoning model"
 msgstr "ByteDance 最新的推理模型"
 
-#: src/lib/model-descriptions.ts:51
+#: src/lib/model-descriptions.ts:56
 msgid "ByteDance's recent reasoning model"
 msgstr "ByteDance 近期的推理模型"
+
+#: src/lib/model-descriptions.ts:38
+msgid "ByteDance's Seedream 5.0 Pro text-to-image model, up to 2K output"
+msgstr "字节跳动的文生图模型 Seedream 5.0 Pro，最高支持 2K 输出"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:105
 msgid "BZIP2 compressed"
@@ -4447,6 +4497,7 @@ msgstr "加拿大"
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:501
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
 #: src/routes/auth/extension.tsx:145
 msgid "Cancel"
@@ -4485,7 +4536,7 @@ msgstr "取消/退出"
 #: src/features/evals/components/run-status.tsx:12
 #: src/features/tasks/components/task-detail-dialog.tsx:132
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:62
-#: src/features/workflow/components/canvas/workflow-controls.tsx:49
+#: src/features/workflow/components/canvas/workflow-controls.tsx:50
 msgid "Cancelled"
 msgstr "已取消"
 
@@ -4503,7 +4554,7 @@ msgstr "候选"
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "无法使用提示词：{errorMessages}"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:23
+#: src/features/workflow/components/nodes/controlnet-node.tsx:25
 msgid "Canny Edge"
 msgstr "Canny 边缘"
 
@@ -4535,11 +4586,11 @@ msgstr "能力"
 msgid "capable"
 msgstr "能力出色"
 
-#: src/lib/model-descriptions.ts:52
+#: src/lib/model-descriptions.ts:57
 msgid "Capable balanced model from xAI with vision support"
 msgstr "xAI 支持视觉的强大均衡型模型"
 
-#: src/lib/model-descriptions.ts:53
+#: src/lib/model-descriptions.ts:58
 msgid "Capable open-source model from Meta"
 msgstr "Meta 的强大开源模型"
 
@@ -4555,9 +4606,25 @@ msgstr "说明文字"
 msgid "Caption text"
 msgstr "说明文字"
 
+#: src/features/workflow/components/nodes/video-frames-section.tsx:102
+#~ msgid "Capture"
+#~ msgstr "截取"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:95
+#~ msgid "Capture {label}"
+#~ msgstr "截取 {label}"
+
 #: src/features/chat/thread/composer-input-area.tsx:192
 msgid "Capture screen"
 msgstr "截取屏幕"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:92
+#~ msgid "captured"
+#~ msgstr "已截取"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:130
+msgid "Capturing…"
+msgstr "正在截取…"
 
 #: src/features/evals/components/eval-summary-stats.tsx:33
 msgid "Cases"
@@ -4579,7 +4646,7 @@ msgstr "{0} 中的用例"
 msgid "Cases with no reported cost used {0} of {1} budgeted tokens."
 msgstr "未报告费用的用例使用了 {0}/{1} 个预算 token。"
 
-#: src/lib/model-descriptions.ts:54
+#: src/lib/model-descriptions.ts:59
 msgid "Cassette AI text-to-music — up to 3-minute clips at 44.1kHz stereo."
 msgstr "Cassette AI 文生音乐 — 最长 3 分钟、44.1kHz 立体声片段。"
 
@@ -4690,7 +4757,7 @@ msgstr "“基本设置”标签页中的 Channel secret，用于验证 X-Line-S
 msgid "Channels"
 msgstr "通道"
 
-#: src/features/workflow/templates/index.ts:310
+#: src/features/workflow/templates/index.ts:311
 msgid "character"
 msgstr "角色"
 
@@ -4698,7 +4765,7 @@ msgstr "角色"
 msgid "character consistency"
 msgstr "角色一致性"
 
-#: src/features/workflow/templates/index.ts:309
+#: src/features/workflow/templates/index.ts:310
 msgid "Character Consistency"
 msgstr "角色一致性"
 
@@ -4706,9 +4773,9 @@ msgstr "角色一致性"
 msgid "Character performance"
 msgstr "角色表演"
 
-#: src/features/workflow/templates/index.ts:288
-#: src/features/workflow/types/index.ts:419
-#: src/features/workflow/types/index.ts:423
+#: src/features/workflow/templates/index.ts:289
+#: src/features/workflow/types/index.ts:441
+#: src/features/workflow/types/index.ts:445
 msgid "Character Reference"
 msgstr "角色参考"
 
@@ -4717,7 +4784,7 @@ msgid "chars"
 msgstr "字符"
 
 #: src/features/marketing/data/models-data.ts:778
-#: src/features/workflow/templates/index.ts:485
+#: src/features/workflow/templates/index.ts:486
 msgid "chat"
 msgstr "聊天"
 
@@ -4790,7 +4857,7 @@ msgstr "此项目中的聊天会搜索并引用这些集合。"
 msgid "Chats that use its models will stop working until you pick another model."
 msgstr "使用其模型的聊天将无法工作，直到你选择其他模型。"
 
-#: src/lib/model-descriptions.ts:55
+#: src/lib/model-descriptions.ts:60
 msgid "Cheapest medium-quality Hailuo 2.3 tier — best cost-to-quality ratio"
 msgstr "Hailuo 2.3 最便宜的中等质量档 — 最佳性价比"
 
@@ -4885,15 +4952,15 @@ msgstr "选择一个唯一的用户名"
 msgid "Choose at least one permission"
 msgstr "请至少选择一项权限"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:225
+#: src/features/settings/components/chat/default-models-settings.tsx:223
 msgid "Choose default image models"
 msgstr "选择默认图像模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:183
+#: src/features/settings/components/chat/default-models-settings.tsx:181
 msgid "Choose default text models"
 msgstr "选择默认文本模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:267
+#: src/features/settings/components/chat/default-models-settings.tsx:265
 msgid "Choose default video models"
 msgstr "选择默认视频模型"
 
@@ -4965,11 +5032,11 @@ msgstr "电影级 AI 视频"
 msgid "Cinematic depth and visual flair"
 msgstr "电影般的纵深与视觉风格"
 
-#: src/lib/model-descriptions.ts:56
+#: src/lib/model-descriptions.ts:61
 msgid "Cinematic image model with references"
 msgstr "支持参考的电影感图像模型"
 
-#: src/lib/model-descriptions.ts:57
+#: src/lib/model-descriptions.ts:62
 msgid "Cinematic quality with improved motion"
 msgstr "动态改进的电影级质量"
 
@@ -5204,7 +5271,7 @@ msgstr "CLIP Skip"
 #: src/features/settings/components/chat/mcp/server-form.tsx:167
 #: src/features/settings/components/chat/native-providers-settings.tsx:463
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:172
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:309
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:312
 msgid "Close"
 msgstr "关闭"
 
@@ -5258,8 +5325,8 @@ msgstr "云服务提供商账户"
 #: src/features/canvas/canvas-panel.tsx:735
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/workflow/components/nodes/code-node.tsx:60
-#: src/features/workflow/types/index.ts:429
-#: src/features/workflow/types/index.ts:433
+#: src/features/workflow/types/index.ts:451
+#: src/features/workflow/types/index.ts:455
 msgid "Code"
 msgstr "代码"
 
@@ -5367,15 +5434,15 @@ msgstr "需要阿里巴巴 30B 编程专用模型的编程任务"
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "需要 Mistral 开发专用模型的编程任务"
 
-#: src/lib/model-descriptions.ts:58
+#: src/lib/model-descriptions.ts:63
 msgid "Coding-specialized model from Alibaba"
 msgstr "Alibaba 的编程专用模型"
 
-#: src/lib/model-descriptions.ts:59
+#: src/lib/model-descriptions.ts:64
 msgid "Cohere's advanced command LLM"
 msgstr "Cohere 的高级指令 LLM"
 
-#: src/lib/model-descriptions.ts:60
+#: src/lib/model-descriptions.ts:65
 msgid "Cohere's advanced command LLM with thinking"
 msgstr "Cohere 支持思考的高级指令 LLM"
 
@@ -5497,8 +5564,8 @@ msgstr "命令"
 #: src/features/pages/components/page-comments-panel.tsx:146
 #: src/features/pages/components/page-view.tsx:429
 #: src/features/workflow/components/nodes/comment-node.tsx:95
-#: src/features/workflow/types/index.ts:439
-#: src/features/workflow/types/index.ts:443
+#: src/features/workflow/types/index.ts:461
+#: src/features/workflow/types/index.ts:465
 msgid "Comment"
 msgstr "评论"
 
@@ -5561,7 +5628,7 @@ msgstr "更快生成代码的紧凑型 Codex 模型"
 msgid "Compact coding model from Mistral"
 msgstr "来自 Mistral 的紧凑型编程模型"
 
-#: src/lib/model-descriptions.ts:61
+#: src/lib/model-descriptions.ts:66
 msgid "Compact distilled reasoning model from DeepSeek"
 msgstr "DeepSeek 的紧凑蒸馏推理模型"
 
@@ -5603,15 +5670,15 @@ msgstr "比较不同 AI 模型如何向初学者解释量子计算。"
 msgid "Compare models"
 msgstr "比较模型"
 
-#: src/features/workflow/templates/index.ts:238
+#: src/features/workflow/templates/index.ts:239
 msgid "Compare Models"
 msgstr "对比模型"
 
-#: src/features/workflow/templates/index.ts:254
+#: src/features/workflow/templates/index.ts:255
 msgid "Compare outputs from multiple image models side-by-side"
 msgstr "并排对比多个图像模型的输出"
 
-#: src/features/workflow/types/index.ts:577
+#: src/features/workflow/types/index.ts:599
 msgid "Compare outputs from multiple models side-by-side"
 msgstr "并排对比多个模型的输出"
 
@@ -5625,11 +5692,11 @@ msgstr "比较各种可再生能源的优缺点"
 msgid "Comparing \"{0}\" (baseline) with \"{1}\""
 msgstr "正在比较“{0}”（基线）与“{1}”"
 
-#: src/features/workflow/templates/index.ts:258
+#: src/features/workflow/templates/index.ts:259
 msgid "comparison"
 msgstr "对比"
 
-#: src/features/workflow/templates/index.ts:248
+#: src/features/workflow/templates/index.ts:249
 msgid "Comparison Results"
 msgstr "对比结果"
 
@@ -5658,7 +5725,7 @@ msgstr "已完成"
 #: src/features/tasks/components/goal-form-dialog.tsx:48
 #: src/features/tasks/components/goal-list.tsx:27
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:63
-#: src/features/workflow/components/canvas/workflow-controls.tsx:50
+#: src/features/workflow/components/canvas/workflow-controls.tsx:51
 msgid "Completed"
 msgstr "已完成"
 
@@ -5756,7 +5823,7 @@ msgstr "需要对视觉输入进行透明思考的复杂视觉推理"
 msgid "composition"
 msgstr "构图"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:25
+#: src/features/workflow/components/nodes/character-ref-node.tsx:27
 msgid "Composition"
 msgstr "构图"
 
@@ -5772,7 +5839,7 @@ msgstr "正在压缩上下文..."
 msgid "Condition (JavaScript expression)"
 msgstr "条件（JavaScript 表达式）"
 
-#: src/features/workflow/types/index.ts:404
+#: src/features/workflow/types/index.ts:426
 msgid "Conditional branching"
 msgstr "条件分支"
 
@@ -5892,10 +5959,10 @@ msgstr "通过 Messaging API 连接 LINE 官方账号。每个聊天或群组都
 msgid "Connect an audio/file node as input"
 msgstr "连接一个音频/文件节点作为输入"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:131
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:170
-#: src/features/workflow/components/nodes/outpaint-node.tsx:157
-#: src/features/workflow/components/nodes/video-node.tsx:163
+#: src/features/workflow/components/nodes/background-removal-node.tsx:122
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:168
+#: src/features/workflow/components/nodes/outpaint-node.tsx:148
+#: src/features/workflow/components/nodes/video-node.tsx:158
 msgid "Connect an image node as input"
 msgstr "连接一个图像节点作为输入"
 
@@ -5927,8 +5994,8 @@ msgstr "连接 Feishu / Lark"
 msgid "Connect LINE"
 msgstr "连接 LINE"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:111
-#: src/features/workflow/components/nodes/object-editor-node.tsx:172
+#: src/features/workflow/components/nodes/inpaint-node.tsx:101
+#: src/features/workflow/components/nodes/object-editor-node.tsx:164
 msgid "Connect mask from upstream node or provide URL"
 msgstr "从上游节点连接蒙版或提供 URL"
 
@@ -6087,7 +6154,7 @@ msgid "Consent Preferences"
 msgstr "同意偏好"
 
 #: src/features/marketing/data/models-data.ts:332
-#: src/features/workflow/templates/index.ts:310
+#: src/features/workflow/templates/index.ts:311
 msgid "consistency"
 msgstr "一致性"
 
@@ -6138,7 +6205,7 @@ msgstr "联系销售"
 msgid "Contact support"
 msgstr "联系支持"
 
-#: src/features/workflow/types/index.ts:477
+#: src/features/workflow/types/index.ts:499
 msgid "Container for organizing workflow nodes"
 msgstr "用于组织工作流节点的容器"
 
@@ -6156,11 +6223,11 @@ msgstr "内容"
 msgid "Content Creation"
 msgstr "内容创作"
 
-#: src/features/workflow/templates/index.ts:187
+#: src/features/workflow/templates/index.ts:188
 msgid "Content Image"
 msgstr "内容图像"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:118
+#: src/features/workflow/components/nodes/style-ref-node.tsx:108
 msgid "Content Image URL (optional)"
 msgstr "内容图像 URL（可选）"
 
@@ -6266,19 +6333,19 @@ msgstr "通过光圈设置控制景深"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:190
+#: src/features/workflow/components/nodes/controlnet-node.tsx:182
 msgid "Control Strength"
 msgstr "控制强度"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:200
+#: src/features/workflow/components/nodes/controlnet-node.tsx:192
 msgid "Control Timing"
 msgstr "控制时机"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:107
+#: src/features/workflow/components/nodes/controlnet-node.tsx:108
 msgid "Control Type"
 msgstr "控制类型"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:223
+#: src/features/workflow/components/nodes/controlnet-node.tsx:215
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "控制 ControlNet 在生成过程中何时生效"
 
@@ -6294,12 +6361,12 @@ msgstr "控制哪些 AI 提供商可以处理你的请求。"
 msgid "controlled"
 msgstr "可控"
 
-#: src/features/workflow/types/index.ts:456
-#: src/features/workflow/types/index.ts:460
+#: src/features/workflow/types/index.ts:478
+#: src/features/workflow/types/index.ts:482
 msgid "ControlNet"
 msgstr "ControlNet"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:129
+#: src/features/workflow/components/nodes/controlnet-node.tsx:130
 msgid "ControlNet Model"
 msgstr "ControlNet 模型"
 
@@ -6329,11 +6396,11 @@ msgstr "转换"
 msgid "Convert Account"
 msgstr "转换账号"
 
-#: src/features/workflow/types/index.ts:612
+#: src/features/workflow/types/index.ts:634
 msgid "Convert speech to text"
 msgstr "语音转文字"
 
-#: src/features/workflow/types/index.ts:373
+#: src/features/workflow/types/index.ts:395
 msgid "Convert text to speech"
 msgstr "文字转语音"
 
@@ -6603,9 +6670,17 @@ msgstr "无法删除页面"
 msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
 msgstr "无法识别聊天提供商。请确认你上传的是来自 ChatGPT、Gemini 或 Claude 的有效导出文件。"
 
+#: src/features/workflow/hooks/use-workflow-transfer.ts:58
+msgid "Could not export the workflow"
+msgstr "无法导出工作流"
+
 #: src/features/skills/components/skill-generate-panel.tsx:62
 msgid "Could not generate a draft. Try again."
 msgstr "无法生成草稿，请重试。"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:82
+msgid "Could not import the workflow"
+msgstr "无法导入工作流"
 
 #: src/features/canvas/canvas-panel.tsx:129
 msgid "Could not load image"
@@ -7291,6 +7366,10 @@ msgstr "剪切"
 msgid "Cut selected cells"
 msgstr "剪切所选单元格"
 
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:43
+msgid "Cut the edges a line crosses"
+msgstr "切断线条经过的连线"
+
 #: src/features/marketing/data/models-data.ts:1113
 msgid "Cutting-edge coding with OpenAI's newest Codex generation"
 msgstr "借助 OpenAI 最新一代 Codex 进行前沿编程"
@@ -7464,7 +7543,7 @@ msgstr "调试错误或审查我的代码..."
 msgid "Decompose the goal into an actionable plan."
 msgstr "将目标分解为可执行的计划。"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:413
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:415
 msgid "Decrease number of images"
 msgstr "减少图片数量"
 
@@ -7530,19 +7609,19 @@ msgstr "深景深，纪录片般清晰"
 msgid "Deeper, more context"
 msgstr "更深，更多背景"
 
-#: src/lib/model-descriptions.ts:62
+#: src/lib/model-descriptions.ts:67
 msgid "DeepSeek V3.1 optimized for software engineering"
 msgstr "为软件工程优化的 DeepSeek V3.1"
 
-#: src/lib/model-descriptions.ts:63
+#: src/lib/model-descriptions.ts:68
 msgid "DeepSeek's advanced chat LLM with thinking"
 msgstr "DeepSeek 支持思考的高级聊天 LLM"
 
-#: src/lib/model-descriptions.ts:64
+#: src/lib/model-descriptions.ts:69
 msgid "DeepSeek's experimental advanced chat LLM"
 msgstr "DeepSeek 的实验性高级聊天 LLM"
 
-#: src/lib/model-descriptions.ts:65
+#: src/lib/model-descriptions.ts:70
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek 支持思考的实验性高级聊天 LLM"
 
@@ -7588,55 +7667,55 @@ msgstr "默认语言已更新"
 msgid "Default Model"
 msgstr "默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:282
+#: src/features/settings/components/chat/default-models-settings.tsx:280
 msgid "Default model for animating a single image"
 msgstr "用于让单张图片动起来的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:187
+#: src/features/settings/components/chat/default-models-settings.tsx:185
 msgid "Default model for chat and text generation"
 msgstr "用于聊天和文本生成的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:251
+#: src/features/settings/components/chat/default-models-settings.tsx:249
 msgid "Default model for combining multiple reference images"
 msgstr "用于组合多张参考图的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:315
+#: src/features/settings/components/chat/default-models-settings.tsx:302
 msgid "Default model for editing or transforming existing video"
 msgstr "用于编辑或转换现有视频的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:229
+#: src/features/settings/components/chat/default-models-settings.tsx:227
 msgid "Default model for generating images from text prompts"
 msgstr "用于根据文本提示词生成图像的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:304
+#: src/features/settings/components/chat/default-models-settings.tsx:291
 msgid "Default model for generating video from multiple images"
 msgstr "用于根据多张图片生成视频的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:271
+#: src/features/settings/components/chat/default-models-settings.tsx:269
 msgid "Default model for generating video from text prompts"
 msgstr "用于根据文本提示词生成视频的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:198
+#: src/features/settings/components/chat/default-models-settings.tsx:196
 msgid "Default model for image understanding and analysis"
 msgstr "用于图像理解与分析的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:240
+#: src/features/settings/components/chat/default-models-settings.tsx:238
 msgid "Default model for transforming existing images"
 msgstr "用于转换现有图像的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:326
+#: src/features/settings/components/chat/default-models-settings.tsx:313
 msgid "Default model for video generation from mixed inputs"
 msgstr "用于根据混合输入生成视频的默认模型"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:293
-msgid "Default model for video generation with start and end frames"
-msgstr "用于根据首尾帧生成视频的默认模型"
+#~ msgid "Default model for video generation with start and end frames"
+#~ msgstr "用于根据首尾帧生成视频的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:209
+#: src/features/settings/components/chat/default-models-settings.tsx:207
 msgid "Default model for video understanding and transcription"
 msgstr "用于视频理解与转录的默认模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:169
+#: src/features/settings/components/chat/default-models-settings.tsx:167
 msgid "Default model updated"
 msgstr "默认模型已更新"
 
@@ -7877,7 +7956,7 @@ msgstr "删除所选内容"
 msgid "Delete Selected"
 msgstr "删除所选"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:451
+#: src/features/workflow/components/canvas/workflow-controls.tsx:440
 msgid "Delete selected ({selectedNonGroupCount})"
 msgstr "删除所选（{selectedNonGroupCount}）"
 
@@ -8034,7 +8113,7 @@ msgstr "部署、边缘函数和前端基础设施"
 msgid "Depth"
 msgstr "深度"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:22
+#: src/features/workflow/components/nodes/controlnet-node.tsx:24
 msgid "Depth Map"
 msgstr "深度图"
 
@@ -8054,15 +8133,15 @@ msgstr "降序"
 msgid "Describe a change. You review the result before anything is saved; applying it creates a version you can restore."
 msgstr "描述一处修改。保存前你会先审阅结果；应用后会创建一个可恢复的版本。"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:117
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:113
 msgid "Describe how the image should animate"
 msgstr "描述图片应如何动起来"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:81
+#: src/features/workflow/components/nodes/img2img-node.tsx:71
 msgid "Describe how to transform the image..."
 msgstr "描述如何转换这张图片..."
 
-#: src/features/workflow/components/nodes/image-node.tsx:89
+#: src/features/workflow/components/nodes/image-node.tsx:88
 msgid "Describe the image to generate..."
 msgstr "描述要生成的图片..."
 
@@ -8070,20 +8149,20 @@ msgstr "描述要生成的图片..."
 msgid "Describe the image you want to create..."
 msgstr "描述你想创建的图像..."
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:112
-#: src/features/workflow/components/nodes/video-node.tsx:157
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:108
+#: src/features/workflow/components/nodes/video-node.tsx:152
 msgid "Describe the motion/animation..."
 msgstr "描述动作/动画效果..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:176
+#: src/features/workflow/components/nodes/style-ref-node.tsx:166
 msgid "Describe the scene or add style modifiers..."
 msgstr "描述场景或添加风格修饰词..."
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:265
+#: src/features/workflow/components/nodes/character-ref-node.tsx:256
 msgid "Describe the scene or context..."
 msgstr "描述场景或上下文..."
 
-#: src/features/workflow/components/nodes/video-node.tsx:157
+#: src/features/workflow/components/nodes/video-node.tsx:152
 msgid "Describe the video to generate..."
 msgstr "描述要生成的视频..."
 
@@ -8099,11 +8178,11 @@ msgstr "描述这个技能应该做什么。下方字段会自动填好供你审
 msgid "Describe what this workflow does..."
 msgstr "描述这个工作流的作用..."
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:131
+#: src/features/workflow/components/nodes/object-editor-node.tsx:123
 msgid "Describe what to add or replace..."
 msgstr "描述要添加或替换的内容..."
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:108
+#: src/features/workflow/components/nodes/outpaint-node.tsx:99
 msgid "Describe what to generate in expanded areas..."
 msgstr "描述要在扩展区域中生成的内容..."
 
@@ -8153,7 +8232,7 @@ msgid "Deselect"
 msgstr "取消选择"
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:152
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:61
 msgid "Deselect all"
 msgstr "取消全选"
 
@@ -8177,7 +8256,7 @@ msgstr "制作 logo、图标和品牌素材、最注重文字与排版精度的�
 msgid "destructive"
 msgstr "破坏性"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:515
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:517
 msgid "Detach from group"
 msgstr "从分组中分离"
 
@@ -8298,7 +8377,7 @@ msgstr "数字"
 msgid "Digital Art"
 msgstr "数字艺术"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:117
+#: src/features/workflow/components/nodes/outpaint-node.tsx:108
 msgid "Direction"
 msgstr "方向"
 
@@ -8386,6 +8465,7 @@ msgstr "Discord 公钥"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "关闭"
 
@@ -8397,7 +8477,7 @@ msgstr "关闭摘要"
 msgid "Dismiss error"
 msgstr "关闭错误提示"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:636
+#: src/features/workflow/components/canvas/workflow-controls.tsx:653
 msgid "Dismiss errors"
 msgstr "关闭错误提示"
 
@@ -8413,11 +8493,11 @@ msgstr ""
 msgid "Dismissed — continuing without an answer"
 msgstr "已忽略 — 在没有回答的情况下继续"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:174
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:175
 msgid "Display model names on results"
 msgstr "在结果上显示模型名称"
 
-#: src/features/workflow/types/index.ts:563
+#: src/features/workflow/types/index.ts:585
 msgid "Display results"
 msgstr "显示结果"
 
@@ -8437,7 +8517,7 @@ msgstr "解散分组并释放所有子节点"
 msgid "distilled"
 msgstr "蒸馏"
 
-#: src/lib/model-descriptions.ts:66
+#: src/lib/model-descriptions.ts:71
 msgid "Distilled and open sourced version of Krea 1"
 msgstr "Krea 1 的蒸馏开源版本"
 
@@ -8445,11 +8525,11 @@ msgstr "Krea 1 的蒸馏开源版本"
 msgid "Distilled from Krea 1 for open access"
 msgstr "从 Krea 1 蒸馏而来，开放使用"
 
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:51
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:52
 msgid "Distribute evenly"
 msgstr "均匀分布"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:518
+#: src/features/workflow/components/canvas/workflow-controls.tsx:511
 msgid "Distribute evenly (D)"
 msgstr "均匀分布（D）"
 
@@ -8541,8 +8621,8 @@ msgstr "双击重命名"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:775
 #: src/features/canvas/canvas-panel.tsx:792
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:297
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:303
 msgid "Download"
 msgstr "下载"
 
@@ -8579,7 +8659,7 @@ msgstr "下载为 CSV"
 msgid "Download as XLSX"
 msgstr "下载为 XLSX"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:549
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:551
 msgid "Download content"
 msgstr "下载内容"
 
@@ -8677,11 +8757,11 @@ msgstr "绘制蒙版"
 msgid "Drawing tools"
 msgstr "绘图工具"
 
-#: src/features/workflow/components/nodes/file-node.tsx:110
+#: src/features/workflow/components/nodes/file-node.tsx:191
 msgid "Drop file here"
 msgstr "将文件拖放到此处"
 
-#: src/features/workflow/components/nodes/file-node.tsx:110
+#: src/features/workflow/components/nodes/file-node.tsx:191
 msgid "Drop file or click to upload"
 msgstr "拖放文件或点击上传"
 
@@ -8733,19 +8813,19 @@ msgstr "复制节点"
 msgid "Duplicate selected"
 msgstr "复制所选内容"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:435
+#: src/features/workflow/components/canvas/workflow-controls.tsx:424
 msgid "Duplicate selected ({selectedNonGroupCount})"
 msgstr "复制所选（{selectedNonGroupCount}）"
 
 #: src/features/admin/components/ban-user-dialog.tsx:117
 #: src/features/chat/header/temporary-chat-dropdown.tsx:274
 #: src/features/chat/thread/media-gallery-view.tsx:559
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:133
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:136
 msgid "Duration"
 msgstr "时长"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:124
-#: src/features/workflow/components/nodes/video-node.tsx:191
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:122
+#: src/features/workflow/components/nodes/video-node.tsx:197
 msgid "Duration: {duration}s"
 msgstr "时长：{duration} 秒"
 
@@ -8895,7 +8975,7 @@ msgstr "需要 Mistral 最小多模态模型的边缘和端侧部署"
 msgid "Edge deployed"
 msgstr "边缘部署"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:23
+#: src/features/workflow/components/nodes/controlnet-node.tsx:25
 msgid "Edge detection"
 msgstr "边缘检测"
 
@@ -8995,7 +9075,7 @@ msgstr "编辑我"
 msgid "Edit memory"
 msgstr "编辑记忆"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:87
+#: src/features/workflow/components/nodes/object-editor-node.tsx:88
 msgid "Edit Mode"
 msgstr "编辑模式"
 
@@ -9025,15 +9105,15 @@ msgstr "编辑技能"
 msgid "Edit Slide {slideNumber}"
 msgstr "编辑第 {slideNumber} 张幻灯片"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
 msgid "Edit specific regions"
 msgstr "编辑特定区域"
 
-#: src/features/workflow/types/index.ts:524
+#: src/features/workflow/types/index.ts:546
 msgid "Edit specific regions of an image"
 msgstr "编辑图像的特定区域"
 
-#: src/features/workflow/templates/index.ts:395
+#: src/features/workflow/templates/index.ts:396
 msgid "Edit specific regions of an image with AI"
 msgstr "用 AI 编辑图像的特定区域"
 
@@ -9057,12 +9137,12 @@ msgstr "编辑你的消息..."
 msgid "edited"
 msgstr "已编辑"
 
-#: src/features/workflow/templates/index.ts:389
+#: src/features/workflow/templates/index.ts:390
 msgid "Edited Image"
 msgstr "编辑后的图像"
 
 #: src/features/marketing/data/models-data.ts:155
-#: src/features/workflow/templates/index.ts:399
+#: src/features/workflow/templates/index.ts:400
 msgid "editing"
 msgstr "编辑"
 
@@ -9415,7 +9495,8 @@ msgstr "“事件与回调 > 加密策略”中的 Encrypt Key（必填——用
 msgid "Encrypted at rest and never shown again. Local servers such as Ollama usually need none."
 msgstr "加密存储，且不会再次显示。Ollama 等本地服务器通常不需要。"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:215
+#: src/features/workflow/components/nodes/controlnet-node.tsx:207
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:192
 msgid "End"
 msgstr "结束"
 
@@ -9486,25 +9567,25 @@ msgstr "英语（英国）"
 msgid "English (US)"
 msgstr "英语（美国）"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:139
-#: src/features/workflow/components/nodes/upscale-node.tsx:142
+#: src/features/workflow/components/nodes/upscale-node.tsx:130
+#: src/features/workflow/components/nodes/upscale-node.tsx:133
 msgid "Enhance Details"
 msgstr "增强细节"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:126
-#: src/features/workflow/components/nodes/upscale-node.tsx:129
+#: src/features/workflow/components/nodes/upscale-node.tsx:117
+#: src/features/workflow/components/nodes/upscale-node.tsx:120
 msgid "Enhance Faces"
 msgstr "增强面部"
 
-#: src/features/workflow/types/index.ts:622
+#: src/features/workflow/types/index.ts:644
 msgid "Enhance image resolution"
 msgstr "提升图像分辨率"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:85
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
 msgid "Enhance resolution"
 msgstr "提升分辨率"
 
-#: src/features/workflow/templates/index.ts:157
+#: src/features/workflow/templates/index.ts:158
 msgid "Enhanced Image"
 msgstr "增强后的图像"
 
@@ -9528,7 +9609,7 @@ msgstr "视觉理解能力优于 GLM 4.5v"
 msgid "Enhanced visual style adaptation"
 msgstr "增强的视觉风格适配"
 
-#: src/features/workflow/templates/index.ts:167
+#: src/features/workflow/templates/index.ts:168
 msgid "enhancement"
 msgstr "增强"
 
@@ -9606,7 +9687,7 @@ msgid "Enter text or leave empty to use input from previous node..."
 msgstr "输入文本，或留空以使用上一个节点的输入..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:381
-#: src/features/workflow/components/nodes/text-node.tsx:69
+#: src/features/workflow/components/nodes/text-node.tsx:151
 msgid "Enter text..."
 msgstr "输入文本..."
 
@@ -10077,11 +10158,11 @@ msgstr "执行"
 msgid "Execute cleanup"
 msgstr "执行清理"
 
-#: src/features/workflow/types/index.ts:430
+#: src/features/workflow/types/index.ts:452
 msgid "Execute code"
 msgstr "执行代码"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:591
+#: src/features/workflow/components/canvas/workflow-controls.tsx:608
 msgid "Execute workflow"
 msgstr "执行工作流"
 
@@ -10130,7 +10211,7 @@ msgstr "展开 {title}"
 msgid "Expand browser panel"
 msgstr "展开浏览器面板"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
 msgid "Expand canvas"
 msgstr "扩展画布"
 
@@ -10150,7 +10231,7 @@ msgstr "展开分组"
 msgid "Expand group to show children"
 msgstr "展开分组以显示子节点"
 
-#: src/features/workflow/types/index.ts:553
+#: src/features/workflow/types/index.ts:575
 msgid "Expand image canvas beyond original borders"
 msgstr "将图像画布扩展到原始边界之外"
 
@@ -10162,11 +10243,11 @@ msgstr "展开文本框"
 msgid "Expand thinking"
 msgstr "展开思考过程"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:554
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:556
 msgid "Expand to fullscreen"
 msgstr "全屏展开"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:135
+#: src/features/workflow/components/nodes/outpaint-node.tsx:126
 msgid "Expand: {expandPixels}px"
 msgstr "扩展：{expandPixels}px"
 
@@ -10174,7 +10255,7 @@ msgstr "扩展：{expandPixels}px"
 msgid "Expanded Editor"
 msgstr "扩展编辑器"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:102
+#: src/features/workflow/components/nodes/outpaint-node.tsx:93
 msgid "Expansion Prompt"
 msgstr "扩展提示词"
 
@@ -10334,9 +10415,17 @@ msgstr "导出已就绪！"
 msgid "Export request submitted. You will receive an email when it's ready."
 msgstr "导出请求已提交。准备好后你会收到一封邮件。"
 
+#: src/features/workflow/components/canvas/workflow-controls.tsx:332
+msgid "Export workflow"
+msgstr "导出工作流"
+
 #: src/features/workflow/components/canvas/workflow-controls.tsx:356
-msgid "Export workflow (JSON)"
-msgstr "导出工作流（JSON）"
+#~ msgid "Export workflow (JSON)"
+#~ msgstr "导出工作流（JSON）"
+
+#: src/features/workflow/components/canvas/workflow-controls.tsx:345
+msgid "Export workflow (ZIP)"
+msgstr "导出工作流 (ZIP)"
 
 #: src/features/marketing/data/models-data.ts:229
 msgid "Expressive dynamic motion"
@@ -10409,7 +10498,7 @@ msgstr "提取“{selector}”"
 msgid "Extract page"
 msgstr "提取页面"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
 msgid "Extract subject"
 msgstr "提取主体"
 
@@ -10437,7 +10526,7 @@ msgstr "极度畸变"
 msgid "Fable (British)"
 msgstr "Fable（英式）"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:23
+#: src/features/workflow/components/nodes/character-ref-node.tsx:25
 msgid "Face"
 msgstr "面部"
 
@@ -10476,7 +10565,7 @@ msgstr "失败"
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:41
 #: src/features/tasks/components/task-status.tsx:17
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:64
-#: src/features/workflow/components/canvas/workflow-controls.tsx:51
+#: src/features/workflow/components/canvas/workflow-controls.tsx:52
 msgid "Failed"
 msgstr "失败"
 
@@ -11084,7 +11173,7 @@ msgstr "更新配置失败"
 msgid "Failed to update connection"
 msgstr "更新连接失败"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:163
+#: src/features/settings/components/chat/default-models-settings.tsx:161
 msgid "Failed to update default model"
 msgstr "更新默认模型失败"
 
@@ -11274,19 +11363,19 @@ msgstr "快速"
 msgid "Fast and affordable AI"
 msgstr "快速且实惠的 AI"
 
-#: src/lib/model-descriptions.ts:67
+#: src/lib/model-descriptions.ts:72
 msgid "Fast and cheap model. Up to 12 seconds"
 msgstr "快速且便宜的模型。最长 12 秒"
 
-#: src/lib/model-descriptions.ts:68
+#: src/lib/model-descriptions.ts:73
 msgid "Fast and cheap next-gen model"
 msgstr "快速且便宜的新一代模型"
 
-#: src/lib/model-descriptions.ts:69
+#: src/lib/model-descriptions.ts:74
 msgid "Fast and efficient model from Z.AI"
 msgstr "Z.AI 的快速高效模型"
 
-#: src/lib/model-descriptions.ts:70
+#: src/lib/model-descriptions.ts:75
 msgid "Fast and efficient multimodal model from Google"
 msgstr "Google 的快速高效多模态模型"
 
@@ -11350,7 +11439,7 @@ msgstr "支持视觉和 PDF 的快速推理"
 msgid "Fast iteration cycle for creative exploration"
 msgstr "快速迭代，便于创意探索"
 
-#: src/lib/model-descriptions.ts:71
+#: src/lib/model-descriptions.ts:76
 msgid "Fast model. Best for LoRAs"
 msgstr "快速模型。最适合 LoRA"
 
@@ -11427,7 +11516,7 @@ msgstr "需要 StepFun 优化 Flash 模型的快速、高效任务"
 msgid "Fast, general purpose"
 msgstr "快速，通用"
 
-#: src/lib/model-descriptions.ts:72
+#: src/lib/model-descriptions.ts:77
 msgid "Fast, high-quality model from ByteDance"
 msgstr "ByteDance 的快速高质量模型"
 
@@ -11435,7 +11524,7 @@ msgstr "ByteDance 的快速高质量模型"
 msgid "Fast, high-quality video generation backed by xAI's foundation model technology"
 msgstr "依托 xAI 基础模型技术的快速、高品质视频生成"
 
-#: src/lib/model-descriptions.ts:73
+#: src/lib/model-descriptions.ts:78
 msgid "Fast, high-quality video generation by xAI"
 msgstr "xAI 的快速高质量视频生成"
 
@@ -11443,7 +11532,7 @@ msgstr "xAI 的快速高质量视频生成"
 msgid "Fast, high-quality video generation from ByteDance's professional-tier Seedance model"
 msgstr "来自字节跳动专业级 Seedance 模型的快速、高品质视频生成"
 
-#: src/lib/model-descriptions.ts:74
+#: src/lib/model-descriptions.ts:79
 msgid "Fast, inexpensive model with live previews"
 msgstr "带实时预览的快速廉价模型"
 
@@ -11455,7 +11544,7 @@ msgstr "快速、低成本的模型"
 msgid "Fast, low-cost models. 20 messages a day."
 msgstr "快速、低成本的模型。每天 20 条消息。"
 
-#: src/lib/model-descriptions.ts:75
+#: src/lib/model-descriptions.ts:80
 msgid "Fast, lower-quality model from Alibaba"
 msgstr "Alibaba 的快速低质量模型"
 
@@ -11471,7 +11560,7 @@ msgstr "比完整版 GLM 4.5 更快、更轻量"
 msgid "Faster and more affordable than Veo 3"
 msgstr "比 Veo 3 更快、更实惠"
 
-#: src/lib/model-descriptions.ts:76
+#: src/lib/model-descriptions.ts:81
 msgid "Faster and more affordable version of Veo 3.1 with audio"
 msgstr "Veo 3.1 更快更实惠的带音频版本"
 
@@ -11483,11 +11572,11 @@ msgstr "推理速度快于完整版 R1 模型"
 msgid "Faster version of the top-ranked Veo 3.1"
 msgstr "排名第一的 Veo 3.1 的更快版本"
 
-#: src/lib/model-descriptions.ts:77
+#: src/lib/model-descriptions.ts:82
 msgid "Faster, cheaper Seedance 1.5 variant from ByteDance"
 msgstr "ByteDance Seedance 1.5 更快更便宜的变体"
 
-#: src/lib/model-descriptions.ts:78
+#: src/lib/model-descriptions.ts:83
 msgid "Faster, cheaper Seedance 2.0 variant — quick iterations at high quality"
 msgstr "Seedance 2.0 更快更便宜的变体 — 高质量快速迭代"
 
@@ -11495,7 +11584,7 @@ msgstr "Seedance 2.0 更快更便宜的变体 — 高质量快速迭代"
 msgid "Faster, cheaper variant of Seedance 2.0"
 msgstr "Seedance 2.0 更快、更便宜的版本"
 
-#: src/lib/model-descriptions.ts:79
+#: src/lib/model-descriptions.ts:84
 msgid "Faster, more affordable Veo 3 variant with optional audio"
 msgstr "Veo 3 更快更实惠的变体，可选音频"
 
@@ -11515,15 +11604,15 @@ msgstr "目前最快的图像生成"
 msgid "Fastest in the Wan model family"
 msgstr "Wan 模型系列中最快的"
 
-#: src/lib/model-descriptions.ts:80
+#: src/lib/model-descriptions.ts:85
 msgid "Fastest low-quality model with video Lora support"
 msgstr "支持视频 LoRA 的最快低质量模型"
 
-#: src/lib/model-descriptions.ts:81
+#: src/lib/model-descriptions.ts:86
 msgid "Fastest model. Realistic, low diversity"
 msgstr "最快的模型。写实，多样性低"
 
-#: src/lib/model-descriptions.ts:82
+#: src/lib/model-descriptions.ts:87
 msgid "Fastest, most affordable Claude model"
 msgstr "最快、最实惠的 Claude 模型"
 
@@ -11601,8 +11690,8 @@ msgstr "获取模型"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:26
 #: src/features/evals/components/import-cases-dialog.tsx:81
-#: src/features/workflow/types/index.ts:466
-#: src/features/workflow/types/index.ts:470
+#: src/features/workflow/types/index.ts:488
+#: src/features/workflow/types/index.ts:492
 msgid "File"
 msgstr "文件"
 
@@ -11614,7 +11703,7 @@ msgstr "文件“{fileName}”已成功删除"
 msgid "File access and AI-powered universal search across work apps"
 msgstr "跨工作应用的文件访问和 AI 驱动的通用搜索"
 
-#: src/features/workflow/types/index.ts:467
+#: src/features/workflow/types/index.ts:489
 msgid "File input"
 msgstr "文件输入"
 
@@ -11684,7 +11773,7 @@ msgstr "填充颜色"
 msgid "Fill in a name, a valid command, a description and instructions before saving."
 msgstr "保存前请填写名称、有效的命令、描述和指令。"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:87
+#: src/features/workflow/components/nodes/inpaint-node.tsx:77
 msgid "Fill Prompt"
 msgstr "填充提示词"
 
@@ -11792,7 +11881,7 @@ msgstr "帮我找附近最好的意大利餐厅"
 msgid "Find tutorials on how to learn Python programming"
 msgstr "查找学习 Python 编程的教程"
 
-#: src/features/workflow/types/index.ts:353
+#: src/features/workflow/types/index.ts:375
 msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
 msgstr "微调 CFG scale、采样器、调度器和种子"
 
@@ -11826,8 +11915,8 @@ msgid "Firefox works too, and may ask the same question."
 msgstr "Firefox 也可以使用，并且可能会询问同样的问题。"
 
 #: src/features/settings/components/chat/default-models-settings.tsx:296
-msgid "First frame / last frame"
-msgstr "首帧 / 尾帧"
+#~ msgid "First frame / last frame"
+#~ msgstr "首帧 / 尾帧"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:121
 msgid "First of each month at 9 AM"
@@ -11850,7 +11939,7 @@ msgstr "鱼眼"
 msgid "Fisheye, extreme distortion"
 msgstr "鱼眼，极度畸变"
 
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:52
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:54
 msgid "Fit view"
 msgstr "适应视图"
 
@@ -11890,15 +11979,15 @@ msgstr "垂直翻转"
 msgid "fluid motion"
 msgstr "流畅运动"
 
-#: src/lib/model-descriptions.ts:83
+#: src/lib/model-descriptions.ts:88
 msgid "FLUX Kontext Max for highest quality editing via Fireworks"
 msgstr "通过 Fireworks 提供的最高质量编辑 FLUX Kontext Max"
 
-#: src/lib/model-descriptions.ts:84
+#: src/lib/model-descriptions.ts:89
 msgid "FLUX Kontext Pro for image editing via Fireworks"
 msgstr "通过 Fireworks 提供的图像编辑 FLUX Kontext Pro"
 
-#: src/lib/model-descriptions.ts:85
+#: src/lib/model-descriptions.ts:90
 msgid "FLUX.1 Dev model via Fireworks"
 msgstr "通过 Fireworks 提供的 FLUX.1 Dev 模型"
 
@@ -11906,7 +11995,7 @@ msgstr "通过 Fireworks 提供的 FLUX.1 Dev 模型"
 msgid "FLUX.2 architecture improvements"
 msgstr "FLUX.2 架构改进"
 
-#: src/lib/model-descriptions.ts:86
+#: src/lib/model-descriptions.ts:91
 msgid "FLUX.2 dev with enhanced realism and native editing"
 msgstr "增强写实感并支持原生编辑的 FLUX.2 dev"
 
@@ -12036,6 +12125,14 @@ msgstr "已复刻“{0}”——正在打开你的副本。"
 msgid "Forking..."
 msgstr "正在复刻..."
 
+#: src/features/workflow/components/nodes/text-node.tsx:212
+msgid "Format"
+msgstr "格式化"
+
+#: src/features/workflow/components/nodes/text-node.tsx:104
+msgid "Formatting would change values"
+msgstr "格式化会改变值"
+
 #: src/features/chat/forward/forward-selection-bar.tsx:74
 msgid "Forward"
 msgstr "转发"
@@ -12048,9 +12145,17 @@ msgstr "转发到新聊天"
 msgid "Foundation of Google's leading Veo 3.x series"
 msgstr "Google 领先的 Veo 3.x 系列的基础模型"
 
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:135
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:138
 msgid "FPS"
 msgstr "FPS"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:78
+msgid "Frame capture failed"
+msgstr "截取帧失败"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:88
+msgid "Frames"
+msgstr "帧"
 
 #: src/features/chat/core/utils/language-utilities.ts:353
 msgid "France"
@@ -12197,35 +12302,35 @@ msgstr "前沿智能"
 msgid "Frontier intelligence for complex scenes"
 msgstr "应对复杂场景的前沿智能"
 
-#: src/lib/model-descriptions.ts:87
+#: src/lib/model-descriptions.ts:92
 msgid "Frontier model by Black Forest Labs"
 msgstr "Black Forest Labs 的前沿模型"
 
-#: src/lib/model-descriptions.ts:88
+#: src/lib/model-descriptions.ts:93
 msgid "Frontier model designed for image editing"
 msgstr "专为图像编辑设计的前沿模型"
 
-#: src/lib/model-descriptions.ts:89
+#: src/lib/model-descriptions.ts:94
 msgid "Frontier model designed for image editing, optimized for Krea"
 msgstr "专为图像编辑设计、针对 Krea 优化的前沿模型"
 
-#: src/lib/model-descriptions.ts:90
+#: src/lib/model-descriptions.ts:95
 msgid "Frontier model for complex image references"
 msgstr "适用于复杂参考图像的前沿模型"
 
-#: src/lib/model-descriptions.ts:91
+#: src/lib/model-descriptions.ts:96
 msgid "Frontier model from Kling with native audio"
 msgstr "Kling 支持原生音频的前沿模型"
 
-#: src/lib/model-descriptions.ts:92
+#: src/lib/model-descriptions.ts:97
 msgid "Frontier model with 1080p resolution"
 msgstr "1080p 分辨率的前沿模型"
 
-#: src/lib/model-descriptions.ts:93
+#: src/lib/model-descriptions.ts:98
 msgid "Frontier model with exceptional long context from Google"
 msgstr "Google 拥有出色长上下文能力的前沿模型"
 
-#: src/lib/model-descriptions.ts:94
+#: src/lib/model-descriptions.ts:99
 msgid "Frontier model with extended thinking from Anthropic"
 msgstr "Anthropic 支持扩展思考的前沿模型"
 
@@ -12461,7 +12566,7 @@ msgstr "用不同模型生成 4 张图片并并排对比"
 msgid "Generate a storyboard for a short documentary"
 msgstr "为一部短纪录片生成分镜"
 
-#: src/features/workflow/templates/index.ts:439
+#: src/features/workflow/templates/index.ts:440
 msgid "Generate a video from a text description"
 msgstr "根据文字描述生成视频"
 
@@ -12469,7 +12574,7 @@ msgstr "根据文字描述生成视频"
 msgid "Generate an image"
 msgstr "生成图像"
 
-#: src/features/workflow/templates/index.ts:121
+#: src/features/workflow/templates/index.ts:122
 msgid "Generate an image from a text prompt"
 msgstr "根据文本提示词生成图像"
 
@@ -12485,6 +12590,10 @@ msgstr "生成一张温馨阅读角的图像，带有暖色灯光和绿植。"
 msgid "Generate an image or video..."
 msgstr "生成图像或视频..."
 
+#: src/features/workflow/components/nodes/video-model-options.tsx:50
+msgid "Generate audio"
+msgstr "生成音频"
+
 #: src/features/skills/components/skill-generate-panel.tsx:73
 msgid "Generate from a description"
 msgstr "根据描述生成"
@@ -12498,11 +12607,11 @@ msgid "Generate image"
 msgstr "生成图像"
 
 #: src/features/chat/thread/media-gallery-view.tsx:612
-#: src/features/workflow/templates/index.ts:105
+#: src/features/workflow/templates/index.ts:106
 msgid "Generate Image"
 msgstr "生成图像"
 
-#: src/features/workflow/templates/index.ts:306
+#: src/features/workflow/templates/index.ts:307
 msgid "Generate images with consistent character appearance"
 msgstr "生成角色外观一致的图像"
 
@@ -12524,11 +12633,11 @@ msgid "Generate video"
 msgstr "生成视频"
 
 #: src/features/chat/thread/media-gallery-view.tsx:612
-#: src/features/workflow/templates/index.ts:423
+#: src/features/workflow/templates/index.ts:424
 msgid "Generate Video"
 msgstr "生成视频"
 
-#: src/features/workflow/types/index.ts:632
+#: src/features/workflow/types/index.ts:661
 msgid "Generate videos from text or images"
 msgstr "根据文本或图像生成视频"
 
@@ -12549,7 +12658,7 @@ msgstr "用 AI 生成工作流"
 msgid "Generated image"
 msgstr "生成的图像"
 
-#: src/features/workflow/templates/index.ts:300
+#: src/features/workflow/templates/index.ts:301
 msgid "Generated Image"
 msgstr "生成的图像"
 
@@ -12602,16 +12711,16 @@ msgstr "正在生成..."
 msgid "Generating…"
 msgstr "正在生成…"
 
-#: src/features/workflow/templates/index.ts:443
+#: src/features/workflow/templates/index.ts:444
 msgid "generation"
 msgstr "生成"
 
-#: src/features/workflow/components/nodes/image-node.tsx:83
+#: src/features/workflow/components/nodes/image-node.tsx:85
 msgid "Generation Prompt"
 msgstr "生成提示词"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:259
-#: src/features/workflow/components/nodes/style-ref-node.tsx:170
+#: src/features/workflow/components/nodes/character-ref-node.tsx:250
+#: src/features/workflow/components/nodes/style-ref-node.tsx:160
 msgid "Generation Prompt (optional)"
 msgstr "生成提示词（可选）"
 
@@ -12948,7 +13057,7 @@ msgstr "Google 旗舰"
 msgid "Google Gemini"
 msgstr "Google Gemini"
 
-#: src/lib/model-descriptions.ts:95
+#: src/lib/model-descriptions.ts:100
 msgid "Google Lyria 2 — 30s text-to-music clips at 48kHz with negative-prompt support."
 msgstr "Google Lyria 2 — 48kHz、30 秒的文生音乐片段，支持负面提示词。"
 
@@ -12956,23 +13065,23 @@ msgstr "Google Lyria 2 — 48kHz、30 秒的文生音乐片段，支持负面提
 msgid "Google reliability at budget pricing"
 msgstr "经济价格下的 Google 可靠性"
 
-#: src/lib/model-descriptions.ts:96
+#: src/lib/model-descriptions.ts:101
 msgid "Google Veo 2 — high-quality cinematic video generation"
 msgstr "Google Veo 2 — 高质量电影级视频生成"
 
-#: src/lib/model-descriptions.ts:97
+#: src/lib/model-descriptions.ts:102
 msgid "Google Veo 3 — frontier video generation with native audio"
 msgstr "Google Veo 3 — 支持原生音频的前沿视频生成"
 
-#: src/lib/model-descriptions.ts:98
+#: src/lib/model-descriptions.ts:103
 msgid "Google's advanced LLM with thinking"
 msgstr "Google 支持思考的高级 LLM"
 
-#: src/lib/model-descriptions.ts:99
+#: src/lib/model-descriptions.ts:104
 msgid "Google's advanced small LLM with thinking"
 msgstr "Google 支持思考的高级小型 LLM"
 
-#: src/lib/model-descriptions.ts:100
+#: src/lib/model-descriptions.ts:105
 msgid "Google's current generation image model"
 msgstr "Google 当前一代的图像模型"
 
@@ -12984,11 +13093,15 @@ msgstr "Google 当前一代品质"
 msgid "Google's fastest image generation"
 msgstr "Google 最快的图像生成"
 
-#: src/lib/model-descriptions.ts:101
+#: src/lib/model-descriptions.ts:106
 msgid "Google's fastest image model"
 msgstr "Google 最快的图像模型"
 
-#: src/lib/model-descriptions.ts:102
+#: src/lib/model-descriptions.ts:40
+msgid "Google's Gemini Omni Flash 1.1 reference-to-video, guided by images and short reference videos"
+msgstr "谷歌的 Gemini Omni Flash 1.1 参考生视频模型，由图片和简短参考视频引导"
+
+#: src/lib/model-descriptions.ts:107
 msgid "Google's highest quality image model"
 msgstr "Google 最高质量的图像模型"
 
@@ -12996,11 +13109,11 @@ msgstr "Google 最高质量的图像模型"
 msgid "Google's highest-quality image model"
 msgstr "Google 最高品质的图像模型"
 
-#: src/lib/model-descriptions.ts:103
+#: src/lib/model-descriptions.ts:108
 msgid "Google's latest small SOTA LLM with thinking"
 msgstr "Google 支持思考的最新小型 SOTA LLM"
 
-#: src/lib/model-descriptions.ts:104
+#: src/lib/model-descriptions.ts:109
 msgid "Google's most advanced AI video model with native audio and reference images"
 msgstr "Google 最先进的 AI 视频模型，支持原生音频和参考图像"
 
@@ -13008,7 +13121,7 @@ msgstr "Google 最先进的 AI 视频模型，支持原生音频和参考图像"
 msgid "Google's most advanced image generation model"
 msgstr "Google 最先进的图像生成模型"
 
-#: src/lib/model-descriptions.ts:105
+#: src/lib/model-descriptions.ts:110
 msgid "Google's new state-of-the-art fast image generation and editing model"
 msgstr "Google 全新的最先进快速图像生成与编辑模型"
 
@@ -13020,7 +13133,7 @@ msgstr "Google 全新最先进的快速模型"
 msgid "Google's newest flagship model with advanced reasoning"
 msgstr "Google 具备先进推理的最新旗舰模型"
 
-#: src/lib/model-descriptions.ts:106
+#: src/lib/model-descriptions.ts:111
 msgid "Google's newest flagship with advanced reasoning"
 msgstr "Google 最新的旗舰模型，具备高级推理能力"
 
@@ -13032,7 +13145,7 @@ msgstr "Google 推理过程透明的新一代 Flash"
 msgid "Google's optimized performance-cost balance"
 msgstr "Google 优化的性能与成本平衡"
 
-#: src/lib/model-descriptions.ts:107
+#: src/lib/model-descriptions.ts:112
 msgid "Google's previous generation image model"
 msgstr "Google 上一代的图像模型"
 
@@ -13040,7 +13153,7 @@ msgstr "Google 上一代的图像模型"
 msgid "Google's proven photorealism quality"
 msgstr "Google 久经验证的照片级真实感品质"
 
-#: src/lib/model-descriptions.ts:108
+#: src/lib/model-descriptions.ts:113
 msgid "Google's state-of-the-art image generation and editing model"
 msgstr "Google 最先进的图像生成与编辑模型"
 
@@ -13131,17 +13244,17 @@ msgstr "Grok 3、Grok 3 Mini——实时知识"
 msgid "Grok models from xAI with real-time web access"
 msgstr "来自 xAI 的 Grok 模型，支持实时网络访问"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:132
+#: src/features/workflow/components/canvas/workflow-controls.tsx:107
 #: src/features/workflow/components/nodes/group-node.tsx:57
 #: src/features/workflow/components/nodes/group-node.tsx:299
 #: src/features/workflow/components/nodes/group-node.tsx:317
-#: src/features/workflow/hooks/use-workflow-shortcuts.ts:168
-#: src/features/workflow/types/index.ts:476
-#: src/features/workflow/types/index.ts:480
+#: src/features/workflow/hooks/use-workflow-shortcuts.ts:181
+#: src/features/workflow/types/index.ts:498
+#: src/features/workflow/types/index.ts:502
 msgid "Group"
 msgstr "分组"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:469
+#: src/features/workflow/components/canvas/workflow-controls.tsx:458
 msgid "Group ({selectedNonGroupCount})"
 msgstr "分组（{selectedNonGroupCount}）"
 
@@ -13161,7 +13274,7 @@ msgstr "将知识文件归入一个库，可将其整体附加到聊天或项目
 msgid "Group label"
 msgstr "分组标签"
 
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:48
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:49
 msgid "Group selected"
 msgstr "将所选内容分组"
 
@@ -13190,7 +13303,7 @@ msgstr "访客账号只能使用免费模型。"
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "访客账号仅可使用免费模型。注册即可解锁所有模型。"
 
-#: src/features/workflow/types/index.ts:457
+#: src/features/workflow/types/index.ts:479
 msgid "Guide generation with pose, depth, or edge detection"
 msgstr "通过姿态、深度或边缘检测引导生成"
 
@@ -13330,7 +13443,7 @@ msgstr "隐藏密码"
 msgid "Hide Personal Information"
 msgstr "隐藏个人信息"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:541
+#: src/features/workflow/components/canvas/workflow-controls.tsx:558
 msgid "Hide run history"
 msgstr "隐藏运行历史"
 
@@ -13416,15 +13529,15 @@ msgstr "借助 Google 成熟 AI 能力生成照片级真实效果的高品质图
 msgid "High-quality image synthesis"
 msgstr "高品质图像合成"
 
-#: src/lib/model-descriptions.ts:109
+#: src/lib/model-descriptions.ts:114
 msgid "High-quality model with camera control"
 msgstr "支持镜头控制的高质量模型"
 
-#: src/lib/model-descriptions.ts:110
+#: src/lib/model-descriptions.ts:115
 msgid "High-quality model with great aesthetics"
 msgstr "美感出色的高质量模型"
 
-#: src/lib/model-descriptions.ts:111
+#: src/lib/model-descriptions.ts:116
 msgid "High-quality model with reference images support"
 msgstr "支持参考图像的高质量模型"
 
@@ -13480,7 +13593,7 @@ msgstr "需要 OpenAI 最小、最快模型的大规模轻量任务"
 msgid "High-volume, time-sensitive workflows where generation speed is the top priority"
 msgstr "生成速度最优先的大规模、时效敏感工作流"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:253
+#: src/features/workflow/components/nodes/character-ref-node.tsx:244
 msgid "Higher = closer match to reference"
 msgstr "越高 = 越贴近参考图"
 
@@ -13488,7 +13601,7 @@ msgstr "越高 = 越贴近参考图"
 msgid "Higher = more prompt adherence, Lower = more creativity"
 msgstr "越高 = 越遵循提示词，越低 = 越有创意"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:147
+#: src/features/workflow/components/nodes/style-ref-node.tsx:137
 msgid "Higher = stronger style influence"
 msgstr "越高 = 风格影响越强"
 
@@ -13508,7 +13621,7 @@ msgstr "来自 Black Forest Labs 的最高品质输出"
 msgid "Highly aesthetic visual output"
 msgstr "极具美感的视觉输出"
 
-#: src/lib/model-descriptions.ts:112
+#: src/lib/model-descriptions.ts:117
 msgid "Highly aesthetic, general-purpose model"
 msgstr "美感极佳的通用模型"
 
@@ -13618,15 +13731,15 @@ msgstr "仅支持 HTTPS。服务器根地址，与 ANTHROPIC_BASE_URL 相同—�
 msgid "HTTPS only. Usually ends in /v1."
 msgstr "仅支持 HTTPS。通常以 /v1 结尾。"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:146
+#: src/features/workflow/components/nodes/object-editor-node.tsx:138
 msgid "https://... (white = edit area)"
 msgstr "https://...（白色 = 编辑区域）"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:107
+#: src/features/workflow/components/nodes/inpaint-node.tsx:97
 msgid "https://... (white = edit, black = keep)"
 msgstr "https://...（白色 = 编辑，黑色 = 保留）"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:176
+#: src/features/workflow/components/nodes/controlnet-node.tsx:168
 msgid "https://... or from input"
 msgstr "https://... 或来自输入"
 
@@ -13638,7 +13751,7 @@ msgstr "色相旋转"
 msgid "Human Creativity"
 msgstr "人类创造力"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:21
+#: src/features/workflow/components/nodes/controlnet-node.tsx:23
 msgid "Human pose & skeleton"
 msgstr "人体姿态和骨架"
 
@@ -13722,15 +13835,15 @@ msgstr "插画"
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
-#: src/features/settings/components/chat/default-models-settings.tsx:224
+#: src/features/settings/components/chat/default-models-settings.tsx:222
 #: src/features/settings/components/chat/models-settings.tsx:38
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:71
 #: src/features/workflow/components/gallery/gallery-card.tsx:27
 #: src/features/workflow/components/nodes/output-node.tsx:19
 #: src/features/workflow/components/template-picker.tsx:20
-#: src/features/workflow/templates/index.ts:363
-#: src/features/workflow/types/index.ts:486
-#: src/features/workflow/types/index.ts:490
+#: src/features/workflow/templates/index.ts:364
+#: src/features/workflow/types/index.ts:508
+#: src/features/workflow/types/index.ts:512
 #: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Image"
 msgstr "图像"
@@ -13763,7 +13876,7 @@ msgid "Image Gen"
 msgstr "图像生成"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:91
-#: src/features/workflow/templates/index.ts:125
+#: src/features/workflow/templates/index.ts:126
 msgid "image generation"
 msgstr "图像生成"
 
@@ -13793,33 +13906,33 @@ msgstr "图像生成模型"
 #~ msgid "Image is too large. Choose one under 300 KB."
 #~ msgstr ""
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:127
+#: src/features/workflow/components/nodes/style-ref-node.tsx:117
 msgid "Image to apply the style to (or use input from previous node)"
 msgstr "要应用风格的图像（或使用上一个节点的输入）"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:243
+#: src/features/settings/components/chat/default-models-settings.tsx:241
 msgid "Image to image"
 msgstr "图生图"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:201
+#: src/features/settings/components/chat/default-models-settings.tsx:199
 msgid "Image to text"
 msgstr "图生文"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:285
+#: src/features/settings/components/chat/default-models-settings.tsx:283
 msgid "Image to video"
 msgstr "图生视频"
 
-#: src/features/workflow/components/nodes/video-node.tsx:124
-#: src/features/workflow/types/index.ts:503
-#: src/features/workflow/types/index.ts:507
+#: src/features/workflow/components/nodes/video-node.tsx:127
+#: src/features/workflow/types/index.ts:525
+#: src/features/workflow/types/index.ts:529
 msgid "Image to Video"
 msgstr "图生视频"
 
-#: src/features/workflow/templates/index.ts:350
+#: src/features/workflow/templates/index.ts:351
 msgid "Image Transform"
 msgstr "图像变换"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:308
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:309
 msgid "Image upload failed. Try again."
 msgstr ""
 
@@ -13836,16 +13949,16 @@ msgstr "需要图片 URL 或已上传的图片"
 msgid "Image variation & editing"
 msgstr "图像变体与编辑"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:112
+#: src/features/workflow/components/nodes/style-ref-node.tsx:102
 msgid "Image whose artistic style will be applied"
 msgstr "将应用其艺术风格的图像"
 
-#: src/features/workflow/types/index.ts:513
-#: src/features/workflow/types/index.ts:517
+#: src/features/workflow/types/index.ts:535
+#: src/features/workflow/types/index.ts:539
 msgid "Image-to-Image"
 msgstr "图生图"
 
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:127
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:130
 msgid "Images"
 msgstr "图像"
 
@@ -13853,19 +13966,19 @@ msgstr "图像"
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
 msgstr "需要最新知识、网页搜索上下文或对主题进行复杂推理的图像"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:254
+#: src/features/settings/components/chat/default-models-settings.tsx:252
 msgid "Images to image"
 msgstr "多图生图"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:307
+#: src/features/settings/components/chat/default-models-settings.tsx:294
 msgid "Images to video"
 msgstr "多图生视频"
 
-#: src/features/workflow/templates/index.ts:351
+#: src/features/workflow/templates/index.ts:352
 msgid "img2img"
 msgstr "img2img"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:90
 msgid "Img2Img"
 msgstr "Img2Img"
 
@@ -13957,9 +14070,17 @@ msgstr ""
 msgid "Import skill"
 msgstr "导入技能"
 
+#: src/features/workflow/components/canvas/workflow-controls.tsx:311
+msgid "Import workflow"
+msgstr "导入工作流"
+
 #: src/features/workflow/components/canvas/workflow-controls.tsx:342
-msgid "Import workflow (JSON)"
-msgstr "导入工作流（JSON）"
+#~ msgid "Import workflow (JSON)"
+#~ msgstr "导入工作流（JSON）"
+
+#: src/features/workflow/components/canvas/workflow-controls.tsx:324
+msgid "Import workflow (ZIP or JSON)"
+msgstr "导入工作流 (ZIP 或 JSON)"
 
 #: src/features/canvas/canvas-panel.tsx:761
 msgid "Import XLSX"
@@ -14028,11 +14149,11 @@ msgstr "在复杂任务上的基准表现提升"
 msgid "Improved detail over Imagen 3"
 msgstr "细节优于 Imagen 3"
 
-#: src/lib/model-descriptions.ts:113
+#: src/lib/model-descriptions.ts:118
 msgid "Improved fast multimodal model from Google"
 msgstr "Google 改进的快速多模态模型"
 
-#: src/lib/model-descriptions.ts:114
+#: src/lib/model-descriptions.ts:119
 msgid "Improved general-purpose model from DeepSeek"
 msgstr "DeepSeek 改进的通用模型"
 
@@ -14126,7 +14247,7 @@ msgstr "不活跃阈值"
 msgid "Inactivity threshold (days)"
 msgstr "不活跃阈值（天）"
 
-#: src/lib/model-descriptions.ts:115
+#: src/lib/model-descriptions.ts:120
 msgid "Inception's diffusion-based language model"
 msgstr "Inception 基于扩散的语言模型"
 
@@ -14134,7 +14255,7 @@ msgstr "Inception 基于扩散的语言模型"
 msgid "Includes audio generation"
 msgstr "包含音频生成"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:422
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:424
 msgid "Increase number of images"
 msgstr "增加图片数量"
 
@@ -14170,18 +14291,18 @@ msgstr "继承组织设置"
 #~ msgid "Initial state"
 #~ msgstr "初始状态"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
-#: src/features/workflow/templates/index.ts:379
-#: src/features/workflow/types/index.ts:523
-#: src/features/workflow/types/index.ts:527
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
+#: src/features/workflow/templates/index.ts:380
+#: src/features/workflow/types/index.ts:545
+#: src/features/workflow/types/index.ts:549
 msgid "Inpaint"
 msgstr "局部重绘"
 
-#: src/features/workflow/templates/index.ts:398
+#: src/features/workflow/templates/index.ts:399
 msgid "Inpaint Edit"
 msgstr "局部重绘编辑"
 
-#: src/features/workflow/templates/index.ts:399
+#: src/features/workflow/templates/index.ts:400
 msgid "inpainting"
 msgstr "局部重绘"
 
@@ -14195,7 +14316,7 @@ msgstr "局部重绘"
 msgid "Input"
 msgstr "输入"
 
-#: src/features/workflow/components/nodes/text-node.tsx:49
+#: src/features/workflow/components/nodes/text-node.tsx:131
 msgid "Input (Rich Text)"
 msgstr "输入（富文本）"
 
@@ -14203,7 +14324,7 @@ msgstr "输入（富文本）"
 msgid "Input (URL)"
 msgstr "输入（URL）"
 
-#: src/features/workflow/templates/index.ts:137
+#: src/features/workflow/templates/index.ts:138
 msgid "Input Image"
 msgstr "输入图像"
 
@@ -14211,11 +14332,11 @@ msgstr "输入图像"
 msgid "Input is required"
 msgstr "请输入内容"
 
-#: src/features/workflow/types/index.ts:487
+#: src/features/workflow/types/index.ts:509
 msgid "Input or generate images"
 msgstr "输入或生成图像"
 
-#: src/features/workflow/types/index.ts:602
+#: src/features/workflow/types/index.ts:624
 msgid "Input or transform text"
 msgstr "输入或转换文本"
 
@@ -14296,7 +14417,7 @@ msgstr "请输入指令"
 msgid "Instructions are too long"
 msgstr "指令过长"
 
-#: src/features/workflow/components/nodes/ai-node.tsx:49
+#: src/features/workflow/components/nodes/ai-node.tsx:47
 msgid "Instructions for the AI..."
 msgstr "给 AI 的指令..."
 
@@ -14318,7 +14439,7 @@ msgstr "智能"
 msgid "Intelligent scene composition"
 msgstr "智能场景构图"
 
-#: src/lib/model-descriptions.ts:116
+#: src/lib/model-descriptions.ts:121
 msgid "Intelligent video model that thinks before generating"
 msgstr "先思考再生成的智能视频模型"
 
@@ -14345,6 +14466,10 @@ msgstr "图标 URL 格式无效"
 #: src/features/workflow/components/nodes/output-node.tsx:55
 msgid "Invalid image output"
 msgstr "无效的图像输出"
+
+#: src/features/workflow/components/nodes/text-node.tsx:75
+msgid "Invalid JSON"
+msgstr "无效的 JSON"
 
 #: src/routes/dashboard/settings/connectors/callback.tsx:48
 msgid "Invalid OAuth callback"
@@ -14489,7 +14614,7 @@ msgstr "调用技能"
 msgid "Invoke Skill"
 msgstr "调用技能"
 
-#: src/features/workflow/templates/index.ts:310
+#: src/features/workflow/templates/index.ts:311
 msgid "ip-adapter"
 msgstr "ip-adapter"
 
@@ -14623,6 +14748,7 @@ msgid "JPEG image"
 msgstr "JPEG 图像"
 
 #: src/features/workflow/components/nodes/output-node.tsx:18
+#: src/features/workflow/components/nodes/text-node.tsx:170
 msgid "JSON"
 msgstr "JSON"
 
@@ -14686,6 +14812,10 @@ msgstr "保留当前行"
 msgid "Keep files"
 msgstr "保留文件"
 
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:146
+msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
+msgstr "保留视频的一部分。保留的部分会在此浏览器中重新编码为 MP4，可能需要一点时间。"
+
 #: src/features/chat/header/temporary-chat-dropdown.tsx:292
 msgid "Keep Permanently"
 msgstr "永久保留"
@@ -14714,12 +14844,12 @@ msgstr "键盘快捷键"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:69
 #: src/features/layout/lib/dashboard-page-names.ts:24
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:181
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:74
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:76
 msgid "Keyboard Shortcuts"
 msgstr "键盘快捷键"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:139
-#: src/features/workflow/components/canvas/workflow-controls.tsx:389
+#: src/features/workflow/components/canvas/workflow-controls.tsx:378
 msgid "Keyboard shortcuts (?)"
 msgstr "键盘快捷键（?）"
 
@@ -14743,7 +14873,7 @@ msgstr "高棉语"
 msgid "Khmer (Cambodia)"
 msgstr "高棉语（柬埔寨）"
 
-#: src/lib/model-descriptions.ts:117
+#: src/lib/model-descriptions.ts:122
 msgid "Kling 2.6 text-to-video with native audio via direct API"
 msgstr "通过直接 API 提供的支持原生音频的 Kling 2.6 文生视频"
 
@@ -14822,7 +14952,7 @@ msgstr "Krea 标志性的美学品质"
 msgid "KV-backed rate limiting per user and tier. Configurable burst and sustained limits."
 msgstr "基于 KV 的按用户和套餐等级限流，可配置突发与持续限额。"
 
-#: src/lib/model-descriptions.ts:118
+#: src/lib/model-descriptions.ts:123
 msgid "Kwaipilot's advanced coding LLM"
 msgstr "Kwaipilot 的高级编程 LLM"
 
@@ -14846,7 +14976,7 @@ msgstr "吉尔吉斯斯坦"
 msgid "Label"
 msgstr "标签"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:172
+#: src/features/workflow/components/nodes/object-editor-node.tsx:164
 msgid "LAMA uses AI to seamlessly remove objects"
 msgstr "LAMA 使用 AI 无缝移除物体"
 
@@ -14889,7 +15019,7 @@ msgid "Landscape (widescreen)"
 msgstr "横向（宽屏）"
 
 #: src/features/workflow/components/nodes/code-node.tsx:42
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:131
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:134
 #: src/features/workflow/components/nodes/transcription-node.tsx:51
 msgid "Language"
 msgstr "语言"
@@ -14948,6 +15078,10 @@ msgstr "上次确认于 {0}"
 #: src/features/tasks/components/task-detail-dialog.tsx:254
 msgid "Last error"
 msgstr "上次错误"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:41
+msgid "Last frame"
+msgstr "最后一帧"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
@@ -15025,7 +15159,7 @@ msgstr "能力更强的最新一代 Codex"
 msgid "Latest coding agent run"
 msgstr "最近一次编程智能体运行"
 
-#: src/lib/model-descriptions.ts:119
+#: src/lib/model-descriptions.ts:124
 msgid "Latest flagship model from Anthropic"
 msgstr "Anthropic 最新的旗舰模型"
 
@@ -15037,11 +15171,11 @@ msgstr "最新前沿"
 msgid "Latest frontier generation from Hailuo"
 msgstr "海螺最新一代前沿模型"
 
-#: src/lib/model-descriptions.ts:120
+#: src/lib/model-descriptions.ts:125
 msgid "Latest frontier Kling model with native audio and extended durations"
 msgstr "支持原生音频和更长时长的最新前沿 Kling 模型"
 
-#: src/lib/model-descriptions.ts:121
+#: src/lib/model-descriptions.ts:126
 msgid "Latest frontier model from Runway with native text-to-video"
 msgstr "Runway 最新的前沿模型，支持原生文生视频"
 
@@ -15053,7 +15187,7 @@ msgstr "Kling 最新前沿级视频质量"
 msgid "Latest general-purpose capabilities from DeepSeek"
 msgstr "DeepSeek 最新通用能力"
 
-#: src/lib/model-descriptions.ts:122
+#: src/lib/model-descriptions.ts:127
 msgid "Latest general-purpose model from DeepSeek"
 msgstr "DeepSeek 最新的通用模型"
 
@@ -15069,11 +15203,11 @@ msgstr "阿里巴巴最新一代模型"
 msgid "Latest generation from Runway"
 msgstr "Runway 最新一代模型"
 
-#: src/lib/model-descriptions.ts:123
+#: src/lib/model-descriptions.ts:128
 msgid "Latest generation model from Alibaba"
 msgstr "Alibaba 最新一代模型"
 
-#: src/lib/model-descriptions.ts:124
+#: src/lib/model-descriptions.ts:129
 msgid "Latest GPT-5 series model from OpenAI"
 msgstr "OpenAI 最新的 GPT-5 系列模型"
 
@@ -15081,19 +15215,19 @@ msgstr "OpenAI 最新的 GPT-5 系列模型"
 msgid "Latest in the GPT-5 family with continued improvements"
 msgstr "GPT-5 系列最新成员，持续改进"
 
-#: src/lib/model-descriptions.ts:125
+#: src/lib/model-descriptions.ts:130
 msgid "Latest Kling image-to-video model via direct API"
 msgstr "通过直接 API 提供的最新 Kling 图生视频模型"
 
-#: src/lib/model-descriptions.ts:126
+#: src/lib/model-descriptions.ts:131
 msgid "Latest Kling text-to-video model via direct API"
 msgstr "通过直接 API 提供的最新 Kling 文生视频模型"
 
-#: src/lib/model-descriptions.ts:127
+#: src/lib/model-descriptions.ts:132
 msgid "Latest medium quality model from Alibaba"
 msgstr "Alibaba 最新的中等质量模型"
 
-#: src/lib/model-descriptions.ts:128
+#: src/lib/model-descriptions.ts:133
 msgid "Latest medium quality model from ByteDance with audio generation and end frame support"
 msgstr "ByteDance 最新的中等质量模型，支持音频生成和尾帧"
 
@@ -15117,7 +15251,7 @@ msgstr "最新 Sonnet 更新，指令遵循能力提升"
 msgid "Latest Sonnet with transparent reasoning for complex analytical tasks"
 msgstr "最新 Sonnet，具备透明推理，适合复杂分析任务"
 
-#: src/lib/model-descriptions.ts:129
+#: src/lib/model-descriptions.ts:134
 msgid "Latest updated Sonnet model from Anthropic"
 msgstr "Anthropic 最新更新的 Sonnet 模型"
 
@@ -15141,7 +15275,7 @@ msgstr "拉脱维亚语"
 msgid "Latvian (Latvia)"
 msgstr "拉脱维亚语（拉脱维亚）"
 
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:46
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:47
 msgid "Layout"
 msgstr "布局"
 
@@ -15182,7 +15316,7 @@ msgstr "全部不勾选则搜索所有已索引的文件。"
 msgid "Leave empty for \"any model\"."
 msgstr "留空表示“任意模型”。"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:126
+#: src/features/workflow/components/nodes/background-removal-node.tsx:117
 msgid "Leave empty for transparent background"
 msgstr "留空则使用透明背景"
 
@@ -15203,7 +15337,7 @@ msgid "Leave Team"
 msgstr "离开团队"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:397
-#: src/features/workflow/components/nodes/outpaint-node.tsx:23
+#: src/features/workflow/components/nodes/outpaint-node.tsx:25
 msgid "Left"
 msgstr "左"
 
@@ -15256,7 +15390,7 @@ msgstr "变亮"
 msgid "Lightning-fast inference at production scale"
 msgstr "生产级规模的极速推理"
 
-#: src/lib/model-descriptions.ts:130
+#: src/lib/model-descriptions.ts:135
 msgid "Lightricks LTX — fast open-source video model, low latency"
 msgstr "Lightricks LTX — 快速开源视频模型，低延迟"
 
@@ -15296,6 +15430,10 @@ msgstr "直线"
 #: src/features/evals/components/import-cases-dialog.tsx:104
 msgid "Line {0}: {1}"
 msgstr "第 {0} 行：{1}"
+
+#: src/features/workflow/components/nodes/text-node.tsx:101
+msgid "Line {line}, column {column}"
+msgstr "第 {line} 行，第 {column} 列"
 
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:168
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
@@ -15409,7 +15547,7 @@ msgstr "实时预览——随工件流式输出实时更新"
 msgid "LLaMA, Mixtral, Gemma — fastest inference"
 msgstr "LLaMA、Mixtral、Gemma——最快推理"
 
-#: src/features/workflow/templates/index.ts:485
+#: src/features/workflow/templates/index.ts:486
 msgid "llm"
 msgstr "llm"
 
@@ -15616,7 +15754,7 @@ msgstr "正在加载概览…"
 #: src/features/settings/components/chat/agent-settings.tsx:28
 #: src/features/settings/components/chat/api-keys-settings.tsx:462
 #: src/features/settings/components/chat/custom-providers-settings.tsx:343
-#: src/features/settings/components/chat/default-models-settings.tsx:134
+#: src/features/settings/components/chat/default-models-settings.tsx:132
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:165
 #: src/features/settings/components/chat/trigger-settings.tsx:776
@@ -15663,7 +15801,7 @@ msgstr "位置已更新"
 msgid "Lock group"
 msgstr "锁定分组"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:531
 msgid "Lock node"
 msgstr "锁定节点"
 
@@ -15738,7 +15876,7 @@ msgstr "图像中的长文本生成"
 msgid "Long video clips (up to 12 seconds) generated quickly at an affordable price point"
 msgstr "以实惠价格快速生成长视频片段（最长 12 秒）"
 
-#: src/lib/model-descriptions.ts:131
+#: src/lib/model-descriptions.ts:136
 msgid "Long-context model from Moonshot AI"
 msgstr "Moonshot AI 的长上下文模型"
 
@@ -15784,7 +15922,7 @@ msgstr "低"
 msgid "Low latency text-to-video"
 msgstr "低延迟文生视频"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:96
+#: src/features/workflow/components/nodes/img2img-node.tsx:86
 msgid "Lower = subtle changes, Higher = major transformation"
 msgstr "越低 = 细微变化，越高 = 大幅转换"
 
@@ -15809,15 +15947,15 @@ msgstr "Luma Labs AI 基础模型"
 msgid "Luma's best-in-class video model"
 msgstr "Luma 同类最佳的视频模型"
 
-#: src/lib/model-descriptions.ts:132
+#: src/lib/model-descriptions.ts:137
 msgid "Luma's Dream Machine image generation model"
 msgstr "Luma 的 Dream Machine 图像生成模型"
 
-#: src/lib/model-descriptions.ts:133
+#: src/lib/model-descriptions.ts:138
 msgid "Luma's fast image generation model"
 msgstr "Luma 的快速图像生成模型"
 
-#: src/lib/model-descriptions.ts:134
+#: src/lib/model-descriptions.ts:139
 msgid "Luma's second-generation video model — realistic visuals with natural, coherent motion"
 msgstr "Luma 第二代视频模型 — 画面写实，动作自然连贯"
 
@@ -15865,11 +16003,11 @@ msgstr "主字体"
 msgid "Main font updated"
 msgstr "主字体已更新"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:157
+#: src/features/workflow/components/nodes/style-ref-node.tsx:147
 msgid "Maintain original structure"
 msgstr "保持原始结构"
 
-#: src/features/workflow/types/index.ts:420
+#: src/features/workflow/types/index.ts:442
 msgid "Maintain subject consistency across generations"
 msgstr "在多次生成中保持主体一致"
 
@@ -16045,11 +16183,11 @@ msgstr "全部标为已读"
 msgid "Mark as favorite"
 msgstr "标记为收藏"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:150
+#: src/features/workflow/components/nodes/object-editor-node.tsx:142
 msgid "Mark the area to edit in white"
 msgstr "用白色标记要编辑的区域"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:150
+#: src/features/workflow/components/nodes/object-editor-node.tsx:142
 msgid "Mark the object to remove in white"
 msgstr "用白色标记要移除的物体"
 
@@ -16082,7 +16220,7 @@ msgstr "营销"
 msgid "Marketplace"
 msgstr "市场"
 
-#: src/features/workflow/templates/index.ts:371
+#: src/features/workflow/templates/index.ts:372
 msgid "Mask"
 msgstr "蒙版"
 
@@ -16090,11 +16228,11 @@ msgstr "蒙版"
 msgid "Mask preview"
 msgstr "蒙版预览"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:140
+#: src/features/workflow/components/nodes/object-editor-node.tsx:132
 msgid "Mask URL"
 msgstr "蒙版 URL"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:101
+#: src/features/workflow/components/nodes/inpaint-node.tsx:91
 msgid "Mask URL (optional)"
 msgstr "蒙版 URL（可选）"
 
@@ -16102,7 +16240,7 @@ msgstr "蒙版 URL（可选）"
 msgid "massive"
 msgstr "超大规模"
 
-#: src/lib/model-descriptions.ts:135
+#: src/lib/model-descriptions.ts:140
 msgid "Massive 235B MoE model from Alibaba"
 msgstr "Alibaba 的超大 235B MoE 模型"
 
@@ -16111,7 +16249,7 @@ msgstr "Alibaba 的超大 235B MoE 模型"
 msgid "Match input"
 msgstr "与输入一致"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:25
+#: src/features/workflow/components/nodes/character-ref-node.tsx:27
 msgid "Match layout and structure"
 msgstr "匹配布局和结构"
 
@@ -16249,23 +16387,23 @@ msgstr "中等质量"
 msgid "Medium quality at manageable cost"
 msgstr "成本可控的中等质量"
 
-#: src/lib/model-descriptions.ts:136
+#: src/lib/model-descriptions.ts:141
 msgid "Medium quality model by Black Forest"
 msgstr "Black Forest 的中等质量模型"
 
-#: src/lib/model-descriptions.ts:137
+#: src/lib/model-descriptions.ts:142
 msgid "Medium quality model for photorealism"
 msgstr "用于照片级写实的中等质量模型"
 
-#: src/lib/model-descriptions.ts:138
+#: src/lib/model-descriptions.ts:143
 msgid "Medium quality model for rendering text"
 msgstr "用于文字渲染的中等质量模型"
 
-#: src/lib/model-descriptions.ts:139
+#: src/lib/model-descriptions.ts:144
 msgid "Medium quality model with a focus on cinematic visuals"
 msgstr "注重电影感画面的中等质量模型"
 
-#: src/lib/model-descriptions.ts:140
+#: src/lib/model-descriptions.ts:145
 msgid "Medium quality model with reasoning and web search"
 msgstr "支持推理和网页搜索的中等质量模型"
 
@@ -16456,7 +16594,7 @@ msgstr "消息平台密钥已保存"
 msgid "Meta's latest open-source model with multimodal vision"
 msgstr "Meta 最新的开源多模态视觉模型"
 
-#: src/lib/model-descriptions.ts:141
+#: src/lib/model-descriptions.ts:146
 msgid "Meta's MusicGen text-to-music — medium / large / melody variants via passthrough."
 msgstr "Meta 的 MusicGen 文生音乐 — 通过透传提供 medium / large / melody 变体。"
 
@@ -16500,7 +16638,7 @@ msgstr "以极低成本完成简单分类与提取"
 msgid "Minimal cost for simple tasks"
 msgstr "以极低成本完成简单任务"
 
-#: src/lib/model-descriptions.ts:142
+#: src/lib/model-descriptions.ts:147
 msgid "MiniMax Hailuo 02 frontier tier — dynamic motion, high fidelity"
 msgstr "MiniMax Hailuo 02 前沿档 — 动态运动，高保真"
 
@@ -16512,23 +16650,23 @@ msgstr "MiniMax 海螺 02 专业版"
 msgid "MiniMax Hailuo 02 standard tier"
 msgstr "MiniMax 海螺 02 标准版"
 
-#: src/lib/model-descriptions.ts:143
+#: src/lib/model-descriptions.ts:148
 msgid "MiniMax Hailuo 02 standard tier — balanced quality and speed"
 msgstr "MiniMax Hailuo 02 标准档 — 质量与速度均衡"
 
-#: src/lib/model-descriptions.ts:144
+#: src/lib/model-descriptions.ts:149
 msgid "MiniMax Hailuo 2.3 frontier tier — dynamic motion, latest generation"
 msgstr "MiniMax Hailuo 2.3 前沿档 — 动态运动，最新一代"
 
-#: src/lib/model-descriptions.ts:145
+#: src/lib/model-descriptions.ts:150
 msgid "MiniMax Hailuo 2.3 standard tier — strong motion, balanced cost"
 msgstr "MiniMax Hailuo 2.3 标准档 — 运动表现强，成本均衡"
 
-#: src/lib/model-descriptions.ts:146
+#: src/lib/model-descriptions.ts:151
 msgid "MiniMax video generation model via Replicate"
 msgstr "通过 Replicate 提供的 MiniMax 视频生成模型"
 
-#: src/lib/model-descriptions.ts:147
+#: src/lib/model-descriptions.ts:152
 msgid "MiniMax Video-01 Live — high-quality model optimized for animating people"
 msgstr "MiniMax Video-01 Live — 针对人物动画优化的高质量模型"
 
@@ -16536,7 +16674,7 @@ msgstr "MiniMax Video-01 Live — 针对人物动画优化的高质量模型"
 msgid "MiniMax's advanced production model"
 msgstr "MiniMax 的先进生产模型"
 
-#: src/lib/model-descriptions.ts:148
+#: src/lib/model-descriptions.ts:153
 msgid "MiniMax's advanced reasoning LLM"
 msgstr "MiniMax 的高级推理 LLM"
 
@@ -16544,7 +16682,7 @@ msgstr "MiniMax 的高级推理 LLM"
 msgid "MiniMax's advanced reasoning model"
 msgstr "MiniMax 的先进推理模型"
 
-#: src/lib/model-descriptions.ts:149
+#: src/lib/model-descriptions.ts:154
 msgid "MiniMax's fast advanced reasoning LLM"
 msgstr "MiniMax 的快速高级推理 LLM"
 
@@ -16553,7 +16691,7 @@ msgid "MiniMax's fastest model with reasoning capability"
 msgstr "MiniMax 具备推理能力的最快模型"
 
 #: src/features/marketing/data/models-data.ts:1278
-#: src/lib/model-descriptions.ts:150
+#: src/lib/model-descriptions.ts:155
 msgid "MiniMax's most capable reasoning LLM"
 msgstr "MiniMax 最强的推理大模型"
 
@@ -16591,7 +16729,7 @@ msgid "Mistral's balanced medium model"
 msgstr "Mistral 均衡的中型模型"
 
 #: src/features/marketing/data/models-data.ts:1338
-#: src/lib/model-descriptions.ts:151
+#: src/lib/model-descriptions.ts:156
 msgid "Mistral's coding-focused LLM"
 msgstr "Mistral 专注编程的大模型"
 
@@ -16603,27 +16741,27 @@ msgstr "Mistral 首个专用推理模型"
 msgid "Mistral's largest Ministral model at 14B"
 msgstr "Mistral 最大的 Ministral 模型（14B）"
 
-#: src/lib/model-descriptions.ts:152
+#: src/lib/model-descriptions.ts:157
 msgid "Mistral's latest and greatest large multi-modal LLM"
 msgstr "Mistral 最新最强的大型多模态 LLM"
 
-#: src/lib/model-descriptions.ts:153
+#: src/lib/model-descriptions.ts:158
 msgid "Mistral's medium multi-modal LLM"
 msgstr "Mistral 的中型多模态 LLM"
 
-#: src/lib/model-descriptions.ts:154
+#: src/lib/model-descriptions.ts:159
 msgid "Mistral's medium reasoning LLM"
 msgstr "Mistral 的中型推理 LLM"
 
-#: src/lib/model-descriptions.ts:155
+#: src/lib/model-descriptions.ts:160
 msgid "Mistral's mini-model 14B multi-modal LLM"
 msgstr "Mistral 的 14B 迷你多模态 LLM"
 
-#: src/lib/model-descriptions.ts:156
+#: src/lib/model-descriptions.ts:161
 msgid "Mistral's mini-model 3B multi-modal LLM"
 msgstr "Mistral 的 3B 迷你多模态 LLM"
 
-#: src/lib/model-descriptions.ts:157
+#: src/lib/model-descriptions.ts:162
 msgid "Mistral's mini-model 8B multi-modal LLM"
 msgstr "Mistral 的 8B 迷你多模态 LLM"
 
@@ -16631,11 +16769,11 @@ msgstr "Mistral 的 8B 迷你多模态 LLM"
 msgid "Mistral's most capable model with 675B total parameters"
 msgstr "Mistral 最强模型，总参数 675B"
 
-#: src/lib/model-descriptions.ts:158
+#: src/lib/model-descriptions.ts:163
 msgid "Mistral's small coding-focused LLM"
 msgstr "Mistral 专注编程的小型 LLM"
 
-#: src/lib/model-descriptions.ts:159
+#: src/lib/model-descriptions.ts:164
 msgid "Mistral's small reasoning LLM"
 msgstr "Mistral 的小型推理 LLM"
 
@@ -16643,7 +16781,7 @@ msgstr "Mistral 的小型推理 LLM"
 msgid "Mistral's smallest 3B multi-modal model"
 msgstr "Mistral 最小的 3B 多模态模型"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:329
+#: src/features/settings/components/chat/default-models-settings.tsx:316
 msgid "Mixed to video"
 msgstr "混合转视频"
 
@@ -16659,9 +16797,9 @@ msgid "Mobile app icon"
 msgstr "移动应用图标"
 
 #: src/features/workflow/components/nodes/image-node.tsx:45
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:129
-#: src/features/workflow/components/nodes/text-node.tsx:41
-#: src/features/workflow/components/nodes/video-node.tsx:113
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:132
+#: src/features/workflow/components/nodes/text-node.tsx:123
+#: src/features/workflow/components/nodes/video-node.tsx:116
 msgid "Mode"
 msgstr "模式"
 
@@ -16677,16 +16815,16 @@ msgstr "模式："
 #: src/features/workflow/components/nodes/ai-node.tsx:34
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
 #: src/features/workflow/components/nodes/character-ref-node.tsx:144
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:87
-#: src/features/workflow/components/nodes/img2img-node.tsx:56
-#: src/features/workflow/components/nodes/inpaint-node.tsx:68
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:123
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:215
-#: src/features/workflow/components/nodes/object-editor-node.tsx:105
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:89
+#: src/features/workflow/components/nodes/img2img-node.tsx:55
+#: src/features/workflow/components/nodes/inpaint-node.tsx:67
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:126
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:216
+#: src/features/workflow/components/nodes/object-editor-node.tsx:106
 #: src/features/workflow/components/nodes/outpaint-node.tsx:83
-#: src/features/workflow/components/nodes/style-ref-node.tsx:84
+#: src/features/workflow/components/nodes/style-ref-node.tsx:83
 #: src/features/workflow/components/nodes/upscale-node.tsx:88
-#: src/features/workflow/components/nodes/video-node.tsx:132
+#: src/features/workflow/components/nodes/video-node.tsx:135
 #: src/routes/admin/gateway/index.tsx:83
 msgid "Model"
 msgstr "模型"
@@ -16704,7 +16842,7 @@ msgid "Model comparison"
 msgstr "模型对比"
 
 #: src/features/chat/core/hooks/use-comparison-chat.ts:108
-#: src/features/workflow/templates/index.ts:257
+#: src/features/workflow/templates/index.ts:258
 msgid "Model Comparison"
 msgstr "模型对比"
 
@@ -16798,7 +16936,7 @@ msgstr "从组织继承的模型："
 msgid "Models support tool calling"
 msgstr "模型支持工具调用"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:96
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:97
 msgid "Models to Compare"
 msgstr "要对比的模型"
 
@@ -16871,7 +17009,7 @@ msgstr "按月"
 msgid "Monthly cost (microdollars)"
 msgstr "月度成本（微美元）"
 
-#: src/lib/model-descriptions.ts:160
+#: src/lib/model-descriptions.ts:165
 msgid "Moonshot AI's advanced base LLM"
 msgstr "Moonshot AI 的高级基础 LLM"
 
@@ -16883,7 +17021,7 @@ msgstr "Moonshot AI 的高效基础模型"
 msgid "Moonshot AI's flagship conversation model"
 msgstr "Moonshot AI 的旗舰对话模型"
 
-#: src/lib/model-descriptions.ts:161
+#: src/lib/model-descriptions.ts:166
 msgid "MoonShot AI's latest multi-modal LLM with thinking"
 msgstr "MoonShot AI 支持思考的最新多模态 LLM"
 
@@ -16891,7 +17029,7 @@ msgstr "MoonShot AI 支持思考的最新多模态 LLM"
 msgid "Moonshot AI's latest vision-enabled flagship"
 msgstr "Moonshot AI 最新的视觉旗舰模型"
 
-#: src/lib/model-descriptions.ts:162
+#: src/lib/model-descriptions.ts:167
 msgid "MoonShot AI's latest vision-enabled LLM"
 msgstr "MoonShot AI 最新的支持视觉的 LLM"
 
@@ -16958,7 +17096,7 @@ msgstr "此用例允许的最高费用，单位为美元"
 msgid "Most Used"
 msgstr "最常用"
 
-#: src/lib/model-descriptions.ts:163
+#: src/lib/model-descriptions.ts:168
 msgid "Most versatile intelligent model"
 msgstr "最通用的智能模型"
 
@@ -16966,13 +17104,13 @@ msgstr "最通用的智能模型"
 msgid "motion fluidity"
 msgstr "运动流畅度"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:106
-#: src/features/workflow/components/nodes/video-node.tsx:151
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:102
+#: src/features/workflow/components/nodes/video-node.tsx:146
 msgid "Motion Prompt"
 msgstr "运动提示词"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:138
-#: src/features/workflow/components/nodes/video-node.tsx:206
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:136
+#: src/features/workflow/components/nodes/video-node.tsx:212
 msgid "Motion: {motionPercent}%"
 msgstr "运动：{motionPercent}%"
 
@@ -17111,7 +17249,7 @@ msgstr "多模态"
 msgid "Multimodal analysis for images and documents"
 msgstr "图像与文档的多模态分析"
 
-#: src/lib/model-descriptions.ts:164
+#: src/lib/model-descriptions.ts:169
 msgid "Multimodal open-source model from Meta"
 msgstr "Meta 的多模态开源模型"
 
@@ -17189,7 +17327,7 @@ msgstr "缅甸语（缅甸）"
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
 #: src/features/skills/components/skill-form-dialog.tsx:201
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:107
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:110
 msgid "Name"
 msgstr "名称"
 
@@ -17337,7 +17475,7 @@ msgstr "正在导航到 {target}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
 #: src/components/command-palette.tsx:286
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:57
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
 msgstr "导航"
 
@@ -17357,9 +17495,9 @@ msgstr "待你处理"
 msgid "Negative prompt — what to exclude"
 msgstr "反向提示词——要排除的内容"
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:120
-#: src/features/workflow/components/nodes/object-editor-node.tsx:159
-#: src/features/workflow/components/nodes/outpaint-node.tsx:144
+#: src/features/workflow/components/nodes/inpaint-node.tsx:110
+#: src/features/workflow/components/nodes/object-editor-node.tsx:151
+#: src/features/workflow/components/nodes/outpaint-node.tsx:135
 msgid "Negative Prompt (optional)"
 msgstr "反向提示词（可选）"
 
@@ -17533,11 +17671,11 @@ msgstr "新建目标"
 msgid "New group chat"
 msgstr "新建群聊"
 
-#: src/lib/model-descriptions.ts:165
+#: src/lib/model-descriptions.ts:170
 msgid "New high quality model for photorealism and text rendering"
 msgstr "擅长照片级写实和文字渲染的新款高质量模型"
 
-#: src/lib/model-descriptions.ts:166
+#: src/lib/model-descriptions.ts:171
 msgid "New model excelling at anime"
 msgstr "擅长动漫的新模型"
 
@@ -17681,7 +17819,7 @@ msgstr "新一代"
 msgid "Next-gen creative AI"
 msgstr "新一代创意 AI"
 
-#: src/lib/model-descriptions.ts:167
+#: src/lib/model-descriptions.ts:172
 msgid "Next-gen fast model preview from Google"
 msgstr "Google 新一代快速模型预览版"
 
@@ -17693,7 +17831,7 @@ msgstr "基于 Google 最新 Flash 架构的新一代快速推理，支持思考
 msgid "Next-gen Flux architecture at budget cost"
 msgstr "以经济成本使用新一代 Flux 架构"
 
-#: src/lib/model-descriptions.ts:168
+#: src/lib/model-descriptions.ts:173
 msgid "Next-gen frontier model preview from Google"
 msgstr "Google 新一代前沿模型预览版"
 
@@ -17701,7 +17839,7 @@ msgstr "Google 新一代前沿模型预览版"
 msgid "Next-gen image generation"
 msgstr "新一代图像生成"
 
-#: src/lib/model-descriptions.ts:169
+#: src/lib/model-descriptions.ts:174
 msgid "Next-gen model with improved dynamics and enhanced style adaptation"
 msgstr "动态表现改进、风格适应增强的新一代模型"
 
@@ -17814,11 +17952,11 @@ msgstr "未找到与“{searchTerm}”匹配的连接器"
 msgid "No console output"
 msgstr "无控制台输出"
 
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:165
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:168
 msgid "No content"
 msgstr "无内容"
 
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:196
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:199
 msgid "No content to display"
 msgstr "无可显示的内容"
 
@@ -17988,7 +18126,7 @@ msgstr "无麦克风"
 msgid "No microphone found."
 msgstr "未找到麦克风。"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:77
+#: src/features/settings/components/chat/default-models-settings.tsx:75
 msgid "No models available"
 msgstr "没有可用的模型"
 
@@ -18313,7 +18451,7 @@ msgstr "还没有工作流"
 msgid "No. Neore provides direct API access to {0} and every other model through a single account. One login, one subscription — no need to manage accounts with {1} or any other provider separately."
 msgstr "不需要。Neore 通过一个账号即可直接通过 API 访问 {0} 以及其他所有模型。一次登录，一份订阅——无需另外管理 {1} 或其他提供商的账号。"
 
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:148
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:151
 msgid "Node content"
 msgstr "节点内容"
 
@@ -18331,11 +18469,11 @@ msgstr "节点输出"
 msgid "Node Results"
 msgstr "节点结果"
 
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:60
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:62
 msgid "Node search"
 msgstr "节点搜索"
 
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:110
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:113
 msgid "Node type"
 msgstr "节点类型"
 
@@ -18362,7 +18500,7 @@ msgstr "无（顶级任务）"
 msgid "Normal"
 msgstr "正常"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:24
+#: src/features/workflow/components/nodes/controlnet-node.tsx:26
 msgid "Normal Map"
 msgstr "法线贴图"
 
@@ -18542,12 +18680,12 @@ msgstr "图片数量"
 msgid "Number of messages"
 msgstr "消息数量"
 
-#: src/features/workflow/types/index.ts:537
-#: src/features/workflow/types/index.ts:541
+#: src/features/workflow/types/index.ts:559
+#: src/features/workflow/types/index.ts:563
 msgid "Object Editor"
 msgstr "物体编辑器"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:125
+#: src/features/workflow/components/nodes/object-editor-node.tsx:117
 msgid "Object Prompt"
 msgstr "物体提示词"
 
@@ -18591,7 +18729,7 @@ msgstr "偏移：0x{hoveredOffsetHex}（{hoveredByte}）= 0x{hoveredValueHex}（
 msgid "Oil Painting"
 msgstr "油画"
 
-#: src/lib/model-descriptions.ts:170
+#: src/lib/model-descriptions.ts:175
 msgid "Old generation cinematic model with higher consistency"
 msgstr "一致性更高的上一代电影感模型"
 
@@ -19022,7 +19160,7 @@ msgstr "以开源方式使用阿里巴巴最先进的 AI"
 msgid "Open-source AI deployments requiring capable, unrestricted access to Meta's Llama 3.3"
 msgstr "需要能力强、无限制地使用 Meta Llama 3.3 的开源 AI 部署"
 
-#: src/lib/model-descriptions.ts:171
+#: src/lib/model-descriptions.ts:176
 msgid "Open-source audio-video model with native sound, 4K output, and lip sync from Lightricks"
 msgstr "Lightricks 的开源音视频模型，支持原生声音、4K 输出和口型同步"
 
@@ -19034,7 +19172,7 @@ msgstr "需要 OpenAI 更大、更强开源模型的开源部署"
 msgid "Open-source from Lightricks"
 msgstr "来自 Lightricks 的开源模型"
 
-#: src/lib/model-descriptions.ts:172
+#: src/lib/model-descriptions.ts:177
 msgid "Open-source frontier reasoning model from DeepSeek"
 msgstr "DeepSeek 的开源前沿推理模型"
 
@@ -19042,7 +19180,7 @@ msgstr "DeepSeek 的开源前沿推理模型"
 msgid "Open-source frontier-level reasoning model"
 msgstr "开源的前沿级推理模型"
 
-#: src/lib/model-descriptions.ts:173
+#: src/lib/model-descriptions.ts:178
 msgid "Open-source model competitive with top closed image models"
 msgstr "可与顶级闭源图像模型媲美的开源模型"
 
@@ -19106,15 +19244,15 @@ msgstr "OpenAI 级的视频连贯性"
 msgid "OpenAI's advanced 120B open-source model"
 msgstr "OpenAI 先进的 120B 开源模型"
 
-#: src/lib/model-descriptions.ts:174
+#: src/lib/model-descriptions.ts:179
 msgid "OpenAI's advanced coding LLM"
 msgstr "OpenAI 的高级编程 LLM"
 
-#: src/lib/model-descriptions.ts:175
+#: src/lib/model-descriptions.ts:180
 msgid "OpenAI's advanced instruction-following LLM"
 msgstr "OpenAI 的高级指令遵循 LLM"
 
-#: src/lib/model-descriptions.ts:176
+#: src/lib/model-descriptions.ts:181
 msgid "OpenAI's advanced open-source LLM"
 msgstr "OpenAI 的高级开源 LLM"
 
@@ -19122,11 +19260,11 @@ msgstr "OpenAI 的高级开源 LLM"
 msgid "OpenAI's advanced reasoning architecture"
 msgstr "OpenAI 先进的推理架构"
 
-#: src/lib/model-descriptions.ts:177
+#: src/lib/model-descriptions.ts:182
 msgid "OpenAI's advanced reasoning LLM"
 msgstr "OpenAI 的高级推理 LLM"
 
-#: src/lib/model-descriptions.ts:178
+#: src/lib/model-descriptions.ts:183
 msgid "OpenAI's compact coding LLM"
 msgstr "OpenAI 的紧凑型编程 LLM"
 
@@ -19134,20 +19272,24 @@ msgstr "OpenAI 的紧凑型编程 LLM"
 msgid "OpenAI's efficient mini reasoning model"
 msgstr "OpenAI 高效的 mini 推理模型"
 
-#: src/lib/model-descriptions.ts:179
+#: src/lib/model-descriptions.ts:184
 msgid "OpenAI's flagship frontier model"
 msgstr "OpenAI 的旗舰前沿模型"
 
-#: src/lib/model-descriptions.ts:180
+#: src/lib/model-descriptions.ts:37
+msgid "OpenAI's GPT Image 2 text-to-image model"
+msgstr "OpenAI 的文生图模型 GPT Image 2"
+
+#: src/lib/model-descriptions.ts:185
 msgid "OpenAI's latest advanced coding LLM"
 msgstr "OpenAI 最新的高级编程 LLM"
 
-#: src/lib/model-descriptions.ts:181
+#: src/lib/model-descriptions.ts:186
 msgid "OpenAI's latest and greatest reasoning LLM"
 msgstr "OpenAI 最新最强的推理 LLM"
 
 #: src/features/marketing/data/models-data.ts:1050
-#: src/lib/model-descriptions.ts:182
+#: src/lib/model-descriptions.ts:187
 msgid "OpenAI's latest flagship reasoning LLM"
 msgstr "OpenAI 最新的旗舰推理大模型"
 
@@ -19155,7 +19297,7 @@ msgstr "OpenAI 最新的旗舰推理大模型"
 msgid "OpenAI's latest model with thinking transparency"
 msgstr "OpenAI 最新模型，思考过程透明"
 
-#: src/lib/model-descriptions.ts:183
+#: src/lib/model-descriptions.ts:188
 msgid "OpenAI's most advanced flagship video generation model"
 msgstr "OpenAI 最先进的旗舰视频生成模型"
 
@@ -19167,7 +19309,7 @@ msgstr "OpenAI 最先进的前沿模型"
 msgid "OpenAI's most advanced video model"
 msgstr "OpenAI 最先进的视频模型"
 
-#: src/lib/model-descriptions.ts:184
+#: src/lib/model-descriptions.ts:189
 msgid "OpenAI's most capable coding LLM"
 msgstr "OpenAI 能力最强的编程 LLM"
 
@@ -19179,15 +19321,15 @@ msgstr "OpenAI 最强的编程模型"
 msgid "OpenAI's most capable model in the 5.2 family"
 msgstr "OpenAI 5.2 系列中最强的模型"
 
-#: src/lib/model-descriptions.ts:185
+#: src/lib/model-descriptions.ts:190
 msgid "OpenAI's most capable premium model"
 msgstr "OpenAI 能力最强的高级模型"
 
-#: src/lib/model-descriptions.ts:186
+#: src/lib/model-descriptions.ts:191
 msgid "OpenAI's new powerful video model. Rich world knowledge with very stable structure"
 msgstr "OpenAI 全新的强大视频模型。丰富的世界知识，结构非常稳定"
 
-#: src/lib/model-descriptions.ts:187
+#: src/lib/model-descriptions.ts:192
 msgid "OpenAI's newest coding LLM"
 msgstr "OpenAI 最新的编程 LLM"
 
@@ -19199,23 +19341,23 @@ msgstr "OpenAI 最新的编程模型"
 msgid "OpenAI's open-source 20B model"
 msgstr "OpenAI 的 20B 开源模型"
 
-#: src/lib/model-descriptions.ts:188
+#: src/lib/model-descriptions.ts:193
 msgid "OpenAI's recent and smart reasoning LLM"
 msgstr "OpenAI 近期的智能推理 LLM"
 
-#: src/lib/model-descriptions.ts:189
+#: src/lib/model-descriptions.ts:194
 msgid "OpenAI's recent mini reasoning LLM"
 msgstr "OpenAI 近期的迷你推理 LLM"
 
-#: src/lib/model-descriptions.ts:190
+#: src/lib/model-descriptions.ts:195
 msgid "OpenAI's small LLM"
 msgstr "OpenAI 的小型 LLM"
 
-#: src/lib/model-descriptions.ts:191
+#: src/lib/model-descriptions.ts:196
 msgid "OpenAI's small open-source LLM"
 msgstr "OpenAI 的小型开源 LLM"
 
-#: src/lib/model-descriptions.ts:192
+#: src/lib/model-descriptions.ts:197
 msgid "OpenAI's smallest LLM"
 msgstr "OpenAI 最小的 LLM"
 
@@ -19370,7 +19512,7 @@ msgstr "或"
 msgid "or click to browse"
 msgstr "或点击浏览"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:164
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:165
 msgid "Or connect a Text node to provide the prompt"
 msgstr "或连接一个文本节点来提供提示词"
 
@@ -19467,7 +19609,7 @@ msgstr "整理对话"
 msgid "Original"
 msgstr "原图"
 
-#: src/lib/model-descriptions.ts:193
+#: src/lib/model-descriptions.ts:198
 msgid "Original ChatGPT image model"
 msgstr "初代 ChatGPT 图像模型"
 
@@ -19513,9 +19655,9 @@ msgstr "我们的隐私政策说明了我们如何依据 GDPR 及其他适用的
 msgid "Outcome of every case per model"
 msgstr ""
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:87
-#: src/features/workflow/types/index.ts:552
-#: src/features/workflow/types/index.ts:556
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
+#: src/features/workflow/types/index.ts:574
+#: src/features/workflow/types/index.ts:578
 msgid "Outpaint"
 msgstr "扩图"
 
@@ -19523,8 +19665,8 @@ msgstr "扩图"
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
-#: src/features/workflow/types/index.ts:562
-#: src/features/workflow/types/index.ts:566
+#: src/features/workflow/types/index.ts:584
+#: src/features/workflow/types/index.ts:588
 msgid "Output"
 msgstr "输出"
 
@@ -19536,7 +19678,7 @@ msgstr "输出 {outputNumber}：{label}"
 msgid "Output files"
 msgstr "输出文件"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:82
+#: src/features/workflow/components/nodes/background-removal-node.tsx:73
 msgid "Output Format"
 msgstr "输出格式"
 
@@ -19686,8 +19828,8 @@ msgstr "巴拉圭"
 msgid "Parallel"
 msgstr "并行"
 
-#: src/features/workflow/types/index.ts:576
-#: src/features/workflow/types/index.ts:580
+#: src/features/workflow/types/index.ts:598
+#: src/features/workflow/types/index.ts:602
 msgid "Parallel Compare"
 msgstr "并行对比"
 
@@ -19699,7 +19841,7 @@ msgstr "巴黎"
 msgid "Parsing file..."
 msgstr "正在解析文件..."
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:57
+#: src/features/workflow/components/canvas/workflow-controls.tsx:58
 msgid "Part of a circular dependency"
 msgstr "属于循环依赖的一部分"
 
@@ -19854,7 +19996,7 @@ msgstr "粘贴到 LINE 频道 Messaging API 标签页中的 Webhook URL。"
 msgid "Paste cells"
 msgstr "粘贴单元格"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:123
+#: src/features/workflow/components/nodes/style-ref-node.tsx:113
 msgid "Paste content image URL to stylize..."
 msgstr "粘贴要风格化的内容图片 URL..."
 
@@ -19862,7 +20004,7 @@ msgstr "粘贴要风格化的内容图片 URL..."
 msgid "Paste image URL"
 msgstr "粘贴图片 URL"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:197
+#: src/features/workflow/components/nodes/character-ref-node.tsx:188
 msgid "Paste image URL..."
 msgstr "粘贴图片 URL..."
 
@@ -19874,7 +20016,7 @@ msgstr "只粘贴现有行能容纳的内容"
 msgid "Paste or write a system prompt to optimize..."
 msgstr "粘贴或编写要优化的系统提示词..."
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:108
+#: src/features/workflow/components/nodes/style-ref-node.tsx:98
 msgid "Paste style reference image URL..."
 msgstr "粘贴风格参考图片 URL..."
 
@@ -19927,7 +20069,7 @@ msgstr "画笔"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:133
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:59
-#: src/features/workflow/components/canvas/workflow-controls.tsx:52
+#: src/features/workflow/components/canvas/workflow-controls.tsx:53
 msgid "Pending"
 msgstr "待处理"
 
@@ -20077,6 +20219,18 @@ msgstr "选择颜色"
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "最多选择 {maxReferences} 张图片。你选择的顺序就是模型看到它们的顺序。"
 
+#: src/features/workflow/components/nodes/video-frames-section.tsx:116
+msgid "Picked at (s)"
+msgstr "选取位置（秒）"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:79
+#~ msgid "Picked frame"
+#~ msgstr "选取的帧"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:102
+msgid "Picked frame wire (remove it)"
+msgstr "选取帧的连线（移除）"
+
 #: src/features/local-models/components/ollama-model-manager.tsx:230
 msgid "Picker up to date"
 msgstr "选择器已是最新"
@@ -20089,7 +20243,7 @@ msgstr "Pika Labs"
 msgid "Pika Labs 2.2 — narrative-focused generation"
 msgstr "Pika Labs 2.2——专注叙事的生成"
 
-#: src/lib/model-descriptions.ts:194
+#: src/lib/model-descriptions.ts:199
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — 注重叙事的视频模型，具备出色的故事表现力和运动控制"
 
@@ -20156,6 +20310,10 @@ msgstr "像素大小"
 #: src/features/canvas/canvas-panel.tsx:200
 msgid "Pixelize"
 msgstr "像素化"
+
+#: src/features/workflow/components/nodes/text-node.tsx:210
+#~ msgid "Placeholders outside quotes are checked as written, so this may read as invalid until a run fills them in"
+#~ msgstr "引号外的占位符会按原样检查，因此在运行填入之前可能显示为无效"
 
 #: src/features/chat/thread/composer.tsx:260
 msgid "Plan a project or brainstorm ideas..."
@@ -20253,7 +20411,7 @@ msgstr "请验证你的新邮箱地址"
 msgid "Plug in your own tools"
 msgstr "接入你自己的工具"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:21
+#: src/features/workflow/components/nodes/background-removal-node.tsx:23
 msgid "PNG (Transparent)"
 msgstr "PNG（透明）"
 
@@ -20348,7 +20506,7 @@ msgstr "葡萄牙语（巴西）"
 msgid "Portuguese (Portugal)"
 msgstr "葡萄牙语（葡萄牙）"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:21
+#: src/features/workflow/components/nodes/controlnet-node.tsx:23
 msgid "Pose Detection"
 msgstr "姿态检测"
 
@@ -20376,11 +20534,11 @@ msgstr "强大"
 msgid "Powerful 8B model with vision capabilities"
 msgstr "具备视觉能力的强大 8B 模型"
 
-#: src/lib/model-descriptions.ts:195
+#: src/lib/model-descriptions.ts:200
 msgid "Powerful general-purpose model from Z.AI"
 msgstr "Z.AI 的强大通用模型"
 
-#: src/lib/model-descriptions.ts:196
+#: src/lib/model-descriptions.ts:201
 msgid "Powerful multimodal model from MiniMax"
 msgstr "MiniMax 的强大多模态模型"
 
@@ -20475,7 +20633,7 @@ msgstr "正在准备导入…"
 msgid "Preparing..."
 msgstr "正在准备..."
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:150
+#: src/features/workflow/components/nodes/controlnet-node.tsx:142
 msgid "Preprocessor"
 msgstr "预处理器"
 
@@ -20486,12 +20644,12 @@ msgstr "预处理器"
 msgid "Presentation"
 msgstr "演示文稿"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:154
-#: src/features/workflow/components/nodes/style-ref-node.tsx:161
+#: src/features/workflow/components/nodes/style-ref-node.tsx:144
+#: src/features/workflow/components/nodes/style-ref-node.tsx:151
 msgid "Preserve Content"
 msgstr "保留内容"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:23
+#: src/features/workflow/components/nodes/character-ref-node.tsx:25
 msgid "Preserve facial features"
 msgstr "保留面部特征"
 
@@ -20558,7 +20716,7 @@ msgstr "预览版"
 #: src/features/canvas/canvas-panel.tsx:748
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
-#: src/features/workflow/components/canvas/workflow-controls.tsx:569
+#: src/features/workflow/components/canvas/workflow-controls.tsx:586
 #: src/features/workflow/components/nodes/image-node.tsx:76
 msgid "Preview"
 msgstr "预览"
@@ -20579,7 +20737,7 @@ msgstr "抢先体验未来的 Gemini 能力"
 msgid "Preview access to Qwen's most advanced model"
 msgstr "抢先体验 Qwen 最先进的模型"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:575
+#: src/features/workflow/components/canvas/workflow-controls.tsx:592
 msgid "Preview execution order (dry run)"
 msgstr "预览执行顺序（试运行）"
 
@@ -20626,7 +20784,7 @@ msgstr "上一个分支"
 msgid "Previous export was cancelled"
 msgstr "上次导出已取消"
 
-#: src/lib/model-descriptions.ts:197
+#: src/lib/model-descriptions.ts:202
 msgid "Previous generation high-quality model for complex scenes"
 msgstr "适用于复杂场景的上一代高质量模型"
 
@@ -20730,12 +20888,18 @@ msgstr "默认私密"
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:553
+#: src/features/workflow/components/nodes/pro-badge.tsx:6
 msgid "Pro"
 msgstr "Pro"
 
 #: src/features/billing/components/personal-plan-card.tsx:20
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro 是你的个人方案：所有模型，每天 1,000 条消息。"
+
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:90
+#: src/features/workflow/components/nodes/video-node.tsx:136
+msgid "Pro models need a Pro plan. On a free plan the run stops before it starts."
+msgstr "Pro 模型需要 Pro 套餐。免费套餐下，运行会在开始前停止。"
 
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:29
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
@@ -20745,11 +20909,11 @@ msgstr "用 AI 处理文本文件提取要点，再根据摘要生成图像"
 msgid "Process each message independently with only the system prompt and current input. No chat history context."
 msgstr "仅使用系统提示词和当前输入独立处理每条消息，不带聊天历史上下文。"
 
-#: src/features/workflow/templates/index.ts:481
+#: src/features/workflow/templates/index.ts:482
 msgid "Process text through an AI language model"
 msgstr "通过 AI 语言模型处理文本"
 
-#: src/features/workflow/types/index.ts:363
+#: src/features/workflow/types/index.ts:385
 msgid "Process with AI model"
 msgstr "使用 AI 模型处理"
 
@@ -20921,8 +21085,8 @@ msgstr "提升为管理员"
 
 #: ../../packages/ui/src/components/image-gallery.tsx:409
 #: src/features/chat/thread/media-gallery-view.tsx:433
-#: src/features/workflow/templates/index.ts:95
-#: src/features/workflow/templates/index.ts:229
+#: src/features/workflow/templates/index.ts:96
+#: src/features/workflow/templates/index.ts:230
 msgid "Prompt"
 msgstr "提示词"
 
@@ -20961,6 +21125,10 @@ msgstr "提示词已创建"
 msgid "Prompt deleted"
 msgstr "提示词已删除"
 
+#: src/features/workflow/components/nodes/text-node.tsx:159
+msgid "Prompt format"
+msgstr "提示词格式"
+
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:353
 msgid "Prompt improved"
 msgstr "提示词已优化"
@@ -20985,7 +21153,7 @@ msgstr "提示词已加载"
 msgid "Prompt optimized successfully"
 msgstr "提示词优化成功"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:159
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:160
 msgid "Prompt to run on all models..."
 msgstr "要在所有模型上运行的提示词..."
 
@@ -21263,27 +21431,27 @@ msgstr "使用阿里巴巴 Wan 模型快速、低质量级别的实惠视频生�
 msgid "Quote Card"
 msgstr "引言卡片"
 
-#: src/lib/model-descriptions.ts:198
+#: src/lib/model-descriptions.ts:203
 msgid "Qwen's advanced instruct LLM"
 msgstr "Qwen 的高级指令 LLM"
 
-#: src/lib/model-descriptions.ts:199
+#: src/lib/model-descriptions.ts:204
 msgid "Qwen's advanced instruct LLM preview"
 msgstr "Qwen 的高级指令 LLM 预览版"
 
-#: src/lib/model-descriptions.ts:200
+#: src/lib/model-descriptions.ts:205
 msgid "Qwen's advanced thinking LLM"
 msgstr "Qwen 的高级思考 LLM"
 
-#: src/lib/model-descriptions.ts:201
+#: src/lib/model-descriptions.ts:206
 msgid "Qwen's advanced vision LLM"
 msgstr "Qwen 的高级视觉 LLM"
 
-#: src/lib/model-descriptions.ts:202
+#: src/lib/model-descriptions.ts:207
 msgid "Qwen's advanced vision LLM with thinking"
 msgstr "Qwen 支持思考的高级视觉 LLM"
 
-#: src/lib/model-descriptions.ts:203
+#: src/lib/model-descriptions.ts:208
 msgid "Qwen's most advanced instruct LLM"
 msgstr "Qwen 最先进的指令 LLM"
 
@@ -21291,7 +21459,7 @@ msgstr "Qwen 最先进的指令 LLM"
 msgid "Qwen's most advanced reasoning capability"
 msgstr "Qwen 最先进的推理能力"
 
-#: src/lib/model-descriptions.ts:204
+#: src/lib/model-descriptions.ts:209
 msgid "Qwen's most advanced reasoning LLM"
 msgstr "Qwen 最先进的推理 LLM"
 
@@ -21319,6 +21487,10 @@ msgstr "随机"
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:187
 msgid "Random seed"
 msgstr "随机种子"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:171
+msgid "Range to keep"
+msgstr "保留范围"
 
 #: src/features/settings/components/account/account-settings.tsx:537
 msgid "Range: 1 hour to 7 days (168 hours)"
@@ -21551,11 +21723,11 @@ msgstr "需要阿里巴巴带思考能力的 80B MoE 模型的推理任务"
 msgid "Reasoning toggle for flexible task handling"
 msgstr "推理开关，灵活处理任务"
 
-#: src/lib/model-descriptions.ts:205
+#: src/lib/model-descriptions.ts:210
 msgid "Reasoning version of Kimi K2 from Moonshot AI"
 msgstr "Moonshot AI 的 Kimi K2 推理版"
 
-#: src/lib/model-descriptions.ts:206
+#: src/lib/model-descriptions.ts:211
 msgid "Reasoning version of Qwen3 235B from Alibaba"
 msgstr "Alibaba 的 Qwen3 235B 推理版"
 
@@ -21636,11 +21808,11 @@ msgstr "恢复账号"
 msgid "Recover Account"
 msgstr "恢复账号"
 
-#: src/lib/model-descriptions.ts:207
+#: src/lib/model-descriptions.ts:212
 msgid "Recraft V4 Pro — true visual taste for brand systems and production-ready workflows"
 msgstr "Recraft V4 Pro — 面向品牌系统和生产级工作流的真正视觉品味"
 
-#: src/lib/model-descriptions.ts:208
+#: src/lib/model-descriptions.ts:213
 msgid "Recraft's text-to-image model with long text generation, vector art, and brand-style images"
 msgstr "Recraft 的文生图模型，支持长文本生成、矢量图和品牌风格图像"
 
@@ -21676,7 +21848,7 @@ msgstr "重做"
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr "重做（Ctrl+Shift+Z）"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:181
+#: src/features/workflow/components/nodes/controlnet-node.tsx:173
 msgid "Reference"
 msgstr "参考"
 
@@ -21684,7 +21856,7 @@ msgstr "参考"
 msgid "Reference {ordinal}"
 msgstr "参考图 {ordinal}"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:170
+#: src/features/workflow/components/nodes/controlnet-node.tsx:162
 msgid "Reference Image (optional)"
 msgstr "参考图像（可选）"
 
@@ -21706,25 +21878,38 @@ msgstr "参考图像"
 msgid "Reference images"
 msgstr "参考图"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:163
+#: src/features/workflow/components/nodes/character-ref-node.tsx:154
 msgid "Reference Images ({referenceCount}/{maxImages})"
 msgstr "参考图像（{referenceCount}/{maxImages}）"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:225
+#: src/features/workflow/components/nodes/video-model-options.tsx:136
+msgid "Reference mode"
+msgstr "参考模式"
+
+#: src/features/workflow/components/nodes/character-ref-node.tsx:216
 msgid "Reference Mode"
 msgstr "参考模式"
 
-#: src/features/workflow/templates/index.ts:270
+#: src/features/workflow/templates/index.ts:271
 msgid "Reference Photo"
 msgstr "参考照片"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:247
+#: src/features/workflow/components/nodes/character-ref-node.tsx:238
 msgid "Reference Strength"
 msgstr "参考强度"
 
 #: src/features/marketing/data/models-data.ts:361
 msgid "reference video"
 msgstr "参考视频"
+
+#. placeholder {0}: String(REFERENCE_VIDEO_MIN_SECONDS)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:214
+msgid "Reference videos together must be at least {0} seconds."
+msgstr "参考视频的总时长至少为 {0} 秒。"
+
+#: src/features/workflow/components/nodes/video-model-options.tsx:152
+msgid "References"
+msgstr "参考"
 
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:312
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
@@ -21733,7 +21918,7 @@ msgstr "参考视频"
 msgid "Refine"
 msgstr "改进"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:100
+#: src/features/workflow/components/nodes/background-removal-node.tsx:91
 msgid "Refine Edge Detection"
 msgstr "精细边缘检测"
 
@@ -21751,7 +21936,7 @@ msgstr "精炼"
 msgid "Refined capabilities over Claude Sonnet 4"
 msgstr "相比 Claude Sonnet 4 的能力进一步完善"
 
-#: src/lib/model-descriptions.ts:209
+#: src/lib/model-descriptions.ts:214
 msgid "Refined flagship model from Anthropic"
 msgstr "Anthropic 精炼的旗舰模型"
 
@@ -21759,7 +21944,7 @@ msgstr "Anthropic 精炼的旗舰模型"
 msgid "Refined frontier capabilities over Claude Opus 4"
 msgstr "相比 Claude Opus 4 的前沿能力进一步完善"
 
-#: src/lib/model-descriptions.ts:210
+#: src/lib/model-descriptions.ts:215
 msgid "Refined GPT-5 update from OpenAI"
 msgstr "OpenAI 对 GPT-5 的精炼更新"
 
@@ -21999,19 +22184,19 @@ msgstr "全部移除"
 msgid "Remove All Files"
 msgstr "移除所有文件"
 
-#: src/features/workflow/types/index.ts:387
+#: src/features/workflow/types/index.ts:409
 msgid "Remove Background"
 msgstr "移除背景"
 
-#: src/features/workflow/types/index.ts:388
+#: src/features/workflow/types/index.ts:410
 msgid "Remove background and extract subject"
 msgstr "移除背景并提取主体"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:88
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
 msgid "Remove BG"
 msgstr "去背景"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:537
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:539
 msgid "Remove bookmark"
 msgstr "移除书签"
 
@@ -22025,7 +22210,7 @@ msgid "Remove endpoint?"
 msgstr "移除端点？"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:87
+#: src/features/workflow/components/nodes/file-node.tsx:168
 msgid "Remove file"
 msgstr "移除文件"
 
@@ -22068,15 +22253,15 @@ msgstr "移除密钥"
 msgid "Remove Member"
 msgstr "移除成员"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:130
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:131
 msgid "Remove model"
 msgstr "移除模型"
 
-#: src/features/workflow/components/nodes/object-editor-node.tsx:23
+#: src/features/workflow/components/nodes/object-editor-node.tsx:25
 msgid "Remove Object"
 msgstr "移除物体"
 
-#: src/features/workflow/types/index.ts:538
+#: src/features/workflow/types/index.ts:560
 msgid "Remove or add objects in an image"
 msgstr "移除或添加图像中的物体"
 
@@ -22088,7 +22273,7 @@ msgstr "要移除提供商吗？"
 msgid "Remove queued message {position}"
 msgstr "移除排队消息 {position}"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:175
+#: src/features/workflow/components/nodes/character-ref-node.tsx:166
 msgid "Remove reference image"
 msgstr "移除参考图像"
 
@@ -22331,7 +22516,7 @@ msgstr "重置"
 msgid "Reset {0} to default"
 msgstr "将 {0} 重置为默认"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:607
+#: src/features/workflow/components/canvas/workflow-controls.tsx:624
 msgid "Reset execution state"
 msgstr "重置执行状态"
 
@@ -22369,6 +22554,10 @@ msgstr "重置缩放（当前 {zoomPercent}%）"
 msgid "Resize {label} column"
 msgstr "调整 {label} 列宽"
 
+#: src/features/workflow/components/nodes/video-model-options.tsx:64
+msgid "Resolution"
+msgstr "分辨率"
+
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Resolve"
 msgstr "解决"
@@ -22381,7 +22570,7 @@ msgstr "资源"
 msgid "Resources"
 msgstr "资源"
 
-#: src/features/workflow/templates/index.ts:475
+#: src/features/workflow/templates/index.ts:476
 msgid "Response"
 msgstr "响应"
 
@@ -22432,7 +22621,7 @@ msgstr "限制模型可以托管的地区。适用于 GDPR、数据驻留和合�
 
 #: src/features/evals/components/run-detail.tsx:223
 #: src/features/workflow/components/nodes/output-node.tsx:97
-#: src/features/workflow/templates/index.ts:115
+#: src/features/workflow/templates/index.ts:116
 msgid "Result"
 msgstr "结果"
 
@@ -22478,6 +22667,7 @@ msgstr "检索：命中 {0} · MRR {1} · 精确率 {2} · 召回率 {3}"
 #: src/features/chat/translation/message-translation.tsx:85
 #: src/features/local-models/components/ollama-model-manager.tsx:187
 #: src/features/tasks/components/task-detail-dialog.tsx:106
+#: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
 #: src/lib/toast.ts:236
@@ -22601,7 +22791,7 @@ msgid "RIFF (WAV/AVI/WebP)"
 msgstr "RIFF（WAV/AVI/WebP）"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:399
-#: src/features/workflow/components/nodes/outpaint-node.tsx:24
+#: src/features/workflow/components/nodes/outpaint-node.tsx:26
 msgid "Right"
 msgstr "右"
 
@@ -22718,7 +22908,7 @@ msgstr "规则名称为必填项"
 #: src/features/evals/components/dataset-panel.tsx:123
 #: src/features/evals/components/dataset-panel.tsx:233
 #: src/features/tasks/components/task-card.tsx:100
-#: src/features/workflow/components/canvas/workflow-controls.tsx:585
+#: src/features/workflow/components/canvas/workflow-controls.tsx:602
 msgid "Run"
 msgstr "运行"
 
@@ -22765,11 +22955,19 @@ msgstr "运行进度"
 msgid "Run Python, see charts and images instantly"
 msgstr "运行 Python，即时查看图表和图像"
 
+#: src/features/workflow/components/nodes/video-frames-section.tsx:135
+msgid "Run the node first to pick a frame"
+msgstr "请先运行该节点再选取帧"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:125
+#~ msgid "Run the node to capture its frames"
+#~ msgstr "运行该节点以截取其帧"
+
 #: src/features/skills/components/skill-form-dialog.tsx:245
 msgid "Run the skill by typing /command in chat."
 msgstr "在聊天中输入 /命令 即可运行此技能。"
 
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:199
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:202
 msgid "Run the workflow to generate output"
 msgstr "运行工作流以生成输出"
 
@@ -22799,7 +22997,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 #: src/features/tasks/components/task-detail-dialog.tsx:136
 #: src/features/tasks/components/task-status.tsx:20
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:66
-#: src/features/workflow/components/canvas/workflow-controls.tsx:53
+#: src/features/workflow/components/canvas/workflow-controls.tsx:54
 msgid "Running"
 msgstr "运行中"
 
@@ -22813,7 +23011,7 @@ msgstr "正在 {device} 上运行…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:190
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
-#: src/features/workflow/components/canvas/workflow-controls.tsx:558
+#: src/features/workflow/components/canvas/workflow-controls.tsx:575
 #: src/features/workflow/components/nodes/base-node.tsx:263
 msgid "Running..."
 msgstr "正在运行..."
@@ -22926,7 +23124,7 @@ msgstr "沙特阿拉伯"
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/personalization/memory-item.tsx:145
 #: src/features/slides/components/slide-editor-dialog.tsx:117
-#: src/features/workflow/components/canvas/workflow-controls.tsx:409
+#: src/features/workflow/components/canvas/workflow-controls.tsx:398
 msgid "Save"
 msgstr "保存"
 
@@ -22969,7 +23167,7 @@ msgstr "保存用例"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:504
-#: src/features/workflow/components/canvas/workflow-controls.tsx:414
+#: src/features/workflow/components/canvas/workflow-controls.tsx:403
 msgid "Save changes"
 msgstr "保存更改"
 
@@ -23017,7 +23215,7 @@ msgstr "保存版本"
 msgid "Save workflow"
 msgstr "保存工作流"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:409
+#: src/features/workflow/components/canvas/workflow-controls.tsx:398
 msgid "Saved"
 msgstr "已保存"
 
@@ -23051,7 +23249,7 @@ msgstr "正在保存..."
 msgid "Saving…"
 msgstr "正在保存…"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:107
+#: src/features/workflow/components/nodes/upscale-node.tsx:98
 msgid "Scale Factor"
 msgstr "缩放倍数"
 
@@ -23071,7 +23269,7 @@ msgstr "扫描此二维码，它会生成一个 6 位数的验证码，请在下
 msgid "Scanning..."
 msgstr "正在扫描..."
 
-#: src/features/workflow/templates/index.ts:279
+#: src/features/workflow/templates/index.ts:280
 msgid "Scene Description"
 msgstr "场景描述"
 
@@ -23138,7 +23336,7 @@ msgstr "滚动到底部"
 msgid "Scroll up one page"
 msgstr "向上滚动一页"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:163
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:161
 msgid "Seamless Loop"
 msgstr "无缝循环"
 
@@ -23497,7 +23695,7 @@ msgid "Select mode"
 msgstr "选择模式"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
-#: src/components/model-picker/model-picker-button.tsx:176
+#: src/components/model-picker/model-picker-button.tsx:177
 #: src/components/model-picker/model-picker-popup.tsx:42
 msgid "Select Model"
 msgstr "选择模型"
@@ -23508,17 +23706,17 @@ msgstr "选择模型（可选）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
 #: src/components/model-picker/model-picker-button.tsx:94
-#: src/features/workflow/components/nodes/background-removal-node.tsx:67
-#: src/features/workflow/components/nodes/character-ref-node.tsx:148
+#: src/features/workflow/components/nodes/background-removal-node.tsx:66
+#: src/features/workflow/components/nodes/character-ref-node.tsx:147
 #: src/features/workflow/components/nodes/controlnet-node.tsx:133
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:91
-#: src/features/workflow/components/nodes/img2img-node.tsx:60
-#: src/features/workflow/components/nodes/inpaint-node.tsx:72
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:93
+#: src/features/workflow/components/nodes/img2img-node.tsx:58
+#: src/features/workflow/components/nodes/inpaint-node.tsx:70
 #: src/features/workflow/components/nodes/object-editor-node.tsx:109
-#: src/features/workflow/components/nodes/outpaint-node.tsx:87
-#: src/features/workflow/components/nodes/style-ref-node.tsx:88
-#: src/features/workflow/components/nodes/upscale-node.tsx:92
-#: src/features/workflow/components/nodes/video-node.tsx:136
+#: src/features/workflow/components/nodes/outpaint-node.tsx:86
+#: src/features/workflow/components/nodes/style-ref-node.tsx:86
+#: src/features/workflow/components/nodes/upscale-node.tsx:91
+#: src/features/workflow/components/nodes/video-node.tsx:139
 msgid "Select model..."
 msgstr "选择模型..."
 
@@ -23610,7 +23808,7 @@ msgstr "选择性焦平面"
 msgid "semi-realistic"
 msgstr "半写实"
 
-#: src/lib/model-descriptions.ts:211
+#: src/lib/model-descriptions.ts:216
 msgid "Semi-realistic model with good prompt adherence"
 msgstr "提示词遵循度高的半写实模型"
 
@@ -23879,7 +24077,7 @@ msgstr "共享文件夹和本地服务器…"
 msgid "Shared page"
 msgstr "共享的页面"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:153
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:154
 msgid "Shared Prompt"
 msgstr "共享提示词"
 
@@ -23965,8 +24163,8 @@ msgstr "在选择器中显示已安装的模型"
 msgid "Show keyboard shortcuts"
 msgstr "显示键盘快捷键"
 
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:171
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:177
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:172
+#: src/features/workflow/components/nodes/parallel-compare-node.tsx:178
 msgid "Show Labels"
 msgstr "显示标签"
 
@@ -23994,7 +24192,7 @@ msgstr "显示密码"
 msgid "Show resolved"
 msgstr "显示已解决"
 
-#: src/features/workflow/components/canvas/workflow-controls.tsx:541
+#: src/features/workflow/components/canvas/workflow-controls.tsx:558
 msgid "Show run history"
 msgstr "显示运行历史"
 
@@ -24002,7 +24200,7 @@ msgstr "显示运行历史"
 msgid "Show this goal's tasks"
 msgstr "显示此目标的任务"
 
-#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:61
+#: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:63
 msgid "Show this help"
 msgstr "显示此帮助"
 
@@ -24411,11 +24609,11 @@ msgstr "斯洛文尼亚语"
 msgid "Slovenian (Slovenia)"
 msgstr "斯洛文尼亚语（斯洛文尼亚）"
 
-#: src/lib/model-descriptions.ts:212
+#: src/lib/model-descriptions.ts:217
 msgid "Slow cinematic model with realistic textures"
 msgstr "质感写实的慢速电影感模型"
 
-#: src/lib/model-descriptions.ts:213
+#: src/lib/model-descriptions.ts:218
 msgid "Slow model with high control and 10s duration"
 msgstr "控制力强、时长 10 秒的慢速模型"
 
@@ -24467,11 +24665,11 @@ msgstr "社交公告"
 msgid "Social Media"
 msgstr "社交媒体"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:25
+#: src/features/workflow/components/nodes/controlnet-node.tsx:27
 msgid "Soft Edge"
 msgstr "软边缘"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:25
+#: src/features/workflow/components/nodes/controlnet-node.tsx:27
 msgid "Soft edge detection"
 msgstr "软边缘检测"
 
@@ -24559,7 +24757,7 @@ msgstr "排序"
 msgid "SOTA cost-efficiency with 2M token context"
 msgstr "SOTA 级性价比，支持 2M token 上下文"
 
-#: src/lib/model-descriptions.ts:214
+#: src/lib/model-descriptions.ts:219
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "通过 Replicate 提供的支持矢量图和排版的 SOTA"
 
@@ -24598,7 +24796,7 @@ msgstr "来源聊天"
 msgid "Source Code Pro"
 msgstr "Source Code Pro"
 
-#: src/features/workflow/templates/index.ts:322
+#: src/features/workflow/templates/index.ts:323
 msgid "Source Image"
 msgstr "源图像"
 
@@ -24745,7 +24943,7 @@ msgstr "你的浏览器不支持语音识别"
 msgid "Speech synthesis and transcription"
 msgstr "语音合成与转写"
 
-#: src/features/workflow/types/index.ts:611
+#: src/features/workflow/types/index.ts:633
 msgid "Speech to Text"
 msgstr "语音转文字"
 
@@ -24757,6 +24955,10 @@ msgstr "语音转文字"
 #: src/features/chat/thread/composer-research-depth.tsx:25
 msgid "Speed"
 msgstr "语速"
+
+#: src/lib/model-descriptions.ts:39
+msgid "Speed tier of Nano Banana 2 for fast text-to-image generation"
+msgstr "Nano Banana 2 的极速档，用于快速文生图"
 
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:145
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:247
@@ -24808,7 +25010,7 @@ msgstr "SSO"
 msgid "SSO & team management"
 msgstr "SSO 与团队管理"
 
-#: src/lib/model-descriptions.ts:215
+#: src/lib/model-descriptions.ts:220
 msgid "Stability AI's Stable Audio 2.5 — high-quality text-to-music, up to ~190s."
 msgstr "Stability AI 的 Stable Audio 2.5 — 高质量文生音乐，最长约 190 秒。"
 
@@ -24866,7 +25068,8 @@ msgstr "星形"
 msgid "Starred"
 msgstr "星标"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:206
+#: src/features/workflow/components/nodes/controlnet-node.tsx:198
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:174
 msgid "Start"
 msgstr "开始"
 
@@ -24931,6 +25134,11 @@ msgstr "免费开始聊天"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:186
 msgid "Start editing cell"
 msgstr "开始编辑单元格"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:40
+#: src/features/workflow/components/nodes/video-model-options.tsx:152
+msgid "Start frame"
+msgstr "起始帧"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:119
 #: src/features/marketing/components/gateway-landing-page.tsx:137
@@ -25075,7 +25283,7 @@ msgstr "第 {0}/{totalSteps} 步：{title}"
 msgid "Step-by-step tutorials for getting the most out of Neore Chat"
 msgstr "充分利用 Neore Chat 的分步教程"
 
-#: src/lib/model-descriptions.ts:216
+#: src/lib/model-descriptions.ts:221
 msgid "StepFun's fast and efficient LLM"
 msgstr "StepFun 的快速高效 LLM"
 
@@ -25102,7 +25310,7 @@ msgstr "股票"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:233
-#: src/features/workflow/components/canvas/workflow-controls.tsx:554
+#: src/features/workflow/components/canvas/workflow-controls.tsx:571
 msgid "Stop"
 msgstr "停止"
 
@@ -25172,8 +25380,8 @@ msgstr "流式输出中"
 msgid "Streaming..."
 msgstr "流式输出中..."
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:90
-#: src/features/workflow/components/nodes/node-expand-modal.tsx:137
+#: src/features/workflow/components/nodes/img2img-node.tsx:80
+#: src/features/workflow/components/nodes/node-expand-modal.tsx:140
 msgid "Strength"
 msgstr "强度"
 
@@ -25249,7 +25457,7 @@ msgstr "出色的商业级输出"
 msgid "Strong complex scene handling"
 msgstr "出色的复杂场景处理能力"
 
-#: src/lib/model-descriptions.ts:217
+#: src/lib/model-descriptions.ts:222
 msgid "Strong general-purpose and coding model from DeepSeek"
 msgstr "DeepSeek 的强大通用与编程模型"
 
@@ -25457,13 +25665,13 @@ msgstr "出色的视觉推理与理解"
 msgid "Strongest reasoning in the GLM family"
 msgstr "GLM 系列中最强的推理能力"
 
-#: src/features/workflow/templates/index.ts:216
+#: src/features/workflow/templates/index.ts:217
 msgid "style"
 msgstr "风格"
 
 #: src/features/chat/thread/composer-image-settings.tsx:205
 #: src/features/chat/thread/media-gallery-view.tsx:494
-#: src/features/workflow/components/nodes/character-ref-node.tsx:24
+#: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Style"
 msgstr "风格"
 
@@ -25475,24 +25683,24 @@ msgstr "风格适配"
 msgid "style consistency"
 msgstr "风格一致性"
 
-#: src/features/workflow/templates/index.ts:179
+#: src/features/workflow/templates/index.ts:180
 msgid "Style Image"
 msgstr "风格图像"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:103
+#: src/features/workflow/components/nodes/style-ref-node.tsx:93
 msgid "Style Image URL"
 msgstr "风格图像 URL"
 
-#: src/features/workflow/types/index.ts:591
-#: src/features/workflow/types/index.ts:595
+#: src/features/workflow/types/index.ts:613
+#: src/features/workflow/types/index.ts:617
 msgid "Style Reference"
 msgstr "风格参考"
 
-#: src/features/workflow/components/nodes/style-ref-node.tsx:134
+#: src/features/workflow/components/nodes/style-ref-node.tsx:124
 msgid "Style Strength"
 msgstr "风格强度"
 
-#: src/features/workflow/templates/index.ts:215
+#: src/features/workflow/templates/index.ts:216
 msgid "Style Transfer"
 msgstr "风格迁移"
 
@@ -25509,7 +25717,7 @@ msgstr "以参考图像引导、保持视觉连贯的风格一致视频生成"
 msgid "Style: {0}"
 msgstr "风格：{0}"
 
-#: src/features/workflow/templates/index.ts:206
+#: src/features/workflow/templates/index.ts:207
 msgid "Styled Result"
 msgstr "风格化结果"
 
@@ -25658,7 +25866,7 @@ msgstr "支持 10 秒视频时长"
 msgid "Supports 20+ languages with vision and PDF"
 msgstr "支持 20+ 种语言，具备视觉和 PDF 能力"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:24
+#: src/features/workflow/components/nodes/controlnet-node.tsx:26
 msgid "Surface normals"
 msgstr "表面法线"
 
@@ -25774,8 +25982,8 @@ msgstr "汇总者（权衡双方）"
 msgid "System"
 msgstr "跟随系统"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:67
-#: src/features/settings/components/chat/default-models-settings.tsx:103
+#: src/features/settings/components/chat/default-models-settings.tsx:65
+#: src/features/settings/components/chat/default-models-settings.tsx:101
 msgid "System default"
 msgstr "系统默认"
 
@@ -25789,8 +25997,12 @@ msgstr "系统消息："
 msgid "System prompt"
 msgstr "系统提示词"
 
+#: src/features/workflow/components/nodes/ai-node.tsx:49
+#~ msgid "System Prompt"
+#~ msgstr "系统提示词"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:279
-#: src/features/workflow/components/nodes/ai-node.tsx:43
+#: src/features/workflow/components/nodes/ai-node.tsx:44
 msgid "System Prompt (optional)"
 msgstr "系统提示词（可选）"
 
@@ -26079,7 +26291,7 @@ msgstr "泰卢固语"
 msgid "Telugu (India)"
 msgstr "泰卢固语（印度）"
 
-#: src/features/workflow/components/nodes/text-node.tsx:60
+#: src/features/workflow/components/nodes/text-node.tsx:181
 msgid "Template"
 msgstr "模板"
 
@@ -26161,7 +26373,7 @@ msgstr "测试运行触发器"
 msgid "Test your agents, models and knowledge base against a fixed set of cases, score every answer, and catch regressions between runs."
 msgstr "用一组固定的用例测试你的智能体、模型和知识库，为每个答案评分，并发现运行之间的退步。"
 
-#: src/features/workflow/templates/index.ts:258
+#: src/features/workflow/templates/index.ts:259
 msgid "testing"
 msgstr "测试"
 
@@ -26176,13 +26388,14 @@ msgstr "文本"
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
-#: src/features/settings/components/chat/default-models-settings.tsx:182
+#: src/features/settings/components/chat/default-models-settings.tsx:180
 #: src/features/settings/components/chat/models-settings.tsx:42
 #: src/features/workflow/components/gallery/gallery-card.tsx:28
 #: src/features/workflow/components/nodes/output-node.tsx:16
+#: src/features/workflow/components/nodes/text-node.tsx:167
 #: src/features/workflow/components/template-picker.tsx:21
-#: src/features/workflow/types/index.ts:601
-#: src/features/workflow/types/index.ts:605
+#: src/features/workflow/types/index.ts:623
+#: src/features/workflow/types/index.ts:627
 #: src/routes/(chat)/workflow/gallery.tsx:22
 msgid "Text"
 msgstr "文本"
@@ -26203,7 +26416,7 @@ msgstr "文本与聊天"
 msgid "Text alignment"
 msgstr "文本对齐"
 
-#: src/features/workflow/components/nodes/text-node.tsx:60
+#: src/features/workflow/components/nodes/text-node.tsx:143
 msgid "Text Content"
 msgstr "文本内容"
 
@@ -26239,7 +26452,7 @@ msgstr "支持流式输出的文本生成"
 msgid "Text only: no web search, tools, or file and image input."
 msgstr "仅支持文本：不支持网络搜索、工具以及文件和图片输入。"
 
-#: src/features/workflow/templates/index.ts:485
+#: src/features/workflow/templates/index.ts:486
 msgid "text processing"
 msgstr "文本处理"
 
@@ -26260,11 +26473,11 @@ msgstr "答案必须包含的文本（不区分大小写）"
 msgid "Text the answer must not contain"
 msgstr "答案不得包含的文本"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:232
+#: src/features/settings/components/chat/default-models-settings.tsx:230
 msgid "Text to image"
 msgstr "文本转图像"
 
-#: src/features/workflow/templates/index.ts:124
+#: src/features/workflow/templates/index.ts:125
 msgid "Text to Image"
 msgstr "文本转图像"
 
@@ -26272,20 +26485,20 @@ msgstr "文本转图像"
 msgid "Text to Speak"
 msgstr "要朗读的文本"
 
-#: src/features/workflow/types/index.ts:372
+#: src/features/workflow/types/index.ts:394
 msgid "Text to Speech"
 msgstr "文本转语音"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:190
+#: src/features/settings/components/chat/default-models-settings.tsx:188
 msgid "Text to text"
 msgstr "文本转文本"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:274
+#: src/features/settings/components/chat/default-models-settings.tsx:272
 msgid "Text to video"
 msgstr "文本转视频"
 
-#: src/features/workflow/components/nodes/video-node.tsx:121
-#: src/features/workflow/templates/index.ts:442
+#: src/features/workflow/components/nodes/video-node.tsx:124
+#: src/features/workflow/templates/index.ts:443
 msgid "Text to Video"
 msgstr "文本转视频"
 
@@ -26347,9 +26560,21 @@ msgstr "AI 会从你的对话中学习以个性化回复，并在每晚反思所
 msgid "The AI will lose access to {0}, and the access token is revoked at the provider where possible."
 msgstr "AI 将无法再访问 {0}，并会尽可能在提供商处撤销访问令牌。"
 
+#: src/features/workflow/hooks/use-workflow-transfer.ts:28
+msgid "The archive contains an unsafe file path."
+msgstr "压缩包中包含不安全的文件路径。"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:24
+msgid "The archive holds too many files."
+msgstr "压缩包中的文件过多。"
+
 #: src/features/chat/thread/ask-user-prompt.tsx:141
 msgid "The assistant has a question"
 msgstr "助手有一个问题"
+
+#: src/features/workflow/components/nodes/video-frames-section.tsx:77
+msgid "The browser cannot read this video to capture a frame"
+msgstr "浏览器无法读取此视频，因此无法截取帧"
 
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
@@ -26640,6 +26865,11 @@ msgstr "你在服务器配置中输入的 Token"
 msgid "The trigger stops running and its execution history is removed. This cannot be undone."
 msgstr ""
 
+#. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:118
+msgid "The trimmed video is larger than {0} MB. Choose a shorter range."
+msgstr "裁剪后的视频超过 {0} MB。请选择更短的范围。"
+
 #: src/features/marketing/components/gateway-footer.tsx:79
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "面向现代 AI 应用的统一 LLM 网关。"
@@ -26671,6 +26901,22 @@ msgstr "免提模式朗读回复时使用的语音。带有自有语音的技能
 #: src/features/evals/components/case-fields.tsx:25
 msgid "The whole answer, exactly"
 msgstr "完整答案，完全一致"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:26
+msgid "The workflow file contains a node type this version does not support."
+msgstr "工作流文件包含此版本不支持的节点类型。"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:21
+msgid "The workflow file contains an invalid node."
+msgstr "工作流文件包含无效节点。"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:23
+msgid "The workflow file is too large."
+msgstr "工作流文件过大。"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:25
+msgid "The workflow has too many nodes."
+msgstr "工作流的节点过多。"
 
 #: src/features/appearance/components/appearance-controls.tsx:135
 msgid "Theme for Mermaid diagrams in chat."
@@ -26848,6 +27094,10 @@ msgstr "此端点不是 Ollama。模型管理仅适用于 Ollama——在 LM Stu
 msgid "This file could not be read."
 msgstr "无法读取此文件。"
 
+#: src/features/workflow/components/nodes/file-node.tsx:107
+msgid "This file could not be uploaded. Check its type and size, then try again."
+msgstr "无法上传此文件。请检查其类型和大小，然后重试。"
+
 #. placeholder {0}: formatNumber(stats.estimatedTokens, i18n.locale)
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:712
 msgid "This file is large (~{0} tokens) and will consume a significant portion of the model's context window."
@@ -26856,6 +27106,10 @@ msgstr "此文件较大（约 {0} 个 token），将占用模型上下文窗口�
 #: src/features/knowledge/hooks/use-knowledge-import.ts:207
 msgid "This file is not a readable ZIP archive."
 msgstr "此文件不是可读取的 ZIP 压缩包。"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:22
+msgid "This file is not a workflow export."
+msgstr "此文件不是工作流导出文件。"
 
 #. placeholder {0}: (file.size / 1024).toFixed(0)
 #. placeholder {1}: (CONTEXT_ERROR_THRESHOLD / 1024).toFixed(0)
@@ -27039,6 +27293,19 @@ msgstr "无法添加此 URL。"
 msgid "This version was optimized from an older system prompt. Re-optimize before applying it."
 msgstr ""
 
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:166
+msgid "This video cannot be previewed in this browser, so it cannot be trimmed here."
+msgstr "此浏览器无法预览该视频，因此无法在此裁剪。"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:119
+msgid "This video could not be trimmed in this browser. Upload it without trimming instead."
+msgstr "无法在此浏览器中裁剪该视频。请改为不裁剪直接上传。"
+
+#. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:230
+msgid "This video is larger than {0} MB, so it must be trimmed."
+msgstr "此视频超过 {0} MB，必须先裁剪。"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:46
 msgid "This Week"
 msgstr "本周"
@@ -27077,6 +27344,10 @@ msgstr "这将从你的知识库中永久移除这 {0} 个文件及其已索引�
 #: src/features/canvas/canvas-panel.tsx:634
 msgid "This workbook has {sheetCount} sheets — only the first sheet was imported."
 msgstr "此工作簿有 {sheetCount} 个工作表——只导入了第一个工作表。"
+
+#: src/features/workflow/hooks/use-workflow-transfer.ts:27
+msgid "This workflow file uses a version this app cannot read."
+msgstr "此工作流文件使用的版本无法被本应用读取。"
 
 #: src/routes/(chat)/workflow/shared/$token.tsx:48
 msgid "This workflow may have been unpublished or deleted."
@@ -27345,6 +27616,10 @@ msgstr "东京"
 msgid "too large"
 msgstr "文件过大"
 
+#: src/features/workflow/components/nodes/text-node.tsx:78
+msgid "Too long to check as JSON"
+msgstr "内容过长，无法按 JSON 检查"
+
 #: src/features/chat/thread/sandbox-files.tsx:282
 msgid "too many files"
 msgstr "文件过多"
@@ -27376,7 +27651,7 @@ msgstr "工具提供商密钥"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:445
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:447
 msgid "Tools"
 msgstr "工具"
 
@@ -27388,7 +27663,7 @@ msgstr "此技能运行时助手不得使用的工具。"
 msgid "Tools the skill needs even when the current chat mode would not load them."
 msgstr "即使当前聊天模式不会加载，此技能仍需要的工具。"
 
-#: src/features/workflow/components/nodes/outpaint-node.tsx:25
+#: src/features/workflow/components/nodes/outpaint-node.tsx:27
 msgid "Top"
 msgstr "上"
 
@@ -27400,7 +27675,7 @@ msgstr "顶级编程表现，媲美闭源模型"
 msgid "Top-tier frontier performance with 4.6 generation improvements"
 msgstr "顶级前沿表现，带来 4.6 代改进"
 
-#: src/lib/model-descriptions.ts:218
+#: src/lib/model-descriptions.ts:223
 msgid "Top-tier Kling text-to-video with unparalleled motion fluidity"
 msgstr "顶级 Kling 文生视频，运动流畅度无与伦比"
 
@@ -27473,41 +27748,41 @@ msgstr "基于推理轨迹进行强化学习训练"
 msgid "Transcribe an audio file, summarize the text with AI, then convert back to speech"
 msgstr "转写音频文件，用 AI 总结文本，然后再转换为语音"
 
-#: src/features/workflow/types/index.ts:615
+#: src/features/workflow/types/index.ts:637
 msgid "Transcription"
 msgstr "转写"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:290
 #: src/features/canvas/canvas-panel.tsx:124
-#: src/features/workflow/templates/index.ts:330
+#: src/features/workflow/templates/index.ts:331
 msgid "Transform"
 msgstr "变换"
 
-#: src/features/workflow/components/nodes/text-node.tsx:52
+#: src/features/workflow/components/nodes/text-node.tsx:134
 msgid "Transform (Template)"
 msgstr "转换（模板）"
 
-#: src/features/workflow/templates/index.ts:347
+#: src/features/workflow/templates/index.ts:348
 msgid "Transform an image with AI guidance"
 msgstr "在 AI 引导下转换图像"
 
-#: src/features/workflow/types/index.ts:514
+#: src/features/workflow/types/index.ts:536
 msgid "Transform images with AI guidance"
 msgstr "在 AI 引导下转换图像"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:89
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:90
 msgid "Transform with AI"
 msgstr "用 AI 转换"
 
-#: src/features/workflow/templates/index.ts:351
+#: src/features/workflow/templates/index.ts:352
 msgid "transformation"
 msgstr "转换"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:75
+#: src/features/workflow/components/nodes/img2img-node.tsx:65
 msgid "Transformation Prompt"
 msgstr "转换提示词"
 
-#: src/features/workflow/templates/index.ts:341
+#: src/features/workflow/templates/index.ts:342
 msgid "Transformed Image"
 msgstr "转换后的图像"
 
@@ -27535,7 +27810,7 @@ msgstr "翻译失败。"
 msgid "Translation to {languageName}"
 msgstr "翻译为{languageName}"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:121
+#: src/features/workflow/components/nodes/background-removal-node.tsx:112
 msgid "Transparent"
 msgstr "透明"
 
@@ -27624,6 +27899,29 @@ msgstr "触发器"
 #: src/features/marketing/components/tutorials-page.tsx:91
 msgid "Triggers & Automation"
 msgstr "触发器与自动化"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:244
+msgid "Trim and upload"
+msgstr "裁剪并上传"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:144
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:151
+msgid "Trim video"
+msgstr "裁剪视频"
+
+#. placeholder {0}: formatSeconds(length)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:211
+msgid "Trimmed length: {0} s"
+msgstr "裁剪后的时长：{0} 秒"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:222
+msgid "Trimming progress"
+msgstr "裁剪进度"
+
+#. placeholder {0}: String(progress)
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:220
+msgid "Trimming… {0}%"
+msgstr "正在裁剪… {0}%"
 
 #: src/features/workflow/components/nodes/branch-node.tsx:20
 msgid "True"
@@ -27769,6 +28067,15 @@ msgstr "你的账号当前已启用双重验证，为账号增加了一层额外
 msgid "Type"
 msgstr "类型"
 
+#: src/features/workflow/components/nodes/ai-node.tsx:43
+#: src/features/workflow/components/nodes/text-node.tsx:180
+msgid "Type @ to insert the output of a connected text node"
+msgstr "输入 @ 以插入已连接文本节点的输出"
+
+#: src/features/workflow/components/nodes/image-node.tsx:83
+msgid "Type @ to refer to a connected text node or image"
+msgstr "输入 @ 以引用已连接的文本节点或图片"
+
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:130
 msgid "Type into \"{selector}\""
 msgstr "在“{selector}”中输入"
@@ -27832,7 +28139,7 @@ msgstr "超快"
 msgid "ultra quality"
 msgstr "超高质量"
 
-#: src/lib/model-descriptions.ts:219
+#: src/lib/model-descriptions.ts:224
 msgid "Ultra-fast budget model from Google"
 msgstr "Google 的超快速经济型模型"
 
@@ -27848,7 +28155,7 @@ msgstr "为 Llama、Mixtral 等开源模型提供超快推理"
 msgid "Ultra-fast inference tasks requiring Inception's novel diffusion-based architecture"
 msgstr "需要 Inception 新颖扩散架构的超快推理任务"
 
-#: src/lib/model-descriptions.ts:220
+#: src/lib/model-descriptions.ts:225
 msgid "Ultra-fast lightweight GPT-5 model from OpenAI"
 msgstr "OpenAI 的超快速轻量 GPT-5 模型"
 
@@ -28021,7 +28328,7 @@ msgstr "取消关联"
 msgid "Unlock group"
 msgstr "解锁分组"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:529
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:531
 msgid "Unlock node"
 msgstr "解锁节点"
 
@@ -28187,7 +28494,7 @@ msgstr "更新工作流的画廊设置或取消发布。"
 msgid "updated"
 msgstr "已更新"
 
-#: src/lib/model-descriptions.ts:221
+#: src/lib/model-descriptions.ts:226
 msgid "Updated balanced frontier model from Anthropic"
 msgstr "Anthropic 更新的均衡型前沿模型"
 
@@ -28199,7 +28506,7 @@ msgstr "相比 GLM 4.5 能力更新"
 msgid "Updated Codex with improved code quality"
 msgstr "更新版 Codex，代码质量提升"
 
-#: src/lib/model-descriptions.ts:222
+#: src/lib/model-descriptions.ts:227
 msgid "Updated general-purpose model from Z.AI"
 msgstr "Z.AI 更新的通用模型"
 
@@ -28207,11 +28514,11 @@ msgstr "Z.AI 更新的通用模型"
 msgid "Updated M2 architecture with improved capabilities"
 msgstr "更新的 M2 架构，能力提升"
 
-#: src/lib/model-descriptions.ts:223
+#: src/lib/model-descriptions.ts:228
 msgid "Updated multimodal model from MiniMax"
 msgstr "MiniMax 更新的多模态模型"
 
-#: src/lib/model-descriptions.ts:224
+#: src/lib/model-descriptions.ts:229
 msgid "Updated open-source reasoning model from DeepSeek"
 msgstr "DeepSeek 更新的开源推理模型"
 
@@ -28231,7 +28538,7 @@ msgstr "已更新幻灯片"
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
-#: src/lib/model-descriptions.ts:225
+#: src/lib/model-descriptions.ts:230
 msgid "Updated vision model from Z.AI"
 msgstr "Z.AI 更新的视觉模型"
 
@@ -28277,7 +28584,7 @@ msgstr "为你的账号上传头像"
 msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown."
 msgstr "上传 SKILL.md 或技能 .zip（Claude 及其他 Agent Skills 工具所用格式），或粘贴 Markdown。"
 
-#: src/features/workflow/templates/index.ts:163
+#: src/features/workflow/templates/index.ts:164
 msgid "Upload an image and upscale it with AI enhancement"
 msgstr "上传图像并通过 AI 增强进行放大"
 
@@ -28326,7 +28633,7 @@ msgstr "上传文件夹"
 msgid "Upload Image"
 msgstr "上传图像"
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:503
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:505
 msgid "Upload image / video"
 msgstr "上传图像 / 视频"
 
@@ -28338,6 +28645,10 @@ msgstr "上传徽标"
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:295
 msgid "Upload new file"
 msgstr "上传新文件"
+
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:240
+msgid "Upload without trimming"
+msgstr "不裁剪直接上传"
 
 #: src/features/auth/components/organization/organization-logo-card.tsx:134
 #: src/features/auth/components/organization/organization-logo-card.tsx:193
@@ -28363,25 +28674,25 @@ msgstr "正在上传来自 {0} 的数据以便导入..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:103
+#: src/features/workflow/components/nodes/file-node.tsx:184
 msgid "Uploading..."
 msgstr "正在上传..."
 
-#: src/features/workflow/components/nodes/node-top-toolbar.tsx:85
-#: src/features/workflow/types/index.ts:621
-#: src/features/workflow/types/index.ts:625
+#: src/features/workflow/components/nodes/node-top-toolbar.tsx:86
+#: src/features/workflow/types/index.ts:643
+#: src/features/workflow/types/index.ts:647
 msgid "Upscale"
 msgstr "放大"
 
-#: src/features/workflow/templates/index.ts:166
+#: src/features/workflow/templates/index.ts:167
 msgid "Upscale & Enhance"
 msgstr "放大与增强"
 
-#: src/features/workflow/templates/index.ts:147
+#: src/features/workflow/templates/index.ts:148
 msgid "Upscale 4x"
 msgstr "4 倍放大"
 
-#: src/features/workflow/templates/index.ts:167
+#: src/features/workflow/templates/index.ts:168
 msgid "upscaling"
 msgstr "放大"
 
@@ -28449,7 +28760,7 @@ msgstr "使用 {0, plural, other {# 张参考图}}"
 msgid "Use {0} instead"
 msgstr "改用 {0}"
 
-#: src/features/workflow/components/nodes/text-node.tsx:78
+#: src/features/workflow/components/nodes/text-node.tsx:186
 msgid "Use {templateVariable} for variables from connected nodes..."
 msgstr "使用 {templateVariable} 引用已连接节点的变量..."
 
@@ -28609,7 +28920,7 @@ msgstr "用户已解封"
 msgid "User information"
 msgstr "用户信息"
 
-#: src/features/workflow/templates/index.ts:456
+#: src/features/workflow/templates/index.ts:457
 msgid "User Input"
 msgstr "用户输入"
 
@@ -28710,6 +29021,10 @@ msgstr "乌兹别克语（乌兹别克斯坦）"
 msgid "Uzbekistan"
 msgstr "乌兹别克斯坦"
 
+#: src/features/workflow/components/nodes/text-node.tsx:81
+msgid "Valid JSON"
+msgstr "有效的 JSON"
+
 #: src/features/settings/components/chat/agent-settings.tsx:116
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "验证数据质量并优先采用权威来源。对研究任务和事实核查至关重要。"
@@ -28788,11 +29103,11 @@ msgstr "为任意文本生成向量嵌入"
 msgid "Venezuela"
 msgstr "委内瑞拉"
 
-#: src/lib/model-descriptions.ts:226
+#: src/lib/model-descriptions.ts:231
 msgid "Vercel's v0 1.0 model"
 msgstr "Vercel 的 v0 1.0 模型"
 
-#: src/lib/model-descriptions.ts:227
+#: src/lib/model-descriptions.ts:232
 msgid "Vercel's v0 1.5 model"
 msgstr "Vercel 的 v0 1.5 模型"
 
@@ -28956,7 +29271,7 @@ msgstr "非常深的景深，风景纵深"
 msgid "Very fast generation speed"
 msgstr "生成速度非常快"
 
-#: src/lib/model-descriptions.ts:228
+#: src/lib/model-descriptions.ts:233
 msgid "Very intelligent model. Best for logos"
 msgstr "非常智能的模型。最适合 Logo"
 
@@ -28964,7 +29279,7 @@ msgstr "非常智能的模型。最适合 Logo"
 msgid "Very low cost per generation"
 msgstr "单次生成成本极低"
 
-#: src/features/workflow/templates/index.ts:443
+#: src/features/workflow/templates/index.ts:444
 msgid "video"
 msgstr "视频"
 
@@ -28973,14 +29288,14 @@ msgstr "视频"
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
-#: src/features/settings/components/chat/default-models-settings.tsx:266
+#: src/features/settings/components/chat/default-models-settings.tsx:264
 #: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:78
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
 #: src/features/workflow/components/gallery/publish-dialog.tsx:30
 #: src/features/workflow/components/template-picker.tsx:22
-#: src/features/workflow/types/index.ts:631
-#: src/features/workflow/types/index.ts:635
+#: src/features/workflow/types/index.ts:660
+#: src/features/workflow/types/index.ts:664
 #: src/routes/(chat)/workflow/gallery.tsx:23
 msgid "Video"
 msgstr "视频"
@@ -28988,6 +29303,12 @@ msgstr "视频"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:120
 msgid "Video attachment"
 msgstr "视频附件"
+
+#. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
+#. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
+#: src/features/workflow/components/nodes/file-node.tsx:85
+msgid "Video can be at most {0} MB and audio at most {1} MB."
+msgstr "视频最大 {0} MB，音频最大 {1} MB。"
 
 #: src/features/marketing/components/landing-page.tsx:287
 msgid "Video Creation"
@@ -28997,7 +29318,7 @@ msgstr "视频创作"
 msgid "Video creators who need expressive motion with flexible visual style adaptation and next-gen quality"
 msgstr "适合需要富有表现力的运动、灵活视觉风格适配和新一代品质的视频创作者"
 
-#: src/features/workflow/templates/index.ts:412
+#: src/features/workflow/templates/index.ts:413
 msgid "Video Description"
 msgstr "视频描述"
 
@@ -29028,11 +29349,11 @@ msgstr "视频生成模型"
 msgid "Video LoRA support for custom styles"
 msgstr "视频 LoRA 支持，可用于自定义风格"
 
-#: src/features/workflow/components/nodes/video-node.tsx:151
+#: src/features/workflow/components/nodes/video-node.tsx:146
 msgid "Video Prompt"
 msgstr "视频提示词"
 
-#: src/features/workflow/templates/index.ts:433
+#: src/features/workflow/templates/index.ts:434
 msgid "Video Result"
 msgstr "视频结果"
 
@@ -29040,11 +29361,11 @@ msgstr "视频结果"
 msgid "Video thumbnail"
 msgstr "视频缩略图"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:212
+#: src/features/settings/components/chat/default-models-settings.tsx:210
 msgid "Video to text"
 msgstr "视频转文本"
 
-#: src/features/settings/components/chat/default-models-settings.tsx:318
+#: src/features/settings/components/chat/default-models-settings.tsx:305
 msgid "Video to video"
 msgstr "视频转视频"
 
@@ -29292,7 +29613,7 @@ msgstr "需要 Z.AI 更新改进的多模态能力的视觉任务"
 msgid "Vision understanding alongside strong text capabilities"
 msgstr "视觉理解与强大文本能力兼备"
 
-#: src/lib/model-descriptions.ts:229
+#: src/lib/model-descriptions.ts:234
 msgid "Vision-capable model from Z.AI"
 msgstr "Z.AI 支持视觉的模型"
 
@@ -29492,7 +29813,7 @@ msgstr "Webhook URL"
 msgid "Webhook URL copied to clipboard"
 msgstr "Webhook URL 已复制到剪贴板"
 
-#: src/features/workflow/components/nodes/background-removal-node.tsx:22
+#: src/features/workflow/components/nodes/background-removal-node.tsx:24
 msgid "WebP (Smaller)"
 msgstr "WebP（更小）"
 
@@ -29638,13 +29959,13 @@ msgstr "过去 30 天内智能体请求你的设备执行的操作。"
 msgid "What this variable represents..."
 msgstr "此变量代表什么..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:126
-#: src/features/workflow/components/nodes/object-editor-node.tsx:165
-#: src/features/workflow/components/nodes/outpaint-node.tsx:150
+#: src/features/workflow/components/nodes/inpaint-node.tsx:116
+#: src/features/workflow/components/nodes/object-editor-node.tsx:157
+#: src/features/workflow/components/nodes/outpaint-node.tsx:141
 msgid "What to avoid..."
 msgstr "要避免的内容..."
 
-#: src/features/workflow/components/nodes/inpaint-node.tsx:93
+#: src/features/workflow/components/nodes/inpaint-node.tsx:83
 msgid "What to generate in the masked area..."
 msgstr "要在蒙版区域生成的内容..."
 
@@ -29785,6 +30106,14 @@ msgstr "跨数千款应用的工作流自动化"
 msgid "Workflow not found"
 msgstr "未找到工作流"
 
+#: src/features/workflow/hooks/use-workflow.ts:179
+msgid "Workflow run failed"
+msgstr "工作流运行失败"
+
+#: src/features/workflow/hooks/use-workflow.ts:179
+msgid "Workflow run finished"
+msgstr "工作流运行完成"
+
 #: src/features/workflow/components/template-picker.tsx:108
 msgid "Workflow Templates"
 msgstr "工作流模板"
@@ -29865,11 +30194,11 @@ msgstr "X 坐标"
 msgid "xAI"
 msgstr "xAI"
 
-#: src/lib/model-descriptions.ts:230
+#: src/lib/model-descriptions.ts:235
 msgid "xAI's advanced coding LLM"
 msgstr "xAI 的高级编程 LLM"
 
-#: src/lib/model-descriptions.ts:231
+#: src/lib/model-descriptions.ts:236
 msgid "xAI's Aurora-based image generation model"
 msgstr "xAI 基于 Aurora 的图像生成模型"
 
@@ -29882,7 +30211,7 @@ msgid "xAI's capable balanced model with vision support"
 msgstr "xAI 支持视觉的强大均衡模型"
 
 #: src/features/marketing/data/models-data.ts:873
-#: src/lib/model-descriptions.ts:232
+#: src/lib/model-descriptions.ts:237
 msgid "xAI's flagship frontier model with advanced reasoning"
 msgstr "xAI 具备高级推理的旗舰前沿模型"
 
@@ -29890,15 +30219,19 @@ msgstr "xAI 具备高级推理的旗舰前沿模型"
 msgid "xAI's foundation model capabilities"
 msgstr "xAI 的基础模型能力"
 
-#: src/lib/model-descriptions.ts:233
+#: src/lib/model-descriptions.ts:238
 msgid "xAI's greatest and fastest multimodel LLM"
 msgstr "xAI 最强最快的多模态 LLM"
 
-#: src/lib/model-descriptions.ts:234
+#: src/lib/model-descriptions.ts:239
 msgid "xAI's greatest and fastest multimodel reasoning LLM"
 msgstr "xAI 最强最快的多模态推理 LLM"
 
-#: src/lib/model-descriptions.ts:235
+#: src/lib/model-descriptions.ts:41
+msgid "xAI's Grok Imagine 1.5 image-to-video model"
+msgstr "xAI 的图生视频模型 Grok Imagine 1.5"
+
+#: src/lib/model-descriptions.ts:240
 msgid "xAI's image generation model"
 msgstr "xAI 的图像生成模型"
 
@@ -29906,25 +30239,29 @@ msgstr "xAI 的图像生成模型"
 msgid "xAI's most compact reasoning model"
 msgstr "xAI 最紧凑的推理模型"
 
-#: src/lib/model-descriptions.ts:236
+#: src/lib/model-descriptions.ts:241
 msgid "xAI's previous fastest multimodel LLM"
 msgstr "xAI 上一代最快的多模态 LLM"
 
-#: src/lib/model-descriptions.ts:237
+#: src/lib/model-descriptions.ts:242
 msgid "xAI's previous fastest multimodel reasoning LLM"
 msgstr "xAI 上一代最快的多模态推理 LLM"
 
-#: src/lib/model-descriptions.ts:238
+#: src/lib/model-descriptions.ts:243
 msgid "xAI's recent smallest LLM"
 msgstr "xAI 近期最小的 LLM"
 
-#: src/lib/model-descriptions.ts:239
+#: src/lib/model-descriptions.ts:244
 msgid "Xiaomi's fast Mimo V2 Flash model via OpenRouter (thinking disabled)"
 msgstr "通过 OpenRouter 提供的 Xiaomi 快速 Mimo V2 Flash 模型（已禁用思考）"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:239
 msgid "Y position"
 msgstr "Y 坐标"
+
+#: src/features/workflow/components/nodes/text-node.tsx:173
+msgid "YAML"
+msgstr "YAML"
 
 #: src/features/workflow/components/nodes/comment-node.tsx:14
 msgid "Yellow"
@@ -30341,7 +30678,7 @@ msgstr "Z.AI 最新的通用模型"
 msgid "Z.AI's latest vision model with broader capability"
 msgstr "Z.AI 能力更全面的最新视觉模型"
 
-#: src/lib/model-descriptions.ts:240
+#: src/lib/model-descriptions.ts:245
 msgid "Z.AI's most capable frontier model"
 msgstr "Z.AI 能力最强的前沿模型"
 
@@ -30358,19 +30695,19 @@ msgstr "Z.AI 视觉增强的旗舰模型"
 msgid "Zero Data Retention (ZDR)"
 msgstr "零数据保留（ZDR）"
 
-#: src/lib/model-descriptions.ts:241
+#: src/lib/model-descriptions.ts:246
 msgid "Zhipu AI's fast vision reasoning LLM"
 msgstr "Zhipu AI 的快速视觉推理 LLM"
 
-#: src/lib/model-descriptions.ts:242
+#: src/lib/model-descriptions.ts:247
 msgid "Zhipu AI's latest fast vision reasoning LLM"
 msgstr "Zhipu AI 最新的快速视觉推理 LLM"
 
-#: src/lib/model-descriptions.ts:243
+#: src/lib/model-descriptions.ts:248
 msgid "Zhipu AI's most powerful LLM"
 msgstr "Zhipu AI 最强大的 LLM"
 
-#: src/lib/model-descriptions.ts:244
+#: src/lib/model-descriptions.ts:249
 msgid "Zhipu AI's most powerful reasoning LLM"
 msgstr "Zhipu AI 最强大的推理 LLM"
 

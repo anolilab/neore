@@ -57,7 +57,8 @@ export const formatAsMarkdown = (thread: Chat, messages: Message[]): string => {
     return lines.join("\n");
 };
 
-const triggerBrowserDownload = (blob: Blob, filename: string) => {
+/** Saves a blob through a temporary object URL. The URL is revoked on the next task: some browsers start the download asynchronously. */
+export const saveBlob = (blob: Blob, filename: string): void => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
 
@@ -69,14 +70,14 @@ const triggerBrowserDownload = (blob: Blob, filename: string) => {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
 };
 
 const downloadMarkdown = (chat: Chat, messages: Message[], filename: string) => {
     const content = formatAsMarkdown(chat, messages);
     const blob = new Blob([content], { type: "text/markdown" });
 
-    triggerBrowserDownload(blob, filename);
+    saveBlob(blob, filename);
 };
 
 const downloadJson = (chat: Chat, messages: Message[], filename: string) => {
@@ -85,7 +86,7 @@ const downloadJson = (chat: Chat, messages: Message[], filename: string) => {
         type: "application/json",
     });
 
-    triggerBrowserDownload(blob, filename);
+    saveBlob(blob, filename);
 };
 
 const downloadTxt = (chat: Chat, messages: Message[], filename: string) => {
@@ -96,7 +97,7 @@ const downloadTxt = (chat: Chat, messages: Message[], filename: string) => {
 
     const blob = new Blob([content], { type: "text/plain" });
 
-    triggerBrowserDownload(blob, filename);
+    saveBlob(blob, filename);
 };
 
 const downloadPdf = async (chat: Chat, messages: Message[], filename: string) => {

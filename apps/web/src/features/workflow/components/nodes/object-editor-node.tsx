@@ -1,6 +1,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { MEDIA_DEFAULT_MODELS, resolveWorkflowModel } from "@neore/ai/models";
 import { Input } from "@ui/components/input";
 import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
@@ -18,6 +19,7 @@ import NODE_CONFIGS from "../../types";
 import { toBaseOption } from "../../utils/model-options";
 import BaseNode from "./base-node";
 import MaskSection from "./mask-section";
+import ModelSelect from "./model-select";
 
 const EDIT_MODES = [
     { label: msg`Remove Object`, value: "remove" },
@@ -45,10 +47,9 @@ const ObjectEditorNodeComponent = (props: NodeProps<Node<ObjectEditorNodeData>>)
         };
     });
 
-    const defaultModel = isRemoveMode ? "fal-ai/lama" : (modelOptions[0]?.value ?? "fal-ai/flux-dev-inpaint");
-
     // Check if current model supports negative prompt
-    const currentModelSupportsNegative = allModels.find((m) => m.id === (data.model ?? defaultModel))?.supportsNegativePrompt ?? false;
+    const currentModelSupportsNegative =
+        allModels.find((m) => m.id === resolveWorkflowModel(isRemoveMode ? "objectRemove" : "inpaint", data.model))?.supportsNegativePrompt ?? false;
 
     const handleModeChange = (mode: string | null) => {
         if (mode === null) {
@@ -56,7 +57,7 @@ const ObjectEditorNodeComponent = (props: NodeProps<Node<ObjectEditorNodeData>>)
         }
 
         // Reset model when switching modes
-        const newDefaultModel = mode === "remove" ? "fal-ai/lama" : "fal-ai/flux-dev-inpaint";
+        const newDefaultModel = mode === "remove" ? MEDIA_DEFAULT_MODELS.objectRemove : MEDIA_DEFAULT_MODELS.inpaint;
 
         updateNode(id, { mode: mode as ObjectEditorNodeData["mode"], model: newDefaultModel });
     };
@@ -101,22 +102,13 @@ const ObjectEditorNodeComponent = (props: NodeProps<Node<ObjectEditorNodeData>>)
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>Model</Trans>
-                    </Label>
-                    <Select onValueChange={handleModelChange} value={data.model ?? defaultModel}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
-                            <SelectValue placeholder={t`Select model...`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {modelOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                    {option.isPremium && <span className="ml-1 text-xs text-amber-500">★</span>}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <ModelSelect
+                        label={<Trans>Model</Trans>}
+                        onChange={handleModelChange}
+                        options={modelOptions}
+                        placeholder={t`Select model...`}
+                        value={resolveWorkflowModel(isRemoveMode ? "objectRemove" : "inpaint", data.model)}
+                    />
                 </div>
 
                 {!isRemoveMode && (

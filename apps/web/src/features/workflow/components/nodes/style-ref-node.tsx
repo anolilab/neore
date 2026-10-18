@@ -1,7 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveWorkflowModel } from "@neore/ai/models";
 import { Input } from "@ui/components/input";
 import { Label } from "@ui/components/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
 import { Slider } from "@ui/components/slider";
 import { Switch } from "@ui/components/switch";
 import { Textarea } from "@ui/components/textarea";
@@ -16,6 +16,7 @@ import type { StyleRefNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { toBaseOption } from "../../utils/model-options";
 import BaseNode from "./base-node";
+import ModelSelect from "./model-select";
 
 const StyleRefNodeComponent = (props: NodeProps<Node<StyleRefNodeData>>) => {
     const { data, id } = props;
@@ -37,12 +38,10 @@ const StyleRefNodeComponent = (props: NodeProps<Node<StyleRefNodeData>>) => {
             : [],
     );
 
-    const defaultModel = modelOptions[0]?.value ?? "fal-ai/flux-redux-style";
-
     // Get current model's capabilities
     const currentModel = {
         strengthRange: [0, 1] as readonly [number, number],
-        supportsNegativePrompt: models.find((m) => m.id === (data.model ?? defaultModel))?.supportsNegativePrompt ?? false,
+        supportsNegativePrompt: models.find((m) => m.id === resolveWorkflowModel("styleRef", data.model))?.supportsNegativePrompt ?? false,
         supportsWeight: false,
     };
 
@@ -80,22 +79,13 @@ const StyleRefNodeComponent = (props: NodeProps<Node<StyleRefNodeData>>) => {
         <BaseNode {...props} color={config.color} icon={<Palette className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>Model</Trans>
-                    </Label>
-                    <Select onValueChange={handleModelChange} value={data.model ?? defaultModel}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
-                            <SelectValue placeholder={t`Select model...`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {modelOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                    {option.isPremium && <span className="ml-1 text-xs text-amber-500">★</span>}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <ModelSelect
+                        label={<Trans>Model</Trans>}
+                        onChange={handleModelChange}
+                        options={modelOptions}
+                        placeholder={t`Select model...`}
+                        value={resolveWorkflowModel("styleRef", data.model)}
+                    />
                 </div>
 
                 <div className="space-y-1.5">

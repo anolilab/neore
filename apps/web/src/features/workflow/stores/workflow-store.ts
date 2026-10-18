@@ -6,6 +6,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 
 import type { NodeExecutionStatus, WorkflowContent, WorkflowEdge, WorkflowExecutionState, WorkflowNode, WorkflowNodeData, WorkflowNodeType } from "../types";
 import NODE_CONFIGS from "../types";
+import { lastUsedSettings } from "../utils/last-used-settings";
 import { stripResolvedImageUrl } from "../utils/resolved-image";
 
 // A dimension change is a measurement unless the user is resizing: only resizes carry `resizing`.
@@ -41,6 +42,8 @@ interface WorkflowState {
     // Actions - Grouping
     /** `label` is the (already translated) name for the new group; defaults to "Group". */
     groupNodes: (nodeIds: string[], label?: string) => string;
+    /** Loads a file the user imported. Unlike `loadContent` it is unsaved, so the save control offers it. */
+    importContent: (content: WorkflowContent) => void;
 
     // Dirty state for save indicator
     isDirty: boolean;
@@ -107,6 +110,7 @@ export const useWorkflowStore = create<WorkflowState>()(
                 const newNode: WorkflowNode = {
                     data: {
                         ...config.defaultData,
+                        ...lastUsedSettings(get().nodes, type, data),
                         ...data,
                     } as WorkflowNodeData,
                     id,
@@ -286,6 +290,10 @@ export const useWorkflowStore = create<WorkflowState>()(
             isDirty: false,
 
             // Content actions
+            importContent: (content) => {
+                get().loadContent(content);
+                set({ isDirty: true });
+            },
             loadContent: (content) => {
                 if (content) {
                     set({

@@ -22,6 +22,26 @@ export {
     parseCustomModelId,
     type ParsedCustomModelId,
 } from "./custom-model-id";
+export { enabledModelOf, FAL_IMAGE, FAL_VIDEO, type ModelAccepts } from "./enabled-model";
+export {
+    exceedsFreePlanCap,
+    FAL_VIDEO_INPUTS,
+    FAL_VIDEO_PRICES,
+    type FalVideoBillingInput,
+    falVideoFixedSecondsOf,
+    falVideoInputsOf,
+    type FalVideoInputSpec,
+    falVideoMicrodollarsOf,
+    type FalVideoPrice,
+    falVideoPriceOf,
+    type FalVideoRate,
+    FREE_PLAN_MAX_HEIGHT,
+    resolutionWithinFreePlan,
+    snapVideoOptions,
+    UNPRICED_FAL_VIDEO,
+    type VideoOptions,
+    videoOptionsOf,
+} from "./fal-video-inputs";
 export { FREE_TIER_TEXT_MODELS, requiresPaidPlan } from "./free-tier";
 export {
     DEFAULT_SPEECH_MODEL,
@@ -78,8 +98,10 @@ export {
     MODELS_VERSION,
     MUSIC_CATALOG,
     type Provider,
+    REFERENCE_MEDIA_CAPS,
     type RegistryKey,
     TEXT_CATALOG,
     VIDEO_CATALOG,
 } from "./registry";
 export type { AgentConfig, ContextOptions, ModelDefinition, ProviderKind, StorageOptions, UsageHandler } from "./types";
+export { LEGACY_WORKFLOW_MODELS, MEDIA_DEFAULT_MODELS, resolveWorkflowModel, WORKFLOW_KIND_ACCEPTS, type WorkflowModelKind } from "./workflow-defaults";

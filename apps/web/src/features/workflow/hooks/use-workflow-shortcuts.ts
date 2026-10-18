@@ -14,15 +14,17 @@
  * - H: Align selected nodes horizontally
  * - V: Align selected nodes vertically (when no text input is focused)
  * - D: Distribute selected nodes evenly
+ * - G: Arrange selected nodes into a grid around their centre
  * - Escape: Deselect all
  */
 import { useLingui } from "@lingui/react/macro";
 import { useReactFlow } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 
-import { redoWorkflow, undoWorkflow } from "../stores/history-store";
+import { flushPendingHistory, redoWorkflow, undoWorkflow } from "../stores/history-store";
 import { useWorkflowStore } from "../stores/workflow-store";
-import { autoLayout } from "../utils/auto-layout";
+import type { WorkflowNode } from "../types";
+import { arrangeSelectedGrid, autoLayout, layoutSelection } from "../utils/auto-layout";
 
 interface UseWorkflowShortcutsOptions {
     onRun?: () => void;
@@ -31,32 +33,38 @@ interface UseWorkflowShortcutsOptions {
     onShowShortcuts?: () => void;
 }
 
+/** Writes a layout as one undo step: the pending edit is committed first, so the move is not merged into it. */
+function commitLayout(nodes: WorkflowNode[]) {
+    flushPendingHistory();
+    useWorkflowStore.getState().setNodes(nodes);
+}
+
 /** Align selected nodes along an axis. */
 function alignSelectedNodes(direction: "horizontal" | "vertical") {
     const { nodes } = useWorkflowStore.getState();
-    const selected = nodes.filter((n) => n.selected && n.type !== "group" && !n.parentId);
+    const selected = layoutSelection(nodes);
 
     if (selected.length < 2) return;
+
+    const selectedIds = new Set(selected.map((n) => n.id));
 
     if (direction === "horizontal") {
         // Align all to the average Y position
         const avgY = selected.reduce((sum, n) => sum + n.position.y, 0) / selected.length;
-        const selectedIds = new Set(selected.map((n) => n.id));
 
-        useWorkflowStore.getState().setNodes(nodes.map((n) => (selectedIds.has(n.id) ? { ...n, position: { ...n.position, y: avgY } } : n)));
+        commitLayout(nodes.map((n) => (selectedIds.has(n.id) ? { ...n, position: { ...n.position, y: avgY } } : n)));
     } else {
         // Align all to the average X position
         const avgX = selected.reduce((sum, n) => sum + n.position.x, 0) / selected.length;
-        const selectedIds = new Set(selected.map((n) => n.id));
 
-        useWorkflowStore.getState().setNodes(nodes.map((n) => (selectedIds.has(n.id) ? { ...n, position: { ...n.position, x: avgX } } : n)));
+        commitLayout(nodes.map((n) => (selectedIds.has(n.id) ? { ...n, position: { ...n.position, x: avgX } } : n)));
     }
 }
 
 /** Distribute selected nodes evenly along the dominant axis. */
 function distributeSelectedNodes() {
     const { nodes } = useWorkflowStore.getState();
-    const selected = nodes.filter((n) => n.selected && n.type !== "group" && !n.parentId);
+    const selected = layoutSelection(nodes);
 
     if (selected.length < 3) return;
 
@@ -76,9 +84,7 @@ function distributeSelectedNodes() {
 
         const posMap = new Map(sorted.map((n, i) => [n.id, minX + step * i]));
 
-        useWorkflowStore
-            .getState()
-            .setNodes(nodes.map((n) => (selectedIds.has(n.id) ? { ...n, position: { ...n.position, x: posMap.get(n.id) ?? n.position.x } } : n)));
+        commitLayout(nodes.map((n) => (selectedIds.has(n.id) ? { ...n, position: { ...n.position, x: posMap.get(n.id) ?? n.position.x } } : n)));
     } else {
         // Distribute vertically
         const sorted = selected.toSorted((a, b) => a.position.y - b.position.y);
@@ -88,18 +94,25 @@ function distributeSelectedNodes() {
 
         const posMap = new Map(sorted.map((n, i) => [n.id, minY + step * i]));
 
-        useWorkflowStore
-            .getState()
-            .setNodes(nodes.map((n) => (selectedIds.has(n.id) ? { ...n, position: { ...n.position, y: posMap.get(n.id) ?? n.position.y } } : n)));
+        commitLayout(nodes.map((n) => (selectedIds.has(n.id) ? { ...n, position: { ...n.position, y: posMap.get(n.id) ?? n.position.y } } : n)));
     }
+}
+
+/** Arrange the selected nodes into a grid around their centre (one undo step). */
+function arrangeSelectedNodes() {
+    const { nodes } = useWorkflowStore.getState();
+    const arranged = arrangeSelectedGrid(nodes);
+
+    if (arranged === nodes) return;
+
+    commitLayout(arranged);
 }
 
 /** Apply auto-layout to the entire workflow. */
 function applyAutoLayout() {
-    const { edges, nodes, setNodes } = useWorkflowStore.getState();
-    const layoutedNodes = autoLayout(nodes, edges);
+    const { edges, nodes } = useWorkflowStore.getState();
 
-    setNodes(layoutedNodes);
+    commitLayout(autoLayout(nodes, edges));
 }
 
 export function useWorkflowShortcuts({ onRun, onSave, onShowNodeSearch, onShowShortcuts }: UseWorkflowShortcutsOptions = {}) {
@@ -253,6 +266,14 @@ export function useWorkflowShortcuts({ onRun, onSave, onShowNodeSearch, onShowSh
 
                     return;
                 }
+                case "g": {
+                    if (isModule) return; // Mod+G is group, handled above
+
+                    event.preventDefault();
+                    arrangeSelectedNodes();
+
+                    break;
+                }
                 case "h": {
                     event.preventDefault();
                     alignSelectedNodes("horizontal");
@@ -289,4 +310,4 @@ export function useWorkflowShortcuts({ onRun, onSave, onShowNodeSearch, onShowSh
     }, [handleKeyDown]);
 }
 
-export { alignSelectedNodes, applyAutoLayout, distributeSelectedNodes };
+export { alignSelectedNodes, applyAutoLayout, arrangeSelectedNodes, distributeSelectedNodes };

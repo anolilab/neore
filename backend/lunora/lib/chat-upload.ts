@@ -15,7 +15,7 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { storeFile } from "../agent/client";
 import { CHAT_UPLOAD_CONTENT_MISMATCH, CHAT_UPLOAD_EXPIRED, CHAT_UPLOAD_TOO_LARGE, CHAT_UPLOAD_UNSUPPORTED_TYPE } from "./chat-upload-codes";
-import { isUploadId, STAGING_TTL_MS, stagingKeyFor, stagingPrefixFor, uploadStatePrefixFor } from "./chat-upload-staging";
+import { isUploadId, STAGING_TTL_MS, stagedPurposeIs, stagingKeyFor, stagingPrefixFor, uploadStatePrefixFor } from "./chat-upload-staging";
 import { contentMatchesType, SNIFF_BYTES } from "./content-sniff";
 import { chatAttachmentLimit, MAX_EXTRACTION_DOCUMENT_BYTES } from "./document-limits";
 import { storageLogger } from "./logger";
@@ -25,11 +25,12 @@ import { UPLOAD_ALLOWED_MIME } from "../vault/lib/file-constants";
 const MEGABYTE = 1024 * 1024;
 
 /**
- * The most finalize reads into memory. Finalize hashes and re-stores the
+ * The most a chat finalize reads into memory. It hashes and re-stores the
  * object from one buffer, so this is a memory ceiling as much as a size cap.
- * It equals the largest per-kind limit of any type the allowlist accepts —
- * documents, 25 MB (images are 20 MB; audio and video are not on the
- * allowlist). Accepting video would need a streaming hash and copy here.
+ * It equals the largest per-kind limit of any type the chat allowlist accepts:
+ * documents, 25 MB (images are 20 MB; audio and video are not on that
+ * allowlist). Reference video and audio take the streaming finalize in
+ * `lib/reference-media-upload.ts` instead.
  */
 export const FINALIZE_MAX_BYTES = MAX_EXTRACTION_DOCUMENT_BYTES;
 
@@ -94,6 +95,13 @@ export const takeStagedUpload = async <T>(
     }
 
     try {
+        // A reference-media object is never a chat attachment, whatever its type says.
+        if (!stagedPurposeIs(object.customMetadata, "chat")) {
+            await object.body?.cancel();
+
+            throw unsupportedType();
+        }
+
         const contentType = normalizeContentType(object.httpMetadata?.contentType ?? "");
 
         if (!isAllowedType(contentType)) {
@@ -130,6 +138,30 @@ export const takeStagedUpload = async <T>(
         await ctx.storage.delete(key).catch((error: unknown) => {
             storageLogger.warn(`Failed to delete staged upload ${key}`, error);
         });
+    }
+};
+
+/**
+ * What a chat-import file must be before anything reads it whole: a chat
+ * upload (not reference media), `application/json`, within the chat document
+ * cap. The import reads the object into memory, so this is its size gate too.
+ * Metadata only, so a refused file is never read.
+ */
+export const assertStagedChatJson = async (ctx: Pick<ActionCtx, "storage">, key: string): Promise<void> => {
+    const metadata = await ctx.storage.getMetadata(key);
+
+    if (!metadata) {
+        throw expired();
+    }
+
+    if (!stagedPurposeIs(metadata.customMetadata, "chat") || normalizeContentType(metadata.contentType ?? "") !== "application/json") {
+        throw unsupportedType();
+    }
+
+    const { maxBytes } = chatAttachmentLimit("application/json");
+
+    if (metadata.size > maxBytes) {
+        throw tooLarge(maxBytes);
     }
 };
 

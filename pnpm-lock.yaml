@@ -509,6 +509,9 @@ catalogs:
     '@visulima/yaml':
       specifier: 1.0.0
       version: 1.0.0
+    mediabunny:
+      specifier: 1.61.6
+      version: 1.61.6
   dnd:
     '@dnd-kit/core':
       specifier: ^6.3.1
@@ -1913,6 +1916,9 @@ importers:
       lucide-react:
         specifier: catalog:icons
         version: 1.55.0(@types/react@19.3.0)(react@19.3.0)
+      mediabunny:
+        specifier: 'catalog:'
+        version: 1.61.6
       mermaid:
         specifier: catalog:syntax
         version: 12.1.0
@@ -2237,7 +2243,7 @@ importers:
         version: 1.0.0-alpha.206(@cloudflare/workers-types@5.20261012.1)(@electric-sql/pglite@0.3.15)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(kysely@0.29.6)
       '@lunora/storage':
         specifier: catalog:lunora
-        version: 1.0.0-alpha.134(@aws-sdk/client-s3@3.1149.0)(@aws-sdk/credential-providers@3.1148.0)(@aws-sdk/types@3.974.6)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.7))(hono@4.13.13)(sharp@0.35.5(@types/node@26.6.5))(supports-color@10.2.2)(zod@4.6.7)
+        version: 1.0.0-alpha.134(@aws-sdk/client-s3@3.1149.0)(@aws-sdk/credential-providers@3.1148.0)(@aws-sdk/types@3.974.6)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.7))(hono@4.13.13)(mediabunny@1.61.6)(sharp@0.35.5(@types/node@26.6.5))(supports-color@10.2.2)(zod@4.6.7)
       '@lunora/workflow':
         specifier: 'catalog:'
         version: 1.0.0-alpha.78
@@ -11206,6 +11212,12 @@ packages:
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
+  '@types/dom-mediacapture-transform@0.1.12':
+    resolution: {integrity: sha512-d7/QsLRwF864A5mgIM/YrfiglHoYn7zgCcAoJgW404r+2DwnNr7EBbLnCWpmOMgH8y0te73L1AV6H1bmauaWFw==}
+
+  '@types/dom-webcodecs@0.1.13':
+    resolution: {integrity: sha512-O5hkiFIcjjszPIYyUSyvScyvrBoV3NOEEZx/pMlsu44TKzWNkLVBBxnxJz42in5n3QIolYOcBYFCPZZ0h8SkwQ==}
+
   '@types/esrecurse@4.3.1':
     resolution: {integrity: sha512-xJBAbDifo5hpffDBuHl0Y8ywswbiAp/Wi7Y/GtAgSlZyIABppyurxVueOPE8LUQOxdlgi6Zqce7uoEpqNTeiUw==}
 
@@ -17794,6 +17806,9 @@ packages:
   media-typer@1.1.1:
     resolution: {integrity: sha512-yz3xRaG20c6/BOzvYoDaGtPmGscs7YivItZEEqe6GbwNfHuxu9YNmvnEkMzKldAGY4/80pRcQRZSEnhquk9XuQ==}
     engines: {node: '>= 0.8'}
+
+  mediabunny@1.61.6:
+    resolution: {integrity: sha512-VHEZ53/7jGl4dQ+uOdndsZufFYwEUFWv9UXgvrGun3OapyzoqI9iaPOD7z3xxY/nAttLZBNwswgJzMtGJAquOQ==}
 
   merge-descriptors@2.0.0:
     resolution: {integrity: sha512-Snk314V5ayFLhp3fkUREub6WtjBfPdCPY1Ln8/8munuLuiYhsABgBVWsozAG+MWMbVEvcdcpbi9R7ww22l9Q3g==}
@@ -26384,11 +26399,11 @@ snapshots:
       - sql.js
       - sqlite3
 
-  '@lunora/storage@1.0.0-alpha.134(@aws-sdk/client-s3@3.1149.0)(@aws-sdk/credential-providers@3.1148.0)(@aws-sdk/types@3.974.6)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.7))(hono@4.13.13)(sharp@0.35.5(@types/node@26.6.5))(supports-color@10.2.2)(zod@4.6.7)':
+  '@lunora/storage@1.0.0-alpha.134(@aws-sdk/client-s3@3.1149.0)(@aws-sdk/credential-providers@3.1148.0)(@aws-sdk/types@3.974.6)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.7))(hono@4.13.13)(mediabunny@1.61.6)(sharp@0.35.5(@types/node@26.6.5))(supports-color@10.2.2)(zod@4.6.7)':
     dependencies:
       '@lunora/errors': 1.0.0-alpha.52
       '@lunora/platform': 1.0.0-alpha.64
-      '@visulima/storage': 2.0.37(@aws-sdk/client-s3@3.1149.0)(@aws-sdk/credential-providers@3.1148.0)(@aws-sdk/types@3.974.6)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.7))(aws4fetch@1.0.20)(hono@4.13.13)(sharp@0.35.5(@types/node@26.6.5))(supports-color@10.2.2)(zod@4.6.7)
+      '@visulima/storage': 2.0.37(@aws-sdk/client-s3@3.1149.0)(@aws-sdk/credential-providers@3.1148.0)(@aws-sdk/types@3.974.6)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.7))(aws4fetch@1.0.20)(hono@4.13.13)(mediabunny@1.61.6)(sharp@0.35.5(@types/node@26.6.5))(supports-color@10.2.2)(zod@4.6.7)
       aws4fetch: 1.0.20
     transitivePeerDependencies:
       - '@anthropic-ai/claude-agent-sdk'
@@ -30960,6 +30975,12 @@ snapshots:
 
   '@types/deep-eql@4.0.2': {}
 
+  '@types/dom-mediacapture-transform@0.1.12':
+    dependencies:
+      '@types/dom-webcodecs': 0.1.13
+
+  '@types/dom-webcodecs@0.1.13': {}
+
   '@types/esrecurse@4.3.1': {}
 
   '@types/estree-jsx@1.0.5':
@@ -32273,7 +32294,7 @@ snapshots:
       '@tanstack/react-query': 5.104.2(react@19.3.0)
       react: 19.3.0
 
-  '@visulima/storage@2.0.37(@aws-sdk/client-s3@3.1149.0)(@aws-sdk/credential-providers@3.1148.0)(@aws-sdk/types@3.974.6)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.7))(aws4fetch@1.0.20)(hono@4.13.13)(sharp@0.35.5(@types/node@26.6.5))(supports-color@10.2.2)(zod@4.6.7)':
+  '@visulima/storage@2.0.37(@aws-sdk/client-s3@3.1149.0)(@aws-sdk/credential-providers@3.1148.0)(@aws-sdk/types@3.974.6)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.7))(aws4fetch@1.0.20)(hono@4.13.13)(mediabunny@1.61.6)(sharp@0.35.5(@types/node@26.6.5))(supports-color@10.2.2)(zod@4.6.7)':
     dependencies:
       '@remix-run/multipart-parser': 1.0.0
       '@visulima/pagination': 7.0.2(openapi-types@12.1.3)
@@ -32291,6 +32312,7 @@ snapshots:
       ai: 7.0.137(zod@4.6.7)
       aws4fetch: 1.0.20
       hono: 4.13.13
+      mediabunny: 1.61.6
       sharp: 0.35.5(@types/node@26.6.5)
       zod: 4.6.7
     transitivePeerDependencies:
@@ -38039,6 +38061,11 @@ snapshots:
       - react
 
   media-typer@1.1.1: {}
+
+  mediabunny@1.61.6:
+    dependencies:
+      '@types/dom-mediacapture-transform': 0.1.12
+      '@types/dom-webcodecs': 0.1.13
 
   merge-descriptors@2.0.0: {}
 

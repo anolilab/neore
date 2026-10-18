@@ -1,6 +1,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveWorkflowModel } from "@neore/ai/models";
 import { Input } from "@ui/components/input";
 import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
@@ -17,6 +18,7 @@ import type { OutpaintNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { toBaseOption } from "../../utils/model-options";
 import BaseNode from "./base-node";
+import ModelSelect from "./model-select";
 
 const EXPAND_DIRECTIONS = [
     { label: msg`All Directions`, value: "all" },
@@ -42,10 +44,8 @@ const OutpaintNodeComponent = (props: NodeProps<Node<OutpaintNodeData>>) => {
         }
     }
 
-    const defaultModel = modelOptions[0]?.value ?? "fal-ai/flux-outpaint";
-
     // Check if current model supports negative prompt
-    const currentModelSupportsNegative = models.find((m) => m.id === (data.model ?? defaultModel))?.supportsNegativePrompt ?? false;
+    const currentModelSupportsNegative = models.find((m) => m.id === resolveWorkflowModel("outpaint", data.model))?.supportsNegativePrompt ?? false;
 
     const handleModelChange = (model: string | null) => {
         if (model) {
@@ -79,22 +79,13 @@ const OutpaintNodeComponent = (props: NodeProps<Node<OutpaintNodeData>>) => {
         <BaseNode {...props} color={config.color} icon={<Expand className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>Model</Trans>
-                    </Label>
-                    <Select onValueChange={handleModelChange} value={data.model ?? defaultModel}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
-                            <SelectValue placeholder={t`Select model...`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {modelOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                    {option.isPremium && <span className="ml-1 text-xs text-amber-500">★</span>}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <ModelSelect
+                        label={<Trans>Model</Trans>}
+                        onChange={handleModelChange}
+                        options={modelOptions}
+                        placeholder={t`Select model...`}
+                        value={resolveWorkflowModel("outpaint", data.model)}
+                    />
                 </div>
 
                 <div className="space-y-1.5">

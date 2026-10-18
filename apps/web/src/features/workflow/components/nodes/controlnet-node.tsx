@@ -1,6 +1,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveWorkflowModel } from "@neore/ai/models";
 import { Input } from "@ui/components/input";
 import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
@@ -16,6 +17,7 @@ import type { ControlNetNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
 import { toBaseOption } from "../../utils/model-options";
 import BaseNode from "./base-node";
+import ModelSelect from "./model-select";
 
 const CONTROL_TYPES = [
     { description: msg`Human pose & skeleton`, label: msg`Pose Detection`, value: "pose" },
@@ -47,7 +49,6 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
 
     const preprocessorModels = models.flatMap((m) => (m.enabled && m.isPreprocessor && m.preprocessorType === data.controlType ? [toBaseOption(m)] : []));
 
-    const defaultModel = controlNetModels[0]?.value ?? "fal-ai/controlnet-sdxl";
     const defaultPreprocessor = preprocessorModels[0]?.value;
 
     const handleControlTypeChange = (controlType: string | null) => {
@@ -125,22 +126,13 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
 
                 {/* ControlNet Model */}
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>ControlNet Model</Trans>
-                    </Label>
-                    <Select onValueChange={handleModelChange} value={data.model ?? defaultModel}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
-                            <SelectValue placeholder={t`Select model...`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {controlNetModels.map((option: { isPremium?: boolean; label: string; value: string }) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                    {option.isPremium && <span className="ml-1 text-xs text-amber-500">★</span>}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <ModelSelect
+                        label={<Trans>ControlNet Model</Trans>}
+                        onChange={handleModelChange}
+                        options={controlNetModels}
+                        placeholder={t`Select model...`}
+                        value={resolveWorkflowModel("controlnet", data.model)}
+                    />
                 </div>
 
                 {/* Preprocessor Model */}

@@ -95,7 +95,9 @@ export const startImportJob = authMutation
         // key is rebuilt under the CALLER's staging prefix from the upload id.
         // Another user's upload id names an object of the caller's that does
         // not exist, and the workflow's read fails the job like any missing
-        // file — it never reaches anyone else's.
+        // file — it never reaches anyone else's. The key is the CHAT key, so a
+        // reference-media upload cannot be named here at all; the workflow's read
+        // (`steps.ts#processImportFile`) checks the object is chat JSON before it reads.
         if (!isUploadId(input.uploadId)) {
             throw new LunoraError("NOT_FOUND", "Upload not found");
         }

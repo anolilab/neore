@@ -290,8 +290,12 @@ export const changeRefcount = async (context: MutationContext, previous: Id<"cha
 
         const file = await context.db.chatFiles.findFirst({ where: { _id: fileId } });
 
-        if (file) {
+        if (file && file.refcount > 0) {
             await patchRow(context.db, file, refcountChange(file, file.refcount - 1));
+        } else if (file) {
+            // A release with no matching add (a write that counted differently) must not take the count below zero,
+            // nor re-stamp `unreferencedSince` on a file that is already released.
+            console.error(`File ${fileId} has no reference to release`);
         } else {
             console.error(`File ${fileId} not found when decrementing refcount`);
         }

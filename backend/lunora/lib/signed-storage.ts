@@ -14,6 +14,7 @@
  * never needs a URL at all (`lib/storage-read.ts`).
  */
 import { verifySignedUrl } from "@lunora/storage";
+import type { Storage } from "@lunora/storage";
 import type { HttpActionCtx } from "lunorash/server";
 
 /**
@@ -87,6 +88,100 @@ export const downloadHeaders = (contentType: string, size: number | undefined): 
     return headers;
 };
 
+/** What a `Range` header asks for, against an object of `size` bytes. */
+export type ByteRange = { kind: "all" } | { end: number; kind: "partial"; start: number } | { kind: "unsatisfiable" };
+
+const SINGLE_RANGE = /^bytes=(\d*)-(\d*)$/u;
+
+/**
+ * One `bytes=` range, as RFC 9110 reads it. A header this does not understand
+ * (another unit, several ranges, a reversed or empty spec) is ignored, which
+ * serves the whole object; a range that starts past the end is unsatisfiable.
+ */
+export const parseRange = (header: string | null, size: number): ByteRange => {
+    const match = header === null ? null : SINGLE_RANGE.exec(header.trim());
+
+    if (!match || (match[1] === "" && match[2] === "")) {
+        return { kind: "all" };
+    }
+
+    const [, first = "", last = ""] = match;
+
+    if (first === "") {
+        const suffix = Number(last);
+
+        return suffix === 0 || size === 0 ? { kind: "unsatisfiable" } : { end: size - 1, kind: "partial", start: Math.max(0, size - suffix) };
+    }
+
+    const start = Number(first);
+
+    if (last !== "" && Number(last) < start) {
+        return { kind: "all" };
+    }
+
+    if (start >= size) {
+        return { kind: "unsatisfiable" };
+    }
+
+    return { end: last === "" ? size - 1 : Math.min(Number(last), size - 1), kind: "partial", start };
+};
+
+type R2Range = NonNullable<NonNullable<Parameters<Storage["download"]>[1]>["range"]>;
+
+/**
+ * The R2 read that fetches a `Range` header's one span, or `"all"` when the
+ * header is ignored (absent, another unit, several spans, a reversed span).
+ * R2 resolves the span against the object, so the read returns the object's
+ * size with its bytes and no metadata read is needed.
+ */
+const readFor = (header: string | null): R2Range | "all" => {
+    const match = header === null ? null : SINGLE_RANGE.exec(header.trim());
+
+    if (!match || (match[1] === "" && match[2] === "")) {
+        return "all";
+    }
+
+    const [, first = "", last = ""] = match;
+
+    // A suffix or an end too large to be an exact integer means "to the end", which is the
+    // open-ended read: R2 then clamps nothing it needs and the object's size settles the rest.
+    if (first === "") {
+        return Number.isSafeInteger(Number(last)) ? { suffix: Number(last) } : { offset: 0 };
+    }
+
+    const start = Number(first);
+
+    if (last !== "" && Number(last) < start) {
+        return "all";
+    }
+
+    if (last === "" || !Number.isSafeInteger(start) || !Number.isSafeInteger(Number(last) + 1)) {
+        return { offset: start };
+    }
+
+    return { length: Number(last) - start + 1, offset: start };
+};
+
+/**
+ * R2's own refusal of a span past the end: its `R2Error` carries code 10039
+ * (`The requested range is not satisfiable`). Anything else (a timeout, a reset,
+ * a server fault) is NOT a range answer, and must surface as a failure.
+ */
+const R2_INVALID_RANGE_CODE = 10_039;
+
+export const isInvalidRangeError = (error: unknown): boolean =>
+    typeof error === "object" &&
+    error !== null &&
+    (("code" in error && error.code === R2_INVALID_RANGE_CODE) ||
+        ("message" in error && typeof error.message === "string" && error.message.includes("not satisfiable")));
+
+/**
+ * Serves a verified GET or HEAD. A `Range` of one span is answered 206 (the
+ * bytes come from R2 by range, so the rest never reaches the Worker), so
+ * browsers can seek a video and a provider can fetch an attachment in parts.
+ * A GET makes one R2 read: the object (or its range) carries the size. Only a
+ * HEAD, and a range R2 returns nothing for, read the metadata.
+ */
 export const handleSignedGet = async (context: HttpActionCtx, request: Request, options: SignedStorageOptions): Promise<Response | null> => {
     const verified = await verify(request, options);
 
@@ -99,13 +194,97 @@ export const handleSignedGet = async (context: HttpActionCtx, request: Request, 
         return new Response("Storage is not configured", { status: 503 });
     }
 
-    const object = await context.storage.download(verified.key);
+    const { storage } = context;
+    const { key } = verified;
+    const read = readFor(request.headers.get("Range"));
+
+    if (request.method === "HEAD") {
+        return await headObject(storage, key, request);
+    }
+
+    if (read === "all") {
+        const object = await storage.download(key);
+
+        if (!object) {
+            return new Response("Not found", { status: 404 });
+        }
+
+        const headers = downloadHeaders(object.httpMetadata?.contentType ?? "application/octet-stream", object.size);
+
+        headers.set("Accept-Ranges", "bytes");
+
+        return new Response(object.body, { headers, status: 200 });
+    }
+
+    // R2 refuses some spans past the end by throwing or answering nothing; the
+    // metadata then says whether the object is missing or the span unsatisfiable.
+    const object = await storage.download(key, { range: read }).catch((error: unknown) => {
+        if (isInvalidRangeError(error)) {
+            return null;
+        }
+
+        throw error;
+    });
 
     if (!object) {
+        const metadata = await storage.getMetadata(key);
+
+        return metadata ? unsatisfiable(metadata) : new Response("Not found", { status: 404 });
+    }
+
+    const range = parseRange(request.headers.get("Range"), object.size);
+
+    if (range.kind !== "partial") {
+        await object.body?.cancel();
+
+        return unsatisfiable({ size: object.size });
+    }
+
+    const headers = downloadHeaders(object.httpMetadata?.contentType ?? "application/octet-stream", undefined);
+
+    headers.set("Accept-Ranges", "bytes");
+    setPartialHeaders(headers, range, object.size);
+
+    return new Response(object.body, { headers, status: 206 });
+};
+
+/** A HEAD: the framing a GET would send, read from the metadata alone, so no body is read. */
+const headObject = async (storage: NonNullable<HttpActionCtx["storage"]>, key: string, request: Request): Promise<Response> => {
+    const metadata = await storage.getMetadata(key);
+
+    if (!metadata) {
         return new Response("Not found", { status: 404 });
     }
 
-    const contentType = object.httpMetadata?.contentType ?? "application/octet-stream";
+    // The same classification a GET makes (`parseRange` against the object's size).
+    const span = parseRange(request.headers.get("Range"), metadata.size);
 
-    return new Response(request.method === "HEAD" ? null : object.body, { headers: downloadHeaders(contentType, object.size), status: 200 });
+    if (span.kind === "unsatisfiable") {
+        return unsatisfiable(metadata);
+    }
+
+    const headers = downloadHeaders(metadata.contentType ?? "application/octet-stream", metadata.size);
+
+    headers.set("Accept-Ranges", "bytes");
+
+    if (span.kind === "partial") {
+        setPartialHeaders(headers, span, metadata.size);
+
+        return new Response(null, { headers, status: 206 });
+    }
+
+    return new Response(null, { headers, status: 200 });
+};
+
+/** The 206 framing of one span: its length and `Content-Range` against the object's size. A GET and a HEAD share it. */
+const setPartialHeaders = (headers: Headers, range: { end: number; start: number }, size: number): void => {
+    headers.set("Content-Length", String(range.end - range.start + 1));
+    headers.set("Content-Range", `bytes ${String(range.start)}-${String(range.end)}/${String(size)}`);
+};
+
+/** 416 for a span the object cannot satisfy, with the object's size in `Content-Range`. */
+const unsatisfiable = (metadata: { size: number } | null): Response => {
+    const headers = new Headers({ "Accept-Ranges": "bytes", "Content-Range": `bytes */${String(metadata?.size ?? 0)}` });
+
+    return new Response(null, { headers, status: 416 });
 };

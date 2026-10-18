@@ -388,6 +388,7 @@ export interface ApiTypes {
     };
     file: {
         finalizeChatUpload: FunctionReference<"action", { filename: string; uploadId: string }, { fileId: Id<"chatFiles">; url: string }>;
+        finalizeReferenceMedia: FunctionReference<"action", { filename: string; uploadId: string }, { fileId: Id<"chatFiles">; url: string }>;
         getChatFileExtraction: FunctionReference<"query", { fileId: Id<"chatFiles"> }, null | { status: "pending" | "processing" | "completed" | "failed" | "unsupported" }>;
         getChatFileImageUrl: FunctionReference<"query", { fileId: Id<"chatFiles"> }, null | string>;
     };
@@ -728,7 +729,7 @@ export interface ApiTypes {
             updateGalleryMeta: FunctionReference<"mutation", { category?: "image" | "text" | "video" | "audio" | "automation"; description?: string; projectId: Id<"projects">; tags?: Array<string> }, { success: boolean }>;
         };
         generate: {
-            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "output" | "image" | "text" | "file" | "code" | "branch" | "video" | "audio" | "ai" | "img2img" | "upscale" | "inpaint" | "outpaint" | "background-removal" | "image-to-video" | "transcription"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "output" | "image" | "text" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
         };
         presence: {
             checkNodeLock: FunctionReference<"query", { nodeId: string; projectId: Id<"projects"> }, { locked: boolean; lockedBy: string | null; lockerColor: string | null }>;
@@ -1124,6 +1125,7 @@ export const api: ApiTypes = {
     },
     file: {
         finalizeChatUpload: { __lunoraRef: "file:finalizeChatUpload" },
+        finalizeReferenceMedia: { __lunoraRef: "file:finalizeReferenceMedia" },
         getChatFileExtraction: { __lunoraRef: "file:getChatFileExtraction" },
         getChatFileImageUrl: { __lunoraRef: "file:getChatFileImageUrl" },
     },

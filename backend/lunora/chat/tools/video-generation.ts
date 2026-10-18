@@ -1,4 +1,5 @@
 import z from "zod/v4";
+import { MEDIA_DEFAULT_MODELS } from "@neore/ai/models";
 
 import { internal } from "../../_generated/internal";
 
@@ -31,12 +32,12 @@ Supports durations: 1-10 seconds.
 Aspect ratios: auto, 1:1, 16:9, 9:16, 4:3, 3:4, 2:1, 21:9, 9:20.
 
 Modes:
-- Text-to-video: omit startFrameUrl. Default model: fal-ai/mochi-v1. Frontier options: fal-ai/veo3, fal-ai/veo3/fast, fal-ai/veo2.
+- Text-to-video: omit startFrameUrl. Default model: fal-ai/ltx-video. Frontier options: fal-ai/veo3, fal-ai/veo3/fast, fal-ai/veo2.
 - Image-to-video: pass a publicly reachable startFrameUrl and pick an I2V model (e.g. fal-ai/veo3/image-to-video, fal-ai/veo3/fast/image-to-video, fal-ai/veo2/image-to-video, fal-ai/kling-video/v1.5/pro/image-to-video, fal-ai/bytedance/seedance/v1.5/pro/image-to-video, fal-ai/luma-dream-machine/image-to-video, fal-ai/minimax/video-01-live/image-to-video).
 
 Note: Video generation takes 60-120 seconds to complete.`,
     execute: async (context, input) => {
-        const { aspectRatio = "16:9", duration = 5, model = "fal-ai/mochi-v1", prompt, startFrameUrl } = input;
+        const { aspectRatio = "16:9", duration = 5, model = MEDIA_DEFAULT_MODELS.textToVideo, prompt, startFrameUrl } = input;
 
         if (!context.userId) {
             return { error: "Authentication required", prompt, videoUrl: "" };
@@ -95,7 +96,7 @@ Note: Video generation takes 60-120 seconds to complete.`,
                 .default("16:9")
                 .meta({ description: "Video aspect ratio (ignored for image-to-video models that infer aspect from the source image)" }),
             duration: z.number().min(1).max(10).optional().default(5).meta({ description: "Video duration in seconds" }),
-            model: z.string().optional().default("fal-ai/mochi-v1").meta({ description: "AI model id from the registry" }),
+            model: z.string().optional().default(MEDIA_DEFAULT_MODELS.textToVideo).meta({ description: "AI model id from the registry" }),
             prompt: z.string().min(1).max(500).meta({ description: "Video scene description (optional context when animating an image)" }),
             startFrameUrl: z
                 .url()

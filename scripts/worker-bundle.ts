@@ -116,8 +116,11 @@ export const BACKEND_BUILD = {
  * left out of the upload. Were the server ever to import one, the lazy boundary fails and
  * React renders that part on the client instead. Chunk names are `<name>-<hash>.js`.
  * (`xlsx` also covers `xlsx-convert`, the thin loader in front of it.)
+ *
+ * `video-trim-encode` is the reference-video trimmer, which bundles `mediabunny`; it is named after
+ * its own module, so the entry is specific to it.
  */
-export const WEB_CLIENT_ONLY_CHUNKS = ["elk", "jspdf.es.min", "pptxgen.es", "univer-sheet-editor", "xlsx"] as const;
+export const WEB_CLIENT_ONLY_CHUNKS = ["elk", "jspdf.es.min", "pptxgen.es", "univer-sheet-editor", "video-trim-encode", "xlsx"] as const;
 
 /** Wrangler's default module rules, minus {@link WEB_CLIENT_ONLY_CHUNKS}. */
 export const WEB_UPLOAD_RULES = [

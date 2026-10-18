@@ -23,6 +23,7 @@ import type { BaseModelOption } from "../../utils/model-options";
 import { getModelLabel, toBaseOption } from "../../utils/model-options";
 import { isCurrentImageSelection, startImageSelection, storeWorkflowImage } from "../../utils/workflow-image";
 import NodeExpandModal from "./node-expand-modal";
+import ProBadge from "./pro-badge";
 
 // Inline images travel inside the workflow save, which is capped at 1 MiB per RPC body.
 const MAX_INLINE_IMAGE_BYTES = 300 * 1024;
@@ -372,6 +373,7 @@ const NodeTopToolbar = ({ data, nodeId, nodeType, selected = false }: NodeTopToo
                                                 onClick={() => handleModelChange(opt.value)}
                                             >
                                                 {opt.label}
+                                                {opt.isPremium && <ProBadge />}
                                             </DropdownMenuItem>
                                         ))}
                                     </DropdownMenuContent>

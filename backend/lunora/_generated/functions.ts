@@ -175,7 +175,8 @@ import * as lunora_workflow_fork_170 from "../workflow/fork.js";
 import * as lunora_workflow_functions_171 from "../workflow/functions.js";
 import * as lunora_workflow_gallery_172 from "../workflow/gallery.js";
 import * as lunora_workflow_generate_173 from "../workflow/generate.js";
-import * as lunora_workflow_presence_174 from "../workflow/presence.js";
+import * as lunora_workflow_media_ops_174 from "../workflow/media-ops.js";
+import * as lunora_workflow_presence_175 from "../workflow/presence.js";
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
 import { LunoraError } from "lunorash/server";
@@ -426,9 +427,11 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "auth_api_keys:createScopedApiKey": lunora_auth_api_keys_21.createScopedApiKey as unknown as RegisteredLunoraFunction,
     "auth_api_keys:getApiKeyCreationState": lunora_auth_api_keys_21.getApiKeyCreationState as unknown as RegisteredLunoraFunction,
     "auth_billing:applyCreemSubscription": lunora_auth_billing_22.applyCreemSubscription as unknown as RegisteredLunoraFunction,
+    "auth_billing:creditsLeftQuery": lunora_auth_billing_22.creditsLeftQuery as unknown as RegisteredLunoraFunction,
     "auth_billing:deductCreditsFromGateway": lunora_auth_billing_22.deductCreditsFromGateway as unknown as RegisteredLunoraFunction,
     "auth_billing:getBillingInfo": lunora_auth_billing_22.getBillingInfo as unknown as RegisteredLunoraFunction,
     "auth_billing:getMemberCredits": lunora_auth_billing_22.getMemberCredits as unknown as RegisteredLunoraFunction,
+    "auth_billing:getRunPlanForOrganizationQuery": lunora_auth_billing_22.getRunPlanForOrganizationQuery as unknown as RegisteredLunoraFunction,
     "auth_billing:listMemberCredits": lunora_auth_billing_22.listMemberCredits as unknown as RegisteredLunoraFunction,
     "auth_billing:setMemberCreditOverride": lunora_auth_billing_22.setMemberCreditOverride as unknown as RegisteredLunoraFunction,
     "auth_billing:setOrganizationBillingTier": lunora_auth_billing_22.setOrganizationBillingTier as unknown as RegisteredLunoraFunction,
@@ -817,6 +820,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "evals_internal:completeCase": lunora_evals_internal_83.completeCase as unknown as RegisteredLunoraFunction,
     "evals_internal:reapCase": lunora_evals_internal_83.reapCase as unknown as RegisteredLunoraFunction,
     "file:finalizeChatUpload": lunora_file_84.finalizeChatUpload as unknown as RegisteredLunoraFunction,
+    "file:finalizeReferenceMedia": lunora_file_84.finalizeReferenceMedia as unknown as RegisteredLunoraFunction,
     "file:getChatFileExtraction": lunora_file_84.getChatFileExtraction as unknown as RegisteredLunoraFunction,
     "file:getChatFileImageUrl": lunora_file_84.getChatFileImageUrl as unknown as RegisteredLunoraFunction,
     "file:purgeStagedChatUploads": lunora_file_84.purgeStagedChatUploads as unknown as RegisteredLunoraFunction,
@@ -1308,14 +1312,15 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "workflow_gallery:unpublishWorkflow": lunora_workflow_gallery_172.unpublishWorkflow as unknown as RegisteredLunoraFunction,
     "workflow_gallery:updateGalleryMeta": lunora_workflow_gallery_172.updateGalleryMeta as unknown as RegisteredLunoraFunction,
     "workflow_generate:generateWorkflowFromPrompt": lunora_workflow_generate_173.generateWorkflowFromPrompt as unknown as RegisteredLunoraFunction,
-    "workflow_presence:checkNodeLock": lunora_workflow_presence_174.checkNodeLock as unknown as RegisteredLunoraFunction,
-    "workflow_presence:cleanupStalePresence": lunora_workflow_presence_174.cleanupStalePresence as unknown as RegisteredLunoraFunction,
-    "workflow_presence:disconnect": lunora_workflow_presence_174.disconnect as unknown as RegisteredLunoraFunction,
-    "workflow_presence:heartbeat": lunora_workflow_presence_174.heartbeat as unknown as RegisteredLunoraFunction,
-    "workflow_presence:listPresence": lunora_workflow_presence_174.listPresence as unknown as RegisteredLunoraFunction,
-    "workflow_presence:listVersions": lunora_workflow_presence_174.listVersions as unknown as RegisteredLunoraFunction,
-    "workflow_presence:restoreVersion": lunora_workflow_presence_174.restoreVersion as unknown as RegisteredLunoraFunction,
-    "workflow_presence:saveVersion": lunora_workflow_presence_174.saveVersion as unknown as RegisteredLunoraFunction,
+    "workflow_media_ops:extractVideoFrame": lunora_workflow_media_ops_174.extractVideoFrame as unknown as RegisteredLunoraFunction,
+    "workflow_presence:checkNodeLock": lunora_workflow_presence_175.checkNodeLock as unknown as RegisteredLunoraFunction,
+    "workflow_presence:cleanupStalePresence": lunora_workflow_presence_175.cleanupStalePresence as unknown as RegisteredLunoraFunction,
+    "workflow_presence:disconnect": lunora_workflow_presence_175.disconnect as unknown as RegisteredLunoraFunction,
+    "workflow_presence:heartbeat": lunora_workflow_presence_175.heartbeat as unknown as RegisteredLunoraFunction,
+    "workflow_presence:listPresence": lunora_workflow_presence_175.listPresence as unknown as RegisteredLunoraFunction,
+    "workflow_presence:listVersions": lunora_workflow_presence_175.listVersions as unknown as RegisteredLunoraFunction,
+    "workflow_presence:restoreVersion": lunora_workflow_presence_175.restoreVersion as unknown as RegisteredLunoraFunction,
+    "workflow_presence:saveVersion": lunora_workflow_presence_175.saveVersion as unknown as RegisteredLunoraFunction,
 };
 
 /**
@@ -3444,56 +3449,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
-});
-installCompiledValidatorMap(lunora_chat_functions_46.generateImageToVideo.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["duration"] !== undefined) {
-if (typeof source["duration"] !== "number" || !Number.isFinite(source["duration"])) return DEFER;
-__val1 = source["duration"];
-__has1 = true;
-}
-let __has2 = false;
-let __val2;
-if (source["fps"] !== undefined) {
-if (typeof source["fps"] !== "number" || !Number.isFinite(source["fps"])) return DEFER;
-__val2 = source["fps"];
-__has2 = true;
-}
-if (typeof source["imageUrl"] !== "string") return DEFER;
-let __has3 = false;
-let __val3;
-if (source["loop"] !== undefined) {
-if (typeof source["loop"] !== "boolean") return DEFER;
-__val3 = source["loop"];
-__has3 = true;
-}
-let __has4 = false;
-let __val4;
-if (source["model"] !== undefined) {
-if (typeof source["model"] !== "string") return DEFER;
-__val4 = source["model"];
-__has4 = true;
-}
-let __has5 = false;
-let __val5;
-if (source["motionStrength"] !== undefined) {
-if (typeof source["motionStrength"] !== "number" || !Number.isFinite(source["motionStrength"])) return DEFER;
-__val5 = source["motionStrength"];
-__has5 = true;
-}
-let __has6 = false;
-let __val6;
-if (source["prompt"] !== undefined) {
-if (typeof source["prompt"] !== "string") return DEFER;
-__val6 = source["prompt"];
-__has6 = true;
-}
-if (typeof source["threadId"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { ...(__has1 ? { "duration": __val1 } : {}), ...(__has2 ? { "fps": __val2 } : {}), "imageUrl": source["imageUrl"], ...(__has3 ? { "loop": __val3 } : {}), ...(__has4 ? { "model": __val4 } : {}), ...(__has5 ? { "motionStrength": __val5 } : {}), ...(__has6 ? { "prompt": __val6 } : {}), "threadId": source["threadId"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_chat_functions_46.generateImg2Img.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -7917,13 +7872,13 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_presence_174.listPresence.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_presence_175.listPresence.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;
 return { "projectId": source["projectId"] };
 });
-installCompiledValidatorMap(lunora_workflow_presence_174.listVersions.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_presence_175.listVersions.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -8233,9 +8188,11 @@ export interface Caller {
         };
         billing: {
             applyCreemSubscription: (args: { baseTier: "free" | "pro"; creemCustomerId?: string; creemPurchaserId?: string; creemSubscriptionId: string; referenceId: string; subject: "organization" | "user" }) => Promise<null>;
+            creditsLeftQuery: (args: { orgId: string; userId: string }) => Promise<{ creditsLeft: number | null }>;
             deductCreditsFromGateway: (args: { billingMode?: "custom" | "platform" | "byok"; byokFeeRate?: number; costMicrodollars: number; modelId: string; orgId?: string; requestId: string; userId: string }) => Promise<void>;
             getBillingInfo: (args?: {}) => Promise<{ allowedModels: Array<string>; baseTier: "free" | "pro" | "enterprise"; billingEmail: string | null; creditsPerUser: number; creemCustomerId?: string | null; creemSubscriptionId?: string | null } | null>;
             getMemberCredits: (args: { userId?: string }) => Promise<({} & { creditOverride: number | null; effectiveCredits: number; orgDefault: number; resetAt: number | null; usedCredits: number; userId: string; }) | null>;
+            getRunPlanForOrganizationQuery: (args: { organizationId: string | null; userId: string }) => Promise<{ isAdmin: boolean; plan: "premium" | null }>;
             listMemberCredits: (args?: {}) => Promise<({} & { creditOverride: number | null; effectiveCredits: number; role: string; usedCredits: number; userEmail: string | null; userId: string; userName: string | null; })[]>;
             setMemberCreditOverride: (args: { creditOverride: number | null; organizationId: string; userId: string }) => Promise<void>;
             setOrganizationBillingTier: (args: { baseTier?: "free" | "pro" | "enterprise"; creditsPerUser?: number; organizationId: string }) => Promise<null>;
@@ -8378,7 +8335,7 @@ export interface Caller {
             saveCustomProvider: (args: { accessKeyId?: string; apiKey?: string; apiVersion?: string; baseUrl: string; enabled: boolean; id?: string; models: Array<{ id: string; name?: string }>; name: string; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" }) => Promise<{ id: string }>;
         };
         daily_charge: {
-            chargeDailyUnit: (args: { kind: "Audio" | "Text"; organizationId?: string; userId: string }) => Promise<boolean>;
+            chargeDailyUnit: (args: { kind: "Audio" | "Text" | "Video"; organizationId?: string; requestId?: string; userId: string }) => Promise<boolean>;
         };
         edit_abandon: {
             failAbandonedEditReply: (args: { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }) => Promise<{ added: boolean; failed: number }>;
@@ -8410,7 +8367,7 @@ export interface Caller {
             generateControlNet: (args: { controlType: string; endPercent?: number; imageUrl: string; model?: string; preprocessor?: string; prompt?: string; startPercent?: number; strength?: number; threadId: string; userId: string }) => Promise<{ controlType: string; imageUrl: string; mimeType: string; model: string }>;
             generateFollowupSuggestionsForThread: (args: { threadId: string; userId: string }) => Promise<void>;
             generateImage: (args: { cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; imageSize: string; jobId?: string; model: string; negativePrompt?: string; numImages?: number; prompt: string; promptMessageId?: Id<"messages">; referenceImages?: Array<string>; seed?: number; threadId: string; userId: string }) => Promise<{ assets: Array<{ imageSize: string; imageUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
-            generateImageToVideo: (args: { duration?: number; fps?: number; imageUrl: string; loop?: boolean; model?: string; motionStrength?: number; prompt?: string; threadId: string; userId: string }) => Promise<{ mimeType: string; model: string; videoUrl: string }>;
+            generateImageToVideo: (args: { generateAudio?: boolean; resolution?: string; duration?: number; fps?: number; imageUrl: string; loop?: boolean; model?: string; motionStrength?: number; organizationId?: string | null; prompt?: string; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; threadId: string; userId: string }) => Promise<{ fileId: string; mimeType: string; model: string; videoUrl: string }>;
             generateImg2Img: (args: { imageUrl: string; model?: string; negativePrompt?: string; prompt?: string; strength?: number; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string }>;
             generateInpaint: (args: { imageUrl: string; maskUrl: string; model?: string; negativePrompt?: string; prompt: string; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string }>;
             generateMusic: (args: { duration?: number; model: string; negativePrompt?: string; prompt: string; threadId: string; userId: string }) => Promise<{ assets: Array<{ audioUrl: string; mimeType: string }>; modelId: string; prompt: string }>;
@@ -8421,7 +8378,7 @@ export interface Caller {
             generateSummary: (args: { threadId: Id<"threads"> }) => Promise<{ success: boolean }>;
             generateTranscription: (args: { audioUrl: string; language?: string; model?: string; threadId: string; userId: string }) => Promise<{ chunks: Array<{ text: string; timestamp: Array<number> }>; model: string; text: string }>;
             generateUpscale: (args: { enhanceDetails?: boolean; enhanceFace?: boolean; imageUrl: string; model?: string; scale?: number; threadId: string; userId: string }) => Promise<{ imageUrl: string; mimeType: string; model: string; scale: number }>;
-            generateVideo: (args: { aspectRatio?: string; cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; duration?: number; jobId?: string; model: string; prompt: string; promptMessageId?: Id<"messages">; startFrameUrl?: string; threadId: string; userId: string }) => Promise<{ assets: Array<{ mimeType: string; videoUrl: string }>; modelId: string; prompt: string }>;
+            generateVideo: (args: { generateAudio?: boolean; resolution?: string; aspectRatio?: string; cinemaSettings?: { aperture?: 1.4 | 2 | 2.8 | 4 | 5.6 | 8 | 11 | 16; camera?: "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital"; enabled: boolean; focalLength?: 8 | 14 | 24 | 35 | 50 | 85 | 100 | 135 | 200; lens?: "cooke-s4" | "panavision-anamorphic" | "canon-k35" | "hawk-anamorphic" | "lensbaby" | "petzval" | "zeiss-ultra" | "anamorphic" | "prime" | "vintage-lens" | "zoom" | "macro" | "wide-angle" | "telephoto" | "fisheye" | "tilt-shift" | "cine-lens" | "bokeh-master" }; duration?: number; jobId?: string; model: string; organizationId?: string | null; prompt: string; promptMessageId?: Id<"messages">; referenceAudioUrls?: Array<string>; referenceVideoUrls?: Array<string>; startFrameUrl?: string; threadId: string; userId: string }) => Promise<{ assets: Array<{ fileId?: string; mimeType: string; videoUrl: string }>; modelId: string; prompt: string }>;
             getAllThreadRelationships: (args?: {}) => Promise<{ _creationTime: number; _id: Id<"threadRelationships">; branchPoint?: number; branchType?: "branch" | "continuation" | "comparison" | "subagent"; createdAt: number; parentThreadId: Id<"threads">; threadId: Id<"threads">; }[]>;
             getAnonymousMessageLimit: (args: { now: number }) => Promise<{ limit: number; remaining: number } | null>;
             getBrowserActions: (args: { sessionId: string }) => Promise<Array<{ _id: Id<"browserActions">; action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; durationMs?: number; errorMessage?: string; success: boolean; target?: string; timestamp: number; value?: string }>>;
@@ -8781,6 +8738,7 @@ export interface Caller {
     };
     file: {
         finalizeChatUpload: (args: { filename: string; uploadId: string }) => Promise<{ fileId: Id<"chatFiles">; url: string }>;
+        finalizeReferenceMedia: (args: { filename: string; uploadId: string }) => Promise<{ fileId: Id<"chatFiles">; url: string }>;
         getChatFileExtraction: (args: { fileId: Id<"chatFiles"> }) => Promise<null | { status: "pending" | "processing" | "completed" | "failed" | "unsupported" }>;
         getChatFileImageUrl: (args: { fileId: Id<"chatFiles"> }) => Promise<null | string>;
         purgeStagedChatUploads: (args: { userId: string }) => Promise<{ deleted: number }>;
@@ -9492,7 +9450,10 @@ export interface Caller {
             updateGalleryMeta: (args: { category?: "image" | "text" | "video" | "audio" | "automation"; description?: string; projectId: Id<"projects">; tags?: Array<string> }) => Promise<{ success: boolean }>;
         };
         generate: {
-            generateWorkflowFromPrompt: (args: { prompt: string }) => Promise<{ edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "output" | "image" | "text" | "file" | "code" | "branch" | "video" | "audio" | "ai" | "img2img" | "upscale" | "inpaint" | "outpaint" | "background-removal" | "image-to-video" | "transcription"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+            generateWorkflowFromPrompt: (args: { prompt: string }) => Promise<{ edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "output" | "image" | "text" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+        };
+        media_ops: {
+            extractVideoFrame: (args: { charge?: { costMicrodollars: number; orgId: string; requestId: string }; frame: "start" | "end"; threadId: string; userId: string; videoUrl: string }) => Promise<{ fileId: string; mimeType: string }>;
         };
         presence: {
             checkNodeLock: (args: { nodeId: string; projectId: Id<"projects"> }) => Promise<{ locked: boolean; lockedBy: string | null; lockerColor: string | null }>;
@@ -9787,9 +9748,11 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         billing: {
             applyCreemSubscription: (args) => callRegistered(context, "auth_billing:applyCreemSubscription", args),
+            creditsLeftQuery: (args) => callRegistered(context, "auth_billing:creditsLeftQuery", args),
             deductCreditsFromGateway: (args) => callRegistered(context, "auth_billing:deductCreditsFromGateway", args),
             getBillingInfo: (args) => callRegistered(context, "auth_billing:getBillingInfo", args),
             getMemberCredits: (args) => callRegistered(context, "auth_billing:getMemberCredits", args),
+            getRunPlanForOrganizationQuery: (args) => callRegistered(context, "auth_billing:getRunPlanForOrganizationQuery", args),
             listMemberCredits: (args) => callRegistered(context, "auth_billing:listMemberCredits", args),
             setMemberCreditOverride: (args) => callRegistered(context, "auth_billing:setMemberCreditOverride", args),
             setOrganizationBillingTier: (args) => callRegistered(context, "auth_billing:setOrganizationBillingTier", args),
@@ -10335,6 +10298,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
     },
     file: {
         finalizeChatUpload: (args) => callRegistered(context, "file:finalizeChatUpload", args),
+        finalizeReferenceMedia: (args) => callRegistered(context, "file:finalizeReferenceMedia", args),
         getChatFileExtraction: (args) => callRegistered(context, "file:getChatFileExtraction", args),
         getChatFileImageUrl: (args) => callRegistered(context, "file:getChatFileImageUrl", args),
         purgeStagedChatUploads: (args) => callRegistered(context, "file:purgeStagedChatUploads", args),
@@ -11047,6 +11011,9 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         generate: {
             generateWorkflowFromPrompt: (args) => callRegistered(context, "workflow_generate:generateWorkflowFromPrompt", args),
+        },
+        media_ops: {
+            extractVideoFrame: (args) => callRegistered(context, "workflow_media_ops:extractVideoFrame", args),
         },
         presence: {
             checkNodeLock: (args) => callRegistered(context, "workflow_presence:checkNodeLock", args),

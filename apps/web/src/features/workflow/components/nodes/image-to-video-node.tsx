@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveWorkflowModel } from "@neore/ai/models";
 import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
 import { Slider } from "@ui/components/slider";
@@ -12,8 +13,11 @@ import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { ImageToVideoNodeData } from "../../types";
 import NODE_CONFIGS from "../../types";
-import { toBaseOption } from "../../utils/model-options";
+import { toBaseOption, videoModelPatch } from "../../utils/model-options";
 import BaseNode from "./base-node";
+import ModelSelect from "./model-select";
+import { VideoFramesSection } from "./video-frames-section";
+import { ReferenceMode, VideoModelOptions } from "./video-model-options";
 
 const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
     const { data, id } = props;
@@ -36,10 +40,8 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
             : [],
     );
 
-    const defaultModel = modelOptions[0]?.value ?? "fal-ai/kling-video/v1.5/pro/image-to-video";
-
     // Get current model capabilities
-    const currentModelDefinition = models.find((m) => m.id === (data.model ?? defaultModel));
+    const currentModelDefinition = models.find((m) => m.id === resolveWorkflowModel("imageToVideo", data.model));
     const currentModelInfo = {
         maxDuration: currentModelDefinition?.maxVideoDuration ?? 10,
         supportedFps: currentModelDefinition?.supportedFps ?? [24],
@@ -47,7 +49,7 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
 
     const handleModelChange = (model: string | null) => {
         if (model) {
-            updateNode(id, { model });
+            updateNode(id, videoModelPatch(model, data));
         }
     };
 
@@ -83,23 +85,17 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
         <BaseNode {...props} color={config.color} icon={<Film className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
-                        <Trans>Model</Trans>
-                    </Label>
-                    <Select onValueChange={handleModelChange} value={data.model ?? defaultModel}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
-                            <SelectValue placeholder={t`Select model...`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {modelOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    <span className="block max-w-[200px] truncate">{option.label}</span>
-                                    {option.isPremium && <span className="ml-1 text-xs text-amber-500">★</span>}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <ModelSelect
+                        label={<Trans>Model</Trans>}
+                        note={<Trans>Pro models need a Pro plan. On a free plan the run stops before it starts.</Trans>}
+                        onChange={handleModelChange}
+                        options={modelOptions}
+                        placeholder={t`Select model...`}
+                        value={resolveWorkflowModel("imageToVideo", data.model)}
+                    />
                 </div>
+
+                <ReferenceMode data={data} id={id} modelId={resolveWorkflowModel("imageToVideo", data.model)} models={models} />
 
                 <div className="space-y-1.5">
                     <Label className="text-muted-foreground text-xs" htmlFor={`${id}-prompt`}>
@@ -119,6 +115,8 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
+                    <VideoModelOptions data={data} id={id} modelId={resolveWorkflowModel("imageToVideo", data.model)} />
+
                     <div className="space-y-1.5">
                         <Label className="text-muted-foreground text-xs">
                             <Trans>Duration: {duration}s</Trans>
@@ -169,6 +167,8 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
                 <div className="text-muted-foreground bg-muted/50 rounded p-2 text-xs">
                     <Trans>Connect an image node as input</Trans>
                 </div>
+
+                <VideoFramesSection nodeId={id} pickedTime={data.pickedTime} />
             </div>
         </BaseNode>
     );

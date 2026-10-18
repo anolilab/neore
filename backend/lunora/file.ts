@@ -25,6 +25,7 @@ import { v } from "lunorash/server";
 import { internal } from "./_generated/internal";
 import { internalAction, internalMutation } from "./_generated/server";
 import { finalizeStagedUpload, purgeStagedUploads } from "./lib/chat-upload";
+import { finalizeStagedReferenceMedia } from "./lib/reference-media-upload";
 import { authAction, authQuery, rateLimit } from "./lib/crpc";
 import { displayUrlExpiresInSeconds } from "./lib/storage-ref";
 import { currentUserShard } from "./lib/shard-context";
@@ -49,6 +50,27 @@ export const finalizeChatUpload = authAction
 
         // The file id only: the filename is user-chosen and stays out of the logs.
         ctx.log.event("file.finalize_chat_upload", { fileId: finalized.fileId });
+
+        return finalized;
+    });
+
+/**
+ * Turn a reference-media upload (`purpose=reference-media`) into a chat file a
+ * workflow media node can point at. Same staging key rule as
+ * {@link finalizeChatUpload}; the bytes are checked against the reference
+ * allowlist and caps, not the chat ones (`lib/reference-media-upload.ts`).
+ */
+export const finalizeReferenceMedia = authAction
+    .use(rateLimit("chat/attachmentUpload"))
+    .input({
+        filename: v.string().max(MAX_LENGTH.short),
+        uploadId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ fileId: v.id("chatFiles"), url: v.string() }))
+    .action(async ({ args, ctx }) => {
+        const finalized = await finalizeStagedReferenceMedia(ctx, ctx.user.userId, args);
+
+        ctx.log.event("file.finalize_reference_media", { fileId: finalized.fileId });
 
         return finalized;
     });

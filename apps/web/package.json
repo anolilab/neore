@@ -137,6 +137,7 @@
         "katex": "catalog:syntax",
         "lowlight": "catalog:tiptap",
         "lucide-react": "catalog:icons",
+        "mediabunny": "catalog:",
         "mermaid": "catalog:syntax",
         "motion": "catalog:animation",
         "my-ua-parser": "catalog:utils",

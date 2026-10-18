@@ -6,6 +6,7 @@ import type { AgentConfig } from "@neore/ai/providers";
  * Provides SSE streaming for workflow execution, sending real-time updates
  * for node status changes and AI text generation.
  */
+import { resolveWorkflowModel } from "@neore/ai/models";
 import { streamText as streamTextAi } from "ai";
 import type { HttpActionCtx } from "lunorash/server";
 
@@ -23,7 +24,6 @@ import {
     executeCodeNode,
     executeFileNode,
     executeOutputNode,
-    executeTextNode,
     type ExecutionContext,
     extractUrl,
     getExecutionOrder,
@@ -34,6 +34,9 @@ import {
     type WorkflowContent,
     type WorkflowNode,
 } from "./core";
+import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext } from "./media-args";
+import { executeTextNode } from "./mention-targets";
+import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
 
 let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
 
@@ -108,6 +111,14 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
         return Response.json({ error: "Workflow has no nodes" }, { status: 400 });
     }
 
+    // Checked before any node runs, so a run that cannot finish never bills an earlier clip.
+    const account = await resolveRunAccount(context, userId);
+    const inputErrors = workflowRunErrors(account, workflowContent);
+
+    if (inputErrors.length > 0) {
+        return Response.json({ error: inputErrors.join("; ") }, { status: 400 });
+    }
+
     const userProviderKeys = await context.runQuery(internal.auth.functions.getDecryptedProviderKeysQuery, { userId });
 
     const execution = await context.runMutation(internal.agent.workflow_executions.create, {
@@ -134,10 +145,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
 
     // Start streaming execution
     const executeWorkflow = async () => {
-        const executionContext: ExecutionContext = {
-            nodeOutputs: {},
-            variables: variables ?? {},
-        };
+        const executionContext = buildExecutionContext({ account, content: workflowContent, runId: executionId, variables });
 
         const totalUsage = createEmptyUsage();
 
@@ -286,8 +294,9 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                             break;
                         }
 
-                        case "image-to-video": {
-                            const result = await executeImageToVideoNodeStreaming(node, executionContext, context, userId);
+                        case "image-to-video":
+                        case "video": {
+                            const result = await executeVideoNodeStreaming(node, executionContext, context, userId);
 
                             output = result.output;
                             break;
@@ -358,13 +367,6 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
 
                         case "upscale": {
                             const result = await executeUpscaleNodeStreaming(node, executionContext, context, userId);
-
-                            output = result.output;
-                            break;
-                        }
-
-                        case "video": {
-                            const result = await executeVideoNodeStreaming(node, executionContext, context, userId);
 
                             output = result.output;
                             break;
@@ -490,7 +492,7 @@ const executeAINodeStreaming = async (
         maxOutputTokens: data.maxTokens,
         model: languageModel,
         prompt,
-        system: data.systemPrompt,
+        system: systemPromptFor(node, context),
         temperature: data.temperature,
     });
 
@@ -533,78 +535,27 @@ const executeImageNodeStreaming = async (
         return { output: data.imageUrl ?? "" };
     }
 
-    const inputPrompt = getLastOutput(context);
-    const genPrompt = typeof inputPrompt === "string" ? inputPrompt : data.prompt;
+    const { prompt, referenceImages } = imageRequestArgs(node, context);
 
     const result = await actionContext.runAction(internal.chat.functions.generateImage, {
         imageSize: data.aspectRatio ?? "1:1",
-        model: data.model ?? "fal:flux-dev",
+        model: resolveWorkflowModel("image", data.model),
         numImages: 1,
-        prompt: genPrompt ?? "",
+        prompt: prompt ?? "",
         threadId: "workflow",
         userId,
+        ...(referenceImages.length > 0 && { referenceImages }),
     });
 
     return { output: result };
 };
 
 /**
- * Execute video node (non-streaming).
+ * Execute a video node, text-to-video or image-to-video (`runVideoNode`). A failure throws, as the other
+ * streaming node executors do; the caller reports it as the node's error.
  */
-const executeVideoNodeStreaming = async (
-    node: WorkflowNode,
-    context: ExecutionContext,
-    actionContext: HttpActionCtx,
-    userId: string,
-): Promise<{ output: unknown }> => {
-    const data = node.data as {
-        aspectRatio?: string;
-        duration?: number;
-        fps?: number;
-        mode?: "text-to-video" | "image-to-video";
-        model?: string;
-        motionStrength?: number;
-        prompt?: string;
-    };
-
-    const inputValue = getLastOutput(context);
-
-    // If mode is image-to-video, dispatch to the image-to-video action
-    if (data.mode === "image-to-video") {
-        const imageUrl = extractUrl(inputValue, "imageUrl");
-
-        if (!imageUrl) {
-            throw new Error("No image input provided for image-to-video mode");
-        }
-
-        const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
-            duration: data.duration,
-            fps: data.fps,
-            imageUrl,
-            model: data.model,
-            motionStrength: data.motionStrength,
-            prompt: data.prompt,
-            threadId: "workflow",
-            userId,
-        });
-
-        return { output: result };
-    }
-
-    // Default: text-to-video mode
-    const genPrompt = data.prompt ?? (typeof inputValue === "string" ? inputValue : "");
-
-    const result = await actionContext.runAction(internal.chat.functions.generateVideo, {
-        aspectRatio: data.aspectRatio ?? "16:9",
-        duration: data.duration ?? 5,
-        model: data.model ?? "fal:mochi-v1",
-        prompt: genPrompt,
-        threadId: "workflow",
-        userId,
-    });
-
-    return { output: result };
-};
+const executeVideoNodeStreaming = async (node: WorkflowNode, context: ExecutionContext, actionContext: VideoRunContext, userId: string) =>
+    await runVideoNode(node, context, actionContext, userId);
 
 /**
  * Execute audio node (non-streaming).
@@ -625,7 +576,7 @@ const executeAudioNodeStreaming = async (
     const text = data.text ?? (typeof inputValue === "string" ? inputValue : "");
 
     const result = await actionContext.runAction(internal.chat.functions.generateAudio, {
-        model: data.model ?? "openai:tts-1",
+        model: resolveWorkflowModel("tts", data.model),
         prompt: text,
         threadId: "workflow",
         userId,
@@ -660,7 +611,7 @@ const executeImg2ImgNodeStreaming = async (
 
     const result = await actionContext.runAction(internal.chat.functions.generateImg2Img, {
         imageUrl,
-        model: data.model,
+        model: resolveWorkflowModel("img2img", data.model),
         negativePrompt: data.negativePrompt,
         prompt: data.prompt,
         strength: data.strength ?? 0.75,
@@ -698,7 +649,7 @@ const executeUpscaleNodeStreaming = async (
         enhanceDetails: data.enhanceDetails ?? true,
         enhanceFace: data.enhanceFace ?? false,
         imageUrl,
-        model: data.model,
+        model: resolveWorkflowModel("upscale", data.model),
         scale: data.scale ?? 2,
         threadId: "workflow",
         userId,
@@ -748,7 +699,7 @@ const executeInpaintNodeStreaming = async (
     const result = await actionContext.runAction(internal.chat.functions.generateInpaint, {
         imageUrl,
         maskUrl,
-        model: data.model,
+        model: resolveWorkflowModel("inpaint", data.model),
         negativePrompt: data.negativePrompt,
         prompt: data.prompt,
         threadId: "workflow",
@@ -1015,48 +966,8 @@ const executeObjectEditorNodeStreaming = async (
         imageUrl,
         maskUrl,
         mode: data.mode ?? "remove",
-        model: data.model,
+        model: resolveWorkflowModel(data.mode === "add" ? "inpaint" : "objectRemove", data.model),
         negativePrompt: data.negativePrompt,
-        prompt: data.prompt,
-        threadId: "workflow",
-        userId,
-    });
-
-    return { output: result };
-};
-
-/**
- * Execute image-to-video node (non-streaming).
- */
-const executeImageToVideoNodeStreaming = async (
-    node: WorkflowNode,
-    context: ExecutionContext,
-    actionContext: HttpActionCtx,
-    userId: string,
-): Promise<{ output: unknown }> => {
-    const data = node.data as {
-        duration?: number;
-        fps?: number;
-        loop?: boolean;
-        model?: string;
-        motionStrength?: number;
-        prompt?: string;
-    };
-
-    const inputValue = getLastOutput(context);
-    const imageUrl = extractUrl(inputValue, "imageUrl");
-
-    if (!imageUrl) {
-        throw new Error("No image input provided for image-to-video");
-    }
-
-    const result = await actionContext.runAction(internal.chat.functions.generateImageToVideo, {
-        duration: data.duration,
-        fps: data.fps,
-        imageUrl,
-        loop: data.loop,
-        model: data.model,
-        motionStrength: data.motionStrength,
         prompt: data.prompt,
         threadId: "workflow",
         userId,
@@ -1097,7 +1008,7 @@ const executeControlNetNodeStreaming = async (
         controlType: data.controlType ?? "pose",
         endPercent: data.endPercent,
         imageUrl,
-        model: data.model,
+        model: resolveWorkflowModel("controlnet", data.model),
         preprocessor: data.preprocessor,
         prompt,
         startPercent: data.startPercent,
@@ -1133,7 +1044,7 @@ const executeTranscriptionNodeStreaming = async (
     const result = await actionContext.runAction(internal.chat.functions.generateTranscription, {
         audioUrl,
         language: data.language,
-        model: data.model,
+        model: resolveWorkflowModel("transcription", data.model),
         threadId: "workflow",
         userId,
     });

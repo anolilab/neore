@@ -51,6 +51,64 @@ export interface ChatAttachmentLimit {
 }
 
 /**
+ * Reference media: the video and audio a workflow node hands to a generation
+ * model (`fal-ai/...` reference-to-video inputs). These are NOT chat
+ * attachments: they travel the `reference-media` upload purpose
+ * (`lib/upload-route.ts`) and are refused by the chat allowlist. The caps are
+ * the reference endpoints' documented limits.
+ */
+export const REFERENCE_VIDEO_MIME_TYPES = ["video/mp4", "video/quicktime"] as const;
+export const REFERENCE_AUDIO_MIME_TYPES = ["audio/mpeg", "audio/wav", "audio/x-wav"] as const;
+export const REFERENCE_MEDIA_MIME_TYPES: ReadonlyArray<string> = [...REFERENCE_VIDEO_MIME_TYPES, ...REFERENCE_AUDIO_MIME_TYPES];
+
+/** 50 MiB per reference video. */
+export const MAX_REFERENCE_VIDEO_BYTES = 50 * MEGABYTE;
+
+/** 15 MiB per reference audio clip. */
+export const MAX_REFERENCE_AUDIO_BYTES = 15 * MEGABYTE;
+
+/** The largest reference upload there is: the cap the upload route declares for every purpose. */
+export const MAX_REFERENCE_MEDIA_BYTES = MAX_REFERENCE_VIDEO_BYTES;
+
+const REFERENCE_EXTENSION_TYPES: Readonly<Record<string, string>> = {
+    mov: "video/quicktime",
+    mp3: "audio/mpeg",
+    mp4: "video/mp4",
+    wav: "audio/wav",
+};
+
+/**
+ * The reference-media MIME type of a file, or `undefined` when it is not
+ * reference media. The declared type wins when it is one of ours; otherwise
+ * the extension decides, since browsers report `.wav` under several types and
+ * `.mov` under none. The server still checks the real bytes.
+ */
+export const referenceMediaTypeOf = (fileName: string, declaredType: string): string | undefined => {
+    const declared = declaredType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+
+    if (REFERENCE_MEDIA_MIME_TYPES.includes(declared)) {
+        return declared;
+    }
+
+    const extension = fileName.includes(".") ? (fileName.split(".").pop()?.toLowerCase() ?? "") : "";
+
+    return REFERENCE_EXTENSION_TYPES[extension];
+};
+
+/** The most a reference upload of this MIME type may weigh, or `undefined` when the type is not reference media. */
+export const referenceMediaLimitFor = (mimeType: string): number | undefined => {
+    if (REFERENCE_VIDEO_MIME_TYPES.includes(mimeType as (typeof REFERENCE_VIDEO_MIME_TYPES)[number])) {
+        return MAX_REFERENCE_VIDEO_BYTES;
+    }
+
+    if (REFERENCE_AUDIO_MIME_TYPES.includes(mimeType as (typeof REFERENCE_AUDIO_MIME_TYPES)[number])) {
+        return MAX_REFERENCE_AUDIO_BYTES;
+    }
+
+    return undefined;
+};
+
+/**
  * The most a CHAT attachment of this MIME type may weigh — one rule for the
  * composer's pre-check, the upload route that receives the bytes
  * (`lib/upload-route.ts`, which refuses a larger declared size before storing

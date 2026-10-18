@@ -6,9 +6,10 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { claimKey } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
 import schema from "../schema";
-import { chargeDailyUnit } from "./daily-charge";
+import { chargeDailyUnit, DAILY_CHARGE_SCOPE } from "./daily-charge";
 
 const { orgs, users } = vi.hoisted(() => {
     return {
@@ -37,7 +38,7 @@ type Harness = ReturnType<typeof lunoraTest>;
 
 let harness: Harness;
 
-const charge = async (args: { kind: "Audio" | "Text"; organizationId?: string; userId: string }): Promise<boolean> =>
+const charge = async (args: { kind: "Audio" | "Text"; organizationId?: string; requestId?: string; userId: string }): Promise<boolean> =>
     await harness.run(async (ctx: any) => await ctx.runMutation(chargeDailyUnit, args));
 
 const remaining = async (key: string, userId: string): Promise<number> =>
@@ -87,5 +88,39 @@ describe("chargeDailyUnit", () => {
 
         await expect(charge({ kind: "Text", userId: "gone" })).resolves.toBe(false);
         await expect(charge({ kind: "Text", userId: "admin" })).resolves.toBe(true);
+    });
+
+    it("takes one unit per request: a retry of the same request is not charged again, and a new request is", async () => {
+        users.set("u1", {});
+
+        const before = await remaining("chat/dailyText:free", "u1");
+
+        await expect(charge({ kind: "Text", requestId: "run-1:node-1", userId: "u1" })).resolves.toBe(true);
+        await expect(charge({ kind: "Text", requestId: "run-1:node-1", userId: "u1" })).resolves.toBe(true);
+        expect(await remaining("chat/dailyText:free", "u1")).toBe(before - 1);
+
+        await expect(charge({ kind: "Text", requestId: "run-2:node-1", userId: "u1" })).resolves.toBe(true);
+        expect(await remaining("chat/dailyText:free", "u1")).toBe(before - 2);
+    });
+
+    it("releases a refused request's claim, so its retry is refused again rather than passing for free", async () => {
+        users.set("u1", {});
+
+        // Spend the free text quota with unkeyed charges until the limiter refuses one.
+        let spent = false;
+
+        for (let attempt = 0; attempt < 500 && !spent; attempt += 1) {
+            spent = !(await charge({ kind: "Text", userId: "u1" }));
+        }
+
+        expect(spent).toBe(true);
+        await expect(charge({ kind: "Text", requestId: "run-3:node-1", userId: "u1" })).resolves.toBe(false);
+
+        // Nothing holds the refused request's key: a later attempt of it is not a replay of a taken unit.
+        const claimedBefore = await harness.run(
+            async (ctx: any) => await ctx.runMutation(claimKey, { key: "run-3:node-1", scope: DAILY_CHARGE_SCOPE, ttlMs: 60_000 }),
+        );
+
+        expect(claimedBefore).toBe(true);
     });
 });

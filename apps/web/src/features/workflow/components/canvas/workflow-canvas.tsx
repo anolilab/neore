@@ -1,16 +1,19 @@
 import "@xyflow/react/dist/style.css";
 
 import { useLingui } from "@lingui/react/macro";
+import type { Connection, Edge } from "@xyflow/react";
 import { Background, MiniMap, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { useRef, useState } from "react";
 
 import { WorkflowCollabProvider } from "../../contexts";
+import { useEdgeCut } from "../../hooks/use-edge-cut";
 import type { PresenceUser } from "../../hooks/use-workflow-presence";
 import { useWorkflowShortcuts } from "../../hooks/use-workflow-shortcuts";
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { WorkflowEdge, WorkflowNode, WorkflowNodeType } from "../../types";
 import NODE_CONFIGS from "../../types";
+import { canConnectFrom, hasFrameEdgeInto } from "../../utils/frame-connection";
 import CollaboratorCursors from "../collab/collaborator-cursors";
 import { edgeTypes } from "../edges";
 import { nodeTypes } from "../nodes";
@@ -52,8 +55,8 @@ const WorkflowCanvasInner = ({
     onStartEditingNode,
     onStopEditingNode,
 }: WorkflowCanvasProps) => {
-    const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const { getIntersectingNodes, screenToFlowPosition } = useReactFlow();
+    const { cutLineRef, onPointerDownCapture } = useEdgeCut();
     const { i18n } = useLingui();
 
     const nodes = useWorkflowStore((state) => state.nodes);
@@ -148,12 +151,23 @@ const WorkflowCanvasInner = ({
             type: "animated" as const,
         };
 
+        // The node is still created when the edge is refused; only the frame edge is dropped.
         const { edges: currentEdges } = useWorkflowStore.getState();
 
-        setEdges([...currentEdges, newEdge]);
+        if (canConnectFrom(newEdge.sourceHandle, type, hasFrameEdgeInto(currentEdges, newEdge.target))) {
+            setEdges([...currentEdges, newEdge]);
+        }
 
         selectNode(newNodeId);
         setConnectionDropMenu(null);
+    };
+
+    // A frame may only feed a video or image-to-video node (its handle is `frame-<kind>`), and only one per node.
+    const isValidConnection = (connection: Edge | Connection) => {
+        const state = useWorkflowStore.getState();
+        const target = state.nodes.find((node) => node.id === connection.target);
+
+        return canConnectFrom(connection.sourceHandle, target?.type, hasFrameEdgeInto(state.edges, connection.target));
     };
 
     const onDragOver = (event: React.DragEvent) => {
@@ -277,7 +291,12 @@ const WorkflowCanvasInner = ({
             startEditingNode={onStartEditingNode ?? noopStartEditing}
             stopEditingNode={onStopEditingNode ?? noopStopEditing}
         >
-            <div className={`relative h-full w-full ${className ?? ""}`} onMouseLeave={onMouseLeave} onMouseMove={onMouseMove} ref={reactFlowWrapper}>
+            <div
+                className={`relative h-full w-full ${className ?? ""}`}
+                onMouseLeave={onMouseLeave}
+                onMouseMove={onMouseMove}
+                onPointerDownCapture={onPointerDownCapture}
+            >
                 <ReactFlow<WorkflowNode, WorkflowEdge>
                     defaultEdgeOptions={{
                         animated: true,
@@ -287,6 +306,7 @@ const WorkflowCanvasInner = ({
                     deleteKeyCode={["Backspace", "Delete"]}
                     edges={edges}
                     edgeTypes={edgeTypes}
+                    isValidConnection={isValidConnection}
                     maxZoom={2}
                     minZoom={0.1}
                     multiSelectionKeyCode={["Shift", "Meta"]}
@@ -320,6 +340,11 @@ const WorkflowCanvasInner = ({
                         nodeColor={(node) => NODE_CONFIGS[node.type as WorkflowNodeType]?.color ?? "#6366f1"}
                     />
                 </ReactFlow>
+
+                {/* Edge cut line, shown only while an Alt/Ctrl drag is in progress */}
+                <svg aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible">
+                    <line ref={cutLineRef} stroke="var(--destructive)" strokeDasharray="6 4" strokeWidth={1.5} visibility="hidden" />
+                </svg>
 
                 {/* Collaborator cursors overlay */}
                 {collaborators && collaborators.length > 0 && <CollaboratorCursors users={collaborators} />}
