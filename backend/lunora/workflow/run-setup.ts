@@ -46,7 +46,7 @@ export const resolveRunAccount = async (context: RunContext, userId: string): Pr
 /** Every refusal for a run, checked before any node runs so a doomed run bills nothing. */
 export const workflowRunErrors = (account: RunAccount, content: Pick<WorkflowContent, "edges" | "nodes">): string[] => [
     ...workflowInputErrors(content),
-    ...workflowVideoErrors(account, content.nodes),
+    ...workflowVideoErrors(account, content.nodes, content.edges),
 ];
 
 /** The execution context of one run. The organization is the account's, so a clip is charged to it. */

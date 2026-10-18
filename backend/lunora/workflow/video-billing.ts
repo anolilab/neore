@@ -23,7 +23,7 @@ import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
 import { computeGatewayCredits } from "../auth/lib/gateway-credits";
 import { chatLogger } from "../lib/logger";
-import type { ExecutionContext, WorkflowNode } from "./core";
+import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
 import { isVideoNode, modelIdFor, videoKindOf } from "./video-inputs";
 import { premiumVideoErrors, unrunnableVideoErrors, videoRequestId } from "./video-policy";
 import type { RunAccount } from "./run-setup";
@@ -41,13 +41,13 @@ export interface VideoRunCosts {
  * The graph-wide refusals for a run's video nodes, checked with the other input errors before any node
  * runs. Empty when the graph has no video node.
  */
-export const workflowVideoErrors = (account: RunAccount, nodes: ReadonlyArray<WorkflowNode>): string[] => {
+export const workflowVideoErrors = (account: RunAccount, nodes: ReadonlyArray<WorkflowNode>, edges: ReadonlyArray<WorkflowEdge> = []): string[] => {
     if (nodes.every((candidate) => !isVideoNode(candidate))) {
         return [];
     }
 
     // Refused before any charge: these runs could never reach their paid call.
-    const refusals = unrunnableVideoErrors(nodes);
+    const refusals = unrunnableVideoErrors(nodes, edges);
 
     if (refusals.length > 0) {
         return refusals;

@@ -8,8 +8,18 @@ import { TEXT_TO_VIDEO_PROVIDERS } from "../chat/lib/video-providers";
 import { byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { falVideoOptionInput } from "../chat/lib/fal-reference-mapping";
 import type { FrameKind } from "./mentions";
-import type { WorkflowNode } from "./core";
-import { DEFAULT_VIDEO_SECONDS, generatedClipSecondsOf, isVideoNode, modelIdFor, videoDefinitionOf, videoDurationOf, videoKindOf } from "./video-inputs";
+import { isFrameHandleId } from "./mentions";
+import type { WorkflowEdge, WorkflowNode } from "./core";
+import {
+    DEFAULT_VIDEO_SECONDS,
+    generatedClipSecondsOf,
+    isVideoNode,
+    modelIdFor,
+    videoDefinitionOf,
+    videoDurationOf,
+    videoKindOf,
+    wireRoleOf,
+} from "./video-inputs";
 
 /**
  * An injective encoding of a tuple of ids into one request-id segment. Ids are user-controlled strings, so a
@@ -88,7 +98,7 @@ export const premiumVideoErrors = (nodes: ReadonlyArray<WorkflowNode>, canUsePre
  * on a provider the action calls (`TEXT_TO_VIDEO_PROVIDERS`); an image-to-video node needs an enabled fal row that
  * takes an image input (the `imageToVideo` accept rule in the registry package).
  */
-export const unrunnableVideoErrors = (nodes: ReadonlyArray<WorkflowNode>): string[] =>
+export const unrunnableVideoErrors = (nodes: ReadonlyArray<WorkflowNode>, edges: ReadonlyArray<WorkflowEdge> = []): string[] =>
     nodes.flatMap((node) => {
         const kind = videoKindOf(node);
 
@@ -106,9 +116,33 @@ export const unrunnableVideoErrors = (nodes: ReadonlyArray<WorkflowNode>): strin
 
         const definition = enabledModelOf(modelId, { mode: "video" });
 
-        return definition && TEXT_TO_VIDEO_PROVIDERS.includes(definition.provider)
-            ? []
-            : [`The "${labelOf(node)}" node's model ${modelId} is not an enabled video model`];
+        if (!definition || !TEXT_TO_VIDEO_PROVIDERS.includes(definition.provider)) {
+            return [`The "${labelOf(node)}" node's model ${modelId} is not an enabled video model`];
+        }
+
+        // An image-only model fails in the action without a start image, after the daily unit is spent: the node needs
+        // a frame wire or a wire from an image source.
+        if (definition.supportsImageToVideo && !definition.supportsTextToVideo && !hasImageSource(node, nodes, edges)) {
+            return [`The "${labelOf(node)}" node's model ${modelId} needs an image input; wire in an image or a frame`];
+        }
+
+        return [];
+    });
+
+/** Whether `node` has an incoming frame wire or a wire from a source that provides an image. */
+const hasImageSource = (node: WorkflowNode, nodes: ReadonlyArray<WorkflowNode>, edges: ReadonlyArray<WorkflowEdge>): boolean =>
+    edges.some((edge) => {
+        if (edge.target !== node.id) {
+            return false;
+        }
+
+        if (isFrameHandleId(edge.sourceHandle)) {
+            return true;
+        }
+
+        const source = nodes.find((candidate) => candidate.id === edge.source);
+
+        return source !== undefined && wireRoleOf(source) === "image";
     });
 
 /**

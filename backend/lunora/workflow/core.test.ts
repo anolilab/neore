@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { executionContextOf } from "./test-execution-context";
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
-import { extractUrl, getNodeInput, sourceNodesOf } from "./core";
+import { executeFileNode, extractUrl, getNodeInput, sourceNodesOf } from "./core";
 
 const node = (id: string, type: string, data: Record<string, unknown> = {}): WorkflowNode => {
     return { data, id, position: { x: 0, y: 0 }, type };
@@ -64,5 +64,28 @@ describe("getNodeInput", () => {
 
         expect(getNodeInput("c", ctx)).toStrictEqual(["one", "two"]);
         expect(getNodeInput("a", ctx)).toBeUndefined();
+    });
+});
+
+describe("executeFileNode", () => {
+    it("keeps the stored file id beside a signed url, so a later run signs the file again instead of sending an expired link", () => {
+        const result = executeFileNode(
+            node("f", "file", { fileId: "file-1", fileName: "a.mp4", fileType: "video/mp4", fileUrl: "https://signed.example/a.mp4?sig=1" }),
+        );
+
+        expect(result.output).toStrictEqual({ fileId: "file-1", name: "a.mp4", type: "video/mp4", url: "https://signed.example/a.mp4?sig=1" });
+    });
+
+    it("still returns just the url for a file with no stored id, and just the id when there is no url", () => {
+        expect(executeFileNode(node("f", "file", { fileName: "a.png", fileType: "image/png", fileUrl: "https://x.example/a.png" })).output).toStrictEqual({
+            name: "a.png",
+            type: "image/png",
+            url: "https://x.example/a.png",
+        });
+        expect(executeFileNode(node("f", "file", { fileId: "file-2", fileName: "a.png", fileType: "image/png" })).output).toStrictEqual({
+            fileId: "file-2",
+            name: "a.png",
+            type: "image/png",
+        });
     });
 });

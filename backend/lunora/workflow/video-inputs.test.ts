@@ -92,6 +92,13 @@ describe("resolveVideoInputs", () => {
 });
 
 describe("mediaOf", () => {
+    it("prefers the stored file id over a signed url in the same output, so the url is never the one sent", () => {
+        expect(mediaOf({ fileId: "file-1", type: "video/mp4", url: "https://signed.example/a.mp4?sig=1" })).toStrictEqual({
+            mimeType: "video/mp4",
+            ref: { fileId: "file-1" },
+        });
+    });
+
     it("reads the audio of a generateAudio answer, which keeps it under assets[0].audioUrl", () => {
         const output = { assets: [{ audioUrl: "https://x.example/a.mp3", mimeType: "audio/mpeg" }], modelId: "openai:tts-1", prompt: "hi" };
 

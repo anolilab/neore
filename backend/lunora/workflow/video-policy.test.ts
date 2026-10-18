@@ -2,7 +2,7 @@ import { MODEL_LOOKUP, type ModelDefinition, UNPRICED_FAL_VIDEO } from "@neore/a
 import { describe, expect, it } from "vitest";
 
 import { TEXT_TO_VIDEO_PROVIDERS } from "../chat/lib/video-providers";
-import type { WorkflowNode } from "./core";
+import type { WorkflowEdge, WorkflowNode } from "./core";
 import { DEFAULT_VIDEO_SECONDS, videoDurationOf, videoKindOf } from "./video-inputs";
 import {
     frameClipSeconds,
@@ -198,6 +198,58 @@ describe("videoRequestId", () => {
         expect(videoRequestId("exec-1", "n1")).toBe(`workflow-video:${JSON.stringify(["exec-1", "n1"])}`);
         expect(videoRequestId("exec-1", "n2")).not.toBe(videoRequestId("exec-1", "n1"));
         expect(videoRequestId("exec-2", "n1")).not.toBe(videoRequestId("exec-1", "n1"));
+    });
+});
+
+describe("unrunnableVideoErrors: an image-only model", () => {
+    // An enabled fal video row that takes an image and no text-only generation (the action throws without a start image).
+    const imageOnlyRow = (): ModelDefinition | undefined => {
+        for (const definition of MODEL_LOOKUP.values()) {
+            if (
+                definition.mode === "video" &&
+                definition.provider === "fal" &&
+                definition.enabled !== false &&
+                definition.supportsImageToVideo &&
+                !definition.supportsTextToVideo &&
+                TEXT_TO_VIDEO_PROVIDERS.includes(definition.provider)
+            ) {
+                return definition;
+            }
+        }
+
+        return undefined;
+    };
+
+    const imageOnly = imageOnlyRow();
+
+    const edge = (source: string, target: string, sourceHandle?: string): WorkflowEdge => {
+        return { id: `${source}-${target}`, source, sourceHandle, target };
+    };
+
+    it("has a registry fixture", () => {
+        expect(imageOnly, "no enabled image-only fal video row in the registry").toBeDefined();
+    });
+
+    it("is refused before any unit is spent when no image reaches the node", () => {
+        const t2v = node("t", "video", { label: "Clip", mode: "text-to-video", model: imageOnly?.id });
+
+        expect(unrunnableVideoErrors([t2v], [])).toStrictEqual([`The "Clip" node's model ${imageOnly?.id} needs an image input; wire in an image or a frame`]);
+    });
+
+    it("is accepted with a wire from an image source or a frame wire", () => {
+        const t2v = node("t", "video", { label: "Clip", mode: "text-to-video", model: imageOnly?.id });
+        const image = node("i", "image", { mode: "input" });
+        const clip = node("c", "video", { mode: "text-to-video" });
+
+        expect(unrunnableVideoErrors([t2v, image], [edge("i", "t")])).toStrictEqual([]);
+        expect(unrunnableVideoErrors([t2v, clip], [edge("c", "t", "frame-end")])).toStrictEqual([]);
+    });
+
+    it("is still refused when only a text wire reaches it, since text is not an image", () => {
+        const t2v = node("t", "video", { label: "Clip", mode: "text-to-video", model: imageOnly?.id });
+        const text = node("x", "text", { mode: "input" });
+
+        expect(unrunnableVideoErrors([t2v, text], [edge("x", "t")])).toHaveLength(1);
     });
 });
 

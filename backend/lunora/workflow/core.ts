@@ -410,8 +410,10 @@ export const executeFileNode = (node: WorkflowNode): NodeExecutionResult => {
     };
 
     if (data.fileUrl) {
+        // The stored url is signed and expires; keep the file id beside it so a later run signs the file again
+        // (`mediaOf` prefers the id) instead of sending an expired link.
         return {
-            output: { name: data.fileName, type: data.fileType, url: data.fileUrl },
+            output: { ...(data.fileId && { fileId: data.fileId }), name: data.fileName, type: data.fileType, url: data.fileUrl },
             success: true,
         };
     }
