@@ -39,29 +39,37 @@ import { signedReadUrl } from "./storage-read";
 const HEAD_BYTES = 16;
 
 /**
- * The major brands an MP4 may declare (bytes 8-11): ISO base media, the MP4
- * profiles and the 3GPP and DASH forms. HEIC/HEIX/MIF1/MSF1 (images), AVIF/AVIS
- * (AV1 images) and M4A (audio) are deliberately absent.
+ * The major brands an MP4 may declare (bytes 8-11): ISO base media (`iso2`-`iso9`, matched by
+ * {@link ISO_BASE_BRAND}), the MP4 profiles, the 3GPP and 3GPP2 forms, Sony's XAVC, Adobe's F4V and the
+ * DASH forms. HEIC/HEIX/HEVC/MIF1/MSF1 (images), AVIF/AVIS (AV1 images) and M4A (audio) are deliberately absent.
+ * Only the major brand is read: compatible brands sit past the head this check reads, and a HEIF or M4A file
+ * lists MP4 brands among its compatible ones, so they are no evidence of a video.
  */
 const MP4_BRANDS: ReadonlySet<string> = new Set([
+    "3g2a",
+    "3g2b",
+    "3g2c",
     "3gp4",
     "3gp5",
+    "3gp6",
     "avc1",
     "dash",
-    "iso2",
-    "iso3",
-    "iso4",
-    "iso5",
-    "iso6",
-    "iso8",
+    "f4v ",
     "isom",
     "M4V ",
     "M4VP",
+    "mmp4",
     "mp41",
     "mp42",
     "mp71",
     "MSNV",
+    "XAVC",
 ]);
+
+/** The ISO base media brands `iso2` to `iso9` (`isom` is in {@link MP4_BRANDS}). */
+const ISO_BASE_BRAND = /^iso[2-9]$/u;
+
+const isMp4Brand = (brand: string): boolean => MP4_BRANDS.has(brand) || ISO_BASE_BRAND.test(brand);
 
 /** How far past the start of the audio (after any ID3 tag) the first MPEG frame header may sit: zero padding and a short run of junk, never a whole file. */
 export const MPEG_SCAN_BYTES = 4096;
@@ -144,7 +152,7 @@ export const referenceMediaMatches = (head: Uint8Array, contentType: string, mpe
             return at(head, 0, "RIFF") && at(head, 8, "WAVE");
         }
         case "video/mp4": {
-            return at(head, 4, "ftyp") && MP4_BRANDS.has(brandAt(head, 8));
+            return at(head, 4, "ftyp") && isMp4Brand(brandAt(head, 8));
         }
         case "video/quicktime": {
             return at(head, 4, "ftyp") && brandAt(head, 8) === QUICKTIME_BRAND;

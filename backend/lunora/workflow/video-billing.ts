@@ -7,8 +7,8 @@
  *   the run's account cannot pay for (`premiumVideoErrors`);
  * - per node, before any paid work: the credits the node's paid calls cost must fit the member's remaining
  *   credits, when the account has a credit record. The calls are the clip and, when this node is the first
- *   to need it in the run, the frame extracted for it. The run takes one unit of the daily video quota that
- *   `/chat/media` and the chat video tool take (frame extraction takes none);
+ *   to need it in the run, the frame extracted for it. The node run takes one unit of the daily video quota that
+ *   `/chat/media` and the chat video tool take, once: a retry of the same node finds it taken (frame extraction takes none);
  * - per node, after a clip is made: its cost is deducted from the account's credits, keyed on the run and
  *   node so a retry is a no-op. A failed generation settles nothing, so it is not charged.
  * - per frame extraction: charged by the extraction action (`media-ops.ts`) once fal has accepted the request,
@@ -78,8 +78,14 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
         }
     }
 
-    // The same unit `/chat/media` charges: the tier and the admin exemption are read where the quota is kept.
-    const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, { kind: "Video", organizationId: run.orgId, userId });
+    // The same unit `/chat/media` charges: the tier and the admin exemption are read where the quota is kept. Keyed on the node run,
+    // so a retry of it takes no second unit.
+    const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+        kind: "Video",
+        organizationId: run.orgId,
+        requestId: videoRequestId(run.runId, node.id),
+        userId,
+    });
 
     if (!charged) {
         throw new Error("You've reached your daily video generation limit.");

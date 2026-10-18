@@ -7,9 +7,11 @@ import { createHash } from "node:crypto";
 
 import type { R2UploadBucket } from "@lunora/storage/upload";
 import { R2_PART_SIZE } from "@lunora/storage/upload";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
+import { internal } from "../_generated/internal";
 import { stagingKeyFor, stagingPrefixFor, uploadStatePrefixFor } from "./chat-upload-staging";
+import { finalizeStagedReferenceMedia } from "./reference-media-upload";
 import { handleUploadRequest, refuseDeclaredPurpose, UPLOAD_PATH } from "./upload-route";
 
 const ORIGIN = "http://localhost:8788";
@@ -380,5 +382,111 @@ describe(handleUploadRequest, () => {
             expect(objects.get(stagingKeyFor(ALICE, id, "reference-media"))?.contentType).toBe("video/mp4");
             expect(objects.get(stagingKeyFor(ALICE, id, "reference-media"))?.customMetadata).toStrictEqual({ purpose: "reference-media" });
         });
+    });
+});
+
+/** `DigestStream` as the finalize reads it: a writable whose `digest` is the SHA-256 of what was written. Node has none. */
+const digestStreamShim = function (algorithm: string) {
+    const chunks: Uint8Array[] = [];
+    const stream = new WritableStream<Uint8Array>({
+        write(chunk) {
+            chunks.push(chunk);
+        },
+    });
+
+    Object.defineProperty(stream, "digest", {
+        get: async () => crypto.subtle.digest(algorithm, Buffer.concat(chunks)),
+    });
+
+    return stream;
+};
+
+/** The storage calls finalize makes, over the same fake bucket the TUS chunks were written to. */
+const finalizeContext = (
+    bucket: R2UploadBucket,
+    objects: Map<string, { bytes: Uint8Array; contentType?: string; customMetadata?: Record<string, string> }>,
+) => {
+    const r2 = bucket as unknown as { createMultipartUpload: (key: string, options: object) => Promise<unknown> };
+    const storage = {
+        createMultipartUpload: async (key: string, options: { contentType?: string }) =>
+            await r2.createMultipartUpload(key, { httpMetadata: { contentType: options.contentType } }),
+        delete: async (key: string) => {
+            objects.delete(key);
+        },
+        download: async (key: string, options?: { range?: { length: number; offset: number } }) => {
+            const object = objects.get(key);
+
+            if (!object) {
+                return null;
+            }
+
+            const { length = object.bytes.byteLength, offset = 0 } = options?.range ?? {};
+
+            return { body: new Blob([object.bytes.slice(offset, offset + length)]).stream() };
+        },
+        getMetadata: async (key: string) => {
+            const object = objects.get(key);
+
+            return object && { contentType: object.contentType, customMetadata: object.customMetadata, size: object.bytes.byteLength };
+        },
+        getSignedUrl: async (key: string) => `https://files.example/${key}`,
+    };
+    const runMutation = vi.fn(async (reference: unknown) =>
+        reference === internal.agent.files.useExistingFile ? null : { fileId: "file-1", storageId: "agent-files/stored" },
+    );
+
+    return { runMutation, storage };
+};
+
+describe("a reference-media upload, from its create to finalize", () => {
+    beforeAll(() => {
+        Object.defineProperty(crypto, "DigestStream", { configurable: true, value: digestStreamShim });
+    });
+
+    it.each([
+        ["one PATCH", 64 * 1024],
+        ["a multipart upload, past one 5 MiB part", 6 * MB],
+    ])("writes %s under the reference-media key, and finalize takes that object", async (_, size) => {
+        const { bucket, objects } = fakeBucket();
+        const bytes = mp4(size);
+        const created = await send(bucket, ALICE, createFor(bytes.byteLength, "video/mp4", "reference-media"));
+
+        expect(created.status).toBe(201);
+
+        const location = created.headers.get("Location")!;
+        // The continuations name the upload by id alone, and carry no purpose.
+        const uploadId = location.split("/").pop()!.split("?", 1)[0]!;
+        const key = stagingKeyFor(ALICE, uploadId, "reference-media");
+
+        for (let offset = 0; offset < bytes.byteLength; offset += 5 * MB) {
+            expect(await statusOf(bucket, ALICE, patch(location, offset, bytes.subarray(offset, offset + 5 * MB)))).toBe(204);
+
+            const head = await send(bucket, ALICE, new Request(location, { headers: { "Tus-Resumable": "1.0.0" }, method: "HEAD" }));
+
+            expect(head.headers.get("Upload-Offset")).toBe(String(Math.min(offset + 5 * MB, bytes.byteLength)));
+        }
+
+        expect(objects.get(key)?.customMetadata).toStrictEqual({ purpose: "reference-media" });
+        expect(objects.has(`${stagingPrefixFor(ALICE)}${uploadId}`)).toBe(false);
+
+        const finalized = await finalizeStagedReferenceMedia(finalizeContext(bucket, objects) as never, ALICE, { filename: "clip.mp4", uploadId });
+
+        expect(finalized.fileId).toBe("file-1");
+        expect(objects.has(key)).toBe(false);
+    });
+
+    it("deletes a part-written reference-media upload by the id its create named, and leaves no object or state under it", async () => {
+        const { bucket, objects } = fakeBucket();
+        const bytes = mp4(6 * MB);
+        const created = await send(bucket, ALICE, createFor(bytes.byteLength, "video/mp4", "reference-media"));
+        const location = created.headers.get("Location")!;
+        const uploadId = location.split("/").pop()!.split("?", 1)[0]!;
+
+        expect(await statusOf(bucket, ALICE, patch(location, 0, bytes.subarray(0, 5 * MB)))).toBe(204);
+        expect(await statusOf(bucket, ALICE, new Request(location, { headers: { "Tus-Resumable": "1.0.0" }, method: "DELETE" }))).toBe(204);
+
+        expect(objects.has(stagingKeyFor(ALICE, uploadId, "reference-media"))).toBe(false);
+        expect(objects.has(`${stagingPrefixFor(ALICE)}${uploadId}`)).toBe(false);
+        expect([...objects.keys()].filter((key) => key.startsWith(uploadStatePrefixFor(ALICE)))).toStrictEqual([]);
     });
 });

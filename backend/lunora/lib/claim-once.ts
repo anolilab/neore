@@ -13,6 +13,7 @@
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
+ * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  *
  * A key must be remembered at least as long as a replay of it could still pass
  * the caller's own freshness check, or a replay could arrive after its claim

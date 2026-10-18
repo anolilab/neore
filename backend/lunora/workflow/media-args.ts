@@ -16,16 +16,19 @@ import { runBilledVideo, type VideoRunCosts } from "./video-billing";
 import {
     type FrameSource,
     frameSourceOf,
+    generatedClipSecondsOf,
     isVideoNode,
     type MediaRef,
     mediaOf,
     modelIdFor,
     resolveMediaUrls,
     resolveVideoInputUrls,
+    videoDefinitionOf,
+    videoDurationOf,
     videoInputErrors,
     videoKindOf,
 } from "./video-inputs";
-import { frameClipSeconds, frameExtractionMicrodollars, frameRequestId, videoDefinitionOf, videoDurationOf, videoRunCost } from "./video-policy";
+import { frameClipSeconds, frameExtractionMicrodollars, frameRequestId, videoRunCost } from "./video-policy";
 import { readRunPlan } from "../chat/lib/agent-run";
 
 /** The part of an action or HTTP action context the workflow reads stored files through, and extracts frames with. */
@@ -126,7 +129,7 @@ export const referenceSecondsOf = (node: WorkflowNode, context: ExecutionContext
         return falVideoInputsOf(model?.modelApiId)?.references?.totalSeconds ?? 0;
     }
 
-    return wired.reduce((seconds, source) => seconds + videoDurationOf(source, videoDefinitionOf(source)).billed, 0);
+    return wired.reduce((seconds, source) => seconds + generatedClipSecondsOf(source), 0);
 };
 
 /** The frame a video node's wire carries, as a stored file. `undefined` when no frame is wired. */

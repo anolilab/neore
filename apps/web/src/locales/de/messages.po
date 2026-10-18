@@ -8756,11 +8756,11 @@ msgstr "Maske zeichnen"
 msgid "Drawing tools"
 msgstr "Zeichenwerkzeuge"
 
-#: src/features/workflow/components/nodes/file-node.tsx:165
+#: src/features/workflow/components/nodes/file-node.tsx:181
 msgid "Drop file here"
 msgstr "Datei hier ablegen"
 
-#: src/features/workflow/components/nodes/file-node.tsx:165
+#: src/features/workflow/components/nodes/file-node.tsx:181
 msgid "Drop file or click to upload"
 msgstr "Datei ablegen oder zum Hochladen klicken"
 
@@ -22209,7 +22209,7 @@ msgid "Remove endpoint?"
 msgstr "Endpunkt entfernen?"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:142
+#: src/features/workflow/components/nodes/file-node.tsx:158
 msgid "Remove file"
 msgstr "Datei entfernen"
 
@@ -27092,7 +27092,7 @@ msgstr "Dieser Endpunkt ist nicht Ollama. Die Modellverwaltung ist nur für Olla
 msgid "This file could not be read."
 msgstr "Diese Datei konnte nicht gelesen werden."
 
-#: src/features/workflow/components/nodes/file-node.tsx:85
+#: src/features/workflow/components/nodes/file-node.tsx:101
 msgid "This file could not be uploaded. Check its type and size, then try again."
 msgstr "Diese Datei konnte nicht hochgeladen werden. Prüfe Typ und Größe und versuche es erneut."
 
@@ -28671,7 +28671,7 @@ msgstr "Daten für Import von {0} werden hochgeladen..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:158
+#: src/features/workflow/components/nodes/file-node.tsx:174
 msgid "Uploading..."
 msgstr "Wird hochgeladen..."
 
@@ -29303,7 +29303,7 @@ msgstr "Videoanhang"
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
 #. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/file-node.tsx:65
+#: src/features/workflow/components/nodes/file-node.tsx:81
 msgid "Video can be at most {0} MB and audio at most {1} MB."
 msgstr "Videos dürfen höchstens {0} MB und Audiodateien höchstens {1} MB groß sein."
 

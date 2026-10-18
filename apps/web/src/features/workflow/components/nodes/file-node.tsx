@@ -4,7 +4,7 @@ import { MAX_REFERENCE_AUDIO_BYTES, MAX_REFERENCE_VIDEO_BYTES, referenceMediaLim
 import { Button } from "@ui/components/button";
 import type { Node, NodeProps } from "@xyflow/react";
 import { File, Loader2, Upload, X } from "lucide-react";
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 
 import { uploadChatAttachment } from "@/features/chat/core/adapters/lunora-attachment-adapter";
@@ -45,6 +45,22 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
     useEffect(() => {
         void canTrimVideo().then(setCanTrim);
     }, []);
+
+    // The preview url is a blob of the whole video (up to 50 MB): revoke it when the node goes away with the dialog open.
+    const trimUrlRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        trimUrlRef.current = trimCandidate?.url ?? null;
+    }, [trimCandidate]);
+
+    useEffect(
+        () => () => {
+            if (trimUrlRef.current) {
+                URL.revokeObjectURL(trimUrlRef.current);
+            }
+        },
+        [],
+    );
 
     const closeTrim = () => {
         if (trimCandidate) {

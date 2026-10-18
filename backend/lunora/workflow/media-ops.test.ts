@@ -6,7 +6,7 @@ const QUEUE = `https://queue.fal.run/${FRAME_EXTRACT_ENDPOINT}`;
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 /** A fake fal queue: submit, then one status poll that is COMPLETED, then the result, then the image. */
-const falQueue = (overrides: { images?: unknown; status?: unknown; statusResponse?: Response; submit?: Response } = {}) => {
+const falQueue = (overrides: { download?: Response; images?: unknown; status?: unknown; statusResponse?: Response; submit?: Response } = {}) => {
     const calls: { init?: RequestInit; url: string }[] = [];
     const fake = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
@@ -25,7 +25,7 @@ const falQueue = (overrides: { images?: unknown; status?: unknown; statusRespons
             return json({ images: overrides.images ?? [{ content_type: "image/jpeg", url: "https://v3.fal.media/frame.jpg" }] });
         }
 
-        return new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/jpeg" } });
+        return overrides.download ?? new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/jpeg" } });
     });
 
     vi.stubGlobal("fetch", fake);
@@ -194,6 +194,41 @@ describe("extractFrameImage", () => {
             expect(call.init?.redirect).toBe("error");
         }
 
+        expect(fake.mock.calls.some(([input]) => String(input).includes("attacker.example"))).toBe(false);
+    });
+
+    it("fetches the frame only from fal's media host, and charges the submit before refusing any other", async () => {
+        // Plain http on fal's own host: the scheme is what is refused, so it is built with the protocol switched.
+        const plainHttp = new URL("https://v3.fal.media/frame.jpg");
+
+        plainHttp.protocol = "http:";
+
+        for (const url of ["https://evil.example/frame.jpg", plainHttp.href, "https://fal.media.evil.example/frame.jpg", "https://evilfal.media/frame.jpg"]) {
+            const { fake } = falQueue({ images: [{ content_type: "image/jpeg", url }] });
+            const accepted = vi.fn();
+
+            await expect(extractFrameImage("https://x.example/clip.mp4", "end", "key-1", 0, accepted)).rejects.toThrow("outside fal.media");
+            expect(accepted).toHaveBeenCalledTimes(1);
+            expect(fake.mock.calls.some(([input]) => String(input) === url)).toBe(false);
+        }
+    });
+
+    it("downloads the frame from fal's media host with no key and no redirect", async () => {
+        const { calls } = falQueue({ images: [{ content_type: "image/png", url: "https://v3.fal.media/files/frame.png" }] });
+
+        await extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0);
+
+        const download = calls.find((call) => call.url === "https://v3.fal.media/files/frame.png");
+
+        expect(download?.init?.redirect).toBe("error");
+        expect((download?.init?.headers as Record<string, string> | undefined)?.Authorization).toBeUndefined();
+    });
+
+    it("does not follow a redirect on the frame download, so a 3xx to another host is never requested", async () => {
+        const redirect = new Response(null, { headers: { Location: "https://attacker.example/frame.jpg" }, status: 302 });
+        const { fake } = falQueue({ download: redirect });
+
+        await expect(extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0)).rejects.toThrow("Frame download failed: 302");
         expect(fake.mock.calls.some(([input]) => String(input).includes("attacker.example"))).toBe(false);
     });
 });

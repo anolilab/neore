@@ -112,6 +112,19 @@ export const captureVideoFrame = async (videoUrl: string, timeFor: (duration: nu
     });
 };
 
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "[::1]", "localhost"]);
+
+/** A media URL the browser may load as a video source: https, or http on a loopback host for local development. */
+const isSafeMediaUrl = (value: string): boolean => {
+    try {
+        const { hostname, protocol } = new URL(value);
+
+        return protocol === "https:" || (protocol === "http:" && LOOPBACK_HOSTS.has(hostname));
+    } catch {
+        return false;
+    }
+};
+
 /**
  * The URL of the clip a video node generated: `assets[0].videoUrl`, the one shape a run stores, or a
  * top-level `videoUrl` saved by an older run.
@@ -121,5 +134,5 @@ export const videoUrlOfOutput = (output: unknown): string | undefined => {
     const first = Array.isArray(object?.assets) ? (object.assets[0] as { videoUrl?: unknown } | undefined) : undefined;
     const url = typeof first?.videoUrl === "string" ? first.videoUrl : object?.videoUrl;
 
-    return typeof url === "string" && url.startsWith("http") ? url : undefined;
+    return typeof url === "string" && isSafeMediaUrl(url) ? url : undefined;
 };

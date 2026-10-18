@@ -13,18 +13,36 @@ import { v } from "lunorash/server";
 import { internalMutation } from "../_generated/server";
 import { getMembersByUserId, getOrganization, getUser } from "../auth/lib/better-auth-queries";
 import { resolveUserPlan } from "../auth/lib/plan";
+import { claimOnce, releaseClaim } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
+import { MAX_LENGTH } from "../lib/validators";
 import { dailyLimitKeyOf, dailyLimitTierOf } from "./lib/daily-limit";
+
+/** The claim scope of a unit taken for one request (`requestId`). */
+export const DAILY_CHARGE_SCOPE = "daily-charge";
+
+/** A retry of the same request must find its unit still claimed: it outlasts any retry of one run node. */
+const DAILY_CHARGE_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Charge one unit of `kind` to `userId`'s daily quota. `false` when it is
  * spent, the tier may not generate `kind` at all, or the user is gone — the
  * caller stops there. Platform admins are exempt, as on the HTTP routes.
+ *
+ * With a `requestId` the unit is taken once per request: a retry of the same
+ * request returns `true` without a second unit. The claim and the unit are one
+ * transaction, and a refused unit releases its claim, so a retry after a refusal
+ * is charged normally.
  */
 export const chargeDailyUnit = internalMutation
-    .input({ kind: v.union(v.literal("Audio"), v.literal("Text"), v.literal("Video")), organizationId: v.optional(v.string()), userId: v.string() })
+    .input({
+        kind: v.union(v.literal("Audio"), v.literal("Text"), v.literal("Video")),
+        organizationId: v.optional(v.string()),
+        requestId: v.optional(v.string().max(MAX_LENGTH.long)),
+        userId: v.string(),
+    })
     .output(v.boolean())
-    .mutation(async ({ args: { kind, organizationId, userId }, ctx }) => {
+    .mutation(async ({ args: { kind, organizationId, requestId, userId }, ctx }) => {
         const user = await getUser(ctx, userId);
 
         if (!user) {
@@ -52,7 +70,16 @@ export const chargeDailyUnit = internalMutation
             return false;
         }
 
+        // A request whose unit is already claimed was charged by an earlier attempt: it is not charged again.
+        if (requestId !== undefined && !(await claimOnce(ctx, DAILY_CHARGE_SCOPE, requestId, DAILY_CHARGE_CLAIM_TTL_MS, userId))) {
+            return true;
+        }
+
         const { ok } = await createRatelimit(key, ctx.db as never).limit(userId);
+
+        if (!ok && requestId !== undefined) {
+            await releaseClaim(ctx, DAILY_CHARGE_SCOPE, requestId);
+        }
 
         return ok;
     });

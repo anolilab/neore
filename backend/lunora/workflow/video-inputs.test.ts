@@ -225,6 +225,24 @@ describe("videoInputErrors", () => {
         expect(videoInputErrors([...nodes, node("txt", "text", {})], [...edges, { id: "t", source: "txt", target: "gen" }])).toStrictEqual([]);
     });
 
+    it("does not count a reference-media wire as the prompt: only a text output stands in for one", () => {
+        const frameSource = node("src", "video", {});
+        const target = node("gen", "video", { mode: "text-to-video", model: SEEDANCE });
+        const frame: WorkflowEdge = { id: "f", source: "src", sourceHandle: "frame-start", target: "gen" };
+        const reference = node("ref", "file", { type: "video/mp4" });
+        const referenceVideo = node("clip", "video", {});
+
+        expect(videoInputErrors([frameSource, reference, target], [frame, { id: "r", source: "ref", target: "gen" }])).toStrictEqual([
+            "The start frame feeds a text-to-video node with no prompt; give it a prompt or wire a text node into it",
+        ]);
+        expect(videoInputErrors([frameSource, referenceVideo, target], [frame, { id: "r", source: "clip", target: "gen" }])).toHaveLength(1);
+
+        // A stored prompt is what the run reads (`videoPromptOf`), so an empty one is no prompt even with text wired in.
+        const emptyPrompt = node("gen", "video", { mode: "text-to-video", model: SEEDANCE, prompt: "" });
+
+        expect(videoInputErrors([frameSource, node("txt", "text", {}), emptyPrompt], [frame, { id: "t", source: "txt", target: "gen" }])).toHaveLength(1);
+    });
+
     it("rejects a frame that runs into a node that does not read it, or out of a node with no clip", () => {
         const source = node("src", "video", {});
         const wrongTarget = node("img", "text", {});
@@ -246,17 +264,22 @@ describe("videoInputErrors", () => {
         ]);
     });
 
-    it("rejects reference clips whose known durations exceed the model's budget, and skips unknown ones", () => {
-        const long = node("long", "video", { duration: 10 });
-        const alsoLong = node("long2", "video", { duration: 8 });
+    it("totals reference clips at the length each one bills, and skips unknown ones", () => {
+        // MiniMax Video 01 takes no duration and is fixed at 6 s: the stored 10 s is not what it produces.
+        const minimax = { maxVideoDuration: 6, mode: "text-to-video", model: "fal-ai/minimax/video-01" };
+        const long = node("long", "video", { ...minimax, duration: 10 });
+        const alsoLong = node("long2", "video", minimax);
+        const third = node("long3", "video", minimax);
         const upload = node("upload", "file", {});
         const target = node("gen", "video", { mode: "text-to-video", model: SEEDANCE });
-        const over = [long, alsoLong, target];
+        const over = [long, alsoLong, third, target];
         const overEdges: WorkflowEdge[] = [
             { id: "e1", source: "long", target: "gen" },
             { id: "e2", source: "long2", target: "gen" },
+            { id: "e3", source: "long3", target: "gen" },
         ];
 
+        // Three default-length MiniMax clips: 3 x 6 s = 18 s, over the 15 s budget, refused before any clip is paid for.
         expect(videoInputErrors(over, overEdges)).toStrictEqual([`The reference clips total 18s; ${SEEDANCE} accepts at most 15s of reference video`]);
 
         const underEdges: WorkflowEdge[] = [
@@ -267,7 +290,22 @@ describe("videoInputErrors", () => {
         expect(videoInputErrors([long, upload, target], underEdges)).toStrictEqual([]);
     });
 
-    it("counts a text-to-video source with no duration as the 5 s the executor requests", () => {
+    it("takes an upload among the first reference wires, so a set holding one is not totalled as if its clips were all sent", () => {
+        const minimax = { maxVideoDuration: 6, mode: "text-to-video", model: "fal-ai/minimax/video-01" };
+        const upload = node("upload", "file", { fileType: "video/mp4" });
+        const gens = [node("g1", "video", minimax), node("g2", "video", minimax), node("g3", "video", minimax)];
+        const target = node("gen", "video", { mode: "text-to-video", model: SEEDANCE });
+        const wire = (source: string): WorkflowEdge => {
+            return { id: `e-${source}`, source, target: "gen" };
+        };
+
+        // The runtime sends the upload and the first two clips (three video wires, the cap), so the third clip is not counted.
+        expect(videoInputErrors([upload, ...gens, target], [wire("upload"), wire("g1"), wire("g2"), wire("g3")])).toStrictEqual([]);
+        // Three generated clips in the window, with no upload, are 18 s and refused.
+        expect(videoInputErrors([...gens, target], [wire("g1"), wire("g2"), wire("g3")])).toHaveLength(1);
+    });
+
+    it("counts a text-to-video source with no duration as the 5 s the executor requests, and only the clips it sends", () => {
         const defaultClip = node("default", "video", { mode: "text-to-video" });
         const target = node("gen", "video", { mode: "text-to-video", model: SEEDANCE });
         const edges: WorkflowEdge[] = [
@@ -278,7 +316,7 @@ describe("videoInputErrors", () => {
 
         // Three wires, each 5 s, is 15 s: within the budget.
         expect(videoInputErrors([defaultClip, target], edges)).toStrictEqual([]);
-        // A fourth reference over the budget is caught.
-        expect(videoInputErrors([defaultClip, target], [...edges, { id: "e4", source: "default", target: "gen" }])).toHaveLength(1);
+        // The runtime sends the first three reference clips only (`maxReferenceVideos`), so a fourth wire adds nothing to the budget.
+        expect(videoInputErrors([defaultClip, target], [...edges, { id: "e4", source: "default", target: "gen" }])).toStrictEqual([]);
     });
 });

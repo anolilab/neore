@@ -3,12 +3,12 @@
  *
  * Pure apart from the signing callback the executors pass in: no action context is needed here.
  */
-import { MODEL_LOOKUP, type ModelDefinition, resolveWorkflowModel } from "@neore/ai/models";
+import { falVideoFixedSecondsOf, MODEL_LOOKUP, type ModelDefinition, resolveWorkflowModel } from "@neore/ai/models";
 
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
 import { sourceNodesOf } from "./core";
-import { isFrameHandleId, parseFrameHandle, type FrameKind } from "./mentions";
-import { referenceVideoLimitSeconds } from "../chat/lib/fal-reference-mapping";
+import { isFrameHandleId, parseFrameHandle, type FrameKind, TEXT_MENTION_NODE_TYPES } from "./mentions";
+import { falDurationInput, referenceVideoLimitSeconds } from "../chat/lib/fal-reference-mapping";
 
 /** Media a video node reads, before it is turned into URLs. */
 export type MediaRef = { fileId: string } | { url: string };
@@ -159,6 +159,44 @@ export const videoKindOf = (node: WorkflowNode): VideoKind | undefined => {
 export const modelIdFor = (node: WorkflowNode, kind: VideoKind): string => resolveWorkflowModel(kind, (node.data as { model?: string }).model);
 
 /**
+ * The clip length a video node asks for when it sets none, and what the endpoint bills for an endpoint
+ * that takes no duration. The gateway bills the same 5 s (`body.duration ?? 5`).
+ */
+export const DEFAULT_VIDEO_SECONDS = 5;
+
+/** The registry row a video node runs (its resolved model), or `undefined` for a node that is not a video node. */
+export const videoDefinitionOf = (node: WorkflowNode): ModelDefinition | undefined => {
+    const kind = videoKindOf(node);
+
+    return kind === undefined ? undefined : MODEL_LOOKUP.get(modelIdFor(node, kind));
+};
+
+/** A stored duration when it is a positive finite number; anything else counts as unset. */
+const validDuration = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined);
+
+/**
+ * The one length a video node run uses: `requested` is what the action receives (the node's duration,
+ * capped at the row's `maxVideoDuration`, else the default), and `billed` is the length the endpoint is
+ * sent, which is what the run is charged for. An endpoint with no duration input is sent nothing, and it
+ * bills the default.
+ */
+export const videoDurationOf = (node: WorkflowNode, definition: ModelDefinition | undefined): { billed: number; requested: number } => {
+    const asked = validDuration((node.data as { duration?: unknown }).duration) ?? DEFAULT_VIDEO_SECONDS;
+    const requested = definition?.maxVideoDuration === undefined ? asked : Math.min(asked, definition.maxVideoDuration);
+    const sent = falDurationInput(definition, requested);
+    const sentSeconds = typeof sent === "number" ? sent : Number.parseFloat(String(sent));
+
+    // An endpoint with no duration input is sent nothing: its page fixes the clip length (`falVideoFixedSecondsOf`), else the default.
+    return { billed: sent === undefined ? (falVideoFixedSecondsOf(definition?.modelApiId) ?? DEFAULT_VIDEO_SECONDS) : sentSeconds, requested };
+};
+
+/**
+ * The seconds a generated clip (a video or image-to-video node's output) runs: the length its run bills. The
+ * reference budget and a frame's clip length both read it, so a check and a charge cannot disagree on a clip.
+ */
+export const generatedClipSecondsOf = (node: WorkflowNode): number => videoDurationOf(node, videoDefinitionOf(node)).billed;
+
+/**
  * The provider-readable URLs of a video node's inputs: the start image (a wired frame handle,
  * which wins over the upstream image) and the reference media. A reference video or audio is
  * resolved only when `model` declares a cap for it, otherwise it is ignored as it always was, so
@@ -184,31 +222,18 @@ export const resolveVideoInputUrls = async (
 };
 
 /**
- * A video node's clip length in seconds, as the graph fixes it: its requested `duration`, or the default
- * the run bills when it sets none (`DEFAULT_VIDEO_SECONDS`, kept in step by `video-policy.ts`).
+ * The node types whose output is text the prompt path reads as a string (`videoPromptOf`). A wire from any
+ * other type (a file, a video) carries media, not a prompt.
  */
-const knownDurationOf = (source: WorkflowNode): number => {
-    const { duration } = source.data as { duration?: unknown };
+const TEXT_OUTPUT_NODE_TYPES: ReadonlySet<string> = new Set([...TEXT_MENTION_NODE_TYPES, "transcription"]);
 
-    return typeof duration === "number" && Number.isFinite(duration) && duration > 0 ? duration : 5;
-};
-
-/**
- * Checks that need only the graph, run before any node so a doomed run never bills a clip:
- * - a frame wire must name a supported frame (`start` or `end`), run from a video or
- *   image-to-video node into one, and feed a node whose model takes an image (with a prompt when
- *   it is text-to-video);
- * - the upstream clips with a known duration must fit the model's reference-video budget
- *   (see `referenceVideoLimitSeconds`). Unknown durations (an uploaded file) are not checked.
- *
- * Returns one message per problem, empty when the graph can run.
- */
 /**
  * What a video node fed by a frame needs before its paid call: a model that takes an image input
- * (the registry's `supportsImageToVideo`), and a prompt when it runs text-to-video. A prompt wired
- * as text counts here; the run checks the text it actually gets before it extracts the frame.
+ * (the registry's `supportsImageToVideo`), and a prompt when it runs text-to-video. The prompt is the
+ * node's own, when it stores one (`videoPromptOf` reads a stored string before anything wired, even an
+ * empty one), else a text wire into it. The run checks the text it actually gets before it extracts the frame.
  */
-const frameTargetErrors = (target: WorkflowNode, kind: FrameKind, edges: ReadonlyArray<WorkflowEdge>): string[] => {
+const frameTargetErrors = (target: WorkflowNode, kind: FrameKind, byId: ReadonlyMap<string, WorkflowNode>, edges: ReadonlyArray<WorkflowEdge>): string[] => {
     const errors: string[] = [];
     const modelId = modelIdFor(target, videoKindOf(target) ?? "textToVideo");
 
@@ -217,8 +242,13 @@ const frameTargetErrors = (target: WorkflowNode, kind: FrameKind, edges: Readonl
     }
 
     const hasPrompt =
-        (typeof target.data.prompt === "string" && target.data.prompt.length > 0) ||
-        edges.some((edge) => edge.target === target.id && !isFrameHandleId(edge.sourceHandle));
+        typeof target.data.prompt === "string"
+            ? target.data.prompt.length > 0
+            : edges.some((edge) => {
+                  const source = byId.get(edge.source);
+
+                  return edge.target === target.id && !isFrameHandleId(edge.sourceHandle) && source !== undefined && TEXT_OUTPUT_NODE_TYPES.has(source.type);
+              });
 
     if (target.type === "video" && target.data.mode !== "image-to-video" && !hasPrompt) {
         errors.push(`The ${kind} frame feeds a text-to-video node with no prompt; give it a prompt or wire a text node into it`);
@@ -227,6 +257,19 @@ const frameTargetErrors = (target: WorkflowNode, kind: FrameKind, edges: Readonl
     return errors;
 };
 
+/** A file node whose declared type is video: a reference clip whose length is not known until it is read. */
+const isVideoFile = (node: WorkflowNode): boolean => node.type === "file" && typeof node.data.fileType === "string" && node.data.fileType.startsWith("video/");
+
+/**
+ * Checks that need only the graph, run before any node so a doomed run never bills a clip:
+ * - a frame wire must name a supported frame (`start` or `end`), run from a video or
+ *   image-to-video node into one, and feed a node whose model takes an image (with a prompt when
+ *   it is text-to-video);
+ * - the upstream generated clips must fit the model's reference-video budget (see `referenceVideoLimitSeconds`), each at the
+ *   length its generation bills (`generatedClipSecondsOf`). An uploaded clip of unknown length is not checked.
+ *
+ * Returns one message per problem, empty when the graph can run.
+ */
 export const videoInputErrors = (nodes: ReadonlyArray<WorkflowNode>, edges: ReadonlyArray<WorkflowEdge>): string[] => {
     const errors: string[] = [];
     const byId = new Map(nodes.map((node) => [node.id, node]));
@@ -258,7 +301,7 @@ export const videoInputErrors = (nodes: ReadonlyArray<WorkflowNode>, edges: Read
         const frame = frameFed.get(target.id);
 
         if (frame !== undefined) {
-            errors.push(...frameTargetErrors(target, frame, edges));
+            errors.push(...frameTargetErrors(target, frame, byId, edges));
         }
 
         const modelId = modelIdFor(target, videoKindOf(target) ?? "textToVideo");
@@ -268,12 +311,20 @@ export const videoInputErrors = (nodes: ReadonlyArray<WorkflowNode>, edges: Read
             continue;
         }
 
-        // Only plain wires are reference clips; a frame wire is an image.
-        const total = edges
+        // Only plain wires are reference clips; a frame wire is an image. The runtime takes the first `maxReferenceVideos` video
+        // wires (`referenceSecondsOf`), uploads included. An upload's length is not known here, so a set holding one is not totalled.
+        const clips = edges
             .filter((edge) => edge.target === target.id && !isFrameHandleId(edge.sourceHandle))
             .map((edge) => byId.get(edge.source))
-            .filter((source): source is WorkflowNode => source !== undefined && VIDEO_OUTPUT_NODE_TYPES.has(source.type))
-            .reduce((sum, source) => sum + knownDurationOf(source), 0);
+            .filter((source): source is WorkflowNode => source !== undefined && (VIDEO_OUTPUT_NODE_TYPES.has(source.type) || isVideoFile(source)))
+            .slice(0, MODEL_LOOKUP.get(modelId)?.maxReferenceVideos ?? 0);
+
+        if (clips.some((source) => !VIDEO_OUTPUT_NODE_TYPES.has(source.type))) {
+            continue;
+        }
+
+        // Each generated clip is billed at the length its generation produces, the same as the reference charge.
+        const total = clips.reduce((sum, source) => sum + generatedClipSecondsOf(source), 0);
 
         if (total > limit) {
             errors.push(`The reference clips total ${total}s; ${modelId} accepts at most ${limit}s of reference video`);

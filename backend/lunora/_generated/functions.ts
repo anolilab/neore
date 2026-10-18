@@ -8335,7 +8335,7 @@ export interface Caller {
             saveCustomProvider: (args: { accessKeyId?: string; apiKey?: string; apiVersion?: string; baseUrl: string; enabled: boolean; id?: string; models: Array<{ id: string; name?: string }>; name: string; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" }) => Promise<{ id: string }>;
         };
         daily_charge: {
-            chargeDailyUnit: (args: { kind: "Audio" | "Text" | "Video"; organizationId?: string; userId: string }) => Promise<boolean>;
+            chargeDailyUnit: (args: { kind: "Audio" | "Text" | "Video"; organizationId?: string; requestId?: string; userId: string }) => Promise<boolean>;
         };
         edit_abandon: {
             failAbandonedEditReply: (args: { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }) => Promise<{ added: boolean; failed: number }>;

@@ -3,15 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import { TEXT_TO_VIDEO_PROVIDERS } from "../chat/lib/video-providers";
 import type { WorkflowNode } from "./core";
-import { videoKindOf } from "./video-inputs";
+import { DEFAULT_VIDEO_SECONDS, videoDurationOf, videoKindOf } from "./video-inputs";
 import {
-    DEFAULT_VIDEO_SECONDS,
     frameClipSeconds,
     frameExtractionMicrodollars,
     frameRequestId,
     premiumVideoErrors,
     unrunnableVideoErrors,
-    videoDurationOf,
     videoRequestId,
     videoRunCost,
 } from "./video-policy";

@@ -8756,11 +8756,11 @@ msgstr "Desenhar máscara"
 msgid "Drawing tools"
 msgstr "Ferramentas de desenho"
 
-#: src/features/workflow/components/nodes/file-node.tsx:165
+#: src/features/workflow/components/nodes/file-node.tsx:181
 msgid "Drop file here"
 msgstr "Solte o arquivo aqui"
 
-#: src/features/workflow/components/nodes/file-node.tsx:165
+#: src/features/workflow/components/nodes/file-node.tsx:181
 msgid "Drop file or click to upload"
 msgstr "Solte um arquivo ou clique para enviar"
 
@@ -22209,7 +22209,7 @@ msgid "Remove endpoint?"
 msgstr "Remover endpoint?"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:142
+#: src/features/workflow/components/nodes/file-node.tsx:158
 msgid "Remove file"
 msgstr "Remover arquivo"
 
@@ -27092,7 +27092,7 @@ msgstr "Este endpoint não é o Ollama. O gerenciamento de modelos está dispon�
 msgid "This file could not be read."
 msgstr "Não foi possível ler este arquivo."
 
-#: src/features/workflow/components/nodes/file-node.tsx:85
+#: src/features/workflow/components/nodes/file-node.tsx:101
 msgid "This file could not be uploaded. Check its type and size, then try again."
 msgstr "Não foi possível enviar este arquivo. Verifique o tipo e o tamanho e tente novamente."
 
@@ -28671,7 +28671,7 @@ msgstr "Enviando dados para importação de {0}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:158
+#: src/features/workflow/components/nodes/file-node.tsx:174
 msgid "Uploading..."
 msgstr "Enviando..."
 
@@ -29303,7 +29303,7 @@ msgstr "Anexo de vídeo"
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
 #. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/file-node.tsx:65
+#: src/features/workflow/components/nodes/file-node.tsx:81
 msgid "Video can be at most {0} MB and audio at most {1} MB."
 msgstr "O vídeo pode ter no máximo {0} MB e o áudio {1} MB."
 

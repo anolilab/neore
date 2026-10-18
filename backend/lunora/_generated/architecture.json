@@ -17684,61 +17684,61 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 83,
+      "line": 84,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 83,
+      "line": 84,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 83,
+      "line": 84,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 83,
+      "line": 84,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 97,
+      "line": 98,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 97,
+      "line": 98,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 100,
+      "line": 101,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 100,
+      "line": 101,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 140,
+      "line": 141,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 201,
+      "line": 202,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -17792,13 +17792,13 @@
     {
       "file": "lib/reference-media-upload",
       "kind": "call",
-      "line": 320,
+      "line": 328,
       "reason": "\"finalizeStagedReferenceMedia\" is not a registered function"
     },
     {
       "file": "lib/reference-media-upload",
       "kind": "call",
-      "line": 330,
+      "line": 338,
       "reason": "\"finalizeStagedReferenceMedia\" is not a registered function"
     },
     {
@@ -18866,25 +18866,25 @@
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 48,
+      "line": 51,
       "reason": "\"videoInputArgs\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 84,
+      "line": 87,
       "reason": "\"videoInputArgs\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 359,
+      "line": 362,
       "reason": "\"runVideoNode\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 368,
+      "line": 371,
       "reason": "\"runVideoNode\" is not a registered function"
     },
     {
@@ -18908,13 +18908,13 @@
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 82,
+      "line": 83,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 103,
+      "line": 109,
       "reason": "\"chargePaidCall\" is not a registered function"
     }
   ],

@@ -8756,11 +8756,11 @@ msgstr "マスクを描画"
 msgid "Drawing tools"
 msgstr "描画ツール"
 
-#: src/features/workflow/components/nodes/file-node.tsx:165
+#: src/features/workflow/components/nodes/file-node.tsx:181
 msgid "Drop file here"
 msgstr "ここにファイルをドロップ"
 
-#: src/features/workflow/components/nodes/file-node.tsx:165
+#: src/features/workflow/components/nodes/file-node.tsx:181
 msgid "Drop file or click to upload"
 msgstr "ファイルをドロップするか、クリックしてアップロード"
 
@@ -22209,7 +22209,7 @@ msgid "Remove endpoint?"
 msgstr "エンドポイントを削除しますか？"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:142
+#: src/features/workflow/components/nodes/file-node.tsx:158
 msgid "Remove file"
 msgstr "ファイルを削除"
 
@@ -27092,7 +27092,7 @@ msgstr "このエンドポイントは Ollama ではありません。モデル�
 msgid "This file could not be read."
 msgstr "このファイルを読み込めませんでした。"
 
-#: src/features/workflow/components/nodes/file-node.tsx:85
+#: src/features/workflow/components/nodes/file-node.tsx:101
 msgid "This file could not be uploaded. Check its type and size, then try again."
 msgstr "このファイルをアップロードできませんでした。種類とサイズを確認して、もう一度お試しください。"
 
@@ -28671,7 +28671,7 @@ msgstr "{0} からのインポート用データをアップロードしてい�
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:158
+#: src/features/workflow/components/nodes/file-node.tsx:174
 msgid "Uploading..."
 msgstr "アップロードしています..."
 
@@ -29303,7 +29303,7 @@ msgstr "動画の添付ファイル"
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
 #. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/file-node.tsx:65
+#: src/features/workflow/components/nodes/file-node.tsx:81
 msgid "Video can be at most {0} MB and audio at most {1} MB."
 msgstr "動画は最大 {0} MB、音声は最大 {1} MB です。"
 

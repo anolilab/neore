@@ -8755,11 +8755,11 @@ msgstr "Draw Mask"
 msgid "Drawing tools"
 msgstr "Drawing tools"
 
-#: src/features/workflow/components/nodes/file-node.tsx:165
+#: src/features/workflow/components/nodes/file-node.tsx:181
 msgid "Drop file here"
 msgstr "Drop file here"
 
-#: src/features/workflow/components/nodes/file-node.tsx:165
+#: src/features/workflow/components/nodes/file-node.tsx:181
 msgid "Drop file or click to upload"
 msgstr "Drop file or click to upload"
 
@@ -22208,7 +22208,7 @@ msgid "Remove endpoint?"
 msgstr "Remove endpoint?"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:142
+#: src/features/workflow/components/nodes/file-node.tsx:158
 msgid "Remove file"
 msgstr "Remove file"
 
@@ -27091,7 +27091,7 @@ msgstr "This endpoint is not Ollama. Model management is available for Ollama on
 msgid "This file could not be read."
 msgstr "This file could not be read."
 
-#: src/features/workflow/components/nodes/file-node.tsx:85
+#: src/features/workflow/components/nodes/file-node.tsx:101
 msgid "This file could not be uploaded. Check its type and size, then try again."
 msgstr "This file could not be uploaded. Check its type and size, then try again."
 
@@ -28670,7 +28670,7 @@ msgstr "Uploading data for import from {0}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:158
+#: src/features/workflow/components/nodes/file-node.tsx:174
 msgid "Uploading..."
 msgstr "Uploading..."
 
@@ -29302,7 +29302,7 @@ msgstr "Video attachment"
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
 #. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/file-node.tsx:65
+#: src/features/workflow/components/nodes/file-node.tsx:81
 msgid "Video can be at most {0} MB and audio at most {1} MB."
 msgstr "Video can be at most {0} MB and audio at most {1} MB."
 

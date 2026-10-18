@@ -81,6 +81,7 @@ describe("runBilledVideo", () => {
         expect(ctx.runMutation).toHaveBeenCalledWith(internal.chat.daily_charge.chargeDailyUnit, {
             kind: "Video",
             organizationId: "org-1",
+            requestId: 'workflow-video:["run","gen"]',
             userId: "u1",
         });
         expect(dispatch).toHaveBeenCalledTimes(1);
@@ -128,6 +129,34 @@ describe("runBilledVideo", () => {
 
         await expect(runBilledVideo(ctx, executionContextOf(), videoNode, "u1", costs(), dispatch)).rejects.toThrow("daily video generation limit");
         expect(dispatch).not.toHaveBeenCalled();
+    });
+
+    it("keys the daily unit on the node run, so a retry of the node takes no second unit and a new run takes its own", async () => {
+        const ctx = makeCtx({ creditsLeft: 10_000 });
+        const quotaCall = (run: string) => {
+            return { kind: "Video", organizationId: "org-1", requestId: `workflow-video:${JSON.stringify([run, "gen"])}`, userId: "u1" };
+        };
+
+        await runBilledVideo(ctx, executionContextOf({ orgId: "org-1", runId: "run-a" }), videoNode, "u1", costs(), async () => "clip");
+        await runBilledVideo(ctx, executionContextOf({ orgId: "org-1", runId: "run-a" }), videoNode, "u1", costs(), async () => "clip");
+        await runBilledVideo(ctx, executionContextOf({ orgId: "org-1", runId: "run-b" }), videoNode, "u1", costs(), async () => "clip");
+
+        const quotaCalls = ctx.runMutation.mock.calls.filter(([reference]) => reference === internal.chat.daily_charge.chargeDailyUnit);
+
+        expect(quotaCalls.map(([, args]) => args)).toStrictEqual([quotaCall("run-a"), quotaCall("run-a"), quotaCall("run-b")]);
+    });
+
+    it("retries a run the quota refused, and the retry is charged the unit again", async () => {
+        const ctx = makeCtx({ creditsLeft: 10_000, limitOk: false });
+        const dispatch = vi.fn(async () => "clip");
+
+        await expect(runBilledVideo(ctx, executionContextOf(), videoNode, "u1", costs(), dispatch)).rejects.toThrow("daily video generation limit");
+
+        // The mutation released the refused request's claim, so the same request asks for its unit again.
+        ctx.runMutation.mockImplementation(async () => true);
+
+        await expect(runBilledVideo(ctx, executionContextOf(), videoNode, "u1", costs(), dispatch)).resolves.toBe("clip");
+        expect(dispatch).toHaveBeenCalledTimes(1);
     });
 
     it("charges nothing for a clip whose generation failed", async () => {

@@ -211,9 +211,18 @@ describe(referenceMediaMatches, () => {
             expect(referenceMediaMatches(mp4Head(brand), "video/mp4")).toBe(true);
         }
 
-        for (const brand of ["heic", "heix", "mif1", "msf1", "avif", "avis", "M4A ", "qt  "]) {
+        for (const brand of ["heic", "heix", "hevc", "mif1", "msf1", "avif", "avis", "M4A ", "qt  "]) {
             expect(referenceMediaMatches(mp4Head(brand), "video/mp4")).toBe(false);
         }
+
+        // The brands a real camera or encoder writes that the list did not name before: ISO 9, Sony XAVC, Adobe F4V, 3GPP 6, 3GPP2 and mobile MP4.
+        for (const brand of ["iso7", "iso9", "XAVC", "f4v ", "3gp6", "3g2a", "3g2b", "3g2c", "mmp4"]) {
+            expect(referenceMediaMatches(mp4Head(brand), "video/mp4")).toBe(true);
+        }
+
+        // Not a prefix match: `f4v` without its padding space is not the F4V brand (the brand is four bytes, so the head pads it with NUL).
+        expect(referenceMediaMatches(mp4Head("f4v"), "video/mp4")).toBe(false);
+        expect(referenceMediaMatches(mp4Head("iso1"), "video/mp4")).toBe(false);
 
         expect(referenceMediaMatches(mp4Head("qt  "), "video/quicktime")).toBe(true);
         expect(referenceMediaMatches(mp4Head("isom"), "video/quicktime")).toBe(false);

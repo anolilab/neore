@@ -53,6 +53,28 @@ const assertFalQueueUrl = (value: string | undefined, name: string): string => {
 };
 
 /**
+ * The host fal serves its output files from (`v3.fal.media`, `fal.media`). The frame is downloaded with no key,
+ * but the URL is still fal's word, so only an https URL on that host is fetched.
+ */
+const FAL_MEDIA_HOST = /^(?:[a-z0-9-]+\.)*fal\.media$/u;
+
+const assertFalMediaUrl = (value: string | undefined): string => {
+    let url: URL | undefined;
+
+    try {
+        url = new URL(value ?? "");
+    } catch {
+        url = undefined;
+    }
+
+    if (url?.protocol !== "https:" || !FAL_MEDIA_HOST.test(url.hostname)) {
+        throw new Error("fal.ai returned a frame URL outside fal.media; the frame is not fetched");
+    }
+
+    return url.href;
+};
+
+/**
  * One frame of a clip, from fal's queue. The request is submitted ONCE: a failed poll or download
  * throws rather than submitting again, because every submit is billed. A caller that retries the
  * whole run pays for the frame again, which is the price of a fresh run, not of this helper.
@@ -103,7 +125,12 @@ export const extractFrameImage = async (
                 throw new Error("fal.ai returned no frame image");
             }
 
-            const download = await fetchOk(image.url, { errorPrefix: "Frame download failed", timeoutMs: FETCH_TIMEOUT_LONG_MS });
+            // Checked before the download, and the download follows no redirect: a 3xx would name a host fal did not.
+            const download = await fetchOk(assertFalMediaUrl(image.url), {
+                errorPrefix: "Frame download failed",
+                redirect: "error",
+                timeoutMs: FETCH_TIMEOUT_LONG_MS,
+            });
 
             return new Blob([await download.arrayBuffer()], { type: image.content_type ?? "image/png" });
         }
