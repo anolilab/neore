@@ -1,11 +1,13 @@
 import { MEDIA_DEFAULT_MODELS } from "@neore/ai/models";
 import { describe, expect, it, vi } from "vitest";
 
+import { internal } from "../_generated/internal";
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
 import { executionContextOf } from "./test-execution-context";
 import {
     imageRequestArgs,
     imageToVideoArgs,
+    referenceSecondsOf,
     runVideoNode,
     textToVideoArgs,
     type WorkflowFileContext,
@@ -117,6 +119,38 @@ describe("video action arguments", () => {
     });
 });
 
+describe("referenceSecondsOf", () => {
+    const REFERENCE = "fal-ai/bytedance/seedance-2.0/reference-to-video";
+    const videoOutput = { assets: [{ mimeType: "video/mp4", videoUrl: "https://x.example/r.mp4" }] };
+    const videoEdge = (id: string, source: string, target: string): WorkflowEdge => {
+        return { id, source, target };
+    };
+
+    it("sums the billed lengths of generated reference clips, which are known", () => {
+        const target = node("gen", "video", { mode: "text-to-video", model: REFERENCE });
+        const generated = node("ref", "video", { duration: 2, mode: "text-to-video", model: "fal/grok-imagine-video-1-5" });
+        const ctx = context([videoEdge("e", "ref", "gen")], [target, generated], { ref: videoOutput });
+
+        expect(referenceSecondsOf(target, ctx)).toBe(2);
+    });
+
+    it("takes the endpoint's whole reference budget when a wired clip is an upload of unknown length", () => {
+        const target = node("gen", "video", { mode: "text-to-video", model: REFERENCE });
+        const upload = node("file", "file", {});
+        const ctx = context([videoEdge("e", "file", "gen")], [target, upload], { file: videoOutput });
+
+        expect(referenceSecondsOf(target, ctx)).toBe(15);
+    });
+
+    it("is zero when no reference video is wired, or the wired output is not a video", () => {
+        const target = node("gen", "video", { mode: "text-to-video", model: REFERENCE });
+        const text = node("t", "text", {});
+
+        expect(referenceSecondsOf(target, context([], [target], {}))).toBe(0);
+        expect(referenceSecondsOf(target, context([videoEdge("e", "t", "gen")], [target, text], { t: "a fox" }))).toBe(0);
+    });
+});
+
 describe("videoInputArgs", () => {
     const clipOutput = { assets: [{ mimeType: "video/mp4", videoUrl: "https://x.example/clip.mp4" }] };
     const frameEdge = (id: string, target: string): WorkflowEdge => {
@@ -129,8 +163,9 @@ describe("videoInputArgs", () => {
             runAction: vi.fn(async () => {
                 return { fileId: "stored-frame", mimeType: "image/jpeg" };
             }),
+            runMutation: vi.fn(async () => undefined),
             runQuery: vi.fn(async (_query: unknown, { fileId }: { fileId: string }) => `https://signed.example/${fileId}`),
-        }) as unknown as WorkflowFileContext & { runAction: ReturnType<typeof vi.fn> };
+        }) as unknown as WorkflowFileContext & { runAction: ReturnType<typeof vi.fn>; runMutation: ReturnType<typeof vi.fn> };
 
     it("extracts a wired frame from its source clip, and hands the stored frame to the target as its start image", async () => {
         const target = node("gen", "video", { mode: "text-to-video" });
@@ -142,6 +177,7 @@ describe("videoInputArgs", () => {
         expect(args.frameUrl).toBe("https://signed.example/stored-frame");
         expect(files.runAction).toHaveBeenCalledTimes(1);
         expect(files.runAction.mock.calls[0]?.[1]).toStrictEqual({
+            charge: undefined,
             frame: "start",
             threadId: "workflow",
             userId: "user-1",
@@ -160,6 +196,38 @@ describe("videoInputArgs", () => {
 
         expect(secondArgs.frameUrl).toBe("https://signed.example/stored-frame");
         expect(files.runAction).toHaveBeenCalledTimes(1);
+    });
+
+    it("charges a frame extraction once per run and source clip, at 0.0002 a second of that clip, keyed on the source", async () => {
+        const first = node("a", "video", { mode: "text-to-video" });
+        const second = node("b", "video", { mode: "text-to-video" });
+        const ctx = executionContextOf({
+            graph: { edges: [frameEdge("e1", "a"), frameEdge("e2", "b")], nodes: [first, second, node("src", "video", {})] },
+            nodeOutputs: { src: clipOutput },
+            orgId: "org-1",
+        });
+        const files = filesFake();
+
+        await videoInputArgs(first, ctx, files, "user-1");
+        await videoInputArgs(second, ctx, files, "user-1");
+
+        // The second reader reuses the extraction, so only the first extraction call carries a charge.
+        expect(files.runAction).toHaveBeenCalledTimes(1);
+        expect(files.runAction.mock.calls[0]?.[1]).toMatchObject({
+            charge: {
+                costMicrodollars: 1000,
+                orgId: "org-1",
+                requestId: `workflow-frame:${JSON.stringify(["run", "src", "start"])}`,
+            },
+        });
+    });
+
+    it("sends no charge for a frame extraction in a run with no organization", async () => {
+        const target = node("gen", "video", { mode: "text-to-video" });
+        const files = filesFake();
+
+        await videoInputArgs(target, context([frameEdge("e", "gen")], [target, node("src", "video", {})], { src: clipOutput }), files, "user-1");
+        expect(files.runAction.mock.calls[0]?.[1]).toMatchObject({ charge: undefined });
     });
 
     it("fails before any extraction when the frame's source produced no clip in this run", async () => {
@@ -203,6 +271,28 @@ describe("videoRunInputError", () => {
 });
 
 describe("runVideoNode", () => {
+    it("refuses a clip and the frame extraction it needs together when the credits cannot cover both, before any extraction", async () => {
+        const target = node("gen", "image-to-video", { label: "Hero", model: "fal-ai/luma-dream-machine/ray-2" });
+        const actionContext = {
+            runAction: vi.fn(),
+            runMutation: vi.fn(),
+            runQuery: vi.fn(async (reference: unknown) =>
+                reference === internal.auth.billing.creditsLeftQuery ? { creditsLeft: 500 } : { isAdmin: false, plan: "premium" },
+            ),
+        };
+        const frame: WorkflowEdge[] = [{ id: "e", source: "src", sourceHandle: "frame-start", target: "gen" }];
+        const ctx = executionContextOf({
+            graph: { edges: frame, nodes: [target, node("src", "video", {})] },
+            nodeOutputs: { src: { assets: [{ mimeType: "video/mp4", videoUrl: "https://x.example/c.mp4" }] } },
+            orgId: "org-1",
+        });
+
+        // The clip is 500 credits (one 5 s block at 540p), the extraction of its 5 s is 1: 501 against 500 left.
+        await expect(runVideoNode(target, ctx, actionContext as never, "u")).rejects.toThrow("it costs 501 and 500 are left");
+        expect(actionContext.runAction).not.toHaveBeenCalled();
+        expect(actionContext.runMutation).not.toHaveBeenCalled();
+    });
+
     it("refuses a node with no input before any billing read or quota charge", async () => {
         const actionContext = { runAction: vi.fn(), runMutation: vi.fn(), runQuery: vi.fn() };
         const gen = node("gen", "image-to-video", { label: "Still" });

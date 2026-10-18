@@ -10,6 +10,7 @@ import { internalAction } from "../_generated/server";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk } from "../lib/fetch-timeout";
 import { MAX_LENGTH } from "../lib/validators";
 import type { FrameKind } from "./mentions";
+import { chargePaidCall } from "./video-billing";
 
 export const FRAME_EXTRACT_ENDPOINT = "fal-ai/ffmpeg-api/extract-frame";
 
@@ -56,7 +57,13 @@ const assertFalQueueUrl = (value: string | undefined, name: string): string => {
  * throws rather than submitting again, because every submit is billed. A caller that retries the
  * whole run pays for the frame again, which is the price of a fresh run, not of this helper.
  */
-export const extractFrameImage = async (videoUrl: string, frame: FrameKind, apiKey: string, pollIntervalMs = POLL_INTERVAL_MS): Promise<Blob> => {
+export const extractFrameImage = async (
+    videoUrl: string,
+    frame: FrameKind,
+    apiKey: string,
+    pollIntervalMs = POLL_INTERVAL_MS,
+    onSubmitted?: () => void,
+): Promise<Blob> => {
     // Every request that carries the key refuses a redirect: a 3xx would otherwise be
     // followed to whatever host it names, with the `Authorization` header.
     const headers = { Authorization: `Key ${apiKey}` };
@@ -68,6 +75,10 @@ export const extractFrameImage = async (videoUrl: string, frame: FrameKind, apiK
         method: "POST",
         redirect: "error",
     });
+
+    // fal has accepted the request, so it is billed from here on, whatever the rest of the call does.
+    onSubmitted?.();
+
     const queued = (await submit.json()) as { response_url?: string; status_url?: string };
 
     if (!queued.status_url || !queued.response_url) {
@@ -109,23 +120,47 @@ export const extractFrameImage = async (videoUrl: string, frame: FrameKind, apiK
     throw new Error("fal.ai frame extraction timed out");
 };
 
-/** Extracts a frame of a clip and stores it for `userId`. Called by a video node that has a frame wire. */
+/**
+ * Extracts a frame of a clip and stores it for `userId`. Called by a video node that has a frame wire. The
+ * extraction is charged here, once fal has accepted it (`charge`, keyed by the run and the source clip so
+ * the second reader of the frame pays nothing): a failure before that, such as a missing key or a refused
+ * submit, is not billed, and a failure after it still is.
+ */
 export const extractVideoFrame = internalAction
     .input({
+        charge: v.optional(
+            v.object({
+                costMicrodollars: v.number(),
+                orgId: v.string().max(MAX_LENGTH.id),
+                requestId: v.string().max(MAX_LENGTH.long),
+            }),
+        ),
         frame: v.union(v.literal("start"), v.literal("end")),
         threadId: v.string().max(MAX_LENGTH.id),
         userId: v.string().max(MAX_LENGTH.id),
         videoUrl: v.string().max(MAX_LENGTH.url),
     })
     .output(v.object({ fileId: v.string(), mimeType: v.string() }))
-    .action(async ({ args: { frame, threadId, userId, videoUrl }, ctx: context }) => {
+    .action(async ({ args: { charge, frame, threadId, userId, videoUrl }, ctx: context }) => {
         const falApiKey = process.env.FAL_API_KEY;
 
         if (!falApiKey) {
             throw new LunoraError("BAD_REQUEST", "FAL_API_KEY not configured");
         }
 
-        const blob = await extractFrameImage(videoUrl, frame, falApiKey);
+        let accepted = false;
+        let blob: Blob;
+
+        try {
+            blob = await extractFrameImage(videoUrl, frame, falApiKey, POLL_INTERVAL_MS, () => {
+                accepted = true;
+            });
+        } finally {
+            if (accepted && charge) {
+                await chargePaidCall(context, { ...charge, modelId: FRAME_EXTRACT_ENDPOINT }, userId);
+            }
+        }
+
         const { file } = await storeFile(context, blob, { threadId, userId });
 
         return { fileId: file.fileId, mimeType: blob.type };

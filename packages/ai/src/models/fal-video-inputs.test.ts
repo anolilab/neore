@@ -34,7 +34,7 @@ describe("FAL_VIDEO_INPUTS and the registry", () => {
 
 describe("videoOptionsOf", () => {
     it("exposes nothing for an unverified or unknown endpoint", () => {
-        expect(videoOptionsOf("fal-ai/bytedance/seedance/v1.5/lite/image-to-video")).toBeUndefined();
+        expect(videoOptionsOf("fal-ai/unknown/endpoint")).toBeUndefined();
         expect(videoOptionsOf("fal-ai/not-in-the-table")).toBeUndefined();
         expect(videoOptionsOf(undefined)).toBeUndefined();
     });
@@ -63,7 +63,7 @@ describe("snapVideoOptions", () => {
 
     it("sends nothing for an unset option, and drops everything for an unverified endpoint", () => {
         expect(snapVideoOptions("fal-ai/veo3/image-to-video", {})).toEqual({});
-        expect(snapVideoOptions("fal-ai/minimax/hailuo-2.3-fast/standard/text-to-video", { generateAudio: true, resolution: "720p" })).toEqual({});
+        expect(snapVideoOptions("fal-ai/unknown/endpoint", { generateAudio: true, resolution: "720p" })).toEqual({});
     });
 });
 

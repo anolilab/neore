@@ -88,6 +88,28 @@ describe("extractFrameImage", () => {
         expect(fake.mock.calls.filter(([input]) => String(input).endsWith("/status"))).toHaveLength(3);
     });
 
+    it("reports the submit only once fal has accepted it, so a refused submit is not billed", async () => {
+        const accepted = vi.fn();
+
+        falQueue();
+        await extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0, accepted);
+        expect(accepted).toHaveBeenCalledTimes(1);
+
+        falQueue({ submit: new Response("no credit", { status: 403, statusText: "Forbidden" }) });
+        const refused = vi.fn();
+
+        await expect(extractFrameImage("https://x.example/clip.mp4", "start", "key-1", 0, refused)).rejects.toThrow("403");
+        expect(refused).not.toHaveBeenCalled();
+    });
+
+    it("reports a submit that is then followed by a failed poll, since fal has billed it", async () => {
+        falQueue({ status: { error: "bad video", status: "FAILED" } });
+        const accepted = vi.fn();
+
+        await expect(extractFrameImage("https://x.example/clip.mp4", "end", "key-1", 0, accepted)).rejects.toThrow("bad video");
+        expect(accepted).toHaveBeenCalledTimes(1);
+    });
+
     it("throws on a rejected submit without submitting again", async () => {
         const { fake } = falQueue({ submit: new Response("no credit", { status: 403, statusText: "Forbidden" }) });
 

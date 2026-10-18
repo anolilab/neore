@@ -209,7 +209,7 @@ describe("falDurationInput", () => {
     });
 
     it("keeps the number as given for an unverified endpoint, and for no model", () => {
-        expect(falDurationInput(videoModel("fal-ai/bytedance/seedance/v1.5/lite/text-to-video", {}), 5)).toBe(5);
+        expect(falDurationInput(videoModel("fal-ai/unknown/endpoint", {}), 5)).toBe(5);
         expect(falDurationInput(undefined, 5)).toBe(5);
     });
 });
@@ -220,7 +220,7 @@ describe("falAcceptsAspectRatio", () => {
         expect(falAcceptsAspectRatio(videoModel("fal-ai/minimax/hailuo-02/standard/text-to-video", {}))).toBe(false);
         expect(falAcceptsAspectRatio(videoModel("fal-ai/stable-video", {}))).toBe(false);
         expect(falAcceptsAspectRatio(videoModel("fal-ai/veo3.1", {}))).toBe(true);
-        expect(falAcceptsAspectRatio(videoModel("fal-ai/bytedance/seedance/v1.5/lite/text-to-video", {}))).toBe(true);
+        expect(falAcceptsAspectRatio(videoModel("fal-ai/unknown/endpoint", {}))).toBe(true);
     });
 });
 

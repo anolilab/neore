@@ -2816,7 +2816,8 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         avgLatencyMs: 60_000,
         desc: "Faster, cheaper Seedance 1.5 variant from ByteDance",
         displayProvider: "ByteDance",
-        enabled: true,
+        // Hidden: fal's model page for this endpoint loads with no model on it, so calls are expected to fail. Re-enable once fal lists it.
+        enabled: false,
         filterCapabilities: ["text_to_video"],
         id: "fal-ai/bytedance/seedance/v1.5/lite/text-to-video",
         listed: true,
@@ -2832,7 +2833,8 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
     },
     {
         avgLatencyMs: 60_000,
-        enabled: true,
+        // Hidden: fal's model page for this endpoint loads with no model on it, so calls are expected to fail. Re-enable once fal lists it.
+        enabled: false,
         filterCapabilities: ["image_to_video"],
         id: "fal-ai/bytedance/seedance/v1.5/lite/image-to-video",
         maxVideoDuration: 10,
@@ -5187,7 +5189,8 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
         avgLatencyMs: 70_000,
         desc: "Cheapest medium-quality Hailuo 2.3 tier — best cost-to-quality ratio",
         displayProvider: "Hailuo",
-        enabled: true,
+        // Hidden: fal's model page for this endpoint loads with no model on it, so calls are expected to fail. Re-enable once fal lists it.
+        enabled: false,
         filterCapabilities: ["text_to_video"],
         id: "fal-ai/minimax/hailuo-2.3-fast/standard/text-to-video",
         listed: true,

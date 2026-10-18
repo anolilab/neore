@@ -5,15 +5,17 @@
  *
  * - before the run (`workflowVideoErrors`): a guest is refused, and so is a paid-plan video model
  *   the run's account cannot pay for (`premiumVideoErrors`);
- * - per node, before any paid work (frame extraction included): the credits the clip costs must fit the
- *   member's remaining credits, when the account has a credit record, and the run takes one unit of the
- *   daily video quota that `/chat/media` and the chat video tool take;
+ * - per node, before any paid work: the credits the node's paid calls cost must fit the member's remaining
+ *   credits, when the account has a credit record. The calls are the clip and, when this node is the first
+ *   to need it in the run, the frame extracted for it. The run takes one unit of the daily video quota that
+ *   `/chat/media` and the chat video tool take (frame extraction takes none);
  * - per node, after a clip is made: its cost is deducted from the account's credits, keyed on the run and
  *   node so a retry is a no-op. A failed generation settles nothing, so it is not charged.
+ * - per frame extraction: charged by the extraction action (`media-ops.ts`) once fal has accepted the request,
+ *   whatever happens after. Keyed on the run and source clip, so a second node reading the frame pays nothing.
  *
  * The account is the run's organization, or the user's own when the run has none (`run-setup.ts`). With no
  * organization or no credit record nothing is charged or refused, as in chat (`applyGatewayDeduction`).
- * Frame extraction is paid on fal as well, at a price this module does not know, so it is not billed.
  */
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
@@ -21,11 +23,17 @@ import { computeGatewayCredits } from "../auth/lib/gateway-credits";
 import { chatLogger } from "../lib/logger";
 import type { ExecutionContext, WorkflowNode } from "./core";
 import { isVideoNode, modelIdFor, videoKindOf } from "./video-inputs";
-import { premiumVideoErrors, unrunnableVideoErrors, videoRequestId, videoRunCost } from "./video-policy";
+import { premiumVideoErrors, unrunnableVideoErrors, videoRequestId } from "./video-policy";
 import type { RunAccount } from "./run-setup";
 
 /** The part of an action or HTTP action context a run's charges go through. */
 type RunContext = Pick<ActionCtx, "runMutation" | "runQuery">;
+
+/** The paid calls one node run makes, in microdollars: its clip, and the frame it extracts when it is the first to need it. */
+export interface VideoRunCosts {
+    clipMicrodollars: number | undefined;
+    extractionMicrodollars: number | undefined;
+}
 
 /**
  * The graph-wide refusals for a run's video nodes, checked with the other input errors before any node
@@ -50,16 +58,18 @@ export const workflowVideoErrors = (account: RunAccount, nodes: ReadonlyArray<Wo
     return premiumVideoErrors(nodes, account.isAdmin || account.plan === "premium");
 };
 
-/**
- * Refuses a video node run before its paid work: the credits its clip costs, then the daily quota.
- * Throws the message the run reports. A node with no price is not checked against credits.
- */
-const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: WorkflowNode, userId: string): Promise<void> => {
-    const { costMicrodollars } = videoRunCost(node);
+const creditsOf = (costMicrodollars: number): number => computeGatewayCredits({ billingMode: "platform", costMicrodollars });
 
-    if (costMicrodollars !== undefined && run.orgId) {
+/**
+ * Refuses a video node run before its paid work: the credits its paid calls cost, then the daily quota.
+ * Throws the message the run reports.
+ */
+const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: WorkflowNode, userId: string, costs: VideoRunCosts): Promise<void> => {
+    const calls = [costs.clipMicrodollars, costs.extractionMicrodollars].filter((cost): cost is number => cost !== undefined);
+
+    if (calls.length > 0 && run.orgId) {
         const { creditsLeft } = await context.runQuery(internal.auth.billing.creditsLeftQuery, { orgId: run.orgId, userId });
-        const credits = computeGatewayCredits({ billingMode: "platform", costMicrodollars });
+        const credits = calls.reduce((sum, cost) => sum + creditsOf(cost), 0);
 
         if (creditsLeft !== null && credits > creditsLeft) {
             throw new Error(
@@ -76,49 +86,67 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
     }
 };
 
-/** Deducts a finished clip's cost from the account's credits. Keyed on the run and node, so a retry is a no-op. */
-const settleVideoRun = async (context: RunContext, run: ExecutionContext, node: WorkflowNode, userId: string): Promise<void> => {
-    const { costMicrodollars } = videoRunCost(node);
-
-    if (costMicrodollars === undefined || !run.orgId) {
+/**
+ * Deducts one paid call's cost from the account's credits, keyed on `requestId` so a retry is a no-op. A call
+ * with no organization is not charged. A failure is logged and not thrown: the paid work already happened.
+ */
+export const chargePaidCall = async (
+    context: Pick<ActionCtx, "runMutation">,
+    call: { costMicrodollars: number; modelId: string; orgId: string | undefined; requestId: string },
+    userId: string,
+): Promise<void> => {
+    if (!call.orgId) {
         return;
     }
-
-    const kind = videoKindOf(node);
 
     try {
         await context.runMutation(internal.auth.billing.deductCreditsFromGateway, {
             billingMode: "platform",
-            costMicrodollars,
-            modelId: kind === undefined ? "" : modelIdFor(node, kind),
-            orgId: run.orgId,
-            requestId: videoRequestId(run.runId, node.id),
+            costMicrodollars: call.costMicrodollars,
+            modelId: call.modelId,
+            orgId: call.orgId,
+            requestId: call.requestId,
             userId,
         });
     } catch (error) {
-        // The clip exists and fal is paid: failing the node would hide a finished clip and invite a paid re-run.
+        // The clip or frame exists and fal is paid: failing the node would hide a finished result and invite a paid re-run.
         // The charge is lost instead, and the log is where it is found.
-        chatLogger.error("[workflow] could not record a video charge", { error, nodeId: node.id, runId: run.runId });
+        chatLogger.error("[workflow] could not record a video charge", { error, requestId: call.requestId });
     }
 };
 
 /**
- * One video node run, billed: begin (credits, quota), then `dispatch` (inputs and the paid call), then
- * settle. Settling only after `dispatch` returns means a failed clip is never charged; `beginVideoRun` runs
- * before the frame is extracted, which is paid too.
+ * One video node run, billed: begin (credits, quota), then `dispatch` (frame extraction, inputs and the paid
+ * call), then the clip's charge. Charging only after `dispatch` returns means a failed clip is never charged.
+ * The extraction's own charge is made where the extraction runs (`media-args.ts`), since only the first node
+ * to read a frame pays for it.
  */
 export const runBilledVideo = async <T>(
     context: RunContext,
     run: ExecutionContext,
     node: WorkflowNode,
     userId: string,
+    costs: VideoRunCosts,
     dispatch: () => Promise<T>,
 ): Promise<T> => {
-    await beginVideoRun(context, run, node, userId);
+    await beginVideoRun(context, run, node, userId, costs);
 
     const result = await dispatch();
 
-    await settleVideoRun(context, run, node, userId);
+    if (costs.clipMicrodollars !== undefined) {
+        const kind = videoKindOf(node);
+
+        await chargePaidCall(
+            context,
+            {
+                costMicrodollars: costs.clipMicrodollars,
+                modelId: kind === undefined ? "" : modelIdFor(node, kind),
+                orgId: run.orgId,
+                requestId: videoRequestId(run.runId, node.id),
+            },
+            userId,
+        );
+    }
 
     return result;
 };

@@ -4,30 +4,41 @@
  * system prompt, and the one shape a video node stores. Both entry points read these, so the two
  * cannot disagree on what a node sends.
  */
+import { falVideoInputsOf } from "@neore/ai/models";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
 import { type ExecutionContext, extractUrl, getLastOutput, type WorkflowContent, type WorkflowNode } from "./core";
 import { expandNodeMentions, referenceImageUrls } from "./mention-targets";
-import { runBilledVideo } from "./video-billing";
+import { isFrameHandleId } from "./mentions";
+import { runBilledVideo, type VideoRunCosts } from "./video-billing";
 import {
     type FrameSource,
     frameSourceOf,
+    isVideoNode,
     type MediaRef,
+    mediaOf,
     modelIdFor,
     resolveMediaUrls,
     resolveVideoInputUrls,
     videoInputErrors,
     videoKindOf,
 } from "./video-inputs";
-import { videoDefinitionOf, videoDurationOf } from "./video-policy";
+import { frameClipSeconds, frameExtractionMicrodollars, frameRequestId, videoDefinitionOf, videoDurationOf, videoRunCost } from "./video-policy";
+import { readRunPlan } from "../chat/lib/agent-run";
 
 /** The part of an action or HTTP action context the workflow reads stored files through, and extracts frames with. */
 export interface WorkflowFileContext {
     runAction: (
         action: typeof internal.workflow.media_ops.extractVideoFrame,
-        args: { frame: "start" | "end"; threadId: string; userId: string; videoUrl: string },
+        args: {
+            charge?: { costMicrodollars: number; orgId: string; requestId: string };
+            frame: "start" | "end";
+            threadId: string;
+            userId: string;
+            videoUrl: string;
+        },
     ) => Promise<{ fileId: string; mimeType: string }>;
     runQuery: (query: typeof api.file.getChatFileImageUrl, args: { fileId: Id<"chatFiles"> }) => Promise<string | null>;
 }
@@ -36,29 +47,86 @@ export interface WorkflowFileContext {
 const signChatFile = async (context: WorkflowFileContext, fileId: string): Promise<string | null> =>
     await context.runQuery(api.file.getChatFileImageUrl, { fileId: fileId as Id<"chatFiles"> });
 
+/** The key a run memoizes a frame extraction under: one per source clip and kind. */
+const frameKeyOf = (source: Pick<FrameSource, "kind" | "sourceId">): string => `${source.sourceId}:${source.kind}`;
+
+/** What extracting a frame of this source clip costs, in microdollars: fal bills the clip's seconds. */
+const extractionCostOf = (source: FrameSource, context: ExecutionContext): number =>
+    frameExtractionMicrodollars(frameClipSeconds(context.graph.nodes.find((candidate) => candidate.id === source.sourceId)));
+
 /**
  * The stored file of a frame wire, extracted from its source clip. A frame wired into two nodes is
- * extracted once per run: the promise is kept on the run's context, keyed by source and kind.
+ * extracted once per run: the promise is kept on the run's context, keyed by source and kind. The
+ * extraction is charged where it is made, whether it succeeds or fails: fal bills the attempt, and the
+ * charge is keyed on the source so the second reader of the frame pays nothing.
  */
 const extractedFrameFileId = (context: ExecutionContext, files: WorkflowFileContext, userId: string, source: FrameSource, videoUrl: string) => {
     const frames = context.frames ?? new Map<string, Promise<string>>();
 
     context.frames = frames;
 
-    const key = `${source.sourceId}:${source.kind}`;
+    const key = frameKeyOf(source);
     const known = frames.get(key);
 
     if (known) {
         return known;
     }
 
+    // The extraction action charges it once fal accepts the request, so a run that never reaches fal bills nothing.
+    const charge =
+        context.orgId === undefined
+            ? undefined
+            : {
+                  costMicrodollars: extractionCostOf(source, context),
+                  orgId: context.orgId,
+                  requestId: frameRequestId(context.runId, source.sourceId, source.kind),
+              };
     const pending = files
-        .runAction(internal.workflow.media_ops.extractVideoFrame, { frame: source.kind, threadId: "workflow", userId, videoUrl })
+        .runAction(internal.workflow.media_ops.extractVideoFrame, { charge, frame: source.kind, threadId: "workflow", userId, videoUrl })
         .then((stored) => stored.fileId);
 
     frames.set(key, pending);
 
     return pending;
+};
+
+/**
+ * The frame extraction a node run would start, in microdollars, for the pre-check: `undefined` when no clip
+ * is wired to its frame, or when the run has already extracted that frame (its node paid).
+ */
+const frameExtractionDue = (node: WorkflowNode, context: ExecutionContext): number | undefined => {
+    const source = frameSourceOf(node, context);
+
+    if (!source?.clip || context.frames?.has(frameKeyOf(source))) {
+        return undefined;
+    }
+
+    return extractionCostOf(source, context);
+};
+
+/**
+ * The seconds of reference video this node sends, for the reference charge. Each wired video is taken up to the
+ * model's cap, in wire order. A generated clip counts its billed length; a clip of unknown length (an upload) makes
+ * the sum the endpoint's whole reference budget, since a valid request cannot exceed that. 0 when none is sent.
+ */
+export const referenceSecondsOf = (node: WorkflowNode, context: ExecutionContext): number => {
+    const model = videoDefinitionOf(node);
+    const cap = model?.maxReferenceVideos ?? 0;
+    const wired = context.graph.edges
+        .filter((edge) => edge.target === node.id && !isFrameHandleId(edge.sourceHandle))
+        .flatMap((edge) => context.graph.nodes.filter((candidate) => candidate.id === edge.source))
+        .filter((source) => mediaOf(context.nodeOutputs[source.id])?.mimeType.startsWith("video/") === true)
+        .slice(0, cap);
+
+    if (wired.length === 0) {
+        return 0;
+    }
+
+    if (wired.some((source) => !isVideoNode(source))) {
+        return falVideoInputsOf(model?.modelApiId)?.references?.totalSeconds ?? 0;
+    }
+
+    return wired.reduce((seconds, source) => seconds + videoDurationOf(source, videoDefinitionOf(source)).billed, 0);
 };
 
 /** The frame a video node's wire carries, as a stored file. `undefined` when no frame is wired. */
@@ -266,8 +334,19 @@ export const runVideoNode = async (
     }
 
     const kind = videoKindOf(node);
+    // The action's own plan read (`generateVideo` reads it the same way), so the clamp and the charge agree with the call.
+    const plan = await readRunPlan(actionContext, userId, context.orgId ?? null);
+    const costs: VideoRunCosts = {
+        clipMicrodollars: videoRunCost(node, {
+            // A start image is sent to image-to-video always, and to text-to-video when a frame is wired (`textToVideoArgs`).
+            paidPlan: plan.isAdmin || plan.plan === "premium",
+            referenceSeconds: referenceSecondsOf(node, context),
+            startImage: kind === "imageToVideo" || frameSourceOf(node, context) !== undefined,
+        }).costMicrodollars,
+        extractionMicrodollars: frameExtractionDue(node, context),
+    };
 
-    const output = await runBilledVideo(actionContext, context, node, userId, async () => {
+    const output = await runBilledVideo(actionContext, context, node, userId, costs, async () => {
         const inputs = await videoInputArgs(node, context, actionContext, userId);
 
         if (kind === "imageToVideo") {
