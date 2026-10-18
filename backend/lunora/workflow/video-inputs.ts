@@ -372,6 +372,7 @@ const isVideoFile = (node: WorkflowNode): boolean => node.type === "file" && typ
  * - a frame wire must name a supported frame (`start` or `end`), run from a video or
  *   image-to-video node into one, and feed a node whose model takes an image (with a prompt when
  *   it is text-to-video);
+ * - a video node takes at most one frame wire, a start or an end frame, never both;
  * - the upstream generated clips must fit the model's reference-video budget (see `referenceVideoLimitSeconds`), each at the
  *   length its generation bills (`generatedClipSecondsOf`). An uploaded clip of unknown length is not checked.
  *
@@ -381,6 +382,7 @@ export const videoInputErrors = (nodes: ReadonlyArray<WorkflowNode>, edges: Read
     const errors: string[] = [];
     const byId = new Map(nodes.map((node) => [node.id, node]));
     const frameFed = new Map<string, FrameKind>();
+    const frameWires = new Map<string, number>();
 
     for (const edge of edges) {
         const source = byId.get(edge.source);
@@ -390,6 +392,8 @@ export const videoInputErrors = (nodes: ReadonlyArray<WorkflowNode>, edges: Read
         if (!isFrameHandleId(edge.sourceHandle) || !source || !target) {
             continue;
         }
+
+        frameWires.set(target.id, (frameWires.get(target.id) ?? 0) + 1);
 
         if (frame === undefined) {
             errors.push(`The ${edge.sourceHandle} handle is no longer supported: add the frame as an image node and wire that instead`);
@@ -403,6 +407,15 @@ export const videoInputErrors = (nodes: ReadonlyArray<WorkflowNode>, edges: Read
     for (const target of nodes) {
         if (target.type !== "video" && target.type !== "image-to-video") {
             continue;
+        }
+
+        const wires = frameWires.get(target.id) ?? 0;
+
+        // The run has one start image slot, so a second frame wire would be silently ignored: refuse the graph instead.
+        if (wires > 1) {
+            const name = typeof target.data.label === "string" && target.data.label !== "" ? target.data.label : target.id;
+
+            errors.push(`"${name}" has ${wires} frame wires; a video node takes one start or end frame, so keep one`);
         }
 
         const frame = frameFed.get(target.id);

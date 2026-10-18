@@ -256,6 +256,17 @@ describe("videoInputErrors", () => {
         ]);
     });
 
+    it("refuses a node wired with two frame wires, so no edge is silently ignored", () => {
+        const nodes = [node("a", "video", {}), node("b", "video", {}), node("gen", "video", { label: "Poster", mode: "image-to-video", model: SEEDANCE })];
+        const both: WorkflowEdge[] = [
+            { id: "s", source: "a", sourceHandle: "frame-start", target: "gen" },
+            { id: "e", source: "b", sourceHandle: "frame-end", target: "gen" },
+        ];
+
+        expect(videoInputErrors(nodes, both)).toStrictEqual(['"Poster" has 2 frame wires; a video node takes one start or end frame, so keep one']);
+        expect(videoInputErrors(nodes, both.slice(0, 1))).toStrictEqual([]);
+    });
+
     it("reports a saved picked-frame wire, which is no longer a handle", () => {
         const nodes = [node("src", "video", {}), node("gen", "video", {})];
 

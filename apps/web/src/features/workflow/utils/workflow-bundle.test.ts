@@ -7,6 +7,7 @@ import { createJsZip, loadJsZip } from "@/lib/zip";
 
 import type { WorkflowContent, WorkflowNode } from "../types";
 import {
+    ASSET_BYTE_BUDGET,
     exportWorkflowBundle,
     importWorkflowBundle,
     MAX_BUNDLE_ENTRIES,
@@ -194,6 +195,91 @@ describe("workflow bundle", () => {
 
         await expect(bundle.readAsset(name)).rejects.toBeInstanceOf(WorkflowBundleError);
     });
+
+    it("refuses a manifest that references more assets than the cap, before reading any of them", async () => {
+        const assetPath = (index: number) => `assets/${index.toString(16).padStart(64, "0")}.png`;
+        const nodesFor = (count: number) => Array.from({ length: count }, (_, index) => node(`n${index}`, "image", { imageFileId: assetPath(index) }));
+
+        const over = await zipFile(manifestZip(nodesFor(101)));
+        const atCap = await zipFile(manifestZip(nodesFor(100)));
+
+        await expect(readWorkflowBundle(over, OPTIONS)).rejects.toMatchObject({ code: "too-many-entries" });
+        await expect(readWorkflowBundle(atCap, OPTIONS)).resolves.toBeDefined();
+    });
+
+    it("stops the import at the first asset past the archive's total budget, even when each is within its own cap", async () => {
+        // Under the asset cap, a bundle passes the total budget only with assets close to their per-type cap. Each asset
+        // here is valid (its name is its digest), so the uploads before the budget run and the next one stops the import.
+        const cap = chatAttachmentLimit("image/png").maxBytes;
+        const fits = Math.floor(ASSET_BYTE_BUDGET / cap);
+        const count = fits + 2;
+        const digestOf = async (index: number) => {
+            const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(cap).fill(index));
+
+            return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+        };
+        const paths = await Promise.all(Array.from({ length: count }, async (_, index) => `assets/${await digestOf(index)}.png`));
+        let opened = 0;
+
+        // Every asset is `cap` bytes of its own index, emitted in chunks, the way JSZip's stream hands them out.
+        const fakeEntry = (index: number, name: string) => {
+            const listeners: Record<string, ((value?: Uint8Array) => void) | undefined> = {};
+            const filled = new Uint8Array(1024 * 1024).fill(index);
+            let paused = false;
+            const stream = {
+                on(event: string, listener: (value?: Uint8Array) => void) {
+                    listeners[event] = listener;
+
+                    return stream;
+                },
+                pause() {
+                    paused = true;
+
+                    return stream;
+                },
+                resume() {
+                    for (let sent = 0; sent < cap && !paused; sent += filled.byteLength) {
+                        listeners.data?.(filled);
+                    }
+
+                    if (!paused) {
+                        listeners.end?.();
+                    }
+
+                    return stream;
+                },
+            };
+
+            return {
+                async: vi.fn(),
+                dir: false,
+                internalStream: () => {
+                    opened += 1;
+
+                    return stream;
+                },
+                name,
+            };
+        };
+        const nodes = paths.map((path, index) => node(`n${index}`, "image", { imageFileId: path }));
+        const withEntries = async (data: ArrayBuffer): Promise<JsZipLike> => {
+            const zip = await loadJsZip(data);
+
+            paths.forEach((path, index) => {
+                zip.files[path] = fakeEntry(index, path);
+            });
+
+            return zip;
+        };
+        const stored = vi.fn(store);
+
+        const bundle = await readWorkflowBundle(await zipFile(manifestZip(nodes)), { loadZip: withEntries });
+
+        await expect(importWorkflowBundle(bundle, stored)).rejects.toMatchObject({ code: "too-large" });
+        expect(stored).toHaveBeenCalledTimes(fits);
+        // The asset that takes the total past the budget is the last one read.
+        expect(opened).toBe(fits + 1);
+    }, 60_000);
 
     it("reads an asset in chunks and stops at its size cap instead of inflating it whole", async () => {
         const name = `assets/${"0".repeat(64)}.png`;

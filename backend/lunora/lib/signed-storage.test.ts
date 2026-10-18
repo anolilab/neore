@@ -146,6 +146,52 @@ describe("signed GET ranges", () => {
         expect(download).not.toHaveBeenCalled();
     });
 
+    it("answers a HEAD range 206 with that span's length, and the same Content-Range a GET gives", async () => {
+        const { context, download } = contextWith({ contentType: "video/mp4", text: "0123456789" });
+        const head = await handleSignedGet(context, new Request(await sign("GET"), { headers: { Range: "bytes=2-4" }, method: "HEAD" }), OPTIONS);
+
+        expect(head?.status).toBe(206);
+        expect(head?.headers.get("Content-Length")).toBe("3");
+        expect(head?.headers.get("Content-Range")).toBe("bytes 2-4/10");
+        expect(head?.headers.get("Accept-Ranges")).toBe("bytes");
+        expect(download).not.toHaveBeenCalled();
+    });
+
+    it("answers a HEAD suffix range 206 with the last bytes of the object", async () => {
+        const head = await get({ Range: "bytes=-3" }, "HEAD");
+
+        expect(head?.status).toBe(206);
+        expect(head?.headers.get("Content-Length")).toBe("3");
+        expect(head?.headers.get("Content-Range")).toBe("bytes 7-9/10");
+    });
+
+    it("answers a HEAD range past the end 416 with the object's size, as a GET does", async () => {
+        const head = await get({ Range: "bytes=10-" }, "HEAD");
+
+        expect(head?.status).toBe(416);
+        expect(head?.headers.get("Content-Range")).toBe("bytes */10");
+    });
+
+    it("answers a HEAD with an unparseable Range 200 for the whole object, as a GET does", async () => {
+        const head = await get({ Range: "pages=1-2" }, "HEAD");
+
+        expect(head?.status).toBe(200);
+        expect(head?.headers.get("Content-Length")).toBe("10");
+        expect(head?.headers.get("Content-Range")).toBeNull();
+    });
+
+    it("answers a HEAD of an empty object 200 with no range, and 416 for any range", async () => {
+        const { context } = contextWith({ contentType: "text/plain", text: "" });
+        const head = async (headers: Record<string, string>) =>
+            await handleSignedGet(context, new Request(await sign("GET"), { headers, method: "HEAD" }), OPTIONS);
+
+        const whole = await head({});
+        const ranged = await head({ Range: "bytes=0-" });
+
+        expect(whole?.headers.get("Content-Length")).toBe("0");
+        expect(ranged?.status).toBe(416);
+    });
+
     it("answers 404 for a missing object", async () => {
         const { context } = contextWith();
 

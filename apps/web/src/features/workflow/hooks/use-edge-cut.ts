@@ -53,6 +53,8 @@ export const useEdgeCut = () => {
 
         const bounds = event.currentTarget.getBoundingClientRect();
         const origin = { x: event.clientX, y: event.clientY };
+        // Only the pointer that started the cut may move or finish it; another pointer's events are ignored.
+        const { pointerId } = event;
         const controller = new AbortController();
         const { signal } = controller;
         const end = () => {
@@ -69,6 +71,8 @@ export const useEdgeCut = () => {
         globalThis.addEventListener(
             "pointermove",
             (move: PointerEvent) => {
+                if (move.pointerId !== pointerId) return;
+
                 cutLine.setAttribute("x2", String(move.clientX - bounds.left));
                 cutLine.setAttribute("y2", String(move.clientY - bounds.top));
                 cutLine.setAttribute("visibility", "visible");
@@ -78,6 +82,8 @@ export const useEdgeCut = () => {
         globalThis.addEventListener(
             "pointerup",
             (up: PointerEvent) => {
+                if (up.pointerId !== pointerId) return;
+
                 end();
 
                 if (Math.hypot(up.clientX - origin.x, up.clientY - origin.y) < 2) return;
@@ -87,7 +93,13 @@ export const useEdgeCut = () => {
             { signal },
         );
         // A cancelled pointer cuts nothing; it only clears the line.
-        globalThis.addEventListener("pointercancel", end, { signal });
+        globalThis.addEventListener(
+            "pointercancel",
+            (cancel: PointerEvent) => {
+                if (cancel.pointerId === pointerId) end();
+            },
+            { signal },
+        );
         // macOS opens the context menu on Ctrl+press, before the drag ends.
         globalThis.addEventListener("contextmenu", (menu: Event) => menu.preventDefault(), { signal });
     };

@@ -13,7 +13,7 @@ import { useWorkflowShortcuts } from "../../hooks/use-workflow-shortcuts";
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { WorkflowEdge, WorkflowNode, WorkflowNodeType } from "../../types";
 import NODE_CONFIGS from "../../types";
-import { canConnectFrom } from "../../utils/frame-connection";
+import { canConnectFrom, hasFrameEdgeInto } from "../../utils/frame-connection";
 import CollaboratorCursors from "../collab/collaborator-cursors";
 import { edgeTypes } from "../edges";
 import { nodeTypes } from "../nodes";
@@ -152,9 +152,9 @@ const WorkflowCanvasInner = ({
         };
 
         // The node is still created when the edge is refused; only the frame edge is dropped.
-        if (canConnectFrom(newEdge.sourceHandle, type)) {
-            const { edges: currentEdges } = useWorkflowStore.getState();
+        const { edges: currentEdges } = useWorkflowStore.getState();
 
+        if (canConnectFrom(newEdge.sourceHandle, type, hasFrameEdgeInto(currentEdges, newEdge.target))) {
             setEdges([...currentEdges, newEdge]);
         }
 
@@ -162,11 +162,12 @@ const WorkflowCanvasInner = ({
         setConnectionDropMenu(null);
     };
 
-    // A frame may only feed a video or image-to-video node (its handle is `frame-<kind>`).
+    // A frame may only feed a video or image-to-video node (its handle is `frame-<kind>`), and only one per node.
     const isValidConnection = (connection: Edge | Connection) => {
-        const target = useWorkflowStore.getState().nodes.find((node) => node.id === connection.target);
+        const state = useWorkflowStore.getState();
+        const target = state.nodes.find((node) => node.id === connection.target);
 
-        return canConnectFrom(connection.sourceHandle, target?.type);
+        return canConnectFrom(connection.sourceHandle, target?.type, hasFrameEdgeInto(state.edges, connection.target));
     };
 
     const onDragOver = (event: React.DragEvent) => {

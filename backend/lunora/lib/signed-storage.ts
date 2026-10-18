@@ -199,17 +199,7 @@ export const handleSignedGet = async (context: HttpActionCtx, request: Request, 
     const read = readFor(request.headers.get("Range"));
 
     if (request.method === "HEAD") {
-        const metadata = await storage.getMetadata(key);
-
-        if (!metadata) {
-            return new Response("Not found", { status: 404 });
-        }
-
-        const headers = downloadHeaders(metadata.contentType ?? "application/octet-stream", metadata.size);
-
-        headers.set("Accept-Ranges", "bytes");
-
-        return new Response(null, { headers, status: 200 });
+        return await headObject(storage, key, request);
     }
 
     if (read === "all") {
@@ -253,10 +243,43 @@ export const handleSignedGet = async (context: HttpActionCtx, request: Request, 
     const headers = downloadHeaders(object.httpMetadata?.contentType ?? "application/octet-stream", undefined);
 
     headers.set("Accept-Ranges", "bytes");
-    headers.set("Content-Length", String(range.end - range.start + 1));
-    headers.set("Content-Range", `bytes ${String(range.start)}-${String(range.end)}/${String(object.size)}`);
+    setPartialHeaders(headers, range, object.size);
 
     return new Response(object.body, { headers, status: 206 });
+};
+
+/** A HEAD: the framing a GET would send, read from the metadata alone, so no body is read. */
+const headObject = async (storage: NonNullable<HttpActionCtx["storage"]>, key: string, request: Request): Promise<Response> => {
+    const metadata = await storage.getMetadata(key);
+
+    if (!metadata) {
+        return new Response("Not found", { status: 404 });
+    }
+
+    // The same classification a GET makes (`parseRange` against the object's size).
+    const span = parseRange(request.headers.get("Range"), metadata.size);
+
+    if (span.kind === "unsatisfiable") {
+        return unsatisfiable(metadata);
+    }
+
+    const headers = downloadHeaders(metadata.contentType ?? "application/octet-stream", metadata.size);
+
+    headers.set("Accept-Ranges", "bytes");
+
+    if (span.kind === "partial") {
+        setPartialHeaders(headers, span, metadata.size);
+
+        return new Response(null, { headers, status: 206 });
+    }
+
+    return new Response(null, { headers, status: 200 });
+};
+
+/** The 206 framing of one span: its length and `Content-Range` against the object's size. A GET and a HEAD share it. */
+const setPartialHeaders = (headers: Headers, range: { end: number; start: number }, size: number): void => {
+    headers.set("Content-Length", String(range.end - range.start + 1));
+    headers.set("Content-Range", `bytes ${String(range.start)}-${String(range.end)}/${String(size)}`);
 };
 
 /** 416 for a span the object cannot satisfy, with the object's size in `Content-Range`. */

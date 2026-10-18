@@ -37,6 +37,9 @@ export const MAX_BUNDLE_ENTRIES = 128;
 const MAX_BUNDLE_NODES = 2000;
 const MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
 
+/** The inflated bytes all of a bundle's assets may total; the archive is read against this, and export writes within it. */
+export const ASSET_BYTE_BUDGET = MAX_BUNDLE_BYTES - MAX_MANIFEST_BYTES;
+
 /**
  * The image and PDF types a bundle carries. A deliberate mirror of the image and PDF entries in
  * `UPLOAD_ALLOWED_MIME` (`backend/lunora/vault/lib/file-constants.ts`); the web app does not import
@@ -276,6 +279,24 @@ const decodeDataUrl = (url: string): BundleSource | undefined => {
     }
 };
 
+/** The archive paths the nodes reference, each counted once: a file's id or an inline image's path. */
+const referencedAssetPaths = (nodes: ReadonlyArray<WorkflowNode>): Set<string> => {
+    const paths = new Set<string>();
+
+    for (const node of nodes) {
+        for (const reference of ASSET_REFERENCES) {
+            const inline = reference.inlinePath === undefined ? undefined : node.data[reference.inlinePath];
+            const path = [getAt(node.data, reference.idPath), inline].find(isAssetPath);
+
+            if (path !== undefined) {
+                paths.add(path);
+            }
+        }
+    }
+
+    return paths;
+};
+
 const isValidNode = (node: unknown): node is WorkflowNode =>
     isRecord(node) &&
     typeof node.id === "string" &&
@@ -317,6 +338,11 @@ const parseDocument = (value: unknown): { bundled: boolean; content: WorkflowCon
         if (!Object.hasOwn(NODE_CONFIGS, node.type)) {
             throw new WorkflowBundleError("unknown-node-type");
         }
+    }
+
+    // Each referenced asset is one archive file to read and one upload, so a manifest naming more than the cap is refused before any is read.
+    if (referencedAssetPaths(value.nodes as WorkflowNode[]).size > MAX_BUNDLE_ASSETS) {
+        throw new WorkflowBundleError("too-many-entries");
     }
 
     for (const edge of value.edges) {
@@ -390,6 +416,9 @@ export const readWorkflowBundle = async (file: File, { loadZip }: ReadBundleOpti
         throw new WorkflowBundleError("not-workflow");
     }
 
+    // The inflated bytes of every asset read so far, against the one budget for the whole archive.
+    let inflatedBytes = 0;
+
     return {
         ...parseDocument(parsed),
         // Looked up by the exact name the manifest gave, one at a time, so an archive
@@ -408,10 +437,12 @@ export const readWorkflowBundle = async (file: File, { loadZip }: ReadBundleOpti
                 return undefined;
             }
 
-            const assetBytes = await readEntryCapped(entry, chatAttachmentLimit(contentType).maxBytes);
+            const assetBytes = await readEntryCapped(entry, Math.min(chatAttachmentLimit(contentType).maxBytes, ASSET_BYTE_BUDGET - inflatedBytes));
+
+            inflatedBytes += assetBytes.byteLength;
 
             if (assetBytes.byteLength === 0) {
-                throw new WorkflowBundleError("too-large");
+                throw new WorkflowBundleError("asset-mismatch");
             }
 
             if (path !== `assets/${await sha256Hex(assetBytes)}.${extension}`) {
@@ -427,6 +458,8 @@ export const readWorkflowBundle = async (file: File, { loadZip }: ReadBundleOpti
  * Imports a bundle's referenced assets through `store` (one at a time) and rewrites
  * the nodes to the new references. A reference that cannot be read or stored is
  * dropped from its node and counted in `skipped`, so the rest of the workflow still loads.
+ * An asset past its size cap, or an archive past its total asset budget, stops the import
+ * with a `too-large` {@link WorkflowBundleError}.
  */
 export const importWorkflowBundle = async (
     bundle: WorkflowBundle,
@@ -435,12 +468,19 @@ export const importWorkflowBundle = async (
     let skipped = 0;
 
     const storedAsset = memoAsync(async (path: string): Promise<StoredAsset | undefined> => {
-        try {
-            const source = await bundle.readAsset(path);
+        const source = await bundle.readAsset(path).catch((error: unknown) => {
+            // An archive past its size limits stops the import. Any other unreadable asset costs its node the file and nothing more.
+            if (error instanceof WorkflowBundleError && error.code === "too-large") {
+                throw error;
+            }
 
+            return undefined;
+        });
+
+        try {
             return source ? await store(new File([source.bytes], path.slice("assets/".length), { type: source.contentType })) : undefined;
         } catch {
-            // A failed asset (a rate-limited upload, a rejected type, corrupt bytes) costs its node the file and nothing more.
+            // A failed asset (a rate-limited upload, a rejected type) costs its node the file and nothing more.
             return undefined;
         }
     });
@@ -521,7 +561,7 @@ export const exportWorkflowBundle = async (
 
         if (!assets.has(path)) {
             // The manifest and the zip's own headers come out of the same archive cap import reads against.
-            if (assets.size >= MAX_BUNDLE_ASSETS || totalBytes + source.bytes.byteLength > MAX_BUNDLE_BYTES - MAX_MANIFEST_BYTES) {
+            if (assets.size >= MAX_BUNDLE_ASSETS || totalBytes + source.bytes.byteLength > ASSET_BYTE_BUDGET) {
                 return undefined;
             }
 
