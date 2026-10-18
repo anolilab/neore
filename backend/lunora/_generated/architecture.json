@@ -18866,25 +18866,25 @@
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 37,
+      "line": 48,
       "reason": "\"videoInputArgs\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 55,
+      "line": 84,
       "reason": "\"videoInputArgs\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 280,
+      "line": 359,
       "reason": "\"runVideoNode\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 289,
+      "line": 368,
       "reason": "\"runVideoNode\" is not a registered function"
     },
     {
@@ -18902,20 +18902,20 @@
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 61,
+      "line": 71,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 72,
+      "line": 82,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 90,
-      "reason": "\"runBilledVideo\" is not a registered function"
+      "line": 103,
+      "reason": "\"chargePaidCall\" is not a registered function"
     }
   ],
   "version": 1
