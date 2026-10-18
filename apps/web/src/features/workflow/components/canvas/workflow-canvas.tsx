@@ -7,7 +7,9 @@ import { nanoid } from "nanoid";
 import { useRef, useState } from "react";
 
 import { WorkflowCollabProvider } from "../../contexts";
+import { useCanvasAriaLabels } from "../../hooks/use-canvas-aria-labels";
 import { useEdgeCut } from "../../hooks/use-edge-cut";
+import { useFocusOrderedNodes } from "../../hooks/use-focus-ordered-nodes";
 import type { PresenceUser } from "../../hooks/use-workflow-presence";
 import { useWorkflowShortcuts } from "../../hooks/use-workflow-shortcuts";
 import { useWorkflowStore } from "../../stores/workflow-store";
@@ -57,9 +59,12 @@ const WorkflowCanvasInner = ({
 }: WorkflowCanvasProps) => {
     const { getIntersectingNodes, screenToFlowPosition } = useReactFlow();
     const { cutLineRef, onPointerDownCapture } = useEdgeCut();
-    const { i18n } = useLingui();
+    const { i18n, t } = useLingui();
+    const ariaLabelConfig = useCanvasAriaLabels();
 
     const nodes = useWorkflowStore((state) => state.nodes);
+    // Tab and DOM order follow the visual layout; the store keeps its own order.
+    const focusNodes = useFocusOrderedNodes(nodes);
     const edges = useWorkflowStore((state) => state.edges);
     const onNodesChange = useWorkflowStore((state) => state.onNodesChange);
     const onEdgesChange = useWorkflowStore((state) => state.onEdgesChange);
@@ -298,6 +303,8 @@ const WorkflowCanvasInner = ({
                 onPointerDownCapture={onPointerDownCapture}
             >
                 <ReactFlow<WorkflowNode, WorkflowEdge>
+                    aria-label={t`Workflow canvas`}
+                    ariaLabelConfig={ariaLabelConfig}
                     defaultEdgeOptions={{
                         animated: true,
                         type: "animated",
@@ -310,7 +317,7 @@ const WorkflowCanvasInner = ({
                     maxZoom={2}
                     minZoom={0.1}
                     multiSelectionKeyCode={["Shift", "Meta"]}
-                    nodes={nodes}
+                    nodes={focusNodes}
                     nodeTypes={nodeTypes}
                     onConnect={onConnect}
                     onConnectEnd={onConnectEnd}
@@ -328,6 +335,7 @@ const WorkflowCanvasInner = ({
                     panOnDrag={canvasMode === "pan" ? true : [1, 2]}
                     panOnScroll
                     proOptions={{ hideAttribution: true }}
+                    role="region"
                     selectionOnDrag={canvasMode === "select"}
                     snapGrid={[16, 16]}
                     snapToGrid
@@ -335,6 +343,7 @@ const WorkflowCanvasInner = ({
                 >
                     <Background color="var(--border)" gap={16} size={1} />
                     <MiniMap
+                        ariaLabel={ariaLabelConfig["minimap.ariaLabel"]}
                         className="!bg-background !border-border"
                         maskColor="rgba(0, 0, 0, 0.1)"
                         nodeColor={(node) => NODE_CONFIGS[node.type as WorkflowNodeType]?.color ?? "#6366f1"}
