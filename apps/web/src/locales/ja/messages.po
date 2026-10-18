@@ -1396,7 +1396,7 @@ msgid "A question is waiting for you"
 msgstr "回答待ちの質問があります"
 
 #. placeholder {0}: String(REFERENCE_VIDEO_MAX_SECONDS)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:214
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:218
 msgid "A reference video can be at most {0} seconds."
 msgstr "参照動画の長さは最大 {0} 秒です。"
 
@@ -4497,7 +4497,7 @@ msgstr "カナダ"
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:501
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:232
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
 #: src/routes/auth/extension.tsx:145
 msgid "Cancel"
@@ -8465,6 +8465,7 @@ msgstr "Discord 公開鍵"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "閉じる"
 
@@ -8756,11 +8757,11 @@ msgstr "マスクを描画"
 msgid "Drawing tools"
 msgstr "描画ツール"
 
-#: src/features/workflow/components/nodes/file-node.tsx:182
+#: src/features/workflow/components/nodes/file-node.tsx:191
 msgid "Drop file here"
 msgstr "ここにファイルをドロップ"
 
-#: src/features/workflow/components/nodes/file-node.tsx:182
+#: src/features/workflow/components/nodes/file-node.tsx:191
 msgid "Drop file or click to upload"
 msgstr "ファイルをドロップするか、クリックしてアップロード"
 
@@ -9495,7 +9496,7 @@ msgid "Encrypted at rest and never shown again. Local servers such as Ollama usu
 msgstr "保存時に暗号化され、再表示されることはありません。Ollama などのローカルサーバーでは通常不要です。"
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:207
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:188
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:192
 msgid "End"
 msgstr "終了"
 
@@ -14811,7 +14812,7 @@ msgstr "現在の行を保持"
 msgid "Keep files"
 msgstr "ファイルを残す"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:143
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:146
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 msgstr "動画の一部を残します。残した部分はこのブラウザーで MP4 に再エンコードされるため、少し時間がかかることがあります。"
 
@@ -21487,7 +21488,7 @@ msgstr "ランダム"
 msgid "Random seed"
 msgstr "ランダムシード"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:167
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:171
 msgid "Range to keep"
 msgstr "残す範囲"
 
@@ -21902,7 +21903,7 @@ msgid "reference video"
 msgstr "参照動画"
 
 #. placeholder {0}: String(REFERENCE_VIDEO_MIN_SECONDS)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:210
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:214
 msgid "Reference videos together must be at least {0} seconds."
 msgstr "参照動画の合計は {0} 秒以上にしてください。"
 
@@ -22209,7 +22210,7 @@ msgid "Remove endpoint?"
 msgstr "エンドポイントを削除しますか？"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:159
+#: src/features/workflow/components/nodes/file-node.tsx:168
 msgid "Remove file"
 msgstr "ファイルを削除"
 
@@ -22666,6 +22667,7 @@ msgstr "検索：ヒット {0} · MRR {1} · 適合率 {2} · 再現率 {3}"
 #: src/features/chat/translation/message-translation.tsx:85
 #: src/features/local-models/components/ollama-model-manager.tsx:187
 #: src/features/tasks/components/task-detail-dialog.tsx:106
+#: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
 #: src/lib/toast.ts:236
@@ -25067,7 +25069,7 @@ msgid "Starred"
 msgstr "スター付き"
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:198
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:170
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:174
 msgid "Start"
 msgstr "開始"
 
@@ -26864,7 +26866,7 @@ msgid "The trigger stops running and its execution history is removed. This cann
 msgstr ""
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:115
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:118
 msgid "The trimmed video is larger than {0} MB. Choose a shorter range."
 msgstr "トリミング後の動画が {0} MB を超えています。より短い範囲を選んでください。"
 
@@ -27092,7 +27094,7 @@ msgstr "このエンドポイントは Ollama ではありません。モデル�
 msgid "This file could not be read."
 msgstr "このファイルを読み込めませんでした。"
 
-#: src/features/workflow/components/nodes/file-node.tsx:101
+#: src/features/workflow/components/nodes/file-node.tsx:107
 msgid "This file could not be uploaded. Check its type and size, then try again."
 msgstr "このファイルをアップロードできませんでした。種類とサイズを確認して、もう一度お試しください。"
 
@@ -27291,16 +27293,16 @@ msgstr "この URL は追加できません。"
 msgid "This version was optimized from an older system prompt. Re-optimize before applying it."
 msgstr ""
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:162
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:166
 msgid "This video cannot be previewed in this browser, so it cannot be trimmed here."
 msgstr "この動画はこのブラウザーでプレビューできないため、ここではトリミングできません。"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:116
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:119
 msgid "This video could not be trimmed in this browser. Upload it without trimming instead."
 msgstr "この動画をこのブラウザーでトリミングできませんでした。トリミングせずにアップロードしてください。"
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:226
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:230
 msgid "This video is larger than {0} MB, so it must be trimmed."
 msgstr "この動画は {0} MB を超えているため、トリミングが必要です。"
 
@@ -27898,25 +27900,26 @@ msgstr "トリガー"
 msgid "Triggers & Automation"
 msgstr "トリガーと自動化"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:240
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:244
 msgid "Trim and upload"
 msgstr "トリミングしてアップロード"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:141
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:144
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:151
 msgid "Trim video"
 msgstr "動画をトリミング"
 
 #. placeholder {0}: formatSeconds(length)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:207
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:211
 msgid "Trimmed length: {0} s"
 msgstr "トリミング後の長さ: {0} 秒"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:218
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:222
 msgid "Trimming progress"
 msgstr "トリミングの進行状況"
 
 #. placeholder {0}: String(progress)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:216
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:220
 msgid "Trimming… {0}%"
 msgstr "トリミング中… {0}%"
 
@@ -28643,7 +28646,7 @@ msgstr "ロゴをアップロード"
 msgid "Upload new file"
 msgstr "新しいファイルをアップロード"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:240
 msgid "Upload without trimming"
 msgstr "トリミングせずにアップロード"
 
@@ -28671,7 +28674,7 @@ msgstr "{0} からのインポート用データをアップロードしてい�
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:175
+#: src/features/workflow/components/nodes/file-node.tsx:184
 msgid "Uploading..."
 msgstr "アップロードしています..."
 
@@ -29303,7 +29306,7 @@ msgstr "動画の添付ファイル"
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
 #. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/file-node.tsx:81
+#: src/features/workflow/components/nodes/file-node.tsx:85
 msgid "Video can be at most {0} MB and audio at most {1} MB."
 msgstr "動画は最大 {0} MB、音声は最大 {1} MB です。"
 

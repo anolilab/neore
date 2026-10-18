@@ -67,6 +67,13 @@ export const trimVideo = async (file: File, { onProgress, range, signal }: TrimV
             throw new Error(reasons || "no video track");
         }
 
+        // An abort during `init` fired before this listener existed, so it is honoured here, before anything executes.
+        if (signal?.aborted) {
+            await conversion.cancel();
+
+            throw abortError();
+        }
+
         const onAbort = (): void => {
             void conversion.cancel();
         };

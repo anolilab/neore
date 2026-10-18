@@ -284,6 +284,46 @@ describe("videoRunInputError", () => {
     });
 });
 
+describe("an image-only model in text-to-video mode", () => {
+    // An enabled fal row that takes a start image and has no text-to-video: the action refuses it without one.
+    const IMAGE_ONLY = "fal-ai/bytedance/seedance/v1.5/pro/image-to-video";
+    const picture = { assets: [{ imageUrl: "https://x.example/still.png", mimeType: "image/png" }] };
+    const files = {
+        runAction: vi.fn(async () => {
+            return { fileId: "stored-frame", mimeType: "image/jpeg" };
+        }),
+        runMutation: vi.fn(),
+        runQuery: vi.fn(async (_query: unknown, { fileId }: { fileId: string }) => `https://signed.example/${fileId}`),
+    } as unknown as WorkflowFileContext;
+    const gen = node("gen", "video", { mode: "text-to-video", model: IMAGE_ONLY, prompt: "a fox" });
+
+    it("sends the wired image as the start frame, and runs past the input check", async () => {
+        const ctx = context([{ id: "e", source: "image", target: "gen" }], [gen, node("image", "image")], { image: picture });
+
+        expect(videoRunInputError(gen, ctx)).toBeUndefined();
+
+        const inputs = await videoInputArgs(gen, ctx, files, "user-1");
+
+        expect(inputs.frameUrl).toBe("https://x.example/still.png");
+        expect(textToVideoArgs(gen, "a fox", inputs, "user-1").startFrameUrl).toBe("https://x.example/still.png");
+    });
+
+    it("sends a wired frame as the start frame, as before", async () => {
+        const ctx = context([{ id: "e", source: "src", sourceHandle: "frame-start", target: "gen" }], [gen, node("src", "video", {})], {
+            src: { assets: [{ mimeType: "video/mp4", videoUrl: "https://x.example/clip.mp4" }] },
+        });
+        const inputs = await videoInputArgs(gen, ctx, files, "user-1");
+
+        expect(inputs.frameUrl).toBe("https://signed.example/stored-frame");
+    });
+
+    it("refuses a text wire alone before any extraction or charge", () => {
+        const ctx = context([{ id: "e", source: "text", target: "gen" }], [gen, node("text", "text")], { text: "a fox" });
+
+        expect(videoRunInputError(gen, ctx)).toBe("No image input provided: this model needs a start image; wire in an image or a frame");
+    });
+});
+
 describe("wired inputs are read by role, whatever order the run produced them", () => {
     /** An enabled fal row that takes an image and reference clips, so a reference wire is sent. */
     const referenceRow = MODEL_REGISTRY.find(
@@ -334,10 +374,20 @@ describe("wired inputs are read by role, whatever order the run produced them", 
     });
 
     it("takes a wired text as the prompt and a reference file as the reference clip, in either run order", async () => {
-        expect(referenceRow, "an enabled fal row with reference clips").toBeDefined();
+        // A row that also does text-to-video: an image-only row would need a start image, which this run has none of.
+        const textReferenceRow = MODEL_REGISTRY.find(
+            (definition) =>
+                definition.mode === "video" &&
+                definition.enabled !== false &&
+                definition.provider === "fal" &&
+                definition.supportsTextToVideo === true &&
+                (definition.maxReferenceVideos ?? 0) > 0,
+        );
+
+        expect(textReferenceRow, "an enabled fal text-to-video row with reference clips").toBeDefined();
 
         for (const order of ["first", "last"] as const) {
-            const target = node("gen", "video", { mode: "text-to-video", model: referenceRow?.id });
+            const target = node("gen", "video", { mode: "text-to-video", model: textReferenceRow?.id });
             const nodes = [target, node("text", "text"), node("ref", "file", { fileType: "video/mp4" })];
             const edges = [wire("e1", "text", "gen"), wire("e2", "ref", "gen")];
             const ctx = context(edges, nodes, outputsIn(order, { ref: referenceFileOutput, text: "a fox" }));

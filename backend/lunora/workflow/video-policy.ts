@@ -13,6 +13,7 @@ import type { WorkflowEdge, WorkflowNode } from "./core";
 import {
     DEFAULT_VIDEO_SECONDS,
     generatedClipSecondsOf,
+    isImageOnlyModel,
     isVideoNode,
     modelIdFor,
     videoDefinitionOf,
@@ -122,7 +123,7 @@ export const unrunnableVideoErrors = (nodes: ReadonlyArray<WorkflowNode>, edges:
 
         // An image-only model fails in the action without a start image, after the daily unit is spent: the node needs
         // a frame wire or a wire from an image source.
-        if (definition.supportsImageToVideo && !definition.supportsTextToVideo && !hasImageSource(node, nodes, edges)) {
+        if (isImageOnlyModel(definition) && !hasImageSource(node, nodes, edges)) {
             return [`The "${labelOf(node)}" node's model ${modelId} needs an image input; wire in an image or a frame`];
         }
 

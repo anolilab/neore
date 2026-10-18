@@ -107,7 +107,10 @@ const VideoTrimDialog = ({ file, onCancel, onConfirm, src }: VideoTrimDialogProp
                 signal: controller.signal,
             });
 
-            onConfirm(trimmed);
+            // A cancel that lands after the encode finished still means the user does not want the clip.
+            if (!controller.signal.aborted) {
+                onConfirm(trimmed);
+            }
         } catch (error_) {
             if (!controller.signal.aborted) {
                 setError(
@@ -145,6 +148,7 @@ const VideoTrimDialog = ({ file, onCancel, onConfirm, src }: VideoTrimDialogProp
                 </DialogHeader>
                 <div className="flex flex-col gap-4 px-6 pb-2">
                     <video
+                        aria-label={t`Trim video`}
                         className="w-full rounded-md bg-black"
                         controls
                         muted

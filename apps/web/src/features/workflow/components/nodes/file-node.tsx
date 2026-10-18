@@ -39,6 +39,9 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [trimCandidate, setTrimCandidate] = useState<{ file: File; url: string } | null>(null);
+    // The file of a failed upload, kept so Retry sends the same bytes (a confirmed trim is not redone) until it
+    // uploads, is dismissed, or a new file is dropped.
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
     const lunora = useLunora();
 
     useEffect(() => {
@@ -77,6 +80,7 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
             const limit = referenceType ? referenceMediaLimitFor(referenceType) : undefined;
 
             if (limit !== undefined && file.size > limit) {
+                setPendingFile(null);
                 setUploadError(
                     t`Video can be at most ${String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)} MB and audio at most ${String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)} MB.`,
                 );
@@ -90,6 +94,7 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
             try {
                 const result = referenceType ? await uploadReferenceMedia(lunora, file, referenceType) : await uploadChatAttachment(lunora, file);
 
+                setPendingFile(null);
                 updateNode(id, {
                     fileId: result.fileId,
                     fileName: file.name,
@@ -98,6 +103,7 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
                 });
             } catch {
                 // No local fallback: a blob URL is not reachable from another node or a later run.
+                setPendingFile(file);
                 setUploadError(t`This file could not be uploaded. Check its type and size, then try again.`);
             } finally {
                 setIsUploading(false);
@@ -113,6 +119,9 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
             if (!file) {
                 return;
             }
+
+            setPendingFile(null);
+            setUploadError(null);
 
             // A video is trimmed first, so its size limit applies to the kept part, not the source. The support
             // probe is answered once per page; wait for it so an early drop is not sent down the plain upload.
@@ -200,6 +209,29 @@ const FileNodeComponent = (props: NodeProps<Node<FileNodeData>>) => {
                 <p aria-live="polite" className="text-destructive mt-1 text-xs" role="status">
                     {uploadError}
                 </p>
+                {pendingFile && !isUploading && (
+                    <div className="mt-1 flex gap-2">
+                        <Button
+                            onClick={() => {
+                                void upload(pendingFile);
+                            }}
+                            size="sm"
+                            variant="outline"
+                        >
+                            <Trans>Retry</Trans>
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                setPendingFile(null);
+                                setUploadError(null);
+                            }}
+                            size="sm"
+                            variant="ghost"
+                        >
+                            <Trans>Dismiss</Trans>
+                        </Button>
+                    </div>
+                )}
             </div>
         </BaseNode>
     );

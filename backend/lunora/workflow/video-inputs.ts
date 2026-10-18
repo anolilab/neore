@@ -185,11 +185,18 @@ export const wiredInputsOf = (node: WorkflowNode, context: ExecutionContext): { 
 };
 
 /**
+ * A model that takes an image and no text-to-video (`supportsImageToVideo` without `supportsTextToVideo`). The action
+ * refuses it without a start image, so a text-to-video node of one starts from its wired image as well.
+ */
+export const isImageOnlyModel = (model: ModelDefinition | undefined): boolean => model?.supportsImageToVideo === true && model.supportsTextToVideo !== true;
+
+/**
  * What a video node reads from its incoming edges, by handle, not by execution order.
  *
  * A frame wire is the image input, and `frame` is the stored frame extracted for it (see `frameSourceOf`). A
- * reference wire contributes its clip or track by MIME type. An image-to-video run with no frame wire starts from
- * its wired image (`wiredInputsOf`); a text-to-video run never takes an upstream image as its start frame.
+ * reference wire contributes its clip or track by MIME type. With no frame wire, an image-to-video run and an
+ * image-only model's run start from their wired image (`wiredInputsOf`); any other text-to-video run takes no
+ * upstream image as its start frame.
  */
 export const resolveVideoInputs = (node: WorkflowNode, context: ExecutionContext, frame?: MediaRef): VideoInputs => {
     const inputs: VideoInputs = { referenceAudios: [], referenceVideos: [] };
@@ -214,7 +221,7 @@ export const resolveVideoInputs = (node: WorkflowNode, context: ExecutionContext
         }
     }
 
-    if (inputs.image === undefined && videoKindOf(node) === "imageToVideo") {
+    if (inputs.image === undefined && (videoKindOf(node) === "imageToVideo" || isImageOnlyModel(videoDefinitionOf(node)))) {
         inputs.image = wiredInputsOf(node, context).image;
     }
 

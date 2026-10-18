@@ -18866,25 +18866,25 @@
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 53,
+      "line": 54,
       "reason": "\"videoInputArgs\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 89,
+      "line": 90,
       "reason": "\"videoInputArgs\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 368,
+      "line": 374,
       "reason": "\"runVideoNode\" is not a registered function"
     },
     {
       "file": "workflow/media-args",
       "kind": "call",
-      "line": 377,
+      "line": 383,
       "reason": "\"runVideoNode\" is not a registered function"
     },
     {

@@ -1396,7 +1396,7 @@ msgid "A question is waiting for you"
 msgstr "Uma pergunta está esperando por você"
 
 #. placeholder {0}: String(REFERENCE_VIDEO_MAX_SECONDS)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:214
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:218
 msgid "A reference video can be at most {0} seconds."
 msgstr "Um vídeo de referência pode ter no máximo {0} segundos."
 
@@ -4497,7 +4497,7 @@ msgstr "Canadá"
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:501
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:232
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
 #: src/routes/auth/extension.tsx:145
 msgid "Cancel"
@@ -8465,6 +8465,7 @@ msgstr "Public Key do Discord"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Dispensar"
 
@@ -8756,11 +8757,11 @@ msgstr "Desenhar máscara"
 msgid "Drawing tools"
 msgstr "Ferramentas de desenho"
 
-#: src/features/workflow/components/nodes/file-node.tsx:182
+#: src/features/workflow/components/nodes/file-node.tsx:191
 msgid "Drop file here"
 msgstr "Solte o arquivo aqui"
 
-#: src/features/workflow/components/nodes/file-node.tsx:182
+#: src/features/workflow/components/nodes/file-node.tsx:191
 msgid "Drop file or click to upload"
 msgstr "Solte um arquivo ou clique para enviar"
 
@@ -9495,7 +9496,7 @@ msgid "Encrypted at rest and never shown again. Local servers such as Ollama usu
 msgstr "Criptografada em repouso e nunca exibida novamente. Servidores locais como o Ollama geralmente não precisam de chave."
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:207
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:188
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:192
 msgid "End"
 msgstr "Fim"
 
@@ -14811,7 +14812,7 @@ msgstr "Manter linhas atuais"
 msgid "Keep files"
 msgstr "Manter arquivos"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:143
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:146
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 msgstr "Mantenha uma parte do vídeo. A parte mantida é recodificada como MP4 neste navegador, o que pode levar um momento."
 
@@ -21487,7 +21488,7 @@ msgstr "Aleatório"
 msgid "Random seed"
 msgstr "Seed aleatória"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:167
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:171
 msgid "Range to keep"
 msgstr "Intervalo a manter"
 
@@ -21902,7 +21903,7 @@ msgid "reference video"
 msgstr "vídeo de referência"
 
 #. placeholder {0}: String(REFERENCE_VIDEO_MIN_SECONDS)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:210
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:214
 msgid "Reference videos together must be at least {0} seconds."
 msgstr "Os vídeos de referência devem ter juntos pelo menos {0} segundos."
 
@@ -22209,7 +22210,7 @@ msgid "Remove endpoint?"
 msgstr "Remover endpoint?"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:159
+#: src/features/workflow/components/nodes/file-node.tsx:168
 msgid "Remove file"
 msgstr "Remover arquivo"
 
@@ -22666,6 +22667,7 @@ msgstr "Recuperação: acerto {0} · MRR {1} · precisão {2} · recall {3}"
 #: src/features/chat/translation/message-translation.tsx:85
 #: src/features/local-models/components/ollama-model-manager.tsx:187
 #: src/features/tasks/components/task-detail-dialog.tsx:106
+#: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
 #: src/lib/toast.ts:236
@@ -25067,7 +25069,7 @@ msgid "Starred"
 msgstr "Marcados com estrela"
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:198
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:170
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:174
 msgid "Start"
 msgstr "Início"
 
@@ -26864,7 +26866,7 @@ msgid "The trigger stops running and its execution history is removed. This cann
 msgstr ""
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:115
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:118
 msgid "The trimmed video is larger than {0} MB. Choose a shorter range."
 msgstr "O vídeo cortado é maior que {0} MB. Escolha um intervalo mais curto."
 
@@ -27092,7 +27094,7 @@ msgstr "Este endpoint não é o Ollama. O gerenciamento de modelos está dispon�
 msgid "This file could not be read."
 msgstr "Não foi possível ler este arquivo."
 
-#: src/features/workflow/components/nodes/file-node.tsx:101
+#: src/features/workflow/components/nodes/file-node.tsx:107
 msgid "This file could not be uploaded. Check its type and size, then try again."
 msgstr "Não foi possível enviar este arquivo. Verifique o tipo e o tamanho e tente novamente."
 
@@ -27291,16 +27293,16 @@ msgstr "Não é possível adicionar esta URL."
 msgid "This version was optimized from an older system prompt. Re-optimize before applying it."
 msgstr ""
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:162
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:166
 msgid "This video cannot be previewed in this browser, so it cannot be trimmed here."
 msgstr "Este vídeo não pode ser visualizado neste navegador, então não pode ser cortado aqui."
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:116
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:119
 msgid "This video could not be trimmed in this browser. Upload it without trimming instead."
 msgstr "Não foi possível cortar este vídeo neste navegador. Envie-o sem cortar."
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:226
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:230
 msgid "This video is larger than {0} MB, so it must be trimmed."
 msgstr "Este vídeo é maior que {0} MB, então precisa ser cortado."
 
@@ -27898,25 +27900,26 @@ msgstr "Gatilhos"
 msgid "Triggers & Automation"
 msgstr "Gatilhos e automação"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:240
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:244
 msgid "Trim and upload"
 msgstr "Cortar e enviar"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:141
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:144
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:151
 msgid "Trim video"
 msgstr "Cortar vídeo"
 
 #. placeholder {0}: formatSeconds(length)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:207
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:211
 msgid "Trimmed length: {0} s"
 msgstr "Duração cortada: {0} s"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:218
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:222
 msgid "Trimming progress"
 msgstr "Progresso do corte"
 
 #. placeholder {0}: String(progress)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:216
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:220
 msgid "Trimming… {0}%"
 msgstr "Cortando… {0}%"
 
@@ -28643,7 +28646,7 @@ msgstr "Enviar logo"
 msgid "Upload new file"
 msgstr "Enviar novo arquivo"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:240
 msgid "Upload without trimming"
 msgstr "Enviar sem cortar"
 
@@ -28671,7 +28674,7 @@ msgstr "Enviando dados para importação de {0}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:175
+#: src/features/workflow/components/nodes/file-node.tsx:184
 msgid "Uploading..."
 msgstr "Enviando..."
 
@@ -29303,7 +29306,7 @@ msgstr "Anexo de vídeo"
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
 #. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/file-node.tsx:81
+#: src/features/workflow/components/nodes/file-node.tsx:85
 msgid "Video can be at most {0} MB and audio at most {1} MB."
 msgstr "O vídeo pode ter no máximo {0} MB e o áudio {1} MB."
 

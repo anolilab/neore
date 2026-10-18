@@ -1,6 +1,6 @@
 import { chatAttachmentLimit } from "@neore/backend/document-limits";
 import JSZip from "jszip";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { JsZipLike, JsZipWriter } from "@/lib/zip";
 import { createJsZip, loadJsZip } from "@/lib/zip";
@@ -8,6 +8,7 @@ import { createJsZip, loadJsZip } from "@/lib/zip";
 import type { WorkflowContent, WorkflowNode } from "../types";
 import {
     ASSET_BYTE_BUDGET,
+    downloadBundleSource,
     exportWorkflowBundle,
     importWorkflowBundle,
     MAX_BUNDLE_BYTES,
@@ -405,5 +406,124 @@ describe("workflow bundle", () => {
         expect(bundle.bundled).toBe(false);
         expect(bundle.content.nodes).toHaveLength(1);
         expect(await bundle.readAsset("assets/x.png")).toBeUndefined();
+    });
+});
+
+describe("importing an external image URL", () => {
+    it("keeps an https URL and drops, and counts, every other one", async () => {
+        const urls = [
+            "https://cdn.example/keep.png",
+            // A plain http URL is the case under test, not a link to fetch.
+            // eslint-disable-next-line unicorn/prefer-https
+            "http://cdn.example/plain.png",
+            "ftp://cdn.example/file.png",
+            // A script URL is the case under test: it must never survive an import.
+            // eslint-disable-next-line no-script-url
+            "javascript:alert(1)",
+            "data:image/png;base64,iVBORw0KGgo=",
+            "not a url",
+            "/relative.png",
+        ];
+        const legacy = { edges: [], nodes: urls.map((imageUrl, index) => node(`n${index}`, "image", { imageUrl, mode: "input" })) };
+        const bundle = await readWorkflowBundle(new File([JSON.stringify(legacy)], "workflow.json"), OPTIONS);
+        const imported = await importWorkflowBundle(bundle, store);
+        const kept = imported.content.nodes.map((candidate) => (candidate.data as { imageUrl?: string }).imageUrl);
+
+        expect(kept).toStrictEqual(["https://cdn.example/keep.png", undefined, undefined, undefined, undefined, undefined, undefined]);
+        expect(imported.skipped).toBe(6);
+    });
+});
+
+describe("importing a bundled file URL", () => {
+    it("drops a file URL that is not https when its file id did not survive, and counts it", async () => {
+        const legacy = {
+            edges: [],
+            nodes: [
+                // eslint-disable-next-line unicorn/prefer-https -- the case under test: a plain http file URL must not survive an import.
+                node("plain", "file", { fileName: "a.pdf", fileUrl: "http://cdn.example/a.pdf" }),
+                node("secure", "file", { fileName: "b.pdf", fileUrl: "https://cdn.example/b.pdf" }),
+            ],
+        };
+        const bundle = await readWorkflowBundle(new File([JSON.stringify(legacy)], "workflow.json"), OPTIONS);
+        const imported = await importWorkflowBundle(bundle, store);
+        const [plain, secure] = imported.content.nodes as WorkflowNode[];
+
+        expect(plain!.data).not.toHaveProperty("fileUrl");
+        expect(secure!.data).toMatchObject({ fileUrl: "https://cdn.example/b.pdf" });
+        expect(imported.skipped).toBe(1);
+    });
+});
+
+describe("downloadBundleSource", () => {
+    const cap = chatAttachmentLimit("image/png").maxBytes;
+    const MIB = 1024 * 1024;
+
+    const stubFetch = (response: Response) => {
+        const fetchMock = vi.fn(async () => response);
+
+        vi.stubGlobal("fetch", fetchMock);
+
+        return fetchMock;
+    };
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("reads an asset under its type's cap, and refuses redirects", async () => {
+        const fetchMock = stubFetch(new Response(PNG_BYTES, { headers: { "content-type": "image/png" } }));
+
+        expect(await downloadBundleSource("https://storage.test/a")).toStrictEqual({ bytes: PNG_BYTES, contentType: "image/png" });
+        expect(fetchMock).toHaveBeenCalledWith("https://storage.test/a", { redirect: "error" });
+    });
+
+    it("refuses an asset whose declared length is past the cap, without reading its body", async () => {
+        let pulled = 0;
+        // No eager pull: a stream pulls once on creation unless its high-water mark is zero.
+        const body = new ReadableStream(
+            {
+                pull(controller) {
+                    pulled += 1;
+                    controller.enqueue(new Uint8Array(MIB));
+                },
+            },
+            { highWaterMark: 0 },
+        );
+
+        stubFetch(new Response(body, { headers: { "content-length": String(cap + 1), "content-type": "image/png" } }));
+
+        expect(await downloadBundleSource("https://storage.test/big")).toBeUndefined();
+        expect(pulled).toBe(0);
+    });
+
+    it("stops reading a body with no declared length at the cap, and cancels the rest", async () => {
+        let cancelled = false;
+        let pulled = 0;
+        const chunks = Math.ceil(cap / MIB) + 50;
+        const body = new ReadableStream({
+            cancel() {
+                cancelled = true;
+            },
+            pull(controller) {
+                pulled += 1;
+                controller.enqueue(new Uint8Array(MIB));
+
+                if (pulled >= chunks) {
+                    controller.close();
+                }
+            },
+        });
+
+        stubFetch(new Response(body, { headers: { "content-type": "image/png" } }));
+
+        expect(await downloadBundleSource("https://storage.test/streamed")).toBeUndefined();
+        expect(cancelled).toBe(true);
+        expect(pulled).toBeLessThan(chunks);
+    });
+
+    it("refuses a type with no asset rule before reading its body", async () => {
+        stubFetch(new Response(new Uint8Array([1, 2]), { headers: { "content-type": "audio/mpeg" } }));
+
+        expect(await downloadBundleSource("https://storage.test/audio")).toBeUndefined();
     });
 });

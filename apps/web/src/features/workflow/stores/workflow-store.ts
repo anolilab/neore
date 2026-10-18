@@ -110,7 +110,7 @@ export const useWorkflowStore = create<WorkflowState>()(
                 const newNode: WorkflowNode = {
                     data: {
                         ...config.defaultData,
-                        ...lastUsedSettings(get().nodes, type),
+                        ...lastUsedSettings(get().nodes, type, data),
                         ...data,
                     } as WorkflowNodeData,
                     id,

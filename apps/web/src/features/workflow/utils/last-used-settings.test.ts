@@ -1,3 +1,4 @@
+import { MEDIA_DEFAULT_MODELS } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
 import type { WorkflowNode } from "../types";
@@ -26,9 +27,11 @@ describe("lastUsedSettings", () => {
     });
 
     it("never carries prompts, media, results or status, even when the type has settings", () => {
-        const nodes = [node("v", "video", { model: "fal:m", negativePrompt: "x", pickedTime: 2, prompt: "p", frameFileIds: { end: "f" } })];
+        const nodes = [
+            node("v", "video", { model: MEDIA_DEFAULT_MODELS.textToVideo, negativePrompt: "x", pickedTime: 2, prompt: "p", frameFileIds: { end: "f" } }),
+        ];
 
-        expect(lastUsedSettings(nodes, "video")).toEqual({ model: "fal:m" });
+        expect(lastUsedSettings(nodes, "video")).toEqual({ model: MEDIA_DEFAULT_MODELS.textToVideo });
     });
 
     it("returns nothing when no node of the type exists or the type has no settings", () => {
@@ -49,11 +52,38 @@ describe("lastUsedSettings", () => {
 
     it("carries the audio and resolution choice of the last video and image-to-video node", () => {
         const nodes = [
-            node("t2v", "video", { generateAudio: false, model: "fal:m", prompt: "p", resolution: "720p" }),
-            node("i2v", "image-to-video", { generateAudio: true, loop: false, model: "fal:i", resolution: "1080p" }),
+            node("t2v", "video", { generateAudio: false, model: MEDIA_DEFAULT_MODELS.textToVideo, prompt: "p", resolution: "720p" }),
+            node("i2v", "image-to-video", { generateAudio: true, loop: false, model: MEDIA_DEFAULT_MODELS.imageToVideo, resolution: "1080p" }),
         ];
 
-        expect(lastUsedSettings(nodes, "video")).toEqual({ generateAudio: false, model: "fal:m", resolution: "720p" });
-        expect(lastUsedSettings(nodes, "image-to-video")).toEqual({ generateAudio: true, loop: false, model: "fal:i", resolution: "1080p" });
+        expect(lastUsedSettings(nodes, "video")).toEqual({ generateAudio: false, model: MEDIA_DEFAULT_MODELS.textToVideo, resolution: "720p" });
+        expect(lastUsedSettings(nodes, "image-to-video")).toEqual({
+            generateAudio: true,
+            loop: false,
+            model: MEDIA_DEFAULT_MODELS.imageToVideo,
+            resolution: "1080p",
+        });
+    });
+
+    it("copies a video model only into a node whose mode it takes: an image-only model is not carried into text-to-video", () => {
+        const imageOnly = MEDIA_DEFAULT_MODELS.imageToVideo;
+        const image = [node("i2v", "video", { mode: "image-to-video", model: imageOnly })];
+
+        expect(lastUsedSettings(image, "video", { mode: "image-to-video" })).toEqual({ model: imageOnly });
+        expect(lastUsedSettings(image, "video")).toEqual({ model: MEDIA_DEFAULT_MODELS.textToVideo });
+    });
+
+    it("gives an image-to-video node the image default when there is no copyable model, not the text-to-video one", () => {
+        const text = [node("t2v", "video", { mode: "text-to-video", model: MEDIA_DEFAULT_MODELS.textToVideo })];
+
+        expect(lastUsedSettings(text, "video", { mode: "image-to-video" })).toEqual({ model: MEDIA_DEFAULT_MODELS.imageToVideo });
+        expect(lastUsedSettings(text, "image-to-video")).toEqual({ model: MEDIA_DEFAULT_MODELS.imageToVideo });
+    });
+
+    it("does not copy a text-to-video model the text action refuses, though the picker lists it", () => {
+        // A klingai row is enabled and text-capable, so the picker shows it; the text action calls only fal and openrouter.
+        const nodes = [node("v", "video", { model: "klingai/kling-v3.0-t2v" })];
+
+        expect(lastUsedSettings(nodes, "video")).toEqual({ model: MEDIA_DEFAULT_MODELS.textToVideo });
     });
 });

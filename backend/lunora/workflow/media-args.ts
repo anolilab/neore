@@ -17,6 +17,7 @@ import {
     type FrameSource,
     frameSourceOf,
     generatedClipSecondsOf,
+    isImageOnlyModel,
     isVideoNode,
     type MediaRef,
     mediaOf,
@@ -162,8 +163,8 @@ const frameRefOf = async (
 };
 
 /**
- * A video node's provider-readable inputs. `frameUrl` is the wired frame alone: the caller decides
- * whether an upstream image may stand in for it, since text-to-video never used one.
+ * A video node's provider-readable inputs. `frameUrl` is the start image: the wired frame, else the wired image for
+ * image-to-video and image-only models (`resolveVideoInputs`). An ordinary text-to-video node takes no upstream image.
  */
 export const videoInputArgs = async (node: WorkflowNode, context: ExecutionContext, files: WorkflowFileContext, userId: string) => {
     const model = videoDefinitionOf(node);
@@ -172,7 +173,7 @@ export const videoInputArgs = async (node: WorkflowNode, context: ExecutionConte
     const inputs = await resolveVideoInputUrls(node, context, sign, model, frame);
 
     return {
-        // The start image: a wired frame, or for image-to-video the wired image (`resolveVideoInputs`).
+        // The start image: a wired frame, or the wired image for image-to-video and image-only models (`resolveVideoInputs`).
         frameUrl: inputs.image,
         prompt: wiredInputsOf(node, context).prompt,
         referenceAudioUrls: inputs.referenceAudioUrls,
@@ -265,10 +266,14 @@ export const textToVideoArgs = (node: WorkflowNode, prompt: string, inputs: Inpu
  * so a node that cannot run never bills its extraction. Returns the error, or `undefined` to run.
  */
 export const videoRunInputError = (node: WorkflowNode, context: ExecutionContext): string | undefined => {
-    if (videoKindOf(node) === "imageToVideo") {
-        const hasImage = frameSourceOf(node, context) !== undefined || wiredInputsOf(node, context).image !== undefined;
+    const hasImage = frameSourceOf(node, context) !== undefined || wiredInputsOf(node, context).image !== undefined;
 
+    if (videoKindOf(node) === "imageToVideo") {
         return hasImage ? undefined : "No image input provided for image-to-video mode";
+    }
+
+    if (!hasImage && isImageOnlyModel(videoDefinitionOf(node))) {
+        return "No image input provided: this model needs a start image; wire in an image or a frame";
     }
 
     return videoPromptOf(node, context) ? undefined : "No prompt provided for video generation";
@@ -347,10 +352,11 @@ export const runVideoNode = async (
     const plan = await readRunPlan(actionContext, userId, context.orgId ?? null);
     const costs: VideoRunCosts = {
         clipMicrodollars: videoRunCost(node, {
-            // A start image is sent to image-to-video always, and to text-to-video when a frame is wired (`textToVideoArgs`).
+            // A start image is sent to image-to-video always, and to text-to-video when a frame is wired or the model is
+            // image-only (`textToVideoArgs`, `resolveVideoInputs`).
             paidPlan: plan.isAdmin || plan.plan === "premium",
             referenceSeconds: referenceSecondsOf(node, context),
-            startImage: kind === "imageToVideo" || frameSourceOf(node, context) !== undefined,
+            startImage: kind === "imageToVideo" || isImageOnlyModel(videoDefinitionOf(node)) || frameSourceOf(node, context) !== undefined,
         }).costMicrodollars,
         extractionMicrodollars: frameExtractionDue(node, context),
     };

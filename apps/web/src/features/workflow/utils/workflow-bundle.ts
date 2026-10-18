@@ -6,8 +6,8 @@
  * account that uploaded them, and the signed URLs they resolve to expire. So export
  * fetches each file through the owner's grant and rewrites the reference to its asset
  * path; import re-uploads each asset (TUS, then finalize) and points the node at the
- * new id. Inline `data:` images are bundled the same way. External `http(s)` URLs are
- * kept as they are.
+ * new id. Inline `data:` images are bundled the same way. External URLs are kept as they
+ * are on export; on import only `https` ones survive.
  *
  * The archive is untrusted input on import: entry names are matched exactly, never
  * joined onto a path, and every count and size is capped before it is read.
@@ -256,9 +256,49 @@ const readEntryCapped = (entry: JsZipLike["files"][string], maxBytes: number): P
 
 const normalizeContentType = (value: string | null): string => value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
 
-/** Downloads a signed asset URL; `undefined` when the server does not answer with a success status. */
+/**
+ * Reads a response body up to `maxBytes`. Past the cap the stream is cancelled and the read gives up with `undefined`, so an
+ * oversize asset is never buffered whole.
+ */
+const readBodyCapped = async (response: Response, maxBytes: number): Promise<Uint8Array<ArrayBuffer> | undefined> => {
+    if (!response.body) {
+        return new Uint8Array(0);
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array<ArrayBuffer>[] = [];
+    let total = 0;
+
+    for (let read = await reader.read(); !read.done; read = await reader.read()) {
+        total += read.value.byteLength;
+
+        if (total > maxBytes) {
+            await reader.cancel();
+
+            return undefined;
+        }
+
+        chunks.push(read.value);
+    }
+
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+
+    return bytes;
+};
+
+/**
+ * Downloads a signed asset URL; `undefined` when the server does not answer with a success status, the type has no
+ * asset rule, or the asset is past its type's cap. The declared length is checked before the body is read, and the body
+ * is read against the cap, since a server may send no length. Redirects are refused: the signed URL is the asset.
+ */
 export const downloadBundleSource = async (url: string): Promise<BundleSource | undefined> => {
-    const response = await fetch(url);
+    const response = await fetch(url, { redirect: "error" });
 
     if (!response.ok) {
         await response.body?.cancel();
@@ -266,7 +306,26 @@ export const downloadBundleSource = async (url: string): Promise<BundleSource | 
         return undefined;
     }
 
-    return { bytes: new Uint8Array(await response.arrayBuffer()), contentType: normalizeContentType(response.headers.get("content-type")) };
+    const contentType = normalizeContentType(response.headers.get("content-type"));
+
+    if (!EXTENSION_BY_TYPE.has(contentType)) {
+        await response.body?.cancel();
+
+        return undefined;
+    }
+
+    const { maxBytes } = chatAttachmentLimit(contentType);
+    const declared = response.headers.get("content-length");
+
+    if (declared !== null && Number(declared) > maxBytes) {
+        await response.body?.cancel();
+
+        return undefined;
+    }
+
+    const bytes = await readBodyCapped(response, maxBytes);
+
+    return bytes && { bytes, contentType };
 };
 
 const decodeDataUrl = (url: string): BundleSource | undefined => {
@@ -300,6 +359,15 @@ const referencedAssetPaths = (nodes: ReadonlyArray<WorkflowNode>): Set<string> =
     }
 
     return paths;
+};
+
+/** Whether an external image URL may be kept on import: an absolute https URL. Anything else would make the importer's browser request it. */
+const isHttpsUrl = (value: string): boolean => {
+    try {
+        return new URL(value).protocol === "https:";
+    } catch {
+        return false;
+    }
 };
 
 const isValidNode = (node: unknown): node is WorkflowNode =>
@@ -503,6 +571,16 @@ export const importWorkflowBundle = async (
         const path = [getAt(next, reference.idPath), inline].find((value): value is string => isAssetPath(value));
 
         if (path === undefined) {
+            // A shared bundle may name any URL in these fields; only https survives, and a dropped one costs its node the file.
+            for (const field of [reference.inlinePath, reference.urlPath]) {
+                const value = field === undefined ? undefined : next[field];
+
+                if (field !== undefined && typeof value === "string" && value !== "" && !isHttpsUrl(value)) {
+                    skipped += 1;
+                    next = setAt(next, [field], undefined);
+                }
+            }
+
             return next;
         }
 

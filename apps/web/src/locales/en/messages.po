@@ -1395,7 +1395,7 @@ msgid "A question is waiting for you"
 msgstr "A question is waiting for you"
 
 #. placeholder {0}: String(REFERENCE_VIDEO_MAX_SECONDS)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:214
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:218
 msgid "A reference video can be at most {0} seconds."
 msgstr "A reference video can be at most {0} seconds."
 
@@ -4496,7 +4496,7 @@ msgstr "Canada"
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:501
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:232
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
 #: src/routes/auth/extension.tsx:145
 msgid "Cancel"
@@ -8464,6 +8464,7 @@ msgstr "Discord Public Key"
 #: src/features/changelog/components/changelog-card.tsx:59
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
+#: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Dismiss"
 
@@ -8755,11 +8756,11 @@ msgstr "Draw Mask"
 msgid "Drawing tools"
 msgstr "Drawing tools"
 
-#: src/features/workflow/components/nodes/file-node.tsx:182
+#: src/features/workflow/components/nodes/file-node.tsx:191
 msgid "Drop file here"
 msgstr "Drop file here"
 
-#: src/features/workflow/components/nodes/file-node.tsx:182
+#: src/features/workflow/components/nodes/file-node.tsx:191
 msgid "Drop file or click to upload"
 msgstr "Drop file or click to upload"
 
@@ -9494,7 +9495,7 @@ msgid "Encrypted at rest and never shown again. Local servers such as Ollama usu
 msgstr "Encrypted at rest and never shown again. Local servers such as Ollama usually need none."
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:207
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:188
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:192
 msgid "End"
 msgstr "End"
 
@@ -14810,7 +14811,7 @@ msgstr "Keep current rows"
 msgid "Keep files"
 msgstr "Keep files"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:143
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:146
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 msgstr "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 
@@ -21486,7 +21487,7 @@ msgstr "Random"
 msgid "Random seed"
 msgstr "Random seed"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:167
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:171
 msgid "Range to keep"
 msgstr "Range to keep"
 
@@ -21901,7 +21902,7 @@ msgid "reference video"
 msgstr "reference video"
 
 #. placeholder {0}: String(REFERENCE_VIDEO_MIN_SECONDS)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:210
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:214
 msgid "Reference videos together must be at least {0} seconds."
 msgstr "Reference videos together must be at least {0} seconds."
 
@@ -22208,7 +22209,7 @@ msgid "Remove endpoint?"
 msgstr "Remove endpoint?"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:378
-#: src/features/workflow/components/nodes/file-node.tsx:159
+#: src/features/workflow/components/nodes/file-node.tsx:168
 msgid "Remove file"
 msgstr "Remove file"
 
@@ -22665,6 +22666,7 @@ msgstr "Retrieval: hit {0} · MRR {1} · precision {2} · recall {3}"
 #: src/features/chat/translation/message-translation.tsx:85
 #: src/features/local-models/components/ollama-model-manager.tsx:187
 #: src/features/tasks/components/task-detail-dialog.tsx:106
+#: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
 #: src/lib/toast.ts:236
@@ -25066,7 +25068,7 @@ msgid "Starred"
 msgstr "Starred"
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:198
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:170
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:174
 msgid "Start"
 msgstr "Start"
 
@@ -26863,7 +26865,7 @@ msgid "The trigger stops running and its execution history is removed. This cann
 msgstr "The trigger stops running and its execution history is removed. This cannot be undone."
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:115
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:118
 msgid "The trimmed video is larger than {0} MB. Choose a shorter range."
 msgstr "The trimmed video is larger than {0} MB. Choose a shorter range."
 
@@ -27091,7 +27093,7 @@ msgstr "This endpoint is not Ollama. Model management is available for Ollama on
 msgid "This file could not be read."
 msgstr "This file could not be read."
 
-#: src/features/workflow/components/nodes/file-node.tsx:101
+#: src/features/workflow/components/nodes/file-node.tsx:107
 msgid "This file could not be uploaded. Check its type and size, then try again."
 msgstr "This file could not be uploaded. Check its type and size, then try again."
 
@@ -27290,16 +27292,16 @@ msgstr "This URL cannot be added."
 msgid "This version was optimized from an older system prompt. Re-optimize before applying it."
 msgstr "This version was optimized from an older system prompt. Re-optimize before applying it."
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:162
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:166
 msgid "This video cannot be previewed in this browser, so it cannot be trimmed here."
 msgstr "This video cannot be previewed in this browser, so it cannot be trimmed here."
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:116
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:119
 msgid "This video could not be trimmed in this browser. Upload it without trimming instead."
 msgstr "This video could not be trimmed in this browser. Upload it without trimming instead."
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:226
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:230
 msgid "This video is larger than {0} MB, so it must be trimmed."
 msgstr "This video is larger than {0} MB, so it must be trimmed."
 
@@ -27897,25 +27899,26 @@ msgstr "Triggers"
 msgid "Triggers & Automation"
 msgstr "Triggers & Automation"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:240
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:244
 msgid "Trim and upload"
 msgstr "Trim and upload"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:141
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:144
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:151
 msgid "Trim video"
 msgstr "Trim video"
 
 #. placeholder {0}: formatSeconds(length)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:207
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:211
 msgid "Trimmed length: {0} s"
 msgstr "Trimmed length: {0} s"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:218
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:222
 msgid "Trimming progress"
 msgstr "Trimming progress"
 
 #. placeholder {0}: String(progress)
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:216
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:220
 msgid "Trimming… {0}%"
 msgstr "Trimming… {0}%"
 
@@ -28642,7 +28645,7 @@ msgstr "Upload Logo"
 msgid "Upload new file"
 msgstr "Upload new file"
 
-#: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
+#: src/features/workflow/components/nodes/video-trim-dialog.tsx:240
 msgid "Upload without trimming"
 msgstr "Upload without trimming"
 
@@ -28670,7 +28673,7 @@ msgstr "Uploading data for import from {0}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1469
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:315
-#: src/features/workflow/components/nodes/file-node.tsx:175
+#: src/features/workflow/components/nodes/file-node.tsx:184
 msgid "Uploading..."
 msgstr "Uploading..."
 
@@ -29302,7 +29305,7 @@ msgstr "Video attachment"
 
 #. placeholder {0}: String(MAX_REFERENCE_VIDEO_BYTES / MEGABYTE)
 #. placeholder {1}: String(MAX_REFERENCE_AUDIO_BYTES / MEGABYTE)
-#: src/features/workflow/components/nodes/file-node.tsx:81
+#: src/features/workflow/components/nodes/file-node.tsx:85
 msgid "Video can be at most {0} MB and audio at most {1} MB."
 msgstr "Video can be at most {0} MB and audio at most {1} MB."
 
