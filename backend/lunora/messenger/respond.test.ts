@@ -20,6 +20,8 @@ const state = vi.hoisted(() => {
         charge: "charged" as "charged" | "limit" | "unavailable",
         /** Whether this chat's AI disclosure is still unsent (the claim succeeds). */
         disclose: false,
+        /** Discord and Slack: `true` delivered, `false` refused. */
+        discord: true,
         mutations: [] as { args: unknown; path: string }[],
         replyFiles: [] as { filename?: string; key: string; mediaType: string }[],
         runs: [] as Record<string, unknown>[],
@@ -27,6 +29,7 @@ const state = vi.hoisted(() => {
         sentText: [] as { chatId: string; platform: string; text: string }[],
         setting: null as { enabled: boolean; groups?: string[] } | null,
         settingArgs: [] as unknown[],
+        slack: true,
         /** Telegram's send result: `true` delivered, `false` refused, `"throw"` a network error. */
         telegram: true as boolean | "throw",
     };
@@ -39,6 +42,28 @@ vi.mock("../chat/lib/headless-run", () => {
             state.afterRun?.();
 
             return { text: "Here is your picture.", threadId: "thread-1" };
+        },
+    };
+});
+
+vi.mock("./platforms/discord", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./platforms/discord")>()),
+        sendDiscordMessage: async (_token: string, chatId: string, text: string) => {
+            state.sentText.push({ chatId, platform: "discord", text });
+
+            return state.discord;
+        },
+    };
+});
+
+vi.mock("./platforms/slack", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./platforms/slack")>()),
+        sendSlackMessage: async (_token: string, chatId: string, text: string) => {
+            state.sentText.push({ chatId, platform: "slack", text });
+
+            return state.slack;
         },
     };
 });
@@ -109,7 +134,15 @@ const { respondToInbound } = await import("./respond");
 const NOW = 1_800_000_000_000;
 const HOUR = 3_600_000;
 
-const KEYS = { telegram_bot_token: "tg", wechat_app_id: "wx", wechat_app_secret: "wx-secret", whatsapp_access_token: "wa", whatsapp_phone_number_id: "phone" };
+const KEYS = {
+    discord_bot_token: "dc",
+    slack_bot_token: "sl",
+    telegram_bot_token: "tg",
+    wechat_app_id: "wx",
+    wechat_app_secret: "wx-secret",
+    whatsapp_access_token: "wa",
+    whatsapp_phone_number_id: "phone",
+};
 
 const ctx = () =>
     ({
@@ -176,6 +209,8 @@ beforeEach(() => {
     state.disclose = false;
     state.mutations = [];
     state.telegram = true;
+    state.discord = true;
+    state.slack = true;
     state.replyFiles = [{ filename: "cat.png", key: "agent-files/cat", mediaType: "image/png" }];
     state.runs = [];
     state.sentMedia = [];
@@ -296,6 +331,15 @@ describe("AI disclosure", () => {
         state.telegram = false;
 
         await respond();
+
+        expect(mutationPaths()).toContain("messenger_functions:releaseAiDisclosure");
+    });
+
+    it.each(["discord", "slack"] as const)("gives the disclosure back when %s refuses the send", async (platform) => {
+        state.disclose = true;
+        state[platform] = false;
+
+        await respond({ platform });
 
         expect(mutationPaths()).toContain("messenger_functions:releaseAiDisclosure");
     });

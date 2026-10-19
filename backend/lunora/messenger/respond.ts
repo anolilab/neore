@@ -386,9 +386,10 @@ const sendPlatformMessage = async (delivery: Delivery, text: string, messengerKe
 
     switch (platform) {
         case "discord": {
-            await sendDiscordMessage(requireKey(messengerKeys, "discord_bot_token", "Discord bot token"), chatId, text);
+            const delivered = await sendDiscordMessage(requireKey(messengerKeys, "discord_bot_token", "Discord bot token"), chatId, text);
 
-            return "sent";
+            // A tool reply with no text still ships its files, so an empty send is not a refusal.
+            return delivered || text.trim() === "" ? "sent" : "not_sent";
         }
         case "feishu": {
             await sendFeishuMessage(
@@ -409,9 +410,9 @@ const sendPlatformMessage = async (delivery: Delivery, text: string, messengerKe
             return "sent";
         }
         case "slack": {
-            await sendSlackMessage(requireKey(messengerKeys, "slack_bot_token", "Slack bot token"), chatId, text, delivery.platformThreadTs);
+            const delivered = await sendSlackMessage(requireKey(messengerKeys, "slack_bot_token", "Slack bot token"), chatId, text, delivery.platformThreadTs);
 
-            return "sent";
+            return delivered || text.trim() === "" ? "sent" : "not_sent";
         }
         case "teams": {
             if (!delivery.serviceUrl || !delivery.replyToId) {
