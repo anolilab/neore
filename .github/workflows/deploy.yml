@@ -480,6 +480,7 @@ jobs:
                   CREEM_PRODUCT_PRO_YEARLY: "${{ secrets.CREEM_PRODUCT_PRO_YEARLY }}"
                   CREEM_PRODUCT_TEAM: "${{ secrets.CREEM_PRODUCT_TEAM }}"
                   CREEM_PRODUCT_TEAM_YEARLY: "${{ secrets.CREEM_PRODUCT_TEAM_YEARLY }}"
+                  # Yearly checkout needs BOTH a yearly product secret and this variable set to `true`.
                   CREEM_YEARLY_CHECKOUT: "${{ vars.CREEM_YEARLY_CHECKOUT }}"
                   CREEM_TEST_MODE: "${{ secrets.CREEM_TEST_MODE }}"
                   CREEM_WEBHOOK_SECRET: "${{ secrets.CREEM_WEBHOOK_SECRET }}"

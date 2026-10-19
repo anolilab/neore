@@ -108,12 +108,16 @@ SLACK_CONNECTOR_CLIENT_ID=
 SLACK_CONNECTOR_CLIENT_SECRET=
 # Creem subscriptions (creem.io). Product ids are the Pro and Team products;
 # the webhook endpoint is ${PUBLIC_ORIGIN}/billing/creem/webhook. CREEM_TEST_MODE=true
-# uses the test API.
+# uses the test API. Yearly products are optional; yearly checkout is offered only when
+# CREEM_YEARLY_CHECKOUT=true as well as the yearly product id.
 CREEM_API_KEY=
 CREEM_PRODUCT_PRO=
+CREEM_PRODUCT_PRO_YEARLY=
 CREEM_PRODUCT_TEAM=
+CREEM_PRODUCT_TEAM_YEARLY=
 CREEM_TEST_MODE=true
 CREEM_WEBHOOK_SECRET=
+CREEM_YEARLY_CHECKOUT=
 DOCUMENT_PARSER_SIGNING_SECRET=
 DOCUMENT_PARSER_URL=
 DPO_EMAIL=
