@@ -34,7 +34,7 @@ import getAgent from "./get-agent";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
-import { pipeToPersistentChunks } from "./persist-stream";
+import { asRefusedWrite, isStreamWriteRefused, originalWriteError, pipeToPersistentChunks, type PipedStream, type StreamText } from "./persist-stream";
 import { buildReasoningProviderOptions } from "./reasoning-options";
 import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
@@ -618,10 +618,12 @@ export const finishRun = async (
         snapshot: ToolRunConfig;
         streamId: string;
         threadId: string;
+        /** Text written since the run's last finished step: with `pending`, what a stop leaves owed to the reply. */
+        unsaved?: StreamText;
         userId: string;
     },
 ): Promise<{ paused: boolean }> => {
-    const { keepOpenUnlessPaused, mcpLabels, pending, savedMessages, snapshot, streamId, threadId, userId } = args;
+    const { keepOpenUnlessPaused, mcpLabels, pending, savedMessages, snapshot, streamId, threadId, unsaved = { reasoning: "", text: "" }, userId } = args;
     const labelledIds = (savedMessages ?? []).flatMap((m) => (labelMcpToolCalls(m.message?.content, mcpLabels) ? [m._id] : []));
 
     if (labelledIds.length > 0) {
@@ -644,14 +646,63 @@ export const finishRun = async (
 
     const paused = approvalIds.length > 0;
 
-    await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-        final: paused || keepOpenUnlessPaused !== true,
-        reasoning: pending.reasoning || undefined,
-        streamId: streamId as Id<"persistentStreams">,
-        text: pending.text,
-    });
+    try {
+        await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+            final: paused || keepOpenUnlessPaused !== true,
+            reasoning: pending.reasoning || undefined,
+            streamId: streamId as Id<"persistentStreams">,
+            text: pending.text,
+        });
+    } catch (error) {
+        // A stop can end the stream between the pipe and this write: what was owed is then the unsaved text plus `pending`.
+        throw asRefusedWrite(error, { reasoning: unsaved.reasoning + pending.reasoning, text: unsaved.text + pending.text });
+    }
 
     return { paused };
+};
+
+/**
+ * A sidebar stop refused one of this run's chunk writes. The text the reply still owes is saved first
+ * (`finishStoppedReply`), and only then is the model call aborted: the agent marks its pending row failed on
+ * abort, which would undo the save. Any other error, and a refusal that was not a stop, is rethrown as it was.
+ */
+export const endStoppedRun = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    error: unknown,
+    args: {
+        agentName?: string;
+        /** A continuation's reply takes its own order (`order`) and branches from the tool result (`promptMessageId`). */
+        continuation: boolean;
+        order: number | undefined;
+        promptMessageId: string | undefined;
+        stop: AbortController;
+        streamId: string;
+    },
+): Promise<void> => {
+    if (!isStreamWriteRefused(error)) {
+        throw error;
+    }
+
+    // The metadata is set on every streamText result; without it the reply has no place to be saved.
+    if (args.order === undefined || args.promptMessageId === undefined) {
+        throw originalWriteError(error);
+    }
+
+    const stopped = await ctx.runMutation(internal.chat.streaming.persistent.library.finishStoppedReply, {
+        ...(args.agentName !== undefined && { agentName: args.agentName }),
+        continuation: args.continuation,
+        order: args.order,
+        pendingReasoning: error.pending.reasoning,
+        pendingText: error.pending.text,
+        promptMessageId: args.promptMessageId,
+        streamId: args.streamId as Id<"persistentStreams">,
+    });
+
+    if (!stopped) {
+        throw originalWriteError(error);
+    }
+
+    args.stop.abort();
 };
 
 /**
@@ -699,7 +750,7 @@ export const resumeApprovedRun = async (
         contextHandler?: ContextHandler;
         keepOpenUnlessPaused?: boolean;
     } = {},
-): Promise<{ lastMessageId: string | undefined; paused: boolean }> => {
+): Promise<{ lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     const [toolResult, userProviderKeys] = await Promise.all([
@@ -768,11 +819,14 @@ export const resumeApprovedRun = async (
 
         setResearchDepth(ctx, config.researchDepth);
 
+        const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
             model: config.model,
             reasoningEffort: config.reasoningEffort,
             shouldAutoContinue: config.shouldAutoContinue,
         });
+
+        streamTextArgs.abortSignal = stopping.signal;
 
         await options.beforeStream?.();
 
@@ -781,7 +835,28 @@ export const resumeApprovedRun = async (
             : await agent.denyToolCall(ctx, { approvalId, ...(denyReason !== undefined && { reason: denyReason }), threadId }, streamTextArgs as never, {
                   saveStreamDeltas: false,
               });
-        const { pending: piped } = await pipeToPersistentChunks(ctx, streamId, result.fullStream);
+
+        // A stop during this continuation ends it here, after its owed text is saved (`endStoppedRun`).
+        const stoppedAt = async (error: unknown) => {
+            await endStoppedRun(ctx, error, {
+                agentName: options.agentName,
+                continuation: true,
+                order: result.order,
+                promptMessageId: result.promptMessageId,
+                stop: stopping,
+                streamId,
+            });
+
+            return { lastMessageId: undefined, paused: false, stopped: true };
+        };
+
+        let piped: PipedStream;
+
+        try {
+            piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream);
+        } catch (error) {
+            return await stoppedAt(error);
+        }
 
         await result.consumeStream();
 
@@ -795,18 +870,25 @@ export const resumeApprovedRun = async (
         }
 
         // Paused again: the next approval inherits this snapshot unchanged.
-        const { paused } = await finishRun(ctx, {
-            keepOpenUnlessPaused: options.keepOpenUnlessPaused,
-            mcpLabels: toolResult.mcpLabels,
-            pending: piped,
-            savedMessages: result.savedMessages,
-            snapshot: config,
-            streamId,
-            threadId,
-            userId,
-        });
+        let paused: boolean;
 
-        return { lastMessageId: messageIds.at(-1), paused };
+        try {
+            ({ paused } = await finishRun(ctx, {
+                keepOpenUnlessPaused: options.keepOpenUnlessPaused,
+                mcpLabels: toolResult.mcpLabels,
+                pending: piped.pending,
+                savedMessages: result.savedMessages,
+                snapshot: config,
+                streamId,
+                threadId,
+                unsaved: piped.unsaved,
+                userId,
+            }));
+        } catch (error) {
+            return await stoppedAt(error);
+        }
+
+        return { lastMessageId: messageIds.at(-1), paused, stopped: false };
     } finally {
         await closeMCPClients(toolResult.mcpClients);
     }

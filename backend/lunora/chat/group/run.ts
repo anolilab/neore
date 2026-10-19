@@ -56,7 +56,7 @@ import { buildAgentTools } from "../lib/agent-tools";
 import { getMaxSteps } from "../lib/auto-continue";
 import getAgent from "../lib/get-agent";
 import { closeMCPClients } from "../lib/mcp-tools";
-import { pipeToPersistentChunks } from "../lib/persist-stream";
+import { pipeToPersistentChunks, rethrowOriginalWriteError } from "../lib/persist-stream";
 import type { SearchMode } from "../lib/tool-builder";
 import type { ToolRunConfig } from "../lib/tool-run-config";
 import type { GroupHistoryRow, GroupParticipantInfo } from "./logic";
@@ -312,7 +312,8 @@ const runSpeaker = async (
             saveStreamDeltas: false,
         });
         const timingStart = Date.now();
-        const { firstTokenTime, pending } = await pipeToPersistentChunks(ctx, turn.streamId, result.fullStream);
+        // Not stop-aware yet: a refused write surfaces as the original error, as before.
+        const { firstTokenTime, pending } = await pipeToPersistentChunks(ctx, turn.streamId, result.fullStream).catch(rethrowOriginalWriteError);
 
         await result.consumeStream();
 
@@ -351,7 +352,7 @@ const runSpeaker = async (
             streamId: turn.streamId,
             threadId: turn.threadId,
             userId: turn.userId,
-        });
+        }).catch(rethrowOriginalWriteError);
 
         // Timing only: memory is not extracted from group turns — the exchange
         // is several participants' voices, not the user talking to one assistant.
@@ -707,7 +708,8 @@ export const continueGroupAfterToolApproval = async (
         },
     );
 
-    if (resumed.paused) {
+    // Paused again, or stopped by the user: either way this turn goes no further.
+    if (resumed.paused || resumed.stopped) {
         return;
     }
 

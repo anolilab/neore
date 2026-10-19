@@ -28,6 +28,7 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    endStoppedRun,
     failRun,
     finishRun,
     isAgentRunError,
@@ -42,7 +43,7 @@ import { getMaxSteps } from "./lib/auto-continue";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { closeMCPClients } from "./lib/mcp-tools";
-import { isStreamWriteRefused, pipeToPersistentChunks, type PipedStream } from "./lib/persist-stream";
+import { pipeToPersistentChunks, type PipedStream } from "./lib/persist-stream";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import type { SearchMode } from "./lib/tool-builder";
@@ -343,31 +344,26 @@ export const runStreamingAgent = internalAction
             const timingStart = Date.now();
             let piped: PipedStream;
 
+            // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
+            const stoppedAt = async (error: unknown) => {
+                await endStoppedRun(ctx, error, {
+                    continuation: false,
+                    order: result.order,
+                    promptMessageId: result.promptMessageId,
+                    stop: stopping,
+                    streamId,
+                });
+            };
+
             try {
                 piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream);
             } catch (error) {
-                // A sidebar stop refused the write: keep what was written as the reply, then abort the
-                // model call. The abort comes second because the agent marks its pending row failed on abort.
-                if (!isStreamWriteRefused(error)) {
-                    throw error;
-                }
-
-                const saved = await ctx.runMutation(internal.chat.streaming.persistent.library.finishStoppedReply, {
-                    pendingReasoning: error.pending.reasoning,
-                    pendingText: error.pending.text,
-                    streamId: streamId as Id<"persistentStreams">,
-                });
-
-                if (!saved) {
-                    throw error;
-                }
-
-                stopping.abort();
+                await stoppedAt(error);
 
                 return;
             }
 
-            const { firstTokenTime, pending } = piped;
+            const { firstTokenTime, pending, unsaved } = piped;
 
             // Wait for the agent to save the final message
             await result.consumeStream();
@@ -378,26 +374,34 @@ export const runStreamingAgent = internalAction
 
             // Record the approval snapshot (if the run paused) and flush. The
             // snapshot is what the continuation rebuilds this exact run from.
-            await finishRun(ctx, {
-                mcpLabels: toolResult.mcpLabels,
-                pending,
-                savedMessages: result.savedMessages,
-                snapshot: {
-                    autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
-                    instructions: streamTextArgs.system ?? agent.options.instructions,
-                    mcpServerNames: toolResult.mcpServerNames,
-                    model,
-                    reasoningEffort: threadReasoningEffort,
-                    researchDepth: effectiveResearchDepth,
-                    searchMode: effectiveSearchMode,
-                    shouldAutoContinue: isAutoContinue,
-                    toolNames: Object.keys(tools),
-                    toolPermissionKeys: toolResult.permissionKeys,
-                },
-                streamId,
-                threadId,
-                userId,
-            });
+            try {
+                await finishRun(ctx, {
+                    mcpLabels: toolResult.mcpLabels,
+                    pending,
+                    savedMessages: result.savedMessages,
+                    snapshot: {
+                        autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
+                        instructions: streamTextArgs.system ?? agent.options.instructions,
+                        mcpServerNames: toolResult.mcpServerNames,
+                        model,
+                        reasoningEffort: threadReasoningEffort,
+                        researchDepth: effectiveResearchDepth,
+                        searchMode: effectiveSearchMode,
+                        shouldAutoContinue: isAutoContinue,
+                        toolNames: Object.keys(tools),
+                        toolPermissionKeys: toolResult.permissionKeys,
+                    },
+                    streamId,
+                    threadId,
+                    unsaved,
+                    userId,
+                });
+            } catch (error) {
+                // A stop landed after the pipe ended: the final write is refused, the owed text is saved.
+                await stoppedAt(error);
+
+                return;
+            }
 
             // Post-stream work: timing and memory extraction, then follow-ups.
             afterRun(ctx, {

@@ -189,19 +189,26 @@ export const stopActiveForThread = internalMutation
     });
 
 /**
- * The run that a sidebar stop refused (`stopActiveForThread`) saves what it has as
- * its reply: the chunks already written plus `pending`, the text it had not yet
- * written. Only a stream ended `done` counts, so a timeout or a failure is left to
- * the run's own error path. Returns whether a reply was saved.
+ * The run a sidebar stop refused saves the text it still owes its reply: what it wrote since its last
+ * finished step (`text`, `reasoning`). Each finished step is already a saved message, so no chunk is read here.
  *
- * The run's assistant row is the pending one for the prompt (the step in flight),
- * so it is completed in place. Called once per claimed run; a redelivery never gets
- * here (`claimStreamRun`), and a second Stop finds no live stream.
+ * The reply's row is the pending one for `order` (the step in flight). A continuation has none until a step
+ * saves (start.ts: `forceNewOrder` skips the pending row), so then the text becomes a new row at `order`, after
+ * `promptMessageId`, the way the agent saves a continuation's rows. No text, no row.
+ *
+ * Only a stream a stop ended counts: a timeout or a failure is left to the run's own error path. The thread
+ * leaves `running` in every case it returns true. Returns whether the stream was stopped.
+ * Called once per run: a redelivery never gets here (`claimStreamRun`), and a second Stop finds no live stream.
  */
 export const finishStoppedReply = internalMutation
     .input({
-        pendingReasoning: v.string(),
-        pendingText: v.string(),
+        agentName: v.optional(v.string().max(MAX_LENGTH.short)),
+        /** A continuation's rows take their own order and branch from the tool result (`promptMessageId`). */
+        continuation: v.boolean(),
+        order: v.number(),
+        pendingReasoning: v.string().max(MAX_LENGTH.document),
+        pendingText: v.string().max(MAX_LENGTH.document),
+        promptMessageId: v.string().max(MAX_LENGTH.id),
         streamId: v.id("persistentStreams"),
     })
     .output(v.boolean())
@@ -213,25 +220,28 @@ export const finishStoppedReply = internalMutation
         }
 
         const threadId = stream.threadId as Id<"threads">;
-        const { page: chunks } = await ctx.db.persistentChunks.findMany({ orderBy: [{ seq: "asc" }], where: { streamId: args.streamId } });
-        const text = chunks.map((chunk) => chunk.text).join("") + args.pendingText;
-        const reasoning = chunks.map((chunk) => chunk.reasoning ?? "").join("") + args.pendingReasoning;
-        const prompt = await ctx.db.get(stream.messageId as Id<"messages">);
 
-        if (prompt && (text.length > 0 || reasoning.length > 0)) {
-            const { page: pendingRows } = await ctx.db.messages.findMany({
-                where: { order: prompt.order, status: "pending", threadId, tool: false },
+        if (args.pendingText.length > 0 || args.pendingReasoning.length > 0) {
+            const { page: rows } = await ctx.db.messages.findMany({
+                where: { order: args.order, status: "pending", threadId, tool: false },
             });
-            const pending = pendingRows.toSorted((a, b) => b.stepOrder - a.stepOrder)[0];
-            const content = [...(reasoning ? [{ text: reasoning, type: "reasoning" as const }] : []), ...(text ? [{ text, type: "text" as const }] : [])];
+            const pending = rows.toSorted((a, b) => b.stepOrder - a.stepOrder)[0];
+            const content = [
+                ...(args.pendingReasoning ? [{ text: args.pendingReasoning, type: "reasoning" as const }] : []),
+                ...(args.pendingText ? [{ text: args.pendingText, type: "text" as const }] : []),
+            ];
+            const placement = args.continuation
+                ? { overrideOrder: args.order, parentMessageId: args.promptMessageId, promptMessageId: undefined }
+                : { overrideOrder: undefined, parentMessageId: undefined, promptMessageId: args.promptMessageId as Id<"messages"> };
 
             await addMessagesHandler(ctx, {
+                agentName: args.agentName,
                 failPendingSteps: false,
                 messages: [{ message: { content, role: "assistant" }, status: "success" }],
                 pendingMessageId: pending?._id,
-                promptMessageId: prompt._id,
                 threadId,
                 userId: stream.userId,
+                ...placement,
             });
         }
 
