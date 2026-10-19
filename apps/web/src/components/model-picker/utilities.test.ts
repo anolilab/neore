@@ -170,12 +170,12 @@ describe(formatPricePerMillion, () => {
 });
 
 describe(moveFavorite, () => {
-    it("moves one favourite to where another sits", () => {
+    it("moves one favorite to where another sits", () => {
         expect(moveFavorite(["a", "b", "c", "d"], "d", "b")).toStrictEqual(["a", "d", "b", "c"]);
         expect(moveFavorite(["a", "b", "c", "d"], "a", "c")).toStrictEqual(["b", "c", "a", "d"]);
     });
 
-    it("keeps favourites the screen does not show", () => {
+    it("keeps favorites the screen does not show", () => {
         // "gone" is hidden or no longer in the catalog: the visible list is a, b, c.
         expect(moveFavorite(["a", "gone", "b", "c"], "c", "a")).toStrictEqual(["c", "a", "gone", "b"]);
     });

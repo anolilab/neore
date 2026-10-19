@@ -81,7 +81,11 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
 });
 
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
-    return { useUserSettings: () => ({ data: undefined }) };
+    return {
+        useUserSettings: () => {
+            return { data: undefined };
+        },
+    };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {

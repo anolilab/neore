@@ -76,7 +76,7 @@ const FavoriteModelsSettings: FC = () => {
     const { favoriteModelIds, reorderFavorites } = useFavoriteModels();
     const { nicknames, setNickname } = useModelNicknames();
 
-    // Favourites the catalog still offers, in the user's order. A hidden or retired favourite keeps its place in the stored list.
+    // Favorites the catalog still offers, in the user's order. A hidden or retired favorite keeps its place in the stored list.
     const favorites = useMemo(() => {
         const byId = new Map(models.map((model) => [model.id, model]));
 
@@ -99,7 +99,7 @@ const FavoriteModelsSettings: FC = () => {
     return (
         <Card>
             <CardHeader className="pb-2">
-                <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Favourite models`}</CardTitle>
+                <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Favorite models`}</CardTitle>
                 <CardDescription className="text-muted-foreground mt-1 text-xs">
                     {t`Order the models you starred in the model picker and give them your own names. A nickname shows in the picker, the composer and on replies.`}
                 </CardDescription>

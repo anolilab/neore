@@ -420,8 +420,8 @@ export const formatPricePerMillion = (value: number): string =>
     new Intl.NumberFormat("en-US", { currency: "USD", maximumFractionDigits: 4, minimumFractionDigits: 2, style: "currency" }).format(value);
 
 /**
- * Moves `movedId` to where `targetId` sits in the user's FULL favourites list.
- * The list on screen may show only part of it (a favourite that is filtered out
+ * Moves `movedId` to where `targetId` sits in the user's FULL favorites list.
+ * The list on screen may show only part of it (a favorite that is filtered out
  * or no longer in the catalog stays where it is), so the move is by id on the
  * stored array, never by index on the visible one. Unknown ids change nothing.
  */
