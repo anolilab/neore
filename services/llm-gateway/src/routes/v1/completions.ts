@@ -131,6 +131,23 @@ const plainText = (content: RequestMessage["content"]): string => {
     return (content ?? []).map((part) => (typeof part.text === "string" ? part.text : "")).join("");
 };
 
+/**
+ * A tool result's text. A parts array (`[{ type: "text", text }]`, which the schema accepts) is its
+ * text parts joined, not its JSON, which would cost the model extra tokens and read as noise; an
+ * array with no text part at all is passed as JSON so nothing is dropped.
+ */
+const toolResultText = (content: RequestMessage["content"]): string => {
+    if (typeof content === "string") {
+        return content;
+    }
+
+    if (content == null) {
+        return "";
+    }
+
+    return content.some((part) => typeof part.text === "string") ? plainText(content) : JSON.stringify(content);
+};
+
 /** Clients send tool arguments as a JSON string; the model wants the object. Text that is not JSON is passed as sent. */
 const parseArguments = (raw: string): unknown => {
     try {
@@ -159,7 +176,7 @@ export const convertMessages = (messages: RequestMessage[]): ModelMessage[] => {
 
         if (message.role === "tool") {
             const toolCallId = message.tool_call_id ?? "";
-            const value = typeof message.content === "string" || message.content == null ? (message.content ?? "") : JSON.stringify(message.content);
+            const value = toolResultText(message.content);
 
             return {
                 content: [
@@ -253,8 +270,8 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
 
     const body = parsed.data;
 
-    // Without tools there is nothing to require or name, and a silent drop would hand back a plain reply the caller asked us not to give.
-    if (body.tools === undefined && body.tool_choice !== undefined && body.tool_choice !== "auto" && body.tool_choice !== "none") {
+    // Without tools (none, or an empty array) there is nothing to require or name, and a silent drop would hand back a plain reply the caller asked us not to give.
+    if ((body.tools === undefined || body.tools.length === 0) && body.tool_choice !== undefined && body.tool_choice !== "auto" && body.tool_choice !== "none") {
         return c.json({ error: { message: "tool_choice requires a tools array", param: "tool_choice", type: "invalid_request_error" } }, 400);
     }
 

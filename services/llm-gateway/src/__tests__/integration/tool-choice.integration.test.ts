@@ -112,6 +112,15 @@ describe("tool_choice without tools on /v1/chat/completions", () => {
         expect(state.toolChoices).toEqual([]);
     });
 
+    it("treats an empty tools array as no tools", async () => {
+        const res = await fetchApp(
+            post("/v1/chat/completions", { messages: [{ content: "Hi", role: "user" }], tool_choice: "required", tools: [] }),
+            await env(),
+        );
+
+        expect(res.status).toBe(400);
+    });
+
     it.each([["auto"], ["none"]])("lets %s through without tools", async (toolChoice) => {
         const res = await fetchApp(post("/v1/chat/completions", { messages: [{ content: "Hi", role: "user" }], tool_choice: toolChoice }), await env());
 

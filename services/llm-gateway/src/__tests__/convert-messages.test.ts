@@ -59,6 +59,32 @@ describe("convertMessages — tool round trip", () => {
         );
     });
 
+    it("gives the model the text of a tool result sent as parts, not their JSON", () => {
+        const [, tool] = convertMessages([
+            { content: null, role: "assistant", tool_calls: [CALL] },
+            { content: [{ text: '{"temp":5}', type: "text" }], role: "tool", tool_call_id: "call_1" },
+        ]);
+
+        expect(tool).toMatchObject({ content: [{ output: { type: "text", value: '{"temp":5}' } }] });
+    });
+
+    it("joins several text parts and keeps JSON only for parts that carry no text", () => {
+        const [first, second] = convertMessages([
+            {
+                content: [
+                    { text: "a", type: "text" },
+                    { text: "b", type: "text" },
+                ],
+                role: "tool",
+                tool_call_id: "x",
+            },
+            { content: [{ image_url: { url: "https://example.com/a.png" }, type: "image_url" }], role: "tool", tool_call_id: "y" },
+        ]);
+
+        expect(first).toMatchObject({ content: [{ output: { value: "ab" } }] });
+        expect(second).toMatchObject({ content: [{ output: { value: '[{"image_url":{"url":"https://example.com/a.png"},"type":"image_url"}]' } }] });
+    });
+
     it("keeps an assistant's text beside its calls, as a text part before them", () => {
         const [assistant] = convertMessages([{ content: "Checking.", role: "assistant", tool_calls: [CALL] }]);
 
