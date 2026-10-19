@@ -32,6 +32,10 @@ const makeCtx = ({ creditsLeft = null, limitOk = true }: Answers = {}) => {
             return { creditsLeft };
         }
 
+        if (reference === internal.auth.billing.gatewayDeductionTakenQuery) {
+            return false;
+        }
+
         throw new Error("unexpected query");
     });
     const runMutation = vi.fn(async (reference: unknown, _args?: unknown) => {
@@ -100,7 +104,11 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
 
         return undefined;
     });
-    const runQuery = vi.fn(async () => {
+    const runQuery = vi.fn(async (reference: unknown) => {
+        if (reference === internal.auth.billing.gatewayDeductionTakenQuery) {
+            return false;
+        }
+
         return { creditsLeft: null };
     });
 
@@ -344,11 +352,13 @@ describe("the recorded charge's lapse target", () => {
  */
 const balanceCtx = ({
     balance,
+    liveSnapshot = false,
     quotaFails = false,
     quotaOk = true,
     releaseFailures = 0,
 }: {
     balance: number;
+    liveSnapshot?: boolean;
     quotaFails?: boolean;
     quotaOk?: boolean;
     releaseFailures?: number;
@@ -398,8 +408,13 @@ const balanceCtx = ({
 
         return undefined;
     });
-    const runQuery = vi.fn(async () => {
-        return { creditsLeft: balance };
+    // Answers the balance as it stands when `liveSnapshot` is set, and as it stood when the run started otherwise.
+    const runQuery = vi.fn(async (reference: unknown, args?: any) => {
+        if (reference === internal.auth.billing.gatewayDeductionTakenQuery) {
+            return reserved.has(args.requestId);
+        }
+
+        return { creditsLeft: liveSnapshot ? left : balance };
     });
 
     return { left: () => left, runMutation, runQuery };
@@ -470,6 +485,21 @@ describe("the clip's credit reservation", () => {
             }),
         ).rejects.toThrow("fal is down");
         expect(ctx.left()).toBe(500);
+    });
+
+    it("lets a retry use its own earlier reservation, even when that reservation took the last credits", async () => {
+        const ctx = balanceCtx({ balance: 500, liveSnapshot: true });
+        const run = executionContextOf({ orgId: "org-1", runId: "run-a" });
+
+        await expect(runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => "clip")).resolves.toBe("clip");
+        expect(ctx.left()).toBe(0);
+
+        await expect(
+            runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => {
+                throw new Error("fal is down");
+            }),
+        ).rejects.toThrow("fal is down");
+        expect(ctx.left()).toBe(0);
     });
 
     it("gives the reservation back when the daily quota refuses the run", async () => {

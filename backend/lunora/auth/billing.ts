@@ -365,6 +365,22 @@ export const creditsLeftQuery = internalQuery
     });
 
 /**
+ * Whether a ledger row already holds this request id: a reservation or charge an earlier attempt of the same node made.
+ * Read before the snapshot check, so a retry is not refused for credits its own earlier reservation already took.
+ */
+export const gatewayDeductionTakenQuery = internalQuery
+    .input({ requestId: v.string().max(MAX_LENGTH.long) })
+    .output(v.boolean())
+    .query(async ({ args: { requestId }, ctx: context }) => {
+        const row = await context.db
+            .query("gatewayUsageDeductions")
+            .withIndex("by_requestId", (q) => q.eq("requestId", requestId))
+            .first();
+
+        return Boolean(row);
+    });
+
+/**
  * The run plan for a run acting in one organization: its paid tier when the user is still a member, or the
  * user's own Pro, or `null` for a personal run (`organizationId: null`). Admins run any model. The same
  * organization decides the gate, the quota and the credits, so none of them can disagree.

@@ -1056,6 +1056,11 @@
       "to": "table:user"
     },
     {
+      "from": "function:auth_billing:gatewayDeductionTakenQuery",
+      "kind": "read",
+      "to": "table:gatewayUsageDeductions"
+    },
+    {
       "from": "function:auth_billing:releaseGatewayCredits",
       "kind": "read",
       "to": "table:gatewayUsageDeductions"
@@ -8094,6 +8099,13 @@
       "id": "function:auth_billing:deductCreditsFromGateway",
       "kind": "function",
       "name": "auth.billing.deductCreditsFromGateway",
+      "module": "auth"
+    },
+    {
+      "detail": "query",
+      "id": "function:auth_billing:gatewayDeductionTakenQuery",
+      "kind": "function",
+      "name": "auth.billing.gatewayDeductionTakenQuery",
       "module": "auth"
     },
     {
@@ -19786,37 +19798,43 @@
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 75,
+      "line": 76,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 90,
+      "line": 80,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 108,
+      "line": 95,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 148,
+      "line": 113,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 180,
+      "line": 153,
+      "reason": "\"runBilledVideo\" is not a registered function"
+    },
+    {
+      "file": "workflow/video-billing",
+      "kind": "call",
+      "line": 185,
       "reason": "\"chargePaidCall\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 232,
+      "line": 237,
       "reason": "\"chargePaidCall\" is not a registered function"
     }
   ],

@@ -69,7 +69,12 @@ const creditsOf = (costMicrodollars: number): number => computeGatewayCredits({ 
  * Throws the message the run reports.
  */
 const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: WorkflowNode, userId: string, costs: VideoRunCosts): Promise<boolean> => {
-    const calls = [costs.clipMicrodollars, costs.extractionMicrodollars].filter((cost): cost is number => cost !== undefined);
+    // A retry of the node finds its clip already reserved by an earlier attempt, so the snapshot counts only what is still to be taken.
+    const clipTaken =
+        costs.clipMicrodollars !== undefined &&
+        !!run.orgId &&
+        (await context.runQuery(internal.auth.billing.gatewayDeductionTakenQuery, { requestId: videoRequestId(run.runId, node.id) }));
+    const calls = [clipTaken ? undefined : costs.clipMicrodollars, costs.extractionMicrodollars].filter((cost): cost is number => cost !== undefined);
 
     if (calls.length > 0 && run.orgId) {
         const { creditsLeft } = await context.runQuery(internal.auth.billing.creditsLeftQuery, { orgId: run.orgId, userId });
