@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { localizeModelDescription } from "@/lib/model-descriptions";
 
-import { filterModelsByQuery, getModelSearchText } from "./utilities";
+import { filterModelsByBlockedCreators, filterModelsByQuery, getCreatorSlug, getModelSearchText } from "./utilities";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
 vi.mock("@lingui/core/macro", () => {
@@ -72,5 +72,20 @@ describe(filterModelsByQuery, () => {
 
         expect(filterModelsByQuery(items, " ".repeat(3), germanIndex)).toBe(items);
         expect(ids(filterModelsByQuery(items, "replicate", emptyIndex))).toStrictEqual([flux.id]);
+    });
+});
+
+describe(filterModelsByBlockedCreators, () => {
+    const llama = { displayProvider: "Meta", id: "meta-llama/llama-3", provider: "openrouter" } as GatewayModel;
+    const llamaElsewhere = { displayProvider: "Meta", id: "meta-llama/other", provider: "groq" } as GatewayModel;
+    const gpt = { displayProvider: "OpenAI", id: "openai/gpt-4o", provider: "openai" } as GatewayModel;
+    const all = [llama, llamaElsewhere, gpt];
+
+    it("hides every model of a blocked lab, whichever route serves it", () => {
+        expect(filterModelsByBlockedCreators(all, [getCreatorSlug(llama)])).toStrictEqual([gpt]);
+    });
+
+    it("returns the same list when nothing is blocked", () => {
+        expect(filterModelsByBlockedCreators(all, [])).toBe(all);
     });
 });

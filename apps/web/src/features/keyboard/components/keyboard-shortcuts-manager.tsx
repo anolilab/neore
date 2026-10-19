@@ -46,6 +46,7 @@ const KeyboardShortcutsHandler: React.FC<{
     const convertedShortcuts = useMemo(() => {
         return {
             audioRecord: convertShortcutToHotkeysHook(shortcuts.audioRecord),
+            copyLastCodeBlock: convertShortcutToHotkeysHook(shortcuts.copyLastCodeBlock),
             escape: convertShortcutToHotkeysHook(shortcuts.escape),
             firstItem: convertShortcutToHotkeysHook(shortcuts.firstItem),
             focusSearch: convertShortcutToHotkeysHook(shortcuts.focusSearch),
@@ -61,6 +62,7 @@ const KeyboardShortcutsHandler: React.FC<{
         };
     }, [
         shortcuts.audioRecord,
+        shortcuts.copyLastCodeBlock,
         shortcuts.escape,
         shortcuts.firstItem,
         shortcuts.focusSearch,
@@ -80,6 +82,14 @@ const KeyboardShortcutsHandler: React.FC<{
         (event: KeyboardEvent) => {
             event.preventDefault();
             onShortcut?.("audioRecord", event);
+        },
+        [onShortcut],
+    );
+
+    const handleCopyLastCodeBlock = useCallback(
+        (event: KeyboardEvent) => {
+            event.preventDefault();
+            onShortcut?.("copyLastCodeBlock", event);
         },
         [onShortcut],
     );
@@ -206,6 +216,20 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: true,
         },
         [convertedShortcuts.audioRecord, handleAudioRecord],
+    );
+
+    useHotkeys(
+        convertedShortcuts.copyLastCodeBlock,
+        handleCopyLastCodeBlock,
+        {
+            description: "Copy last code block",
+            enabled: !!shortcuts.copyLastCodeBlock && typeof shortcuts.copyLastCodeBlock === "string",
+            // A modifier chord that inserts no text, so it works from the composer too.
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: true,
+        },
+        [convertedShortcuts.copyLastCodeBlock, handleCopyLastCodeBlock],
     );
 
     useHotkeys(

@@ -15,6 +15,7 @@ import type { ReturnOf } from "@lunora/react";
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import type { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { markdownToPlainText } from "@neore/chat-ui/utils/markdown-text";
 import { getVisibleUserText } from "@neore/chat-ui/utils/page-context";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { HistoryState } from "@tanstack/react-router";
@@ -33,6 +34,7 @@ import { AppError, ErrorFactory } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
 import { useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { registerStreamOfThread } from "@/lib/lunora/shard-routing";
+import { withUnlockProofBody } from "@/lib/lunora/unlock-proofs";
 import { notifyNative, shouldNotifyReplyFinished } from "@/lib/native/bridge";
 
 import { DEFAULT_MESSAGE_OPTS } from "../constants/query-options";
@@ -210,7 +212,7 @@ export interface ChatActionsContextValue {
     cancelStream: () => Promise<void>;
     capabilities: ThreadCapabilities;
     clearError: () => void;
-    copyMessage: (messageId: string) => void;
+    copyMessage: (messageId: string, format?: "markdown" | "plain") => void;
     editMessage: (messageId: string, text: string) => Promise<void>;
     error: AppError | null;
     jwtToken: string;
@@ -269,6 +271,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // Get user settings for default language
     const { data: userSettings } = useUserSettings();
     const userLanguage = userSettings?.language as string | undefined;
+    // The temporary default for new composer chats (`features/chat/header/temporary-chat-dropdown.tsx` shows it too).
+    const newChatsTemporary = userSettings?.newChatsTemporary === true;
 
     // Memoize default language - only recomputes when userLanguage changes
     const defaultLanguage = useMemo(() => userLanguage || navigatorLanguage, [userLanguage]);
@@ -960,6 +964,12 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                         requestBody.reasoningEffort = pendingSettings.reasoningEffort;
                         requestBody.statelessMode = pendingSettings.statelessMode;
                     }
+
+                    // The dropdown's explicit choice for this chat wins over the user's default.
+                    if (pendingSettings?.isTempChat ?? newChatsTemporary) {
+                        requestBody.temporary = true;
+                        requestBody.retentionHours = pendingSettings?.retentionHours;
+                    }
                 } else if (changedSettings) {
                     // Existing thread: also send changed settings
                     Object.assign(requestBody, changedSettings);
@@ -973,7 +983,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
                 // Call gateway /v1/chat — creates thread + message, schedules agent, returns metadata
                 const response = await fetch(CHAT_STREAM_URL, {
-                    body: JSON.stringify(requestBody),
+                    body: JSON.stringify(withUnlockProofBody(requestBody, threadId)),
                     headers: {
                         "Content-Type": "application/json",
                         ...authHeader(),
@@ -1101,11 +1111,16 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     if (data.contentType && data.contentType !== "text" && data.streamingConfig) {
                         fetch(`${env.VITE_LLM_GATEWAY_URL}/v1/chat/media`, {
                             // `threadId` routes the call to the thread owner's shard.
-                            body: JSON.stringify({
-                                messageId: data.messageId,
-                                streamingConfig: data.streamingConfig,
-                                threadId: data.threadId,
-                            }),
+                            body: JSON.stringify(
+                                withUnlockProofBody(
+                                    {
+                                        messageId: data.messageId,
+                                        streamingConfig: data.streamingConfig,
+                                        threadId: data.threadId,
+                                    },
+                                    data.threadId,
+                                ),
+                            ),
                             headers: {
                                 "Content-Type": "application/json",
                                 ...authHeader(),
@@ -1149,6 +1164,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             getPendingSettingsFromStore,
             getChangedSettings,
             defaultLanguage,
+            newChatsTemporary,
             setTransitioningMessage,
             crpc,
             localTarget,
@@ -1297,7 +1313,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 }
 
                 const response = await fetch(CHAT_STREAM_URL, {
-                    body: JSON.stringify(requestBody),
+                    body: JSON.stringify(withUnlockProofBody(requestBody, threadId)),
                     headers: {
                         "Content-Type": "application/json",
                         ...authHeader(),
@@ -1338,7 +1354,12 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                         setIsRegenerating(false);
 
                         fetch(`${env.VITE_LLM_GATEWAY_URL}/v1/chat/media`, {
-                            body: JSON.stringify({ messageId: data.messageId, streamingConfig: data.streamingConfig, threadId: data.threadId }),
+                            body: JSON.stringify(
+                                withUnlockProofBody(
+                                    { messageId: data.messageId, streamingConfig: data.streamingConfig, threadId: data.threadId },
+                                    data.threadId,
+                                ),
+                            ),
                             headers: {
                                 "Content-Type": "application/json",
                                 ...authHeader(),
@@ -1465,7 +1486,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 };
 
                 const response = await fetch(CHAT_EDIT_URL, {
-                    body: JSON.stringify(requestBody),
+                    body: JSON.stringify(withUnlockProofBody(requestBody, threadId)),
                     headers: {
                         "Content-Type": "application/json",
                         ...authHeader(),
@@ -1509,7 +1530,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         [threadId, isAuthenticated, authHeader, handleError, localTarget, sendLocalTurn, startTurn],
     );
 
-    const copyMessage = useCallback((messageId: string) => {
+    const copyMessage = useCallback((messageId: string, format: "markdown" | "plain" = "markdown") => {
         const message = messagesRef.current.find((m) => m.id === messageId);
 
         if (!message) {
@@ -1517,7 +1538,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         }
 
         // Without an attached page's wrapped text (see `getVisibleUserText`).
-        const textContent = getVisibleUserText(message);
+        const markdown = getVisibleUserText(message);
+        const textContent = format === "plain" ? markdownToPlainText(markdown) : markdown;
 
         if (textContent) {
             navigator.clipboard

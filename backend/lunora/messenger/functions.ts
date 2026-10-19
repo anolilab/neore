@@ -24,6 +24,7 @@ import { isStorageRef, STORAGE_REF_PREFIX } from "../lib/storage-ref";
 import { MESSENGER_MAX_OUTBOUND_FILES } from "./lib/media";
 import { MESSENGER_REPLY_TOOL_GROUPS, normalizeReplyToolGroups } from "./lib/reply-tools";
 import { MAX_LENGTH } from "../lib/validators";
+import { isThreadLocked } from "../lib/thread-lock";
 
 const messengerPlatformSchema = v.union(
     v.literal("telegram"),
@@ -593,6 +594,13 @@ export const claimThreadReply = internalMutation
     .input({ threadId: v.id("threads"), userId: v.string() })
     .output(v.union(v.object({ claimed: v.literal(true), newestUserMessageId: v.string() }), v.object({ claimed: v.literal(false) })))
     .mutation(async ({ args: { threadId, userId }, ctx }) => {
+        // A locked chat is never answered from a messenger: no reply, no claim, no read.
+        const thread = await ctx.db.get(threadId);
+
+        if (!thread || isThreadLocked(thread)) {
+            return { claimed: false as const };
+        }
+
         const rows = await ctx.db
             .query("messages")
             .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))

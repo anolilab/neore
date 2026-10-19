@@ -396,6 +396,18 @@
                 "unique": false
               }
             },
+            "blockedCreators": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            },
             "blockedModels": {
               "kind": "array",
               "nullable": false,
@@ -1464,6 +1476,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "unreferencedSince": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
           "unique": false
         }
       },
@@ -15852,7 +15870,19 @@
           "optional": true,
           "unique": false
         },
+        "autoArchiveAfterDays": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "autoReadReplies": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "capLongCodeBlocks": {
           "kind": "boolean",
           "nullable": false,
           "optional": true,
@@ -15866,6 +15896,12 @@
         },
         "codeHighlightTheme": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "codeLineNumbers": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -15884,6 +15920,12 @@
         },
         "dailyBriefEnabled": {
           "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "density": {
+          "kind": "string",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -15972,6 +16014,12 @@
           "optional": true,
           "unique": false
         },
+        "newChatsTemporary": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "nickname": {
           "kind": "string",
           "nullable": false,
@@ -15995,6 +16043,18 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "searchDomainBlocklist": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
         },
         "sendBehavior": {
           "kind": "string",

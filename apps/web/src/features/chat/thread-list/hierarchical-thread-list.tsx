@@ -24,7 +24,7 @@ import {
 } from "@/features/projects/hooks/use-projects";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { showError } from "@/lib/toast";
+import { showError, showInfo } from "@/lib/toast";
 
 import ThreadGroupRenderer from "./components/thread-group-renderer";
 import GroupHeader from "./group-header";
@@ -34,7 +34,8 @@ import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
 import SortableThreadItem from "./sortable-thread-item";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
-import { getGroupType, isGroupFullySelected } from "./utilities";
+import type { ThreadDateRange } from "./utilities";
+import { getGroupType, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
 
 // Lazy: it pulls `lucide-react/dynamic`'s import map of every icon (~190KB) for its icon picker.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
@@ -130,10 +131,16 @@ const SelectionToolbar: FC<{
     onDeleteSelected: () => void;
     onDone: () => void;
     onSelectAll: () => void;
+    onSelectByDate: (range: ThreadDateRange) => void;
     selectedCount: number;
-}> = memo(({ isAllSelected, onClearSelection, onDeleteSelected, onDone, onSelectAll, selectedCount }) => {
+}> = memo(({ isAllSelected, onClearSelection, onDeleteSelected, onDone, onSelectAll, onSelectByDate, selectedCount }) => {
     const { t } = useLingui();
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
+    const [dateRange, setDateRange] = useState<ThreadDateRange>({ from: "", to: "" });
+    const hasDateRange = dateRange.from !== "" || dateRange.to !== "";
+    const dateFromId = useId();
+    const dateToId = useId();
 
     const handleDeleteClick = () => setShowDeleteDialog(true);
     const handleConfirmDelete = () => {
@@ -158,6 +165,15 @@ const SelectionToolbar: FC<{
                     )}
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button
+                        aria-expanded={isDateRangeOpen}
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setIsDateRangeOpen((open) => !open)}
+                        size="sm"
+                        variant="ghost"
+                    >
+                        {t`Select by date`}
+                    </Button>
                     {selectedCount > 0 && (
                         <Button className="text-destructive hover:bg-destructive/20 h-6 px-2 text-xs" onClick={handleDeleteClick} size="sm" variant="ghost">
                             <Trash2 className="mr-1 h-3 w-3" />
@@ -170,6 +186,48 @@ const SelectionToolbar: FC<{
                     </Button>
                 </div>
             </div>
+            {isDateRangeOpen && (
+                <div
+                    aria-label={t`Select threads active in a date range`}
+                    className="bg-sidebar-accent text-brand-black dark:text-brand-white flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs"
+                    id="select-by-date-range"
+                    role="group"
+                >
+                    <div className="flex items-center gap-1">
+                        <label htmlFor={dateFromId}>{t`From`}</label>
+                        <input
+                            className="bg-background rounded border px-1.5 py-0.5"
+                            id={dateFromId}
+                            max={dateRange.to || undefined}
+                            onChange={(event) =>
+                                setDateRange((previous) => {
+                                    return { ...previous, from: event.target.value };
+                                })
+                            }
+                            type="date"
+                            value={dateRange.from}
+                        />
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <label htmlFor={dateToId}>{t`To`}</label>
+                        <input
+                            className="bg-background rounded border px-1.5 py-0.5"
+                            id={dateToId}
+                            min={dateRange.from || undefined}
+                            onChange={(event) =>
+                                setDateRange((previous) => {
+                                    return { ...previous, to: event.target.value };
+                                })
+                            }
+                            type="date"
+                            value={dateRange.to}
+                        />
+                    </div>
+                    <Button className="h-6 px-2 text-xs" disabled={!hasDateRange} onClick={() => onSelectByDate(dateRange)} size="sm" variant="ghost">
+                        {t`Select matching`}
+                    </Button>
+                </div>
+            )}
             <DeleteConfirmationDialog
                 description={t`Are you sure you want to delete ${plural(selectedCount, { one: "# thread", other: "# threads" })}? This action cannot be undone and will permanently remove all messages in these conversations.`}
                 onConfirm={handleConfirmDelete}
@@ -532,26 +590,44 @@ const HierarchicalThreadList: FC<
     const expandedThreadsArray = useMemo(() => [...expandedThreads].toSorted((a, b) => a.localeCompare(b)), [expandedThreads]);
 
     // Get all visible thread IDs for selection
-    const visibleThreadIds = useMemo(() => {
-        const visible: string[] = [];
+    const visibleNodes = useMemo(() => {
+        const visible: BranchNode[] = [];
         const expandedSet = new Set(expandedThreadsArray); // Reconstruct Set from array
 
-        const collectThreadIds = (node: BranchNode) => {
-            visible.push(node.threadId);
+        const collectNodes = (node: BranchNode) => {
+            visible.push(node);
 
             if (expandedSet.has(node.threadId)) {
-                node.children.forEach((child) => collectThreadIds(child));
+                node.children.forEach((child) => collectNodes(child));
             }
         };
 
         threadGroups.forEach((group) => {
             if (!group.isCollapsed) {
-                group.threads.forEach((thread) => collectThreadIds(thread));
+                group.threads.forEach((thread) => collectNodes(thread));
             }
         });
 
         return visible;
     }, [threadGroups, expandedThreadsArray]);
+
+    const visibleThreadIds = useMemo(() => visibleNodes.map((node) => node.threadId), [visibleNodes]);
+
+    // Select (never deselect) the visible threads active in the range. Pinned ones are skipped inside.
+    const handleSelectByDate = useCallback(
+        (range: ThreadDateRange) => {
+            const matchingIds = selectThreadIdsByDate(visibleNodes, range);
+
+            if (matchingIds.length === 0) {
+                showInfo(t`No threads were active in that date range.`);
+
+                return;
+            }
+
+            setSelectedThreadIds((previous) => new Set([...previous, ...matchingIds]));
+        },
+        [visibleNodes, setSelectedThreadIds, t],
+    );
 
     const isAllSelected = useMemo(
         () => visibleThreadIds.length > 0 && visibleThreadIds.every((id) => selectedThreadIds.has(id)),
@@ -1252,6 +1328,7 @@ const HierarchicalThreadList: FC<
                     onDeleteSelected={handleBulkDelete}
                     onDone={onExitSelectionMode}
                     onSelectAll={handleSelectAll}
+                    onSelectByDate={handleSelectByDate}
                     selectedCount={selectedThreadIds.size}
                 />
             )}

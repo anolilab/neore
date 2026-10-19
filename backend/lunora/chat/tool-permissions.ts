@@ -24,6 +24,7 @@
  *    deny) the call via `approveToolCall` / `denyToolCall`, and pipes the
  *    continuation into `persistentChunks` exactly like the original run.
  */
+import { MAX_LENGTH } from "../lib/validators";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -307,10 +308,11 @@ export const respondToToolApproval = authMutation
         approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
         decision: v.union(v.literal("approve"), v.literal("deny"), v.literal("always")),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
-    .mutation(async ({ args: { approvalId, decision, threadId }, ctx }) => {
-        const claim = await claimToolApproval(ctx, { approvalId, callerId: ctx.user.userId, decision, threadId });
+    .mutation(async ({ args: { approvalId, decision, threadId, unlockProof }, ctx }) => {
+        const claim = await claimToolApproval(ctx, { approvalId, callerId: ctx.user.userId, decision, threadId, unlockProof });
 
         if (claim.kind === "already-resolved") {
             return { alreadyResolved: true, streamId: claim.streamId };

@@ -10,6 +10,7 @@ export interface BranchNode {
     depth: number;
     expiresAt?: number; // Present if thread is temporary
     isPinned?: boolean;
+    lockedAt?: number; // Present while the chat has a passcode
     model?: string;
     order?: number;
     projectId?: string; // Project ID if thread belongs to a project
@@ -21,6 +22,7 @@ export interface BranchNode {
     tags?: ThreadTag[]; // `tagIds` resolved against the user's tags, in display order
     threadId: string;
     title: string;
+    updatedAt?: number; // Last activity, when the row recorded it
 }
 
 export interface ThreadGroup {

@@ -6,10 +6,11 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { isThreadLocked } from "../lib/thread-lock";
 import { withoutUndefined } from "../lib/patch";
 import { lastConfirmedOf, type MemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
-import { admitOwnedThread } from "../agent/thread-read-access";
+import { requireOwnedThread } from "../agent/thread-read-access";
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -272,7 +273,7 @@ export const clearAllUserMemories = authMutation
  * as such rather than disappearing.
  */
 export const getMessageMemoryUsage = authQuery
-    .input({ messageId: v.string().max(MAX_LENGTH.id) })
+    .input({ messageId: v.string().max(MAX_LENGTH.id), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(
         v.array(
             v.object({
@@ -286,7 +287,7 @@ export const getMessageMemoryUsage = authQuery
             }),
         ),
     )
-    .query(async ({ args: { messageId }, ctx: context }) => {
+    .query(async ({ args: { messageId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
         // The reply row carries whoever started the run, so it is found through
         // its thread: decide on the thread, admit it, then read the row.
@@ -302,7 +303,7 @@ export const getMessageMemoryUsage = authQuery
             throw new LunoraError("FORBIDDEN", "Not authorized to view this message");
         }
 
-        admitOwnedThread(context, thread, userId);
+        await requireOwnedThread(context, threadId as Id<"threads">, userId, unlockProof);
 
         const message = await context.db.get(messageId as Id<"messages">);
 
@@ -610,7 +611,8 @@ export const recordRetrievedMemories = internalMutation
 
         const thread = await ctx.db.get(message.threadId);
 
-        if (thread?.userId !== args.userId) {
+        // A locked chat's message rows are not written to (its proof is not here).
+        if (!thread || thread.userId !== args.userId || isThreadLocked(thread)) {
             return null;
         }
 
@@ -645,4 +647,14 @@ export const isThreadTemporary = internalQuery
         const thread = await ctx.db.get(args.threadId);
 
         return thread?.isTemporary === true;
+    });
+
+/** A locked chat's exchange is never mined for memories (`memory/extract.ts`), whatever the caller holds. */
+export const isThreadLockedForMemory = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get(args.threadId);
+
+        return thread !== null && isThreadLocked(thread);
     });

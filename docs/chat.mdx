@@ -115,6 +115,32 @@ Auto-expiring conversations with configurable retention periods.
 - The thread becomes a normal thread and won't expire
 - All message history is preserved
 
+### Locked Chats
+
+A chat can be locked with a passcode. A locked chat shows only a lock icon and the name "Locked chat" in the list until you enter the passcode.
+
+**How to lock a chat:**
+1. Open the lock menu on the chat row and choose "Lock chat"
+2. Enter a passcode of at least 6 characters, and type it again
+
+**While a chat is locked:**
+- Its messages, title and summary are not shown, and search does not match them
+- Sharing and public links are not available; stop sharing before you lock a chat
+- Memories are not taken from it, and it is never answered from a messenger or the public API
+
+**Unlocking:** choose "Unlock chat" and enter the passcode. The chat stays open in this browser until you lock it again, reload the page, or leave it idle for 15 minutes.
+
+**Changing or removing the passcode:** use "Change passcode" or "Remove passcode". Both ask for the current passcode. "Lock now" closes the chat immediately.
+
+**Passcode limits:** wrong passcodes are counted per chat. After several wrong attempts you must wait before trying again, and the wait grows with each attempt.
+
+**What a locked chat does not protect against:**
+- It is not end-to-end encryption. The service can still read the chat's data.
+- Someone who knows the passcode, or who has already read the chat, is not stopped.
+- It is meant for a shared computer or a colleague at an unlocked desk, not for a stolen account. Someone who controls your signed-in session can ask the service for the unlock.
+
+**If you forget the passcode:** there is no recovery. The only way to get rid of the lock is to delete the chat.
+
 ### Stateless Threads
 
 Process each message independently without chat history context.
@@ -367,6 +393,8 @@ Edit your messages after sending:
 3. Save changes
 4. AI can respond to edited message
 
+You can also edit an AI reply: click the edit icon under it and change the text. The reply is updated in place. Tool calls, reasoning and images are kept, and no credits are used. The text is saved as one block, so any separate text paragraphs in the reply are merged into the last one.
+
 ### Prompt Improvement
 
 Get AI-powered rewrites of your prompt before you send it:
@@ -512,6 +540,19 @@ See [Prompts](/docs/prompts) for more information about variables.
 - Organize related conversations
 - Branch conversations
 - Create a branch from the thread menu or the command palette (`Ctrl+K`)
+
+**Stopping a reply from the list:**
+- A thread whose reply is still streaming shows a stop button in its row
+
+**Selecting by date:**
+- In selection mode, choose **Select by date** to select threads last active within a date range (or before a date, by leaving "From" empty)
+- Pinned threads are not picked by date; select them by hand
+- Deleting still goes through the usual confirmation
+
+**Prompt outline:**
+- Long conversations (three or more prompts) show a rail beside the messages with one tick per prompt
+- Hover or focus a tick to see its prompt; click it to jump there
+- Shown on wider screens only
 
 ### Thread Sharing
 

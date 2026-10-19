@@ -450,12 +450,13 @@ export const attachToThread = authMutation
     .input({
         knowledgeFileId: v.id("knowledgeFiles"),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .mutation(async ({ args: input, ctx }) => {
         const threadId = input.threadId as Id<"threads">;
         const knowledgeFileId = input.knowledgeFileId as Id<"knowledgeFiles">;
 
-        await requireOwnedThread(ctx, threadId, ctx.user.userId);
+        await requireOwnedThread(ctx, threadId, ctx.user.userId, input.unlockProof);
 
         // Verify ownership
         const file = await ctx.db.get(knowledgeFileId);
@@ -493,12 +494,13 @@ export const detachFromThread = authMutation
     .input({
         knowledgeFileId: v.id("knowledgeFiles"),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .mutation(async ({ args: input, ctx }) => {
         const threadId = input.threadId as Id<"threads">;
         const knowledgeFileId = input.knowledgeFileId as Id<"knowledgeFiles">;
 
-        await requireOwnedThread(ctx, threadId, ctx.user.userId);
+        await requireOwnedThread(ctx, threadId, ctx.user.userId, input.unlockProof);
 
         const links = await ctx.db
             .query("threadKnowledge")
@@ -525,11 +527,12 @@ export const detachFromThread = authMutation
 export const getThreadKnowledge = authQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .query(async ({ args: input, ctx }) => {
         const threadId = input.threadId as Id<"threads">;
 
-        const { thread } = await requireThreadPermission(ctx, threadId, ctx.user.userId, "read");
+        const { thread } = await requireThreadPermission(ctx, threadId, ctx.user.userId, "read", input.unlockProof);
 
         const links = await ctx.db
             .query("threadKnowledge")

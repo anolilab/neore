@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
 import Assistant from "@/features/chat/assistant";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
+import { LockedChatGate } from "@/features/chat/lock/locked-chat-gate";
 import { useThreadShard } from "@/features/chat/sharing/use-thread-shard";
 import { createLunoraActionQueryOptions, createLunoraQueryOptions, useCRPC } from "@/lib/lunora/crpc";
 import { isLunoraId, LUNORA_ID_SOURCE } from "@/lib/lunora/ids";
@@ -89,7 +90,9 @@ const ChatPage = () => {
 
     return (
         <RouteErrorBoundary routeName={route}>
-            <Assistant initialMessage={initialMessage} initialThread={initialThread} jwtToken={context.token as string} threadId={threadId} />
+            <LockedChatGate threadId={threadId}>
+                <Assistant initialMessage={initialMessage} initialThread={initialThread} jwtToken={context.token as string} threadId={threadId} />
+            </LockedChatGate>
         </RouteErrorBoundary>
     );
 };

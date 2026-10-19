@@ -1,5 +1,6 @@
 import { v } from "lunorash/server";
 
+import { MAX_SEARCH_DOMAIN_BLOCKLIST } from "../chat/tools/search-domains";
 import { MAX_LENGTH } from "../lib/validators";
 
 /**
@@ -21,7 +22,15 @@ export const userSettingsFieldsWithoutUserId = {
     accentColor: v.optional(
         v.union(v.literal("default"), v.literal("blue"), v.literal("violet"), v.literal("green"), v.literal("orange"), v.literal("rose"), v.literal("teal")),
     ),
+    // Archive threads with no activity for this many days (`agent/auto-archive.ts`). 0 or absent = off.
+    autoArchiveAfterDays: v.optional(
+        v.number().check((value) => value === 0 || (Number.isSafeInteger(value) && value >= 7 && value <= 365), {
+            message: "Auto-archive must be off or 7 to 365 days",
+        }),
+    ),
     autoReadReplies: v.optional(v.boolean()), // Speak every finished assistant reply aloud. OPT-IN: absent means off.
+    // Appearance: cap long chat code blocks at 24 lines with an expand toggle. Absent means ON.
+    capLongCodeBlocks: v.optional(v.boolean()),
     codeFont: v.optional(v.union(v.literal("fira-code"), v.literal("mono"), v.literal("consolas"), v.literal("jetbrains"), v.literal("source-code-pro"))),
     // Appearance: Shiki theme pair for code blocks (`apps/web/src/features/appearance/lib/code-themes.ts`).
     codeHighlightTheme: v.optional(
@@ -35,9 +44,13 @@ export const userSettingsFieldsWithoutUserId = {
             v.literal("solarized"),
         ),
     ),
+    // Appearance: show line numbers in chat code blocks. Absent means off.
+    codeLineNumbers: v.optional(v.boolean()),
     composerAutocompleteEnabled: v.optional(v.boolean()), // Ghost-text completions in the chat composer. OPT-IN: absent means off.
     customInstructions: v.optional(v.string().max(MAX_LENGTH.document)), // Custom instructions for how AI should respond (max 3000 chars)
     dailyBriefEnabled: v.optional(v.boolean()), // Opt-in morning summary notification. OPT-IN: absent means off.
+    // Appearance: UI spacing preset (`apps/web/src/features/appearance/lib/display-preferences.ts`). Absent = comfortable.
+    density: v.optional(v.union(v.literal("compact"), v.literal("comfortable"), v.literal("spacious"))),
     dictationLanguage: v.optional(v.string().max(MAX_LENGTH.short)), // Default dictation language for new threads (BCP 47 code, e.g., "en-US", "es-ES")
     disableExternalLinkWarning: v.optional(v.boolean()),
     enableFollowupSuggestions: v.optional(v.boolean()), // Enable/disable follow-up suggestions after assistant messages
@@ -50,6 +63,7 @@ export const userSettingsFieldsWithoutUserId = {
             archiveThread: v.optional(v.string().max(MAX_LENGTH.short)),
             audioRecord: v.optional(v.string().max(MAX_LENGTH.short)),
             commandPalette: v.optional(v.string().max(MAX_LENGTH.short)),
+            copyLastCodeBlock: v.optional(v.string().max(MAX_LENGTH.short)),
             createBranch: v.optional(v.string().max(MAX_LENGTH.short)),
             deleteThread: v.optional(v.string().max(MAX_LENGTH.short)),
             escape: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -70,14 +84,23 @@ export const userSettingsFieldsWithoutUserId = {
     language: v.optional(v.string().max(MAX_LENGTH.short)), // Default language for AI responses in new threads (BCP 47 code, e.g., "en-US", "es-ES")
     lastChatId: v.optional(v.string().max(MAX_LENGTH.id)),
     location: v.optional(v.string().max(MAX_LENGTH.short)), // User's location (e.g., "New York, USA", "Berlin, Germany")
-    mainFont: v.optional(v.union(v.literal("inter"), v.literal("system"), v.literal("serif"), v.literal("mono"), v.literal("roboto-slab"))),
+    // Appearance: UI font family (`apps/web/src/features/appearance/lib/display-preferences.ts`). `inter` is the default sans; `roboto-slab` is legacy, no longer offered.
+    mainFont: v.optional(
+        v.union(v.literal("inter"), v.literal("system"), v.literal("serif"), v.literal("mono"), v.literal("roboto-slab"), v.literal("dyslexic")),
+    ),
     memoryEnabled: v.optional(v.boolean()), // Automatic memory extraction and retrieval. OPT-IN: absent means off.
     // Appearance: Mermaid diagram theme.
     mermaidTheme: v.optional(v.union(v.literal("default"), v.literal("neutral"), v.literal("dark"), v.literal("forest"), v.literal("base"))),
+    newChatsTemporary: v.optional(v.boolean()), // New composer chats start temporary. OPT-IN: absent means off.
     nickname: v.optional(v.string().max(MAX_LENGTH.short)), // User's preferred name for the AI to call them (max 50 chars)
     onboardingCompleted: v.optional(v.boolean()),
     profession: v.optional(v.string().max(MAX_LENGTH.short)), // User's profession (e.g., "Product Designer", "Software Developer") (max 100 chars)
     resumeLastChat: v.optional(v.boolean()), // Open /chat on the most recent thread instead of a blank one. OPT-IN: absent means off.
+    searchDomainBlocklist: v.optional(
+        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_SEARCH_DOMAIN_BLOCKLIST, {
+            message: "Too many blocked domains",
+        }),
+    ), // Hostnames the web search tool never returns (subdomains too). Normalised server-side in `settingsUpsert`.
     sendBehavior: v.optional(v.union(v.literal("enter"), v.literal("shiftEnter"), v.literal("button"))),
     taskEmailEnabled: v.optional(v.boolean()), // Opt-in email when a task or trigger run finishes with a result. OPT-IN: absent means off.
     temporaryChatRetentionHours: v.optional(v.number()), // Default: 24 hours
@@ -227,6 +250,8 @@ export const aiUserPreferencesFields = {
             allowedModels: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
             allowedProviders: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
             allowedRegions: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
+            // Model picker only: hides a lab (creator slug, e.g. "meta"). The gateway ignores it.
+            blockedCreators: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
             blockedModels: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
             blockedProviders: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
             blockedRegions: v.optional(v.array(v.string().max(MAX_LENGTH.short))),

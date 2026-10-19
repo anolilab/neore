@@ -6,6 +6,7 @@ import { shardContext } from "../../../lib/http-shard";
 import { verifySignedRequest } from "../../../lib/sign-request";
 import { threadShardFor } from "../../../lib/thread-shard";
 import { streamLogger } from "../../../lib/logger";
+import { THREAD_LOCKED_CODE } from "../../../lib/thread-lock";
 import type { StreamStatus } from "./schema";
 
 /**
@@ -111,6 +112,13 @@ export const getChunksHttpAction = async (context: HttpActionCtx, request: Reque
     // A poll with no user (an older gateway) can only look on `__root__`.
     if (userId) {
         context = shardContext(context, await threadShardFor(context, userId, threadId));
+    }
+
+    // This poll carries no passcode proof. A thread locked after the stream was
+    // created (see `streamLockedSinceStart`) is refused: the reply was started
+    // before the lock, and nothing may read on from it.
+    if (await context.runQuery(internal.chat.streaming.streamLockedSinceStart, { streamId: streamId as Id<"persistentStreams"> })) {
+        return Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
     }
 
     const waitMs = toChunkWaitMs(body.waitMs);

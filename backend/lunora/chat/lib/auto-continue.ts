@@ -28,6 +28,12 @@ const ESTIMATION_SAFETY_MARGIN = 1.15;
 const RECENT_MESSAGES_TO_KEEP = 6;
 /** Max chars per message in compression summaries */
 const SUMMARY_TRUNCATION_LENGTH = 200;
+/** Replaces the output of a tool result that compression elides. The call keeps its id. */
+const ELIDED_TOOL_OUTPUT = "[Tool output removed to fit the context window]";
+/** Tool outputs at or under this length are kept: eliding them would save nothing. */
+const ELIDE_MIN_CHARS = 200;
+/** Stands in for the summary when the summary alone would not fit. */
+const DROPPED_SUMMARY_NOTE = "[Earlier conversation was removed to fit the context window]";
 
 // ─── Stream Event Types ─────────────────────────────────────────────────────
 
@@ -38,6 +44,25 @@ export type AutoContinueStreamEvent =
     | { data: { iterations: number; toolCalls: number; totalTokens: number }; type: "done" };
 
 // ─── Token Estimation ───────────────────────────────────────────────────────
+
+/**
+ * Text of a tool result. AI SDK 5+ stores `output: { type, value }`; `content`
+ * and `result` are the pre-v5 names, kept for history rebuilt from old rows.
+ */
+const toolResultText = (part: { content?: unknown; output?: unknown; result?: unknown }): string => {
+    const output = part.output ?? part.content ?? part.result;
+    const value = output && typeof output === "object" && "value" in output ? (output as { value: unknown }).value : output;
+
+    if (typeof value === "string") {
+        return value;
+    }
+
+    try {
+        return JSON.stringify(value ?? "") ?? "";
+    } catch {
+        return "[unserialisable tool output]"; // Circular refs never reach stored history
+    }
+};
 
 /**
  * Fast approximate token count. Avoids tiktoken dependency.
@@ -63,9 +88,17 @@ export const estimateTokens = (messages: ModelMessage[]): number => {
                 if (typeof part === "string") {
                     totalChars += part.length;
                 } else if (part && typeof part === "object") {
-                    const p = part as { args?: unknown; content?: unknown; result?: unknown; text?: unknown; type?: unknown };
+                    const p = part as {
+                        args?: unknown;
+                        content?: unknown;
+                        input?: unknown;
+                        output?: unknown;
+                        result?: unknown;
+                        text?: unknown;
+                        type?: unknown;
+                    };
 
-                    if (p.type === "text" && typeof p.text === "string") {
+                    if ((p.type === "text" || p.type === "reasoning") && typeof p.text === "string") {
                         totalChars += p.text.length;
                     } else {
                         switch (p.type) {
@@ -81,7 +114,7 @@ export const estimateTokens = (messages: ModelMessage[]): number => {
                             }
                             case "tool-call": {
                                 try {
-                                    totalChars += JSON.stringify(p.args ?? "").length + TOOL_CALL_OVERHEAD_CHARS;
+                                    totalChars += JSON.stringify(p.input ?? p.args ?? "").length + TOOL_CALL_OVERHEAD_CHARS;
                                 } catch {
                                     totalChars += 500;
                                 }
@@ -89,17 +122,7 @@ export const estimateTokens = (messages: ModelMessage[]): number => {
                                 break;
                             }
                             case "tool-result": {
-                                const resultContent = p.content ?? p.result;
-
-                                if (typeof resultContent === "string") {
-                                    totalChars += resultContent.length;
-                                } else {
-                                    try {
-                                        totalChars += JSON.stringify(resultContent ?? "").length;
-                                    } catch {
-                                        totalChars += 1000; // Fallback for circular refs
-                                    }
-                                }
+                                totalChars += toolResultText(p).length;
 
                                 break;
                             }
@@ -209,32 +232,80 @@ export const getModelContextWindow = (modelId: string): number => {
 // ─── Context Compression ────────────────────────────────────────────────────
 
 /**
- * Compresses older messages in the conversation to fit within context limits.
- * Keeps system messages and recent exchanges intact, summarizes the rest.
+ * Where the kept tail may start, as an index into `conversation` (the non-system
+ * messages). Returns -1 when there is no such index above 0.
  *
- * Returns compressed messages array, or the original if no compression needed.
+ * - At least `keep` messages from the end, when possible.
+ * - Never after the latest user turn, so that turn stays whole.
+ * - On an assistant message. Tool results follow their call, so a tail that
+ *   starts there never orphans a result. And the summary that replaces the
+ *   older messages is a user message, which must not sit beside another one.
  */
-export const compressContextMessages = (messages: ModelMessage[], contextLimit: number): ModelMessage[] => {
-    const currentTokens = estimateTokens(messages);
+const findRecentStart = (conversation: ModelMessage[], keep: number): number => {
+    let latestUser = -1;
 
-    const threshold = DEFAULT_AUTO_CONTINUE_CONFIG.compressionThreshold;
-
-    if (currentTokens < contextLimit * threshold) {
-        return messages; // No compression needed
+    for (let i = conversation.length - 1; i >= 0; i -= 1) {
+        if (conversation[i]?.role === "user") {
+            latestUser = i;
+            break;
+        }
     }
 
-    // Separate system messages from conversation
-    const systemMessages = messages.filter((m) => m.role === "system");
-    const conversationMessages = messages.filter((m) => m.role !== "system");
-
-    if (conversationMessages.length <= RECENT_MESSAGES_TO_KEEP) {
-        return messages; // Too few to compress
+    if (latestUser < 0) {
+        return -1;
     }
 
-    // Keep last N messages (recent exchanges) intact
-    const recentMessages = conversationMessages.slice(-RECENT_MESSAGES_TO_KEEP);
-    const olderMessages = conversationMessages.slice(0, -RECENT_MESSAGES_TO_KEEP);
+    for (let i = Math.min(conversation.length - keep, latestUser); i > 0; i -= 1) {
+        if (conversation[i]?.role === "assistant") {
+            return i;
+        }
+    }
 
+    return -1;
+};
+
+/**
+ * Replaces the output of tool results with a short note, except those in the
+ * final tool message, which the model is reacting to now. Each call keeps its
+ * id and name, so every result still answers its call. Returns the input array
+ * when nothing was replaced.
+ */
+// ponytail: only the final tool message is protected. If that one message alone exceeds the window, nothing more can be elided.
+const elideToolOutputs = (messages: ModelMessage[]): ModelMessage[] => {
+    let lastTool = -1;
+
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+        if (messages[i]?.role === "tool") {
+            lastTool = i;
+            break;
+        }
+    }
+
+    let changed = false;
+
+    const next = messages.map((message, index) => {
+        if (message.role !== "tool" || index === lastTool || !Array.isArray(message.content)) {
+            return message;
+        }
+
+        const content = message.content.map((part) => {
+            if (part.type !== "tool-result" || toolResultText(part).length <= ELIDE_MIN_CHARS) {
+                return part;
+            }
+
+            changed = true;
+
+            return { ...part, output: { type: "text" as const, value: ELIDED_TOOL_OUTPUT } };
+        });
+
+        return changed ? ({ ...message, content } as ModelMessage) : message;
+    });
+
+    return changed ? next : messages;
+};
+
+/** Summary of the messages being dropped, capped at ~20% of the context window. */
+const summarizeOlderMessages = (olderMessages: ModelMessage[], contextLimit: number): string => {
     // Summarize older messages into a compact format
     const summaryParts: string[] = [];
 
@@ -258,7 +329,7 @@ export const compressContextMessages = (messages: ModelMessage[], contextLimit: 
 
                     if (p?.type === "tool-call") return `[Tool: ${p.toolName}]`;
 
-                    if (p?.type === "tool-result") return `[Result: ${String(p.content ?? p.result ?? "").slice(0, SUMMARY_TRUNCATION_LENGTH)}]`;
+                    if (p?.type === "tool-result") return `[Result: ${toolResultText(p).slice(0, SUMMARY_TRUNCATION_LENGTH)}]`;
 
                     return "";
                 })
@@ -290,18 +361,52 @@ export const compressContextMessages = (messages: ModelMessage[], contextLimit: 
         summaryChars += part.length + 1;
     }
 
-    const compressed = [
-        ...systemMessages,
+    return summaryText;
+};
+
+/**
+ * Compresses older messages in the conversation to fit within context limits.
+ * Keeps system messages and recent exchanges intact, summarizes the rest. If the
+ * result is still over the limit, elides older tool outputs (the current turn's
+ * included). Compression never splits a tool call from its result.
+ *
+ * Returns the compressed array, or the original array (same reference) when no
+ * compression applies.
+ */
+export const compressContextMessages = (messages: ModelMessage[], contextLimit: number): ModelMessage[] => {
+    const threshold = contextLimit * DEFAULT_AUTO_CONTINUE_CONFIG.compressionThreshold;
+
+    if (estimateTokens(messages) < threshold) {
+        return messages; // No compression needed
+    }
+
+    const systemMessages = messages.filter((m) => m.role === "system");
+    const conversationMessages = messages.filter((m) => m.role !== "system");
+    let compressed = messages;
+
+    const cut = findRecentStart(conversationMessages, RECENT_MESSAGES_TO_KEEP);
+
+    if (cut > 0) {
+        const olderMessages = conversationMessages.slice(0, cut);
+        const recentMessages = conversationMessages.slice(cut);
         // Use "user" role for summary to avoid conflicting with the real system prompt
-        { content: `[Context from earlier in this conversation]\n${summaryText}`, role: "user" as const } as unknown as ModelMessage,
-        ...recentMessages,
-    ];
+        const summary = {
+            content: `[Context from earlier in this conversation]\n${summarizeOlderMessages(olderMessages, contextLimit)}`,
+            role: "user" as const,
+        } as unknown as ModelMessage;
 
-    // Post-compression size check — if still over limit, drop the summary entirely
-    const compressedTokens = estimateTokens(compressed);
+        compressed = [...systemMessages, summary, ...recentMessages];
 
-    if (compressedTokens > contextLimit * threshold) {
-        return [...systemMessages, ...recentMessages];
+        // Post-compression size check — if the summary still leaves us over, keep a one-line note instead
+        if (estimateTokens(compressed) > threshold) {
+            const note = { content: DROPPED_SUMMARY_NOTE, role: "user" as const } as unknown as ModelMessage;
+
+            compressed = [...systemMessages, note, ...recentMessages];
+        }
+    }
+
+    if (estimateTokens(compressed) >= threshold) {
+        compressed = elideToolOutputs(compressed);
     }
 
     return compressed;
@@ -463,22 +568,24 @@ export const applyLateCompression = (messages: ModelMessage[], modelId: string):
 
 /**
  * More aggressive compression for when standard compression isn't sufficient.
- * Keeps only system messages + last 4 messages, with minimal summaries.
+ * Keeps only system messages + the last 4 messages (cut where `findRecentStart`
+ * allows), with minimal summaries.
  */
 const aggressiveCompressMessages = (messages: ModelMessage[], contextLimit: number): ModelMessage[] => {
     const AGGRESSIVE_RECENT_KEEP = 4;
 
     const systemMessages = messages.filter((m) => m.role === "system");
     const conversationMessages = messages.filter((m) => m.role !== "system");
+    const cut = findRecentStart(conversationMessages, AGGRESSIVE_RECENT_KEEP);
 
-    if (conversationMessages.length <= AGGRESSIVE_RECENT_KEEP) {
+    if (cut <= 0) {
         return messages;
     }
 
     const AGGRESSIVE_SUMMARY_LENGTH = 100;
 
-    const recentMessages = conversationMessages.slice(-AGGRESSIVE_RECENT_KEEP);
-    const olderMessages = conversationMessages.slice(0, -AGGRESSIVE_RECENT_KEEP);
+    const recentMessages = conversationMessages.slice(cut);
+    const olderMessages = conversationMessages.slice(0, cut);
 
     // Build a very short summary
     const summaryParts: string[] = [];

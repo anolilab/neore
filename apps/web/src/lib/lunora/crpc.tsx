@@ -36,6 +36,7 @@ import { useMemo } from "react";
 
 import { getLiveQueryManager, LIVE_ARGS_META_KEY, LIVE_META_KEY } from "./live-queries";
 import { shardOptionsFor } from "./shard-routing";
+import { withUnlockProof } from "./unlock-proofs";
 
 /** A leaf of the `crpc` proxy — what a call site actually invokes. */
 interface CrpcLeaf<F> {
@@ -182,11 +183,12 @@ const leaf = (client: LunoraClient, path: string[]): any => {
     return {
         mutationOptions: (overrides?: object) => {
             return {
-                mutationFn: async (args: Record<string, unknown>) => await client.mutation(resolve(path) as never, args as never, shardOptionsFor(args)),
+                mutationFn: async (args: Record<string, unknown>) =>
+                    await client.mutation(resolve(path) as never, withUnlockProof(args) as never, shardOptionsFor(args)),
                 ...overrides,
             };
         },
-        queryKey: (args: unknown = {}) => lunoraQueryOptions(client, resolve(path), args as never, shardOptionsFor(args)).queryKey,
+        queryKey: (args: unknown = {}) => lunoraQueryOptions(client, resolve(path), withUnlockProof(args) as never, shardOptionsFor(args)).queryKey,
         queryOptions: (args: unknown = {}, options?: CrpcQueryOptions) => {
             // `skipToken` short-circuits before `resolve(path)`, so a skipped query
             // does not even look the function up — which matters, because `resolve`
@@ -199,7 +201,9 @@ const leaf = (client: LunoraClient, path: string[]): any => {
 
             const reference = resolve(path);
             // A shared thread's or page's calls go to its owner's shard (`shard-routing.ts`).
-            const base = lunoraQueryOptions(client, reference, args as never, shardOptionsFor(args));
+            // A locked chat's call carries its in-memory proof (`unlock-proofs.ts`).
+            const scoped = withUnlockProof(args);
+            const base = lunoraQueryOptions(client, reference, scoped as never, shardOptionsFor(args));
             const live = options?.live ?? !NEVER_LIVE.has((reference as unknown as { __lunoraRef: string }).__lunoraRef);
 
             if (!live) {
@@ -208,7 +212,7 @@ const leaf = (client: LunoraClient, path: string[]): any => {
 
             return {
                 ...base,
-                meta: { [LIVE_ARGS_META_KEY]: args ?? {} },
+                meta: { [LIVE_ARGS_META_KEY]: scoped ?? {} },
                 // Answers from the open subscription when there is one; a plain
                 // RPC during SSR, in loaders, and before the manager is installed.
                 queryFn: async ({ queryKey }: { queryKey: QueryKey }) => {
@@ -277,7 +281,10 @@ export { LunoraProvider as CRPCProvider, type LunoraClient as LunoraReactClient,
 export const useAction = <F extends FunctionReference>(reference: F): ((args: ArgsOf<F>) => Promise<ReturnOf<F>>) => {
     const client = useLunora();
 
-    return useMemo(() => async (args: ArgsOf<F>) => await client.action(reference as never, args as never, shardOptionsFor(args)), [client, reference]);
+    return useMemo(
+        () => async (args: ArgsOf<F>) => await client.action(reference as never, withUnlockProof(args) as never, shardOptionsFor(args)),
+        [client, reference],
+    );
 };
 
 /**
@@ -304,7 +311,7 @@ export const useLunoraAuth = (): { isAuthenticated: boolean; isLoading: boolean 
  * `createLunoraQueryOptions(client, ref, args)` — query options for route loaders.
  */
 export const createLunoraQueryOptions = <F extends FunctionReference>(client: LunoraClient, reference: F, args: ArgsOf<F>) =>
-    lunoraQueryOptions(client, reference, args, shardOptionsFor(args));
+    lunoraQueryOptions(client, reference, withUnlockProof(args) as ArgsOf<F>, shardOptionsFor(args));
 
 /**
  * Query options whose fetch is a Lunora ACTION — for reads that must run as an

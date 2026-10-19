@@ -150,6 +150,39 @@ describe("parseChatGPT", () => {
         expect(((result[0] as NormalizedConversation).messages[0] as NormalizedMessage).content).toBe("Hello\nWorld");
     });
 
+    it("keeps the transcript of a voice turn and drops other non-text parts", () => {
+        const data = [
+            {
+                current_node: "msg1",
+                mapping: {
+                    msg1: {
+                        children: [],
+                        id: "msg1",
+                        message: {
+                            author: { role: "assistant" },
+                            content: {
+                                content_type: "multimodal_text",
+                                parts: [
+                                    null,
+                                    { content_type: "image_asset_pointer" },
+                                    { content_type: "audio_transcription", direction: "out", text: "Let me check." },
+                                ],
+                            },
+                            id: "msg1",
+                        },
+                        parent: "root",
+                    },
+                    root: { children: ["msg1"], id: "root" },
+                },
+                title: "Voice",
+            },
+        ];
+
+        const result = parseChatGPT(data);
+
+        expect(((result[0] as NormalizedConversation).messages[0] as NormalizedMessage).content).toBe("Let me check.");
+    });
+
     it("skips messages with empty content", () => {
         const data = [
             {

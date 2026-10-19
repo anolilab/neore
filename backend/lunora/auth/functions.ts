@@ -27,6 +27,7 @@ import { resolveUserPlan } from "./lib/plan";
 import roleGuard from "./lib/role-guard";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
+import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 
 /** Any context an auth helper may be called from. */
 type AnyAuthContext = QueryContext | MutationContext | ActionContext;
@@ -199,6 +200,17 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
         // `userSettings.keyboardShortcuts` is `v.any()` in the schema, so this
         // arrives as `unknown`; narrow before indexing. `String(value)` keeps the
         // original coercion semantics of `RegExp.test`.
+        // The blocklist is stored as hostnames only; anything else is refused here, not silently dropped.
+        if (Array.isArray(toStore.searchDomainBlocklist)) {
+            const { domains, invalid } = normalizeSearchDomainBlocklist(toStore.searchDomainBlocklist as string[]);
+
+            if (invalid.length > 0) {
+                throw new LunoraError("BAD_REQUEST", `Not a web domain: ${invalid.slice(0, 5).join(", ")}`);
+            }
+
+            toStore.searchDomainBlocklist = domains;
+        }
+
         const shortcuts = toStore.keyboardShortcuts;
 
         if (shortcuts && typeof shortcuts === "object") {
@@ -894,6 +906,22 @@ export const updateUserSettings = authMutation
         return result;
     });
 
+/**
+ * The user's web-search blocklist, for the search tool. Unlike `getUserPreferencesQuery`
+ * it has no fallback: a failed read throws, so the tool fails closed rather than searching unfiltered.
+ */
+export const getSearchDomainBlocklistQuery = internalQuery
+    .input({ userId: v.string() })
+    .output(v.array(v.string()))
+    .query(async ({ args: { userId }, ctx: context }) => {
+        const userSettings = await context.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+
+        return userSettings?.searchDomainBlocklist ?? [];
+    });
+
 export const getUserSettings = query.input({}).query(async (options) => await settingsGet("userSettings", options));
 
 export const updateAIUserPreferences = authMutation
@@ -1046,6 +1074,7 @@ export const getAgentModulePreferencesQuery = internalQuery
                     allowedModels: v.optional(v.array(v.string())),
                     allowedProviders: v.optional(v.array(v.string())),
                     allowedRegions: v.optional(v.array(v.string())),
+                    blockedCreators: v.optional(v.array(v.string())),
                     blockedModels: v.optional(v.array(v.string())),
                     blockedProviders: v.optional(v.array(v.string())),
                     blockedRegions: v.optional(v.array(v.string())),

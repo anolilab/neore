@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GroupType, ThreadGroup } from "./types";
-import { buildMatchSnippet, getGroupType, isGroupFullySelected } from "./utilities";
+import { buildMatchSnippet, getGroupType, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
 
 describe("getGroupType", () => {
     it("should return groupType when available", () => {
@@ -89,5 +89,66 @@ describe(buildMatchSnippet, () => {
 
     it("falls back to the start when the query is not verbatim", () => {
         expect(buildMatchSnippet("abcdefghij", "zzz", 2)).toBe("abcd…");
+    });
+});
+
+describe("selectThreadIdsByDate", () => {
+    // Local midnight, so the day boundaries match what the date inputs mean.
+    const at = (year: number, month: number, day: number, hour = 12) => new Date(year, month - 1, day, hour).getTime();
+    const thread = (threadId: string, lastActive: number, extra: { isPinned?: boolean; updatedAt?: number } = {}) => {
+        return {
+            createdAt: lastActive,
+            isPinned: extra.isPinned,
+            threadId,
+            updatedAt: extra.updatedAt,
+        };
+    };
+
+    it("selects threads active on or before the to day, including its last moment", () => {
+        const threads = [thread("early", at(2026, 10, 1)), thread("edge", at(2026, 10, 15, 23)), thread("late", at(2026, 10, 16, 0))];
+
+        expect(selectThreadIdsByDate(threads, { from: "", to: "2026-10-15" })).toEqual(["early", "edge"]);
+    });
+
+    it("treats from as the start of its day and to as inclusive", () => {
+        const threads = [
+            thread("before", at(2026, 10, 9, 23)),
+            thread("first", at(2026, 10, 10, 0)),
+            thread("last", at(2026, 10, 12, 23)),
+            thread("after", at(2026, 10, 13, 0)),
+        ];
+
+        expect(selectThreadIdsByDate(threads, { from: "2026-10-10", to: "2026-10-12" })).toEqual(["first", "last"]);
+    });
+
+    it("parses the day as local time, not UTC", () => {
+        // 00:30 local on the 10th is the 9th in UTC for any zone east of UTC; the local day must still hold it.
+        const threads = [thread("start", at(2026, 10, 10, 0))];
+
+        expect(selectThreadIdsByDate(threads, { from: "2026-10-10", to: "" })).toEqual(["start"]);
+    });
+
+    it("uses updatedAt when the row recorded it, else createdAt", () => {
+        const threads = [
+            { createdAt: at(2026, 1, 1), threadId: "old-but-active", updatedAt: at(2026, 10, 18) },
+            { createdAt: at(2026, 10, 18), threadId: "new-but-idle", updatedAt: at(2026, 1, 1) },
+            { createdAt: at(2026, 1, 1), threadId: "no-updatedAt" },
+        ];
+
+        expect(selectThreadIdsByDate(threads, { from: "2026-10-01", to: "" })).toEqual(["old-but-active"]);
+        expect(selectThreadIdsByDate(threads, { from: "", to: "2026-03-01" })).toEqual(["new-but-idle", "no-updatedAt"]);
+    });
+
+    it("skips pinned threads", () => {
+        const october = at(2026, 10, 1);
+        const threads = [thread("pinned", october, { isPinned: true }), thread("plain", october)];
+
+        expect(selectThreadIdsByDate(threads, { from: "", to: "2026-10-31" })).toEqual(["plain"]);
+    });
+
+    it("selects nothing when neither bound is set", () => {
+        const threads = [thread("a", at(2026, 10, 1))];
+
+        expect(selectThreadIdsByDate(threads, { from: "", to: "" })).toEqual([]);
     });
 });

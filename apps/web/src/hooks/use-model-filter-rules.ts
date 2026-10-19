@@ -1,14 +1,18 @@
 "use client";
 
 import type { GatewayModel } from "@neore/ai/models";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
-interface ModelFilterRules {
+const NO_BLOCKED_CREATORS: string[] = [];
+
+export interface ModelFilterRules {
     allowedModels?: string[];
     allowedProviders?: string[];
     allowedRegions?: string[];
+    /** Labs (creator slugs, e.g. "meta") hidden from the model picker only. Applied in `ModelPicker`, not here: other surfaces still resolve every model. */
+    blockedCreators?: string[];
     blockedModels?: string[];
     blockedProviders?: string[];
     blockedRegions?: string[];
@@ -104,4 +108,19 @@ export const useFilteredModels = (models: GatewayModel[]): GatewayModel[] => {
     if (!hasRules) return models;
 
     return models.filter((m) => isModelAllowed(m, rules));
+};
+
+/**
+ * The labs hidden from the model picker, and a setter for them. The mutation
+ * replaces the whole `modelFilterRules` object, so the other rules are carried
+ * over. Shared by the picker's "Hide" action and the filters page.
+ */
+export const useBlockedCreators = () => {
+    const crpc = useCRPC();
+    const rules = useModelFilterRules();
+    const updateMutation = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
+
+    const setBlockedCreators = (blockedCreators: string[]) => updateMutation.mutateAsync({ modelFilterRules: { ...rules, blockedCreators } });
+
+    return { blockedCreators: rules?.blockedCreators ?? NO_BLOCKED_CREATORS, isPending: updateMutation.isPending, setBlockedCreators };
 };

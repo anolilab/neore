@@ -23,6 +23,7 @@ import { saveEditedSiblingHandler } from "../agent/branches";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread, patchThread } from "../agent/table-writes";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { MAX_LENGTH } from "../lib/validators";
 import type { StoredCustomProvider } from "./lib/custom-providers";
 import {
     buildLocalPromptMessage,
@@ -34,7 +35,7 @@ import {
     MAX_LOCAL_REPLY_CHARS,
     resolveLocalModel,
 } from "./lib/local-turn";
-import { admitOwnedThread } from "../agent/thread-read-access";
+import { requireOwnedThread } from "../agent/thread-read-access";
 
 /** Regenerate the reply to `messageId` (a prompt), or save an edit of it. Requires `threadId`. */
 export interface LocalTurnBranch {
@@ -52,6 +53,8 @@ export interface SaveLocalTurnArgs {
     reasoning?: string;
     reply: string;
     threadId?: Id<"threads">;
+    /** The owner's passcode proof, when the chat they save into is locked. */
+    unlockProof?: string;
 }
 
 export interface SaveLocalTurnResult {
@@ -101,7 +104,8 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
             throw new LunoraError("FORBIDDEN", "Cannot write to another user's thread");
         }
 
-        admitOwnedThread(ctx, thread, userId);
+        // Owner, admitted for the rows below; a locked chat needs its proof.
+        await requireOwnedThread(ctx, args.threadId, userId, args.unlockProof);
 
         threadId = args.threadId;
         await patchThread(ctx.db, threadId, { model: args.model, updatedAt: now });
@@ -184,6 +188,7 @@ export const saveLocalTurn = authMutation
         reply: v.string().check((value) => value.length <= MAX_LOCAL_REPLY_CHARS, { message: "Reply too long" }),
         /** Omit to start a new thread. */
         threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ assistantMessageId: v.string(), threadId: v.string(), userMessageId: v.string() }))
     .mutation(async ({ args, ctx }) => {

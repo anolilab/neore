@@ -5,6 +5,7 @@ import { RadioGroup } from "@base-ui/react/radio-group";
 import { useLingui } from "@lingui/react/macro";
 import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
+import { Switch } from "@neore/ui/components/switch";
 import { CheckIcon } from "lucide-react";
 import type { FC } from "react";
 import { useMemo } from "react";
@@ -16,17 +17,97 @@ import type { AccentId } from "../lib/accent-presets";
 import { ACCENT_PRESETS, isAccentId } from "../lib/accent-presets";
 import type { CodeHighlightThemeId, MermaidThemeId } from "../lib/code-themes";
 import { CODE_HIGHLIGHT_THEME_IDS, isCodeHighlightThemeId, isMermaidThemeId, MERMAID_THEME_IDS } from "../lib/code-themes";
+import type { DensityId, MainFontId } from "../lib/display-preferences";
+import { isDensityId, isMainFontId } from "../lib/display-preferences";
 
 const ACCENT_LABEL_ID = "accent-color-label";
+const DENSITY_LABEL_ID = "ui-density-label";
+const FONT_LABEL_ID = "ui-font-label";
+
+/**
+ * One named radio per option (arrow keys move, the text names it). Shared by
+ * the density and font groups; the accent group draws colour swatches instead.
+ */
+const ChoiceRadioGroup = <T extends string>({
+    labelId,
+    onChange,
+    options,
+    value,
+}: {
+    labelId: string;
+    onChange: (value: T) => void;
+    options: { id: T; label: string }[];
+    value: T;
+}) => (
+    <RadioGroup
+        aria-labelledby={labelId}
+        className="flex flex-wrap gap-x-4 gap-y-2"
+        onValueChange={(next) => {
+            if (typeof next === "string") {
+                onChange(next as T);
+            }
+        }}
+        value={value}
+    >
+        {options.map((option) => (
+            // eslint-disable-next-line jsx-a11y/label-has-associated-control -- Radio.Root renders the control inside this label
+            <label className="group flex cursor-pointer items-center gap-2 text-sm" key={option.id}>
+                <Radio.Root
+                    className="border-border data-checked:border-primary focus-visible:outline-ring relative flex size-4 shrink-0 items-center justify-center rounded-full border outline-offset-4 focus-visible:outline-2"
+                    value={option.id}
+                >
+                    <Radio.Indicator className="bg-primary size-2 rounded-full" />
+                </Radio.Root>
+                <span className="group-has-data-checked:font-medium">{option.label}</span>
+            </label>
+        ))}
+    </RadioGroup>
+);
 
 /**
  * Accent colour swatches (a Base UI radio group: arrow keys move, each option
- * is named in text, never by colour alone) plus the code-highlight and
- * Mermaid theme selects. Rendered inside the Appearance card.
+ * is named in text, never by colour alone), UI density and font family with a
+ * live preview, and the code-highlight and Mermaid theme selects. Rendered
+ * inside the Appearance card.
  */
 const AppearanceControls: FC = () => {
     const { t } = useLingui();
-    const { accentColor, codeHighlightTheme, mermaidTheme, setAccentColor, setCodeHighlightTheme, setMermaidTheme } = useAppearanceSettings();
+    const {
+        accentColor,
+        capLongCodeBlocks,
+        codeHighlightTheme,
+        codeLineNumbers,
+        density,
+        mainFont,
+        mermaidTheme,
+        setAccentColor,
+        setCapLongCodeBlocks,
+        setCodeHighlightTheme,
+        setCodeLineNumbers,
+        setDensity,
+        setMainFont,
+        setMermaidTheme,
+    } = useAppearanceSettings();
+
+    const densityOptions = useMemo<{ id: DensityId; label: string }[]>(
+        () => [
+            { id: "compact", label: t`Compact` },
+            { id: "comfortable", label: t`Comfortable (default)` },
+            { id: "spacious", label: t`Spacious` },
+        ],
+        [t],
+    );
+
+    const fontOptions = useMemo<{ id: MainFontId; label: string }[]>(
+        () => [
+            { id: "inter", label: t`Sans (default)` },
+            { id: "serif", label: t`Serif` },
+            { id: "mono", label: t`Monospace` },
+            { id: "system", label: t`System UI` },
+            { id: "dyslexic", label: t`Dyslexia-friendly` },
+        ],
+        [t],
+    );
 
     const accentLabels = useMemo<Record<AccentId, string>>(() => {
         return {
@@ -101,6 +182,51 @@ const AppearanceControls: FC = () => {
                 </RadioGroup>
             </div>
             <div className="space-y-2">
+                <Label className="text-base font-medium" id={DENSITY_LABEL_ID}>
+                    {t`Density`}
+                </Label>
+                <p className="text-muted-foreground text-sm">{t`Spacing between messages, in chat bubbles and in the thread list.`}</p>
+                <ChoiceRadioGroup
+                    labelId={DENSITY_LABEL_ID}
+                    onChange={(value) => {
+                        if (!isDensityId(value)) {
+                            return;
+                        }
+
+                        setDensity(value);
+                        toast.success(t`Density updated`);
+                    }}
+                    options={densityOptions}
+                    value={density}
+                />
+                {/* The sample sits under the page's own tokens (data-density is on the wrapper too, so it shows the choice at once). */}
+                <div aria-hidden="true" className="border-border bg-background rounded-xl border p-4 text-sm" data-density={density}>
+                    <div className="flex justify-end pb-(--density-message-gap)">
+                        <p className="bg-muted rounded-3xl px-5 py-(--density-bubble-py)">{t`Summarise my notes in three bullets.`}</p>
+                    </div>
+                    <p className="px-1 py-(--density-bubble-py)">{t`Here they are: planning, budget and next steps.`}</p>
+                </div>
+            </div>
+            <div className="space-y-2">
+                <Label className="text-base font-medium" id={FONT_LABEL_ID}>
+                    {t`Font`}
+                </Label>
+                <p className="text-muted-foreground text-sm">{t`Typeface for the whole interface. Code blocks always stay monospace.`}</p>
+                <ChoiceRadioGroup
+                    labelId={FONT_LABEL_ID}
+                    onChange={(value) => {
+                        if (!isMainFontId(value)) {
+                            return;
+                        }
+
+                        setMainFont(value);
+                        toast.success(t`Font updated`);
+                    }}
+                    options={fontOptions}
+                    value={mainFont}
+                />
+            </div>
+            <div className="space-y-2">
                 <Label className="text-base font-medium" htmlFor="code-highlight-theme">
                     {t`Code Highlighting Theme`}
                 </Label>
@@ -155,6 +281,38 @@ const AppearanceControls: FC = () => {
                         ))}
                     </SelectContent>
                 </Select>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                    <Label className="text-base font-medium" htmlFor="code-line-numbers">
+                        {t`Line numbers in code blocks`}
+                    </Label>
+                    <p className="text-muted-foreground text-sm">{t`Number each line of code in chat replies. Off by default.`}</p>
+                </div>
+                <Switch
+                    checked={codeLineNumbers === true}
+                    id="code-line-numbers"
+                    onCheckedChange={(checked) => {
+                        setCodeLineNumbers(checked);
+                        toast.success(checked ? t`Line numbers shown` : t`Line numbers hidden`);
+                    }}
+                />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                    <Label className="text-base font-medium" htmlFor="cap-long-code-blocks">
+                        {t`Limit height of long code blocks`}
+                    </Label>
+                    <p className="text-muted-foreground text-sm">{t`Long code blocks scroll inside a fixed height until you expand them.`}</p>
+                </div>
+                <Switch
+                    checked={capLongCodeBlocks !== false}
+                    id="cap-long-code-blocks"
+                    onCheckedChange={(checked) => {
+                        setCapLongCodeBlocks(checked);
+                        toast.success(checked ? t`Long code blocks limited` : t`Long code blocks shown in full`);
+                    }}
+                />
             </div>
         </>
     );

@@ -10,6 +10,7 @@
  * and becomes its tool result; dismissing denies it with a reason the model
  * reads. A repeat call returns the first call's stream.
  */
+import { MAX_LENGTH } from "../lib/validators";
 import { v } from "lunorash/server";
 
 import { authMutation, rateLimit } from "../lib/crpc";
@@ -27,14 +28,16 @@ export const answerAskUser = authMutation
         ),
         approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
-    .mutation(async ({ args: { answer, approvalId, threadId }, ctx }) => {
+    .mutation(async ({ args: { answer, approvalId, threadId, unlockProof }, ctx }) => {
         const claim = await claimAskUserAnswer(ctx, {
             approvalId,
             callerId: ctx.user.userId,
             reply: answer === null ? { kind: "dismiss" } : { answer, kind: "answer" },
             threadId,
+            unlockProof,
         });
 
         if (claim.kind === "already-resolved") {

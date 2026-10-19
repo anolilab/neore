@@ -18,15 +18,20 @@ import {
     CommandPanel,
 } from "@neore/ui/components/command";
 import cn from "@neore/ui/utils/cn";
-import { CheckIcon, CheckSquare2, Image, Info, Layers2, Lock, Mic, Square, Star, Type, Video } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { CheckIcon, CheckSquare2, EyeOff, Image, Info, Layers2, Lock, Mic, Square, Star, Type, Video } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import React, { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { useBlockedCreators } from "@/hooks/use-model-filter-rules";
 import { trackEvent } from "@/lib/analytics";
 import { localizeModelDescription } from "@/lib/model-descriptions";
 
 import {
+    filterModelsByBlockedCreators,
     filterModelsByQuery,
     getCreatorDisplayName,
     getCreatorSlug,
@@ -493,7 +498,15 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
     // Use provided models list or fall back to the feature-flagged gateway models
     const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
-    const sourceModels = useMemo(() => modelsProp ?? featureFlaggedModels, [modelsProp, featureFlaggedModels]);
+    const { blockedCreators, setBlockedCreators } = useBlockedCreators();
+    const { hooks } = useAuth();
+    const { data: sessionData } = hooks.useSession();
+    // Hiding writes the account's filter rules, so it is offered to signed-in users only.
+    const isSignedIn = Boolean(sessionData?.user?.id);
+    const sourceModels = useMemo(
+        () => filterModelsByBlockedCreators(modelsProp ?? featureFlaggedModels, blockedCreators),
+        [blockedCreators, modelsProp, featureFlaggedModels],
+    );
 
     // Compute provider sidebar info from the current source models
     const creatorInfo = useMemo<{ name: string; slug: string }[]>(() => {
@@ -599,6 +612,37 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
     // Stable callback for selecting "All" (null slug) — avoids inline arrow in JSX
     const handleProviderSelectAll = useCallback(() => handleProviderSelect(null), [handleProviderSelect]);
+
+    // Hides a lab through the same `modelFilterRules` the filters page edits, so the picker
+    // and the page cannot disagree. The toast's undo restores the list as it was.
+    const handleHideCreator = useCallback(
+        async (slug: string, name: string) => {
+            const previous = blockedCreators;
+
+            if (selectedProvider === slug) {
+                handleProviderSelectAll();
+            }
+
+            try {
+                await setBlockedCreators([...previous, slug]);
+            } catch {
+                toast.error(t`Failed to update filter rules`);
+
+                return;
+            }
+
+            toast(t`${name} hidden from the model picker`, {
+                action: {
+                    label: t`Undo`,
+                    onClick: () => {
+                        setBlockedCreators(previous).catch(() => toast.error(t`Failed to update filter rules`));
+                    },
+                },
+                description: <Link to="/dashboard/settings/chat/model-filters">{t`Manage hidden labs`}</Link>,
+            });
+        },
+        [blockedCreators, handleProviderSelectAll, selectedProvider, setBlockedCreators, t],
+    );
 
     const handleTabChange = useCallback((tab: ModelPickerTab) => {
         setActiveTab(tab);
@@ -905,13 +949,19 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     showBorder
                                 />
                                 {creatorInfo.map(({ name, slug }) => (
-                                    <ProviderSidebarItem
-                                        isSelected={selectedProvider === slug}
-                                        key={slug}
-                                        name={name}
-                                        onSelect={handleProviderSelect}
-                                        slug={slug}
-                                    />
+                                    <div className="group/lab relative flex" key={slug}>
+                                        <ProviderSidebarItem isSelected={selectedProvider === slug} name={name} onSelect={handleProviderSelect} slug={slug} />
+                                        {isSignedIn ? (
+                                            <button
+                                                aria-label={t`Hide ${name} from model picker`}
+                                                className="text-muted-foreground hover:text-foreground focus-visible:outline-ring absolute top-1/2 right-1 -translate-y-1/2 rounded p-1 opacity-0 transition-opacity group-hover/lab:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 pointer-coarse:opacity-100"
+                                                onClick={() => handleHideCreator(slug, name)}
+                                                type="button"
+                                            >
+                                                <EyeOff aria-hidden="true" className="size-3" />
+                                            </button>
+                                        ) : null}
+                                    </div>
                                 ))}
                             </div>
                         ) : null}

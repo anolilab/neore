@@ -14,6 +14,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@neore/ui/components/ai-elements/reasoning";
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@neore/ui/components/ai-elements/sources";
 import AnimatedTiles from "@neore/ui/components/animated-tiles";
+import { chatMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
 import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
 import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
@@ -117,14 +118,24 @@ interface MessageContentProps {
  */
 const DefaultText: FC<{ isAnimating: boolean; text: string }> = memo(({ isAnimating, text }) => {
     const plugins = useStreamdownPlugins(text);
-    // The user's code / diagram themes (Appearance settings), provided by the app.
-    const { mermaidTheme, shikiTheme } = useStreamdownAppearance();
+    // The user's code / diagram themes and code-block display (Appearance settings), provided by the app.
+    const { codeLineNumbers, mermaidTheme, shikiTheme } = useStreamdownAppearance();
     const mermaid = useMemo(() => {
         return { config: { theme: mermaidTheme } };
     }, [mermaidTheme]);
 
+    // `codeBlockMaxHeight="none"`: the 24-line cap is per block (`chatMarkdownComponents`), not Streamdown's global 400px.
     return (
-        <Streamdown className="streamdown-animate" isAnimating={isAnimating} mermaid={mermaid} plugins={plugins} shikiTheme={shikiTheme}>
+        <Streamdown
+            className="streamdown-animate"
+            codeBlockMaxHeight="none"
+            components={chatMarkdownComponents}
+            isAnimating={isAnimating}
+            lineNumbers={codeLineNumbers}
+            mermaid={mermaid}
+            plugins={plugins}
+            shikiTheme={shikiTheme}
+        >
             {text}
         </Streamdown>
     );

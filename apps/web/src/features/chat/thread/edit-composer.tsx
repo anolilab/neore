@@ -1,23 +1,29 @@
 "use client";
 
 /**
- * EditComposer - Inline editor for editing user messages
+ * EditComposer - Inline editor for user messages and assistant replies
  *
- * Uses the edit state from chat-ui-store and submits via editMessage from context.
- * Receives the message as a prop to display original content during exit animation.
+ * A user message is submitted via editMessage from context (a new reply is
+ * generated). A reply's text is replaced in place by `agent_branches.editAssistantReply`,
+ * with no model call. Receives the message as a prop to display original content during exit animation.
  */
 
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { Separator } from "@neore/ui/components/separator";
+import { useMutation } from "@tanstack/react-query";
 import { CheckIcon, PlusIcon, XIcon } from "lucide-react";
 import { motion } from "motion/react";
 import type { ChangeEvent, FC, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { useChatActions } from "@/features/chat/core/context/chat-context";
+import { useChatActions, useChatThread } from "@/features/chat/core/context/chat-context";
+import { isValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { UIMessage } from "@/lib/agent";
+import { useCRPC } from "@/lib/lunora/crpc";
+import { showError } from "@/lib/toast";
 
 interface EditComposerProps {
     message: UIMessage;
@@ -26,6 +32,9 @@ interface EditComposerProps {
 const EditComposer: FC<EditComposerProps> = ({ message }) => {
     const { t } = useLingui();
     const { editMessage } = useChatActions();
+    const { threadId } = useChatThread();
+    const crpc = useCRPC();
+    const { isPending, mutateAsync: editReply } = useMutation(crpc.agent.branches.editAssistantReply.mutationOptions());
 
     // Edit state from store
     const stopEditing = useChatUIStore((state) => state.stopEditing);
@@ -59,12 +68,29 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
     }, [editText]);
 
     const handleSubmit = async () => {
-        if (!editText.trim()) {
+        if (!editText.trim() || isPending) {
             return;
         }
 
-        await editMessage(message.id, editText.trim());
-        stopEditing();
+        if (message.role !== "assistant") {
+            await editMessage(message.id, editText.trim());
+            stopEditing();
+
+            return;
+        }
+
+        if (!isValidThreadId(threadId)) {
+            return;
+        }
+
+        try {
+            // The reactive message list delivers the saved reply, so nothing to refresh here.
+            await editReply({ messageId: message.id, text: editText.trim(), threadId: threadId as Id<"threads"> });
+            stopEditing();
+        } catch (error) {
+            // Stay open with the text kept, so the edit can be retried.
+            showError(error as Error);
+        }
     };
 
     const handleCancel = () => {
@@ -110,7 +136,7 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
                         className="text-foreground focus-visible:ring-ring/50 ml-1 flex min-h-8 w-full resize-none bg-transparent py-2 outline-none focus-visible:ring-1"
                         onChange={handleTextChange}
                         onKeyDown={handleKeyDown}
-                        placeholder={t`Edit your message...`}
+                        placeholder={message.role === "assistant" ? t`Edit the reply...` : t`Edit your message...`}
                         ref={textareaRef}
                         rows={1}
                         value={editText}
@@ -123,7 +149,7 @@ const EditComposer: FC<EditComposerProps> = ({ message }) => {
                     <XIcon className="mr-1 h-4 w-4" />
                     {t`Cancel`}
                 </Button>
-                <Button disabled={!editText.trim()} onClick={handleSubmit} size="sm" variant="default">
+                <Button disabled={!editText.trim() || isPending} onClick={handleSubmit} size="sm" variant="default">
                     <CheckIcon className="mr-1 h-4 w-4" />
                     {t`Save`}
                 </Button>

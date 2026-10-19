@@ -28,10 +28,12 @@ import {
     GripVertical,
     HourglassIcon,
     Loader2,
+    Lock,
     Pin,
     PinOff,
     Radio,
     Send,
+    Square,
     Tag,
     TrashIcon,
     Users,
@@ -41,12 +43,17 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
+import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import type { ThreadLockMode } from "@/features/chat/lock/thread-lock-dialog";
+import { ThreadLockDialog } from "@/features/chat/lock/thread-lock-dialog";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { LUNORA_ID_SOURCE } from "@/lib/lunora/ids";
+import { currentUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { showError } from "@/lib/toast";
 
 import MessageSearchMatches from "./message-search-matches";
 import SortableThreadItem from "./sortable-thread-item";
@@ -217,11 +224,18 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const location = useLocation();
     const queryClient = useQueryClient();
     const { mutateAsync: convertToPermanent } = useMutation(crpc.chat.functions.convertTemporaryToPermanent.mutationOptions());
+    const { isPending: isStopping, mutate: stopThreadStream } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
     const [isConverting, setIsConverting] = useState(false);
     const [showMoveToProjectDialog, setShowMoveToProjectDialog] = useState(false);
     // Mounted on first open only: rendered closed in every row, the lazy dialog loaded on first paint.
     const hasOpenedMoveToProject = useHasOpened(showMoveToProjectDialog);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [lockMode, setLockMode] = useState<ThreadLockMode | null>(null);
+    const { mutate: lockNow } = useMutation(crpc.agent.thread_lock.lockThread.mutationOptions());
+    const isLocked = node.lockedAt !== undefined && node.lockedAt !== null;
+    const isUnlocked = isLocked && currentUnlockProof(node.threadId) !== undefined;
+    // A locked chat shows no title: the list never has one for it.
+    const displayTitle = isLocked ? t`Locked chat` : node.title;
     const setShowManageTagsDialog = useThreadListUIStore(selectSetShowManageTagsDialog);
     const isTransitioningRef = useRef(false);
 
@@ -362,7 +376,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
     const content = (
         <div
-            className="group/action-item relative flex items-center gap-2 overflow-hidden rounded-lg px-2.5 py-2"
+            className="group/action-item relative flex items-center gap-2 overflow-hidden rounded-lg px-2.5 py-(--density-row-py)"
             onClick={(e) => {
                 if (isSelectionMode) {
                     return;
@@ -468,16 +482,48 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             {isStreaming && <Radio aria-label={t`Streaming`} className="text-primary h-3 w-3 shrink-0 animate-pulse" />}
                             {isFailed && <Radio aria-label={t`Failed`} className="text-destructive h-3 w-3 shrink-0" />}
                             {isComparisonParent && <GitCompareArrows aria-label={t`Model comparison`} className="text-muted-foreground h-3 w-3 shrink-0" />}
-                            <span className="truncate">{node.title}</span>
+                            {isLocked && <Lock aria-hidden="true" className="text-muted-foreground h-3 w-3 shrink-0" />}
+                            <span className="truncate">{displayTitle}</span>
                         </span>
                     }
                 />
                 <TooltipContent className="max-w-xs" side="right">
-                    <p className="break-words">{node.title}</p>
+                    <p className="break-words">{displayTitle}</p>
                     {isStreaming && <p className="text-muted-foreground mt-1 text-xs">{t`Streaming...`}</p>}
                     {isFailed && <p className="text-destructive mt-1 text-xs">{t`Response failed - try again`}</p>}
                 </TooltipContent>
             </Tooltip>
+
+            {isStreaming && !isSelectionMode && (
+                <Tooltip>
+                    <TooltipTrigger
+                        render={
+                            <Button
+                                aria-label={t`Stop generating`}
+                                className="hover:text-primary h-6 w-6 shrink-0 p-0"
+                                disabled={isStopping}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    // Same as the composer's stop: queued prompts wait for the user instead of sending on their own.
+                                    usePromptQueueStore.getState().setPaused(node.threadId, true);
+                                    stopThreadStream(
+                                        { threadId: node.threadId as Id<"threads"> },
+                                        { onError: () => showError(t`Could not stop the reply. Please try again.`) },
+                                    );
+                                }}
+                                size="icon-sm"
+                                type="button"
+                                variant="ghost"
+                            >
+                                <Square aria-hidden="true" className="h-3 w-3 fill-current" />
+                            </Button>
+                        }
+                    />
+                    <TooltipContent>{t`Stop generating`}</TooltipContent>
+                </Tooltip>
+            )}
 
             {node.tags && node.tags.length > 0 && <ThreadTagChips tags={node.tags} />}
 
@@ -617,10 +663,58 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         }}
                         tagIds={node.tagIds}
                         threadId={node.threadId}
-                        threadTitle={node.title}
+                        threadTitle={displayTitle}
                     />
                 )}
 
+                <DropdownMenu>
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                <DropdownMenuTrigger
+                                    render={
+                                        <Button
+                                            aria-label={isLocked ? t`Chat lock: locked` : t`Chat lock`}
+                                            className="hover:text-primary h-6 w-6 p-0"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                            }}
+                                            size="icon-sm"
+                                            variant="ghost"
+                                        >
+                                            <Lock aria-hidden="true" className="h-3 w-3" />
+                                        </Button>
+                                    }
+                                />
+                            }
+                        />
+                        <TooltipContent>{t`Chat lock`}</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent
+                        onClick={(e) => {
+                            e.stopPropagation();
+                        }}
+                    >
+                        {isLocked ? (
+                            <>
+                                {isUnlocked && (
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            lockNow({ threadId: node.threadId as Id<"threads"> });
+                                        }}
+                                    >
+                                        {t`Lock now`}
+                                    </DropdownMenuItem>
+                                )}
+                                {!isUnlocked && <DropdownMenuItem onClick={() => setLockMode("unlock")}>{t`Unlock chat`}</DropdownMenuItem>}
+                                <DropdownMenuItem onClick={() => setLockMode("change")}>{t`Change passcode`}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setLockMode("remove")}>{t`Remove passcode`}</DropdownMenuItem>
+                            </>
+                        ) : (
+                            <DropdownMenuItem onClick={() => setLockMode("set")}>{t`Lock chat`}</DropdownMenuItem>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <DropdownMenu>
                     <Tooltip>
                         <TooltipTrigger
@@ -755,6 +849,18 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     open={showDeleteDialog}
                     title={t`Delete Thread`}
                 />
+                {lockMode !== null && (
+                    <ThreadLockDialog
+                        mode={lockMode}
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setLockMode(null);
+                            }
+                        }}
+                        open
+                        threadId={node.threadId}
+                    />
+                )}
             </div>
 
             {isTemporary && (

@@ -46,15 +46,12 @@ describe("/chat/media on a shared thread", () => {
     });
 
     it("refuses an author who no longer has write access, before charging anything", async () => {
-        runQuery.mockResolvedValueOnce({ hasAccess: false, permission: null, thread: null });
+        runQuery.mockResolvedValueOnce({ outcome: "denied" });
 
         const response = await mediaGenerationHttpAction({ runMutation, runQuery } as never, post({ threadId: THREAD_ID }));
 
         expect(response.status).toBe(403);
-        expect(runQuery).toHaveBeenLastCalledWith(
-            expect.anything(),
-            expect.objectContaining({ requiredPermission: "write", threadId: THREAD_ID, userId: COLLABORATOR }),
-        );
+        expect(runQuery).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ level: "write", threadId: THREAD_ID, userId: COLLABORATOR }));
         expect(runMutation).not.toHaveBeenCalled();
     });
 
@@ -66,7 +63,7 @@ describe("/chat/media on a shared thread", () => {
     });
 
     it("goes on to the daily charge with write access (control)", async () => {
-        runQuery.mockResolvedValueOnce({ hasAccess: true, permission: "write", thread: {} });
+        runQuery.mockResolvedValueOnce({ outcome: "ok" });
 
         const response = await mediaGenerationHttpAction({ runMutation, runQuery } as never, post({ threadId: THREAD_ID }));
 

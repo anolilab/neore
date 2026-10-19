@@ -63,6 +63,7 @@ const normalizeProviderSlug = (displayProvider: string): string =>
  * Normalizes through the display name so equivalent slugs (e.g. "meta-llama" and
  * "meta") collapse to the same canonical slug (e.g. "meta").
  */
+
 export const getCreatorSlug = (model: GatewayModel): string => {
     const rawSlug = model.displayProvider ? normalizeProviderSlug(model.displayProvider) : model.id.split("/", 1)[0] || "unknown";
 
@@ -71,6 +72,18 @@ export const getCreatorSlug = (model: GatewayModel): string => {
     const displayName = CREATOR_DISPLAY_NAMES[rawSlug];
 
     return displayName ? normalizeProviderSlug(displayName) : rawSlug;
+};
+
+/**
+ * Drops the models of the labs the user hid from the picker (`blockedCreators` in
+ * `modelFilterRules`). Picker-only: the other surfaces still resolve every model.
+ */
+export const filterModelsByBlockedCreators = (models: GatewayModel[], blockedCreators: ReadonlyArray<string>): GatewayModel[] => {
+    if (blockedCreators.length === 0) {
+        return models;
+    }
+
+    return models.filter((model) => !blockedCreators.includes(getCreatorSlug(model)));
 };
 
 /**

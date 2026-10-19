@@ -15,12 +15,18 @@ import { useSyncExternalStore } from "react";
  * nothing here imports Mermaid.
  */
 export type StreamdownAppearance = {
+    /** Long code blocks scroll inside a 24-line cap with an expand toggle. */
+    capLongCodeBlocks: boolean;
+    /** Line numbers in chat code blocks. */
+    codeLineNumbers: boolean;
     mermaidTheme: string;
     /** `[light, dark]`, Streamdown's `shikiTheme` order. */
     shikiTheme: [string, string];
 };
 
 export const DEFAULT_STREAMDOWN_APPEARANCE: StreamdownAppearance = {
+    capLongCodeBlocks: true,
+    codeLineNumbers: false,
     mermaidTheme: "default",
     shikiTheme: ["poimandres", "min-light"],
 };
@@ -39,7 +45,12 @@ const store: { current: StreamdownAppearance; listeners: Set<() => void> } = {
 export const setStreamdownAppearance = (next: StreamdownAppearance): void => {
     const { current } = store;
 
-    if (current.mermaidTheme === next.mermaidTheme && current.shikiTheme === next.shikiTheme) {
+    if (
+        current.mermaidTheme === next.mermaidTheme &&
+        current.shikiTheme === next.shikiTheme &&
+        current.capLongCodeBlocks === next.capLongCodeBlocks &&
+        current.codeLineNumbers === next.codeLineNumbers
+    ) {
         return;
     }
 

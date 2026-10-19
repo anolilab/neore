@@ -3,10 +3,13 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../../_generated/dataModel";
 import { authMutation, authQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
+import { isThreadLocked } from "../../lib/thread-lock";
+import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
 
 export const getThreadPins = authQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         v.array(
@@ -24,8 +27,15 @@ export const getThreadPins = authQuery
             }),
         ),
     )
-    .query(async ({ args: { threadId }, ctx: context }) => {
+    .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
+
+        // A pin quotes the chat's messages: a locked chat's pins need its proof.
+        const thread = await context.db.get(threadId as Id<"threads">);
+
+        if (thread && isThreadLocked(thread) && (await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId })) !== "ok") {
+            return [];
+        }
 
         const pins = await context.db
             .query("threadPins")
@@ -43,11 +53,19 @@ export const createPin = authMutation
         messageRole: v.string().max(MAX_LENGTH.short),
         selectedText: v.optional(v.string().max(MAX_LENGTH.document)),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.string())
-    .mutation(async ({ args: { messageId, messageRole, selectedText, threadId }, ctx: context }) => {
+    .mutation(async ({ args: { messageId, messageRole, selectedText, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
         const { now } = context;
+
+        const thread = await context.db.get(threadId as Id<"threads">);
+
+        if (thread && isThreadLocked(thread)) {
+            throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }));
+        }
+
         const pinId = await context.db.insert("threadPins", {
             createdAt: now,
             messageId,

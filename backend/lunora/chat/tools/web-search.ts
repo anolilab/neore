@@ -12,6 +12,7 @@ import { EXA_API_KEY, PARALLEL_API_KEY, TAVILY_API_KEY } from "../../env";
 import { assertOk } from "../../lib/fetch-timeout";
 import { toolsLogger } from "../../lib/logger";
 import toonEncodeOutput from "./toon-encode";
+import { filterBlockedResults, filterIncludeDomains, mergeExcludeDomains } from "./search-domains";
 import { deduplicateByDomainAndUrl, fetchWithTimeout, formatError, withRetry } from "./utilities";
 
 export interface WebSearchResult {
@@ -227,7 +228,28 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
 
         const { excludeDomains, includeDomains, maxResults = depth.defaultMaxResults, provider = "auto", queries: rawQueries, topic = "general" } = input;
         const queries = rawQueries.slice(0, depth.maxQueries);
-        const domainFilter = includeDomains?.length || excludeDomains?.length ? { excludeDomains, includeDomains } : undefined;
+
+        // The user's blocklist always wins over the model's domain arguments. It is
+        // read here, not carried on the ctx, so every run path (chat, resumed
+        // approvals, group, headless) gets it, and a failed read throws: no
+        // unfiltered search.
+        const blocklist = context.userId ? await context.runQuery(internal.auth.functions.getSearchDomainBlocklistQuery, { userId: context.userId }) : [];
+        const keptIncludes = includeDomains?.length ? filterIncludeDomains(includeDomains, blocklist) : undefined;
+
+        // Every include was blocked: searching with no include list would search the whole web.
+        if (includeDomains?.length && keptIncludes?.length === 0) {
+            return {
+                results: queries.map((query) => {
+                    return { query, results: [] };
+                }),
+                totalResults: 0,
+            };
+        }
+
+        const domainFilter =
+            keptIncludes?.length || excludeDomains?.length || blocklist.length > 0
+                ? { excludeDomains: mergeExcludeDomains(excludeDomains, blocklist), includeDomains: keptIncludes }
+                : undefined;
 
         // Lazy fetch user's Tavily key (BYOK), fall back to env key
         let userTavilyKey: string | undefined;
@@ -286,7 +308,8 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
                     shouldRetry: isPaidSearchRetryable,
                 });
 
-                return { query, results: deduplicateByDomainAndUrl(results) };
+                // Post-filter too: a provider may ignore `exclude_domains`, and `parallel` takes none.
+                return { query, results: deduplicateByDomainAndUrl(filterBlockedResults(results, blocklist)) };
             } catch (error) {
                 toolsLogger.error(`Search failed for query "${query}":`, formatError(error));
 

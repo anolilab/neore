@@ -49,6 +49,8 @@ export const latestResumableThread = liteAuthQuery
                             { OR: [{ deleted: { isNull: true } }, { deleted: false }] },
                             { OR: [{ status: { isNull: true } }, { status: { ne: "archived" } }] },
                             { OR: [{ isTemporary: { isNull: true } }, { isTemporary: false }] },
+                            // A locked chat is not resumed: its proof is what opens it.
+                            { lockedAt: { isNull: true } },
                             // Same team scope as the sidebar: without an active team, team threads are included.
                             ...(args.teamId === undefined ? [] : [{ teamId: args.teamId }]),
                         ],

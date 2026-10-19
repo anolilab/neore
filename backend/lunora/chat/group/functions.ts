@@ -159,7 +159,7 @@ export const listGroupCandidates = authQuery
  * listed so it can be removed, and does not speak.
  */
 export const getGroupChat = authQuery
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(
         v.union(
             v.null(),
@@ -181,8 +181,8 @@ export const getGroupChat = authQuery
             }),
         ),
     )
-    .query(async ({ args: { threadId }, ctx }) => {
-        const access = await resolveThreadReadAccess(ctx, threadId, ctx.user.userId);
+    .query(async ({ args: { threadId, unlockProof }, ctx }) => {
+        const access = await resolveThreadReadAccess(ctx, threadId, ctx.user.userId, unlockProof);
 
         if (access?.kind !== "full" || !access.thread.groupChat || access.thread.groupChat.participants.length === 0) {
             return null;
@@ -440,10 +440,10 @@ export const updateGroupChat = authMutation
  */
 export const stopGroupTurn = authMutation
     .use(rateLimit("chat/update"))
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.null())
-    .mutation(async ({ args: { threadId }, ctx }) => {
-        const access = await resolveThreadReadAccess(ctx, threadId, ctx.user.userId);
+    .mutation(async ({ args: { threadId, unlockProof }, ctx }) => {
+        const access = await resolveThreadReadAccess(ctx, threadId, ctx.user.userId, unlockProof);
 
         if (access?.kind !== "full" || access.permission === "read") {
             throw new LunoraError("FORBIDDEN", "Not allowed to stop this conversation");

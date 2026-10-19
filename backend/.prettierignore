@@ -8,3 +8,5 @@ lunora/.lunora-schema.json
 lunora.advisor.map.json
 .lunora/
 .wrangler/
+# Recorded share pages: their inline scripts are captured bytes, not source to reformat.
+lunora/chat-import/lib/fixtures/

@@ -1,5 +1,5 @@
 import type { Infer } from "lunorash/server";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
@@ -9,8 +9,22 @@ import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "
  * Migrated from `@neore/backend-agent` component.
  */
 import { assert } from "../lib/error-helpers";
-import { meetsThreadPermission, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
 import { withoutUndefined } from "../lib/patch";
+import { isThreadLocked } from "../lib/thread-lock";
+import { meetsThreadPermission, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
+
+/**
+ * A locked chat is owner-only and is not shared: no grant or invite is written for it.
+ * Read through `ctx.db`: these are internal mutations, which see every row.
+ */
+const refuseGrantOnLockedThread = async (ctx: Pick<QueryContext, "db">, threadId: Id<"threads">): Promise<void> => {
+    const thread = await ctx.db.get(threadId);
+
+    if (thread && isThreadLocked(thread)) {
+        throw new LunoraError("BAD_REQUEST", "A locked chat cannot be shared. Unlock it first.");
+    }
+};
+
 // Thread Access Functions — internal only; use chat/sharing.ts for auth-gated client APIs
 export const getThreadAccess = internalQuery
     .input({
@@ -108,6 +122,8 @@ export const createThreadAccess = internalMutation
     })
     .output(v.id("threadAccess"))
     .mutation(async ({ args, ctx }) => {
+        await refuseGrantOnLockedThread(ctx, args.threadId);
+
         const insertedId = await ctx.db.insert("threadAccess", {
             expiresAt: args.expiresAt,
             grantedAt: ctx.now,
@@ -294,6 +310,8 @@ export const createThreadInvite = internalMutation
     })
     .output(v.id("threadInvites"))
     .mutation(async ({ args, ctx }) => {
+        await refuseGrantOnLockedThread(ctx, args.threadId);
+
         const insertedId = await ctx.db.insert("threadInvites", {
             expiresAt: args.expiresAt,
             invitedBy: args.invitedBy,

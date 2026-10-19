@@ -24,6 +24,7 @@ import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { servesUser } from "../lib/shard-context";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { isPushConfigured } from "./push-config";
+import { linksToLockedThread, redactForLockedThread } from "./locked-link";
 import type { vNotificationInput } from "./validators";
 
 export type NotificationInput = Infer<typeof vNotificationInput>;
@@ -72,7 +73,10 @@ export const normalizeNotification = (input: NotificationInput) => {
  * is being deleted. Never throws for a
  * duplicate; a notification must not fail the work it reports on.
  */
-export const notify = async (ctx: MutationCtx, input: NotificationInput): Promise<Id<"notifications"> | null> => {
+export const notify = async (ctx: MutationCtx, rawInput: NotificationInput): Promise<Id<"notifications"> | null> => {
+    // A chat that is locked by now is named, never titled, wherever the row lands.
+    const input = (await linksToLockedThread(ctx.db, rawInput.link)) ? redactForLockedThread(rawInput) : rawInput;
+
     if (!servesUser(input.userId)) {
         await runAfterOnShard(ctx.scheduler, 0, internal.notifications.functions.createNotification, { ...input }, input.userId);
 

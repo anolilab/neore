@@ -35,6 +35,7 @@ import type { Query, QueryCacheNotifyEvent, QueryClient, QueryKey } from "@tanst
 
 import { Entry, NO_VALUE } from "./live-query-entry";
 import { resetShardRegistry } from "./shard-routing";
+import { forgetAllUnlockProofs } from "./unlock-proofs";
 import type { WsTicketMinter } from "./ws-ticket";
 
 export { FIRST_VALUE_TIMEOUT_MS } from "./live-query-entry";
@@ -177,6 +178,8 @@ export class LiveQueryManager {
             subject = next;
             // Another user's grants are not this one's: shared objects re-resolve.
             resetShardRegistry();
+            // Nor are another user's unlocked chats (`unlock-proofs.ts`).
+            forgetAllUnlockProofs();
             // A NEW function identity is what makes `setWsToken` close the open
             // sockets; the client resends every subscription on reconnect.
             this.client.setWsToken(this.wsTokenProvider());

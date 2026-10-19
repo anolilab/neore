@@ -154,6 +154,7 @@ for a schema table that is neither policed nor listed:
 | `admin_cleanup.previewCleanup` | query | adminQuery | cleanupConfigs | admin role | ok |
 | `admin_cleanup.updateCleanupConfig` | mutation | adminMutation | cleanupConfigs | admin role | ok |
 | `admin_gateway_analytics.getGatewayAnalytics` | action | adminAction | — | admin role | ok |
+| `agent_branches.editAssistantReply` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `agent_branches.switchBranch` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `agent_document_history.getVersion` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
 | `agent_document_history.listVersions` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
@@ -168,6 +169,11 @@ for a schema table that is neither policed nor listed:
 | `agent_projects.listThreadsByProject` | query | query | projects | identity (self-resolved); row.userId == caller | ok |
 | `agent_streams.list` | query | query | threads | thread access (owner/grant) | **fixed** (medium) — `isPublic` no longer grants raw stream rows |
 | `agent_streams.listDeltas` | query | query | streamingMessages, threads | thread access (owner/grant) | **fixed** (medium) — `isPublic` no longer grants raw deltas |
+| `agent_thread_lock.changeThreadPasscode` | mutation | authMutation | threadPasscodes, threads | owner only (`requireOwnedThreadIgnoringLock`); identity (self-resolved); rate limit `threadLock/unlock`; current passcode verified, failures counted on the row | ok — a wrong passcode is a result, so the failure count commits |
+| `agent_thread_lock.enableThreadLock` | mutation | authMutation | threadPasscodes, threads, threadAccess | owner only; refuses a shared or public chat; rate limit `threadLock/unlock` | ok — the passcode is hashed (PBKDF2-SHA256, 600k, per-row salt) and never stored |
+| `agent_thread_lock.lockThread` | mutation | authMutation | threadPasscodes, threads | owner only; rotates the epoch so every outstanding proof stops working | ok |
+| `agent_thread_lock.removeThreadPasscode` | mutation | authMutation | threadPasscodes, threads | owner only; needs the passcode; rate limit `threadLock/unlock` | ok |
+| `agent_thread_lock.unlockThread` | mutation | authMutation | threadPasscodes, threads | owner only; rate limit `threadLock/unlock`; per-chat backoff from the 5th failure, capped at 1 h | ok — returns a 30-minute proof bound to the current epoch |
 | `agent_threads.getChildThreads` | query | query | threadRelationships, threads | identity (self-resolved); row.userId == caller | ok |
 | `agent_threads.getTemporaryThread` | query | query | temporaryThreads, threads | identity (self-resolved); row.userId == caller | ok |
 | `agent_threads.getTemporaryThreads` | query | query | — | identity (self-resolved); row.userId == caller | ok |
@@ -273,6 +279,7 @@ for a schema table that is neither policed nor listed:
 | `chat_custom_providers.probeCustomProvider` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_custom_providers.saveCustomProvider` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok |
 | `chat_functions.abortStreamByMessageId` | mutation | authMutation | threads | thread access (owner/grant) | ok |
+| `chat_functions.abortThreadStream` | mutation | authMutation + RL | threads | thread access (owner/grant, write) | ok |
 | `chat_functions.branchThread` | action | authAction + RL | threads | row.userId == caller | ok |
 | `chat_functions.continueThread` | action | authAction + RL | threads | thread access (owner/grant) | accepted — rate-limited; advisor: no maxOutputTokens bound |
 | `chat_functions.convertTemporaryToPermanent` | mutation | authMutation + RL | threads | row.userId == caller | ok |

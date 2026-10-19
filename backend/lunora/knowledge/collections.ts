@@ -26,6 +26,7 @@ import { getMemberByOrganizationAndUser, getMembersByUserId } from "../auth/lib/
 import { callOnShard } from "../lib/cross-shard";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
+import { isThreadLocked } from "../lib/thread-lock";
 import { DELETING_STATUS } from "./file-removal";
 import { canReadCollection, planRetrievalScope } from "./scope";
 import { MAX_LENGTH } from "../lib/validators";
@@ -336,12 +337,12 @@ const describeLinks = async (db: Db, links: Doc<"knowledgeCollectionLinks">[], u
 /** Thread links belong to the thread's OWNER, as file links do (`attachToThread`). */
 export const attachCollectionToThread = authMutation
     .use(rateLimit("knowledge/add"))
-    .input({ collectionId: v.id("knowledgeCollections"), threadId: v.id("threads") })
+    .input({ collectionId: v.id("knowledgeCollections"), threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.object({ alreadyAttached: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const { userId } = ctx.user;
 
-        await requireOwnedThread(ctx, args.threadId, userId);
+        await requireOwnedThread(ctx, args.threadId, userId, args.unlockProof);
         await requireReadableCollection(ctx, args.collectionId);
 
         const existing = await ctx.db
@@ -362,10 +363,10 @@ export const attachCollectionToThread = authMutation
 
 export const detachCollectionFromThread = authMutation
     .use(rateLimit("knowledge/remove"))
-    .input({ collectionId: v.id("knowledgeCollections"), threadId: v.id("threads") })
+    .input({ collectionId: v.id("knowledgeCollections"), threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await requireOwnedThread(ctx, args.threadId, ctx.user.userId);
+        await requireOwnedThread(ctx, args.threadId, ctx.user.userId, args.unlockProof);
 
         const links = await ctx.db
             .query("knowledgeCollectionLinks")
@@ -381,10 +382,10 @@ export const detachCollectionFromThread = authMutation
 
 /** Collections attached to a thread, for anyone who may read it (as `getThreadKnowledge`). */
 export const getThreadCollections = authQuery
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.array(vLinkedCollection))
     .query(async ({ args, ctx }) => {
-        const { thread } = await requireThreadPermission(ctx, args.threadId, ctx.user.userId, "read");
+        const { thread } = await requireThreadPermission(ctx, args.threadId, ctx.user.userId, "read", args.unlockProof);
         const links = await ctx.db
             .query("knowledgeCollectionLinks")
             .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
@@ -581,6 +582,13 @@ export const resolveRetrievalScope = internalQuery
     )
     .query(async ({ args: { threadId, userId }, ctx }) => {
         const thread = await ctx.db.get(threadId);
+
+        // A locked chat's attachments are its content: the search falls back to
+        // nothing (an explicit, empty scope), not to the whole knowledge base.
+        if (thread && isThreadLocked(thread)) {
+            return { fileIds: [], foreign: [], hasExplicitScope: true };
+        }
+
         const projectId = thread?.projectId ?? null;
         const [threadFileLinks, threadCollectionLinks, projectFileLinks, projectCollectionLinks] = await Promise.all([
             ctx.db

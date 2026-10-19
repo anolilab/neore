@@ -49,6 +49,7 @@ import {
     truncateResult,
 } from "./logic";
 import { vSubAgentRunStatus } from "./validators";
+import { isThreadLocked } from "../lib/thread-lock";
 
 type RunDoc = Doc<"subAgentRuns">;
 
@@ -313,7 +314,8 @@ export const attachChildThread = internalMutation
 const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promise<void> => {
     const thread = await ctx.db.get(run.parentThreadId as Id<"threads">);
 
-    if (!thread || thread.deleted || thread.userId !== run.userId) {
+    // A locked parent takes no background post: the result stays with the run, unread.
+    if (!thread || thread.deleted || thread.userId !== run.userId || isThreadLocked(thread)) {
         return;
     }
 

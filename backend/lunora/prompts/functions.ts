@@ -10,6 +10,8 @@ import type { Doc } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext, MutationCtx as MutationContext } from "../_generated/server";
 import { internalAction, internalQuery } from "../_generated/server";
 import { requireOwnedThread } from "../agent/thread-read-access";
+import { isLockedWithoutProof } from "../agent/thread-passcode";
+import { throwThreadLocked } from "../lib/thread-lock";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
 import getAgent from "../chat/lib/get-agent";
 import { gatewayFetch } from "../lib/services";
@@ -967,8 +969,9 @@ export const duplicatePrompt = authMutation
 export const getThreadVariables = authQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
-    .query(async ({ args: { threadId }, ctx }) => {
+    .query(async ({ args: { threadId, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
 
         const threadVariables = await ctx.db
@@ -985,6 +988,10 @@ export const getThreadVariables = authQuery
             throw new LunoraError("FORBIDDEN", "Not authorized to view these variables");
         }
 
+        if (await isLockedWithoutProof(ctx, threadId, unlockProof)) {
+            return throwThreadLocked();
+        }
+
         return threadVariables;
     });
 
@@ -995,10 +1002,11 @@ export const setThreadVariables = authMutation
     .use(rateLimit("prompts/update"))
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         variables: v.array(v.object({ name: v.string().max(MAX_LENGTH.short), value: v.string().max(MAX_LENGTH.document) })),
     })
     .output(v.string())
-    .mutation(async ({ args: { threadId, variables }, ctx }) => {
+    .mutation(async ({ args: { threadId, unlockProof, variables }, ctx }) => {
         const { userId } = ctx.user;
         const { now } = ctx;
 
@@ -1014,6 +1022,10 @@ export const setThreadVariables = authMutation
                 throw new LunoraError("FORBIDDEN", "Not authorized to update these variables");
             }
 
+            if (await isLockedWithoutProof(ctx, threadId, unlockProof)) {
+                throwThreadLocked();
+            }
+
             // Update existing
             await ctx.db.patch(existing._id, {
                 updatedAt: now,
@@ -1025,7 +1037,7 @@ export const setThreadVariables = authMutation
             return existing._id;
         }
 
-        await requireOwnedThread(ctx, threadId, userId);
+        await requireOwnedThread(ctx, threadId, userId, unlockProof);
 
         // Create new
         const id = await ctx.db.insert("threadVariables", {
@@ -1048,10 +1060,11 @@ export const updateThreadVariable = authMutation
     .input({
         name: v.string().max(MAX_LENGTH.short),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         value: v.string().max(MAX_LENGTH.document),
     })
     .output(v.string())
-    .mutation(async ({ args: { name, threadId, value }, ctx }) => {
+    .mutation(async ({ args: { name, threadId, unlockProof, value }, ctx }) => {
         const { userId } = ctx.user;
         const { now } = ctx;
 
@@ -1065,6 +1078,10 @@ export const updateThreadVariable = authMutation
             // Verify ownership
             if (existing.userId !== userId) {
                 throw new LunoraError("FORBIDDEN", "Not authorized to update these variables");
+            }
+
+            if (await isLockedWithoutProof(ctx, threadId, unlockProof)) {
+                throwThreadLocked();
             }
 
             // Update or add the variable
@@ -1087,7 +1104,7 @@ export const updateThreadVariable = authMutation
             return existing._id;
         }
 
-        await requireOwnedThread(ctx, threadId, userId);
+        await requireOwnedThread(ctx, threadId, userId, unlockProof);
 
         // Create new with single variable
         const id = await ctx.db.insert("threadVariables", {
@@ -1110,8 +1127,9 @@ export const deleteThreadVariable = authMutation
     .input({
         name: v.string().max(MAX_LENGTH.short),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
-    .mutation(async ({ args: { name, threadId }, ctx }) => {
+    .mutation(async ({ args: { name, threadId, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
         const { now } = ctx;
 
@@ -1127,6 +1145,10 @@ export const deleteThreadVariable = authMutation
         // Verify ownership
         if (existing.userId !== userId) {
             throw new LunoraError("FORBIDDEN", "Not authorized to delete these variables");
+        }
+
+        if (await isLockedWithoutProof(ctx, threadId, unlockProof)) {
+            throwThreadLocked();
         }
 
         // Remove the variable
@@ -1153,6 +1175,7 @@ export const applyThreadVariablesToPrompt = authQuery
     .input({
         promptId: v.id("prompts"),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         // `prompt: v.any()`, not `v.record(v.string(), v.any())`. The handler returns
@@ -1161,7 +1184,7 @@ export const applyThreadVariablesToPrompt = authQuery
         // describing "an object" and getting "a type nothing can be assigned to".
         v.object({ appliedContent: v.string(), originalContent: v.string(), prompt: v.any(), variables: v.record(v.string(), v.string()) }),
     )
-    .query(async ({ args: { promptId, threadId }, ctx }) => {
+    .query(async ({ args: { promptId, threadId, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
@@ -1184,6 +1207,10 @@ export const applyThreadVariablesToPrompt = authQuery
             .query("threadVariables")
             .withIndex("by_thread", (q) => q.eq("threadId", threadId))
             .first();
+
+        if (threadVariables?.userId === userId && (await isLockedWithoutProof(ctx, threadId, unlockProof))) {
+            throwThreadLocked();
+        }
 
         // Build values map from thread variables
         const values: Record<string, string> = {};

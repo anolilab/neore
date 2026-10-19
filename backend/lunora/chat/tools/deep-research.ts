@@ -19,6 +19,7 @@ import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { EXA_API_KEY, TAVILY_API_KEY } from "../../env";
 import { toolsLogger } from "../../lib/logger";
+import { filterBlockedResults } from "./search-domains";
 import { deduplicateByDomainAndUrl, fetchWithTimeout, isSafeUrl, truncateText, withRetry } from "./utilities";
 import type { WebSearchResult } from "./web-search";
 
@@ -292,8 +293,13 @@ Requirements:
         // Step 2: Execute parallel web searches
         toolsLogger.debug(`[DeepResearch] Step 2: Executing ${searchQueries.length} parallel searches...`);
 
+        // The user's web-search blocklist applies here too (see web-search.ts).
+        const blocklist = context.userId ? await context.runQuery(internal.auth.functions.getSearchDomainBlocklistQuery, { userId: context.userId }) : [];
+
         const searchPromises = searchQueries.map((query) =>
-            withRetry(() => researchSearch(query, resultsPerQuery), { maxRetries: 1 }).catch(() => [] as WebSearchResult[]),
+            withRetry(() => researchSearch(query, resultsPerQuery), { maxRetries: 1 })
+                .then((results) => filterBlockedResults(results, blocklist))
+                .catch(() => [] as WebSearchResult[]),
         );
 
         const searchResults = await Promise.all(searchPromises);

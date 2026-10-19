@@ -238,7 +238,9 @@ export const loadDailyBriefInputs = internalQuery
             ],
             // `recentThreads` is most-recently-updated first, so "touched since
             // the last brief" is its leading run.
-            threads: overview.recentThreads.filter((thread) => thread.updatedAt > since && thread.title).map((thread) => thread.title!),
+            threads: overview.recentThreads
+                .filter((thread) => thread.updatedAt > since && thread.title && thread.locked !== true)
+                .map((thread) => thread.title!),
         };
     });
 

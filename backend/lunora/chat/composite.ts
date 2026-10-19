@@ -29,6 +29,7 @@ import { type StepUsage, sumStepUsage } from "../agent/message-cost";
 import { type RedactedThread, redactThreadForPublicViewer, resolveThreadReadAccess, type ThreadPermission } from "../agent/thread-read-access";
 import { getThreadListDataBatchHandler, publicThread } from "../agent/threads";
 import { liteAuthQuery } from "../lib/crpc";
+import { throwThreadLocked } from "../lib/thread-lock";
 import { loadNsfwStatuses, type RedactedUIMessage, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import type { ThreadTagColor } from "./tags/logic";
 import { MAX_THREAD_TAGS_PER_USER } from "./tags/logic";
@@ -82,13 +83,18 @@ export const getThreadWithData = liteAuthQuery
     .input({
         messageOpts: v.optional(v.object({ cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()), numItems: v.number() })),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
-    .query(async ({ args: { messageOpts, threadId }, ctx: context }): Promise<ThreadWithDataResult> => {
+    .query(async ({ args: { messageOpts, threadId, unlockProof }, ctx: context }): Promise<ThreadWithDataResult> => {
         const { userId } = context.user;
 
         // Owner or live grantee: everything. A public thread read without a grant
         // is the redacted view — the same allow-list as the share page.
-        const access = await resolveThreadReadAccess(context, threadId, userId);
+        const access = await resolveThreadReadAccess(context, threadId, userId, unlockProof);
+
+        if (access?.kind === "locked") {
+            return throwThreadLocked();
+        }
 
         if (!access) {
             throw new LunoraError("FORBIDDEN", "Access denied to this thread");

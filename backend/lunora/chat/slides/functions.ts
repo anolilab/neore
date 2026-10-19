@@ -6,6 +6,8 @@ import type { QueryCtx as QueryContext } from "../../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../../lib/crpc";
 import { withoutUndefined } from "../../lib/patch";
 import { MAX_LENGTH } from "../../lib/validators";
+import { isThreadLocked } from "../../lib/thread-lock";
+import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
 
 /**
  * Presentations are owner-only. Every procedure here takes a presentation or
@@ -39,6 +41,24 @@ const requireOwnedSlide = async (context: Pick<QueryContext, "db">, slideId: Id<
 
     return slide;
 };
+/**
+ * A presentation generated in a locked chat is that chat's content. Refuses
+ * unless the caller holds a valid proof for the thread (owner) — or the thread is
+ * not locked at all.
+ */
+const requirePresentationUnlocked = async (
+    context: Pick<QueryContext, "db">,
+    presentation: Pick<Doc<"presentations">, "threadId">,
+    userId: string,
+    unlockProof: string | null | undefined,
+): Promise<void> => {
+    const thread = await context.db.get(presentation.threadId as Id<"threads">);
+
+    if (thread && isThreadLocked(thread)) {
+        throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId: presentation.threadId as Id<"threads">, unlockProof, userId }));
+    }
+};
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -46,6 +66,7 @@ const requireOwnedSlide = async (context: Pick<QueryContext, "db">, slideId: Id<
 export const getPresentation = authQuery
     .input({
         presentationId: v.id("presentations"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         v.object({
@@ -64,14 +85,18 @@ export const getPresentation = authQuery
             userId: v.string(),
         }),
     )
-    .query(
-        async ({ args: { presentationId }, ctx: context }) =>
-            await requireOwnedPresentation(context, presentationId as Id<"presentations">, context.user.userId),
-    );
+    .query(async ({ args: { presentationId, unlockProof }, ctx: context }) => {
+        const presentation = await requireOwnedPresentation(context, presentationId as Id<"presentations">, context.user.userId);
+
+        await requirePresentationUnlocked(context, presentation, context.user.userId, unlockProof);
+
+        return presentation;
+    });
 
 export const getThreadPresentations = authQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         v.array(
@@ -91,7 +116,7 @@ export const getThreadPresentations = authQuery
             }),
         ),
     )
-    .query(async ({ args: { threadId }, ctx: context }) => {
+    .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
         const presentations = await context.db
@@ -99,6 +124,13 @@ export const getThreadPresentations = authQuery
             .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", threadId as Id<"threads">))
             .order("desc")
             .collect();
+
+        // A locked chat's decks are its content: none are listed without its proof.
+        const thread = await context.db.get(threadId as Id<"threads">);
+
+        if (thread && isThreadLocked(thread) && (await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId })) !== "ok") {
+            return [];
+        }
 
         return presentations;
     });
@@ -124,21 +156,38 @@ const vGetGeneratingPresentationOutput = v.union(
 export const getGeneratingPresentation = authQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(vGetGeneratingPresentationOutput))
-    .query(async ({ args: { threadId }, ctx: context }): Promise<Infer<typeof vGetGeneratingPresentationOutput>> => {
+    .query(async ({ args: { threadId, unlockProof }, ctx: context }): Promise<Infer<typeof vGetGeneratingPresentationOutput>> => {
         const generating = await context.db
             .query("presentations")
             .withIndex("by_thread_and_status", (q) => q.eq("threadId", threadId as Id<"threads">).eq("status", "generating"))
             .order("desc")
             .first();
 
-        return generating?.userId === context.user.userId ? generating : null;
+        if (generating?.userId !== context.user.userId) {
+            return null;
+        }
+
+        // A generating deck in a locked chat is not shown without the proof.
+        const thread = await context.db.get(threadId as Id<"threads">);
+
+        if (
+            thread &&
+            isThreadLocked(thread) &&
+            (await threadGateOutcome(context, { level: "read", threadId: thread._id, unlockProof, userId: generating.userId })) !== "ok"
+        ) {
+            return null;
+        }
+
+        return generating;
     });
 
 export const getPresentationSlides = authQuery
     .input({
         presentationId: v.id("presentations"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         v.array(
@@ -154,8 +203,10 @@ export const getPresentationSlides = authQuery
             }),
         ),
     )
-    .query(async ({ args: { presentationId }, ctx: context }) => {
-        await requireOwnedPresentation(context, presentationId as Id<"presentations">, context.user.userId);
+    .query(async ({ args: { presentationId, unlockProof }, ctx: context }) => {
+        const presentation = await requireOwnedPresentation(context, presentationId as Id<"presentations">, context.user.userId);
+
+        await requirePresentationUnlocked(context, presentation, context.user.userId, unlockProof);
 
         const slides = await context.db
             .query("presentationSlides")
@@ -183,14 +234,19 @@ export const createPresentation = authMutation
         threadId: v.id("threads"),
         title: v.string().max(MAX_LENGTH.long),
         totalSlides: v.optional(v.number()),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ presentationId: v.string() }))
-    .mutation(async ({ args: { description, lastCompletedSlide, name, status, styleName, threadId, title, totalSlides }, ctx: context }) => {
+    .mutation(async ({ args: { description, lastCompletedSlide, name, status, styleName, threadId, title, totalSlides, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
         const thread = await context.db.get(threadId as Id<"threads">);
 
         if (!thread || thread.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Thread not found");
+        }
+
+        if (isThreadLocked(thread)) {
+            throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId: thread._id, unlockProof, userId }));
         }
 
         const { now } = context;
@@ -220,10 +276,13 @@ export const createSlide = authMutation
         presentationId: v.id("presentations"),
         slideNumber: v.number(),
         title: v.string().max(MAX_LENGTH.long),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ slideId: v.string() }))
-    .mutation(async ({ args: { htmlContent, presentationId, slideNumber, title }, ctx: context }) => {
-        await requireOwnedPresentation(context, presentationId as Id<"presentations">, context.user.userId);
+    .mutation(async ({ args: { htmlContent, presentationId, slideNumber, title, unlockProof }, ctx: context }) => {
+        const presentation = await requireOwnedPresentation(context, presentationId as Id<"presentations">, context.user.userId);
+
+        await requirePresentationUnlocked(context, presentation, context.user.userId, unlockProof);
 
         const { now } = context;
 
@@ -269,10 +328,16 @@ export const updateSlide = authMutation
         htmlContent: v.optional(v.string().max(MAX_LENGTH.document)),
         slideId: v.string().max(MAX_LENGTH.id),
         title: v.optional(v.string().max(MAX_LENGTH.long)),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ success: v.boolean() }))
-    .mutation(async ({ args: { htmlContent, slideId, title }, ctx: context }) => {
+    .mutation(async ({ args: { htmlContent, slideId, title, unlockProof }, ctx: context }) => {
         const slide = await requireOwnedSlide(context, slideId as Id<"presentationSlides">, context.user.userId);
+        const slidePresentation = await context.db.get(slide.presentationId);
+
+        if (slidePresentation) {
+            await requirePresentationUnlocked(context, slidePresentation, context.user.userId, unlockProof);
+        }
 
         const { now } = context;
         const patch: { htmlContent?: string; title?: string; updatedAt: number } = { updatedAt: now };

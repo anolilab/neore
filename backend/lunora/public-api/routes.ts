@@ -54,6 +54,7 @@ import type { StreamSource } from "./stream";
 import { collectStream, pollStream, toNdjsonStream } from "./stream";
 import { shardContext } from "../lib/http-shard";
 import { threadShardFor } from "../lib/thread-shard";
+import { isThreadLocked, THREAD_LOCKED_CODE } from "../lib/thread-lock";
 
 export interface RouteInput {
     body: unknown;
@@ -207,6 +208,23 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
     }
 
     return { data: { messageId: body.messageId, streamId: body.streamId, streamToken: body.streamToken, threadId: body.threadId }, status: 202 };
+};
+
+/**
+ * API keys have no unlock path, so a locked thread is NOT FOUND to them: a
+ * procedure that refuses it with THREAD_LOCKED becomes the same answer as a
+ * missing thread, and no title or content leaves through the public API.
+ */
+const notFoundIfLocked = async <T>(read: () => Promise<T>): Promise<T> => {
+    try {
+        return await read();
+    } catch (error) {
+        if ((error as { data?: { code?: string } } | null)?.data?.code === THREAD_LOCKED_CODE) {
+            throw new PublicApiError("not_found", "Thread not found.");
+        }
+
+        throw error;
+    }
 };
 
 const toThread = (thread: {
@@ -376,6 +394,13 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
 
             // The stream lives on the thread's shard — the key owner's own, or the
             // owner of a thread shared with them.
+            // A key cannot unlock a thread, so a stream of a locked one is not found here.
+            const streamThread = await notFoundIfLocked(() => input.ctx.runQuery(api.chat.functions.getThread, { threadId: token.threadId as Id<"threads"> }));
+
+            if (!streamThread || isThreadLocked(streamThread)) {
+                throw new PublicApiError("not_found", "Stream not found or expired.");
+            }
+
             const shardKey = await threadShardFor(input.ctx, token.userId, token.threadId);
 
             const events = pollStream(streamSourceFor(shardContext(input.ctx, shardKey), token.streamId), {
@@ -403,7 +428,12 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
                 paginationOpts: { cursor: decodeNativeCursor(query["cursor"]), numItems: parseLimit(query["limit"]) },
             });
 
-            return { data: { data: page.page.map((thread) => toThread(thread)), nextCursor: encodeNativeCursor(page.continueCursor, page.isDone) } };
+            return {
+                data: {
+                    data: page.page.filter((thread) => !isThreadLocked(thread)).map((thread) => toThread(thread)),
+                    nextCursor: encodeNativeCursor(page.continueCursor, page.isDone),
+                },
+            };
         },
         method: "get",
         operationId: "listThreads",
@@ -416,11 +446,13 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
     },
     {
         handler: async (input) => {
-            const thread = await input.ctx.runQuery(api.chat.functions.getThread, { threadId: idParameter(input, "threadId") as Id<"threads"> });
+            const thread = await notFoundIfLocked(() =>
+                input.ctx.runQuery(api.chat.functions.getThread, { threadId: idParameter(input, "threadId") as Id<"threads"> }),
+            );
 
             // `getThread` answers null for missing AND for not-yours; so does this.
-            // A redacted (public, someone else's) thread carries no `userId`.
-            if (!thread?.userId || thread.userId !== input.identity.userId) {
+            // A redacted (public, someone else's) thread carries no `userId`. A locked one is not reachable from a key.
+            if (!thread?.userId || thread.userId !== input.identity.userId || isThreadLocked(thread)) {
                 throw new PublicApiError("not_found", "Thread not found.");
             }
 
@@ -451,10 +483,12 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
     {
         description: "Newest first. A branched thread lists only its active path, as in the app.",
         handler: async (input) => {
-            const page = await input.ctx.runQuery(api.chat.functions.getThreadUIMessages, {
-                paginationOpts: { cursor: decodeNativeCursor(input.query["cursor"]), numItems: parseLimit(input.query["limit"]) },
-                threadId: idParameter(input, "threadId") as Id<"threads">,
-            });
+            const page = await notFoundIfLocked(() =>
+                input.ctx.runQuery(api.chat.functions.getThreadUIMessages, {
+                    paginationOpts: { cursor: decodeNativeCursor(input.query["cursor"]), numItems: parseLimit(input.query["limit"]) },
+                    threadId: idParameter(input, "threadId") as Id<"threads">,
+                }),
+            );
 
             return {
                 data: {

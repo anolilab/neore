@@ -277,14 +277,15 @@ export const moveThreadToProject = authMutation
     .input({
         projectId: v.optional(v.id("projects")),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ success: v.boolean() }))
-    .mutation(async ({ args: { projectId, threadId }, ctx: context }) => {
+    .mutation(async ({ args: { projectId, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
         // Fetch thread and project in parallel for better performance
         const [, project] = await Promise.all([
-            requireOwnedThread(context, threadId as Id<"threads">, userId),
+            requireOwnedThread(context, threadId as Id<"threads">, userId, unlockProof),
             projectId ? context.runQuery(api.agent.projects.getProject, { projectId: projectId as Id<"projects"> }) : Promise.resolve(null),
         ]);
 

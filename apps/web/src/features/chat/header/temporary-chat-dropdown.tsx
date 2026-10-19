@@ -42,6 +42,7 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
     const { mutateAsync: makeThreadTemporary } = useMutation(crpc.chat.functions.makeThreadTemporary.mutationOptions());
     const { mutateAsync: convertToPermanent } = useMutation(crpc.chat.functions.convertTemporaryToPermanent.mutationOptions());
     const setPendingSettings = useModelStore((state) => state.setPendingSettings);
+    const pendingTemporaryChat = useModelStore((state) => state.pendingSettings?.isTempChat);
 
     const [retentionHours, setRetentionHours] = useState(defaultRetentionHours);
     const [open, setOpen] = useState(false);
@@ -49,6 +50,8 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
 
     const isExistingThread = !!threadId;
     const isTemporary = temporaryStatus?.isTemporary === true;
+    // A chat not yet started is temporary when the dropdown said so, else when the user's default says so.
+    const nextChatTemporary = !isExistingThread && (pendingTemporaryChat ?? userSettings?.newChatsTemporary === true);
 
     const settingsRetentionHours = userSettings?.temporaryChatRetentionHours;
     const statusRetentionHours = temporaryStatus?.retentionHours;
@@ -240,6 +243,10 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
             return t`Enable auto-delete for this conversation.`;
         }
 
+        if (nextChatTemporary) {
+            return t`Your next chat is temporary. Turn this off in Settings to keep it.`;
+        }
+
         return t`Your next message will start a self-destructing chat.`;
     };
 
@@ -251,7 +258,11 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
                         render={
                             <PopoverTrigger
                                 render={
-                                    <Button className={cn(className, isTemporary && "text-orange-500 hover:text-orange-600")} size="icon" variant="ghost">
+                                    <Button
+                                        className={cn(className, (isTemporary || nextChatTemporary) && "text-orange-500 hover:text-orange-600")}
+                                        size="icon"
+                                        variant="ghost"
+                                    >
                                         <HourglassIcon className="size-4" />
                                     </Button>
                                 }

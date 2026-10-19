@@ -40,6 +40,9 @@ const SYSTEM_DB_IMPORTERS = [
     "pages/functions.ts",
     // Existence, uniqueness and storage-ownership decisions about another user.
     "agent/display-media.ts",
+    // Decisions only: a lock check drops rows the caller already passed RLS for; the proof check reads a passcode row to verify it.
+    "agent/messages.ts",
+    "agent/thread-passcode.ts",
     "chat/functions.ts",
     "lib/stored-url-fields.ts",
     "skills/validators.ts",

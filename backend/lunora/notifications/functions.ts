@@ -10,6 +10,7 @@ import type { QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { notify } from "./notify";
+import { linksToLockedThread, redactForLockedThread } from "./locked-link";
 import { notificationInputFields, vNotificationView } from "./validators";
 
 /** Rows the bell lists: the newest, read or not. */
@@ -59,7 +60,16 @@ export const getNotificationInbox = authQuery
             loadUnread(ctx, userId, UNREAD_COUNT_CAP),
         ]);
 
-        return { items: recent.page.map((row) => toNotificationView(row)), unreadCount: unread.length };
+        // Rows written before a chat was locked still carry its title: redact them here too.
+        const items = await Promise.all(
+            recent.page.map(async (row) => {
+                const view = toNotificationView(row);
+
+                return (await linksToLockedThread(ctx.db, row.link)) ? redactForLockedThread(view) : view;
+            }),
+        );
+
+        return { items, unreadCount: unread.length };
     });
 
 export const markNotificationRead = authMutation

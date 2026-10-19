@@ -11,7 +11,7 @@ import { findPendingApprovalOnLatestTurn } from "../chat/lib/tool-approval-claim
 import schema from "../schema";
 import type { BranchTree } from "./branch-tree";
 import { buildBranchTree, continuationOrder, resolveActivePath } from "./branch-tree";
-import { getForkContextIds, listActivePathPage, resolveForkEnd } from "./branches";
+import { editAssistantReplyHandler, getForkContextIds, listActivePathPage, resolveForkEnd } from "./branches";
 import { addMessagesHandler, cloneMessageBatch, getMaxMessage } from "./messages";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -359,5 +359,99 @@ describe("listActivePathPage past 25 rows", () => {
         expect(pinned.page).toHaveLength(6);
         expect(pinned.page.slice(1).map((row: { _id: string }) => row._id)).toStrictEqual(first.page.map((row: { _id: string }) => row._id));
         expect(pinned.continueCursor).toBe(first.continueCursor);
+    });
+});
+
+describe("editing an assistant reply in place", () => {
+    const toolCall = { input: {}, toolCallId: "c1", toolName: "search", type: "tool-call" };
+
+    beforeEach(async () => {
+        // A branched thread: replies rA and rB both answer u3, and share its
+        // order 3. rA is the displayed one; rB is its sibling, off the path.
+        await insertRow("u3", 2, 0, { content: "question", role: "user" });
+        await insertRow("rA0", 3, 0, { content: [{ text: "Let me check.", type: "text" }, toolCall], role: "assistant" }, { parentMessageId: ids.u3 });
+        await insertRow(
+            "rA1",
+            3,
+            1,
+            { content: [{ output: { type: "text", value: "hits" }, toolCallId: "c1", toolName: "search", type: "tool-result" }], role: "tool" },
+            { tool: true },
+        );
+        await insertRow(
+            "rA2",
+            3,
+            2,
+            {
+                content: [
+                    { text: "Answer A.", type: "text" },
+                    { image: "storage:key", type: "image" },
+                ],
+                role: "assistant",
+            },
+            { text: "Answer A." },
+        );
+        await insertRow("rB0", 3, 3, { content: [{ text: "Answer B.", type: "text" }], role: "assistant" }, { parentMessageId: ids.u3 });
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { activeLeafMessageId: ids.rA2 }));
+    });
+
+    const edit = async (messageId: string, text: string, userId = OWNER) =>
+        await harness.run(async (ctx: any) => await editAssistantReplyHandler(ctx, { messageId, text, threadId: threadId as never, userId }));
+
+    const byId = async () => {
+        const rows = await allRows();
+
+        return new Map(rows.map((row) => [row._id, row]));
+    };
+
+    const idOf = (name: string): string => {
+        const id = ids[name];
+
+        if (!id) {
+            throw new Error(`no fixture row ${name}`);
+        }
+
+        return id;
+    };
+
+    it("rewrites the displayed reply, keeps the sibling and the tool and media parts, and adds no row", async () => {
+        const before = await byId();
+
+        await edit(ids.rA0 as string, "Revised answer.");
+
+        const after = await byId();
+
+        expect(after.size).toBe(before.size);
+        expect(after.get(idOf("rA2"))).toMatchObject({
+            message: {
+                content: [
+                    { text: "Revised answer.", type: "text" },
+                    { image: "storage:key", type: "image" },
+                ],
+                role: "assistant",
+            },
+            text: "Revised answer.",
+        });
+        expect(after.get(idOf("rA0"))).toMatchObject({ message: { content: [toolCall] } });
+        expect(after.get(idOf("rA1"))).toStrictEqual(before.get(idOf("rA1")));
+        expect(after.get(idOf("rB0"))).toStrictEqual(before.get(idOf("rB0")));
+        expect(after.get(idOf("rA2"))?.parentMessageId).toBe(before.get(idOf("rA2"))?.parentMessageId);
+    });
+
+    it("writes nothing when the same text is saved again", async () => {
+        await edit(ids.rA0 as string, "Revised answer.");
+
+        const once = await allRows();
+
+        await edit(ids.rA0 as string, "Revised answer.");
+
+        expect(await allRows()).toStrictEqual(once);
+    });
+
+    it("refuses another user's thread", async () => {
+        await expect(edit(ids.rA0 as string, "Hijacked.", "someone-else")).rejects.toThrow();
+    });
+
+    it("refuses a sibling reply that is not on the displayed path", async () => {
+        await expect(edit(ids.rB0 as string, "Off path.")).rejects.toThrow();
     });
 });

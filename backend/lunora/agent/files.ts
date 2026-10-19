@@ -10,8 +10,9 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx as MutationContext } from "../_generated/server";
 import { checkThreadAccessBatchHandler } from "./threads";
+import { isLockedWithoutProof } from "./thread-passcode";
 import { paginatedDocsOf } from "../lib/output-validators";
-import { paginationOptionsValidator } from "../lib/validators";
+import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { ownedStorageKeys } from "../lib/storage-ownership";
 
@@ -144,6 +145,7 @@ export const getFileForUser = internalQuery
     .input({
         fileId: v.id("chatFiles"),
         threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         userId: v.string(),
     })
     // Spelled inline: codegen cannot read `docOf(...)` (a call), and the
@@ -179,6 +181,12 @@ export const getFileForUser = internalQuery
             : null;
 
         if (!file) {
+            return null;
+        }
+
+        // A file read in a locked thread is that thread's content: refused before
+        // the grant shortcut below, which would otherwise return it.
+        if (args.threadId && (await isLockedWithoutProof(ctx, args.threadId, args.unlockProof))) {
             return null;
         }
 

@@ -23,7 +23,7 @@ Most commonly used shortcuts:
 
 ## All Global Shortcuts
 
-These fire anywhere in the app (except while you are typing in a text field).
+These fire anywhere in the app (except while you are typing in a text field), with one exception: Copy Last Code Block also works from the composer.
 
 ### Navigation
 
@@ -54,6 +54,7 @@ These fire anywhere in the app (except while you are typing in a text field).
 | `Ctrl+N` / `Cmd+N` | Create a new thread |
 | `Ctrl+Shift+N` / `Cmd+Shift+N` | Create a new temporary thread |
 | `Ctrl+Shift+R` / `Cmd+Shift+R` | Start / stop audio recording |
+| `Ctrl+Shift+X` / `Cmd+Shift+X` | Copy the last code block of the latest assistant reply |
 
 ### Search and help
 
@@ -76,11 +77,10 @@ Branching, pinning, archiving and deleting a thread are available from the
 | Archive / unarchive thread | Command palette, thread menu |
 | Delete thread | Command palette, thread menu |
 
-:::warning
-The command palette displays a key hint next to each of these four actions
-(`Ctrl+Shift+C`, `Ctrl+P`, `Ctrl+A`, `Ctrl+D`). Those hints are not yet wired up
-as global keystrokes — pressing the key on its own does nothing. Use the palette
-or the thread menu to run the action.
+:::note
+These four actions have no keyboard shortcut. Their old defaults (`Ctrl+P`,
+`Ctrl+A`, `Ctrl+D`) collide with the browser's print, select-all and bookmark
+keys, so run them from the palette or the thread menu.
 :::
 
 ## Command Palette
@@ -135,6 +135,7 @@ Some shortcuts can be rebound at **Settings → App → Keyboard Shortcuts**:
 |---|---|
 | New Chat | Arrow Up / Down, Home, End |
 | New Temporary Chat | Audio recording |
+| Copy last code block | |
 | Search | Thread actions (palette-driven) |
 | Left sidebar | |
 | Right sidebar | |

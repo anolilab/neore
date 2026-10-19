@@ -19,6 +19,7 @@ import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 const keyboardShortcutSchema = z.strictObject({
+    copyLastCodeBlock: z.string().optional(),
     escape: z.string().optional(),
     help: z.string().optional(),
     newChat: z.string().optional(),
@@ -33,6 +34,9 @@ type KeyboardShortcutForm = z.infer<typeof keyboardShortcutSchema>;
 // Get default shortcuts for descriptions
 const getDefaultShortcut = (key: string): string => {
     switch (key) {
+        case "copyLastCodeBlock": {
+            return `ctrl+shift+x`;
+        }
         case "help": {
             return `ctrl+/`;
         }
@@ -61,6 +65,7 @@ const KeyboardShortcutsSettings: FC = () => {
     const { t } = useLingui();
 
     const shortcutLabels = {
+        copyLastCodeBlock: t`Copy Last Code Block`,
         escape: t`Escape`,
         help: t`Help`,
         newChat: t`New Chat`,
@@ -71,6 +76,7 @@ const KeyboardShortcutsSettings: FC = () => {
     };
 
     const shortcutDescriptions = {
+        copyLastCodeBlock: t`Copy the last code block of the latest assistant reply (${formatShortcutForDisplay(getDefaultShortcut("copyLastCodeBlock"))})`,
         escape: t`Close dialogs and menus`,
         help: t`Show help dialog (${formatShortcutForDisplay(getDefaultShortcut("help"))})`,
         newChat: t`Start a new chat (${formatShortcutForDisplay(getDefaultShortcut("newChat"))})`,

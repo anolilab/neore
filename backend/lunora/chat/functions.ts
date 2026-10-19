@@ -33,7 +33,7 @@ import z from "zod/v4";
 import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
-import type { ActionCtx as ActionContext } from "../_generated/server";
+import type { ActionCtx as ActionContext, QueryCtx as QueryContext } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 // Types from their declaring modules rather than the `agent/client` barrel —
 // see the note in `chat/composite.ts` (since fixed; kept because it decouples
@@ -48,9 +48,11 @@ import {
     requireOwnedThread,
     requireThreadPermissionInAction,
     resolveThreadReadAccess,
-    admitOwnedThread,
+    type ThreadPermission,
 } from "../agent/thread-read-access";
 import { publicThread } from "../agent/threads";
+import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
+import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
@@ -83,7 +85,7 @@ import {
     falMaskField,
     falVideoOptionInput,
 } from "./lib/fal-reference-mapping";
-import { getAgentForUser, validateThreadAccess, validateThreadAccessWithData } from "./lib/thread-helpers";
+import { getAgentForUser } from "./lib/thread-helpers";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 
@@ -590,14 +592,31 @@ export const createThreadWithInitialMessage = internalMutation
         mode: v.optional(v.union(v.literal("text"), v.literal("image"), v.literal("video"))),
         model: v.string(),
         reasoningEffort: v.optional(v.number()),
+        /** Hours until expiry when `temporary`; the client sends a preset from the temporary-chat control. */
+        retentionHours: v.optional(v.number().check((value) => value >= 1 && value <= 168, { message: "Invalid retention" })),
         statelessMode: v.optional(v.boolean()),
+        temporary: v.optional(v.boolean()),
         /** A title known up front (a media prompt's); otherwise the default, replaced by `createTitleChat`. */
         title: v.optional(v.string()),
         userId: v.string(),
     })
     .mutation(
         async ({
-            args: { customSystemPrompt, enabledFeatures, fileIds, language, messageContent, mode, model, reasoningEffort, statelessMode, title, userId },
+            args: {
+                customSystemPrompt,
+                enabledFeatures,
+                fileIds,
+                language,
+                messageContent,
+                mode,
+                model,
+                reasoningEffort,
+                retentionHours,
+                statelessMode,
+                temporary,
+                title,
+                userId,
+            },
             ctx: context,
         }) => {
             const agent = await getAgentForUser(context, userId, model);
@@ -625,6 +644,21 @@ export const createThreadWithInitialMessage = internalMutation
                 threadId: threadId as Id<"threads">,
             });
 
+            // A composer chat created as temporary gets the same record as the temporary-chat control writes.
+            if (temporary) {
+                const userSettings = await context.db
+                    .query("userSettings")
+                    .withIndex("by_userId", (q) => q.eq("userId", userId))
+                    .unique();
+                const hours = retentionHours ?? userSettings?.temporaryChatRetentionHours ?? 24;
+
+                await context.runMutation(internal.agent.threads.createTemporaryThread, {
+                    expiresAt: context.now + hours * 60 * 60 * 1000,
+                    retentionHours: hours,
+                    threadId: threadId as Id<"threads">,
+                });
+            }
+
             // Save user message
             const messageMetadata = fileIds && fileIds.length > 0 ? { fileIds } : {};
             const result = await agent.saveMessage(context, {
@@ -645,6 +679,37 @@ export const createThreadWithInitialMessage = internalMutation
             };
         },
     );
+
+/**
+ * The lock-aware access answer for an ACTION, which has no `ctx.db`. Actions
+ * ask this, then throw through `throwUnlessGranted` (so the error reaches the
+ * client as THREAD_LOCKED and not as the runQuery wrapper of it).
+ */
+export const gateThreadActionHandler = async (
+    context: Pick<QueryContext, "db">,
+    args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
+): Promise<{ botId?: Id<"bots">; outcome: ThreadGateOutcome }> => {
+    const outcome = await threadGateOutcome(context, args);
+
+    if (outcome !== "ok") {
+        return { outcome };
+    }
+
+    // A bot thread runs on its bot's model, so a granted caller also learns which bot, if any.
+    const thread = await context.db.get(args.threadId);
+
+    return { botId: thread?.botId, outcome };
+};
+
+export const gateThreadAction = internalQuery
+    .input({
+        level: v.union(v.literal("read"), v.literal("write"), v.literal("admin")),
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        userId: v.string(),
+    })
+    .output(v.object({ botId: v.optional(v.id("bots")), outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")) }))
+    .query(async ({ args, ctx: context }) => await gateThreadActionHandler(context, args));
 
 export const getThreadTemporaryStatus = liteAuthQuery
     .input({
@@ -750,17 +815,16 @@ export const getThreadMessages = authQuery
             numItems: v.number(),
         }),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(paginatedOf(vMessageDoc))
-    .query(async ({ args: { model, paginationOpts, threadId }, ctx: context }): Promise<PaginationResult<MessageDoc>> => {
+    .query(async ({ args: { model, paginationOpts, threadId, unlockProof }, ctx: context }): Promise<PaginationResult<MessageDoc>> => {
         const { userId } = context.user;
 
-        // Run independent queries in parallel
-        // Note: Messages are now copied on branch creation, so no need for dynamic merging
-        const [, thread] = await Promise.all([
-            validateThreadAccess(context, threadId, userId, "read"),
-            context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }),
-        ]);
+        // Gate first: nothing below may read the thread's messages before it passes.
+        throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }), "Access denied to this thread");
+
+        const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
         const threadLanguage = thread?.language;
         const agent = await getAgentForUser(context, userId, model, threadLanguage);
@@ -790,8 +854,9 @@ export const getThreadUIMessages = liteAuthQuery
             numItems: v.number(),
         }),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
-    .query(async ({ args: { paginationOpts, threadId }, ctx: context }): Promise<PaginationResult<UIMessage>> => {
+    .query(async ({ args: { paginationOpts, threadId, unlockProof }, ctx: context }): Promise<PaginationResult<UIMessage>> => {
         const { userId } = context.user;
 
         // Cap numItems to prevent large fetches, ensure at least 1 (paginate rejects 0)
@@ -799,7 +864,7 @@ export const getThreadUIMessages = liteAuthQuery
 
         // Owner or live grantee: the full messages. A PUBLIC thread without a
         // grant: the share page's allow-list (`chat/lib/public-thread.ts`).
-        const access = await resolveThreadReadAccess(context, threadId, userId);
+        const access = await resolveThreadReadAccess(context, threadId, userId, unlockProof);
 
         if (!access) {
             // Existence only — past row-level security, which hides it either way.
@@ -808,16 +873,26 @@ export const getThreadUIMessages = liteAuthQuery
             return exists ? throwUnauthorized("Access denied to this thread") : throwThreadNotFound(threadId);
         }
 
+        // Owner without a valid proof: nothing of the messages, not even the redacted view.
+        if (access.kind === "locked") {
+            return throwThreadLocked();
+        }
+
         const { thread } = access;
 
         // A branched thread lists only its active path (`agent/branches.ts`);
         // `null` keeps every other thread on the direct index scan below.
         // `usePaginatedQuery` sends `endCursor: null` for an unbounded first page.
-        const pathPage = await listActivePathPage(context, thread, {
-            ...paginationOpts,
-            endCursor: paginationOpts.endCursor ?? undefined,
-            numItems: cappedNumberItems,
-        });
+        const pathPage = await listActivePathPage(
+            context,
+            thread,
+            {
+                ...paginationOpts,
+                endCursor: paginationOpts.endCursor ?? undefined,
+                numItems: cappedNumberItems,
+            },
+            unlockProof,
+        );
 
         // Fetch messages directly (bypasses all runQuery validator overhead)
         const rawMessages = pathPage
@@ -827,6 +902,7 @@ export const getThreadUIMessages = liteAuthQuery
                   paginationOpts: { ...paginationOpts, numItems: cappedNumberItems },
                   statuses: ["success", "pending", "failed"],
                   threadId: threadId as Id<"threads">,
+                  unlockProof,
               });
 
         // Transform to UIMessages (same as listUIMessages but without runQuery overhead)
@@ -895,17 +971,20 @@ export const continueThread = authAction
         model: v.string().max(MAX_LENGTH.short),
         prompt: v.string().max(MAX_LENGTH.text),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     // The handler returns a `Response`, whose inferred type drags DOM WebSocket
     // types into `_generated/` (which then fails to compile). Codegen renders a
     // `v.any()` output from the handler's return type, hence `Promise<unknown>`.
     .output(v.any())
-    .action(async ({ args: { model, prompt, threadId }, ctx: context }): Promise<unknown> => {
+    .action(async ({ args: { model, prompt, threadId, unlockProof }, ctx: context }): Promise<unknown> => {
         const { userId } = context.user;
 
-        // Use combined access check to get thread data in one call
-        // Using validateThreadAccessWithData eliminates a duplicate thread fetch
-        const { thread: threadData } = await validateThreadAccessWithData(context, threadId, userId, "write");
+        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "write", threadId, unlockProof, userId });
+
+        throwUnlessGranted(gateResult.outcome, "Write access denied to this thread");
+
+        const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
         const threadLanguage = threadData?.language;
 
         const agent = await getAgentForUser(context, userId, model, threadLanguage);
@@ -996,7 +1075,7 @@ export const getTemporaryThreads = authQuery
                 const expiresAt = expiresAtMap.get(thread._id);
 
                 return {
-                    ...thread,
+                    ...threadRowForList(thread),
                     expiresAt,
                 };
             });
@@ -1027,17 +1106,23 @@ export const getTemporaryThreads = authQuery
 export const getThread = optionalAuthQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     // `vThreadDoc` already carries every field but `_id`/`_creationTime`/`status`
     // as optional, so the redacted shape below fits it without a cast — and its
     // missing `userId` is what the thread page reads as "send this viewer to
     // /thread/$token".
     .output(v.from(v.union(vThreadDoc, v.null())))
-    .query(async ({ args: { threadId }, ctx: context }) => {
-        const access = await resolveThreadReadAccess(context, threadId, context.user?.userId);
+    .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
+        const access = await resolveThreadReadAccess(context, threadId, context.user?.userId, unlockProof);
 
         if (!access || access.thread.deleted) {
             return null;
+        }
+
+        // A locked thread without its proof is shown as the stub: the title is content.
+        if (access.kind === "locked") {
+            return threadRowForList(publicThread(access.thread));
         }
 
         // Anyone but the owner or a grantee sees a public thread only redacted —
@@ -1073,6 +1158,7 @@ export const getThreadsWithTemporaryFilter = internalQuery
                     isPublic: v.optional(v.boolean()),
                     isTemporary: v.optional(v.boolean()),
                     language: v.optional(v.string()),
+                    lockedAt: v.optional(v.number()),
                     mode: v.optional(v.string()),
                     model: v.optional(v.string()),
                     multiChat: v.optional(v.boolean()),
@@ -1094,19 +1180,21 @@ export const getThreadsWithTemporaryFilter = internalQuery
             ),
         }),
     )
-    .query(
-        async ({ args, ctx: context }) =>
-            // Pass excludeTemporary directly — listThreadsByUserId now filters
-            // isTemporary in its JS filter, eliminating the second runQuery call
-            await context.runQuery(api.agent.threads.listThreadsByUserId, {
-                excludeTemporary: args.excludeTemporary || undefined,
-                organizationId: args.organizationId,
-                paginationOpts: args.paginationOpts,
-                status: args.status as "error" | "abort" | "active" | "archived" | "running" | "finish" | undefined,
-                teamId: args.teamId,
-                userId: args.userId,
-            }),
-    );
+    .query(async ({ args, ctx: context }) => {
+        // Pass excludeTemporary directly — listThreadsByUserId now filters
+        // isTemporary in its JS filter, eliminating the second runQuery call
+        const result = await context.runQuery(api.agent.threads.listThreadsByUserId, {
+            excludeTemporary: args.excludeTemporary || undefined,
+            organizationId: args.organizationId,
+            paginationOpts: args.paginationOpts,
+            status: args.status as "error" | "abort" | "active" | "archived" | "running" | "finish" | undefined,
+            teamId: args.teamId,
+            userId: args.userId,
+        });
+
+        // Every list shows a locked row as its stub: metadata only, never the title.
+        return { ...result, page: result.page.map((row) => threadRowForList(row)) };
+    });
 
 /**
  * Get all threads that currently have active streams
@@ -1234,17 +1322,21 @@ export const updateThread = authAction
         summary: v.optional(v.string().max(MAX_LENGTH.text)),
         threadId: v.id("threads"),
         title: v.optional(v.string().max(MAX_LENGTH.long)),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.string())
     .action(
         async ({
-            args: { customSystemPrompt, enabledFeatures, model, order, reasoningEffort, statelessMode, status, summary, threadId, title },
+            args: { customSystemPrompt, enabledFeatures, model, order, reasoningEffort, statelessMode, status, summary, threadId, title, unlockProof },
             ctx: context,
         }) => {
             const { userId } = context.user;
 
-            // Use validateThreadAccessWithData to combine access check + thread fetch in one call
-            const { thread: threadData } = await validateThreadAccessWithData(context, threadId, userId, "admin");
+            const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "admin", threadId, unlockProof, userId });
+
+            throwUnlessGranted(gateResult.outcome, "Admin access denied to this thread");
+
+            const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
             const threadLanguage = threadData?.language;
 
             // Use provided model or fall back to thread's existing model
@@ -1373,6 +1465,11 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
         return;
     }
 
+    // Background work never reads or writes a locked chat: its title is its content.
+    if (isThreadLocked(threadData)) {
+        return;
+    }
+
     const threadLanguage = threadData.language;
 
     // Use thread.userId if available
@@ -1447,6 +1544,10 @@ export const createCategoryChat = internalAction.input({ prompt: v.string(), thr
         return;
     }
 
+    if (isThreadLocked(threadData)) {
+        return;
+    }
+
     const agent = await getAgent(model, { gateway: gatewayFetch(context) });
 
     const { thread } = await agent.continueThread(context, {
@@ -1489,6 +1590,11 @@ export const createSummarizeChat = internalAction.input({ threadId: v.string(), 
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
         threadId: arguments_.threadId as Id<"threads">,
     });
+
+    // A locked chat is not summarised: that would write its content into the thread row.
+    if (threadData && isThreadLocked(threadData)) {
+        return;
+    }
 
     // Use provided userId, or fallback to thread.userId if available
     const userId = arguments_.userId || threadData?.userId;
@@ -1558,14 +1664,17 @@ export const generateSummary = authAction
     .use(rateLimit("chat/update"))
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ success: v.boolean() }))
-    .action(async ({ args: { threadId }, ctx: context }) => {
+    .action(async ({ args: { threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
         // The summary is WRITTEN onto the thread, so reading is not enough. Checked
         // before the thread is read, so a stranger learns nothing about it.
-        await requireThreadPermissionInAction(context, threadId, userId, "write");
+        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "write", threadId, unlockProof, userId });
+
+        throwUnlessGranted(gateResult.outcome);
 
         // Get thread data to check the model
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
@@ -1664,6 +1773,7 @@ export const getThreadRelationship = internalQuery
 export const getChildThreads = authQuery
     .input({
         parentThreadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         v.array(
@@ -1676,13 +1786,18 @@ export const getChildThreads = authQuery
         ),
     )
     .query(async ({ args: input, ctx }) => {
-        const { parentThreadId } = input;
+        const { parentThreadId, unlockProof } = input;
         const { userId } = ctx.user;
 
         const thread = await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: parentThreadId as Id<"threads"> });
 
         if (thread && thread.userId && thread.userId !== userId) {
             throw new LunoraError("FORBIDDEN", "Access denied");
+        }
+
+        // A locked parent's branches are its content: without its proof, none are listed.
+        if (thread && isThreadLocked(thread) && (await threadGateOutcome(ctx, { level: "read", threadId: parentThreadId, unlockProof, userId })) !== "ok") {
+            return [];
         }
 
         const relationships = await ctx.runQuery(api.agent.threads.getChildThreads, {
@@ -1708,7 +1823,7 @@ export const getChildThreads = authQuery
                 }
 
                 return {
-                    ...innerThread,
+                    ...threadRowForList(innerThread),
                     branchPoint: relationship.branchPoint,
                     branchType: relationship.branchType,
                     createdAt: relationship.createdAt,
@@ -1993,6 +2108,7 @@ export const getPinnedThreads = authQuery
                 deletedAt: v.optional(v.number()),
                 enabledFeatures: v.optional(v.array(v.string())),
                 isPublic: v.optional(v.boolean()),
+                lockedAt: v.optional(v.number()),
                 model: v.optional(v.string()),
                 order: v.optional(v.number()),
                 pinnedAt: v.optional(v.number()),
@@ -2012,9 +2128,11 @@ export const getPinnedThreads = authQuery
     .query(async ({ ctx: context }) => {
         const { userId } = context.user;
 
-        return await context.runQuery(api.agent.threads.listPinnedThreads, {
+        const pinned = await context.runQuery(api.agent.threads.listPinnedThreads, {
             userId,
         });
+
+        return pinned.map((row) => threadRowForList(row));
     });
 
 export const updateThreadOrder = authMutation
@@ -2121,6 +2239,11 @@ export const updateThreadVisibility = authMutation
             throw new LunoraError("FORBIDDEN", "Cannot update visibility for another user's thread");
         }
 
+        // A locked chat is never public: the public read would bypass its passcode.
+        if (isPublic === true && isThreadLocked(thread)) {
+            throwThreadLocked();
+        }
+
         // The share token is minted here, as `chat_sharing.toggleThreadVisibility`
         // does. It used to be caller-chosen: guessable, or equal to another
         // thread's token so `getPublicThread`'s `.first()` could shadow that share.
@@ -2172,7 +2295,12 @@ export const searchThreads = liteAuthQuery
                 });
 
                 const query = searchQuery.toLowerCase();
+                // A locked chat is never matched: its title and summary are its content.
                 const filteredThreads = allThreads.page.filter((thread) => {
+                    if (isThreadLocked(thread)) {
+                        return false;
+                    }
+
                     const titleMatch = thread.title?.toLowerCase().includes(query);
                     const summaryMatch = thread.summary?.toLowerCase().includes(query);
 
@@ -2190,11 +2318,13 @@ export const searchThreads = liteAuthQuery
             }
 
             // Use search indexes — single query, no temporary thread lookup needed (isTemporary filtered in agent)
-            const searchResults = await context.runQuery(api.agent.threads.searchThreadsByTitleAndSummary, {
+            // Locked chats are dropped here, after the index match: a result is never shown for one.
+            const searchMatches = await context.runQuery(api.agent.threads.searchThreadsByTitleAndSummary, {
                 limit: paginationOpts.numItems * 2,
                 query: searchQuery,
                 userId,
             });
+            const searchResults = searchMatches.filter((thread) => !isThreadLocked(thread));
 
             // Apply cursor-based pagination over results
             const startIndex = paginationOpts.cursor ? searchResults.findIndex((t) => t._id === paginationOpts.cursor) + 1 : 0;
@@ -2260,7 +2390,8 @@ export const searchMessages = authQuery
         for (const [i, threadId] of threadIds.entries()) {
             const thread = threads[i];
 
-            if (thread && thread.userId === userId) {
+            // A locked thread's messages are never returned here, with or without a proof.
+            if (thread && thread.userId === userId && !isThreadLocked(thread)) {
                 const relevantMessages = searchResults.filter((message) => message.threadId === threadId);
 
                 threadsWithMessages.push({
@@ -2478,8 +2609,9 @@ export const getFullThreadForExport = authQuery
     .input({
         model: v.string().max(MAX_LENGTH.short),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
-    .query(async ({ args: { model, threadId }, ctx: context }) => {
+    .query(async ({ args: { model, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
@@ -2492,7 +2624,8 @@ export const getFullThreadForExport = authQuery
             throwUnauthorized("Unauthorized access to thread");
         }
 
-        admitOwnedThread(context, thread, userId);
+        // Owner, admitted for the rows below; a locked thread needs its proof.
+        await requireOwnedThread(context, threadId, userId, unlockProof);
 
         // A query: the agent only reads the thread here, it never generates.
         const agent = await getAgent(model as string, { gateway: NO_SERVICE_FETCH });
@@ -2509,7 +2642,8 @@ export const getFullThreadForExport = authQuery
             ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadRelationship.parentThreadId as Id<"threads"> })
             : null;
 
-        if (threadRelationship && parentThread?.userId === userId) {
+        // A locked parent is not exported: the proof covers this thread only.
+        if (threadRelationship && parentThread?.userId === userId && !isThreadLocked(parentThread)) {
             const parentMessages = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10_000 },
                 threadId: threadRelationship.parentThreadId,
@@ -2555,9 +2689,10 @@ export const branchThread = authAction
         /** The message to fork at, as the UI shows it: an assistant reply keeps all of its steps. */
         messageId: v.optional(v.string().max(MAX_LENGTH.id)),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.string())
-    .action(async ({ args: { branchName, branchPoint, messageId, threadId }, ctx: context }) => {
+    .action(async ({ args: { branchName, branchPoint, messageId, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
         const parentThread = await context.runQuery(internal.agent.threads.getThreadInternal, {
@@ -2572,6 +2707,11 @@ export const branchThread = authAction
         if (parentThread.userId && parentThread.userId !== userId) {
             throw new LunoraError("FORBIDDEN", "You don't have access to branch this thread");
         }
+
+        // Copies the messages, so a locked parent needs its proof.
+        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "admin", threadId, unlockProof, userId });
+
+        throwUnlessGranted(gateResult.outcome, "Admin access denied to this thread");
 
         const { language, model, organizationId } = parentThread;
 
@@ -3262,13 +3402,13 @@ export const getMessageRateLimit = optionalAuthQuery
 export const getCachedFollowupSuggestions = authQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ lastMessageId: v.optional(v.string()), suggestions: v.array(v.string()) }))
-    .query(async ({ args: { threadId }, ctx: context }) => {
+    .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
-        // Use validateThreadAccessWithData for single-call auth + thread validation
-        await validateThreadAccessWithData(context, threadId, userId, "read");
+        throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }), "Access denied to this thread");
 
         const cached = await context.runQuery(internal.agent.followup_suggestions.getCachedFollowupSuggestions, {
             threadId,
@@ -3293,13 +3433,16 @@ export const getFollowupSuggestions = authAction
     .use(rateLimit("chat/followups"))
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ suggestions: v.array(v.string()) }))
-    .action(async ({ args: { threadId }, ctx: context }) => {
+    .action(async ({ args: { threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
-        // Use validateThreadAccessWithData to combine access check + thread fetch in one call
-        const { thread: threadData } = await validateThreadAccessWithData(context, threadId, userId, "read");
+        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "read", threadId, unlockProof, userId });
+
+        throwUnlessGranted(gateResult.outcome, "Access denied to this thread");
+        const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
         const threadLanguage = threadData?.language;
 
@@ -3371,6 +3514,11 @@ export const generateFollowupSuggestionsForThread = internalAction
             if (!threadData) {
                 chatLogger.warn(`[generateFollowupSuggestionsForThread] Thread not found: ${threadId}`);
 
+                return;
+            }
+
+            // Follow-ups are generated from the messages, so a locked chat gets none.
+            if (isThreadLocked(threadData)) {
                 return;
             }
 
@@ -3475,6 +3623,16 @@ export const streamAsync = internalAction
 
         if (!thread) {
             throw new LunoraError("BAD_REQUEST", `Thread ${threadId} not found`);
+        }
+
+        // The edit that queued this run was written under the lock gate. A lock
+        // applied since the edited prompt was saved means that proof predates it.
+        if (isThreadLocked(thread)) {
+            const [editedPrompt] = await context.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [messageId as Id<"messages">] });
+
+            if (!editedPrompt || lockedAfterCreation(thread, editedPrompt._creationTime)) {
+                return null;
+            }
         }
 
         const { userId } = thread;
@@ -3603,12 +3761,13 @@ export const abortStreamByMessageId = authMutation
     .input({
         messageId: v.string().max(MAX_LENGTH.id),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ aborted: v.boolean() }))
-    .mutation(async ({ args: { messageId, threadId }, ctx: context }) => {
+    .mutation(async ({ args: { messageId, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
-        await validateThreadAccess(context, threadId, userId, "write");
+        throwUnlessGranted(await threadGateOutcome(context, { level: "write", threadId, unlockProof, userId }), "Write access denied to this thread");
 
         // Get the message to find its order
         const messages = await context.runQuery(internal.agent.messages.getMessagesByIds, {
@@ -3640,6 +3799,27 @@ export const abortStreamByMessageId = authMutation
         });
 
         context.log.event("chat.abort_stream_by_message_id", { aborted });
+
+        return { aborted };
+    });
+
+/**
+ * Abort the reply streaming in a thread, without naming the prompt that started
+ * it. The thread list's stop button has the thread, not the message. Same abort
+ * path as `abortStreamByMessageId`, which needs the message to find its order.
+ */
+export const abortThreadStream = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
+    .output(v.object({ aborted: v.boolean() }))
+    .mutation(async ({ args: { threadId, unlockProof }, ctx: context }) => {
+        const { userId } = context.user;
+
+        throwUnlessGranted(await threadGateOutcome(context, { level: "write", threadId, unlockProof, userId }), "Write access denied to this thread");
+
+        const aborted = await context.runMutation(internal.agent.streams.abortActiveForThread, { threadId: threadId as Id<"threads"> });
+
+        context.log.event("chat.abort_thread_stream", { aborted });
 
         return { aborted };
     });

@@ -312,28 +312,24 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                     icon: <GitBranch className="size-4" />,
                     label: t`Create branch`,
                     onClick: handleCreateBranchAction,
-                    shortcut: keyboardShortcuts.createBranch,
                     value: "action-create-branch",
                 },
                 {
                     icon: currentThread?.isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />,
                     label: currentThread?.isPinned ? t`Unpin thread` : t`Pin thread`,
                     onClick: handlePinUnpinThread,
-                    shortcut: keyboardShortcuts.pinThread,
                     value: "action-pin-unpin-thread",
                 },
                 {
                     icon: <Archive className="size-4" />,
                     label: currentThread?.status === "archived" ? t`Unarchive thread` : t`Archive thread`,
                     onClick: handleArchiveCurrentThread,
-                    shortcut: keyboardShortcuts.archiveThread,
                     value: "action-archive-thread",
                 },
                 {
                     icon: <Trash2 className="size-4" />,
                     label: t`Delete thread`,
                     onClick: handleDeleteCurrentThread,
-                    shortcut: keyboardShortcuts.deleteThread,
                     value: "action-delete-thread",
                 },
             );

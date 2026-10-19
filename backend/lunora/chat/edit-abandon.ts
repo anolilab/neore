@@ -15,6 +15,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
 import { patchRow } from "../lib/patch";
+import { isThreadLocked } from "../lib/thread-lock";
 
 export const ABANDONED_REPLY_TEXT = "*The reply did not finish. Please try again.*";
 const ABANDONED_REPLY_ERROR = "The reply stopped before it finished.";
@@ -32,6 +33,13 @@ export const failAbandonedEditReply = internalMutation
         const prompt = await ctx.db.get(promptMessageId);
 
         if (!prompt || prompt.threadId !== threadId) {
+            return { added: false, failed: 0 };
+        }
+
+        // A locked chat takes no placeholder: the lapse is left for the reaper to report.
+        const thread = await ctx.db.get(threadId);
+
+        if (thread && isThreadLocked(thread)) {
             return { added: false, failed: 0 };
         }
 

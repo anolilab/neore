@@ -369,19 +369,20 @@ export const RATE_LIMIT_CONFIGS = {
 
     "pages/update:free": Ratelimit.fixedWindow(60, MINUTE),
     "pages/update:premium": Ratelimit.fixedWindow(180, MINUTE),
-    // Pins limits
     "pins/create:free": Ratelimit.fixedWindow(20, MINUTE),
     "pins/create:premium": Ratelimit.fixedWindow(60, MINUTE),
-
     "pins/delete:free": Ratelimit.fixedWindow(20, MINUTE),
     "pins/delete:premium": Ratelimit.fixedWindow(60, MINUTE),
     "pins/update:free": Ratelimit.fixedWindow(30, MINUTE),
+
     "pins/update:premium": Ratelimit.fixedWindow(100, MINUTE),
+
     premium: Ratelimit.tokenBucket(100, 10 * SECOND, 100),
     // Project limits
     "project/create:free": Ratelimit.fixedWindow(5, MINUTE),
     "project/create:premium": Ratelimit.fixedWindow(20, MINUTE),
     "project/member:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "project/member:premium": Ratelimit.fixedWindow(30, MINUTE),
     "project/update:free": Ratelimit.fixedWindow(20, MINUTE),
 
@@ -395,6 +396,7 @@ export const RATE_LIMIT_CONFIGS = {
     "projects/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Prompts limits
     "prompts/create:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "prompts/create:premium": Ratelimit.fixedWindow(30, MINUTE),
     "prompts/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "prompts/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
@@ -455,14 +457,16 @@ export const RATE_LIMIT_CONFIGS = {
     "skills/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "skills/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "skills/invoke:free": Ratelimit.tokenBucket(30, MINUTE, 50),
+
     "skills/invoke:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
     "skills/update:free": Ratelimit.fixedWindow(20, MINUTE),
     "skills/update:premium": Ratelimit.fixedWindow(60, MINUTE),
-
     // Sub-agent starts (`sub-agents/functions.ts`), on top of the task quotas
     // each start is charged (`tasks/account.ts:chargeRound`) and the fan-out cap.
     "subAgents/run:free": Ratelimit.fixedWindow(10, HOUR),
+
     "subAgents/run:premium": Ratelimit.fixedWindow(60, HOUR),
+
     // Tag limits
     "tag/create:free": Ratelimit.fixedWindow(10, MINUTE),
     "tag/create:premium": Ratelimit.fixedWindow(30, MINUTE),
@@ -491,11 +495,13 @@ export const RATE_LIMIT_CONFIGS = {
     // Team limits
     "team/addMember:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/addMember:premium": Ratelimit.fixedWindow(30, MINUTE),
+
     "team/create:free": Ratelimit.fixedWindow(5, MINUTE),
     "team/create:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/delete:free": Ratelimit.fixedWindow(5, MINUTE),
     "team/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/leave:free": Ratelimit.fixedWindow(5, MINUTE),
+
     "team/leave:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/removeMember:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/removeMember:premium": Ratelimit.fixedWindow(30, MINUTE),
@@ -507,6 +513,11 @@ export const RATE_LIMIT_CONFIGS = {
     "team/updateRole:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/updateSettings:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/updateSettings:premium": Ratelimit.fixedWindow(30, MINUTE),
+    // Pins limits
+    // Passcode attempts on a locked thread (`agent/thread-lock.ts`). Per user, across
+    // threads; the per-thread backoff lives on the passcode row itself.
+    "threadLock/unlock:free": Ratelimit.fixedWindow(20, 15 * MINUTE),
+    "threadLock/unlock:premium": Ratelimit.fixedWindow(40, 15 * MINUTE),
     // Trigger limits
     "triggers/create:free": Ratelimit.fixedWindow(5, MINUTE),
     "triggers/create:premium": Ratelimit.fixedWindow(20, MINUTE),

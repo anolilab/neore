@@ -11,10 +11,27 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { getVisibleUserText } from "@neore/chat-ui/utils/page-context";
 import { Message, MessageAction, MessageActions, MessageContent as MessageContentWrapper } from "@neore/ui/components/ai-elements/message";
+import { Button } from "@neore/ui/components/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/dropdown-menu";
 import cn from "@neore/ui/utils/cn";
 import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useMutation } from "@tanstack/react-query";
-import { CheckIcon, CopyIcon, Gauge, GitBranch, Hash, ImageIcon, MicIcon, PencilIcon, PinIcon, RefreshCwIcon, Timer, VideoIcon } from "lucide-react";
+import {
+    CheckIcon,
+    ChevronDownIcon,
+    CopyIcon,
+    FileTextIcon,
+    Gauge,
+    GitBranch,
+    Hash,
+    ImageIcon,
+    MicIcon,
+    PencilIcon,
+    PinIcon,
+    RefreshCwIcon,
+    Timer,
+    VideoIcon,
+} from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { memo, useCallback, useState } from "react";
 
@@ -132,6 +149,7 @@ interface ActionBarProps {
     message: UIMessage;
     messageIndex: number;
     onCopy: () => void;
+    onCopyPlain: () => void;
     onEdit?: () => void;
     onReload?: () => void;
 }
@@ -144,7 +162,7 @@ const DefaultUserMessage: FC<UserMessageRendererProps> = ({ actionBar, children,
     <Message
         className={cn(
             "relative grid w-full max-w-(--thread-max-width) auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 [&:where(>*)]:col-start-2",
-            isLast ? "pb-0" : "pb-6",
+            isLast ? "pb-0" : "pb-(--density-message-gap)",
             isPending && "opacity-70",
         )}
         from="user"
@@ -153,7 +171,7 @@ const DefaultUserMessage: FC<UserMessageRendererProps> = ({ actionBar, children,
             <Trans>Your message:</Trans>{" "}
         </span>
         {/* Attachments would go here */}
-        <MessageContentWrapper className="col-start-2 row-start-2 rounded-3xl px-5 py-2.5 wrap-break-word">{children}</MessageContentWrapper>
+        <MessageContentWrapper className="col-start-2 row-start-2 rounded-3xl px-5 py-(--density-bubble-py) wrap-break-word">{children}</MessageContentWrapper>
         {!isPending && actionBar}
     </Message>
 );
@@ -169,7 +187,10 @@ const DefaultAssistantMessage: FC<AssistantMessageRendererProps> = ({ actionBar,
 
     return (
         <Message
-            className={cn("relative grid w-full max-w-(--thread-max-width) grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] gap-y-2", isLast ? "pb-0" : "pb-6")}
+            className={cn(
+                "relative grid w-full max-w-(--thread-max-width) grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] gap-y-2",
+                isLast ? "pb-0" : "pb-(--density-message-gap)",
+            )}
             from="assistant"
         >
             <span className="sr-only">
@@ -210,7 +231,7 @@ const DefaultSystemMessage: FC<SystemMessageRendererProps> = ({ children }) => (
  * Default Action Bar - Full featured with image/video/voice generation
  * Uses MessageActions and MessageAction from AI elements
  */
-const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStreaming, message, messageIndex, onCopy, onEdit, onReload }) => {
+const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStreaming, message, messageIndex, onCopy, onCopyPlain, onEdit, onReload }) => {
     const { model: currentModel, threadId } = useChatThread();
     const models = useFeatureFlaggedModels();
     const crpc = useCRPC();
@@ -302,6 +323,24 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                     {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
                 </MessageAction>
 
+                {hasCopyableContent && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger
+                            render={
+                                <Button aria-label={t`More copy options`} size="icon-sm" type="button" variant="ghost">
+                                    <ChevronDownIcon aria-hidden="true" className="size-3.5" />
+                                </Button>
+                            }
+                        />
+                        <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={onCopyPlain}>
+                                <FileTextIcon aria-hidden="true" className="size-4" />
+                                {t`Copy as plain text`}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
+
                 {(isAssistant || isUser) && isTextModel && (
                     <MessageAction onClick={handlePin} tooltip={t`Pin message`}>
                         <PinIcon className="size-4" />
@@ -314,7 +353,7 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                     </MessageAction>
                 )}
 
-                {isUser && onEdit && (
+                {onEdit && (isUser || isValidThreadId(threadId)) && (
                     <MessageAction onClick={onEdit} tooltip={t`Edit`}>
                         <PencilIcon className="size-4" />
                     </MessageAction>
@@ -390,6 +429,9 @@ DefaultActionBar.displayName = "DefaultActionBar";
  */
 const EMPTY_COMPONENTS: NonNullable<MessageItemProps["components"]> = {};
 
+/** A finished reply with visible text; the server edits that text in place (`agent_branches.editAssistantReply`). */
+const canEditReply = (message: UIMessage): boolean => message.role === "assistant" && message.status === "success" && message.text.trim() !== "";
+
 const MessageItem: FC<MessageItemProps> = memo(
     ({ className, components = EMPTY_COMPONENTS, index, isLast = false, isStreaming = false, maxWidth = "var(--thread-max-width)", message }) => {
         const {
@@ -425,12 +467,16 @@ const MessageItem: FC<MessageItemProps> = memo(
             copyMessage(message.id);
         }, [copyMessage, message.id]);
 
+        const handleCopyPlain = useCallback(() => {
+            copyMessage(message.id, "plain");
+        }, [copyMessage, message.id]);
+
         const handleReload = useCallback(() => {
             reloadMessage(message.id);
         }, [reloadMessage, message.id]);
 
         const handleEdit = useCallback(() => {
-            startEditing(message.id, getVisibleUserText(message));
+            startEditing(message.id, message.role === "user" ? getVisibleUserText(message) : message.text);
         }, [startEditing, message]);
 
         // Render content
@@ -450,7 +496,8 @@ const MessageItem: FC<MessageItemProps> = memo(
                 message={message}
                 messageIndex={index}
                 onCopy={handleCopy}
-                onEdit={message.role === "user" ? handleEdit : undefined}
+                onCopyPlain={handleCopyPlain}
+                onEdit={message.role === "user" || canEditReply(message) ? handleEdit : undefined}
                 onReload={message.role === "assistant" ? handleReload : undefined}
             />
         );

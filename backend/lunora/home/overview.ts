@@ -16,6 +16,7 @@ import type { QueryCtx } from "../_generated/server";
 import { repoLabel } from "../coding-agents/repo-label";
 import { vCodingAgentId } from "../coding-agents/validators";
 import { authQuery } from "../lib/crpc";
+import { isThreadLocked } from "../lib/thread-lock";
 import { loadUnread, toNotificationView, UNREAD_COUNT_CAP } from "../notifications/functions";
 import { vNotificationView } from "../notifications/validators";
 
@@ -46,7 +47,8 @@ export const vHomeOverview = v.object({
     ),
     dailyBriefEnabled: v.boolean(),
     notifications: v.array(vNotificationView),
-    recentThreads: v.array(v.object({ _id: v.string(), title: v.optional(v.string()), updatedAt: v.number() })),
+    // `locked` threads carry no title: the list shows the lock, not the name.
+    recentThreads: v.array(v.object({ _id: v.string(), locked: v.optional(v.boolean()), title: v.optional(v.string()), updatedAt: v.number() })),
     reviews: v.array(v.object({ _id: v.string(), title: v.string(), updatedAt: v.number() })),
     runningTasks: v.array(v.object({ _id: v.string(), status: v.union(v.literal("queued"), v.literal("running")), title: v.string(), updatedAt: v.number() })),
     subAgents: v.array(
@@ -104,7 +106,9 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
     }
 
     const approvalThreads = await Promise.all([...approvalsByThread.keys()].map(async (threadId) => await ctx.db.get(threadId as Id<"threads">)));
-    const threadTitle = new Map(approvalThreads.flatMap((thread) => (thread?.title ? [[thread._id as string, thread.title] as const] : [])));
+    const threadTitle = new Map(
+        approvalThreads.flatMap((thread) => (thread?.title && !isThreadLocked(thread) ? [[thread._id as string, thread.title] as const] : [])),
+    );
 
     return {
         approvals: [...approvalsByThread.values()].map((row) => {
@@ -132,7 +136,7 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
                 return {
                     _id: thread._id as string,
                     updatedAt: thread.updatedAt ?? thread._creationTime,
-                    ...(thread.title && { title: clip(thread.title) }),
+                    ...(isThreadLocked(thread) ? { locked: true } : thread.title && { title: clip(thread.title) }),
                 };
             }),
         reviews: reviewRows.page.map((task) => {

@@ -27,6 +27,7 @@ import { loadTaskAccount } from "../tasks/account";
 import { isValidBranchName, parseRepoUrl, PROMPT_MAX, RUN_TIMEOUT_MS } from "./commands";
 import { repoLabel } from "./repo-label";
 import { vCodingAgentId, vCodingAgentRunStatus } from "./validators";
+import { isThreadLocked } from "../lib/thread-lock";
 
 /** The reaper fires this long after the budget, for a runner that died without reporting. */
 const REAPER_GRACE_MS = 3 * 60 * 1000;
@@ -744,7 +745,7 @@ export const postRunResult = internalMutation
     .mutation(async ({ args, ctx }) => {
         const thread = await ctx.db.get(args.threadId as Id<"threads">);
 
-        if (!thread || thread.deleted || thread.userId !== args.userId) {
+        if (!thread || thread.deleted || thread.userId !== args.userId || isThreadLocked(thread)) {
             return null;
         }
 
