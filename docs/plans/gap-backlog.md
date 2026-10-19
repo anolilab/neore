@@ -1,20 +1,18 @@
-# Peer gap backlog — Plans
+# Gap backlog — Plans
 
 **Created:** 2026-10-19
 **Status:** Planned. Nothing in this file is built; each item names the concrete blocker.
 
-Gaps found by comparing the open feature requests of comparable open-source
-chat, gateway, workflow and voice/document projects against this tree. Each item
-says what is missing, the smallest design that fits our architecture, and why it
-is not built yet. Three items have their own plans:
-`knowledge-retrieval-quality.md`, `gateway-responses-api.md`,
-`workflow-canvas-a11y.md`.
+Capabilities of chat, gateway, workflow and voice/document handling that this
+tree does not have, or has only in part. Each item says what is missing, the
+smallest design that fits our architecture, and why it is not built yet. Three
+items have their own plans: `knowledge-retrieval-quality.md`,
+`gateway-responses-api.md`, `workflow-canvas-a11y.md`.
 
-Corrections from the first pass: hands-free voice already runs on ElevenLabs
+Already covered, so not gaps: hands-free voice already runs on ElevenLabs
 Scribe realtime with a Web Speech fallback (`voice-mode/listen.ts`), the gateway
 already serves `/v1/audio/transcriptions`, `/v1/audio/translations` and an
-OpenAI Realtime WebSocket proxy, and the response cache is exact-match. Those
-are not gaps.
+OpenAI Realtime WebSocket proxy, and the response cache is exact-match.
 
 ## MCP elicitation
 
