@@ -288,27 +288,31 @@ const foldHeadingOnly = (sections: Section[]): Section[] => {
 
 export interface ChunkOptions {
     /**
-     * The text is Markdown: `#` lines are headings and `<!-- PAGE n -->` lines
-     * are the parser's page markers. Off by default, because code and config
-     * are full of `#` comments, and read as headings each one splits the file.
+     * `#` lines are headings. Off by default, because code and config are full of
+     * `#` comments, and read as headings each one splits the file.
      */
+    headings?: boolean;
+    /** The text is Markdown: shorthand for `headings` and `pages` together. */
     markdown?: boolean;
+    /** `<!-- PAGE n -->` lines are the parser's page markers: reported as `pageNumber`, never part of the text. */
+    pages?: boolean;
 }
 
 /**
  * Split text into paragraph-aware chunks of ~CHUNK_TARGET_TOKENS with overlap.
- * With `markdown`, headings start a new chunk and are reported as
+ * With `headings`, a heading starts a new chunk and is reported as
  * `sectionHeading` (overlap never crosses one, so a chunk's text belongs to one
- * section), and `<!-- PAGE n -->` lines are reported as `pageNumber` and never
- * appear in the text. Without it the text is packed as paragraphs and nothing else.
+ * section). With `pages`, `<!-- PAGE n -->` lines are reported as `pageNumber` and
+ * never appear in the text. Without either the text is packed as paragraphs and
+ * nothing else.
  */
-export const chunkText = (text: string, { markdown = false }: ChunkOptions = {}): TextChunk[] => {
+export const chunkText = (text: string, { markdown = false, headings = markdown, pages = markdown }: ChunkOptions = {}): TextChunk[] => {
     const chunks: TextChunk[] = [];
-    const sections: Section[] = markdown ? foldHeadingOnly(splitAtHeadings(text)) : [{ text }];
+    const sections: Section[] = headings ? foldHeadingOnly(splitAtHeadings(text)) : [{ text }];
     let page: number | undefined;
 
     for (const section of sections) {
-        const packed = packParagraphs(section.text, page, markdown);
+        const packed = packParagraphs(section.text, page, pages);
 
         page = packed.page;
 

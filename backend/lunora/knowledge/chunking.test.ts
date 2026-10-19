@@ -290,3 +290,28 @@ describe("embeddingInput", () => {
         }
     });
 });
+
+describe("chunkText headings and pages are separate switches", () => {
+    const text = "<!-- PAGE 1 -->\n\n# Slide title\n\nbody one\n\n<!-- PAGE 2 -->\n\nbody two";
+
+    it("reads page markers without reading a '# ' line as a heading (slide text)", () => {
+        const chunks = chunkText(text, { pages: true });
+
+        expect(chunks.every((chunk) => chunk.sectionHeading === undefined)).toBe(true);
+        expect(chunks[0]?.content).toContain("# Slide title");
+        expect(chunks.map((chunk) => chunk.pageNumber)).toEqual([1]);
+        expect(chunks.map((chunk) => chunk.content).join("")).not.toContain("PAGE");
+    });
+
+    it("reads headings without treating a marker line as one (a Markdown file)", () => {
+        const chunks = chunkText("# Title\n\nbody\n\n<!-- PAGE 2 -->\n\nmore", { headings: true });
+
+        expect(chunks[0]?.sectionHeading).toBe("Title");
+        expect(chunks[0]?.pageNumber).toBeUndefined();
+        expect(chunks[0]?.content).toContain("<!-- PAGE 2 -->");
+    });
+
+    it("still takes `markdown` as both", () => {
+        expect(chunkText(text, { markdown: true })[0]).toMatchObject({ pageNumber: 1, sectionHeading: "Slide title" });
+    });
+});

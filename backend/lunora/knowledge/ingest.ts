@@ -18,8 +18,8 @@ import { MARKDOWN_EXTRACTION_MAX_BYTES, MAX_EXTRACTION_DOCUMENT_BYTES, MAX_EXTRA
 import { FETCH_TIMEOUT_LONG_MS } from "../lib/fetch-timeout";
 import { gatewayFetch, isServiceBound, serviceFetch, type ServicesContext } from "../lib/services";
 import { readStoredObject } from "../lib/storage-read";
-import { chunkText, EMBEDDING_INPUT_BUDGET, embeddingInput, estimateTokens } from "./chunking";
-import { documentToText, fetchUrlDocument, hasMarkdownStructure, type ParseDocument } from "./sources";
+import { type ChunkOptions, chunkText, EMBEDDING_INPUT_BUDGET, embeddingInput, estimateTokens } from "./chunking";
+import { documentToText, fetchUrlDocument, hasMarkdownStructure, isPagedMimeType, type ParseDocument } from "./sources";
 
 ("use node");
 
@@ -120,13 +120,18 @@ const pageRenderer = (ctx: ServicesContext): ((url: string) => Promise<{ content
     };
 };
 
+/** What the chunker may read in this source's text: headings where it is Markdown, page markers where the parser wrote them. */
+const chunkingFor = (name: string, mimeType: string): ChunkOptions => {
+    return { headings: hasMarkdownStructure(name, mimeType), pages: isPagedMimeType(mimeType) };
+};
+
 /**
  * The file's text, from wherever it came: a web page (`sourceUrl`), an object
  * stored for a pasted, folder or archive document (`storageKey`), or an upload
  * in the vault (`vaultFileId`). Read through `ctx.storage`, never over HTTP —
  * see `lib/storage-read.ts`. A URL also reports the page title.
  */
-const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Promise<{ markdown: boolean; text: string; title?: string }> => {
+const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Promise<{ chunking: ChunkOptions; text: string; title?: string }> => {
     const parse = documentParser(ctx);
 
     if (file.sourceUrl) {
@@ -138,7 +143,7 @@ const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Prom
         });
 
         return {
-            markdown: hasMarkdownStructure(new URL(fetched.url).pathname, fetched.mimeType),
+            chunking: chunkingFor(new URL(fetched.url).pathname, fetched.mimeType),
             text: fetched.text,
             title: fetched.title,
         };
@@ -158,7 +163,7 @@ const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Prom
 
     const { bytes } = await readStoredObject(ctx.storage, key, { maxBytes: MAX_FILE_SIZE });
 
-    return { markdown: hasMarkdownStructure(file.name, file.mimeType), text: await documentToText(bytes, file.mimeType, parse) };
+    return { chunking: chunkingFor(file.name, file.mimeType), text: await documentToText(bytes, file.mimeType, parse) };
 };
 
 // ============================================================================
@@ -197,14 +202,14 @@ export const ingestFile = internalAction
             }
 
             // 3. The text, from an upload, a stored document or a URL.
-            const { markdown, text: extractedText, title } = await loadSourceText(ctx, file);
+            const { chunking, text: extractedText, title } = await loadSourceText(ctx, file);
 
             if (!extractedText.trim()) {
                 throw new LunoraError("UNPROCESSABLE", "No text content could be extracted from the file");
             }
 
             // 4. Chunk the extracted text
-            const chunks = chunkText(extractedText, { markdown });
+            const chunks = chunkText(extractedText, chunking);
 
             if (chunks.length === 0) {
                 throw new LunoraError("UNPROCESSABLE", "No text content could be extracted from the file");

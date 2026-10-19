@@ -10,6 +10,7 @@ import {
     documentToText,
     fetchUrlDocument,
     hasMarkdownStructure,
+    isPagedMimeType,
     htmlToText,
     isRawText,
     MAX_URL_BYTES,
@@ -194,8 +195,20 @@ describe("markdown structure", () => {
         ["notes", "text/markdown", true],
         ["report.pdf", "application/pdf", true],
         ["page", "text/html", true],
+        // The parser answers a slide deck with plain text, so a slide starting with "# " is not a heading.
+        ["deck.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation", false],
     ])("%s (%s) has Markdown structure: %s", (name, mimeType, expected) => {
         expect(hasMarkdownStructure(name, mimeType)).toBe(expected);
+    });
+
+    it.each([
+        ["application/pdf", true],
+        ["application/vnd.openxmlformats-officedocument.presentationml.presentation", true],
+        ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", false],
+        ["text/markdown", false],
+        ["text/plain", false],
+    ])("%s has parser page markers: %s", (mimeType, expected) => {
+        expect(isPagedMimeType(mimeType)).toBe(expected);
     });
 
     it("reads text/markdown as Markdown, not as raw text", () => {

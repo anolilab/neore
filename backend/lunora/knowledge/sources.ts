@@ -53,12 +53,24 @@ export const isRawText = (mimeType: string): boolean => isPlainTextMimeType(mime
 
 const MARKDOWN_FILE_NAME_RE = /\.md$/iu;
 
+const PPTX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+/** Formats the parser answers with `<!-- PAGE n -->` lines: PDFs, and slide decks (one page per slide). */
+export const isPagedMimeType = (mimeType: string): boolean => {
+    const base = baseMimeType(mimeType);
+
+    return base === "application/pdf" || base === PPTX_MIME_TYPE;
+};
+
 /**
  * Whether text from this file has Markdown structure, so its `#` lines are
  * headings. Parser output and HTML do (the parser and `htmlToText` write them);
- * raw text does not, except a `.md` file. `name` is a file name or URL path.
+ * raw text does not, except a `.md` file. A slide deck is the parser's exception:
+ * its text is plain, so a slide that starts with `# ` is not a heading.
+ * `name` is a file name or URL path.
  */
-export const hasMarkdownStructure = (name: string, mimeType: string): boolean => !isRawText(mimeType) || MARKDOWN_FILE_NAME_RE.test(name);
+export const hasMarkdownStructure = (name: string, mimeType: string): boolean =>
+    baseMimeType(mimeType) !== PPTX_MIME_TYPE && (!isRawText(mimeType) || MARKDOWN_FILE_NAME_RE.test(name));
 
 // ─── HTML ────────────────────────────────────────────────────────────────────
 
