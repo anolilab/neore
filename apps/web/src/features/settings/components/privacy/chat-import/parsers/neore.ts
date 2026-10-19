@@ -94,17 +94,17 @@ const activePathRows = (thread: NeoreExportConversation["thread"], rows: NeoreEx
     }
 
     const seen = new Set<string>();
-    const keys = rows.map((row, index) => {
+    const keyed = rows.map((row, index) => {
         const key = typeof row._id === "string" && !seen.has(row._id) ? row._id : `#${String(index)}`;
 
         seen.add(key);
 
-        return key;
+        return { key, row };
     });
     const tree = buildBranchTree(
-        rows.map((row, index) => {
+        keyed.map(({ key, row }) => {
             return {
-                _id: keys[index] as string,
+                _id: key,
                 order: row.order ?? 0,
                 parentMessageId: row.parentMessageId,
                 stepOrder: row.stepOrder ?? 0,
@@ -114,7 +114,7 @@ const activePathRows = (thread: NeoreExportConversation["thread"], rows: NeoreEx
     // A leaf the file no longer contains degrades to the latest path from the top, as the backend shows it.
     const onPath = new Set(resolveActivePath(tree, leafId));
 
-    return rows.filter((_row, index) => onPath.has(keys[index] as string));
+    return keyed.filter(({ key }) => onPath.has(key)).map(({ row }) => row);
 };
 
 const parseConversation = (conversation: NeoreExportConversation): NormalizedConversation | null => {
