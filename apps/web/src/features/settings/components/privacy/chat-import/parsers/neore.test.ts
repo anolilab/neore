@@ -108,6 +108,39 @@ describe("parseNeore", () => {
         expect(conversation?.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
     });
 
+    it("skips system and tool rows instead of guessing their role from stepOrder", () => {
+        const thread = {
+            messages: [
+                row({ createdAt: 1_700_000_000_100, order: 0, role: "user", stepOrder: 0, text: "Hi" }),
+                // Both would read as a turn under the stepOrder rule: a step-1 row as an assistant, a step-0 row as a user.
+                row({ createdAt: 1_700_000_000_200, order: 0, role: "system", stepOrder: 1, text: "You are helpful" }),
+                row({ createdAt: 1_700_000_000_300, order: 1, role: "tool", stepOrder: 0, text: "Tool output" }),
+                row({ createdAt: 1_700_000_000_400, order: 1, role: "assistant", stepOrder: 1, text: "Hello" }),
+            ],
+            thread: { createdAt: 1_700_000_000_000, title: "Roles" },
+        };
+        const [conversation] = parseNeore(exportRoot([thread]));
+
+        expect(conversation?.messages).toEqual([
+            { content: "Hi", createdAt: 1_700_000_000_100, role: "user" },
+            { content: "Hello", createdAt: 1_700_000_000_400, role: "assistant" },
+        ]);
+    });
+
+    it("skips a null or non-object conversation and keeps the rest of the file", () => {
+        const [conversation, ...rest] = parseNeore([exportRoot([null, "oops", threadWithTurns, 7])]);
+
+        expect(rest).toEqual([]);
+        expect(conversation?.title).toBe("Greeting");
+    });
+
+    it("skips a null message row rather than failing its conversation", () => {
+        const withNull = { messages: [null, ...threadWithTurns.messages], thread: threadWithTurns.thread };
+        const [conversation] = parseNeore([exportRoot([withNull])]);
+
+        expect(conversation?.messages).toEqual(parseNeore([exportRoot([threadWithTurns])])[0]?.messages);
+    });
+
     it("accepts the root object without the array wrapper", () => {
         expect(parseNeore(exportRoot([threadWithTurns]))).toHaveLength(1);
     });

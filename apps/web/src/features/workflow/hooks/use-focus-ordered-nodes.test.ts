@@ -37,6 +37,16 @@ describe("useFocusOrderedNodes", () => {
         expect(ids(result.current)).toEqual(["c", "b", "a"]);
     });
 
+    it("returns the same array while its inputs are the same", () => {
+        const initial = [node("a", 0, 0), node("b", 0, 100)];
+        const { rerender, result } = renderHook(({ nodes }) => useFocusOrderedNodes(nodes), { initialProps: { nodes: initial } });
+        const first = result.current;
+
+        rerender({ nodes: initial });
+
+        expect(result.current).toBe(first);
+    });
+
     it("drops a removed node", () => {
         const { rerender, result } = renderHook(({ nodes }) => useFocusOrderedNodes(nodes), {
             initialProps: { nodes: [node("a", 0, 0), node("b", 0, 100)] },

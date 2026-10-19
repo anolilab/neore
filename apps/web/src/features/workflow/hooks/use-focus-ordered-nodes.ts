@@ -16,11 +16,14 @@ export const useFocusOrderedNodes = <T extends FocusOrderNode>(nodes: T[]): T[] 
     // `structure` is the only input that may reorder; the sort reads positions as of the render it changes in.
     const order = useMemo(() => sortNodesForFocus(nodes).map((node) => node.id), [structure]);
 
-    const byId = new Map(nodes.map((node) => [node.id, node]));
+    // A new array on every render would make React Flow re-adopt every node, so the array is kept while its inputs are.
+    return useMemo(() => {
+        const byId = new Map(nodes.map((node) => [node.id, node]));
 
-    return order.flatMap((id) => {
-        const node = byId.get(id);
+        return order.flatMap((id) => {
+            const node = byId.get(id);
 
-        return node ? [node] : [];
-    });
+            return node ? [node] : [];
+        });
+    }, [nodes, order]);
 };
