@@ -16,9 +16,9 @@ interface ThreadPage<T> {
     page: T[];
 }
 
-export const collectUnlockedThreads = async <T extends { lockedAt?: number | null }, Cursor>(
-    fetchPage: (cursor: Cursor, numberItems: number) => Promise<ThreadPage<T>>,
-    startCursor: Cursor,
+export const collectUnlockedThreads = async <T extends { lockedAt?: number | null }>(
+    fetchPage: (cursor: string | null, numberItems: number) => Promise<ThreadPage<T>>,
+    startCursor: string | null,
     limit: number,
 ): Promise<{ continueCursor: string | null; isDone: boolean; threads: T[] }> => {
     const threads: T[] = [];
@@ -37,7 +37,7 @@ export const collectUnlockedThreads = async <T extends { lockedAt?: number | nul
             break;
         }
 
-        cursor = result.continueCursor as Cursor;
+        cursor = result.continueCursor;
     }
 
     return { continueCursor, isDone, threads };
