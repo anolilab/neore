@@ -60,7 +60,7 @@ export const getThreadPromptOutline = liteAuthQuery
 
         // Missing, someone else's and not shared look the same: the outline does not tell a stranger which ids exist.
         if (!access) {
-            return throwThreadNotFound(threadId);
+            return throwThreadNotFound();
         }
 
         if (access.kind === "locked") {

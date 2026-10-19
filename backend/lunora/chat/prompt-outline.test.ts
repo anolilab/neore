@@ -117,8 +117,8 @@ describe("getThreadPromptOutline", () => {
             const threadId = await seed(harness);
             const lockedId = await seed(harness, { lockedAt: Date.now() });
 
-            await expect(outlineFor(harness, OTHER, threadId)).rejects.toThrow();
-            await expect(outlineFor(harness, OWNER, lockedId)).rejects.toThrow();
+            await expect(outlineFor(harness, OTHER, threadId)).rejects.toMatchObject({ code: "NOT_FOUND" });
+            await expect(outlineFor(harness, OWNER, lockedId)).rejects.toThrow("This chat is locked.");
         } finally {
             harness.close();
         }

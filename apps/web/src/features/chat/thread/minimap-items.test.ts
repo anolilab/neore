@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMinimapItems, mergeOutline, MINIMAP_PREVIEW_CHARS, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
+import { buildMinimapItems, mergeOutline, MINIMAP_PREVIEW_CHARS, promptsDropped, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
 
 describe("toMinimapPreview", () => {
     it("collapses whitespace and newlines to one line", () => {
@@ -97,5 +97,21 @@ describe("mergeOutline", () => {
 
         expect(shouldShowMinimap([{ id: "x", preview: "only one loaded" }])).toBe(false);
         expect(shouldShowMinimap(mergeOutline(outline, [{ id: "x", preview: "only one loaded" }]))).toBe(true);
+    });
+});
+
+describe("promptsDropped", () => {
+    it("is false when older pages load or a prompt is sent", () => {
+        expect(promptsDropped(new Set(["p4", "p5"]), new Set(["p3", "p4", "p5"]))).toBe(false);
+        expect(promptsDropped(new Set(["p4", "p5"]), new Set(["p4", "p5", "p6"]))).toBe(false);
+    });
+
+    it("is true when a branch switch, an edit or a delete replaces a loaded prompt", () => {
+        expect(promptsDropped(new Set(["p4", "p5"]), new Set(["p4", "p5b"]))).toBe(true);
+        expect(promptsDropped(new Set(["p4", "p5"]), new Set(["p4"]))).toBe(true);
+    });
+
+    it("has nothing to compare on the first read", () => {
+        expect(promptsDropped(new Set(), new Set(["p1"]))).toBe(false);
     });
 });

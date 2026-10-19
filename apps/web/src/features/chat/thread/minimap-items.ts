@@ -50,4 +50,11 @@ export const mergeOutline = (outline: ReadonlyArray<{ id: string; text: string }
     return [...older, ...loaded.filter((item) => !known.has(item.id))];
 };
 
+/**
+ * Whether a prompt that was loaded is gone from the loaded list. Loading older pages and
+ * sending a prompt only ADD ids; switching branch, editing a prompt or deleting one
+ * REMOVES some, and the server outline (read once) then lists prompts that are off the path.
+ */
+export const promptsDropped = (previous: ReadonlySet<string>, current: ReadonlySet<string>): boolean => [...previous].some((id) => !current.has(id));
+
 export const shouldShowMinimap = (items: ReadonlyArray<MinimapItem>): boolean => items.length >= MINIMAP_MIN_PROMPTS;
