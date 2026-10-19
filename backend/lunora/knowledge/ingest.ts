@@ -47,6 +47,9 @@ const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
             body: new Blob([bytes], { type: mimeType }),
             client: parserClient,
             headers: { "content-type": mimeType },
+            // Markdown keeps the headings the chunker's section paths come from, and
+            // splits PDF and PPTX content into pages. Only knowledge asks for it.
+            query: { format: "markdown" },
             signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
         });
 
@@ -63,16 +66,14 @@ const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
 
         let text = data.content || "";
 
-        // Append table markdown if present
-        if (data.tables.length > 0) {
-            const tableMarkdown = data.tables
-                .map((table, index) => (table.markdown ? `\n\n### Table ${String(index + 1)}\n${table.markdown}` : ""))
-                .filter(Boolean)
-                .join("");
+        // Markdown already carries the tables in place. Append only the ones it
+        // lacks, so a table is never indexed twice.
+        const missingTables = data.tables.filter((table) => table.markdown && !text.includes(table.markdown.trim()));
 
-            if (tableMarkdown) {
-                text += `\n\n---\n## Extracted Tables${tableMarkdown}`;
-            }
+        if (missingTables.length > 0) {
+            const tableMarkdown = missingTables.map((table, index) => `\n\n### Table ${String(index + 1)}\n${table.markdown}`).join("");
+
+            text += `\n\n---\n## Extracted Tables${tableMarkdown}`;
         }
 
         return text;
@@ -248,6 +249,7 @@ export const ingestFile = internalAction
                         chunkIndex: chunk.index,
                         content: chunk.content,
                         embeddingId: (embeddingIds[i] as string) ?? undefined,
+                        pageNumber: chunk.pageNumber,
                         sectionHeading: chunk.sectionHeading,
                         tokenCount: estimateTokens(chunk.content),
                     };

@@ -54,13 +54,18 @@ export type ExtractDocumentData = {
         'content-type': string;
     };
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * plain (the default): xberg's plain-text rendering. markdown: headings, lists and tables kept as Markdown; a PDF is split into pages under <!-- PAGE n --> lines, a PPTX into slides as plain text under the same lines. Knowledge ingestion asks for markdown; the other callers keep plain.
+         */
+        format?: 'plain' | 'markdown';
+    };
     url: '/extract';
 };
 
 export type ExtractDocumentErrors = {
     /**
-     * Bad request (empty body)
+     * Bad request (empty body, or an unknown format option)
      */
     400: ErrorResponse;
     /**

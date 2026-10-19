@@ -81,6 +81,93 @@ describe("document-parser Worker", () => {
         expect(body.tables).toStrictEqual([{ markdown: "| Name | Score |\n| --- | --- |\n| Ada | 42 |\n", pageNumber: 1 }]);
     });
 
+    // Compared as parsed JSON: xberg's metadata keys come out in a different order
+    // from one request to the next, with or without the option.
+    it("answers the plain format with the same JSON as no format", async () => {
+        const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        const implicit = await extract(fixture("sample.docx"), docx);
+        const explicit = await server.fetch("https://document-parser.internal/extract?format=plain", {
+            body: fixture("sample.docx"),
+            headers: { "content-type": docx },
+            method: "POST",
+        });
+
+        expect(explicit.status).toBe(200);
+        expect(await explicit.json()).toStrictEqual(await implicit.json());
+    });
+
+    it("extracts a DOCX as Markdown with its headings and tables in place", async () => {
+        const response = await server.fetch("https://document-parser.internal/extract?format=markdown", {
+            body: fixture("sample.docx"),
+            headers: { "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+            method: "POST",
+        });
+        const body = (await response.json()) as ExtractBody;
+
+        expect(response.status).toBe(200);
+        expect(body.content.startsWith("# Quarterly Report\n\n")).toBe(true);
+        expect(body.content).toContain("\n## Details\n");
+        expect(body.content).toContain("| Ada | 42 |");
+        expect(body.content).not.toContain("<!-- PAGE");
+        expect(body.tables).toHaveLength(1);
+    });
+
+    it("marks each page of a PDF in Markdown and keeps plain text unmarked", async () => {
+        const markdown = await server.fetch("https://document-parser.internal/extract?format=markdown", {
+            body: fixture("two-pages.pdf"),
+            headers: { "content-type": "application/pdf" },
+            method: "POST",
+        });
+        const { content } = (await markdown.json()) as ExtractBody;
+        const first = content.indexOf("<!-- PAGE 1 -->");
+        const second = content.indexOf("<!-- PAGE 2 -->");
+
+        expect(first).toBeGreaterThanOrEqual(0);
+        expect(second).toBeGreaterThan(first);
+        expect(content.slice(first, second)).toContain("otter");
+        expect(content.slice(second)).toContain("ibex");
+
+        const plain = await extract(fixture("two-pages.pdf"), "application/pdf");
+
+        expect((await plain.json()) as ExtractBody).toMatchObject({ content: expect.not.stringContaining("<!-- PAGE") });
+    });
+
+    it("keeps a PDF heading under its page in Markdown", async () => {
+        const response = await server.fetch("https://document-parser.internal/extract?format=markdown", {
+            body: fixture("headed-pages.pdf"),
+            headers: { "content-type": "application/pdf" },
+            method: "POST",
+        });
+        const { content } = (await response.json()) as ExtractBody;
+
+        expect(content.indexOf("<!-- PAGE 1 -->")).toBeLessThan(content.indexOf("# Rate limits"));
+        expect(content.indexOf("# Rate limits")).toBeLessThan(content.indexOf("<!-- PAGE 2 -->"));
+    });
+
+    it("reads a PPTX as plain text per slide in Markdown, with no heading syntax", async () => {
+        const response = await server.fetch("https://document-parser.internal/extract?format=markdown", {
+            body: fixture("sample.pptx"),
+            headers: { "content-type": "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+            method: "POST",
+        });
+        const { content } = (await response.json()) as ExtractBody;
+
+        expect(content.startsWith("<!-- PAGE 1 -->\n\n")).toBe(true);
+        expect(content).toContain("narwhal");
+        expect(content).not.toContain("## ");
+    });
+
+    it("refuses an unknown format", async () => {
+        const response = await server.fetch("https://document-parser.internal/extract?format=html", {
+            body: fixture("sample.pdf"),
+            headers: { "content-type": "application/pdf" },
+            method: "POST",
+        });
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toMatchObject({ error: "Unknown format" });
+    });
+
     it("extracts an XLSX with its table", async () => {
         const response = await extract(fixture("sample.xlsx"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         const body = (await response.json()) as ExtractBody;

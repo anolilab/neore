@@ -8,6 +8,8 @@ const BLANK_LINE_RE = /\n\s*\n/;
 const WHITESPACE_RE = /\s+/;
 const HEADING_RE = /^(#{1,6})[ \t]+(\S.*)$/;
 const FENCE_RE = /^[ \t]{0,3}(```|~~~)/;
+/** The line the document parser writes before each page of a PDF or PPTX (`services/document-parser/src/shape.rs`). */
+const PAGE_MARKER_RE = /^<!-- PAGE (\d+) -->$/;
 
 export const CHUNK_TARGET_TOKENS = 500;
 const CHUNK_OVERLAP_TOKENS = 50;
@@ -17,26 +19,69 @@ const MAX_HEADING_PATH_LENGTH = 300;
 export interface TextChunk {
     content: string;
     index: number;
+    /** The page the chunk starts on, from the parser's page markers. Absent when the text has none. */
+    pageNumber?: number;
     /** `"Guide > Limits"` — the Markdown headings above the chunk. Absent before the first heading and in text without any. */
     sectionHeading?: string;
 }
+
+/** The page a `<!-- PAGE n -->` line names, or `undefined` for any other line. */
+const pageMarker = (line: string): number | undefined => {
+    const match = PAGE_MARKER_RE.exec(line.trim());
+
+    return match ? Number(match[1]) : undefined;
+};
+
+/** A paragraph without its page-marker lines, and the page the last of them names. */
+const stripPageMarkers = (paragraph: string): { body: string; marker?: number } => {
+    let marker: number | undefined;
+    const body = paragraph.split("\n").filter((line) => {
+        const page = pageMarker(line);
+
+        if (page !== undefined) {
+            marker = page;
+        }
+
+        return page === undefined;
+    });
+
+    return { body: body.join("\n"), marker };
+};
 
 /**
  * Rough token estimation: ~4 chars per token for English text.
  */
 export const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
 
+interface PackedChunk {
+    content: string;
+    pageNumber?: number;
+}
+
 /**
  * Packs paragraphs into strings of ~CHUNK_TARGET_TOKENS with overlap.
+ *
+ * `<!-- PAGE n -->` lines are not text: they move the page on and are dropped
+ * before anything is measured. A chunk's page is the page its first paragraph
+ * is on; overlap carried into the next chunk is the end of the previous one,
+ * so it starts on the page that chunk ended on. `page` is the page in effect
+ * at the end of `text`, which the next section continues from.
  */
-const packParagraphs = (text: string): string[] => {
+const packParagraphs = (text: string, startPage: number | undefined): { chunks: PackedChunk[]; page: number | undefined } => {
     const paragraphs = text.split(BLANK_LINE_RE);
-    const chunks: string[] = [];
+    const chunks: PackedChunk[] = [];
 
+    let page = startPage;
+    let lastPage = startPage;
+    let chunkPage = startPage;
     let currentChunk = "";
 
     for (const paragraph of paragraphs) {
-        const trimmed = paragraph.trim();
+        const stripped = stripPageMarkers(paragraph);
+
+        page = stripped.marker ?? page;
+
+        const trimmed = stripped.body.trim();
 
         if (!trimmed) {
             continue;
@@ -47,7 +92,7 @@ const packParagraphs = (text: string): string[] => {
 
         // If adding this paragraph would exceed the target, save current chunk
         if (currentTokens > 0 && currentTokens + paragraphTokens > CHUNK_TARGET_TOKENS) {
-            chunks.push(currentChunk.trim());
+            chunks.push({ content: currentChunk.trim(), pageNumber: chunkPage });
 
             // Keep overlap from the end of the current chunk
             const words = currentChunk.trim().split(WHITESPACE_RE);
@@ -57,17 +102,23 @@ const packParagraphs = (text: string): string[] => {
             );
 
             currentChunk = overlapWordCount > 0 ? `${words.slice(-overlapWordCount).join(" ")}\n\n` : "";
+            chunkPage = lastPage;
+        }
+
+        if (currentChunk === "") {
+            chunkPage = page;
         }
 
         currentChunk += (currentChunk ? "\n\n" : "") + trimmed;
+        lastPage = page;
     }
 
     // Don't forget the last chunk
     if (currentChunk.trim()) {
-        chunks.push(currentChunk.trim());
+        chunks.push({ content: currentChunk.trim(), pageNumber: chunkPage });
     }
 
-    return chunks;
+    return { chunks, page };
 };
 
 interface Section {
@@ -174,7 +225,9 @@ const foldHeadingOnly = (sections: Section[]): Section[] => {
 
     for (const [position, section] of sections.entries()) {
         const text = carry ? `${carry}\n${section.text}` : section.text;
-        const isHeadingOnly = section.heading !== undefined && section.text.trim().split("\n").length === 1;
+        // A page marker is not content: a heading that ends a page is still heading-only.
+        const contentLines = section.text.split("\n").filter((line) => line.trim() !== "" && pageMarker(line) === undefined);
+        const isHeadingOnly = section.heading !== undefined && contentLines.length === 1;
 
         if (isHeadingOnly && position < sections.length - 1) {
             carry = text;
@@ -191,15 +244,26 @@ const foldHeadingOnly = (sections: Section[]): Section[] => {
  * Split text into paragraph-aware chunks of ~CHUNK_TARGET_TOKENS with overlap.
  * Markdown headings start a new chunk and are reported as `sectionHeading`;
  * overlap never crosses a heading, so a chunk's text belongs to one section.
+ * `<!-- PAGE n -->` lines (the parser's, for PDFs) are reported as `pageNumber`
+ * and never appear in the text.
  */
 export const chunkText = (text: string): TextChunk[] => {
     const chunks: TextChunk[] = [];
-
     const sections = foldHeadingOnly(splitAtHeadings(text));
+    let page: number | undefined;
 
     for (const section of sections) {
-        for (const content of packParagraphs(section.text)) {
-            chunks.push({ content, index: chunks.length, ...(section.heading && { sectionHeading: section.heading }) });
+        const packed = packParagraphs(section.text, page);
+
+        page = packed.page;
+
+        for (const chunk of packed.chunks) {
+            chunks.push({
+                content: chunk.content,
+                index: chunks.length,
+                ...(chunk.pageNumber !== undefined && { pageNumber: chunk.pageNumber }),
+                ...(section.heading && { sectionHeading: section.heading }),
+            });
         }
     }
 

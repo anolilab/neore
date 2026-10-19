@@ -29,10 +29,11 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
 - `saveChunks` takes an optional `metadata.sectionHeading` and writes it.
 - No migration: the field is already optional; old chunks simply have none.
   Re-ingest picks it up.
-- **Reach:** only text that carries Markdown headings benefits (`.md` uploads,
-  pasted Markdown, URL pages converted to Markdown). The document parser's
-  renderer emits plain text for PDF/DOCX — it even strips heading attributes —
-  so those files chunk exactly as before.
+- **Reach:** text that carries Markdown headings benefits: `.md` uploads, pasted
+  Markdown, URL pages, and — since the parser's `?format=markdown` (see
+  `docs/plans/document-parser.md`) — PDF, DOCX, PPTX, XLSX and HTML documents
+  ingested into the knowledge base. Chat attachments still get plain text, so
+  they chunk as before.
 
 ## Part B — rerank
 
@@ -55,6 +56,29 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
 - Not metered separately in v1 (Workers AI neurons are cheap); revisit if the
   gateway usage page needs it.
 
+## Part C — page numbers in citations
+
+- Ingest asks the parser for Markdown. A PDF arrives with a `<!-- PAGE n -->`
+  line before each page, and a PPTX (plain text, one page per slide); `chunkText` drops those lines from
+  the text, counts nothing for them (a chunk's boundaries are identical to the
+  markerless text, pinned by a test), and records on each chunk the page its
+  first paragraph is on. Overlap carried into a chunk starts on the page the
+  previous chunk ended on.
+- `saveChunks` writes it as `metadata.pageNumber`, the field the schema already
+  had. Chunks with no page (DOCX, XLSX, old chunks) carry none.
+- The page travels with the hit through both legs
+  (`getChunksByEmbeddingIds`, `keywordSearchChunks`), RRF, the reranker's
+  candidates, the chat tool result and the citation: the excerpt the model reads
+  says `(passage 3, page 7)`, and the stored source's `providerMetadata` carries
+  `pageNumber`. Every output validator on that chain declares it as optional.
+- `searchKnowledge` (the public v1 API) now maps its hits to the four fields it
+  declares. It returned the full hit, which `.output()` rejects
+  (`rejectUnknownKeys`), so the endpoint failed on any hit before this change.
+- **Not done:** the citation chip in `apps/web` (`knowledge-source-group.tsx`)
+  still shows only `Passage n`. Showing the page needs a new translated message
+  in every locale; the value is already on the citation.
+
+
 ## Tests
 
 - `chunking.test.ts`: heading boundaries, nested path, no-heading parity with
@@ -64,6 +88,19 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
   reranker cannot bury the fused top hit.
 - Gateway `rerank.test.ts`: binding-only access, validation, the 503 without
   `AI`, clipping and the response parser.
+- `chunking.test.ts` (Part C): markers never change a chunk's text or
+  boundaries (compared with the markerless text), a chunk starts on the page of
+  its first paragraph, a heading that ends a page stays with its section,
+  marker-only text yields no chunks.
+- `retrieve.test.ts` (Part C, `lunoraTest`): `saveChunks` writes
+  `metadata.pageNumber`; `getChunksByEmbeddingIds` and `keywordSearchChunks`
+  return it, and leave it out for a chunk without one.
+- `services/document-parser/test/extract.test.ts`: the plain format answers
+  with the same JSON as before (the metadata's key order is xberg's own and
+  varies between requests, with or without the option); `?format=markdown` keeps DOCX headings and tables and
+  splits a two-page PDF at `<!-- PAGE n -->`; an unknown format is `400`.
+- `shape.rs`/`lib.rs` unit tests: the format option, which formats are paged,
+  the page join, and the Markdown extraction of DOCX and PDF fixtures.
 
 ## Out of scope
 

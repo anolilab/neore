@@ -35,6 +35,8 @@ interface RankedChunk {
     /** The knowledge file the chunk came from — eval runs match expected sources by it. */
     fileId: string;
     fileName: string;
+    /** The page the chunk starts on, for PDF and PPTX; absent for other formats and older chunks. */
+    pageNumber?: number;
 }
 
 /**
@@ -115,10 +117,11 @@ const vHit = v.object({
     content: v.string(),
     fileId: v.string(),
     fileName: v.string(),
+    pageNumber: v.optional(v.number()),
     score: v.number(),
 });
 
-type Hit = { chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number };
+type Hit = { chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number };
 
 /**
  * Fuses the two legs by rank (deduplicated by chunk id) into the rows callers
@@ -129,7 +132,15 @@ export const fuseSearchLegs = (vectorHits: ReadonlyArray<RankedChunk>, keywordHi
     reciprocalRankFusion<RankedChunk>([vectorHits, keywordHits], (chunk) => chunk.chunkId)
         .slice(0, limit)
         .map(({ item, score }) => {
-            return { chunkId: item.chunkId, chunkIndex: item.chunkIndex, content: item.content, fileId: item.fileId, fileName: item.fileName, score };
+            return {
+                chunkId: item.chunkId,
+                chunkIndex: item.chunkIndex,
+                content: item.content,
+                fileId: item.fileId,
+                fileName: item.fileName,
+                ...(item.pageNumber !== undefined && { pageNumber: item.pageNumber }),
+                score,
+            };
         });
 
 /**
@@ -379,7 +390,7 @@ const MAX_QUERY_LENGTH = 2000;
 export const searchKnowledge = authAction
     .use(rateLimit("knowledge/search"))
     .input({ query: v.string().max(MAX_LENGTH.long) })
-    .output(v.array(v.object({ chunkIndex: v.number(), content: v.string(), fileName: v.string(), score: v.number() })))
+    .output(v.array(v.object({ chunkIndex: v.number(), content: v.string(), fileName: v.string(), pageNumber: v.optional(v.number()), score: v.number() })))
     .action(async ({ args, ctx }) => {
         const query = args.query.trim();
 
@@ -387,11 +398,20 @@ export const searchKnowledge = authAction
             throw new LunoraError("BAD_REQUEST", `Query must be 1-${String(MAX_QUERY_LENGTH)} characters`);
         }
 
-        const results = await ctx.runAction(internal.knowledge.retrieve.search, { query, userId: ctx.user.userId });
+        const hits = await ctx.runAction(internal.knowledge.retrieve.search, { query, userId: ctx.user.userId });
 
-        ctx.log.event("knowledge.search_knowledge", { queryLength: query.length, resultCount: results.length });
+        ctx.log.event("knowledge.search_knowledge", { queryLength: query.length, resultCount: hits.length });
 
-        return results;
+        // `.output()` rejects keys it does not declare, so only the public fields go out.
+        return hits.map((hit) => {
+            return {
+                chunkIndex: hit.chunkIndex,
+                content: hit.content,
+                fileName: hit.fileName,
+                ...(hit.pageNumber !== undefined && { pageNumber: hit.pageNumber }),
+                score: hit.score,
+            };
+        });
     });
 
 export default search;

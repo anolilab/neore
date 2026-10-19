@@ -115,6 +115,42 @@ describe("chunkText", () => {
     });
 });
 
+describe("page markers", () => {
+    const pageOf = (n: number, body: string): string => `<!-- PAGE ${String(n)} -->\n\n${body}`;
+    const withoutMarkers = (text: string): string => text.replaceAll(/<!-- PAGE \d+ -->\n\n/g, "");
+
+    it("reads the page a chunk starts on and keeps the markers out of its text", () => {
+        const text = `${pageOf(1, "first page text")}\n\n${pageOf(2, "second page text")}`;
+
+        expect(chunkText(text)).toStrictEqual([{ content: "first page text\n\nsecond page text", index: 0, pageNumber: 1 }]);
+    });
+
+    it("gives every chunk the same text as the markerless text, so markers never move a boundary", () => {
+        const pages = [1, 2, 3].map((n) => pageOf(n, Array.from({ length: 6 }, (_, i) => paragraph(`p${String(n)}_${String(i)}w`)).join("\n\n")));
+        const text = pages.join("\n\n");
+        const chunks = chunkText(text);
+
+        expect(chunks.map((c) => c.content)).toStrictEqual(chunkText(withoutMarkers(text)).map((c) => c.content));
+        expect(chunks.some((c) => c.content.includes("<!-- PAGE"))).toBe(false);
+        expect(chunks.map((c) => c.pageNumber)).toStrictEqual([...chunks.map((c) => c.pageNumber)].toSorted((a, b) => (a ?? 0) - (b ?? 0)));
+        expect(new Set(chunks.map((c) => c.pageNumber))).toStrictEqual(new Set([1, 2, 3]));
+    });
+
+    it("reports no page for text without markers", () => {
+        expect(chunkText("just text\n\nmore text")).toStrictEqual([{ content: "just text\n\nmore text", index: 0 }]);
+    });
+
+    it("returns no chunks for text that is only markers", () => {
+        expect(chunkText("<!-- PAGE 1 -->\n\n<!-- PAGE 2 -->")).toStrictEqual([]);
+    });
+
+    it("keeps a heading that ends a page with the section after it", () => {
+        const chunks = chunkText("<!-- PAGE 1 -->\n\n# Title\n\n<!-- PAGE 2 -->\n\n## Next\n\nbody");
+
+        expect(chunks).toStrictEqual([{ content: "# Title\n\n## Next\n\nbody", index: 0, pageNumber: 1, sectionHeading: "Title > Next" }]);
+    });
+});
+
 describe("embeddingInput", () => {
     it("puts the section path in front of the body", () => {
         expect(embeddingInput({ content: "text", sectionHeading: "A > B" })).toBe("A > B\n\ntext");

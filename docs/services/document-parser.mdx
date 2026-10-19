@@ -47,6 +47,16 @@ different runtime — see `docs/plans/document-parser.md`.
 **Request:** the raw file bytes as the body, with the file's MIME type as
 `Content-Type` (for example, `application/pdf`).
 
+**Query:** `format` selects the shape of `content`:
+
+| `format` | `content` |
+| --- | --- |
+| omitted, or `plain` | xberg's plain-text rendering. The default, unchanged by the option. |
+| `markdown` | Markdown: headings, lists and tables kept. A PDF is split into pages, each under a `<!-- PAGE n -->` line (`n` is 1-based). A PPTX is split into slides the same way, but as plain text: its Markdown would put each slide's title and body on one heading line. Knowledge ingestion asks for this. |
+
+Any other value is `400`. `tables` is returned in both formats; in Markdown the
+same tables already sit in `content`.
+
 **Response (200):**
 
 ```json
@@ -62,7 +72,7 @@ different runtime — see `docs/plans/document-parser.md`.
 
 | Status | Meaning |
 | --- | --- |
-| `400` | Empty request body |
+| `400` | Empty request body, or an unknown `format` |
 | `413` | File exceeds 25 MB (`maxBytes` carries the limit) |
 | `500` | Extraction failed (unsupported or corrupt file) |
 

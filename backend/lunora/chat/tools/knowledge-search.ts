@@ -14,7 +14,7 @@ import { createTool } from "../../agent/client";
 
 const knowledgeSearchTool = createTool<
     { fileIds?: string[]; query: string },
-    { results: { chunkIndex: number; content: string; fileName: string; score: number }[] },
+    { results: { chunkIndex: number; content: string; fileName: string; pageNumber?: number; score: number }[] },
     ToolContext
 >({
     description:

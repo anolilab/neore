@@ -16,6 +16,57 @@ use serde::Serialize;
 /// same number before a byte is sent; this is the backstop.
 pub const MAX_DOCUMENT_BYTES: usize = 25 * 1024 * 1024;
 
+/// What `POST /extract` returns as `content`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentFormat {
+    /// xberg's plain-text rendering — the default, and what every caller got before `format` existed.
+    Plain,
+    /// Markdown: headings, lists and tables kept. Knowledge ingestion asks for it.
+    Markdown,
+}
+
+/// The `format` query value. Absent means plain; `None` is an unknown value,
+/// which the caller refuses rather than guessing at.
+pub fn parse_format(value: Option<&str>) -> Option<ContentFormat> {
+    match value {
+        None | Some("plain") => Some(ContentFormat::Plain),
+        Some("markdown") => Some(ContentFormat::Markdown),
+        Some(_) => None,
+    }
+}
+
+const PDF: &str = "application/pdf";
+const PPTX: &str = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+/// Whether xberg's per-page content is real pagination (PDF) or real slides
+/// (PPTX). DOCX and XLSX have none that xberg can see: a page number there
+/// would be a guess, so they get no page markers.
+pub fn is_paged(mime: &str) -> bool {
+    mime == PDF || is_slides(mime)
+}
+
+/// PPTX. Its Markdown is not used: xberg puts a slide's title and body on ONE
+/// `## ` line, so every slide would be a section heading that swallows its
+/// body. Slides are read as plain text, page by page.
+pub fn is_slides(mime: &str) -> bool {
+    mime == PPTX
+}
+
+/// Markdown for a paged document: each page's content under its own
+/// `<!-- PAGE n -->` line, the marker the backend's chunker reads
+/// (`backend/lunora/knowledge/chunking.ts`). The markers are written here, not
+/// taken from xberg's `insert_page_markers`: that path escapes them to
+/// `&lt;!-- PAGE 1 --&gt;` and glues them onto the next heading.
+pub fn paged_markdown<T: AsRef<str>>(pages: impl IntoIterator<Item = (u32, T)>) -> String {
+    pages
+        .into_iter()
+        .map(|(number, content)| {
+            format!("<!-- PAGE {number} -->\n\n{}", content.as_ref().trim_end())
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
 /// The MIME type xberg should parse a document as: the `Content-Type` without
 /// parameters, lower-cased, `application/octet-stream` when absent.
 pub fn normalize_mime(header: Option<&str>) -> String {
@@ -245,6 +296,45 @@ mod tests {
         ] {
             assert_eq!(strip_heading_attributes(line), line);
         }
+    }
+
+    #[test]
+    fn parses_the_format_option() {
+        assert_eq!(parse_format(None), Some(ContentFormat::Plain));
+        assert_eq!(parse_format(Some("plain")), Some(ContentFormat::Plain));
+        assert_eq!(
+            parse_format(Some("markdown")),
+            Some(ContentFormat::Markdown)
+        );
+        assert_eq!(parse_format(Some("Markdown")), None);
+        assert_eq!(parse_format(Some("")), None);
+        assert_eq!(parse_format(Some("html")), None);
+    }
+
+    #[test]
+    fn only_pdf_and_pptx_are_paged_and_only_pptx_is_slides() {
+        assert!(is_paged("application/pdf"));
+        assert!(is_paged(
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ));
+        assert!(is_slides(
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ));
+        assert!(!is_slides("application/pdf"));
+        assert!(!is_paged(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ));
+        assert!(!is_paged(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ));
+    }
+
+    #[test]
+    fn marks_each_page_with_its_number() {
+        assert_eq!(
+            paged_markdown([(1, "# One\n\nalpha\n"), (2, "beta")]),
+            "<!-- PAGE 1 -->\n\n# One\n\nalpha\n\n<!-- PAGE 2 -->\n\nbeta"
+        );
     }
 
     #[test]
