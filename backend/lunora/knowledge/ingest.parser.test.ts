@@ -214,6 +214,12 @@ describe("documentParser", () => {
             expect(await parse(1024)).not.toContain("Extracted Tables");
         });
 
+        it("appends a table whose Markdown is only quoted on another page", async () => {
+            withTables([{ markdown: "End", pageNumber: 1 }]);
+
+            expect(await parse(1024)).toContain("### Table 1\nEnd");
+        });
+
         it("adds no page line for a format without pages", async () => {
             mocks.extractDocument.mockResolvedValue({
                 data: { content: "Body", tables: [{ markdown: "| a |", pageNumber: 1 }] },

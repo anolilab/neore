@@ -86,13 +86,18 @@ export const documentParser = (ctx: ServicesContext): ParseDocument | undefined 
         let text = data.pages ? data.pages.map((page) => markPage(page.pageNumber, page.content)).join("\n\n") : stripPageSentinel(data.content || "");
 
         // Markdown already carries the tables in place. Append only the ones it
-        // lacks, so a table is never indexed twice.
+        // lacks, so a table is never indexed twice. On a paged document the table is looked for on its own
+        // page: the same Markdown quoted on another page does not stand in for it.
         // Each keeps the number it has in the document, so "Table 2" is still the second table when the first is in place.
         const missingTables = data.tables
             .map((table, index) => {
                 return { number: index + 1, table };
             })
-            .filter(({ table }) => table.markdown && !text.includes(table.markdown.trim()));
+            .filter(({ table }) => {
+                const haystack = data.pages?.find((page) => page.pageNumber === table.pageNumber)?.content ?? text;
+
+                return table.markdown && !haystack.includes(table.markdown.trim());
+            });
 
         if (missingTables.length > 0) {
             const isPaged = isPagedMimeType(mimeType);
