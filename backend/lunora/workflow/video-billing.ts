@@ -73,7 +73,13 @@ const creditsOf = (costMicrodollars: number): number => computeGatewayCredits({ 
  * Refuses a video node run before its paid work: the credits its paid calls cost, then the daily quota.
  * Throws the message the run reports. Returns the request id of the reservation this attempt holds, if any.
  */
-const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: WorkflowNode, userId: string, costs: VideoRunCosts): Promise<string | undefined> => {
+const beginVideoRun = async (
+    context: RunContext,
+    run: ExecutionContext,
+    node: WorkflowNode,
+    userId: string,
+    costs: VideoRunCosts,
+): Promise<string | undefined> => {
     const calls = [costs.clipMicrodollars, costs.extractionMicrodollars].filter((cost): cost is number => cost !== undefined);
 
     if (calls.length > 0 && run.orgId) {

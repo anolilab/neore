@@ -109,7 +109,9 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
 
         return undefined;
     });
-    const runQuery = vi.fn(async () => {return { creditsLeft: null }});
+    const runQuery = vi.fn(async () => {
+        return { creditsLeft: null };
+    });
 
     return { claims, deductions, leases, ledger, posted, runMutation, runQuery };
 };
@@ -408,7 +410,9 @@ const balanceCtx = ({
         return undefined;
     });
     // Answers the balance as it stands when `liveSnapshot` is set, and as it stood when the run started otherwise.
-    const runQuery = vi.fn(async () => {return { creditsLeft: liveSnapshot ? left : balance }});
+    const runQuery = vi.fn(async () => {
+        return { creditsLeft: liveSnapshot ? left : balance };
+    });
 
     return { left: () => left, runMutation, runQuery };
 };
@@ -660,15 +664,16 @@ describe("the reservation's lease against the real ledger", () => {
                 return calls;
             });
 
-            expect(swept).toStrictEqual([
-                { args: { claimKey: "r-2", requestId: "r-2" }, target: internal.auth.billing.releaseGatewayCredits.__lunoraRef },
-            ]);
+            expect(swept).toStrictEqual([{ args: { claimKey: "r-2", requestId: "r-2" }, target: internal.auth.billing.releaseGatewayCredits.__lunoraRef }]);
 
             const after = await harness.run(async (ctx: any) => {
                 await ctx.runMutation(releaseGatewayCredits, swept[0]!.args);
 
                 const record = await ctx.db.memberCredits.findFirst({ where: { userId: "u1" } });
-                const row = await ctx.db.query("gatewayUsageDeductions").withIndex("by_requestId", (q: any) => q.eq("requestId", "r-2")).first();
+                const row = await ctx.db
+                    .query("gatewayUsageDeductions")
+                    .withIndex("by_requestId", (q: any) => q.eq("requestId", "r-2"))
+                    .first();
 
                 return { row, usedCredits: (record as { usedCredits?: number }).usedCredits ?? 0 };
             });
