@@ -276,7 +276,7 @@ msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, one {# Benutzer} other {# Benutzer}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:149
+#: src/components/model-picker/model-picker-button.tsx:168
 msgid "{0, plural, one {1 model} other {# models}}"
 msgstr "{0, plural, one {1 Modell} other {# Modelle}}"
 
@@ -429,6 +429,12 @@ msgstr "{0} für {1}"
 msgid "{0} from {1} ratings"
 msgstr "{0} aus {1} Bewertungen"
 
+#. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
+#. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
+#: src/components/model-picker/model-picker.tsx:308
+msgid "{0} input, {1} output per 1M tokens"
+msgstr ""
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:209
 msgid "{0} is one of {totalModels}+ AI models available on Neore — all in one workspace, one subscription. No tab-switching. No managing six accounts."
@@ -501,7 +507,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{0} von {1} Token verwendet ({2}%)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1018
+#: src/components/model-picker/model-picker.tsx:1092
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} von {MAX_PARALLEL} ausgewählt"
 
@@ -895,7 +901,7 @@ msgstr "{name}-Verbindung aktiviert"
 msgid "{name} disconnected"
 msgstr "{name} getrennt"
 
-#: src/components/model-picker/model-picker.tsx:633
+#: src/components/model-picker/model-picker.tsx:677
 msgid "{name} hidden from the model picker"
 msgstr ""
 
@@ -1918,7 +1924,7 @@ msgid "Add to Favorites"
 msgstr "Zu Favoriten hinzufügen"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:288
+#: src/components/model-picker/model-picker.tsx:329
 msgid "Add to starred"
 msgstr "Zu Favoriten hinzufügen"
 
@@ -2478,13 +2484,13 @@ msgstr "Vertikal ausrichten (V)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:617
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
-#: src/components/model-picker/model-picker.tsx:888
-#: src/components/model-picker/model-picker.tsx:946
+#: src/components/model-picker/model-picker.tsx:942
+#: src/components/model-picker/model-picker.tsx:1020
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
-#: src/features/settings/components/chat/models-settings.tsx:417
-#: src/features/settings/components/chat/models-settings.tsx:438
-#: src/features/settings/components/chat/models-settings.tsx:459
+#: src/features/settings/components/chat/models-settings.tsx:420
+#: src/features/settings/components/chat/models-settings.tsx:441
+#: src/features/settings/components/chat/models-settings.tsx:462
 #: src/features/settings/connectors/connectors-page.tsx:73
 #: src/routes/(chat)/workflow/gallery.tsx:20
 msgid "All"
@@ -2495,7 +2501,7 @@ msgstr "Alle"
 msgid "All ({0})"
 msgstr "Alle ({0})"
 
-#: src/features/settings/components/chat/models-settings.tsx:349
+#: src/features/settings/components/chat/models-settings.tsx:351
 msgid "All {provider} models enabled"
 msgstr "Alle {provider}-Modelle aktiviert"
 
@@ -2557,7 +2563,7 @@ msgid "All MCP servers active"
 msgstr "Alle MCP-Server aktiv"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:563
-#: src/components/model-picker/model-picker.tsx:839
+#: src/components/model-picker/model-picker.tsx:892
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "Alle Modelle"
@@ -2570,7 +2576,7 @@ msgstr "Alle Modelle & Tools"
 msgid "All models allowed (Enterprise)"
 msgstr "Alle Modelle erlaubt (Enterprise)"
 
-#: src/features/settings/components/chat/models-settings.tsx:308
+#: src/features/settings/components/chat/models-settings.tsx:310
 msgid "All models disabled"
 msgstr ""
 
@@ -2578,7 +2584,7 @@ msgstr ""
 #~ msgid "All models disabled (reset to defaults)"
 #~ msgstr "Alle Modelle deaktiviert (auf Standard zurückgesetzt)"
 
-#: src/features/settings/components/chat/models-settings.tsx:287
+#: src/features/settings/components/chat/models-settings.tsx:289
 msgid "All models enabled"
 msgstr "Alle Modelle aktiviert"
 
@@ -3354,7 +3360,7 @@ msgid "Auckland"
 msgstr "Auckland"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
-#: src/components/model-picker/model-picker.tsx:934
+#: src/components/model-picker/model-picker.tsx:994
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:119
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -4431,6 +4437,7 @@ msgstr "Cache"
 msgid "Cache Hit Rate"
 msgstr "Cache-Trefferquote"
 
+#: src/components/model-picker/model-picker.tsx:203
 #: src/features/chat/thread/message-cost-badge.tsx:56
 msgid "Cached input"
 msgstr "Gecachte Eingabe"
@@ -4645,7 +4652,7 @@ msgstr "Canvas-Editor"
 msgid "Canvas opens a side-by-side editor next to your chat. Write long-form documents, edit code, and refine content with AI assistance. Changes are versioned so you can always go back."
 msgstr "Canvas öffnet einen Editor direkt neben deinem Chat. Schreibe lange Dokumente, bearbeite Code und verfeinere Inhalte mit KI-Unterstützung. Änderungen werden versioniert, sodass du jederzeit zurückgehen kannst."
 
-#: src/features/settings/components/chat/models-settings.tsx:480
+#: src/features/settings/components/chat/models-settings.tsx:483
 msgid "Capabilities"
 msgstr "Fähigkeiten"
 
@@ -5216,8 +5223,8 @@ msgstr "Bereinigung fehlgeschlagen"
 #: src/features/chat/thread/media-gallery-view.tsx:372
 #: src/features/prompts/components/prompt-list.tsx:615
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
-#: src/features/settings/components/chat/models-settings.tsx:472
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:250
+#: src/features/settings/components/chat/models-settings.tsx:475
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:256
 msgid "Clear"
 msgstr "Löschen"
 
@@ -5288,7 +5295,7 @@ msgstr "Klick"
 msgid "Click \"{selector}\""
 msgstr "Klick auf \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:978
+#: src/components/model-picker/model-picker.tsx:1052
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Klicke auf ★ bei einem Modell unter Alle Modelle, um es hier hinzuzufügen."
 
@@ -5365,7 +5372,7 @@ msgstr "CLIP Skip"
 msgid "Close"
 msgstr "Schließen"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:80
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:85
 msgid "Close dialogs and menus"
 msgstr "Dialoge und Menüs schließen"
 
@@ -6009,7 +6016,7 @@ msgstr "Konfiguriert"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1040
+#: src/components/model-picker/model-picker.tsx:1114
 msgid "Confirm"
 msgstr "Bestätigen"
 
@@ -6601,7 +6608,7 @@ msgstr "Kopiere ihn jetzt – er wird nicht noch einmal angezeigt."
 #~ msgid "Copy key prefix {keyPrefix}"
 #~ msgstr "Schlüsselpräfix {keyPrefix} kopieren"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:68
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:72
 msgid "Copy Last Code Block"
 msgstr ""
 
@@ -6635,7 +6642,7 @@ msgid "Copy the Channel secret (Basic settings) and issue a long-lived Channel a
 msgstr "Kopiere das Channel Secret (Basic settings) und stelle ein langlebiges Channel Access Token aus (Tab Messaging API)."
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("copyLastCodeBlock"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:79
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:84
 msgid "Copy the last code block of the latest assistant reply ({0})"
 msgstr ""
 
@@ -7505,7 +7512,7 @@ msgstr "Anpassung"
 msgid "Customize and regenerate"
 msgstr "Anpassen und neu generieren"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:189
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:195
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "Tastenkürzel für häufige Aktionen anpassen. Klicke auf \"Aufzeichnen\" und drücke die gewünschte Tastenkombination."
 
@@ -7881,6 +7888,10 @@ msgstr "Standardmodell aktualisiert"
 #: src/components/settings/settings-modal.tsx:261
 msgid "Default Models"
 msgstr "Standardmodelle"
+
+#: src/components/model-picker/model-picker.tsx:1005
+msgid "Default order"
+msgstr ""
 
 #: src/features/prompts/components/variable-definitions.tsx:106
 msgid "Default Value"
@@ -8370,7 +8381,7 @@ msgstr "Beschreibe, was du möchtest. Der Builder fragt nach, wenn etwas unklar 
 msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 msgstr "Beschreibe deinen Workflow... z. B. „Ein Bild aus Text generieren, hochskalieren und dann den Hintergrund entfernen“"
 
-#: src/components/model-picker/model-picker.tsx:154
+#: src/components/model-picker/model-picker.tsx:158
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -8456,7 +8467,7 @@ msgstr "Deterministische Prüfungen, die jede Antwort bestehen muss."
 msgid "Deterministic, consistent"
 msgstr "Deterministisch, konsistent"
 
-#: src/components/model-picker/model-picker.tsx:192
+#: src/components/model-picker/model-picker.tsx:225
 #: src/features/marketing/components/tutorials-page.tsx:131
 msgid "Developer"
 msgstr "Entwickler"
@@ -8562,7 +8573,7 @@ msgstr "Directory (tenant) ID – erforderlich für Single-Tenant-Bots, bei Mult
 msgid "Disable 2FA"
 msgstr "2FA deaktivieren"
 
-#: src/features/settings/components/chat/models-settings.tsx:372
+#: src/features/settings/components/chat/models-settings.tsx:375
 msgid "Disable All"
 msgstr "Alle deaktivieren"
 
@@ -9463,7 +9474,7 @@ msgid "Efficient reasoning with sparse activation"
 msgstr "Effizientes Reasoning mit sparsamer Aktivierung"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:153
-#: src/components/model-picker/model-picker.tsx:72
+#: src/components/model-picker/model-picker.tsx:76
 msgid "Effort Control"
 msgstr "Aufwandssteuerung"
 
@@ -9577,8 +9588,8 @@ msgstr "Aktiviere zuerst einen Skill – nur aktivierte Skills können evaluiert
 msgid "Enable advanced features and options."
 msgstr "Erweiterte Funktionen und Optionen aktivieren."
 
-#: src/features/settings/components/chat/models-settings.tsx:369
-#: src/features/settings/components/chat/models-settings.tsx:519
+#: src/features/settings/components/chat/models-settings.tsx:372
+#: src/features/settings/components/chat/models-settings.tsx:522
 msgid "Enable All"
 msgstr "Alle aktivieren"
 
@@ -9622,7 +9633,7 @@ msgstr "Für nächsten Chat aktivieren"
 msgid "Enable memory"
 msgstr "Erinnerungen aktivieren"
 
-#: src/features/settings/components/chat/models-settings.tsx:364
+#: src/features/settings/components/chat/models-settings.tsx:367
 msgid "Enable or disable models to control which ones appear in the model selector."
 msgstr "Aktiviere oder deaktiviere Modelle, um festzulegen, welche in der Modellauswahl erscheinen."
 
@@ -9844,7 +9855,7 @@ msgstr "Standardwert eingeben..."
 msgid "Enter email address"
 msgstr "E-Mail-Adresse eingeben"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:62
+#: src/features/chat/lock/locked-chat-gate.tsx:86
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr ""
 
@@ -10127,7 +10138,7 @@ msgstr "Fehler: {error}"
 msgid "Errors"
 msgstr "Fehler"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:69
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:73
 msgid "Escape"
 msgstr "Escape"
 
@@ -10655,7 +10666,7 @@ msgstr "längere Dauer"
 msgid "extended thinking"
 msgstr "erweitertes Denken"
 
-#: src/components/model-picker/model-picker.tsx:76
+#: src/components/model-picker/model-picker.tsx:80
 msgid "Extended Thinking"
 msgstr "Erweitertes Denken"
 
@@ -10973,7 +10984,7 @@ msgstr "Sammlung konnte nicht entfernt werden"
 msgid "Failed to detach file"
 msgstr "Datei konnte nicht entfernt werden"
 
-#: src/features/settings/components/chat/models-settings.tsx:310
+#: src/features/settings/components/chat/models-settings.tsx:312
 msgid "Failed to disable all models"
 msgstr "Alle Modelle konnten nicht deaktiviert werden"
 
@@ -10997,11 +11008,11 @@ msgstr "Export konnte nicht heruntergeladen werden"
 msgid "Failed to download file. Please try again."
 msgstr "Datei konnte nicht heruntergeladen werden. Bitte versuche es erneut."
 
-#: src/features/settings/components/chat/models-settings.tsx:289
+#: src/features/settings/components/chat/models-settings.tsx:291
 msgid "Failed to enable all models"
 msgstr "Alle Modelle konnten nicht aktiviert werden"
 
-#: src/features/settings/components/chat/models-settings.tsx:351
+#: src/features/settings/components/chat/models-settings.tsx:353
 msgid "Failed to enable models by provider"
 msgstr "Modelle konnten nicht nach Anbieter aktiviert werden"
 
@@ -11197,7 +11208,7 @@ msgstr "Tags konnten nicht neu angeordnet werden"
 msgid "Failed to request export"
 msgstr "Exportanfrage fehlgeschlagen"
 
-#: src/features/settings/components/chat/models-settings.tsx:323
+#: src/features/settings/components/chat/models-settings.tsx:325
 msgid "Failed to reset to defaults"
 msgstr "Zurücksetzen auf Standard fehlgeschlagen"
 
@@ -11392,14 +11403,14 @@ msgstr "Favorit konnte nicht aktualisiert werden"
 msgid "Failed to update favorite status"
 msgstr "Favoritenstatus konnte nicht aktualisiert werden"
 
-#: src/components/model-picker/model-picker.tsx:628
-#: src/components/model-picker/model-picker.tsx:637
+#: src/components/model-picker/model-picker.tsx:672
+#: src/components/model-picker/model-picker.tsx:681
 #: src/features/settings/components/chat/model-filter-settings.tsx:56
 #: src/features/settings/components/chat/model-filter-settings.tsx:67
 msgid "Failed to update filter rules"
 msgstr "Filterregeln konnten nicht aktualisiert werden"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:107
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
 msgid "Failed to update keyboard shortcuts"
 msgstr "Tastenkürzel konnten nicht aktualisiert werden"
 
@@ -11412,7 +11423,7 @@ msgstr "MCP-Server konnte nicht aktualisiert werden"
 msgid "Failed to update memory"
 msgstr "Erinnerung konnte nicht aktualisiert werden"
 
-#: src/features/settings/components/chat/models-settings.tsx:266
+#: src/features/settings/components/chat/models-settings.tsx:268
 msgid "Failed to update model"
 msgstr "Modell konnte nicht aktualisiert werden"
 
@@ -11554,9 +11565,9 @@ msgid "fast"
 msgstr "schnell"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:141
-#: src/components/model-picker/model-picker.tsx:73
+#: src/components/model-picker/model-picker.tsx:77
 #: src/features/marketing/components/model-detail-page.tsx:33
-#: src/features/settings/components/chat/models-settings.tsx:27
+#: src/features/settings/components/chat/models-settings.tsx:29
 msgid "Fast"
 msgstr "Schnell"
 
@@ -11821,6 +11832,10 @@ msgstr "Schnellstes und günstigstes Claude-Modell"
 msgid "Favicon"
 msgstr "Favicon"
 
+#: src/features/settings/components/chat/favorite-models-settings.tsx:113
+msgid "Favorite models"
+msgstr ""
+
 #: src/features/pages/components/pages-sidebar.tsx:202
 msgid "Favorite pages"
 msgstr "Favorisierte Seiten"
@@ -11839,7 +11854,7 @@ msgstr "Empfohlen"
 msgid "Featured image"
 msgstr "Beitragsbild"
 
-#: src/components/model-picker/model-picker.tsx:166
+#: src/components/model-picker/model-picker.tsx:170
 #: src/features/marketing/components/gateway-footer.tsx:32
 #: src/features/marketing/components/gateway-landing-page.tsx:510
 #: src/features/marketing/components/gateway-navbar.tsx:53
@@ -12059,7 +12074,7 @@ msgid "Filtering"
 msgstr "Filtern"
 
 #: src/features/canvas/canvas-panel.tsx:123
-#: src/features/settings/components/chat/models-settings.tsx:402
+#: src/features/settings/components/chat/models-settings.tsx:405
 msgid "Filters"
 msgstr "Filter"
 
@@ -12372,8 +12387,8 @@ msgstr "Frankreich"
 #: src/features/billing/components/personal-plan-card.tsx:23
 #: src/features/marketing/components/gateway-landing-page.tsx:114
 #: src/features/marketing/components/landing-page.tsx:326
-#: src/features/settings/components/chat/models-settings.tsx:37
-#: src/features/settings/components/chat/models-settings.tsx:573
+#: src/features/settings/components/chat/models-settings.tsx:39
+#: src/features/settings/components/chat/models-settings.tsx:576
 msgid "Free"
 msgstr "Kostenlos"
 
@@ -13507,7 +13522,7 @@ msgstr "Gastkonto"
 msgid "Guest accounts"
 msgstr "Gastkonten"
 
-#: src/components/model-picker/model-picker.tsx:803
+#: src/components/model-picker/model-picker.tsx:856
 msgid "Guest accounts use free models only."
 msgstr "Gastkonten verwenden nur kostenlose Modelle."
 
@@ -13622,7 +13637,7 @@ msgid "Hello {0}! What would you like to do today?"
 msgstr "Hallo {0}! Was möchtest du heute tun?"
 
 #: src/features/layout/components/sidebar-shortcut.tsx:275
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:70
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:74
 msgid "Help"
 msgstr "Hilfe"
 
@@ -13646,7 +13661,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:955
+#: src/components/model-picker/model-picker.tsx:1029
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -14063,12 +14078,12 @@ msgstr "Illustration"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:910
+#: src/components/model-picker/model-picker.tsx:968
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:222
-#: src/features/settings/components/chat/models-settings.tsx:38
+#: src/features/settings/components/chat/models-settings.tsx:40
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:71
 #: src/features/workflow/components/gallery/gallery-card.tsx:27
 #: src/features/workflow/components/nodes/output-node.tsx:19
@@ -14102,8 +14117,8 @@ msgstr "Bildanhang (ausgeblendet)"
 msgid "image editing"
 msgstr "Bildbearbeitung"
 
-#: src/components/model-picker/model-picker.tsx:74
-#: src/features/settings/components/chat/models-settings.tsx:31
+#: src/components/model-picker/model-picker.tsx:78
+#: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Image Gen"
 msgstr "Bildgenerierung"
 
@@ -14551,6 +14566,7 @@ msgid "inpainting"
 msgstr "Inpainting"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
+#: src/components/model-picker/model-picker.tsx:193
 #: src/features/devices/components/device-tool-call.tsx:89
 #: src/features/evals/components/case-fields.tsx:69
 #: src/features/evals/components/dataset-panel.tsx:144
@@ -15093,7 +15109,7 @@ msgstr "Tastenkürzel"
 #: src/components/settings/settings-modal.tsx:252
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:70
 #: src/features/layout/lib/dashboard-page-names.ts:25
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:187
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:193
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:76
 msgid "Keyboard Shortcuts"
 msgstr "Tastenkürzel"
@@ -15103,11 +15119,11 @@ msgstr "Tastenkürzel"
 msgid "Keyboard shortcuts (?)"
 msgstr "Tastenkürzel (?)"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:180
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:186
 msgid "Keyboard shortcuts reset to defaults"
 msgstr "Tastenkürzel auf Standardwerte zurückgesetzt"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:105
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
 msgid "Keyboard shortcuts updated successfully"
 msgstr "Tastenkürzel erfolgreich aktualisiert"
 
@@ -16105,7 +16121,7 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1023
+#: src/components/model-picker/model-picker.tsx:1097
 msgid "Locked to {0} models"
 msgstr "Auf {0}-Modelle beschränkt"
 
@@ -16382,7 +16398,7 @@ msgstr "Einwilligungseinstellungen verwalten"
 #~ msgid "Manage gateway API keys with per-key budgets and rate limits"
 #~ msgstr "Gateway-API-Schlüssel mit Budgets und Ratenlimits pro Schlüssel verwalten"
 
-#: src/components/model-picker/model-picker.tsx:640
+#: src/components/model-picker/model-picker.tsx:684
 msgid "Manage hidden labs"
 msgstr ""
 
@@ -16606,7 +16622,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Max. Größe: {size} • Max. {maxFiles} Dateien"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
-#: src/components/model-picker/model-picker.tsx:1017
+#: src/components/model-picker/model-picker.tsx:1091
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Maximale Anzahl von {MAX_PARALLEL} Modellen erreicht"
 
@@ -17122,7 +17138,7 @@ msgstr "Mobile-App-Icon"
 msgid "Mode"
 msgstr "Modus"
 
-#: src/features/settings/components/chat/models-settings.tsx:430
+#: src/features/settings/components/chat/models-settings.tsx:433
 msgid "Mode:"
 msgstr "Modus:"
 
@@ -17170,11 +17186,11 @@ msgstr "Modellvergleich"
 msgid "Model context usage"
 msgstr "Kontextnutzung des Modells"
 
-#: src/features/settings/components/chat/models-settings.tsx:264
+#: src/features/settings/components/chat/models-settings.tsx:266
 msgid "Model disabled"
 msgstr "Modell deaktiviert"
 
-#: src/features/settings/components/chat/models-settings.tsx:264
+#: src/features/settings/components/chat/models-settings.tsx:266
 msgid "Model enabled"
 msgstr "Modell aktiviert"
 
@@ -17182,7 +17198,7 @@ msgstr "Modell aktiviert"
 msgid "Model filter"
 msgstr "Modellfilter"
 
-#: src/components/model-picker/model-picker.tsx:303
+#: src/components/model-picker/model-picker.tsx:344
 msgid "Model info"
 msgstr "Modellinfo"
 
@@ -17227,7 +17243,7 @@ msgstr "Modell: OpenAI Whisper"
 #: src/features/marketing/components/navbar-menu.tsx:58
 #: src/features/marketing/components/navbar-menu.tsx:159
 #: src/features/settings/components/chat/custom-providers-settings.tsx:564
-#: src/features/settings/components/chat/models-settings.tsx:362
+#: src/features/settings/components/chat/models-settings.tsx:365
 #: src/features/settings/components/chat/native-providers-settings.tsx:637
 msgid "Models"
 msgstr "Modelle"
@@ -17602,7 +17618,7 @@ msgstr "Multimodale Aufgaben, bei denen MiniMax M2 zuverlässiges Bild- und Text
 msgid "Mumbai, Kolkata"
 msgstr "Mumbai, Kolkata"
 
-#: src/features/settings/components/chat/models-settings.tsx:39
+#: src/features/settings/components/chat/models-settings.tsx:41
 msgid "Music"
 msgstr "Musik"
 
@@ -17664,6 +17680,10 @@ msgstr "Birmanisch (Myanmar)"
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:110
 msgid "Name"
 msgstr "Name"
+
+#: src/components/model-picker/model-picker.tsx:1006
+msgid "Name (A to Z)"
+msgstr ""
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:74
 msgid "Name and prompt are required"
@@ -17945,9 +17965,9 @@ msgid "Never used"
 msgstr "Nie verwendet"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:145
-#: src/components/model-picker/model-picker.tsx:274
-#: src/features/settings/components/chat/models-settings.tsx:40
-#: src/features/settings/components/chat/models-settings.tsx:563
+#: src/components/model-picker/model-picker.tsx:315
+#: src/features/settings/components/chat/models-settings.tsx:42
+#: src/features/settings/components/chat/models-settings.tsx:566
 msgid "New"
 msgstr "Neu"
 
@@ -17980,7 +18000,7 @@ msgstr "Neuer Chat"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:29
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:220
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:71
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:75
 msgid "New Chat"
 msgstr "Neuer Chat"
 
@@ -18009,6 +18029,10 @@ msgstr "Neuer Datensatz"
 #: src/features/settings/components/privacy/data-export.tsx:158
 msgid "New Export"
 msgstr "Neuer Export"
+
+#: src/components/model-picker/model-picker.tsx:1007
+msgid "New first"
+msgstr ""
 
 #: src/features/tasks/components/goal-form-dialog.tsx:73
 #: src/features/tasks/components/tasks-page.tsx:201
@@ -18072,7 +18096,7 @@ msgstr "Neuer Tag"
 msgid "New task"
 msgstr "Neue Aufgabe"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:72
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:76
 msgid "New Temporary Chat"
 msgstr "Neuer temporärer Chat"
 
@@ -18217,9 +18241,14 @@ msgstr "Seedance-2.0-Architektur der nächsten Generation von ByteDance"
 msgid "Nicaragua"
 msgstr "Nicaragua"
 
+#: src/features/settings/components/chat/favorite-models-settings.tsx:53
 #: src/features/settings/components/personalization/personalization-settings.tsx:151
 msgid "Nickname"
 msgstr "Spitzname"
+
+#: src/features/settings/components/chat/favorite-models-settings.tsx:37
+msgid "Nickname for {label}"
+msgstr ""
 
 #: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:153
 #: src/features/settings/components/privacy/data-access.tsx:42
@@ -18500,12 +18529,12 @@ msgstr "Kein Mikrofon gefunden."
 msgid "No models available"
 msgstr "Keine Modelle verfügbar"
 
-#: src/features/settings/components/chat/models-settings.tsx:509
+#: src/features/settings/components/chat/models-settings.tsx:512
 msgid "No models found matching your filters."
 msgstr "Keine Modelle gefunden, die deinen Filtern entsprechen."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:711
-#: src/components/model-picker/model-picker.tsx:984
+#: src/components/model-picker/model-picker.tsx:1058
 msgid "No models found."
 msgstr "Keine Modelle gefunden."
 
@@ -18624,7 +18653,7 @@ msgstr "Für diesen Zeitraum wurden keine Antworten erfasst."
 msgid "No resolved comments."
 msgstr "Keine erledigten Kommentare."
 
-#: src/features/chat/thread/comparison-view.tsx:62
+#: src/features/chat/thread/comparison-view.tsx:63
 msgid "No response yet"
 msgstr "Noch keine Antwort"
 
@@ -18695,7 +18724,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "Keine Sprache erkannt. Freihandmodus beendet."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:703
-#: src/components/model-picker/model-picker.tsx:976
+#: src/components/model-picker/model-picker.tsx:1050
 msgid "No starred models"
 msgstr "Keine markierten Modelle"
 
@@ -18932,8 +18961,8 @@ msgstr "Nicht gekoppelt – der Bot antwortet noch niemandem"
 msgid "Not rated"
 msgstr "Nicht bewertet"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:219
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:224
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:225
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:230
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "Nicht festgelegt"
@@ -19266,7 +19295,7 @@ msgid "Online"
 msgstr "Online"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:393
+#: src/components/model-picker/model-picker.tsx:434
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "Nur {0}-Modelle können verglichen werden. Auswahl löschen, um Typen zu wechseln."
 
@@ -19348,7 +19377,7 @@ msgctxt "stock opening price"
 msgid "Open"
 msgstr "Eröffnung"
 
-#: src/features/chat/thread/comparison-view.tsx:138
+#: src/features/chat/thread/comparison-view.tsx:140
 msgid "Open {modelName} in full thread"
 msgstr "{modelName} im vollständigen Thread öffnen"
 
@@ -19413,6 +19442,10 @@ msgstr "Menü öffnen"
 msgid "Open messages"
 msgstr "Nachrichten öffnen"
 
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:77
+msgid "Open Model Picker"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:230
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Öffne Neore in der Desktop-App, um diesen Computer zu koppeln. Bereits gekoppelte Geräte stehen unten."
@@ -19442,7 +19475,7 @@ msgid "Open search"
 msgstr "Suche öffnen"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("search"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:84
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:90
 msgid "Open search ({0})"
 msgstr "Suche öffnen ({0})"
 
@@ -19498,6 +19531,11 @@ msgstr "Aufgaben öffnen"
 #: src/features/local-models/components/local-setup-guide.tsx:133
 msgid "Open the Developer tab and start the server."
 msgstr "Öffne den Tab Developer und starte den Server."
+
+#. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("openModelPicker"))
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:89
+msgid "Open the model picker in the composer ({0})"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:118
 msgid "Open the run's conversation"
@@ -19918,6 +19956,10 @@ msgstr "Oder gib deine eigene Antwort ein…"
 msgid "Orange"
 msgstr "Orange"
 
+#: src/features/settings/components/chat/favorite-models-settings.tsx:115
+msgid "Order the models you starred in the model picker and give them your own names. A nickname shows in the picker, the composer and on replies."
+msgstr ""
+
 #: src/components/settings/settings-modal.tsx:280
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
@@ -20007,7 +20049,7 @@ msgid "Original system prompt"
 msgstr "Ursprünglicher System-Prompt"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:143
-#: src/features/settings/components/chat/models-settings.tsx:516
+#: src/features/settings/components/chat/models-settings.tsx:519
 msgid "Other"
 msgstr "Sonstiges"
 
@@ -20018,6 +20060,10 @@ msgstr "Andere Dateinamen"
 #: src/features/marketing/components/model-detail-page.tsx:88
 msgid "Other image models"
 msgstr "Andere Bildmodelle"
+
+#: src/features/settings/components/chat/favorite-models-settings.tsx:166
+msgid "Other models with a nickname"
+msgstr ""
 
 #: src/features/chat/prompt-improvement/components/apply-preset-menu.tsx:98
 msgid "Other presets"
@@ -20047,6 +20093,7 @@ msgstr "Outpainting"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:523
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
+#: src/components/model-picker/model-picker.tsx:197
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
 #: src/features/workflow/types/index.ts:584
@@ -20087,15 +20134,15 @@ msgstr "Fokus auf Ausgabeformat"
 msgid "Output:"
 msgstr "Ausgabe:"
 
-#: src/features/settings/components/chat/models-settings.tsx:584
+#: src/features/settings/components/chat/models-settings.tsx:587
 msgid "Overridden"
 msgstr "Überschrieben"
 
-#: src/features/settings/components/chat/models-settings.tsx:582
+#: src/features/settings/components/chat/models-settings.tsx:585
 msgid "Overridden: Disabled"
 msgstr "Überschrieben: Deaktiviert"
 
-#: src/features/settings/components/chat/models-settings.tsx:582
+#: src/features/settings/components/chat/models-settings.tsx:585
 msgid "Overridden: Enabled"
 msgstr "Überschrieben: Aktiviert"
 
@@ -20209,7 +20256,7 @@ msgid "Paraguay"
 msgstr "Paraguay"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:595
-#: src/components/model-picker/model-picker.tsx:869
+#: src/components/model-picker/model-picker.tsx:922
 msgid "Parallel"
 msgstr "Parallel"
 
@@ -20437,8 +20484,8 @@ msgstr "Zahlungen, Bestellungen, Rechnungen und Abonnements über PayPal"
 msgid "Payments, subscriptions, and financial data"
 msgstr "Zahlungen, Abonnements und Finanzdaten"
 
-#: src/components/model-picker/model-picker.tsx:75
-#: src/features/settings/components/chat/models-settings.tsx:32
+#: src/components/model-picker/model-picker.tsx:79
+#: src/features/settings/components/chat/models-settings.tsx:34
 msgid "PDF"
 msgstr "PDF"
 
@@ -20967,7 +21014,7 @@ msgstr "Bevorzugtes Modell: {0}"
 msgid "premium"
 msgstr "Premium"
 
-#: src/features/settings/components/chat/models-settings.tsx:41
+#: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/settings/connectors/connector-card.tsx:108
 msgid "Premium"
 msgstr "Premium"
@@ -21099,7 +21146,7 @@ msgstr "Enter drücken zum Senden"
 msgid "Press Enter to send, Shift+Enter for new line"
 msgstr "Enter zum Senden, Shift+Enter für neue Zeile"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:223
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:229
 msgid "Press keys..."
 msgstr "Tasten drücken..."
 
@@ -21224,6 +21271,18 @@ msgstr "Vorherige Folie"
 msgid "Previous version"
 msgstr "Vorherige Version"
 
+#: src/components/model-picker/model-picker.tsx:189
+msgid "Price per 1M tokens"
+msgstr ""
+
+#: src/components/model-picker/model-picker.tsx:1009
+msgid "Price: high to low"
+msgstr ""
+
+#: src/components/model-picker/model-picker.tsx:1008
+msgid "Price: low to high"
+msgstr ""
+
 #: src/features/marketing/components/gateway-footer.tsx:27
 #: src/features/marketing/components/gateway-landing-page.tsx:716
 #: src/features/marketing/components/gateway-navbar.tsx:71
@@ -21290,11 +21349,11 @@ msgid "Private by default"
 msgstr "Standardmäßig privat"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
-#: src/components/model-picker/model-picker.tsx:268
+#: src/components/model-picker/model-picker.tsx:302
 #: src/features/billing/components/personal-plan-card.tsx:23
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
-#: src/features/settings/components/chat/models-settings.tsx:553
+#: src/features/settings/components/chat/models-settings.tsx:556
 #: src/features/workflow/components/nodes/pro-badge.tsx:6
 msgid "Pro"
 msgstr "Pro"
@@ -21627,7 +21686,7 @@ msgstr "Bewährte Kino-Ästhetik"
 msgid "Proven reliability from previous generation"
 msgstr "Bewährte Zuverlässigkeit der Vorgängergeneration"
 
-#: src/components/model-picker/model-picker.tsx:186
+#: src/components/model-picker/model-picker.tsx:219
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -21661,7 +21720,7 @@ msgstr "Anbieterbeschränkungen"
 msgid "Provider updated"
 msgstr "Anbieter aktualisiert"
 
-#: src/features/settings/components/chat/models-settings.tsx:409
+#: src/features/settings/components/chat/models-settings.tsx:412
 msgid "Provider:"
 msgstr "Anbieter:"
 
@@ -22101,7 +22160,7 @@ msgstr "Reasoning"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:149
 #: ../../packages/ui/src/components/ai-elements/context.tsx:315
 #: src/features/chat/thread/message-cost-badge.tsx:64
-#: src/features/settings/components/chat/models-settings.tsx:29
+#: src/features/settings/components/chat/models-settings.tsx:31
 msgid "Reasoning"
 msgstr "Reasoning"
 
@@ -22203,7 +22262,7 @@ msgstr "{0} neu verbinden"
 msgid "Reconnecting…"
 msgstr "Verbindung wird wiederhergestellt…"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:239
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:245
 msgid "Record"
 msgstr "Aufzeichnen"
 
@@ -22528,6 +22587,7 @@ msgstr "Angemeldet bleiben"
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
+#: src/features/settings/components/chat/favorite-models-settings.tsx:181
 #: src/features/settings/components/chat/native-providers-settings.tsx:723
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:203
 msgid "Remove"
@@ -22646,7 +22706,7 @@ msgid "Remove from project"
 msgstr "Aus Projekt entfernen"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:288
+#: src/components/model-picker/model-picker.tsx:329
 msgid "Remove from starred"
 msgstr "Aus Markierungen entfernen"
 
@@ -22667,6 +22727,10 @@ msgstr "Mitglied entfernen"
 #: src/features/workflow/components/nodes/parallel-compare-node.tsx:131
 msgid "Remove model"
 msgstr "Modell entfernen"
+
+#: src/features/settings/components/chat/favorite-models-settings.tsx:180
+msgid "Remove nickname for {id}"
+msgstr ""
 
 #: src/features/workflow/components/nodes/object-editor-node.tsx:25
 msgid "Remove Object"
@@ -22730,6 +22794,11 @@ msgstr "Entfernt:"
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Reopen"
 msgstr "Wieder öffnen"
+
+#. placeholder {0}: getModelLabel(model, nicknames)
+#: src/features/settings/components/chat/favorite-models-settings.tsx:144
+msgid "Reorder {0}"
+msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:305
 msgid "Reorder sort"
@@ -22950,12 +23019,12 @@ msgstr "Passwort zurücksetzen"
 msgid "Reset sorting"
 msgstr "Sortierung zurücksetzen"
 
-#: src/features/settings/components/chat/models-settings.tsx:321
+#: src/features/settings/components/chat/models-settings.tsx:323
 msgid "Reset to defaults"
 msgstr "Auf Standard zurücksetzen"
 
-#: src/features/settings/components/chat/models-settings.tsx:376
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:265
+#: src/features/settings/components/chat/models-settings.tsx:379
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:271
 msgid "Reset to Defaults"
 msgstr "Auf Standardwerte zurücksetzen"
 
@@ -23624,7 +23693,7 @@ msgstr "Vorlage speichern"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Speichere wiederverwendbare System-Prompts und verknüpfe sie mit bestimmten Modellen. Nutze die Schaltfläche Optimieren, um jede Vorlage mit dem Prompt-Optimierer zu verfeinern."
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:270
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:276
 msgid "Save Shortcuts"
 msgstr "Tastenkürzel speichern"
 
@@ -23671,7 +23740,7 @@ msgstr "In \"{0}\" gespeichert"
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:270
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:276
 #: src/features/slides/components/slide-editor-dialog.tsx:117
 msgid "Saving..."
 msgstr "Wird gespeichert..."
@@ -23779,7 +23848,7 @@ msgstr "Nahtlose Schleife"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:91
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:73
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:78
 msgid "Search"
 msgstr "Suchen"
 
@@ -23865,12 +23934,12 @@ msgstr "Suchmodus"
 msgid "Search mode: {0}"
 msgstr "Suchmodus: {0}"
 
-#: src/features/settings/components/chat/models-settings.tsx:389
+#: src/features/settings/components/chat/models-settings.tsx:392
 msgid "Search models by name, ID, or provider..."
 msgstr "Modelle nach Name, ID oder Anbieter suchen..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:528
-#: src/components/model-picker/model-picker.tsx:810
+#: src/components/model-picker/model-picker.tsx:863
 msgid "Search models..."
 msgstr "Modelle suchen..."
 
@@ -24140,7 +24209,7 @@ msgid "Select mode"
 msgstr "Modus auswählen"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
-#: src/components/model-picker/model-picker-button.tsx:177
+#: src/components/model-picker/model-picker-button.tsx:196
 #: src/components/model-picker/model-picker-popup.tsx:42
 msgid "Select Model"
 msgstr "Modell auswählen"
@@ -24150,7 +24219,7 @@ msgid "Select model (optional)"
 msgstr "Modell auswählen (optional)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
-#: src/components/model-picker/model-picker-button.tsx:94
+#: src/components/model-picker/model-picker-button.tsx:99
 #: src/features/workflow/components/nodes/background-removal-node.tsx:66
 #: src/features/workflow/components/nodes/character-ref-node.tsx:147
 #: src/features/workflow/components/nodes/controlnet-node.tsx:133
@@ -24265,7 +24334,7 @@ msgstr "Halbrealistisches Modell mit guter Prompt-Treue"
 msgid "Semi-realistic visual style"
 msgstr "Halbrealistischer Bildstil"
 
-#: src/features/chat/thread/comparison-view.tsx:63
+#: src/features/chat/thread/comparison-view.tsx:64
 msgid "Send a message below to start"
 msgstr "Sende eine Nachricht unten, um zu beginnen"
 
@@ -24608,7 +24677,7 @@ msgid "Show follow-up suggestions after assistant messages."
 msgstr "Folgevorschläge nach Assistentennachrichten anzeigen."
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("help"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:81
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:86
 msgid "Show help dialog ({0})"
 msgstr "Hilfedialog anzeigen ({0})"
 
@@ -24708,11 +24777,11 @@ msgstr "Wird dem Assistenten angezeigt, damit er weiß, wann der Skill passt."
 msgid "Sidebar"
 msgstr "Seitenleiste"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:74
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:79
 msgid "Sidebar Left"
 msgstr "Linke Seitenleiste"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:75
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:80
 msgid "Sidebar Right"
 msgstr "Rechte Seitenleiste"
 
@@ -24808,7 +24877,7 @@ msgid "Sign up successful"
 msgstr "Registrierung erfolgreich"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:246
-#: src/components/model-picker/model-picker.tsx:390
+#: src/components/model-picker/model-picker.tsx:431
 msgid "Sign up to unlock all models"
 msgstr "Registriere dich, um alle Modelle freizuschalten"
 
@@ -24874,7 +24943,7 @@ msgid "Singapore"
 msgstr "Singapur"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:582
-#: src/components/model-picker/model-picker.tsx:857
+#: src/components/model-picker/model-picker.tsx:910
 msgid "Single"
 msgstr "Einzeln"
 
@@ -25207,6 +25276,10 @@ msgstr "Daten sortieren"
 msgid "Sort desc"
 msgstr "Absteigend sortieren"
 
+#: src/components/model-picker/model-picker.tsx:999
+msgid "Sort models"
+msgstr ""
+
 #: src/features/skills/components/skill-list.tsx:372
 msgid "Sort skills"
 msgstr "Skills sortieren"
@@ -25533,8 +25606,12 @@ msgstr "Standard-Suchtiefe"
 msgid "Star"
 msgstr "Stern"
 
+#: src/features/settings/components/chat/favorite-models-settings.tsx:120
+msgid "Star a model in the model picker and it shows up here."
+msgstr ""
+
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:547
-#: src/components/model-picker/model-picker.tsx:826
+#: src/components/model-picker/model-picker.tsx:879
 msgid "Starred"
 msgstr "Markiert"
 
@@ -25568,7 +25645,7 @@ msgid "Start a new chat"
 msgstr "Neuen Chat starten"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("newChat"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:82
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:87
 msgid "Start a new chat ({0})"
 msgstr "Neuen Chat starten ({0})"
 
@@ -25581,7 +25658,7 @@ msgid "Start a new conversation to create your first thread"
 msgstr "Starte eine neue Unterhaltung, um deinen ersten Thread zu erstellen"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("newTemporaryChat"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:83
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:88
 msgid "Start a new temporary chat ({0})"
 msgstr "Neuen temporären Chat starten ({0})"
 
@@ -25725,7 +25802,7 @@ msgstr "OpenAI-Qualität auf dem neuesten Stand der Technik"
 msgid "State-of-the-art performance across all benchmarks"
 msgstr "Spitzenleistung in allen Benchmarks"
 
-#: src/features/settings/components/chat/models-settings.tsx:451
+#: src/features/settings/components/chat/models-settings.tsx:454
 msgid "State:"
 msgstr "Status:"
 
@@ -25783,7 +25860,7 @@ msgstr "Aktien"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:239
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:245
 #: src/features/workflow/components/canvas/workflow-controls.tsx:571
 msgid "Stop"
 msgstr "Stopp"
@@ -26222,7 +26299,7 @@ msgstr "Der Sub-Agent wurde nicht genehmigt."
 msgid "Subheading"
 msgstr "Zwischenüberschrift"
 
-#: src/components/model-picker/model-picker.tsx:805
+#: src/components/model-picker/model-picker.tsx:858
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Abonniere für 8 $/Monat, um alle Modelle freizuschalten."
 
@@ -26877,12 +26954,12 @@ msgstr "Text"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:629
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:899
+#: src/components/model-picker/model-picker.tsx:955
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:180
-#: src/features/settings/components/chat/models-settings.tsx:42
+#: src/features/settings/components/chat/models-settings.tsx:44
 #: src/features/workflow/components/gallery/gallery-card.tsx:28
 #: src/features/workflow/components/nodes/output-node.tsx:16
 #: src/features/workflow/components/nodes/text-node.tsx:167
@@ -27073,7 +27150,7 @@ msgstr "Der Assistent hat eine Frage"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:85
+#: src/features/chat/thread/composer-model-selector.tsx:86
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -27537,7 +27614,7 @@ msgstr "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird die Organ
 msgid "This browser cannot receive push notifications here."
 msgstr "Dieser Browser kann hier keine Push-Benachrichtigungen empfangen."
 
-#: src/features/chat/lock/locked-chat-gate.tsx:60
+#: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
 msgstr ""
 
@@ -28072,7 +28149,7 @@ msgid "Toggle interactivity"
 msgstr ""
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("sidebarLeft"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:85
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:91
 msgid "Toggle left sidebar ({0})"
 msgstr "Linke Seitenleiste umschalten ({0})"
 
@@ -28091,7 +28168,7 @@ msgid "Toggle property panel"
 msgstr "Eigenschaftenbereich umschalten"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("sidebarRight"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:86
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:92
 msgid "Toggle right sidebar ({0})"
 msgstr "Rechte Seitenleiste umschalten ({0})"
 
@@ -28169,8 +28246,8 @@ msgstr "Tool-Aufrufe"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:157
 #: ../../packages/chat-ui/src/model-picker/utils.ts:161
-#: src/components/model-picker/model-picker.tsx:77
-#: src/features/settings/components/chat/models-settings.tsx:30
+#: src/components/model-picker/model-picker.tsx:81
+#: src/features/settings/components/chat/models-settings.tsx:32
 msgid "Tool Calling"
 msgstr "Tool-Aufrufe"
 
@@ -28602,7 +28679,7 @@ msgstr "Zwei-Faktor-Authentifizierung ist derzeit für dein Konto aktiviert. Die
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
-#: src/components/model-picker/model-picker.tsx:879
+#: src/components/model-picker/model-picker.tsx:933
 msgid "Type"
 msgstr "Typ"
 
@@ -28780,7 +28857,7 @@ msgid "Under the Hood"
 msgstr "Unter der Haube"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: src/components/model-picker/model-picker.tsx:635
+#: src/components/model-picker/model-picker.tsx:679
 #: src/features/canvas/canvas-panel.tsx:242
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
@@ -28871,7 +28948,7 @@ msgstr "Unbegrenzte Anfragen"
 msgid "Unlink"
 msgstr "Verknüpfung aufheben"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:64
+#: src/features/chat/lock/locked-chat-gate.tsx:88
 #: src/features/chat/thread-list/thread-node.tsx:718
 msgid "Unlock chat"
 msgstr ""
@@ -29849,12 +29926,12 @@ msgid "video"
 msgstr "Video"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
-#: src/components/model-picker/model-picker.tsx:921
+#: src/components/model-picker/model-picker.tsx:981
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:264
-#: src/features/settings/components/chat/models-settings.tsx:43
+#: src/features/settings/components/chat/models-settings.tsx:45
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:78
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
 #: src/features/workflow/components/gallery/publish-dialog.tsx:30
@@ -30115,8 +30192,8 @@ msgid "vision"
 msgstr "Bildverständnis"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:145
-#: src/components/model-picker/model-picker.tsx:78
-#: src/features/settings/components/chat/models-settings.tsx:28
+#: src/components/model-picker/model-picker.tsx:82
+#: src/features/settings/components/chat/models-settings.tsx:30
 msgid "Vision"
 msgstr "Bildverständnis"
 

@@ -11,7 +11,7 @@ import { GripVertical } from "lucide-react";
 import type { FC } from "react";
 import { useMemo, useState } from "react";
 
-import { getModelLabel, moveFavorite } from "@/components/model-picker/utilities";
+import { getModelLabel } from "@/components/model-picker/utilities";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
 import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
 import useCustomModels from "@/features/settings/hooks/use-custom-models";
@@ -98,6 +98,18 @@ const FavoriteModelsSettings: FC = () => {
         return catalog.filter((model) => nicknames[model.id] && !starred.has(model.id));
     }, [favoriteModelIds, catalog, nicknames]);
 
+    // A nickname for a model the catalog no longer lists still counts toward the saved cap, so it is listed by id to be cleared.
+    // Only once the gateway catalog has loaded: while it is empty (loading, or the fetch failed) every nickname would look retired.
+    const retiredNicknames = useMemo(() => {
+        if (models.length === 0) {
+            return [];
+        }
+
+        const listed = new Set(catalog.map((model) => model.id));
+
+        return Object.entries(nicknames).filter(([id]) => !listed.has(id));
+    }, [models, catalog, nicknames]);
+
     const visibleIds = favorites.map((model) => model.id);
 
     return (
@@ -118,7 +130,7 @@ const FavoriteModelsSettings: FC = () => {
                             const target = visibleIds[overIndex];
 
                             if (moved && target) {
-                                reorderFavorites(moveFavorite(favoriteModelIds, moved, target));
+                                reorderFavorites(moved, target);
                             }
                         }}
                         value={visibleIds}
@@ -154,7 +166,7 @@ const FavoriteModelsSettings: FC = () => {
                     </Sortable>
                 )}
 
-                {nicknamedOthers.length > 0 ? (
+                {nicknamedOthers.length > 0 || retiredNicknames.length > 0 ? (
                     <div className="space-y-1">
                         <p className="text-muted-foreground text-xs font-medium">{t`Other models with a nickname`}</p>
                         <ul className="space-y-1">
@@ -162,6 +174,17 @@ const FavoriteModelsSettings: FC = () => {
                                 <li className="bg-background flex items-center gap-2 rounded-md border px-2 py-1.5" key={model.id}>
                                     <ModelName model={model} nickname={nicknames[model.id]} />
                                     <NicknameField model={model} nickname={nicknames[model.id]} onCommit={setNickname} />
+                                </li>
+                            ))}
+                            {retiredNicknames.map(([id, nickname]) => (
+                                <li className="bg-background flex items-center gap-2 rounded-md border px-2 py-1.5" key={id}>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium">{nickname}</p>
+                                        <p className="text-muted-foreground truncate font-mono text-xs">{id}</p>
+                                    </div>
+                                    <Button aria-label={t`Remove nickname for ${id}`} onClick={() => setNickname(id, "")} size="sm" variant="ghost">
+                                        {t`Remove`}
+                                    </Button>
                                 </li>
                             ))}
                         </ul>

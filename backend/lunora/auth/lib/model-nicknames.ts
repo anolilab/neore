@@ -20,10 +20,12 @@ export const normalizeModelNicknames = (nicknames: Readonly<Record<string, strin
     const normalised: Record<string, string> = {};
 
     for (const [modelId, nickname] of Object.entries(nicknames)) {
+        // Keys are looked up by exact model id, so a padded key must be stored trimmed or it can never be shown or cleared.
+        const id = modelId.trim();
         const cleaned = nickname.replaceAll(WHITESPACE_RE, " ").trim();
 
-        if (cleaned !== "" && modelId.trim() !== "") {
-            normalised[modelId] = cleaned;
+        if (cleaned !== "" && id !== "") {
+            normalised[id] = cleaned;
         }
     }
 

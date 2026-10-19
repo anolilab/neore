@@ -19,14 +19,23 @@ export const useUserSettings = () => {
 };
 
 /**
+ * Tail of the settings writes in this tab. Each `updateLatest` write waits for the one before it,
+ * so the patch it builds sees the settings as the earlier write left them.
+ */
+const settingsWrites = { tail: Promise.resolve() as Promise<unknown> };
+
+/**
  * Hook to update user settings with optimistic updates.
+ *
+ * `updateLatest` is for a patch that depends on the current value (a list reorder, a map entry):
+ * it is built from the cache when its turn comes, so two quick edits cannot overwrite each other.
  */
 export const useUpdateUserSettings = () => {
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const queryOptions = crpc.auth.functions.getUserSettings.queryOptions({});
 
-    return useMutation({
+    const mutation = useMutation({
         ...crpc.auth.functions.updateUserSettings.mutationOptions(),
         onMutate: async (args) => {
             // Cancel any outgoing refetches
@@ -60,4 +69,13 @@ export const useUpdateUserSettings = () => {
             await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
         },
     });
+
+    const updateLatest = (build: (current: UserSettingsRow | undefined) => Parameters<typeof mutation.mutateAsync>[0]) => {
+        const run = settingsWrites.tail.then(() => mutation.mutateAsync(build(queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey))));
+
+        // The catch both keeps a failed write from stalling the queue and marks `run` handled (`mutate` swallows errors too).
+        settingsWrites.tail = run.catch(() => undefined);
+    };
+
+    return { ...mutation, updateLatest };
 };

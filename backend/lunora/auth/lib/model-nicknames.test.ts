@@ -15,6 +15,14 @@ describe("normalizeModelNicknames", () => {
         expect(normalizeModelNicknames({ "  ": "orphan" })).toEqual({});
     });
 
+    it("stores a padded model id under its trimmed key", () => {
+        expect(normalizeModelNicknames({ " openai/model ": "Fast" })).toEqual({ "openai/model": "Fast" });
+    });
+
+    it("keeps the later entry when two ids collide after trimming", () => {
+        expect(normalizeModelNicknames({ "a/b": "First", " a/b ": "Second" })).toEqual({ "a/b": "Second" });
+    });
+
     it("leaves a clean map as it was", () => {
         const clean = { "a/b": "One", "c/d": "Two" };
 

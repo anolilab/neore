@@ -276,7 +276,7 @@ msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, other {# 人のユーザー}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:149
+#: src/components/model-picker/model-picker-button.tsx:168
 msgid "{0, plural, one {1 model} other {# models}}"
 msgstr "{0, plural, other {# 個のモデル}}"
 
@@ -429,6 +429,12 @@ msgstr "{1} の{0}"
 msgid "{0} from {1} ratings"
 msgstr "{1} 件の評価で {0}"
 
+#. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
+#. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
+#: src/components/model-picker/model-picker.tsx:308
+msgid "{0} input, {1} output per 1M tokens"
+msgstr ""
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:209
 msgid "{0} is one of {totalModels}+ AI models available on Neore — all in one workspace, one subscription. No tab-switching. No managing six accounts."
@@ -501,7 +507,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{1} トークン中 {0} トークン使用（{2}%）"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1018
+#: src/components/model-picker/model-picker.tsx:1092
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} / {MAX_PARALLEL} 個を選択中"
 
@@ -895,7 +901,7 @@ msgstr "{name} の接続を有効化しました"
 msgid "{name} disconnected"
 msgstr "{name} の接続を解除しました"
 
-#: src/components/model-picker/model-picker.tsx:633
+#: src/components/model-picker/model-picker.tsx:677
 msgid "{name} hidden from the model picker"
 msgstr ""
 
@@ -1918,7 +1924,7 @@ msgid "Add to Favorites"
 msgstr "お気に入りに追加"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:288
+#: src/components/model-picker/model-picker.tsx:329
 msgid "Add to starred"
 msgstr "スターを付ける"
 
@@ -2478,13 +2484,13 @@ msgstr "垂直方向に整列（V）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:617
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
-#: src/components/model-picker/model-picker.tsx:888
-#: src/components/model-picker/model-picker.tsx:946
+#: src/components/model-picker/model-picker.tsx:942
+#: src/components/model-picker/model-picker.tsx:1020
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
-#: src/features/settings/components/chat/models-settings.tsx:417
-#: src/features/settings/components/chat/models-settings.tsx:438
-#: src/features/settings/components/chat/models-settings.tsx:459
+#: src/features/settings/components/chat/models-settings.tsx:420
+#: src/features/settings/components/chat/models-settings.tsx:441
+#: src/features/settings/components/chat/models-settings.tsx:462
 #: src/features/settings/connectors/connectors-page.tsx:73
 #: src/routes/(chat)/workflow/gallery.tsx:20
 msgid "All"
@@ -2495,7 +2501,7 @@ msgstr "すべて"
 msgid "All ({0})"
 msgstr "すべて（{0}）"
 
-#: src/features/settings/components/chat/models-settings.tsx:349
+#: src/features/settings/components/chat/models-settings.tsx:351
 msgid "All {provider} models enabled"
 msgstr "{provider} のすべてのモデルを有効にしました"
 
@@ -2557,7 +2563,7 @@ msgid "All MCP servers active"
 msgstr "すべての MCP サーバーが有効"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:563
-#: src/components/model-picker/model-picker.tsx:839
+#: src/components/model-picker/model-picker.tsx:892
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "すべてのモデル"
@@ -2570,7 +2576,7 @@ msgstr "すべてのモデルとツール"
 msgid "All models allowed (Enterprise)"
 msgstr "すべてのモデルを許可（Enterprise）"
 
-#: src/features/settings/components/chat/models-settings.tsx:308
+#: src/features/settings/components/chat/models-settings.tsx:310
 msgid "All models disabled"
 msgstr ""
 
@@ -2578,7 +2584,7 @@ msgstr ""
 #~ msgid "All models disabled (reset to defaults)"
 #~ msgstr "すべてのモデルを無効にしました（既定にリセット）"
 
-#: src/features/settings/components/chat/models-settings.tsx:287
+#: src/features/settings/components/chat/models-settings.tsx:289
 msgid "All models enabled"
 msgstr "すべてのモデルを有効にしました"
 
@@ -3354,7 +3360,7 @@ msgid "Auckland"
 msgstr "オークランド"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
-#: src/components/model-picker/model-picker.tsx:934
+#: src/components/model-picker/model-picker.tsx:994
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:119
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -4431,6 +4437,7 @@ msgstr "キャッシュ"
 msgid "Cache Hit Rate"
 msgstr "キャッシュヒット率"
 
+#: src/components/model-picker/model-picker.tsx:203
 #: src/features/chat/thread/message-cost-badge.tsx:56
 msgid "Cached input"
 msgstr "キャッシュ入力"
@@ -4645,7 +4652,7 @@ msgstr "キャンバスエディター"
 msgid "Canvas opens a side-by-side editor next to your chat. Write long-form documents, edit code, and refine content with AI assistance. Changes are versioned so you can always go back."
 msgstr "キャンバスは、チャットの横にエディターを並べて開きます。長文のドキュメントを書き、コードを編集し、AI の支援でコンテンツを磨き上げましょう。変更はバージョン管理されるので、いつでも元に戻せます。"
 
-#: src/features/settings/components/chat/models-settings.tsx:480
+#: src/features/settings/components/chat/models-settings.tsx:483
 msgid "Capabilities"
 msgstr "機能"
 
@@ -5216,8 +5223,8 @@ msgstr "クリーンアップに失敗しました"
 #: src/features/chat/thread/media-gallery-view.tsx:372
 #: src/features/prompts/components/prompt-list.tsx:615
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
-#: src/features/settings/components/chat/models-settings.tsx:472
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:250
+#: src/features/settings/components/chat/models-settings.tsx:475
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:256
 msgid "Clear"
 msgstr "クリア"
 
@@ -5288,7 +5295,7 @@ msgstr "クリック"
 msgid "Click \"{selector}\""
 msgstr "「{selector}」をクリック"
 
-#: src/components/model-picker/model-picker.tsx:978
+#: src/components/model-picker/model-picker.tsx:1052
 msgid "Click ★ on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの ★ をクリックすると、ここに追加されます。"
 
@@ -5365,7 +5372,7 @@ msgstr "CLIP Skip"
 msgid "Close"
 msgstr "閉じる"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:80
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:85
 msgid "Close dialogs and menus"
 msgstr "ダイアログとメニューを閉じる"
 
@@ -6009,7 +6016,7 @@ msgstr "設定済み"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1040
+#: src/components/model-picker/model-picker.tsx:1114
 msgid "Confirm"
 msgstr "確認"
 
@@ -6601,7 +6608,7 @@ msgstr "今すぐコピーしてください。再表示はされません。"
 #~ msgid "Copy key prefix {keyPrefix}"
 #~ msgstr "キーのプレフィックス {keyPrefix} をコピー"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:68
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:72
 msgid "Copy Last Code Block"
 msgstr ""
 
@@ -6635,7 +6642,7 @@ msgid "Copy the Channel secret (Basic settings) and issue a long-lived Channel a
 msgstr "Channel secret（Basic settings）をコピーし、長期の Channel access token（Messaging API タブ）を発行してください。"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("copyLastCodeBlock"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:79
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:84
 msgid "Copy the last code block of the latest assistant reply ({0})"
 msgstr ""
 
@@ -7505,7 +7512,7 @@ msgstr "カスタマイズ"
 msgid "Customize and regenerate"
 msgstr "カスタマイズして再生成"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:189
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:195
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "よく使う操作のキーボードショートカットをカスタマイズします。「記録」をクリックして、使いたいキーの組み合わせを押してください。"
 
@@ -7881,6 +7888,10 @@ msgstr "既定のモデルを更新しました"
 #: src/components/settings/settings-modal.tsx:261
 msgid "Default Models"
 msgstr "既定のモデル"
+
+#: src/components/model-picker/model-picker.tsx:1005
+msgid "Default order"
+msgstr ""
 
 #: src/features/prompts/components/variable-definitions.tsx:106
 msgid "Default Value"
@@ -8370,7 +8381,7 @@ msgstr "作りたいものを説明してください。不明な点があれば
 msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 msgstr "ワークフローを説明してください...例：「テキストから画像を生成し、アップスケールしてから背景を除去する」"
 
-#: src/components/model-picker/model-picker.tsx:154
+#: src/components/model-picker/model-picker.tsx:158
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -8456,7 +8467,7 @@ msgstr "すべての回答が合格すべき決定的なチェック。"
 msgid "Deterministic, consistent"
 msgstr "決定的で一貫性がある"
 
-#: src/components/model-picker/model-picker.tsx:192
+#: src/components/model-picker/model-picker.tsx:225
 #: src/features/marketing/components/tutorials-page.tsx:131
 msgid "Developer"
 msgstr "開発者"
@@ -8562,7 +8573,7 @@ msgstr "ディレクトリ（テナント）ID — シングルテナントの�
 msgid "Disable 2FA"
 msgstr "2FA を無効化"
 
-#: src/features/settings/components/chat/models-settings.tsx:372
+#: src/features/settings/components/chat/models-settings.tsx:375
 msgid "Disable All"
 msgstr "すべて無効化"
 
@@ -9463,7 +9474,7 @@ msgid "Efficient reasoning with sparse activation"
 msgstr "スパース活性化による効率的な推論"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:153
-#: src/components/model-picker/model-picker.tsx:72
+#: src/components/model-picker/model-picker.tsx:76
 msgid "Effort Control"
 msgstr "推論レベルの制御"
 
@@ -9577,8 +9588,8 @@ msgstr "まずスキルを有効にしてください。評価できるのは有
 msgid "Enable advanced features and options."
 msgstr "高度な機能とオプションを有効にします。"
 
-#: src/features/settings/components/chat/models-settings.tsx:369
-#: src/features/settings/components/chat/models-settings.tsx:519
+#: src/features/settings/components/chat/models-settings.tsx:372
+#: src/features/settings/components/chat/models-settings.tsx:522
 msgid "Enable All"
 msgstr "すべて有効化"
 
@@ -9622,7 +9633,7 @@ msgstr "次のチャットで有効化"
 msgid "Enable memory"
 msgstr "メモリを有効化"
 
-#: src/features/settings/components/chat/models-settings.tsx:364
+#: src/features/settings/components/chat/models-settings.tsx:367
 msgid "Enable or disable models to control which ones appear in the model selector."
 msgstr "モデルを有効または無効にして、モデル選択に表示するモデルを管理します。"
 
@@ -9844,7 +9855,7 @@ msgstr "既定値を入力..."
 msgid "Enter email address"
 msgstr "メールアドレスを入力"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:62
+#: src/features/chat/lock/locked-chat-gate.tsx:86
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr ""
 
@@ -10127,7 +10138,7 @@ msgstr "エラー: {error}"
 msgid "Errors"
 msgstr "エラー"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:69
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:73
 msgid "Escape"
 msgstr "Escape"
 
@@ -10655,7 +10666,7 @@ msgstr "長尺"
 msgid "extended thinking"
 msgstr "拡張思考"
 
-#: src/components/model-picker/model-picker.tsx:76
+#: src/components/model-picker/model-picker.tsx:80
 msgid "Extended Thinking"
 msgstr "拡張思考"
 
@@ -10973,7 +10984,7 @@ msgstr "コレクションを外せませんでした"
 msgid "Failed to detach file"
 msgstr "ファイルを外せませんでした"
 
-#: src/features/settings/components/chat/models-settings.tsx:310
+#: src/features/settings/components/chat/models-settings.tsx:312
 msgid "Failed to disable all models"
 msgstr "すべてのモデルを無効にできませんでした"
 
@@ -10997,11 +11008,11 @@ msgstr "エクスポートをダウンロードできませんでした"
 msgid "Failed to download file. Please try again."
 msgstr "ファイルをダウンロードできませんでした。もう一度お試しください。"
 
-#: src/features/settings/components/chat/models-settings.tsx:289
+#: src/features/settings/components/chat/models-settings.tsx:291
 msgid "Failed to enable all models"
 msgstr "すべてのモデルを有効にできませんでした"
 
-#: src/features/settings/components/chat/models-settings.tsx:351
+#: src/features/settings/components/chat/models-settings.tsx:353
 msgid "Failed to enable models by provider"
 msgstr "プロバイダー単位でモデルを有効にできませんでした"
 
@@ -11197,7 +11208,7 @@ msgstr "タグを並べ替えられませんでした"
 msgid "Failed to request export"
 msgstr "エクスポートをリクエストできませんでした"
 
-#: src/features/settings/components/chat/models-settings.tsx:323
+#: src/features/settings/components/chat/models-settings.tsx:325
 msgid "Failed to reset to defaults"
 msgstr "既定にリセットできませんでした"
 
@@ -11392,14 +11403,14 @@ msgstr "お気に入りを更新できませんでした"
 msgid "Failed to update favorite status"
 msgstr "お気に入りの状態を更新できませんでした"
 
-#: src/components/model-picker/model-picker.tsx:628
-#: src/components/model-picker/model-picker.tsx:637
+#: src/components/model-picker/model-picker.tsx:672
+#: src/components/model-picker/model-picker.tsx:681
 #: src/features/settings/components/chat/model-filter-settings.tsx:56
 #: src/features/settings/components/chat/model-filter-settings.tsx:67
 msgid "Failed to update filter rules"
 msgstr "フィルタールールを更新できませんでした"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:107
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
 msgid "Failed to update keyboard shortcuts"
 msgstr "キーボードショートカットを更新できませんでした"
 
@@ -11412,7 +11423,7 @@ msgstr "MCP サーバーを更新できませんでした"
 msgid "Failed to update memory"
 msgstr "メモリを更新できませんでした"
 
-#: src/features/settings/components/chat/models-settings.tsx:266
+#: src/features/settings/components/chat/models-settings.tsx:268
 msgid "Failed to update model"
 msgstr "モデルを更新できませんでした"
 
@@ -11554,9 +11565,9 @@ msgid "fast"
 msgstr "高速"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:141
-#: src/components/model-picker/model-picker.tsx:73
+#: src/components/model-picker/model-picker.tsx:77
 #: src/features/marketing/components/model-detail-page.tsx:33
-#: src/features/settings/components/chat/models-settings.tsx:27
+#: src/features/settings/components/chat/models-settings.tsx:29
 msgid "Fast"
 msgstr "高速"
 
@@ -11821,6 +11832,10 @@ msgstr "最速で最も手頃な Claude モデル"
 msgid "Favicon"
 msgstr "ファビコン"
 
+#: src/features/settings/components/chat/favorite-models-settings.tsx:113
+msgid "Favorite models"
+msgstr ""
+
 #: src/features/pages/components/pages-sidebar.tsx:202
 msgid "Favorite pages"
 msgstr "お気に入りのページ"
@@ -11839,7 +11854,7 @@ msgstr "注目"
 msgid "Featured image"
 msgstr "アイキャッチ画像"
 
-#: src/components/model-picker/model-picker.tsx:166
+#: src/components/model-picker/model-picker.tsx:170
 #: src/features/marketing/components/gateway-footer.tsx:32
 #: src/features/marketing/components/gateway-landing-page.tsx:510
 #: src/features/marketing/components/gateway-navbar.tsx:53
@@ -12059,7 +12074,7 @@ msgid "Filtering"
 msgstr "絞り込み"
 
 #: src/features/canvas/canvas-panel.tsx:123
-#: src/features/settings/components/chat/models-settings.tsx:402
+#: src/features/settings/components/chat/models-settings.tsx:405
 msgid "Filters"
 msgstr "フィルター"
 
@@ -12372,8 +12387,8 @@ msgstr "フランス"
 #: src/features/billing/components/personal-plan-card.tsx:23
 #: src/features/marketing/components/gateway-landing-page.tsx:114
 #: src/features/marketing/components/landing-page.tsx:326
-#: src/features/settings/components/chat/models-settings.tsx:37
-#: src/features/settings/components/chat/models-settings.tsx:573
+#: src/features/settings/components/chat/models-settings.tsx:39
+#: src/features/settings/components/chat/models-settings.tsx:576
 msgid "Free"
 msgstr "無料"
 
@@ -13507,7 +13522,7 @@ msgstr "ゲストアカウント"
 msgid "Guest accounts"
 msgstr "ゲストアカウント"
 
-#: src/components/model-picker/model-picker.tsx:803
+#: src/components/model-picker/model-picker.tsx:856
 msgid "Guest accounts use free models only."
 msgstr "ゲストアカウントでは無料モデルのみ利用できます。"
 
@@ -13622,7 +13637,7 @@ msgid "Hello {0}! What would you like to do today?"
 msgstr "こんにちは、{0} さん！今日は何をしますか？"
 
 #: src/features/layout/components/sidebar-shortcut.tsx:275
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:70
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:74
 msgid "Help"
 msgstr "ヘルプ"
 
@@ -13646,7 +13661,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:955
+#: src/components/model-picker/model-picker.tsx:1029
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -14063,12 +14078,12 @@ msgstr "イラスト"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:910
+#: src/components/model-picker/model-picker.tsx:968
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:222
-#: src/features/settings/components/chat/models-settings.tsx:38
+#: src/features/settings/components/chat/models-settings.tsx:40
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:71
 #: src/features/workflow/components/gallery/gallery-card.tsx:27
 #: src/features/workflow/components/nodes/output-node.tsx:19
@@ -14102,8 +14117,8 @@ msgstr "画像の添付ファイル（非表示）"
 msgid "image editing"
 msgstr "画像編集"
 
-#: src/components/model-picker/model-picker.tsx:74
-#: src/features/settings/components/chat/models-settings.tsx:31
+#: src/components/model-picker/model-picker.tsx:78
+#: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Image Gen"
 msgstr "画像生成"
 
@@ -14551,6 +14566,7 @@ msgid "inpainting"
 msgstr "インペインティング"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
+#: src/components/model-picker/model-picker.tsx:193
 #: src/features/devices/components/device-tool-call.tsx:89
 #: src/features/evals/components/case-fields.tsx:69
 #: src/features/evals/components/dataset-panel.tsx:144
@@ -15093,7 +15109,7 @@ msgstr "キーボードショートカット"
 #: src/components/settings/settings-modal.tsx:252
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:70
 #: src/features/layout/lib/dashboard-page-names.ts:25
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:187
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:193
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:76
 msgid "Keyboard Shortcuts"
 msgstr "キーボードショートカット"
@@ -15103,11 +15119,11 @@ msgstr "キーボードショートカット"
 msgid "Keyboard shortcuts (?)"
 msgstr "キーボードショートカット（?）"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:180
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:186
 msgid "Keyboard shortcuts reset to defaults"
 msgstr "キーボードショートカットを既定に戻しました"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:105
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
 msgid "Keyboard shortcuts updated successfully"
 msgstr "キーボードショートカットを更新しました"
 
@@ -16105,7 +16121,7 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1023
+#: src/components/model-picker/model-picker.tsx:1097
 msgid "Locked to {0} models"
 msgstr "{0}モデルに固定"
 
@@ -16382,7 +16398,7 @@ msgstr "同意設定を管理"
 #~ msgid "Manage gateway API keys with per-key budgets and rate limits"
 #~ msgstr "キーごとの予算とレート制限でゲートウェイの API キーを管理"
 
-#: src/components/model-picker/model-picker.tsx:640
+#: src/components/model-picker/model-picker.tsx:684
 msgid "Manage hidden labs"
 msgstr ""
 
@@ -16606,7 +16622,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大サイズ: {size} • 最大 {maxFiles} ファイル"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
-#: src/components/model-picker/model-picker.tsx:1017
+#: src/components/model-picker/model-picker.tsx:1091
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "モデルは最大 {MAX_PARALLEL} 個までです"
 
@@ -17122,7 +17138,7 @@ msgstr "モバイルアプリアイコン"
 msgid "Mode"
 msgstr "モード"
 
-#: src/features/settings/components/chat/models-settings.tsx:430
+#: src/features/settings/components/chat/models-settings.tsx:433
 msgid "Mode:"
 msgstr "モード:"
 
@@ -17170,11 +17186,11 @@ msgstr "モデル比較"
 msgid "Model context usage"
 msgstr "モデルのコンテキスト使用量"
 
-#: src/features/settings/components/chat/models-settings.tsx:264
+#: src/features/settings/components/chat/models-settings.tsx:266
 msgid "Model disabled"
 msgstr "モデルを無効にしました"
 
-#: src/features/settings/components/chat/models-settings.tsx:264
+#: src/features/settings/components/chat/models-settings.tsx:266
 msgid "Model enabled"
 msgstr "モデルを有効にしました"
 
@@ -17182,7 +17198,7 @@ msgstr "モデルを有効にしました"
 msgid "Model filter"
 msgstr "モデルフィルター"
 
-#: src/components/model-picker/model-picker.tsx:303
+#: src/components/model-picker/model-picker.tsx:344
 msgid "Model info"
 msgstr "モデル情報"
 
@@ -17227,7 +17243,7 @@ msgstr "モデル: OpenAI Whisper"
 #: src/features/marketing/components/navbar-menu.tsx:58
 #: src/features/marketing/components/navbar-menu.tsx:159
 #: src/features/settings/components/chat/custom-providers-settings.tsx:564
-#: src/features/settings/components/chat/models-settings.tsx:362
+#: src/features/settings/components/chat/models-settings.tsx:365
 #: src/features/settings/components/chat/native-providers-settings.tsx:637
 msgid "Models"
 msgstr "モデル"
@@ -17602,7 +17618,7 @@ msgstr "MiniMax の M2 が信頼性の高いビジョンとテキスト理解を
 msgid "Mumbai, Kolkata"
 msgstr "ムンバイ、コルカタ"
 
-#: src/features/settings/components/chat/models-settings.tsx:39
+#: src/features/settings/components/chat/models-settings.tsx:41
 msgid "Music"
 msgstr "音楽"
 
@@ -17664,6 +17680,10 @@ msgstr "ミャンマー語（ミャンマー）"
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:110
 msgid "Name"
 msgstr "名前"
+
+#: src/components/model-picker/model-picker.tsx:1006
+msgid "Name (A to Z)"
+msgstr ""
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:74
 msgid "Name and prompt are required"
@@ -17945,9 +17965,9 @@ msgid "Never used"
 msgstr "未使用"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:145
-#: src/components/model-picker/model-picker.tsx:274
-#: src/features/settings/components/chat/models-settings.tsx:40
-#: src/features/settings/components/chat/models-settings.tsx:563
+#: src/components/model-picker/model-picker.tsx:315
+#: src/features/settings/components/chat/models-settings.tsx:42
+#: src/features/settings/components/chat/models-settings.tsx:566
 msgid "New"
 msgstr "新規"
 
@@ -17980,7 +18000,7 @@ msgstr "新しいチャット"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:29
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:220
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:71
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:75
 msgid "New Chat"
 msgstr "新しいチャット"
 
@@ -18009,6 +18029,10 @@ msgstr "新しいデータセット"
 #: src/features/settings/components/privacy/data-export.tsx:158
 msgid "New Export"
 msgstr "新しいエクスポート"
+
+#: src/components/model-picker/model-picker.tsx:1007
+msgid "New first"
+msgstr ""
 
 #: src/features/tasks/components/goal-form-dialog.tsx:73
 #: src/features/tasks/components/tasks-page.tsx:201
@@ -18072,7 +18096,7 @@ msgstr "新しいタグ"
 msgid "New task"
 msgstr "新しいタスク"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:72
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:76
 msgid "New Temporary Chat"
 msgstr "新しい一時チャット"
 
@@ -18217,9 +18241,14 @@ msgstr "ByteDance の次世代 Seedance 2.0 アーキテクチャ"
 msgid "Nicaragua"
 msgstr "ニカラグア"
 
+#: src/features/settings/components/chat/favorite-models-settings.tsx:53
 #: src/features/settings/components/personalization/personalization-settings.tsx:151
 msgid "Nickname"
 msgstr "ニックネーム"
+
+#: src/features/settings/components/chat/favorite-models-settings.tsx:37
+msgid "Nickname for {label}"
+msgstr ""
 
 #: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:153
 #: src/features/settings/components/privacy/data-access.tsx:42
@@ -18500,12 +18529,12 @@ msgstr "マイクが見つかりません。"
 msgid "No models available"
 msgstr "利用可能なモデルがありません"
 
-#: src/features/settings/components/chat/models-settings.tsx:509
+#: src/features/settings/components/chat/models-settings.tsx:512
 msgid "No models found matching your filters."
 msgstr "フィルターに一致するモデルが見つかりません。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:711
-#: src/components/model-picker/model-picker.tsx:984
+#: src/components/model-picker/model-picker.tsx:1058
 msgid "No models found."
 msgstr "モデルが見つかりません。"
 
@@ -18624,7 +18653,7 @@ msgstr "この期間に記録された返信はありません。"
 msgid "No resolved comments."
 msgstr "解決済みのコメントはありません。"
 
-#: src/features/chat/thread/comparison-view.tsx:62
+#: src/features/chat/thread/comparison-view.tsx:63
 msgid "No response yet"
 msgstr "まだ応答がありません"
 
@@ -18695,7 +18724,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "音声が検出されませんでした。ハンズフリーモードを停止しました。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:703
-#: src/components/model-picker/model-picker.tsx:976
+#: src/components/model-picker/model-picker.tsx:1050
 msgid "No starred models"
 msgstr "スター付きのモデルはありません"
 
@@ -18932,8 +18961,8 @@ msgstr "未ペアリング — ボットはまだ誰にも応答しません"
 msgid "Not rated"
 msgstr "未評価"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:219
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:224
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:225
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:230
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "未設定"
@@ -19266,7 +19295,7 @@ msgid "Online"
 msgstr "オンライン"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:393
+#: src/components/model-picker/model-picker.tsx:434
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "比較できるのは{0}モデルのみです。種類を切り替えるには選択を解除してください。"
 
@@ -19348,7 +19377,7 @@ msgctxt "stock opening price"
 msgid "Open"
 msgstr "始値"
 
-#: src/features/chat/thread/comparison-view.tsx:138
+#: src/features/chat/thread/comparison-view.tsx:140
 msgid "Open {modelName} in full thread"
 msgstr "{modelName} をスレッド全体で開く"
 
@@ -19413,6 +19442,10 @@ msgstr "メニューを開く"
 msgid "Open messages"
 msgstr "メッセージを開く"
 
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:77
+msgid "Open Model Picker"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:230
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "このコンピューターをペアリングするには、デスクトップアプリで Neore を開いてください。これまでにペアリングしたデバイスは下に表示されます。"
@@ -19442,7 +19475,7 @@ msgid "Open search"
 msgstr "検索を開く"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("search"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:84
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:90
 msgid "Open search ({0})"
 msgstr "検索を開く（{0}）"
 
@@ -19498,6 +19531,11 @@ msgstr "タスクを開く"
 #: src/features/local-models/components/local-setup-guide.tsx:133
 msgid "Open the Developer tab and start the server."
 msgstr "Developer タブを開いてサーバーを起動してください。"
+
+#. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("openModelPicker"))
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:89
+msgid "Open the model picker in the composer ({0})"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:118
 msgid "Open the run's conversation"
@@ -19918,6 +19956,10 @@ msgstr "または自分で回答を入力…"
 msgid "Orange"
 msgstr "オレンジ"
 
+#: src/features/settings/components/chat/favorite-models-settings.tsx:115
+msgid "Order the models you starred in the model picker and give them your own names. A nickname shows in the picker, the composer and on replies."
+msgstr ""
+
 #: src/components/settings/settings-modal.tsx:280
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
@@ -20007,7 +20049,7 @@ msgid "Original system prompt"
 msgstr "元のシステムプロンプト"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:143
-#: src/features/settings/components/chat/models-settings.tsx:516
+#: src/features/settings/components/chat/models-settings.tsx:519
 msgid "Other"
 msgstr "その他"
 
@@ -20018,6 +20060,10 @@ msgstr "その他のファイル名"
 #: src/features/marketing/components/model-detail-page.tsx:88
 msgid "Other image models"
 msgstr "その他の画像モデル"
+
+#: src/features/settings/components/chat/favorite-models-settings.tsx:166
+msgid "Other models with a nickname"
+msgstr ""
 
 #: src/features/chat/prompt-improvement/components/apply-preset-menu.tsx:98
 msgid "Other presets"
@@ -20047,6 +20093,7 @@ msgstr "アウトペイント"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:523
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
+#: src/components/model-picker/model-picker.tsx:197
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
 #: src/features/workflow/types/index.ts:584
@@ -20087,15 +20134,15 @@ msgstr "出力形式重視"
 msgid "Output:"
 msgstr "出力:"
 
-#: src/features/settings/components/chat/models-settings.tsx:584
+#: src/features/settings/components/chat/models-settings.tsx:587
 msgid "Overridden"
 msgstr "上書き済み"
 
-#: src/features/settings/components/chat/models-settings.tsx:582
+#: src/features/settings/components/chat/models-settings.tsx:585
 msgid "Overridden: Disabled"
 msgstr "上書き済み: 無効"
 
-#: src/features/settings/components/chat/models-settings.tsx:582
+#: src/features/settings/components/chat/models-settings.tsx:585
 msgid "Overridden: Enabled"
 msgstr "上書き済み: 有効"
 
@@ -20209,7 +20256,7 @@ msgid "Paraguay"
 msgstr "パラグアイ"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:595
-#: src/components/model-picker/model-picker.tsx:869
+#: src/components/model-picker/model-picker.tsx:922
 msgid "Parallel"
 msgstr "並列"
 
@@ -20437,8 +20484,8 @@ msgstr "PayPal による支払い、注文、請求書、サブスクリプシ�
 msgid "Payments, subscriptions, and financial data"
 msgstr "支払い、サブスクリプション、財務データ"
 
-#: src/components/model-picker/model-picker.tsx:75
-#: src/features/settings/components/chat/models-settings.tsx:32
+#: src/components/model-picker/model-picker.tsx:79
+#: src/features/settings/components/chat/models-settings.tsx:34
 msgid "PDF"
 msgstr "PDF"
 
@@ -20967,7 +21014,7 @@ msgstr "推奨モデル：{0}"
 msgid "premium"
 msgstr "プレミアム"
 
-#: src/features/settings/components/chat/models-settings.tsx:41
+#: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/settings/connectors/connector-card.tsx:108
 msgid "Premium"
 msgstr "プレミアム"
@@ -21099,7 +21146,7 @@ msgstr "Enter キーで送信"
 msgid "Press Enter to send, Shift+Enter for new line"
 msgstr "Enter で送信、Shift+Enter で改行"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:223
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:229
 msgid "Press keys..."
 msgstr "キーを押してください..."
 
@@ -21224,6 +21271,18 @@ msgstr "前のスライド"
 msgid "Previous version"
 msgstr "前のバージョン"
 
+#: src/components/model-picker/model-picker.tsx:189
+msgid "Price per 1M tokens"
+msgstr ""
+
+#: src/components/model-picker/model-picker.tsx:1009
+msgid "Price: high to low"
+msgstr ""
+
+#: src/components/model-picker/model-picker.tsx:1008
+msgid "Price: low to high"
+msgstr ""
+
 #: src/features/marketing/components/gateway-footer.tsx:27
 #: src/features/marketing/components/gateway-landing-page.tsx:716
 #: src/features/marketing/components/gateway-navbar.tsx:71
@@ -21290,11 +21349,11 @@ msgid "Private by default"
 msgstr "デフォルトでプライベート"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
-#: src/components/model-picker/model-picker.tsx:268
+#: src/components/model-picker/model-picker.tsx:302
 #: src/features/billing/components/personal-plan-card.tsx:23
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
-#: src/features/settings/components/chat/models-settings.tsx:553
+#: src/features/settings/components/chat/models-settings.tsx:556
 #: src/features/workflow/components/nodes/pro-badge.tsx:6
 msgid "Pro"
 msgstr "Pro"
@@ -21627,7 +21686,7 @@ msgstr "実績ある映画的な美しさ"
 msgid "Proven reliability from previous generation"
 msgstr "前世代で実証された信頼性"
 
-#: src/components/model-picker/model-picker.tsx:186
+#: src/components/model-picker/model-picker.tsx:219
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -21661,7 +21720,7 @@ msgstr "プロバイダーの制限"
 msgid "Provider updated"
 msgstr "プロバイダーを更新しました"
 
-#: src/features/settings/components/chat/models-settings.tsx:409
+#: src/features/settings/components/chat/models-settings.tsx:412
 msgid "Provider:"
 msgstr "プロバイダー:"
 
@@ -22101,7 +22160,7 @@ msgstr "推論"
 #: ../../packages/chat-ui/src/model-picker/utils.ts:149
 #: ../../packages/ui/src/components/ai-elements/context.tsx:315
 #: src/features/chat/thread/message-cost-badge.tsx:64
-#: src/features/settings/components/chat/models-settings.tsx:29
+#: src/features/settings/components/chat/models-settings.tsx:31
 msgid "Reasoning"
 msgstr "推論"
 
@@ -22203,7 +22262,7 @@ msgstr "{0} を再接続"
 msgid "Reconnecting…"
 msgstr "再接続しています…"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:239
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:245
 msgid "Record"
 msgstr "記録"
 
@@ -22528,6 +22587,7 @@ msgstr "サインイン状態を保持"
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
+#: src/features/settings/components/chat/favorite-models-settings.tsx:181
 #: src/features/settings/components/chat/native-providers-settings.tsx:723
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:203
 msgid "Remove"
@@ -22646,7 +22706,7 @@ msgid "Remove from project"
 msgstr "プロジェクトから削除"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:288
+#: src/components/model-picker/model-picker.tsx:329
 msgid "Remove from starred"
 msgstr "スターを外す"
 
@@ -22667,6 +22727,10 @@ msgstr "メンバーを削除"
 #: src/features/workflow/components/nodes/parallel-compare-node.tsx:131
 msgid "Remove model"
 msgstr "モデルを削除"
+
+#: src/features/settings/components/chat/favorite-models-settings.tsx:180
+msgid "Remove nickname for {id}"
+msgstr ""
 
 #: src/features/workflow/components/nodes/object-editor-node.tsx:25
 msgid "Remove Object"
@@ -22730,6 +22794,11 @@ msgstr "削除："
 #: src/features/pages/components/page-comments-panel.tsx:223
 msgid "Reopen"
 msgstr "未解決に戻す"
+
+#. placeholder {0}: getModelLabel(model, nicknames)
+#: src/features/settings/components/chat/favorite-models-settings.tsx:144
+msgid "Reorder {0}"
+msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:305
 msgid "Reorder sort"
@@ -22950,12 +23019,12 @@ msgstr "パスワードをリセット"
 msgid "Reset sorting"
 msgstr "並べ替えをリセット"
 
-#: src/features/settings/components/chat/models-settings.tsx:321
+#: src/features/settings/components/chat/models-settings.tsx:323
 msgid "Reset to defaults"
 msgstr "デフォルトに戻す"
 
-#: src/features/settings/components/chat/models-settings.tsx:376
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:265
+#: src/features/settings/components/chat/models-settings.tsx:379
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:271
 msgid "Reset to Defaults"
 msgstr "既定に戻す"
 
@@ -23624,7 +23693,7 @@ msgstr "プリセットを保存"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "再利用可能なシステムプロンプトを保存し、特定のモデルに紐付けます。「最適化」ボタンで、プロンプトオプティマイザーを使って各プリセットを改善できます。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:270
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:276
 msgid "Save Shortcuts"
 msgstr "ショートカットを保存"
 
@@ -23671,7 +23740,7 @@ msgstr "「{0}」に保存しました"
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:270
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:276
 #: src/features/slides/components/slide-editor-dialog.tsx:117
 msgid "Saving..."
 msgstr "保存しています..."
@@ -23779,7 +23848,7 @@ msgstr "シームレスループ"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:91
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:73
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:78
 msgid "Search"
 msgstr "検索"
 
@@ -23865,12 +23934,12 @@ msgstr "検索モード"
 msgid "Search mode: {0}"
 msgstr "検索モード：{0}"
 
-#: src/features/settings/components/chat/models-settings.tsx:389
+#: src/features/settings/components/chat/models-settings.tsx:392
 msgid "Search models by name, ID, or provider..."
 msgstr "名前、ID、プロバイダーでモデルを検索..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:528
-#: src/components/model-picker/model-picker.tsx:810
+#: src/components/model-picker/model-picker.tsx:863
 msgid "Search models..."
 msgstr "モデルを検索..."
 
@@ -24140,7 +24209,7 @@ msgid "Select mode"
 msgstr "選択モード"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
-#: src/components/model-picker/model-picker-button.tsx:177
+#: src/components/model-picker/model-picker-button.tsx:196
 #: src/components/model-picker/model-picker-popup.tsx:42
 msgid "Select Model"
 msgstr "モデルを選択"
@@ -24150,7 +24219,7 @@ msgid "Select model (optional)"
 msgstr "モデルを選択 (任意)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
-#: src/components/model-picker/model-picker-button.tsx:94
+#: src/components/model-picker/model-picker-button.tsx:99
 #: src/features/workflow/components/nodes/background-removal-node.tsx:66
 #: src/features/workflow/components/nodes/character-ref-node.tsx:147
 #: src/features/workflow/components/nodes/controlnet-node.tsx:133
@@ -24265,7 +24334,7 @@ msgstr "プロンプトへの忠実度が高いセミリアルなモデル"
 msgid "Semi-realistic visual style"
 msgstr "セミリアルなビジュアルスタイル"
 
-#: src/features/chat/thread/comparison-view.tsx:63
+#: src/features/chat/thread/comparison-view.tsx:64
 msgid "Send a message below to start"
 msgstr "下にメッセージを送信して始めましょう"
 
@@ -24608,7 +24677,7 @@ msgid "Show follow-up suggestions after assistant messages."
 msgstr "アシスタントのメッセージの後にフォローアップの提案を表示します。"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("help"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:81
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:86
 msgid "Show help dialog ({0})"
 msgstr "ヘルプダイアログを表示（{0}）"
 
@@ -24708,11 +24777,11 @@ msgstr "スキルをいつ適用するかを判断できるよう、アシスタ
 msgid "Sidebar"
 msgstr "サイドバー"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:74
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:79
 msgid "Sidebar Left"
 msgstr "サイドバーを左に"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:75
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:80
 msgid "Sidebar Right"
 msgstr "サイドバーを右に"
 
@@ -24808,7 +24877,7 @@ msgid "Sign up successful"
 msgstr "サインアップが完了しました"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:246
-#: src/components/model-picker/model-picker.tsx:390
+#: src/components/model-picker/model-picker.tsx:431
 msgid "Sign up to unlock all models"
 msgstr "サインアップしてすべてのモデルを利用"
 
@@ -24874,7 +24943,7 @@ msgid "Singapore"
 msgstr "シンガポール"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:582
-#: src/components/model-picker/model-picker.tsx:857
+#: src/components/model-picker/model-picker.tsx:910
 msgid "Single"
 msgstr "単一"
 
@@ -25207,6 +25276,10 @@ msgstr "データを並べ替え"
 msgid "Sort desc"
 msgstr "降順で並べ替え"
 
+#: src/components/model-picker/model-picker.tsx:999
+msgid "Sort models"
+msgstr ""
+
 #: src/features/skills/components/skill-list.tsx:372
 msgid "Sort skills"
 msgstr "スキルを並べ替え"
@@ -25533,8 +25606,12 @@ msgstr "標準の検索の深さ"
 msgid "Star"
 msgstr "星"
 
+#: src/features/settings/components/chat/favorite-models-settings.tsx:120
+msgid "Star a model in the model picker and it shows up here."
+msgstr ""
+
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:547
-#: src/components/model-picker/model-picker.tsx:826
+#: src/components/model-picker/model-picker.tsx:879
 msgid "Starred"
 msgstr "スター付き"
 
@@ -25568,7 +25645,7 @@ msgid "Start a new chat"
 msgstr "新しいチャットを開始"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("newChat"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:82
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:87
 msgid "Start a new chat ({0})"
 msgstr "新しいチャットを開始（{0}）"
 
@@ -25581,7 +25658,7 @@ msgid "Start a new conversation to create your first thread"
 msgstr "新しい会話を始めて、最初のスレッドを作成しましょう"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("newTemporaryChat"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:83
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:88
 msgid "Start a new temporary chat ({0})"
 msgstr "新しい一時チャットを開始（{0}）"
 
@@ -25725,7 +25802,7 @@ msgstr "最先端の OpenAI 品質"
 msgid "State-of-the-art performance across all benchmarks"
 msgstr "あらゆるベンチマークで最先端の性能"
 
-#: src/features/settings/components/chat/models-settings.tsx:451
+#: src/features/settings/components/chat/models-settings.tsx:454
 msgid "State:"
 msgstr "状態:"
 
@@ -25783,7 +25860,7 @@ msgstr "株式"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:239
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:245
 #: src/features/workflow/components/canvas/workflow-controls.tsx:571
 msgid "Stop"
 msgstr "停止"
@@ -26222,7 +26299,7 @@ msgstr "サブエージェントは承認されませんでした。"
 msgid "Subheading"
 msgstr "小見出し"
 
-#: src/components/model-picker/model-picker.tsx:805
+#: src/components/model-picker/model-picker.tsx:858
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "月額 $8 で登録すると、すべてのモデルを利用できます。"
 
@@ -26877,12 +26954,12 @@ msgstr "テキスト"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:629
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:899
+#: src/components/model-picker/model-picker.tsx:955
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:180
-#: src/features/settings/components/chat/models-settings.tsx:42
+#: src/features/settings/components/chat/models-settings.tsx:44
 #: src/features/workflow/components/gallery/gallery-card.tsx:28
 #: src/features/workflow/components/nodes/output-node.tsx:16
 #: src/features/workflow/components/nodes/text-node.tsx:167
@@ -27073,7 +27150,7 @@ msgstr "アシスタントから質問があります"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:85
+#: src/features/chat/thread/composer-model-selector.tsx:86
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -27537,7 +27614,7 @@ msgstr "この操作は元に戻せません。組織と関連するすべての
 msgid "This browser cannot receive push notifications here."
 msgstr "このブラウザーではここでプッシュ通知を受信できません。"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:60
+#: src/features/chat/lock/locked-chat-gate.tsx:84
 msgid "This chat is locked"
 msgstr ""
 
@@ -28072,7 +28149,7 @@ msgid "Toggle interactivity"
 msgstr ""
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("sidebarLeft"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:85
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:91
 msgid "Toggle left sidebar ({0})"
 msgstr "左サイドバーの切り替え（{0}）"
 
@@ -28091,7 +28168,7 @@ msgid "Toggle property panel"
 msgstr "プロパティパネルの表示を切り替え"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("sidebarRight"))
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:86
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:92
 msgid "Toggle right sidebar ({0})"
 msgstr "右サイドバーの切り替え（{0}）"
 
@@ -28169,8 +28246,8 @@ msgstr "ツール呼び出し"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:157
 #: ../../packages/chat-ui/src/model-picker/utils.ts:161
-#: src/components/model-picker/model-picker.tsx:77
-#: src/features/settings/components/chat/models-settings.tsx:30
+#: src/components/model-picker/model-picker.tsx:81
+#: src/features/settings/components/chat/models-settings.tsx:32
 msgid "Tool Calling"
 msgstr "ツール呼び出し"
 
@@ -28602,7 +28679,7 @@ msgstr "お使いのアカウントでは現在、二要素認証が有効にな
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
-#: src/components/model-picker/model-picker.tsx:879
+#: src/components/model-picker/model-picker.tsx:933
 msgid "Type"
 msgstr "種類"
 
@@ -28780,7 +28857,7 @@ msgid "Under the Hood"
 msgstr "内部の仕組み"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: src/components/model-picker/model-picker.tsx:635
+#: src/components/model-picker/model-picker.tsx:679
 #: src/features/canvas/canvas-panel.tsx:242
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
@@ -28871,7 +28948,7 @@ msgstr "無制限のリクエスト"
 msgid "Unlink"
 msgstr "リンク解除"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:64
+#: src/features/chat/lock/locked-chat-gate.tsx:88
 #: src/features/chat/thread-list/thread-node.tsx:718
 msgid "Unlock chat"
 msgstr ""
@@ -29849,12 +29926,12 @@ msgid "video"
 msgstr "動画"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
-#: src/components/model-picker/model-picker.tsx:921
+#: src/components/model-picker/model-picker.tsx:981
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:264
-#: src/features/settings/components/chat/models-settings.tsx:43
+#: src/features/settings/components/chat/models-settings.tsx:45
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:78
 #: src/features/workflow/components/gallery/gallery-card.tsx:29
 #: src/features/workflow/components/gallery/publish-dialog.tsx:30
@@ -30115,8 +30192,8 @@ msgid "vision"
 msgstr "ビジョン"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:145
-#: src/components/model-picker/model-picker.tsx:78
-#: src/features/settings/components/chat/models-settings.tsx:28
+#: src/components/model-picker/model-picker.tsx:82
+#: src/features/settings/components/chat/models-settings.tsx:30
 msgid "Vision"
 msgstr "ビジョン"
 

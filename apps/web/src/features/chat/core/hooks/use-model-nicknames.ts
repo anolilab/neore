@@ -7,19 +7,23 @@ const NO_NICKNAMES: Readonly<Record<string, string>> = {};
 /** The user's own names for models (`userSettings.modelNicknames`), model id → nickname. */
 const useModelNicknames = () => {
     const { data: userSettings } = useUserSettings();
-    const { mutate: updateUserSettings } = useUpdateUserSettings();
+    const { updateLatest } = useUpdateUserSettings();
 
     const nicknames = useMemo<Readonly<Record<string, string>>>(() => userSettings?.modelNicknames ?? NO_NICKNAMES, [userSettings?.modelNicknames]);
 
     /** A blank nickname clears the entry. The server trims and drops blanks too; this keeps the optimistic row honest. */
     const setNickname = useCallback(
         (modelId: string, nickname: string) => {
-            const others = Object.fromEntries(Object.entries(nicknames).filter(([id]) => id !== modelId));
             const trimmed = nickname.trim();
 
-            updateUserSettings({ modelNicknames: trimmed === "" ? others : { ...others, [modelId]: trimmed } });
+            // Built from the stored map when this write's turn comes, so an earlier write to another model survives.
+            updateLatest((current) => {
+                const others = Object.fromEntries(Object.entries(current?.modelNicknames ?? {}).filter(([id]) => id !== modelId));
+
+                return { modelNicknames: trimmed === "" ? others : { ...others, [modelId]: trimmed } };
+            });
         },
-        [nicknames, updateUserSettings],
+        [updateLatest],
     );
 
     return { nicknames, setNickname };
