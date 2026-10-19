@@ -231,6 +231,9 @@ const DefaultSystemMessage: FC<SystemMessageRendererProps> = ({ children }) => (
     </Message>
 );
 
+/** Seeded and local rows can lack a creation time, and formatting NaN throws during render. */
+const hasCreationTime = (message: UIMessage): boolean => Number.isFinite(message._creationTime) && message._creationTime > 0;
+
 /**
  * Default Action Bar - Full featured with image/video/voice generation
  * Uses MessageActions and MessageAction from AI elements
@@ -425,7 +428,7 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                     </>
                 )}
 
-                {showTimestamps && (
+                {showTimestamps && hasCreationTime(message) && (
                     <time
                         className="text-muted-foreground ml-1 text-xs tabular-nums"
                         dateTime={new Date(message._creationTime).toISOString()}
