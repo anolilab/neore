@@ -315,7 +315,8 @@ export const saveChunks = internalMutation
                 content: v.string(),
                 embeddingId: v.optional(v.string()),
                 pageNumber: v.optional(v.number()),
-                sectionHeading: v.optional(v.string().max(MAX_LENGTH.short)),
+                // A literal bound (the value of `MAX_LENGTH.short`): with an imported one codegen drops this procedure's compiled argument validator.
+                sectionHeading: v.optional(v.string().max(500)),
                 tokenCount: v.optional(v.number()),
             }),
         ),

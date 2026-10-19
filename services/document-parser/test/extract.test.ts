@@ -21,6 +21,7 @@ interface ExtractBody {
     content: string;
     metadata: { format?: { format_type?: string } };
     mimeType: string;
+    pages?: { content: string; pageNumber: number }[];
     tables: { markdown: string; pageNumber: number }[];
 }
 
@@ -108,28 +109,31 @@ describe("document-parser Worker", () => {
         expect(body.content.startsWith("# Quarterly Report\n\n")).toBe(true);
         expect(body.content).toContain("\n## Details\n");
         expect(body.content).toContain("| Ada | 42 |");
-        expect(body.content).not.toContain("<!-- PAGE");
+        expect(body.pages).toBeUndefined();
         expect(body.tables).toHaveLength(1);
     });
 
-    it("marks each page of a PDF in Markdown and keeps plain text unmarked", async () => {
+    it("returns each page of a PDF in Markdown with no whole text, and plain text with no pages", async () => {
         const markdown = await server.fetch("https://document-parser.internal/extract?format=markdown", {
             body: fixture("two-pages.pdf"),
             headers: { "content-type": "application/pdf" },
             method: "POST",
         });
-        const { content } = (await markdown.json()) as ExtractBody;
-        const first = content.indexOf("<!-- PAGE 1 -->");
-        const second = content.indexOf("<!-- PAGE 2 -->");
+        const body = (await markdown.json()) as ExtractBody;
 
-        expect(first).toBeGreaterThanOrEqual(0);
-        expect(second).toBeGreaterThan(first);
-        expect(content.slice(first, second)).toContain("otter");
-        expect(content.slice(second)).toContain("ibex");
+        expect(body.content).toBe("");
+        expect(body.pages).toHaveLength(2);
+        expect(body.pages?.[0]).toMatchObject({ pageNumber: 1 });
+        expect(body.pages?.[0]?.content).toContain("otter");
+        expect(body.pages?.[0]?.content).not.toContain("ibex");
+        expect(body.pages?.[1]).toMatchObject({ pageNumber: 2 });
+        expect(body.pages?.[1]?.content).toContain("ibex");
 
         const plain = await extract(fixture("two-pages.pdf"), "application/pdf");
+        const plainBody = (await plain.json()) as ExtractBody;
 
-        expect((await plain.json()) as ExtractBody).toMatchObject({ content: expect.not.stringContaining("<!-- PAGE") });
+        expect(plainBody.pages).toBeUndefined();
+        expect(plainBody.content).toContain("otter");
     });
 
     it("keeps a PDF heading under its page in Markdown", async () => {
@@ -138,10 +142,13 @@ describe("document-parser Worker", () => {
             headers: { "content-type": "application/pdf" },
             method: "POST",
         });
-        const { content } = (await response.json()) as ExtractBody;
+        const { pages } = (await response.json()) as ExtractBody;
 
-        expect(content.indexOf("<!-- PAGE 1 -->")).toBeLessThan(content.indexOf("# Rate limits"));
-        expect(content.indexOf("# Rate limits")).toBeLessThan(content.indexOf("<!-- PAGE 2 -->"));
+        // The fixture repeats its heading on each page: each page starts with its own.
+        expect(pages?.[0]?.content.startsWith("# Rate limits\n")).toBe(true);
+        expect(pages?.[0]?.content).toContain("Page 1 line 0");
+        expect(pages?.[1]?.content.startsWith("# Rate limits\n")).toBe(true);
+        expect(pages?.[1]?.content).toContain("Page 2 line 0");
     });
 
     it("reads a PPTX as plain text per slide in Markdown, with no heading syntax", async () => {
@@ -150,11 +157,11 @@ describe("document-parser Worker", () => {
             headers: { "content-type": "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
             method: "POST",
         });
-        const { content } = (await response.json()) as ExtractBody;
+        const { pages } = (await response.json()) as ExtractBody;
 
-        expect(content.startsWith("<!-- PAGE 1 -->\n\n")).toBe(true);
-        expect(content).toContain("narwhal");
-        expect(content).not.toContain("## ");
+        expect(pages?.[0]?.pageNumber).toBe(1);
+        expect(pages?.some((page) => page.content.includes("narwhal"))).toBe(true);
+        expect(pages?.some((page) => page.content.includes("## "))).toBe(false);
     });
 
     it("refuses an unknown format", async () => {

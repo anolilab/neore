@@ -20,7 +20,14 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
 
 - `chunkText` tracks the current Markdown heading path (`# A` / `## B` →
   `"A > B"`), starts a new chunk at a heading boundary and returns
-  `{ content, index, sectionHeading? }`. Text with no headings must chunk
+  `{ content, index, sectionHeading? }`. Setext headings count too, when
+  `headings` is on: a paragraph line underlined with `===` (level 1) or `---`
+  (level 2) is the heading, and the section splits before that line. Only a
+  single paragraph line counts (a multi-line paragraph's LAST line is the
+  heading, and the lines above stay in the section above). Not headings: a
+  `---`/`===` after a blank line, YAML front matter, an underline under a table
+  row, a list item, a fence, an ATX heading, or an indented (code) line.
+  Text with no headings must chunk
   EXACTLY as before (a test pins it), so existing files and behaviour are
   unchanged.
 - The embedding input is `sectionHeading + "\n\n" + content` (capped at the
@@ -32,11 +39,11 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
 - **Reach:** text that carries Markdown headings benefits: `.md` uploads, pasted
   Markdown, URL pages, and — since the parser's `?format=markdown` (see
   `docs/plans/document-parser.md`) — PDF, DOCX, XLSX and HTML documents ingested into
-  the knowledge base (PPTX stays plain text, with page markers only). Chat attachments still get plain text, so
+  the knowledge base (PPTX stays plain text, with pages only). Chat attachments still get plain text, so
   they chunk as before.
 
 - **Opt-in per source.** `chunkText(text, { markdown: true })` is what reads
-  headings and `<!-- PAGE n -->` markers; the default is the plain paragraph
+  headings and page lines; the default is the plain paragraph
   packer. Ingestion passes the flag for parser output and Markdown files and
   not for raw text types (code, config, plain text), where a `# comment` line is
   not a heading and would otherwise split a file into one chunk per comment.
@@ -64,12 +71,17 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
 
 ## Part C — page numbers in citations
 
-- Ingest asks the parser for Markdown. A PDF arrives with a `<!-- PAGE n -->`
-  line before each page, and a PPTX (plain text, one page per slide); `chunkText` drops those lines from
-  the text, counts nothing for them (a chunk's boundaries are identical to the
-  markerless text, pinned by a test), and records on each chunk the page its
-  first paragraph is on. Overlap carried into a chunk starts on the page the
-  previous chunk ended on.
+- Ingest asks the parser for Markdown. A PDF and a PPTX (plain text, one page
+  per slide) come back as `pages: [{ pageNumber, content }]` with an empty
+  `content`, never as text markers. Ingest joins the pages with a page line
+  before each (`markPage`: the private-use code point U+E000, then `PAGE n`),
+  after stripping that code point from every page's text, so a document cannot
+  write a page line of its own. Appended tables take the same line. `chunkText`
+  drops page lines from the text, counts nothing for them (a chunk's boundaries
+  are identical to the page-less text, pinned by a test), and records on each
+  chunk the page its first paragraph is on. Overlap carried into a chunk starts
+  on the page the previous chunk ended on. A literal `<!-- PAGE n -->` in a
+  document is text: the old in-band marker was forgeable.
 - `saveChunks` writes it as `metadata.pageNumber`, the field the schema already
   had. Chunks with no page (DOCX, XLSX, old chunks) carry none.
 - The page travels with the hit through both legs
@@ -93,19 +105,28 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
   reranker cannot bury the fused top hit.
 - Gateway `rerank.test.ts`: binding-only access, validation, the 503 without
   `AI`, clipping and the response parser.
-- `chunking.test.ts` (Part C): markers never change a chunk's text or
-  boundaries (compared with the markerless text), a chunk starts on the page of
+- `chunking.test.ts` (Part C): page lines never change a chunk's text or
+  boundaries (compared with the page-less text), a chunk starts on the page of
   its first paragraph, a heading that ends a page stays with its section,
-  marker-only text yields no chunks.
+  page-line-only text yields no chunks, the line format `markPage` writes is
+  the one the chunker reads, and a forged page line is stripped.
+- `chunking.test.ts` (setext): `===`/`---` under a paragraph line; the
+  non-heading cases (thematic break, front matter, table row, list item, fence,
+  ATX heading, indented line, the appended-tables `---`); the last-line rule for
+  multi-line paragraphs.
+- `ingest.parser.test.ts`: the pages join, a forged page line, appended tables
+  on their own page, and no page line for a format without pages.
 - `retrieve.test.ts` (Part C, `lunoraTest`): `saveChunks` writes
   `metadata.pageNumber`; `getChunksByEmbeddingIds` and `keywordSearchChunks`
   return it, and leave it out for a chunk without one.
 - `services/document-parser/test/extract.test.ts`: the plain format answers
   with the same JSON as before (the metadata's key order is xberg's own and
-  varies between requests, with or without the option); `?format=markdown` keeps DOCX headings and tables and
-  splits a two-page PDF at `<!-- PAGE n -->`; an unknown format is `400`.
+  varies between requests, with or without the option); `?format=markdown` keeps DOCX headings and tables,
+  returns a two-page PDF as two `pages` entries with an empty `content`, and
+  has no `pages` key for plain text; an unknown format is `400`.
 - `shape.rs`/`lib.rs` unit tests: the format option, which formats are paged,
-  the page join, and the Markdown extraction of DOCX and PDF fixtures.
+  the page trimming and the response with and without `pages`, and the Markdown
+  extraction of DOCX and PDF fixtures.
 
 ## Out of scope
 

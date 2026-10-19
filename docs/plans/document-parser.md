@@ -11,23 +11,33 @@ pdfium — `office`, `excel-wasm`, `html`, `xml`, `archives`). It replaced the
 TypeScript/Hono service on `@kreuzberg/wasm`.
 
 - **Contract**: `POST /extract`, raw body, `Content-Type` = the document's MIME
-  type → `{ content, mimeType, tables, metadata }`; `GET /health`,
-  `GET /health/live`. The OpenAPI description in
+  type → `{ content, mimeType, tables, metadata }` (plus `pages`, below); `GET
+  /health`, `GET /health/live`. The OpenAPI description in
   `packages/service-sdk/openapi/document-parser.json` is maintained by hand.
   **`?format=markdown`** (optional; absent or `plain` is the old response,
-  with the same JSON, and any other value is `400`) returns `content` as Markdown
-  instead. xberg's `output_format = Markdown` keeps headings, lists and tables;
-  for PDF, `pages.extract_pages` gives per-page Markdown and the Worker writes
-  each page under `<!-- PAGE n -->` itself. PPTX is the exception: it keeps
-  xberg's plain output (with `extract_pages`, one page per slide). Its Markdown
-  puts a slide's title and body on ONE `## ` line, so every slide became a
-  section heading that swallowed its body; a three-slide deck chunked into one
-  chunk whose `sectionHeading` was the last slide's text. xberg's own
-  `insert_page_markers` is NOT used: it HTML-escapes the marker
+  with the same JSON, and any other value is `400`) returns Markdown instead.
+  xberg's `output_format = Markdown` keeps headings, lists and tables. A PDF is
+  split into pages (`pages.extract_pages`), and so is a PPTX, which keeps
+  xberg's plain output (one page per slide; its Markdown puts a slide's title
+  and body on ONE `## ` line, so every slide became a section heading that
+  swallowed its body).
+  **Pages are structured, not text.** For a paged document the response carries
+  `pages: [{ pageNumber, content }]`, in order, and `content` is the empty
+  string, so the text is held once in the isolate. `pages` is absent for every
+  other document and format, so those responses are unchanged. The Worker writes
+  no page marker into any text: the old in-band `<!-- PAGE n -->` lines were
+  forgeable, since a document containing such a line passed for a page
+  boundary. The backend joins the pages back with a private-use sentinel line
+  (`backend/lunora/knowledge/chunking.ts#markPage`), after stripping that code
+  point from every page's text, so a document cannot write one. xberg's own
+  `insert_page_markers` was never used: it HTML-escapes the marker
   (`&lt;!-- PAGE 1 --&gt;`) and glues it onto the next heading. Only knowledge
   ingestion asks for Markdown (`backend/lunora/knowledge/ingest.ts`): chat
   attachments keep plain text, because Markdown changes what a model reads and
   repeats tables that plain text only lists.
+  **Deploy order: the parser ships before the backend.** An old backend reads
+  the empty `content` of a Markdown-mode PDF or PPTX and fails that ingest with
+  "No text content could be extracted"; the reverse order is harmless.
 - **Private**: reached only over the backend's `SERVICE_DOCUMENT_PARSER`
   service binding; `workers_dev: false`, Alchemy `url: false`, no auth, no env.
 - **Output shaping** (`src/shape.rs`, unit-tested on the host): xberg's
@@ -112,8 +122,8 @@ The body is read into a buffer sized from `Content-Length` up front (a doubling
   container-only capability: PDFs with several columns come out in the PDF's own
   content-stream order, which is usually reading order for single-column text
   and not guaranteed otherwise.
-- **Pages, by format.** Markdown mode writes page markers for PDF (real pages)
-  and PPTX (slides). DOCX and XLSX get none: xberg fills `pages` for DOCX with
+- **Pages, by format.** Markdown mode returns `pages` for PDF (real pages) and
+  PPTX (slides). DOCX and XLSX get none: xberg fills `pages` for DOCX with
   one page and no real pagination, so a page number there would be a guess.
   A DOCX with explicit page breaks would need the breaks read from the XML;
   not done. `tables[].page_number` is still returned in both formats.

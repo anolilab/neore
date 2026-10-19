@@ -1,8 +1,8 @@
 //! The document-parser service: a Rust Worker on the `xberg` crate.
 //!
 //! `POST /extract` — raw document bytes in the body, the document's MIME type
-//! as `Content-Type` → `{ content, mimeType, tables, metadata }`
-//! (`packages/service-sdk/openapi/document-parser.json`). `GET /health` and
+//! as `Content-Type` → `{ content, mimeType, tables, metadata }`, plus `pages`
+//! for a paged document in Markdown mode (`packages/service-sdk/openapi/document-parser.json`). `GET /health` and
 //! `GET /health/live` answer liveness.
 //!
 //! PRIVATE: no workers.dev URL and no route, so the backend's
@@ -13,7 +13,6 @@ mod shape;
 
 use futures_util::StreamExt;
 use serde::Serialize;
-use std::borrow::Cow;
 use worker::{Context, Env, Method, Request, Response, Result, console_error, event};
 
 use xberg::{
@@ -21,8 +20,8 @@ use xberg::{
 };
 
 use crate::shape::{
-    ContentFormat, ErrorBody, ExtractResponse, ExtractedTable, MAX_DOCUMENT_BYTES, body_capacity,
-    declared_length, declared_length_exceeds, is_paged, is_slides, normalize_mime, paged_markdown,
+    ContentFormat, ErrorBody, ExtractResponse, ExtractedPage, ExtractedTable, MAX_DOCUMENT_BYTES,
+    body_capacity, declared_length, declared_length_exceeds, is_paged, is_slides, normalize_mime,
     parse_format, prune_nulls, retry_as_plain_text, strip_heading_attributes, too_large,
 };
 
@@ -55,7 +54,7 @@ fn error(status: u16, error: &str, details: Option<String>) -> Result<Response> 
 
 /// The extraction config. `Plain` is exactly what the Worker always ran with;
 /// `Markdown` changes only the output format, and per-page content for the
-/// paged formats (see `shape::paged_markdown`).
+/// paged formats (see `ExtractedPage`).
 fn config(format: ContentFormat, mime_type: &str) -> ExtractionConfig {
     let mut config = ExtractionConfig {
         // The result cache is file-backed; a Worker has no filesystem and no use for it.
@@ -154,31 +153,41 @@ pub async fn extract_document(
         .await
         .map_err(ExtractFailure::Xberg)?;
     let first_error = result.errors.into_iter().next();
-    let Some(document) = result.results.into_iter().next() else {
+    let Some(mut document) = result.results.into_iter().next() else {
         return Err(ExtractFailure::Empty(first_error));
     };
 
     // xberg fills `pages` for DOCX too (one page, no real pagination), so only
-    // the paged formats take their markers from it. Slides keep plain text, so
-    // their pages are plain too (see `shape::is_slides`).
+    // the paged formats take their pages from it. Slides keep plain text, so
+    // their pages are plain too (see `shape::is_slides`). The pages are moved
+    // out, not copied: a paged document's text is held once.
     let markdown = format == ContentFormat::Markdown && !is_slides(&mime_type);
     let paged = format == ContentFormat::Markdown && is_paged(&mime_type);
-    let content = match document.pages.as_deref() {
-        Some(pages) if paged && !pages.is_empty() => paged_markdown(pages.iter().map(|page| {
-            let text = if markdown {
-                Cow::Borrowed(page.content.as_str())
-            } else {
-                Cow::Owned(strip_heading_attributes(&page.content))
-            };
+    let (content, pages) = match document.pages.take() {
+        Some(pages) if paged && !pages.is_empty() => (
+            String::new(),
+            Some(
+                pages
+                    .into_iter()
+                    .map(|page| {
+                        let text = if markdown {
+                            page.content
+                        } else {
+                            strip_heading_attributes(&page.content)
+                        };
 
-            (page.page_number, text)
-        })),
-        _ if markdown => document.content,
-        _ => strip_heading_attributes(&document.content),
+                        ExtractedPage::new(page.page_number, text)
+                    })
+                    .collect(),
+            ),
+        ),
+        _ if markdown => (document.content, None),
+        _ => (strip_heading_attributes(&document.content), None),
     };
 
     Ok(ExtractResponse {
         content,
+        pages,
         mime_type: document.mime_type.into_owned(),
         tables: document
             .tables
@@ -386,10 +395,11 @@ mod tests {
     }
 
     #[test]
-    fn plain_output_has_no_page_markers() {
+    fn plain_output_has_no_pages() {
         let response = extract("sample.pdf", "application/pdf");
 
-        assert!(!response.content.contains("<!-- PAGE"));
+        assert!(response.pages.is_none());
+        assert!(response.content.contains("The capybara sits by the river."));
     }
 
     #[test]
@@ -412,8 +422,8 @@ mod tests {
         assert!(response.content.contains("\n## Details\n"));
         assert!(response.content.contains("| Ada | 42 |"));
         assert!(!response.content.contains("style_name"));
-        // DOCX has no pagination xberg can see, so it carries no page markers.
-        assert!(!response.content.contains("<!-- PAGE"));
+        // DOCX has no pagination xberg can see, so it has no pages.
+        assert!(response.pages.is_none());
         assert_eq!(response.tables.len(), 1);
         // Ingest appends a table only when its Markdown is missing from `content`.
         assert!(
@@ -444,36 +454,40 @@ mod tests {
         );
     }
 
-    #[test]
-    fn markdown_marks_the_pdf_page() {
-        let response = extract_as("sample.pdf", "application/pdf", ContentFormat::Markdown);
-
-        assert!(
-            response.content.starts_with("<!-- PAGE 1 -->\n\n"),
-            "{}",
-            response.content
-        );
-        assert!(response.content.contains("The capybara sits by the river."));
+    /// The pages of a paged Markdown response, in order. Panics on a response without them.
+    fn pages_of(response: &ExtractResponse) -> &[ExtractedPage] {
+        response.pages.as_deref().expect("paged response")
     }
 
     #[test]
-    fn markdown_keeps_pdf_headings_under_their_page() {
+    fn markdown_returns_a_pdf_page_by_page_and_no_whole_text() {
+        let response = extract_as("sample.pdf", "application/pdf", ContentFormat::Markdown);
+        let pages = pages_of(&response);
+
+        // The text is held once, in the pages: `content` is empty when they are there.
+        assert!(response.content.is_empty());
+        assert_eq!(pages[0].page_number, 1);
+        assert!(pages[0].content.contains("The capybara sits by the river."));
+        assert!(!pages[0].content.contains("<!-- PAGE"));
+    }
+
+    #[test]
+    fn markdown_keeps_pdf_headings_on_their_page() {
         let response = extract_as(
             "headed-pages.pdf",
             "application/pdf",
             ContentFormat::Markdown,
         );
-        let first = response
-            .content
-            .find("<!-- PAGE 1 -->")
-            .expect("page 1 marker");
-        let heading = response.content.find("# Rate limits").expect("heading");
-        let second = response
-            .content
-            .find("<!-- PAGE 2 -->")
-            .expect("page 2 marker");
+        let pages = pages_of(&response);
 
-        assert!(first < heading && heading < second, "{}", response.content);
+        // The fixture's heading repeats on each page: each page carries its own copy.
+        assert_eq!(pages[0].page_number, 1);
+        assert!(pages[0].content.starts_with("# Rate limits\n"), "{pages:?}");
+        assert!(pages[0].content.contains("Page 1 line 0"));
+        assert!(!pages[0].content.contains("Page 2"));
+        assert_eq!(pages[1].page_number, 2);
+        assert!(pages[1].content.starts_with("# Rate limits\n"), "{pages:?}");
+        assert!(pages[1].content.contains("Page 2 line 0"));
     }
 
     #[test]
@@ -483,34 +497,38 @@ mod tests {
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             ContentFormat::Markdown,
         );
+        let pages = pages_of(&response);
 
-        assert!(
-            response.content.starts_with("<!-- PAGE 1 -->\n\n"),
-            "{}",
-            response.content
-        );
-        assert!(response.content.contains("narwhal"));
+        assert_eq!(pages[0].page_number, 1);
+        assert!(pages.iter().any(|page| page.content.contains("narwhal")));
         // A slide's title and body share one line in xberg's Markdown, which would
         // make the whole slide a heading. Slides are not Markdown.
-        assert!(!response.content.contains("## "), "{}", response.content);
+        assert!(
+            pages.iter().all(|page| !page.content.contains("## ")),
+            "{pages:?}"
+        );
     }
 
     #[test]
     fn markdown_splits_a_two_page_pdf_at_its_pages() {
         let response = extract_as("two-pages.pdf", "application/pdf", ContentFormat::Markdown);
-        let first = response
-            .content
-            .find("<!-- PAGE 1 -->")
-            .expect("page 1 marker");
-        let second = response
-            .content
-            .find("<!-- PAGE 2 -->")
-            .expect("page 2 marker");
+        let pages = pages_of(&response);
 
-        assert!(first < second);
-        assert!(response.content[first..second].contains("The first page mentions the otter."));
-        assert!(response.content[second..].contains("The second page mentions the ibex."));
-        assert!(!response.content[second..].contains("otter"));
+        assert_eq!(pages.len(), 2);
+        assert_eq!(pages[0].page_number, 1);
+        assert!(
+            pages[0]
+                .content
+                .contains("The first page mentions the otter.")
+        );
+        assert!(!pages[0].content.contains("ibex"));
+        assert_eq!(pages[1].page_number, 2);
+        assert!(
+            pages[1]
+                .content
+                .contains("The second page mentions the ibex.")
+        );
+        assert!(!pages[1].content.contains("otter"));
     }
 
     #[test]

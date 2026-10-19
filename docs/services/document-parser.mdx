@@ -52,10 +52,14 @@ different runtime — see `docs/plans/document-parser.md`.
 | `format` | `content` |
 | --- | --- |
 | omitted, or `plain` | xberg's plain-text rendering. The default, unchanged by the option. |
-| `markdown` | Markdown: headings, lists and tables kept. A PDF is split into pages, each under a `<!-- PAGE n -->` line (`n` is 1-based). A PPTX is split into slides the same way, but as plain text: its Markdown would put each slide's title and body on one heading line. Knowledge ingestion asks for this. |
+| `markdown` | Markdown: headings, lists and tables kept. A PDF is split into pages, and a PPTX into slides (as plain text: its Markdown would put each slide's title and body on one heading line). Those pages come back in `pages` and `content` is `""`. Knowledge ingestion asks for this. |
 
 Any other value is `400`. `tables` is returned in both formats; in Markdown the
-same tables already sit in `content`.
+same tables already sit in `content` or `pages`.
+
+With `format=markdown` a paged document is answered with `pages` (one entry per
+page, in order, 1-based `pageNumber`) and an empty `content`, so the text is
+never sent twice. Every other response has no `pages` key.
 
 **Response (200):**
 
@@ -64,6 +68,18 @@ same tables already sit in `content`.
     "content": "Extracted plain text...",
     "mimeType": "application/pdf",
     "tables": [{ "markdown": "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |\n", "pageNumber": 3 }],
+    "metadata": { "format": { "format_type": "pdf" } }
+}
+```
+
+A paged document in Markdown adds `pages` and empties `content`:
+
+```json
+{
+    "content": "",
+    "pages": [{ "pageNumber": 1, "content": "# Title\n\nFirst page." }],
+    "mimeType": "application/pdf",
+    "tables": [],
     "metadata": { "format": { "format_type": "pdf" } }
 }
 ```

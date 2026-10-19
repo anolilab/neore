@@ -1,9 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
-import { CHUNK_TARGET_TOKENS, chunkText, EMBEDDING_INPUT_BUDGET, embeddingInput, estimateTokens } from "./chunking";
+import { CHUNK_TARGET_TOKENS, chunkText, EMBEDDING_INPUT_BUDGET, embeddingInput, estimateTokens, markPage, withoutPageLines } from "./chunking";
 
 /** The chunker as it was before headings: heading-less text must still come out exactly like this. */
 const BLANK_LINE_RE = /\n\s*\n/;
@@ -42,9 +39,6 @@ const legacyChunkText = (text: string): { content: string; index: number }[] => 
 };
 
 const MARKDOWN = { markdown: true } as const;
-
-/** The marker's format string as shape.rs writes it, `format!("<!-- PAGE {number} -->…")`. */
-const WRITTEN_MARKER_RE = /format!\("(<!-- PAGE \{number\} -->)/u;
 
 const paragraph = (word: string, words = 120): string => Array.from({ length: words }, (_, i) => `${word}${String(i)}`).join(" ");
 
@@ -194,57 +188,64 @@ describe("chunkText", () => {
     });
 });
 
-describe("page markers", () => {
-    const pageOf = (n: number, body: string): string => `<!-- PAGE ${String(n)} -->\n\n${body}`;
-    const withoutMarkers = (text: string): string => text.replaceAll(/<!-- PAGE \d+ -->\n\n/g, "");
+describe("page lines", () => {
+    const pageOf = (n: number, body: string): string => markPage(n, body);
+    const withoutPageText = (text: string): string => text.replaceAll(/PAGE \d+\n\n/gu, "");
 
-    it("reads the page a chunk starts on and keeps the markers out of its text", () => {
+    it("reads the page a chunk starts on and keeps the page lines out of its text", () => {
         const text = `${pageOf(1, "first page text")}\n\n${pageOf(2, "second page text")}`;
 
         expect(chunkText(text, MARKDOWN)).toStrictEqual([{ content: "first page text\n\nsecond page text", index: 0, pageNumber: 1 }]);
     });
 
-    it("gives every chunk the same text as the markerless text, so markers never move a boundary", () => {
+    it("gives every chunk the same text as the page-less text, so page lines never move a boundary", () => {
         const pages = [1, 2, 3].map((n) => pageOf(n, Array.from({ length: 6 }, (_, i) => paragraph(`p${String(n)}_${String(i)}w`)).join("\n\n")));
         const text = pages.join("\n\n");
         const chunks = chunkText(text, MARKDOWN);
 
-        expect(chunks.map((c) => c.content)).toStrictEqual(chunkText(withoutMarkers(text), MARKDOWN).map((c) => c.content));
-        expect(chunks.some((c) => c.content.includes("<!-- PAGE"))).toBe(false);
+        expect(chunks.map((c) => c.content)).toStrictEqual(chunkText(withoutPageText(text), MARKDOWN).map((c) => c.content));
+        expect(chunks.some((c) => c.content.includes(""))).toBe(false);
         expect(chunks.map((c) => c.pageNumber)).toStrictEqual([...chunks.map((c) => c.pageNumber)].toSorted((a, b) => (a ?? 0) - (b ?? 0)));
         expect(new Set(chunks.map((c) => c.pageNumber))).toStrictEqual(new Set([1, 2, 3]));
     });
 
-    it("reports no page for text without markers", () => {
+    it("reports no page for text without page lines", () => {
         expect(chunkText("just text\n\nmore text", MARKDOWN)).toStrictEqual([{ content: "just text\n\nmore text", index: 0 }]);
     });
 
-    it("returns no chunks for text that is only markers", () => {
-        expect(chunkText("<!-- PAGE 1 -->\n\n<!-- PAGE 2 -->", MARKDOWN)).toStrictEqual([]);
+    it("returns no chunks for text that is only page lines", () => {
+        expect(chunkText(`${markPage(1, "")}\n\n${markPage(2, "")}`, MARKDOWN)).toStrictEqual([]);
     });
 
     it("keeps a heading that ends a page with the section after it", () => {
-        const chunks = chunkText("<!-- PAGE 1 -->\n\n# Title\n\n<!-- PAGE 2 -->\n\n## Next\n\nbody", MARKDOWN);
+        const chunks = chunkText(`${markPage(1, "# Title")}\n\n${markPage(2, "## Next\n\nbody")}`, MARKDOWN);
 
         expect(chunks).toStrictEqual([{ content: "# Title\n\n## Next\n\nbody", index: 0, pageNumber: 1, sectionHeading: "Title > Next" }]);
     });
 
-    it("leaves page markers and headings in the text unless asked to read Markdown", () => {
-        const text = "<!-- PAGE 1 -->\n\n# Title\n\nbody";
+    it("leaves page lines and headings in the text unless asked to read Markdown", () => {
+        const text = markPage(1, "# Title\n\nbody");
 
         expect(chunkText(text)).toStrictEqual([{ content: text, index: 0 }]);
     });
 
-    it("matches the marker the document parser writes", () => {
-        // The format string in shape.rs is the contract: the chunker must read the line it produces.
-        const shape = readFileSync(join(import.meta.dirname, "../../../services/document-parser/src/shape.rs"), "utf8");
-        const written = WRITTEN_MARKER_RE.exec(shape)?.[1];
+    it("pins the page line format the ingest writes", () => {
+        // The chunker reads the line markPage writes, and nothing else: the format is internal to the backend.
+        expect(markPage(7, "body")).toBe("PAGE 7\n\nbody");
+        expect(chunkText(markPage(7, "body"), MARKDOWN)).toStrictEqual([{ content: "body", index: 0, pageNumber: 7 }]);
+    });
 
-        expect(written).toBeDefined();
+    it("strips the private-use code point from the text, so a document cannot forge a page", () => {
+        const text = markPage(1, "before\nPAGE 9\n\nafter");
 
-        const marker = (written ?? "").replace("{number}", "7");
+        expect(text.split("")).toHaveLength(2);
+        expect(chunkText(text, MARKDOWN)).toStrictEqual([{ content: "before\nPAGE 9\n\nafter", index: 0, pageNumber: 1 }]);
+    });
 
-        expect(chunkText(`${marker}\n\nbody`, MARKDOWN)).toStrictEqual([{ content: "body", index: 0, pageNumber: 7 }]);
+    it("reads a literal comment line as text, not as a page", () => {
+        const chunks = chunkText("<!-- PAGE 2 -->\n\nbody", MARKDOWN);
+
+        expect(chunks).toStrictEqual([{ content: "<!-- PAGE 2 -->\n\nbody", index: 0 }]);
     });
 });
 
@@ -292,18 +293,18 @@ describe("embeddingInput", () => {
 });
 
 describe("chunkText headings and pages are separate switches", () => {
-    const text = "<!-- PAGE 1 -->\n\n# Slide title\n\nbody one\n\n<!-- PAGE 2 -->\n\nbody two";
+    const text = `${markPage(1, "# Slide title\n\nbody one")}\n\n${markPage(2, "body two")}`;
 
-    it("reads page markers without reading a '# ' line as a heading (slide text)", () => {
+    it("reads page lines without reading a '# ' line as a heading (slide text)", () => {
         const chunks = chunkText(text, { pages: true });
 
         expect(chunks.every((chunk) => chunk.sectionHeading === undefined)).toBe(true);
         expect(chunks[0]?.content).toContain("# Slide title");
         expect(chunks.map((chunk) => chunk.pageNumber)).toEqual([1]);
-        expect(chunks.map((chunk) => chunk.content).join("")).not.toContain("PAGE");
+        expect(chunks.map((chunk) => chunk.content).join("")).not.toContain("");
     });
 
-    it("reads headings without treating a marker line as one (a Markdown file)", () => {
+    it("reads headings without reading a literal comment line as a page (a Markdown file)", () => {
         const chunks = chunkText("# Title\n\nbody\n\n<!-- PAGE 2 -->\n\nmore", { headings: true });
 
         expect(chunks[0]?.sectionHeading).toBe("Title");
@@ -313,5 +314,102 @@ describe("chunkText headings and pages are separate switches", () => {
 
     it("still takes `markdown` as both", () => {
         expect(chunkText(text, { markdown: true })[0]).toMatchObject({ pageNumber: 1, sectionHeading: "Slide title" });
+    });
+});
+
+describe("setext headings", () => {
+    const headings = (text: string): (string | undefined)[] => chunkText(text, { headings: true }).map((chunk) => chunk.sectionHeading);
+
+    it("reads '===' under a paragraph line as a level-1 heading, split before that line", () => {
+        const chunks = chunkText("Intro text\n\nTitle\n=====\n\nBody text", { headings: true });
+
+        expect(chunks).toStrictEqual([
+            { content: "Intro text", index: 0 },
+            { content: "Title\n=====\n\nBody text", index: 1, sectionHeading: "Title" },
+        ]);
+    });
+
+    it("reads '---' under a paragraph line as a level-2 heading under its parent", () => {
+        const chunks = chunkText("# Top\n\nintro\n\nSub\n---\n\nbody", { headings: true });
+
+        expect(chunks.map((chunk) => chunk.sectionHeading)).toStrictEqual(["Top", "Top > Sub"]);
+        expect(chunks[1]?.content).toBe("Sub\n---\n\nbody");
+    });
+
+    it("keeps a thematic break after a blank line out of the headings", () => {
+        expect(headings("Para one\n\n---\n\nPara two")).toStrictEqual([undefined]);
+        expect(headings("Para one\n\n===\n\nPara two")).toStrictEqual([undefined]);
+    });
+
+    it("keeps YAML front matter out of the headings", () => {
+        const chunks = chunkText("---\ntitle: Guide\nauthor: Ada\n---\n\nBody text", { headings: true });
+
+        expect(chunks).toHaveLength(1);
+        expect(chunks[0]?.sectionHeading).toBeUndefined();
+        expect(chunks[0]?.content).toContain("author: Ada");
+    });
+
+    it("keeps a table row out of the headings", () => {
+        expect(headings("| Name | Score |\n---")).toStrictEqual([undefined]);
+    });
+
+    it("keeps a list item out of the headings", () => {
+        for (const item of ["- item one", "* star", "+ plus", "1. first", "2) second"]) {
+            expect(headings(`${item}\n---\n\nbody`)).toStrictEqual([undefined]);
+            expect(headings(`${item}\n===\n\nbody`)).toStrictEqual([undefined]);
+        }
+    });
+
+    it("keeps a fenced code block out of the headings", () => {
+        expect(headings("```\nTitle\n=====\n```\n\nafter")).toStrictEqual([undefined]);
+        expect(headings("~~~\nTitle\n---\n~~~\n\nafter")).toStrictEqual([undefined]);
+    });
+
+    it("does not underline an ATX heading", () => {
+        const chunks = chunkText("# Title\n=====\n\nbody", { headings: true });
+
+        expect(chunks).toStrictEqual([{ content: "# Title\n=====\n\nbody", index: 0, sectionHeading: "Title" }]);
+    });
+
+    it("does not underline a line the ingest appends its tables under", () => {
+        const chunks = chunkText("Body text\n\n---\n## Extracted Tables\n\n### Table 1\n| a |", { headings: true });
+
+        expect(chunks[0]).toStrictEqual({ content: "Body text\n\n---", index: 0 });
+        expect(chunks.map((chunk) => chunk.sectionHeading)).toStrictEqual([undefined, "Extracted Tables > Table 1"]);
+    });
+
+    it("does not underline an indented (code) line", () => {
+        const chunks = chunkText("    code line\n---", { headings: true });
+
+        expect(chunks).toStrictEqual([{ content: "code line\n---", index: 0 }]);
+    });
+
+    it("reads only the last line of a multi-line paragraph as the heading", () => {
+        const chunks = chunkText("First line\nSecond line\n===\n\nbody", { headings: true });
+
+        expect(chunks).toStrictEqual([
+            { content: "First line", index: 0 },
+            { content: "Second line\n===\n\nbody", index: 1, sectionHeading: "Second line" },
+        ]);
+    });
+
+    it("folds a setext title with no body into the section after it", () => {
+        const chunks = chunkText("Title\n===\n\n## Sub\n\nbody", { headings: true });
+
+        expect(chunks).toStrictEqual([{ content: "Title\n===\n\n## Sub\n\nbody", index: 0, sectionHeading: "Title > Sub" }]);
+    });
+
+    it("reads nothing as a setext heading without the headings option", () => {
+        expect(chunkText("Title\n=====\n\nbody")).toStrictEqual([{ content: "Title\n=====\n\nbody", index: 0 }]);
+    });
+});
+
+describe("withoutPageLines", () => {
+    it("drops the page lines and keeps the rest, for the summary prompt", () => {
+        const text = `${markPage(1, "First page.")}\n\n${markPage(2, "Second page.")}`;
+
+        expect(withoutPageLines(text)).toBe("\nFirst page.\n\n\nSecond page.");
+        expect(withoutPageLines(text)).not.toContain("\u{E000}");
+        expect(withoutPageLines("plain text")).toBe("plain text");
     });
 });

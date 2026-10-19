@@ -55,7 +55,7 @@ const MARKDOWN_FILE_NAME_RE = /\.md$/iu;
 
 const PPTX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
-/** Formats the parser answers with `<!-- PAGE n -->` lines: PDFs, and slide decks (one page per slide). */
+/** Formats the parser answers with pages (`pages` in its Markdown response): PDFs, and slide decks (one page per slide). */
 export const isPagedMimeType = (mimeType: string): boolean => {
     const base = baseMimeType(mimeType);
 

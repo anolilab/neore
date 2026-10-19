@@ -52,21 +52,6 @@ pub fn is_slides(mime: &str) -> bool {
     mime == PPTX
 }
 
-/// Markdown for a paged document: each page's content under its own
-/// `<!-- PAGE n -->` line, the marker the backend's chunker reads
-/// (`backend/lunora/knowledge/chunking.ts`). The markers are written here, not
-/// taken from xberg's `insert_page_markers`: that path escapes them to
-/// `&lt;!-- PAGE 1 --&gt;` and glues them onto the next heading.
-pub fn paged_markdown<T: AsRef<str>>(pages: impl IntoIterator<Item = (u32, T)>) -> String {
-    pages
-        .into_iter()
-        .map(|(number, content)| {
-            format!("<!-- PAGE {number} -->\n\n{}", content.as_ref().trim_end())
-        })
-        .collect::<Vec<_>>()
-        .join("\n\n")
-}
-
 /// The MIME type xberg should parse a document as: the `Content-Type` without
 /// parameters, lower-cased, `application/octet-stream` when absent.
 pub fn normalize_mime(header: Option<&str>) -> String {
@@ -143,12 +128,40 @@ pub struct ExtractedTable {
     pub page_number: u32,
 }
 
+/// One page of a paged document's Markdown. The page number travels beside the
+/// text, not inside it, so no text can pass for a page boundary.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractedPage {
+    pub page_number: u32,
+    pub content: String,
+}
+
+impl ExtractedPage {
+    /// Trailing whitespace is cut in place, so a page does not carry the blank
+    /// lines xberg ends it with, and no second copy of the text is made.
+    pub fn new(page_number: u32, mut content: String) -> Self {
+        content.truncate(content.trim_end().len());
+
+        Self {
+            page_number,
+            content,
+        }
+    }
+}
+
 /// `POST /extract`'s 200 body — the contract `@neore/service-sdk`'s
 /// `ExtractResponse` describes (`packages/service-sdk/openapi/document-parser.json`).
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExtractResponse {
+    /// The whole text. Empty when `pages` is present: the text is then only
+    /// there, page by page, so the response never holds it twice.
     pub content: String,
+    /// A paged document's Markdown, one entry per page, in order. Absent for
+    /// every other document and format.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pages: Option<Vec<ExtractedPage>>,
     pub mime_type: String,
     pub tables: Vec<ExtractedTable>,
     pub metadata: serde_json::Value,
@@ -330,10 +343,42 @@ mod tests {
     }
 
     #[test]
-    fn marks_each_page_with_its_number() {
+    fn cuts_trailing_whitespace_from_a_page() {
         assert_eq!(
-            paged_markdown([(1, "# One\n\nalpha\n"), (2, "beta")]),
-            "<!-- PAGE 1 -->\n\n# One\n\nalpha\n\n<!-- PAGE 2 -->\n\nbeta"
+            ExtractedPage::new(1, "# One\n\nalpha\n\n".to_owned()),
+            ExtractedPage {
+                page_number: 1,
+                content: "# One\n\nalpha".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn omits_pages_unless_the_document_has_them() {
+        let plain = ExtractResponse {
+            content: "text".to_owned(),
+            pages: None,
+            mime_type: "application/pdf".to_owned(),
+            tables: Vec::new(),
+            metadata: serde_json::json!({}),
+        };
+        assert!(serde_json::to_value(&plain).unwrap().get("pages").is_none());
+
+        let paged = ExtractResponse {
+            content: String::new(),
+            pages: Some(vec![ExtractedPage::new(1, "beta".to_owned())]),
+            ..plain
+        };
+
+        assert_eq!(
+            serde_json::to_value(&paged).unwrap(),
+            serde_json::json!({
+                "content": "",
+                "pages": [{ "pageNumber": 1, "content": "beta" }],
+                "mimeType": "application/pdf",
+                "tables": [],
+                "metadata": {}
+            })
         );
     }
 

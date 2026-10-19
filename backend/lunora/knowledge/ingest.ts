@@ -18,7 +18,16 @@ import { MARKDOWN_EXTRACTION_MAX_BYTES, MAX_EXTRACTION_DOCUMENT_BYTES, MAX_EXTRA
 import { FETCH_TIMEOUT_LONG_MS } from "../lib/fetch-timeout";
 import { gatewayFetch, isServiceBound, serviceFetch, type ServicesContext } from "../lib/services";
 import { readStoredObject } from "../lib/storage-read";
-import { type ChunkOptions, chunkText, EMBEDDING_INPUT_BUDGET, embeddingInput, estimateTokens } from "./chunking";
+import {
+    type ChunkOptions,
+    chunkText,
+    EMBEDDING_INPUT_BUDGET,
+    embeddingInput,
+    estimateTokens,
+    markPage,
+    stripPageSentinel,
+    withoutPageLines,
+} from "./chunking";
 import { documentToText, fetchUrlDocument, hasMarkdownStructure, isPagedMimeType, type ParseDocument } from "./sources";
 
 ("use node");
@@ -72,7 +81,9 @@ export const documentParser = (ctx: ServicesContext): ParseDocument | undefined 
             throw new LunoraError("INTERNAL", `Parser returned ${response?.status ?? "no response"}: ${JSON.stringify(error)}`);
         }
 
-        let text = data.content || "";
+        // A paged document comes back page by page: joined here, each page under its page line.
+        // Plain text is stripped too: a PDF whose Markdown render failed reaches here with its page-less text.
+        let text = data.pages ? data.pages.map((page) => markPage(page.pageNumber, page.content)).join("\n\n") : stripPageSentinel(data.content || "");
 
         // Markdown already carries the tables in place. Append only the ones it
         // lacks, so a table is never indexed twice.
@@ -84,13 +95,13 @@ export const documentParser = (ctx: ServicesContext): ParseDocument | undefined 
             .filter(({ table }) => table.markdown && !text.includes(table.markdown.trim()));
 
         if (missingTables.length > 0) {
-            // A table appended after the last page would inherit that page: mark each with its own.
             const isPaged = isPagedMimeType(mimeType);
             const tableMarkdown = missingTables
                 .map(({ number, table }) => {
-                    const page = isPaged ? `<!-- PAGE ${String(table.pageNumber)} -->\n\n` : "";
+                    const section = `### Table ${String(number)}\n${table.markdown}`;
 
-                    return `\n\n${page}### Table ${String(number)}\n${table.markdown}`;
+                    // A table appended after the last page would inherit that page: mark each with its own.
+                    return `\n\n${isPaged ? markPage(table.pageNumber, section) : section}`;
                 })
                 .join("");
 
@@ -312,7 +323,7 @@ export const ingestFile = internalAction
                     prompt: `Summarize the following document in 2-3 sentences. Focus on the key topics and content type.
 
 Document title: ${file.name}
-Content (first 3000 chars): ${extractedText.slice(0, 3000)}`,
+Content (first 3000 chars): ${withoutPageLines(extractedText).slice(0, 3000)}`,
                 });
 
                 summary = summaryResult.output?.summary;

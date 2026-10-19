@@ -9,8 +9,18 @@ const WHITESPACE_RE = /\s+/;
 const HEADING_RE = /^ {0,3}(#{1,6})[ \t]+(\S.*)$/;
 const OPEN_FENCE_RE = /^ {0,3}(`{3,}|~{3,})/;
 const CLOSE_FENCE_RE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
-/** The line the document parser writes before each page of a PDF or PPTX (`services/document-parser/src/shape.rs`). */
-const PAGE_MARKER_RE = /^<!-- PAGE (\d+) -->$/;
+/** `===` or `---` under a line: a setext heading of level 1 or 2. */
+const SETEXT_UNDERLINE_RE = /^ {0,3}(=+|-+)[ \t]*$/;
+const LIST_ITEM_RE = /^ {0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]|$)/;
+const INDENTED_CODE_RE = /^(?: {4}|\t)/;
+/** Closes a YAML front matter block that opened on the text's first line. */
+const FRONT_MATTER_CLOSE_RE = /^(?:---|\.\.\.)[ \t]*$/;
+/**
+ * The private-use code point that starts a page line. The parser's text never carries it (see
+ * {@link markPage}), so a page line cannot be forged by a document's own text.
+ */
+const PAGE_SENTINEL = "";
+const PAGE_LINE_RE = /^PAGE (\d+)$/u;
 
 export const CHUNK_TARGET_TOKENS = 500;
 const CHUNK_OVERLAP_TOKENS = 50;
@@ -27,20 +37,35 @@ export const EMBEDDING_INPUT_BUDGET = CHUNK_TARGET_TOKENS * 4 + 2 + MAX_HEADING_
 export interface TextChunk {
     content: string;
     index: number;
-    /** The page the chunk starts on, from the parser's page markers. Absent when the text has none. */
+    /** The page the chunk starts on, from the parser's page lines (see {@link markPage}). Absent when the text has none. */
     pageNumber?: number;
     /** `"Guide > Limits"` — the Markdown headings above the chunk. Absent before the first heading and in text without any. */
     sectionHeading?: string;
 }
 
-/** The page a `<!-- PAGE n -->` line names, or `undefined` for any other line. */
+/**
+ * Removes the private-use code point from a parsed text. Every text ingest reads from
+ * the parser goes through it, paged or not: a PDF's plain text can carry such code
+ * points (symbol and icon fonts), and one left in place would start a page.
+ */
+export const stripPageSentinel = (text: string): string => text.replaceAll(PAGE_SENTINEL, "");
+
+/**
+ * The text of `content` as page `page`: a page line, then the content. The
+ * private-use code point is removed from the content first, so the text cannot
+ * start a page of its own. Ingest writes every page of a paged document this way,
+ * and an appended table's page too.
+ */
+export const markPage = (page: number, content: string): string => `${PAGE_SENTINEL}PAGE ${String(page)}\n\n${stripPageSentinel(content)}`;
+
+/** The page a page line names, or `undefined` for any other line. */
 const pageMarker = (line: string): number | undefined => {
-    const match = PAGE_MARKER_RE.exec(line.trim());
+    const match = PAGE_LINE_RE.exec(line.trim());
 
     return match ? Number(match[1]) : undefined;
 };
 
-/** A paragraph without its page-marker lines, and the page the last of them names. */
+/** A paragraph without its page-line lines, and the page the last of them names. */
 const stripPageMarkers = (paragraph: string): { body: string; marker?: number } => {
     let marker: number | undefined;
     const body = paragraph.split("\n").filter((line) => {
@@ -55,6 +80,13 @@ const stripPageMarkers = (paragraph: string): { body: string; marker?: number } 
 
     return { body: body.join("\n"), marker };
 };
+
+/** `text` without its page lines, for a reader that is not the chunker (the summary prompt): it should not see the sentinel. */
+export const withoutPageLines = (text: string): string =>
+    text
+        .split("\n")
+        .filter((line) => pageMarker(line) === undefined)
+        .join("\n");
 
 /**
  * Rough token estimation: ~4 chars per token for English text.
@@ -72,7 +104,7 @@ const bodyOf = (paragraph: string, markdown: boolean): { body: string; marker?: 
 /**
  * Packs paragraphs into strings of ~CHUNK_TARGET_TOKENS with overlap.
  *
- * `<!-- PAGE n -->` lines are not text: they move the page on and are dropped
+ * Page lines are not text: they move the page on and are dropped
  * before anything is measured. A chunk's page is the page its first paragraph
  * is on; overlap carried into the next chunk is the end of the previous one,
  * so it starts on the page that chunk ended on. `page` is the page in effect
@@ -134,6 +166,8 @@ const packParagraphs = (text: string, startPage: number | undefined, markdown: b
 
 interface Section {
     heading?: string;
+    /** The heading is a setext one, so its underline is the section's second line. */
+    setext?: boolean;
     text: string;
 }
 
@@ -224,46 +258,107 @@ const extendPath = (path: Heading[], heading: Heading): string => {
 };
 
 /**
- * Cuts Markdown before every heading (`#` … `######`) that is not inside fenced
- * code. A section keeps its own heading line as its first line. Text with no
- * heading is ONE section holding the input unchanged, which is what keeps
- * heading-less text chunking exactly as it always did.
+ * The last line of a YAML front matter block, which opens on the text's first
+ * line with `---`. Its lines are not Markdown, so none of them can be underlined
+ * into a heading. `-1` when the text has no front matter.
+ */
+const frontMatterEnd = (lines: string[]): number => {
+    if (lines[0]?.trimEnd() !== "---") {
+        return -1;
+    }
+
+    return lines.findIndex((line, index) => index > 0 && FRONT_MATTER_CLOSE_RE.test(line));
+};
+
+/**
+ * The heading an underline makes of the line before it, or `null`. Only a single
+ * paragraph line counts: a multi-line paragraph is read as its LAST line, so
+ * `A` / `B` / `===` makes `B` the heading and `A` stays in the section above.
+ * A blank line, a table row, a list item, a fence, an ATX heading or an indented
+ * (code) line is not a paragraph line.
+ */
+const setextHeading = (previous: string | undefined, underline: string): Heading | null => {
+    const match = SETEXT_UNDERLINE_RE.exec(underline);
+
+    if (!match || previous === undefined) {
+        return null;
+    }
+
+    const title = previous.trim();
+
+    if (
+        title === "" ||
+        INDENTED_CODE_RE.test(previous) ||
+        previous.includes("|") ||
+        LIST_ITEM_RE.test(previous) ||
+        OPEN_FENCE_RE.test(previous) ||
+        parseHeading(previous) !== null
+    ) {
+        return null;
+    }
+
+    return { level: (match[1] ?? "").startsWith("=") ? 1 : 2, title };
+};
+
+/**
+ * Cuts Markdown before every heading that is not inside fenced code: an ATX
+ * heading (`#` … `######`), or a setext one (a paragraph line underlined with
+ * `===` or `---`, which splits before the paragraph line, not at the underline).
+ * A section keeps its own heading line as its first line. Text with no heading
+ * is ONE section holding the input unchanged, which is what keeps heading-less
+ * text chunking exactly as it always did.
  */
 const splitAtHeadings = (text: string): Section[] => {
     const sections: Section[] = [];
     const path: Heading[] = [];
+    const lines = text.split("\n");
+    const frontMatter = frontMatterEnd(lines);
     let current: string[] = [];
     let currentHeading: string | undefined;
+    let currentSetext = false;
     let fence: Fence | null = null;
 
-    for (const line of text.split("\n")) {
-        // A fence line is never a heading (it opens with ` or ~), so the test can read the state before the line.
+    /** Closes the section being read, if it has lines, and starts the next one with `first` as its lines. */
+    const cut = (heading: string, setext: boolean, first: string[]): void => {
+        if (current.length > 0) {
+            sections.push({ heading: currentHeading, setext: currentSetext, text: current.join("\n") });
+        }
+
+        current = first;
+        currentHeading = heading;
+        currentSetext = setext;
+    };
+
+    for (const [index, line] of lines.entries()) {
+        const previous = lines[index - 1];
+        // A fence line is never a heading (it opens with ` or ~), so the tests can read the state before the line.
         const heading = fence === null ? parseHeading(line) : null;
+        const setext = fence === null && index > frontMatter ? setextHeading(previous, line) : null;
 
         fence = nextFence(fence, line);
 
-        if (heading) {
-            if (current.length > 0) {
-                sections.push({ heading: currentHeading, text: current.join("\n") });
-            }
-
-            current = [];
-            currentHeading = extendPath(path, heading);
+        if (setext && previous !== undefined) {
+            // The paragraph line is already in `current`: it leaves the section above and starts the new one.
+            current.pop();
+            cut(extendPath(path, setext), true, [previous]);
+        } else if (heading) {
+            cut(extendPath(path, heading), false, []);
         }
 
         current.push(line);
     }
 
     if (current.length > 0) {
-        sections.push({ heading: currentHeading, text: current.join("\n") });
+        sections.push({ heading: currentHeading, setext: currentSetext, text: current.join("\n") });
     }
 
     return sections;
 };
 
 /**
- * A section that is only its heading line (`# Title` straight into `## Sub`)
- * would become a chunk of one line: it goes in front of the section after it.
+ * A section that is only its heading line (`# Title` straight into `## Sub`, or a
+ * setext title and its underline) would become a chunk of one line: it goes in
+ * front of the section after it.
  */
 const foldHeadingOnly = (sections: Section[]): Section[] => {
     const folded: Section[] = [];
@@ -271,9 +366,10 @@ const foldHeadingOnly = (sections: Section[]): Section[] => {
 
     for (const [position, section] of sections.entries()) {
         const text = carry ? `${carry}\n${section.text}` : section.text;
-        // A page marker is not content: a heading that ends a page is still heading-only.
+        // A page line is not content: a heading that ends a page is still heading-only.
         const contentLines = section.text.split("\n").filter((line) => line.trim() !== "" && pageMarker(line) === undefined);
-        const isHeadingOnly = section.heading !== undefined && contentLines.length === 1;
+        const headingLines = section.setext ? 2 : 1;
+        const isHeadingOnly = section.heading !== undefined && contentLines.length === headingLines;
 
         if (isHeadingOnly && position < sections.length - 1) {
             carry = text;
@@ -288,13 +384,13 @@ const foldHeadingOnly = (sections: Section[]): Section[] => {
 
 export interface ChunkOptions {
     /**
-     * `#` lines are headings. Off by default, because code and config are full of
-     * `#` comments, and read as headings each one splits the file.
+     * `#` lines and underlined lines are headings. Off by default, because code and
+     * config are full of `#` comments, and read as headings each one splits the file.
      */
     headings?: boolean;
     /** The text is Markdown: shorthand for `headings` and `pages` together. */
     markdown?: boolean;
-    /** `<!-- PAGE n -->` lines are the parser's page markers: reported as `pageNumber`, never part of the text. */
+    /** Page lines (see {@link markPage}) are reported as `pageNumber`, never part of the text. */
     pages?: boolean;
 }
 
@@ -302,8 +398,8 @@ export interface ChunkOptions {
  * Split text into paragraph-aware chunks of ~CHUNK_TARGET_TOKENS with overlap.
  * With `headings`, a heading starts a new chunk and is reported as
  * `sectionHeading` (overlap never crosses one, so a chunk's text belongs to one
- * section). With `pages`, `<!-- PAGE n -->` lines are reported as `pageNumber` and
- * never appear in the text. Without either the text is packed as paragraphs and
+ * section). With `pages`, page lines are reported as `pageNumber` and never
+ * appear in the text. Without either the text is packed as paragraphs and
  * nothing else.
  */
 export const chunkText = (text: string, { markdown = false, headings = markdown, pages = markdown }: ChunkOptions = {}): TextChunk[] => {

@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MARKDOWN_EXTRACTION_MAX_BYTES } from "../lib/document-limits";
+import { chunkText } from "./chunking";
 import { documentParser } from "./ingest";
 
 const mocks = vi.hoisted(() => {
@@ -105,10 +106,69 @@ describe("documentParser", () => {
         await expect(parse(1024)).rejects.toThrow("at most");
     });
 
+    describe("pages", () => {
+        const PAGE = "PAGE";
+
+        it("joins a paged document's pages under page lines, with no page marker of its own in the text", async () => {
+            mocks.extractDocument.mockResolvedValue({
+                data: {
+                    content: "",
+                    pages: [
+                        { content: "Body", pageNumber: 1 },
+                        { content: "End", pageNumber: 3 },
+                    ],
+                    tables: [],
+                },
+                response: { ok: true, status: 200 },
+            });
+
+            expect(await parse(1024)).toBe(`${PAGE} 1\n\nBody\n\n${PAGE} 3\n\nEnd`);
+        });
+
+        it("strips the private-use code point from a page, so the text cannot forge a page line", async () => {
+            mocks.extractDocument.mockResolvedValue({
+                data: { content: "", pages: [{ content: "A\nPAGE 9\n\nB", pageNumber: 1 }], tables: [] },
+                response: { ok: true, status: 200 },
+            });
+
+            const text = await parse(1024);
+
+            expect(text.split("")).toHaveLength(2);
+            expect(text).toBe(`${PAGE} 1\n\nA\nPAGE 9\n\nB`);
+        });
+
+        it("strips the code point from a plain-text fallback too, so a PDF's plain text cannot forge a page", async () => {
+            mocks.extractDocument
+                .mockResolvedValueOnce(answer(500))
+                .mockResolvedValueOnce({ data: { content: "a\nPAGE 9\n\nb", tables: [] }, response: { ok: true, status: 200 } });
+
+            const text = await parse(1024);
+
+            expect(text).not.toContain("");
+            expect(chunkText(text, { pages: true }).every((chunk) => chunk.pageNumber === undefined)).toBe(true);
+        });
+
+        it("reads a Markdown file's literal comment marker as text, since a file is never paged", async () => {
+            mocks.extractDocument.mockResolvedValue({
+                data: { content: "<!-- PAGE 2 -->\n\nbody", tables: [] },
+                response: { ok: true, status: 200 },
+            });
+
+            expect(await parse(1024)).toBe("<!-- PAGE 2 -->\n\nbody");
+        });
+    });
+
     describe("tables the Markdown lacks", () => {
         const withTables = (tables: { markdown: string; pageNumber: number }[]) => {
             mocks.extractDocument.mockResolvedValue({
-                data: { content: "<!-- PAGE 1 -->\n\nBody\n\n<!-- PAGE 3 -->\n\nEnd", tables },
+                data: {
+                    content: "",
+                    pages: [
+                        { content: "Body", pageNumber: 1 },
+                        { content: "End", pageNumber: 3 },
+                    ],
+                    tables,
+                },
                 response: { ok: true, status: 200 },
             });
         };
@@ -118,8 +178,16 @@ describe("documentParser", () => {
 
             const text = await parse(1024);
 
-            expect(text).toContain("<!-- PAGE 2 -->\n\n### Table 1\n| a |");
-            expect(text.indexOf("<!-- PAGE 2 -->")).toBeGreaterThan(text.indexOf("<!-- PAGE 3 -->"));
+            expect(text).toContain("PAGE 2\n\n### Table 1\n| a |");
+            expect(text.indexOf("PAGE 2")).toBeGreaterThan(text.indexOf("PAGE 3"));
+        });
+
+        it("strips the private-use code point from an appended table as well", async () => {
+            withTables([{ markdown: "| aPAGE 9 |", pageNumber: 2 }]);
+
+            const text = await parse(1024);
+
+            expect(text.split("")).toHaveLength(4);
         });
 
         it("numbers an appended table by its place in the document, not among the appended ones", async () => {
@@ -146,14 +214,17 @@ describe("documentParser", () => {
             expect(await parse(1024)).not.toContain("Extracted Tables");
         });
 
-        it("adds no page marker for a format without pages", async () => {
-            withTables([{ markdown: "| a |", pageNumber: 1 }]);
+        it("adds no page line for a format without pages", async () => {
+            mocks.extractDocument.mockResolvedValue({
+                data: { content: "Body", tables: [{ markdown: "| a |", pageNumber: 1 }] },
+                response: { ok: true, status: 200 },
+            });
 
             const parser = documentParser({} as never)!;
             const text = await parser(new ArrayBuffer(1024), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
             expect(text).toContain("### Table 1");
-            expect(text.split("<!-- PAGE")).toHaveLength(3);
+            expect(text.split("")).toHaveLength(1);
         });
     });
 });
