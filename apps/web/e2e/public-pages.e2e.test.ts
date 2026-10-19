@@ -51,6 +51,7 @@ test.describe("Landing page", () => {
         // Invite-only hides the sign-up CTAs, but the Free tier's /chat link browses anonymously and stays.
         await expect(page.getByText("Try it free")).toHaveCount(0);
         const freeTierLink = page.getByRole("link", { name: "Get started", exact: true }).first();
+
         await expect(freeTierLink).toBeVisible();
         await expect(freeTierLink).toHaveAttribute("href", "/chat");
     });
