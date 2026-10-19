@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { HonoEnv } from "../env.js";
 import { asBindingCallerEnv } from "../lib/binding-caller.js";
-import { parseRerankResponse, RERANK_MODEL, rerankRouter } from "../routes/internal/rerank.js";
+import { parseRerankResponse, RERANK_DEADLINE_MS, RERANK_MODEL, rerankRouter } from "../routes/internal/rerank.js";
 
 const app = new Hono<HonoEnv>().route("/", rerankRouter);
 
@@ -127,5 +127,26 @@ describe("POST /internal/rerank", () => {
 
         expect(thrown.status).toBe(503);
         expect(empty.status).toBe(503);
+    });
+
+    it("answers 503 when the model stalls past the deadline, instead of holding the request", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const run = vi.fn().mockReturnValue(
+                new Promise(() => {
+                    // never settles
+                }),
+            );
+            const pending = call({ documents: ["a"], query: "q" }, { AI: { run } });
+
+            await vi.advanceTimersByTimeAsync(RERANK_DEADLINE_MS + 1);
+
+            const res = await pending;
+
+            expect(res.status).toBe(503);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

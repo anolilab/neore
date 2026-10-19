@@ -21,6 +21,9 @@ import { internalAuth } from "../../middleware/auth.js";
 
 export const RERANK_MODEL = "@cf/baai/bge-reranker-base";
 
+/** How long the route waits for the model before answering 503. Retrieval gives up after 2 s, so a stalled invocation should not outlive it by much. */
+export const RERANK_DEADLINE_MS = 4000;
+
 /** Candidates per request. Retrieval sends 15; the bound is the gateway's own. */
 export const MAX_RERANK_DOCUMENTS = 50;
 
@@ -107,7 +110,14 @@ rerankRouter.post("/internal/rerank", async (c) => {
             query,
             top_k: topN ?? documents.length,
         };
-        const raw = await ai.run(RERANK_MODEL, input as never);
+        const raw = await Promise.race([
+            ai.run(RERANK_MODEL, input as never),
+            new Promise<never>((_resolve, reject) => {
+                setTimeout(() => {
+                    reject(new Error(`rerank timed out after ${String(RERANK_DEADLINE_MS)} ms`));
+                }, RERANK_DEADLINE_MS);
+            }),
+        ]);
         const results = parseRerankResponse(raw, documents.length);
 
         if (results.length === 0) {
