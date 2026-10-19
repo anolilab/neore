@@ -223,7 +223,12 @@ const sendWithAiDisclosure = async (
     const outcome = await sendPlatformMessage(delivery, disclosed ? options.text : `${AI_DISCLOSURE}\n\n${options.text}`, messengerKeys);
 
     if (!disclosed && outcome === "sent") {
-        await ctx.runMutation(internal.messenger.functions.markAiDisclosed, { threadId: options.threadId, userId: options.userId });
+        // The reply is delivered already: a failure here must not turn it into an error reply.
+        try {
+            await ctx.runMutation(internal.messenger.functions.markAiDisclosed, { threadId: options.threadId, userId: options.userId });
+        } catch (error) {
+            console.error("[Messenger] Failed to record the AI disclosure; the next reply will carry it again", error);
+        }
     }
 
     return outcome;

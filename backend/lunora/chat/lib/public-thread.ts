@@ -38,7 +38,8 @@ export const MAX_PUBLIC_THREAD_ROWS = 200;
 const GENERATION_MARKERS = new Set(["__AUDIO_GENERATING__", "__IMAGE_GENERATING__", "__VIDEO_GENERATING__"]);
 
 /** NSFW states under which a file must not be shown to an anonymous viewer. */
-const UNCLEARED_NSFW_STATUSES = new Set(["blocked", "checking", "pending"]);
+// "failed" is uncleared too: a check that errored or never ran must not pass a file into a public share.
+const UNCLEARED_NSFW_STATUSES = new Set(["blocked", "checking", "failed", "pending"]);
 
 const SAFE_URL_PROTOCOLS = new Set(["http:", "https:"]);
 

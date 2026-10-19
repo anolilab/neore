@@ -76,6 +76,8 @@ export const checkImageNsfwForChatFile = internalAction
         if (!isServiceBound(ctx, "nsfwChecker")) {
             console.warn("nsfw-checker service binding (SERVICE_NSFW_CHECKER) not bound — skipping NSFW check");
 
+            await ctx.runMutation(internal.agent.files.markNsfwFailed, { fileId: args.fileId });
+
             return;
         }
 
