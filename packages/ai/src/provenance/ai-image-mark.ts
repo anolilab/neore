@@ -164,7 +164,26 @@ const markPng = (bytes: Uint8Array): Uint8Array => {
     return concat(chunks);
 };
 
+/**
+ * A C2PA manifest is an APP11 segment whose payload starts with "JP" (JUMBF). It can
+ * sit between scans of a progressive JPEG, so the whole file is searched, not just
+ * the header. A false match on entropy-coded data only skips marking, which is safe.
+ */
+const hasJumbfSegment = (bytes: Uint8Array): boolean => {
+    for (let i = 0; i + 5 < bytes.byteLength; i += 1) {
+        if (bytes[i] === 0xff && bytes[i + 1] === 0xeb && bytes[i + 4] === 0x4a && bytes[i + 5] === 0x50) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 const markJpeg = (bytes: Uint8Array): Uint8Array => {
+    if (hasJumbfSegment(bytes)) {
+        return bytes;
+    }
+
     let offset = 2;
     // Right after the leading APP0/APP1 run (JFIF must stay first, Exif is usually second).
     let insertAt = 2;
@@ -189,12 +208,6 @@ const markJpeg = (bytes: Uint8Array): Uint8Array => {
         if (marker === 0xda || marker === 0xd9) {
             reachedScan = true;
             break;
-        }
-
-        // A C2PA manifest lives in JUMBF boxes: APP11 whose payload starts with "JP".
-        // Other APP11 segments are not C2PA and must not block marking.
-        if (marker === 0xeb && bytes[offset + 4] === 0x4a && bytes[offset + 5] === 0x50) {
-            return bytes;
         }
 
         // A header segment needs its two length bytes.
