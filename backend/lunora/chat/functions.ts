@@ -4998,13 +4998,15 @@ export const generateImg2Img = internalAction
         const [generatedImage] = result.images;
         const imageResponse = await fetchWithDeadline(generatedImage!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = generatedImage!.content_type ?? "image/png";
 
-        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: modelId,
         };
     });
@@ -5081,13 +5083,15 @@ export const generateUpscale = internalAction
         // Store the upscaled image
         const imageResponse = await fetchWithDeadline(result.image.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = result.image.content_type ?? "image/png";
 
-        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: modelId,
             scale: requestedScale,
         };
@@ -5148,13 +5152,15 @@ export const generateInpaint = internalAction
         const [imageSource] = result.images;
         const imageResponse = await fetchWithDeadline(imageSource!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = imageSource!.content_type ?? "image/png";
 
-        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: modelId,
         };
     });
@@ -5262,13 +5268,15 @@ export const generateCharacterRef = internalAction
         const [generatedImage] = result.images;
         const imageResponse = await fetchWithDeadline(generatedImage!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = generatedImage!.content_type ?? "image/png";
 
-        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             mode,
             model: modelId,
         };
@@ -5377,13 +5385,15 @@ export const generateStyleRef = internalAction
         const [generatedImage] = result.images;
         const imageResponse = await fetchWithDeadline(generatedImage!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = generatedImage!.content_type ?? "image/png";
 
-        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: modelId,
         };
     });
@@ -5480,16 +5490,15 @@ export const generateParallelCompare = internalAction
                 const [imageSource] = result.images;
                 const imageResponse = await fetchWithDeadline(imageSource!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
                 const imageBlob = await imageResponse.blob();
-                const mimeType = imageSource!.content_type ?? "image/png";
 
-                const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+                const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
                     threadId,
                     userId,
                 });
 
                 return {
                     imageUrl: file.url,
-                    mimeType,
+                    mimeType: mediaType,
                     modelId,
                     modelName: modelDefinition.name ?? modelId,
                     success: true,
@@ -5617,13 +5626,15 @@ export const generateOutpaint = internalAction
         const [imageSource] = result.images;
         const imageResponse = await fetchWithDeadline(imageSource!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = imageSource!.content_type ?? "image/png";
 
-        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: endpoint,
         };
     });
@@ -5681,13 +5692,15 @@ export const generateBackgroundRemoval = internalAction
 
         const imageResponse = await fetchWithDeadline(result.image.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = result.image.content_type ?? "image/png";
 
-        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: endpoint,
         };
     });
@@ -5756,15 +5769,17 @@ export const generateObjectEdit = internalAction
             throw new LunoraError("BAD_REQUEST", "No result from object editing");
         }
 
-        const contentType = result.image?.content_type ?? result.images?.[0]?.content_type ?? "image/png";
         const imageResponse = await fetchWithDeadline(outputUrl, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
 
-        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType: contentType,
+            mimeType: mediaType,
             model: endpoint,
         };
     });
@@ -5921,14 +5936,16 @@ export const generateControlNet = internalAction
         const [imageSource] = result.images;
         const imageResponse = await fetchWithDeadline(imageSource!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = imageSource!.content_type ?? "image/png";
 
-        const { file } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             controlType,
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: endpoint,
         };
     });
