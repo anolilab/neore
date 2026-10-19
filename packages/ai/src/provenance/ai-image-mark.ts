@@ -22,6 +22,18 @@ const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 // Adobe's XMP namespace identifier.
 const XAP_NAMESPACE = "http://ns.adobe.com/xap/1.0/";
+const XAP_HEADER = `${XAP_NAMESPACE}\0`;
+
+// The PNG iTXt keyword under which XMP is stored.
+const XMP_KEYWORD = "XML:com.adobe.xmp";
+
+const DIGITAL_SOURCE_TYPE_ATTRIBUTE = /Iptc4xmpExt:DigitalSourceType="([^"]*)"/;
+
+/**
+ * True only when the XMP already declares OUR source type. An unrelated text chunk
+ * that merely mentions the URI, or a camera's own source type, does not count.
+ */
+const xmpAlreadyMarked = (xmp: string): boolean => DIGITAL_SOURCE_TYPE_ATTRIBUTE.exec(xmp)?.[1] === DIGITAL_SOURCE_TYPE;
 
 const XMP_PACKET = [
     `<?xpacket begin="\u{FEFF}" id="W5M0MpCehiHzreSzNTczkc9d"?>`,
@@ -116,8 +128,13 @@ const markPng = (bytes: Uint8Array): Uint8Array => {
         }
 
         // Already marked by an upstream that wrote the same field: nothing to add.
-        if (type === "iTXt" && decoder.decode(bytes.subarray(offset + 8, offset + 8 + length)).includes(DIGITAL_SOURCE_TYPE)) {
-            return bytes;
+        if (type === "iTXt") {
+            const data = bytes.subarray(offset + 8, offset + 8 + length);
+            const keywordEnd = data.indexOf(0);
+
+            if (keywordEnd > 0 && decoder.decode(data.subarray(0, keywordEnd)) === XMP_KEYWORD && xmpAlreadyMarked(decoder.decode(data))) {
+                return bytes;
+            }
         }
 
         const end = offset + 12 + length;
@@ -149,25 +166,48 @@ const markJpeg = (bytes: Uint8Array): Uint8Array => {
     // Right after the leading APP0/APP1 run (JFIF must stay first, Exif is usually second).
     let insertAt = 2;
     let leading = true;
+    let reachedScan = false;
 
-    while (offset + 4 <= bytes.byteLength && bytes[offset] === 0xff) {
+    while (offset + 2 <= bytes.byteLength) {
+        // Not a marker where one must be: a malformed header, so leave the file alone.
+        if (bytes[offset] !== 0xff) {
+            return bytes;
+        }
+
+        // Fill bytes (a run of 0xFF) may precede a marker code.
+        if (bytes[offset + 1] === 0xff) {
+            offset += 1;
+            continue;
+        }
+
         const marker = bytes[offset + 1]!;
 
         // Start of scan: entropy-coded data follows, no more header segments.
         if (marker === 0xda || marker === 0xd9) {
+            reachedScan = true;
             break;
         }
 
-        // Refuse to touch a C2PA-signed file: the manifest hashes these bytes.
-        if (marker === 0xeb) {
+        // A C2PA manifest lives in JUMBF boxes: APP11 whose payload starts with "JP".
+        // Other APP11 segments are not C2PA and must not block marking.
+        if (marker === 0xeb && bytes[offset + 4] === 0x4a && bytes[offset + 5] === 0x50) {
+            return bytes;
+        }
+
+        // A header segment needs its two length bytes.
+        if (offset + 4 > bytes.byteLength) {
             return bytes;
         }
 
         const next = offset + 2 + ((bytes[offset + 2]! << 8) | bytes[offset + 3]!);
 
-        // Already marked: the same field is in an XMP APP1, so nothing to add.
-        if (marker === 0xe1 && decoder.decode(bytes.subarray(offset + 4, next)).includes(DIGITAL_SOURCE_TYPE)) {
-            return bytes;
+        // Already marked: our source type is in an XMP APP1 segment.
+        if (marker === 0xe1) {
+            const payload = decoder.decode(bytes.subarray(offset + 4, next));
+
+            if (payload.startsWith(XAP_HEADER) && xmpAlreadyMarked(payload)) {
+                return bytes;
+            }
         }
 
         if (leading && (marker === 0xe0 || marker === 0xe1)) {
@@ -179,8 +219,13 @@ const markJpeg = (bytes: Uint8Array): Uint8Array => {
         offset = next;
     }
 
+    // Never reached the scan data: the header is truncated or unreadable.
+    if (!reachedScan) {
+        return bytes;
+    }
+
     // ponytail: a provider's own XMP packet without this field gets a second packet; merging into it is the upgrade path.
-    const payload = concat([encoder.encode(`${XAP_NAMESPACE}\0`), encoder.encode(XMP_PACKET)]);
+    const payload = concat([encoder.encode(XAP_HEADER), encoder.encode(XMP_PACKET)]);
     const length = payload.byteLength + 2;
 
     if (length > 0xff_ff) {
@@ -190,6 +235,30 @@ const markJpeg = (bytes: Uint8Array): Uint8Array => {
     const segment = concat([new Uint8Array([0xff, 0xe1, length >> 8, length & 0xff]), payload]);
 
     return concat([bytes.subarray(0, insertAt), segment, bytes.subarray(insertAt)]);
+};
+
+/**
+ * The image format of the bytes, from their magic numbers. Providers and the
+ * backend's fallback get the declared type wrong, so trust the bytes.
+ */
+export const sniffImageMediaType = (bytes: Uint8Array): string | undefined => {
+    if (isPng(bytes)) {
+        return "image/png";
+    }
+
+    if (isJpeg(bytes)) {
+        return "image/jpeg";
+    }
+
+    if (decoder.decode(bytes.subarray(0, 4)) === "RIFF" && decoder.decode(bytes.subarray(8, 12)) === "WEBP") {
+        return "image/webp";
+    }
+
+    if (decoder.decode(bytes.subarray(0, 4)) === "GIF8") {
+        return "image/gif";
+    }
+
+    return undefined;
 };
 
 /**

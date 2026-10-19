@@ -1,7 +1,7 @@
 /* eslint-disable no-bitwise -- byte-level PNG/JPEG/CRC work is bitwise by nature */
 import { describe, expect, it } from "vitest";
 
-import { markAiGeneratedImage } from "./ai-image-mark";
+import { markAiGeneratedImage, sniffImageMediaType } from "./ai-image-mark";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -130,5 +130,50 @@ describe("markAiGeneratedImage", () => {
         const webp = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]);
 
         expect(markAiGeneratedImage(webp)).toBe(webp);
+    });
+
+    it("still marks a PNG whose unrelated text chunk mentions the source-type URI", () => {
+        const comment = chunk("iTXt", enc.encode("Comment\0\0\0\0\0http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"));
+        const marked = markAiGeneratedImage(makePng([comment]));
+
+        expect(readPngChunks(marked).map((c) => c.type)).toEqual(["IHDR", "iTXt", "iTXt", "IDAT", "IEND"]);
+        expect(dec.decode(readPngChunks(marked)[2]!.data)).toContain("DigitalSourceType");
+    });
+
+    it("skips a PNG whose XMP already declares our source type", () => {
+        const once = markAiGeneratedImage(makePng());
+
+        expect(markAiGeneratedImage(once)).toBe(once);
+    });
+
+    it("marks a JPEG whose APP11 segment is not a C2PA (JUMBF) box", () => {
+        const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xeb, 0x00, 0x04, 0x41, 0x42, 0xff, 0xd9]);
+        const marked = markAiGeneratedImage(jpeg);
+
+        expect(marked.byteLength).toBeGreaterThan(jpeg.byteLength);
+        expect(dec.decode(marked)).toContain("trainedAlgorithmicMedia");
+    });
+
+    it("skips fill bytes before a marker in a JPEG header", () => {
+        const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xff, 0xdb, 0x00, 0x03, 0x00, 0xff, 0xda, 0x00, 0x02, 0x01, 0xff, 0xd9]);
+        const marked = markAiGeneratedImage(jpeg);
+
+        expect(marked[2]).toBe(0xff);
+        expect(marked[3]).toBe(0xe1);
+        expect(dec.decode(marked)).toContain("trainedAlgorithmicMedia");
+    });
+
+    it("leaves a JPEG with a malformed header unchanged", () => {
+        const jpeg = new Uint8Array([0xff, 0xd8, 0x12, 0x34, 0x56, 0x78, 0xff, 0xd9]);
+
+        expect(markAiGeneratedImage(jpeg)).toBe(jpeg);
+    });
+
+    it("sniffs the image type from the bytes", () => {
+        expect(sniffImageMediaType(makePng())).toBe("image/png");
+        expect(sniffImageMediaType(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]))).toBe("image/jpeg");
+        expect(sniffImageMediaType(new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]))).toBe("image/webp");
+        expect(sniffImageMediaType(new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))).toBe("image/gif");
+        expect(sniffImageMediaType(new Uint8Array([0x00, 0x01, 0x02]))).toBeUndefined();
     });
 });

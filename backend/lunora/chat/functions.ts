@@ -14,7 +14,7 @@ import type { ImageSize, ModelDefinition } from "@neore/ai/models";
 import { exceedsFreePlanCap, FAL_IMAGE, MODEL_LOOKUP, REFERENCE_MEDIA_CAPS, resolveWorkflowModel, WORKFLOW_KIND_ACCEPTS } from "@neore/ai/models";
 import { getFollowupSuggestionsPrompt, getThreadTitlePrompt } from "@neore/ai/prompts";
 import { buildCinemaPrompt } from "@neore/ai/prompts/cinema";
-import { markAiGeneratedImage, withPngOutput } from "@neore/ai/provenance";
+import { markAiGeneratedImage, sniffImageMediaType, withPngOutput } from "@neore/ai/provenance";
 import {
     buildIteratePrompt,
     buildSystemOptimizerPrompt,
@@ -353,13 +353,23 @@ const storeGeneratedImage = async (
     mimeType: string,
     scope: { threadId?: string; userId?: string },
 ): ReturnType<typeof storeFile> => {
-    const stored = await storeFile(context, bytesToBlob(markAiGeneratedImage(bytes), mimeType), scope);
+    // The bytes say what they are; the declared type can be a CDN's generic octet-stream,
+    // which the NSFW check would skip as "not an image".
+    const mediaType = sniffImageMediaType(bytes) ?? (mimeType.startsWith("image/") ? mimeType : "image/png");
+    const stored = await storeFile(context, bytesToBlob(markAiGeneratedImage(bytes), mediaType), scope);
+    const fileId = stored.file.fileId as Id<"chatFiles">;
 
-    await context.scheduler.runAfter(0, internal.agent.nsfw_check.checkImageNsfwForChatFile, {
-        fileId: stored.file.fileId as Id<"chatFiles">,
-        mediaType: mimeType,
-        storageId: String(stored.file.storageId),
-    });
+    try {
+        await context.scheduler.runAfter(0, internal.agent.nsfw_check.checkImageNsfwForChatFile, {
+            fileId,
+            mediaType,
+            storageId: String(stored.file.storageId),
+        });
+    } catch (error) {
+        // Fail closed: a stored image whose check never queued must not show as cleared.
+        console.error(`[image] NSFW check could not be scheduled for chat file ${fileId}:`, error);
+        await context.runMutation(internal.agent.files.markNsfwFailed, { fileId });
+    }
 
     return stored;
 };
