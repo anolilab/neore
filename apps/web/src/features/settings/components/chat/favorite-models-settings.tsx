@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { getModelLabel, moveFavorite } from "@/components/model-picker/utilities";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
 import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
+import useCustomModels from "@/features/settings/hooks/use-custom-models";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
 // Matches `MAX_MODEL_NICKNAME_LENGTH` in `backend/lunora/auth/lib/model-nicknames.ts`.
@@ -72,27 +73,30 @@ const ModelName: FC<{ model: GatewayModel; nickname: string | undefined }> = ({ 
 
 const FavoriteModelsSettings: FC = () => {
     const { t } = useLingui();
+    // Custom endpoint models too: a starred custom model is stored like any other id.
     const models = useFeatureFlaggedModels();
+    const customModels = useCustomModels();
+    const catalog = useMemo(() => [...models, ...customModels], [models, customModels]);
     const { favoriteModelIds, reorderFavorites } = useFavoriteModels();
     const { nicknames, setNickname } = useModelNicknames();
 
     // Favorites the catalog still offers, in the user's order. A hidden or retired favorite keeps its place in the stored list.
     const favorites = useMemo(() => {
-        const byId = new Map(models.map((model) => [model.id, model]));
+        const byId = new Map(catalog.map((model) => [model.id, model]));
 
         return favoriteModelIds.flatMap((id) => {
             const model = byId.get(id);
 
             return model ? [model] : [];
         });
-    }, [favoriteModelIds, models]);
+    }, [favoriteModelIds, catalog]);
 
     // A nickname outlives the star, so it must stay editable here.
     const nicknamedOthers = useMemo(() => {
         const starred = new Set(favoriteModelIds);
 
-        return models.filter((model) => nicknames[model.id] && !starred.has(model.id));
-    }, [favoriteModelIds, models, nicknames]);
+        return catalog.filter((model) => nicknames[model.id] && !starred.has(model.id));
+    }, [favoriteModelIds, catalog, nicknames]);
 
     const visibleIds = favorites.map((model) => model.id);
 
