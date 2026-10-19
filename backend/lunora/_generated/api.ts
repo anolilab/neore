@@ -319,7 +319,7 @@ export interface ApiTypes {
         functions: {
             cancelImportJob: FunctionReference<"mutation", { jobId: string }, null>;
             getImportStatus: FunctionReference<"query", {}, { _id: string; completedAt: number | null; createdAt: number; currentStep: string | null; errorMessage: string | null; failedConversations: number | null; importedConversations: number; progress: number | null; provider: string; status: string; totalConversations: number } | null>;
-            startImportJob: FunctionReference<"mutation", { provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex"; totalConversations: number; uploadId: string }, { jobId: string }>;
+            startImportJob: FunctionReference<"mutation", { provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore"; totalConversations: number; uploadId: string }, { jobId: string }>;
         };
     };
     coding_agents: {
@@ -442,7 +442,7 @@ export interface ApiTypes {
             removeFile: FunctionReference<"mutation", { fileId: Id<"knowledgeFiles"> }, { success: boolean; }>;
         };
         retrieve: {
-            searchKnowledge: FunctionReference<"action", { query: string }, Array<{ chunkIndex: number; content: string; fileName: string; score: number }>>;
+            searchKnowledge: FunctionReference<"action", { query: string }, Array<{ chunkIndex: number; content: string; fileName: string; pageNumber?: number; score: number }>>;
         };
     };
     media: {

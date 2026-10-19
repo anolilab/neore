@@ -203,7 +203,7 @@ export interface Doc_chatImportJobs {
     failedConversations?: number;
     importedConversations: number;
     progress?: number;
-    provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex";
+    provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore";
     r2Key?: string;
     status: "pending" | "processing" | "completed" | "failed";
     totalConversations: number;
@@ -2860,7 +2860,7 @@ export interface Insert_chatImportJobs {
     failedConversations?: number;
     importedConversations: number;
     progress?: number;
-    provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex";
+    provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore";
     r2Key?: string;
     status: "pending" | "processing" | "completed" | "failed";
     totalConversations: number;
