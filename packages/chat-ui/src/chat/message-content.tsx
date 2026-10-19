@@ -341,6 +341,7 @@ const AiGeneratedLabel: FC = memo(() => {
 
     return <span className="text-muted-foreground block text-xs">{t`AI-generated`}</span>;
 });
+AiGeneratedLabel.displayName = "AiGeneratedLabel";
 
 /**
  * Placeholder shown when an image is blocked by the NSFW classifier
