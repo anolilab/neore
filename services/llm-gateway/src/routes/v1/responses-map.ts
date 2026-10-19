@@ -51,6 +51,7 @@ interface ChatUsage {
 export interface ChatCompletion {
     choices: { finish_reason: string | null; message: { content: string | null; tool_calls?: ChatToolCall[] } }[];
     created: number;
+    id?: string;
     model: string;
     usage?: ChatUsage;
 }
@@ -421,6 +422,15 @@ const outputFunctionCall = (callId: string, name: string, args: string, id: stri
     };
 };
 
+const CHAT_COMPLETION_PREFIX = /^chatcmpl-/;
+
+/** `chatcmpl-abc` -> `resp_abc`. A random id only when the completion carries none. */
+const responseIdOf = (completionId: string | undefined): string => {
+    const suffix = completionId?.replace(CHAT_COMPLETION_PREFIX, "");
+
+    return suffix ? `resp_${suffix}` : newId("resp");
+};
+
 /** A non-streaming chat completion as a Responses object. */
 export const chatCompletionToResponse = (completion: ChatCompletion): ResponseObject => {
     const choice = completion.choices[0];
@@ -441,7 +451,8 @@ export const chatCompletionToResponse = (completion: ChatCompletion): ResponseOb
     return {
         created_at: completion.created,
         error: null,
-        id: newId("resp"),
+        // Derived from the completion's id, so a replayed (idempotent) reply keeps its id.
+        id: responseIdOf(completion.id),
         incomplete_details: reason === null ? null : { reason },
         model: completion.model,
         object: "response",

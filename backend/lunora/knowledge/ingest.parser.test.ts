@@ -69,6 +69,29 @@ describe("documentParser", () => {
         expect(queryOf(1)).toBeUndefined();
     });
 
+    it("retries as plain text when the Markdown render rejects, as a Worker out of memory does", async () => {
+        mocks.extractDocument.mockRejectedValueOnce(new Error("Worker exceeded memory")).mockResolvedValueOnce(answer(200, "plain"));
+
+        expect(await parse(1024)).toBe("plain");
+        expect(mocks.extractDocument).toHaveBeenCalledTimes(2);
+        expect(queryOf(0)).toEqual({ format: "markdown" });
+        expect(queryOf(1)).toBeUndefined();
+    });
+
+    it("lets a rejected plain-text attempt propagate", async () => {
+        mocks.extractDocument.mockRejectedValueOnce(new Error("Worker exceeded memory")).mockRejectedValueOnce(new Error("plain failed"));
+
+        await expect(parse(1024)).rejects.toThrow("plain failed");
+        expect(mocks.extractDocument).toHaveBeenCalledTimes(2);
+    });
+
+    it("lets a rejected plain-text attempt propagate for a file over the gate, which has no Markdown attempt", async () => {
+        mocks.extractDocument.mockRejectedValueOnce(new Error("Worker exceeded memory"));
+
+        await expect(parse(MARKDOWN_EXTRACTION_MAX_BYTES + 1)).rejects.toThrow("Worker exceeded memory");
+        expect(mocks.extractDocument).toHaveBeenCalledOnce();
+    });
+
     it("does not retry a 4xx, which is a verdict on the file", async () => {
         mocks.extractDocument.mockResolvedValue(answer(422));
 

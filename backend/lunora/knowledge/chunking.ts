@@ -6,8 +6,9 @@
 
 const BLANK_LINE_RE = /\n\s*\n/;
 const WHITESPACE_RE = /\s+/;
-const HEADING_RE = /^(#{1,6})[ \t]+(\S.*)$/;
-const FENCE_RE = /^[ \t]{0,3}(```|~~~)/;
+const HEADING_RE = /^ {0,3}(#{1,6})[ \t]+(\S.*)$/;
+const OPEN_FENCE_RE = /^ {0,3}(`{3,}|~{3,})/;
+const CLOSE_FENCE_RE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 /** The line the document parser writes before each page of a PDF or PPTX (`services/document-parser/src/shape.rs`). */
 const PAGE_MARKER_RE = /^<!-- PAGE (\d+) -->$/;
 
@@ -15,6 +16,13 @@ export const CHUNK_TARGET_TOKENS = 500;
 const CHUNK_OVERLAP_TOKENS = 50;
 /** A heading path longer than this is cut: it is stored on every chunk of the section. */
 const MAX_HEADING_PATH_LENGTH = 300;
+
+/**
+ * The characters the embedding model reads of a chunk: a body at its target size behind the longest heading path.
+ * The packer closes a chunk on its token estimate (about 4 characters per token), so a body can run to the target
+ * plus the `\n\n` that joins its last paragraph, and the path adds its own `\n\n`.
+ */
+export const EMBEDDING_INPUT_BUDGET = CHUNK_TARGET_TOKENS * 4 + 2 + MAX_HEADING_PATH_LENGTH + 2;
 
 export interface TextChunk {
     content: string;
@@ -154,13 +162,51 @@ const parseHeading = (line: string): Heading | null => {
     return match ? { level: (match[1] ?? "").length, title: headingTitle(match[2] ?? "") } : null;
 };
 
-/** Opens a fence on its marker, closes it on the same marker, ignores the other kind inside it. */
-const nextFence = (fence: string | null, marker: string): string | null => {
-    if (fence === null) {
-        return marker;
+/** A fenced code block: its marker character and the length of its opening run. */
+interface Fence {
+    char: string;
+    length: number;
+}
+
+/**
+ * The fence a line opens, if any. A backtick fence's info string may not contain a
+ * backtick: that line is inline code (`` ```a`b` ``), not a fence.
+ */
+const openingFence = (line: string): Fence | null => {
+    const match = OPEN_FENCE_RE.exec(line);
+
+    if (!match) {
+        return null;
     }
 
-    return fence === marker ? null : fence;
+    const marker = match[1] ?? "";
+    const info = line.slice(match[0].length);
+
+    if (marker.startsWith("`") && info.includes("`")) {
+        return null;
+    }
+
+    return { char: marker.charAt(0), length: marker.length };
+};
+
+/**
+ * CommonMark closes a fence only with the same character, at least as long as the
+ * opening run, and nothing after it but spaces. A longer block (````) therefore
+ * holds a ``` line as code, and a ``` line with an info string is code too.
+ */
+const closesFence = (line: string, fence: Fence): boolean => {
+    const marker = CLOSE_FENCE_RE.exec(line)?.[1] ?? "";
+
+    return marker.charAt(0) === fence.char && marker.length >= fence.length;
+};
+
+/** The fence state after `line`: opened outside a fence, closed by its closer inside one. */
+const nextFence = (fence: Fence | null, line: string): Fence | null => {
+    if (fence === null) {
+        return openingFence(line);
+    }
+
+    return closesFence(line, fence) ? null : fence;
 };
 
 /** Pushes `heading` onto the path (dropping the deeper or equal ones first) and returns the path as `"A > B"`. */
@@ -188,16 +234,13 @@ const splitAtHeadings = (text: string): Section[] => {
     const path: Heading[] = [];
     let current: string[] = [];
     let currentHeading: string | undefined;
-    let fence: string | null = null;
+    let fence: Fence | null = null;
 
     for (const line of text.split("\n")) {
-        const fenceMatch = FENCE_RE.exec(line);
+        // A fence line is never a heading (it opens with ` or ~), so the test can read the state before the line.
+        const heading = fence === null ? parseHeading(line) : null;
 
-        if (fenceMatch) {
-            fence = nextFence(fence, fenceMatch[1] ?? "");
-        }
-
-        const heading = fence === null && !fenceMatch ? parseHeading(line) : null;
+        fence = nextFence(fence, line);
 
         if (heading) {
             if (current.length > 0) {
@@ -282,6 +325,18 @@ export const chunkText = (text: string, { markdown = false }: ChunkOptions = {})
     return chunks;
 };
 
-/** What a chunk is embedded as: its section path in front of the body, so "the limits" carries which limits. */
-export const embeddingInput = (chunk: Pick<TextChunk, "content" | "sectionHeading">): string =>
-    chunk.sectionHeading ? `${chunk.sectionHeading}\n\n${chunk.content}` : chunk.content;
+/** The least body an embedding keeps. A heading path is trimmed before it leaves the body less than this. */
+const MIN_EMBEDDING_BODY_CHARS = 200;
+
+/**
+ * What a chunk is embedded as, in at most `budget` characters: its section path in front
+ * of the body, so "the limits" carries which limits. The body is cut to fit behind the
+ * path, so the end of a long section still reaches the model. Only a path that would
+ * leave the body under its minimum is itself cut.
+ */
+export const embeddingInput = (chunk: Pick<TextChunk, "content" | "sectionHeading">, budget: number): string => {
+    const heading = chunk.sectionHeading ? `${chunk.sectionHeading}\n\n` : "";
+    const prefix = heading.slice(0, Math.max(0, budget - MIN_EMBEDDING_BODY_CHARS));
+
+    return `${prefix}${chunk.content.slice(0, budget - prefix.length)}`;
+};

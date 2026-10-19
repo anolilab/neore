@@ -1,4 +1,6 @@
 export interface FocusOrderNode {
+    /** Set by React Flow while a pointer drag runs on the node. */
+    dragging?: boolean;
     id: string;
     parentId?: string;
     position: { x: number; y: number };
@@ -8,8 +10,9 @@ export interface FocusOrderNode {
  * Orders nodes for DOM and keyboard focus: top to bottom, then left to right.
  *
  * React Flow needs every parent ahead of its children, so a child is placed right after
- * its parent's first appearance. A child's `position` is relative to its parent, so its
- * sort key is the parent's position plus its own.
+ * its parent's first appearance. A child's `position` is relative to its parent, and a
+ * group can sit inside another group, so its sort key is the sum of its own position and
+ * every ancestor's.
  *
  * Returns the input array itself when it is already in that order. Only the array handed
  * to React Flow changes: the store keeps its own order.
@@ -17,17 +20,28 @@ export interface FocusOrderNode {
 export const sortNodesForFocus = <T extends FocusOrderNode>(nodes: T[]): T[] => {
     const byId = new Map(nodes.map((node) => [node.id, node]));
 
-    // ponytail: one level of nesting (the canvas only nests free nodes under a group); deeper trees still get parent-first.
+    // `seen` stops a parentId cycle, which has no position to sum to.
     const absolute = (node: T) => {
-        const parent = node.parentId ? byId.get(node.parentId) : undefined;
+        let { x, y } = node.position;
+        const seen = new Set([node.id]);
+        let parent = node.parentId ? byId.get(node.parentId) : undefined;
 
-        return parent ? { x: parent.position.x + node.position.x, y: parent.position.y + node.position.y } : node.position;
+        while (parent && !seen.has(parent.id)) {
+            seen.add(parent.id);
+            x += parent.position.x;
+            y += parent.position.y;
+            parent = parent.parentId ? byId.get(parent.parentId) : undefined;
+        }
+
+        return { x, y };
     };
+
+    const keys = new Map(nodes.map((node) => [node.id, absolute(node)]));
 
     // toSorted is stable, so equal keys keep their input order.
     const sorted = nodes.toSorted((a, b) => {
-        const pa = absolute(a);
-        const pb = absolute(b);
+        const pa = keys.get(a.id) ?? { x: 0, y: 0 };
+        const pb = keys.get(b.id) ?? { x: 0, y: 0 };
 
         return pa.y - pb.y || pa.x - pb.x;
     });

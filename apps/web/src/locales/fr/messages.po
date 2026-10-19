@@ -6699,9 +6699,13 @@ msgstr "Impossible de supprimer le commentaire"
 msgid "Could not delete the page"
 msgstr "Impossible de supprimer la page"
 
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:119
+msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+msgstr ""
+
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:118
-msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
-msgstr "Impossible de détecter le fournisseur de chat. Assurez-vous d’avoir téléversé un fichier d’export valide de ChatGPT, Gemini ou Claude."
+#~ msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
+#~ msgstr "Impossible de détecter le fournisseur de chat. Assurez-vous d’avoir téléversé un fichier d’export valide de ChatGPT, Gemini ou Claude."
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:58
 msgid "Could not export the workflow"
@@ -14102,8 +14106,12 @@ msgid "Import Conversations"
 msgstr "Importer des conversations"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:299
-msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+#~ msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#~ msgstr ""
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:210
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
@@ -15504,7 +15512,7 @@ msgstr "Ligne {0} : {1}"
 msgid "Line {line}, column {column}"
 msgstr "Ligne {line}, colonne {column}"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:179
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:181
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
 msgstr ""
 
@@ -25978,8 +25986,16 @@ msgid "Superior understanding of complex visual concepts"
 msgstr "Compréhension supérieure des concepts visuels complexes"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:310
-msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
-msgstr "Formats pris en charge : export ChatGPT (conversations.json), Google Gemini (ZIP Takeout), export Claude.ai."
+msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
+msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+#~ msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json)."
+#~ msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+#~ msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
+#~ msgstr "Formats pris en charge : export ChatGPT (conversations.json), Google Gemini (ZIP Takeout), export Claude.ai."
 
 #: src/features/marketing/data/models-data.ts:249
 msgid "Supports 10-second video durations"
@@ -28513,7 +28529,7 @@ msgstr "Modifications non enregistrées"
 #~ msgid "Unsupported file format. Please upload a .json or .zip file."
 #~ msgstr "Format de fichier non pris en charge. Veuillez importer un fichier .json ou .zip."
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:254
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:256
 msgid "Unsupported file format. Please upload a .json, .jsonl or .zip file."
 msgstr ""
 

@@ -18,7 +18,7 @@ import { MARKDOWN_EXTRACTION_MAX_BYTES, MAX_EXTRACTION_DOCUMENT_BYTES, MAX_EXTRA
 import { FETCH_TIMEOUT_LONG_MS } from "../lib/fetch-timeout";
 import { gatewayFetch, isServiceBound, serviceFetch, type ServicesContext } from "../lib/services";
 import { readStoredObject } from "../lib/storage-read";
-import { chunkText, embeddingInput, estimateTokens } from "./chunking";
+import { chunkText, EMBEDDING_INPUT_BUDGET, embeddingInput, estimateTokens } from "./chunking";
 import { documentToText, fetchUrlDocument, hasMarkdownStructure, type ParseDocument } from "./sources";
 
 ("use node");
@@ -54,12 +54,10 @@ export const documentParser = (ctx: ServicesContext): ParseDocument | undefined 
                 signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
             });
         const wantsMarkdown = bytes.byteLength <= MARKDOWN_EXTRACTION_MAX_BYTES;
-        let result = await extract(wantsMarkdown);
-
-        // The Worker running out of memory or time on a Markdown render is a 5xx, not a verdict on the file.
-        if (wantsMarkdown && (result.response?.status ?? 500) >= 500) {
-            result = await extract(false);
-        }
+        // The Worker running out of memory or time on a Markdown render is a 5xx, or a rejected call, not a verdict on the file.
+        // A failed Markdown render falls back to plain text; a rejected plain attempt propagates.
+        const rendered = wantsMarkdown ? await extract(true).catch(() => undefined) : undefined;
+        const result = rendered && (rendered.response?.status ?? 500) < 500 ? rendered : await extract(false);
 
         const { data, error, response } = result;
 
@@ -217,7 +215,7 @@ export const ingestFile = internalAction
             const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), { userId: args.userId });
 
             const { embedMany } = await import("../agent/client/search");
-            const chunkTexts = chunks.map((c) => embeddingInput(c).slice(0, 2000));
+            const chunkTexts = chunks.map((c) => embeddingInput(c, EMBEDDING_INPUT_BUDGET));
             const { embeddings } = await embedMany(ctx, {
                 embeddingModel,
                 threadId: undefined,

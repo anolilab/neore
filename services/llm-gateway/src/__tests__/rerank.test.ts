@@ -51,6 +51,22 @@ describe("parseRerankResponse", () => {
         ).toEqual([{ index: 0, score: 0.4 }]);
     });
 
+    it("drops non-finite scores, which would otherwise make the order arbitrary", () => {
+        expect(
+            parseRerankResponse(
+                {
+                    response: [
+                        { id: 0, score: NaN },
+                        { id: 1, score: Infinity },
+                        { id: 2, score: -Infinity },
+                        { id: 3, score: 0.2 },
+                    ],
+                },
+                4,
+            ),
+        ).toEqual([{ index: 3, score: 0.2 }]);
+    });
+
     it("returns nothing for a malformed answer", () => {
         expect(parseRerankResponse(null, 3)).toEqual([]);
         expect(parseRerankResponse({ response: "no" }, 3)).toEqual([]);

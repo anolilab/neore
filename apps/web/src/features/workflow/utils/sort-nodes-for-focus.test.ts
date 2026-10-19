@@ -60,6 +60,20 @@ describe("sortNodesForFocus", () => {
         expect(sorted).toHaveLength(3);
     });
 
+    it("sums the whole parent chain, so a node in a nested group sorts by its real position", () => {
+        // inner is at 100 + 200 = 300 and leaf at 310, so leaf sorts after free (250).
+        // Summing only its direct parent would give leaf 210, which sorts it above free.
+        const nodes = [node("leaf", 0, 10, "inner"), node("inner", 0, 200, "outer"), node("outer", 0, 100), node("free", 0, 250)];
+
+        expect(ids(sortNodesForFocus(nodes))).toEqual(["outer", "free", "inner", "leaf"]);
+    });
+
+    it("keeps every ancestor before its descendants in a nested group", () => {
+        const nodes = [node("leaf", 0, 0, "inner"), node("inner", 0, 0, "outer"), node("outer", 0, 500)];
+
+        expect(ids(sortNodesForFocus(nodes))).toEqual(["outer", "inner", "leaf"]);
+    });
+
     it("treats a parent reference to a missing node as a free node", () => {
         const nodes = [node("orphan", 0, 0, "gone"), node("a", 0, 10)];
 

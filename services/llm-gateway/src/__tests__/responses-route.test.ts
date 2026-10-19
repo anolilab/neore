@@ -50,10 +50,11 @@ const jsonReply =
     () =>
         Response.json(body, { headers: { "Content-Type": "application/json" }, status });
 
+/** A keyed caller by default: the route refuses a request with no Authorization header before it parses. */
 const post = (body: unknown, headers: Record<string, string> = {}) =>
     new Request("https://gateway.test/v1/responses", {
         body: JSON.stringify(body),
-        headers: { "Content-Type": "application/json", ...headers },
+        headers: { authorization: "Bearer gk_test_key", "Content-Type": "application/json", ...headers },
         method: "POST",
     });
 
@@ -100,6 +101,20 @@ describe("POST /v1/responses — forwarding", () => {
         expect(body.object).toBe("response");
         expect(body.status).toBe("completed");
         expect(body.output[0].content[0].text).toBe("pong");
+    });
+
+    it("refuses a request with no Authorization header with a 401 before parsing or dispatching", async () => {
+        const { calls, dispatch } = stubDispatch(jsonReply(CHAT_REPLY));
+        const unauthenticated = new Request("https://gateway.test/v1/responses", {
+            body: "not json",
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+        });
+        const response = await appWith(dispatch).fetch(unauthenticated, env, ctx);
+
+        expect(response.status).toBe(401);
+        expect(calls).toHaveLength(0);
+        expect(((await response.json()) as { error: { type: string } }).error.type).toBe("invalid_request_error");
     });
 
     it("refuses previous_response_id with a 400 and never dispatches", async () => {

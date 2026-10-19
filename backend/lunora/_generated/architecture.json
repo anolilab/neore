@@ -5198,6 +5198,11 @@
     {
       "from": "function:sandbox_cleanup:checkAndTerminateSandbox",
       "kind": "call",
+      "to": "function:sandbox_functions:closeSession"
+    },
+    {
+      "from": "function:sandbox_cleanup:checkAndTerminateSandbox",
+      "kind": "call",
       "to": "function:sandbox_functions:markBotComputerPaused"
     },
     {

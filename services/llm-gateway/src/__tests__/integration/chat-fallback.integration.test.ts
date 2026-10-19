@@ -9,11 +9,12 @@
 import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provider";
 import { describe, expect, it, vi } from "vitest";
 
+import { UsageTracker } from "../../usage/tracker.js";
 import { createMockEnv, makeVirtualKeyRow } from "../helpers/mock-env.js";
 import { useTrackedAppFetch } from "../helpers/tracked-app-fetch.js";
 
 const state = vi.hoisted(() => {
-    return { failNextModel: false, topPs: [] as unknown[] };
+    return { failNextModel: false, streamErrorNext: false, topPs: [] as unknown[] };
 });
 
 vi.mock("../../providers/factory.js", async (importOriginal) => {
@@ -40,7 +41,22 @@ vi.mock("../../providers/factory.js", async (importOriginal) => {
                 doStream: async (options: LanguageModelV3CallOptions) => {
                     state.topPs.push(options.topP);
 
-                    return model.doStream(options);
+                    const streamed = await model.doStream(options);
+
+                    if (!state.streamErrorNext) {
+                        return streamed;
+                    }
+
+                    state.streamErrorNext = false;
+
+                    // A provider error part ahead of the real output, as a failing upstream reports it.
+                    const withError = new TransformStream({
+                        start(controller) {
+                            controller.enqueue({ error: new Error("provider exploded"), type: "error" });
+                        },
+                    });
+
+                    return { ...streamed, stream: streamed.stream.pipeThrough(withError) };
                 },
             };
         }),
@@ -138,5 +154,25 @@ describe("chat fallback: streaming", () => {
         const calls = frames.flatMap((frame) => frame.choices[0]?.delta.tool_calls ?? []);
 
         expect(calls).toEqual([{ function: { arguments: '{"city":"Oslo"}', name: "get_weather" }, id: expect.any(String), index: 0, type: "function" }]);
+    });
+
+    it("records a fallback stream that carries a provider error as a failed call", async () => {
+        state.failNextModel = true;
+        state.streamErrorNext = true;
+
+        const recordSpy = vi.spyOn(UsageTracker.prototype, "recordAndEvaluate");
+
+        try {
+            const res = await fetchApp(chat({ messages: [{ content: "ping", role: "user" }], stream: true }), await env());
+
+            await res.text();
+
+            // Usage is written in waitUntil, so an earlier test's entry can land in this spy too: match this call, not the first one.
+            const entries = recordSpy.mock.calls.map(([usageEntry]) => usageEntry);
+
+            expect(entries).toContainEqual(expect.objectContaining({ errorCode: "PROVIDER_ERROR", fallbackReason: "infra" }));
+        } finally {
+            recordSpy.mockRestore();
+        }
     });
 });

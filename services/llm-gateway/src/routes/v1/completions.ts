@@ -237,9 +237,11 @@ const toolChoiceOf = (choice: z.infer<typeof requestSchema>["tool_choice"]): Too
 // available for the per-user KV counter check.
 completionsRouter.use("/v1/chat/completions", bearerAuth);
 completionsRouter.use("/v1/chat/completions", rateLimitMiddleware);
-completionsRouter.use("/v1/chat/completions", dailyLimitMiddleware);
-// Idempotency must run after auth (needs userId) and before the route handler
+// Idempotency runs before the daily cap: a retry of a completed call replays its
+// cached reply without a new call, so the cap must not refuse it. A cap 429 is
+// transient and never cached, so it cannot poison a later replay.
 completionsRouter.use("/v1/chat/completions", idempotencyMiddleware);
+completionsRouter.use("/v1/chat/completions", dailyLimitMiddleware);
 completionsRouter.post("/v1/chat/completions", async (c) => {
     const requestId = c.get("requestId") ?? crypto.randomUUID();
     const rawBody = await c.req.json();
@@ -525,6 +527,8 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                         cachedTokens: tokens.cachedTokens,
                                         completionTokens: tokens.completionTokens,
                                         costMicrodollars,
+                                        // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
+                                        ...(hasFailed && { errorCode: "PROVIDER_ERROR" }),
                                         finishReason,
                                         guardrailViolations: guardrailViolationsJson,
                                         isStreaming: true,
@@ -840,25 +844,38 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
                             };
                             let toolCallCount = 0;
+                            let hasFailed = false;
 
                             try {
                                 for await (const part of fbResult.fullStream) {
-                                    if (part.type === "text-delta") {
-                                        sendChunk({
-                                            choices: [{ delta: { content: part.text }, finish_reason: null, index: 0 }],
-                                            created: fallbackCreated,
-                                            id: fallbackCompletionId,
-                                            model: fallbackCandidate.modelId,
-                                            object: "chat.completion.chunk",
-                                        });
-                                    } else if (part.type === "tool-call") {
-                                        sendChunk({
-                                            choices: [{ delta: { tool_calls: [toolCallDelta(part, toolCallCount++)] }, finish_reason: null, index: 0 }],
-                                            created: fallbackCreated,
-                                            id: fallbackCompletionId,
-                                            model: fallbackCandidate.modelId,
-                                            object: "chat.completion.chunk",
-                                        });
+                                    switch (part.type) {
+                                        case "error": {
+                                            hasFailed = true;
+                                            break;
+                                        }
+                                        case "text-delta": {
+                                            sendChunk({
+                                                choices: [{ delta: { content: part.text }, finish_reason: null, index: 0 }],
+                                                created: fallbackCreated,
+                                                id: fallbackCompletionId,
+                                                model: fallbackCandidate.modelId,
+                                                object: "chat.completion.chunk",
+                                            });
+                                            break;
+                                        }
+                                        case "tool-call": {
+                                            sendChunk({
+                                                choices: [{ delta: { tool_calls: [toolCallDelta(part, toolCallCount++)] }, finish_reason: null, index: 0 }],
+                                                created: fallbackCreated,
+                                                id: fallbackCompletionId,
+                                                model: fallbackCandidate.modelId,
+                                                object: "chat.completion.chunk",
+                                            });
+                                            break;
+                                        }
+                                        default: {
+                                            break;
+                                        }
                                     }
                                 }
 
@@ -907,6 +924,8 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                                 completionTokens: tokens.completionTokens,
                                                 costMicrodollars,
                                                 fallbackReason,
+                                                // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
+                                                ...(hasFailed && { errorCode: "PROVIDER_ERROR" }),
                                                 finishReason,
                                                 guardrailViolations: guardrailViolationsJson,
                                                 isStreaming: true,

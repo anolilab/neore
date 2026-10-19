@@ -39,6 +39,12 @@ const post = (path: string, body: unknown): Request =>
     });
 
 const chat = () => post("/v1/chat/completions", { messages: [{ content: "ping", role: "user" }], model: "mock/echo" });
+
+const withKey = (request: Request, key: string): Request => {
+    request.headers.set("Idempotency-Key", key);
+
+    return request;
+};
 const responses = () => post("/v1/responses", { input: "ping", model: "mock/echo" });
 
 describe("daily cap on the public chat route", () => {
@@ -59,6 +65,26 @@ describe("daily cap on the public chat route", () => {
         const res = await fetchApp(responses(), await makeEnv({ DAILY_TOKEN_LIMITS: "free=100" }, { requests: 1, tokens: 100 }));
 
         expect(res.status).toBe(429);
+    });
+
+    it("replays a completed call with its Idempotency-Key even once the day is at the cap", async () => {
+        const usage = { requests: 2, tokens: 0 };
+        const env = await makeEnv({ DAILY_REQUEST_LIMITS: "free=3" }, usage);
+        const first = await fetchApp(withKey(chat(), "replay-at-cap"), env);
+
+        expect(first.status).toBe(200);
+
+        // The day's last allowed call has now been spent: the stub reports the cap.
+        usage.requests = 3;
+
+        const replay = await fetchApp(withKey(chat(), "replay-at-cap"), env);
+
+        expect(replay.status).toBe(200);
+        expect(replay.headers.get("X-Idempotency-Replayed")).toBe("true");
+
+        const fresh = await fetchApp(withKey(chat(), "a-new-key"), env);
+
+        expect(fresh.status).toBe(429);
     });
 
     it("changes nothing when no cap is configured", async () => {

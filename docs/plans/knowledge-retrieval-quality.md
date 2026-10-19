@@ -31,8 +31,8 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
   Re-ingest picks it up.
 - **Reach:** text that carries Markdown headings benefits: `.md` uploads, pasted
   Markdown, URL pages, and — since the parser's `?format=markdown` (see
-  `docs/plans/document-parser.md`) — PDF, DOCX, PPTX, XLSX and HTML documents
-  ingested into the knowledge base. Chat attachments still get plain text, so
+  `docs/plans/document-parser.md`) — PDF, DOCX, XLSX and HTML documents ingested into
+  the knowledge base (PPTX stays plain text, with page markers only). Chat attachments still get plain text, so
   they chunk as before.
 
 - **Opt-in per source.** `chunkText(text, { markdown: true })` is what reads
@@ -80,9 +80,8 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
 - `searchKnowledge` (the public v1 API) now maps its hits to the four fields it
   declares. It returned the full hit, which `.output()` rejects
   (`rejectUnknownKeys`), so the endpoint failed on any hit before this change.
-- **Not done:** the citation chip in `apps/web` (`knowledge-source-group.tsx`)
-  still shows only `Passage n`. Showing the page needs a new translated message
-  in every locale; the value is already on the citation.
+- The citation popover in `apps/web` (`knowledge-source-group.tsx`) shows
+  `Passage n, page p` when the citation has a page.
 
 
 ## Tests

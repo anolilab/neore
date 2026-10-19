@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { CHUNK_TARGET_TOKENS, chunkText, embeddingInput, estimateTokens } from "./chunking";
+import { CHUNK_TARGET_TOKENS, chunkText, EMBEDDING_INPUT_BUDGET, embeddingInput, estimateTokens } from "./chunking";
 
 /** The chunker as it was before headings: heading-less text must still come out exactly like this. */
 const BLANK_LINE_RE = /\n\s*\n/;
@@ -111,6 +111,66 @@ describe("chunkText", () => {
         expect(chunks[0]?.sectionHeading).toBe("Setup");
     });
 
+    it("closes a fence only with a run at least as long as its opening", () => {
+        // The ```` block holds a ``` line as code, so its # comment is not a heading.
+        const chunks = chunkText("````md\n```\n# not a heading\n```\n````\n\n# Real", MARKDOWN);
+
+        expect(chunks.map((c) => c.sectionHeading)).toEqual([undefined, "Real"]);
+    });
+
+    it("does not close a fence on a line with an info string", () => {
+        // ```python is code inside the ``` block, so its # line is code too.
+        const chunks = chunkText("```sh\n# install\n```python\n# still code\n```\n\n# After", MARKDOWN);
+
+        expect(chunks.map((c) => c.sectionHeading)).toEqual([undefined, "After"]);
+    });
+
+    it("closes a fence only with its own marker character", () => {
+        const chunks = chunkText("~~~\n# x\n```\n~~~\n\n# After", MARKDOWN);
+
+        expect(chunks.map((c) => c.sectionHeading)).toEqual([undefined, "After"]);
+    });
+
+    it("does not treat a closer followed by text as a closer", () => {
+        const chunks = chunkText("```\n# a\n``` extra\n# b", MARKDOWN);
+
+        expect(chunks).toHaveLength(1);
+        expect(chunks[0]?.sectionHeading).toBeUndefined();
+    });
+
+    it("closes a fence on a longer run of the same marker", () => {
+        expect(chunkText("```\n# inside\n````\n\n# After", MARKDOWN).map((c) => c.sectionHeading)).toEqual([undefined, "After"]);
+    });
+
+    it("closes a fence on a closer indented by up to three spaces", () => {
+        expect(chunkText("```\n# inside\n   ```\n\n# After", MARKDOWN).map((c) => c.sectionHeading)).toEqual([undefined, "After"]);
+    });
+
+    it("does not open a backtick fence whose info string holds a backtick", () => {
+        // ```a`b is inline code, so the # line after it is a heading.
+        const chunks = chunkText("```a`b\n# head\n\nbody", MARKDOWN);
+
+        expect(chunks.map((c) => c.sectionHeading)).toEqual([undefined, "head"]);
+    });
+
+    it("reads a heading indented by up to three spaces", () => {
+        expect(chunkText("   ## Indented\n\nbody", MARKDOWN)[0]?.sectionHeading).toBe("Indented");
+    });
+
+    it("does not read a heading indented by four spaces as one", () => {
+        const chunks = chunkText("    # not a heading\n\nbody", MARKDOWN);
+
+        expect(chunks).toHaveLength(1);
+        expect(chunks[0]?.sectionHeading).toBeUndefined();
+    });
+
+    it("does not read a heading after a leading tab as one", () => {
+        const chunks = chunkText("\t# not a heading\n\nbody", MARKDOWN);
+
+        expect(chunks).toHaveLength(1);
+        expect(chunks[0]?.sectionHeading).toBeUndefined();
+    });
+
     it("keeps a trailing # that belongs to the title", () => {
         expect(chunkText("# Why C#\n\nbody", MARKDOWN)[0]?.sectionHeading).toBe("Why C#");
         expect(chunkText("## Closed ##\n\nbody", MARKDOWN)[0]?.sectionHeading).toBe("Closed");
@@ -190,10 +250,43 @@ describe("page markers", () => {
 
 describe("embeddingInput", () => {
     it("puts the section path in front of the body", () => {
-        expect(embeddingInput({ content: "text", sectionHeading: "A > B" })).toBe("A > B\n\ntext");
+        expect(embeddingInput({ content: "text", sectionHeading: "A > B" }, 2000)).toBe("A > B\n\ntext");
     });
 
     it("is the body alone without a section", () => {
-        expect(embeddingInput({ content: "text" })).toBe("text");
+        expect(embeddingInput({ content: "text" }, 2000)).toBe("text");
+    });
+
+    it("cuts the body, not the heading path, to fit the budget", () => {
+        const body = `${"x".repeat(2500)}TAIL`;
+        const input = embeddingInput({ content: body, sectionHeading: "Guide" }, 2000);
+
+        expect(input).toBe(`Guide\n\n${body.slice(0, 2000 - "Guide\n\n".length)}`);
+        expect(input).toHaveLength(2000);
+    });
+
+    it("trims the heading path, never the body below its minimum, and stays within the budget", () => {
+        const input = embeddingInput({ content: "x".repeat(1000), sectionHeading: "H".repeat(300) }, 300);
+
+        expect(input).toBe(`${"H".repeat(100)}${"x".repeat(200)}`);
+    });
+
+    it("cuts a section-less input to the budget", () => {
+        expect(embeddingInput({ content: "x".repeat(2500) }, 2000)).toHaveLength(2000);
+    });
+
+    it("embeds every chunk whole under the longest heading path, not only the first part of it", () => {
+        // Paragraphs of 1500-1900 characters: each is a chunk of its own, and the longest sits past the old 1698-character body.
+        const paragraphs = Array.from({ length: 6 }, (_, i) => `p${String(i)} ${"x".repeat(1500 + ((i * 137) % 400))}`);
+        const chunks = chunkText(`# ${"H".repeat(600)}\n\n${paragraphs.join("\n\n")}`, MARKDOWN);
+
+        expect(Math.max(...chunks.map((c) => c.content.length))).toBeGreaterThan(1698);
+
+        for (const chunk of chunks) {
+            const input = embeddingInput(chunk, EMBEDDING_INPUT_BUDGET);
+
+            expect(input.length).toBeLessThanOrEqual(EMBEDDING_INPUT_BUDGET);
+            expect(input.endsWith(chunk.content)).toBe(true);
+        }
     });
 });

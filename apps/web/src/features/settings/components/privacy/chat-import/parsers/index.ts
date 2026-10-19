@@ -115,7 +115,9 @@ const detectProvider = (data: unknown): ImportProvider => {
         }
     }
 
-    throw new ChatImportError(msg`Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude.`);
+    throw new ChatImportError(
+        msg`Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export.`,
+    );
 };
 
 /**

@@ -39,8 +39,8 @@ Response mapping:
 
 - Non-streaming: `{ id: "resp_…", object: "response", status, model, output:
   [message | function_call…], usage: { input_tokens, output_tokens,
-  total_tokens } }`. A tool request is non-streaming too, and its `tool_calls`
-  come back as `function_call` items.
+  total_tokens } }`. When the request declares tools, the reply's `tool_calls` come
+  back as `function_call` items.
 - Streaming: chat SSE → `response.created`, `response.output_item.added`,
   `response.output_text.delta`, `response.function_call_arguments.delta`,
   `response.output_item.done`, `response.completed` (+ `[DONE]`).

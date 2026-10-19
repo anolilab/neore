@@ -44,6 +44,12 @@ export const createResponsesRouter = (dispatch: Dispatch): OpenAPIHono<HonoEnv> 
     const responsesRouter = new OpenAPIHono<HonoEnv>();
 
     responsesRouter.post("/v1/responses", async (c) => {
+        // Refuse an anonymous caller before any work: the body is parsed and translated
+        // here, and only the dispatched chat request checks the key itself.
+        if (!c.req.header("Authorization")) {
+            return c.json(responsesError("Missing or invalid Authorization header."), 401);
+        }
+
         let raw: unknown;
 
         try {

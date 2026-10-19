@@ -338,6 +338,22 @@ describe("chatCompletionToResponse — finish reasons and output", () => {
         ]);
     });
 
+    it("derives the response id from the completion id, so a replayed reply keeps it", () => {
+        const withId: ChatCompletion = { ...completion("stop", { content: "x" }), id: "chatcmpl-abc" };
+
+        expect(chatCompletionToResponse(withId).id).toBe("resp_abc");
+        expect(chatCompletionToResponse(withId).id).toBe(chatCompletionToResponse({ ...withId }).id);
+    });
+
+    it("falls back to a random response id when the completion has none", () => {
+        const first = chatCompletionToResponse(completion("stop", { content: "x" })).id;
+        const second = chatCompletionToResponse(completion("stop", { content: "x" })).id;
+
+        expect(first).toMatch(RESPONSE_ID);
+        expect(second).toMatch(RESPONSE_ID);
+        expect(first).not.toBe(second);
+    });
+
     it("keeps usage null when the reply carried none", () => {
         const bare: ChatCompletion = { ...completion("stop", { content: "x" }), usage: undefined };
 

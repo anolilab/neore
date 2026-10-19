@@ -6699,9 +6699,13 @@ msgstr "无法删除评论"
 msgid "Could not delete the page"
 msgstr "无法删除页面"
 
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:119
+msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+msgstr ""
+
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:118
-msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
-msgstr "无法识别聊天提供商。请确认你上传的是来自 ChatGPT、Gemini 或 Claude 的有效导出文件。"
+#~ msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
+#~ msgstr "无法识别聊天提供商。请确认你上传的是来自 ChatGPT、Gemini 或 Claude 的有效导出文件。"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:58
 msgid "Could not export the workflow"
@@ -14102,8 +14106,12 @@ msgid "Import Conversations"
 msgstr "导入对话"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:299
-msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+#~ msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#~ msgstr ""
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:210
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
@@ -15504,7 +15512,7 @@ msgstr "第 {0} 行：{1}"
 msgid "Line {line}, column {column}"
 msgstr "第 {line} 行，第 {column} 列"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:179
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:181
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
 msgstr ""
 
@@ -25978,8 +25986,16 @@ msgid "Superior understanding of complex visual concepts"
 msgstr "对复杂视觉概念的理解出众"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:310
-msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
-msgstr "支持的格式：ChatGPT 导出（conversations.json）、Google Gemini（Takeout ZIP）、Claude.ai 导出。"
+msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
+msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+#~ msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json)."
+#~ msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+#~ msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
+#~ msgstr "支持的格式：ChatGPT 导出（conversations.json）、Google Gemini（Takeout ZIP）、Claude.ai 导出。"
 
 #: src/features/marketing/data/models-data.ts:249
 msgid "Supports 10-second video durations"
@@ -28513,7 +28529,7 @@ msgstr "未保存的更改"
 #~ msgid "Unsupported file format. Please upload a .json or .zip file."
 #~ msgstr "不支持的文件格式。请上传 .json 或 .zip 文件。"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:254
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:256
 msgid "Unsupported file format. Please upload a .json, .jsonl or .zip file."
 msgstr ""
 

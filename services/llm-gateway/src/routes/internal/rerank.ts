@@ -58,7 +58,16 @@ export const parseRerankResponse = (raw: unknown, documentCount: number): Rerank
         const index = row?.id;
         const score = row?.score;
 
-        if (typeof index !== "number" || typeof score !== "number" || !Number.isSafeInteger(index) || index < 0 || index >= documentCount || seen.has(index)) {
+        // NaN and Infinity pass `typeof`, and a NaN score makes the sort order arbitrary.
+        if (
+            typeof index !== "number" ||
+            typeof score !== "number" ||
+            !Number.isFinite(score) ||
+            !Number.isSafeInteger(index) ||
+            index < 0 ||
+            index >= documentCount ||
+            seen.has(index)
+        ) {
             continue;
         }
 
