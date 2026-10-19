@@ -76,16 +76,21 @@ export const documentParser = (ctx: ServicesContext): ParseDocument | undefined 
 
         // Markdown already carries the tables in place. Append only the ones it
         // lacks, so a table is never indexed twice.
-        const missingTables = data.tables.filter((table) => table.markdown && !text.includes(table.markdown.trim()));
+        // Each keeps the number it has in the document, so "Table 2" is still the second table when the first is in place.
+        const missingTables = data.tables
+            .map((table, index) => {
+                return { number: index + 1, table };
+            })
+            .filter(({ table }) => table.markdown && !text.includes(table.markdown.trim()));
 
         if (missingTables.length > 0) {
             // A table appended after the last page would inherit that page: mark each with its own.
             const isPaged = isPagedMimeType(mimeType);
             const tableMarkdown = missingTables
-                .map((table, index) => {
+                .map(({ number, table }) => {
                     const page = isPaged ? `<!-- PAGE ${String(table.pageNumber)} -->\n\n` : "";
 
-                    return `\n\n${page}### Table ${String(index + 1)}\n${table.markdown}`;
+                    return `\n\n${page}### Table ${String(number)}\n${table.markdown}`;
                 })
                 .join("");
 

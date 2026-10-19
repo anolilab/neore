@@ -122,6 +122,24 @@ describe("documentParser", () => {
             expect(text.indexOf("<!-- PAGE 2 -->")).toBeGreaterThan(text.indexOf("<!-- PAGE 3 -->"));
         });
 
+        it("numbers an appended table by its place in the document, not among the appended ones", async () => {
+            mocks.extractDocument.mockResolvedValue({
+                data: {
+                    content: "Body\n\n| in place |",
+                    tables: [
+                        { markdown: "| in place |", pageNumber: 1 },
+                        { markdown: "| missing |", pageNumber: 1 },
+                    ],
+                },
+                response: { ok: true, status: 200 },
+            });
+
+            const text = await parse(1024);
+
+            expect(text).toContain("### Table 2\n| missing |");
+            expect(text).not.toContain("### Table 1");
+        });
+
         it("leaves a table the Markdown already carries where it is", async () => {
             withTables([{ markdown: "Body", pageNumber: 1 }]);
 
