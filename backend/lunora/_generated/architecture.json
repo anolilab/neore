@@ -8721,6 +8721,13 @@
     },
     {
       "detail": "query",
+      "id": "function:billing_checkout:getBillingOptions",
+      "kind": "function",
+      "name": "billing.checkout.getBillingOptions",
+      "module": "billing"
+    },
+    {
+      "detail": "query",
       "id": "function:billing_checkout:getBillingSubject",
       "kind": "function",
       "name": "billing.checkout.getBillingSubject",
@@ -16815,7 +16822,7 @@
     {
       "file": "billing/webhook",
       "kind": "call",
-      "line": 120,
+      "line": 121,
       "reason": "\"handleCreemWebhook\" is not a registered function"
     },
     {

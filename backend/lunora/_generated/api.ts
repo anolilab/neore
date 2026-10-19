@@ -165,7 +165,8 @@ export interface ApiTypes {
     };
     billing: {
         checkout: {
-            createCheckout: FunctionReference<"action", { plan: "pro" | "team" }, { url: string }>;
+            createCheckout: FunctionReference<"action", { interval?: "month" | "year"; plan: "pro" | "team" }, { url: string }>;
+            getBillingOptions: FunctionReference<"query", {}, { yearly: { pro: boolean; team: boolean } }>;
             getMyPlan: FunctionReference<"query", {}, ({} & { baseTier: "free" | "pro" | "enterprise"; creemCustomerId: string | null; }) | null>;
             getTeamPlansIPay: FunctionReference<"query", {}, Array<{ memberCount: number; name: string; organizationId: string }>>;
             openCustomerPortal: FunctionReference<"action", { subject: "organization" | "user" }, { url: string }>;
@@ -606,10 +607,10 @@ export interface ApiTypes {
             markNotificationsRead: FunctionReference<"mutation", {}, void>;
         };
         usage_functions: {
-            createMyNotificationRule: FunctionReference<"action", { action?: "notify" | "block" | "notify_and_block"; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter?: string; name: string; period?: "hour" | "day" | "month"; threshold: number }, {} & { action: "notify" | "block" | "notify_and_block"; createdAt: string; id: string; isActive: boolean; lastTriggeredAt: string | null; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter: string | null; name: string; orgId: string | null; period: "hour" | "day" | "month"; threshold: number; userId: string; }>;
+            createMyNotificationRule: FunctionReference<"action", { action?: "notify" | "block" | "notify_and_block"; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter?: string; name: string; period?: "hour" | "day" | "month"; threshold: number }, {} & { action: "notify" | "block" | "notify_and_block"; createdAt: string; id: string; isActive: boolean; lastTriggeredAt: string | null; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter: string | null; name: string; orgId: string | null; period: "month" | "hour" | "day"; threshold: number; userId: string; }>;
             deleteMyNotificationRule: FunctionReference<"action", { ruleId: string }, null>;
             getMyUsage: FunctionReference<"action", { days?: number }, {} & { byModel: Record<string, {} & { cost: number; requests: number; tokens: number; }>; dailyBreakdown: ({} & { completionTokens: number; costMicrodollars: number; date: string; promptTokens: number; requestCount: number; })[]; period: string; totalCompletionTokens: number; totalCostMicrodollars: number; totalPromptTokens: number; totalRequests: number; }>;
-            listMyNotificationRules: FunctionReference<"action", {}, ({} & { action: "notify" | "block" | "notify_and_block"; createdAt: string; id: string; isActive: boolean; lastTriggeredAt: string | null; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter: string | null; name: string; orgId: string | null; period: "hour" | "day" | "month"; threshold: number; userId: string; })[]>;
+            listMyNotificationRules: FunctionReference<"action", {}, ({} & { action: "notify" | "block" | "notify_and_block"; createdAt: string; id: string; isActive: boolean; lastTriggeredAt: string | null; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter: string | null; name: string; orgId: string | null; period: "month" | "hour" | "day"; threshold: number; userId: string; })[]>;
         };
     };
     skills: {
@@ -925,6 +926,7 @@ export const api: ApiTypes = {
     billing: {
         checkout: {
             createCheckout: { __lunoraRef: "billing_checkout:createCheckout" },
+            getBillingOptions: { __lunoraRef: "billing_checkout:getBillingOptions" },
             getMyPlan: { __lunoraRef: "billing_checkout:getMyPlan" },
             getTeamPlansIPay: { __lunoraRef: "billing_checkout:getTeamPlansIPay" },
             openCustomerPortal: { __lunoraRef: "billing_checkout:openCustomerPortal" },

@@ -1695,7 +1695,7 @@ msgstr "添加评论"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "从你的组织中添加成员到 <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:266
+#: src/features/auth/components/organization/billing-settings-card.tsx:283
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "添加模型..."
@@ -2672,7 +2672,7 @@ msgstr "允许“{tool}”吗？"
 msgid "Allow this site ({0})"
 msgstr "允许此网站（{0}）"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:236
+#: src/features/auth/components/organization/billing-settings-card.tsx:253
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "允许的 AI 模型"
@@ -3945,17 +3945,17 @@ msgstr "费用计入你自己的 API 密钥，而非你的积分。"
 msgid "Billing"
 msgstr "账单"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:217
+#: src/features/auth/components/organization/billing-settings-card.tsx:234
 msgid "Billing Email"
 msgstr "账单邮箱"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:135
-#: src/features/auth/components/organization/billing-settings-card.tsx:166
-#: src/features/auth/components/organization/billing-settings-card.tsx:296
+#: src/features/auth/components/organization/billing-settings-card.tsx:137
+#: src/features/auth/components/organization/billing-settings-card.tsx:168
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
 msgid "Billing Settings"
 msgstr "账单设置"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:89
+#: src/features/auth/components/organization/billing-settings-card.tsx:91
 msgid "Billing settings updated successfully"
 msgstr "账单设置已更新"
 
@@ -6005,8 +6005,8 @@ msgstr "配置团队“{teamName}”的设置"
 msgid "Configure team settings"
 msgstr "配置团队设置"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:163
-#: src/features/auth/components/organization/billing-settings-card.tsx:294
+#: src/features/auth/components/organization/billing-settings-card.tsx:165
+#: src/features/auth/components/organization/billing-settings-card.tsx:311
 msgid "Configure the billing contact and available AI models"
 msgstr "配置账单联系人和可用的 AI 模型"
 
@@ -7370,8 +7370,8 @@ msgstr "希望用单个前沿品质模型同时生成和编辑图像的创作者
 msgid "Credits"
 msgstr "积分"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:143
-#: src/features/auth/components/organization/billing-settings-card.tsx:184
+#: src/features/auth/components/organization/billing-settings-card.tsx:145
+#: src/features/auth/components/organization/billing-settings-card.tsx:186
 msgid "Credits per user:"
 msgstr "每位用户的积分："
 
@@ -7460,7 +7460,7 @@ msgstr "当前密码"
 msgid "Current password is required"
 msgstr "请输入当前密码"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 msgid "Current plan:"
 msgstr "当前方案："
 
@@ -7468,8 +7468,8 @@ msgstr "当前方案："
 msgid "Current Prompt Variables"
 msgstr "当前提示词变量"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:140
-#: src/features/auth/components/organization/billing-settings-card.tsx:181
+#: src/features/auth/components/organization/billing-settings-card.tsx:142
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 msgid "Current tier:"
 msgstr "当前等级："
 
@@ -9888,7 +9888,7 @@ msgstr "请输入有效的 AWS 区域，例如 us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "请输入 API 版本，例如 v1 或 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:224
+#: src/features/auth/components/organization/billing-settings-card.tsx:241
 msgid "Enter billing email"
 msgstr "输入账单邮箱"
 
@@ -12450,7 +12450,7 @@ msgstr "帧"
 msgid "France"
 msgstr "法国"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:114
 #: src/features/marketing/components/landing-page.tsx:326
 #: src/features/settings/components/chat/models-settings.tsx:39
@@ -16511,7 +16511,7 @@ msgstr "管理参与者"
 msgid "Manage Publication"
 msgstr "管理发布"
 
-#: src/features/billing/components/personal-plan-card.tsx:35
+#: src/features/billing/components/personal-plan-card.tsx:37
 msgid "Manage subscription"
 msgstr "管理订阅"
 
@@ -16524,7 +16524,7 @@ msgstr "管理标签"
 msgid "Manage tags…"
 msgstr "管理标签…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:197
+#: src/features/auth/components/organization/billing-settings-card.tsx:199
 msgid "Manage Team subscription"
 msgstr "管理 Team 订阅"
 
@@ -19397,7 +19397,7 @@ msgstr "每个 token 仅激活 3B 参数，高效节能"
 msgid "Only in one run"
 msgstr "仅在一次运行中"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:134
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
 msgid "Only organization owners can manage billing settings"
 msgstr "只有组织所有者才能管理账单设置"
 
@@ -20570,6 +20570,11 @@ msgstr "已暂停"
 msgid "Pay for what <0>you use.</0>"
 msgstr "按实际<0>用量付费。</0>"
 
+#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/billing/components/personal-plan-card.tsx:52
+msgid "Pay yearly"
+msgstr ""
+
 #: src/features/settings/components/chat/mcp/popular-servers.ts:210
 msgid "Payments, orders, invoices, and subscriptions via PayPal"
 msgstr "通过 PayPal 处理付款、订单、发票和订阅"
@@ -21453,6 +21458,8 @@ msgstr "默认私密"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
 #: src/components/model-picker/model-picker.tsx:313
 #: src/features/billing/components/personal-plan-card.tsx:23
+#: src/components/model-picker/model-picker.tsx:268
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:556
@@ -21460,7 +21467,7 @@ msgstr "默认私密"
 msgid "Pro"
 msgstr "Pro"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro 是你的个人方案：所有模型，每天 1,000 条消息。"
 
@@ -22727,7 +22734,7 @@ msgstr "移除 {fileName}"
 msgid "Remove {label}"
 msgstr "移除 {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:245
+#: src/features/auth/components/organization/billing-settings-card.tsx:262
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "移除 {model}"
@@ -23710,8 +23717,8 @@ msgstr "沙特阿拉伯"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:160
-#: src/features/auth/components/organization/billing-settings-card.tsx:291
+#: src/features/auth/components/organization/billing-settings-card.tsx:162
+#: src/features/auth/components/organization/billing-settings-card.tsx:308
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -24405,7 +24412,7 @@ msgstr "选择到最后一列"
 msgid "Select to top of table"
 msgstr "选择到表格顶部"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:238
+#: src/features/auth/components/organization/billing-settings-card.tsx:255
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "选择组织成员可以使用的 AI 模型。企业版留空则允许所有模型。"
 
@@ -29310,14 +29317,22 @@ msgstr "更新动态"
 msgid "Upgrade"
 msgstr "升级"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:208
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
 msgid "Upgrade organization to Team"
 msgstr "将组织升级到 Team"
 
-#: src/features/billing/components/personal-plan-card.tsx:47
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
+msgid "Upgrade organization to Team, monthly"
+msgstr ""
+
+#: src/features/billing/components/personal-plan-card.tsx:63
 #: src/features/layout/components/nav-user.tsx:255
 msgid "Upgrade to Pro"
 msgstr "升级到 Pro"
+
+#: src/features/billing/components/personal-plan-card.tsx:63
+msgid "Upgrade to Pro, monthly"
+msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:472
 #: src/features/auth/components/organization/create-organization-dialog.tsx:255
@@ -31381,11 +31396,11 @@ msgstr "你自己的 OpenAI 密钥——用于 OpenAI 模型，将工作委派�
 msgid "Your pages"
 msgstr "你的页面"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Your plan"
 msgstr "你的方案"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:188
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "你的方案和额度取决于你的订阅。"
 

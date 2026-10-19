@@ -15,7 +15,7 @@ import { useAction } from "@/lib/lunora/crpc";
 const useCheckout = (): {
     isPending: boolean;
     openPortal: (subject: "organization" | "user") => Promise<void>;
-    startCheckout: (plan: "pro" | "team") => Promise<void>;
+    startCheckout: (plan: "pro" | "team", interval?: "month" | "year") => Promise<void>;
     /** An error toast for a free-plan limit, with an "Upgrade" action that starts a Pro checkout. */
     upgradeToast: (message: string) => void;
 } => {
@@ -41,7 +41,7 @@ const useCheckout = (): {
     );
 
     const startCheckout = useCallback(
-        async (plan: "pro" | "team") => await redirectTo(async () => await createCheckout({ plan })),
+        async (plan: "pro" | "team", interval: "month" | "year" = "month") => await redirectTo(async () => await createCheckout({ interval, plan })),
         [createCheckout, redirectTo],
     );
     const openPortal = useCallback(

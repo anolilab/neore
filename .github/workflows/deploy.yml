@@ -477,7 +477,9 @@ jobs:
                   # Creem subscriptions — checkout is off until CREEM_API_KEY is set.
                   CREEM_API_KEY: "${{ secrets.CREEM_API_KEY }}"
                   CREEM_PRODUCT_PRO: "${{ secrets.CREEM_PRODUCT_PRO }}"
+                  CREEM_PRODUCT_PRO_YEARLY: "${{ secrets.CREEM_PRODUCT_PRO_YEARLY }}"
                   CREEM_PRODUCT_TEAM: "${{ secrets.CREEM_PRODUCT_TEAM }}"
+                  CREEM_PRODUCT_TEAM_YEARLY: "${{ secrets.CREEM_PRODUCT_TEAM_YEARLY }}"
                   CREEM_TEST_MODE: "${{ secrets.CREEM_TEST_MODE }}"
                   CREEM_WEBHOOK_SECRET: "${{ secrets.CREEM_WEBHOOK_SECRET }}"
                   GOOGLE_GENERATIVE_AI_API_KEY: "${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}"

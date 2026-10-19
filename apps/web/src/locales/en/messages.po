@@ -1694,7 +1694,7 @@ msgstr "Add a comment"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "Add a member from your organization to <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:266
+#: src/features/auth/components/organization/billing-settings-card.tsx:283
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "Add a model..."
@@ -2671,7 +2671,7 @@ msgstr "Allow \"{tool}\"?"
 msgid "Allow this site ({0})"
 msgstr "Allow this site ({0})"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:236
+#: src/features/auth/components/organization/billing-settings-card.tsx:253
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "Allowed AI Models"
@@ -3944,17 +3944,17 @@ msgstr "Billed to your own API key, not your credits."
 msgid "Billing"
 msgstr "Billing"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:217
+#: src/features/auth/components/organization/billing-settings-card.tsx:234
 msgid "Billing Email"
 msgstr "Billing Email"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:135
-#: src/features/auth/components/organization/billing-settings-card.tsx:166
-#: src/features/auth/components/organization/billing-settings-card.tsx:296
+#: src/features/auth/components/organization/billing-settings-card.tsx:137
+#: src/features/auth/components/organization/billing-settings-card.tsx:168
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
 msgid "Billing Settings"
 msgstr "Billing Settings"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:89
+#: src/features/auth/components/organization/billing-settings-card.tsx:91
 msgid "Billing settings updated successfully"
 msgstr "Billing settings updated successfully"
 
@@ -6004,8 +6004,8 @@ msgstr "Configure settings for team \"{teamName}\""
 msgid "Configure team settings"
 msgstr "Configure team settings"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:163
-#: src/features/auth/components/organization/billing-settings-card.tsx:294
+#: src/features/auth/components/organization/billing-settings-card.tsx:165
+#: src/features/auth/components/organization/billing-settings-card.tsx:311
 msgid "Configure the billing contact and available AI models"
 msgstr "Configure the billing contact and available AI models"
 
@@ -7369,8 +7369,8 @@ msgstr "Creators who want to both generate and edit images with a single frontie
 msgid "Credits"
 msgstr "Credits"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:143
-#: src/features/auth/components/organization/billing-settings-card.tsx:184
+#: src/features/auth/components/organization/billing-settings-card.tsx:145
+#: src/features/auth/components/organization/billing-settings-card.tsx:186
 msgid "Credits per user:"
 msgstr "Credits per user:"
 
@@ -7459,7 +7459,7 @@ msgstr "Current Password"
 msgid "Current password is required"
 msgstr "Current password is required"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 msgid "Current plan:"
 msgstr "Current plan:"
 
@@ -7467,8 +7467,8 @@ msgstr "Current plan:"
 msgid "Current Prompt Variables"
 msgstr "Current Prompt Variables"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:140
-#: src/features/auth/components/organization/billing-settings-card.tsx:181
+#: src/features/auth/components/organization/billing-settings-card.tsx:142
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 msgid "Current tier:"
 msgstr "Current tier:"
 
@@ -9887,7 +9887,7 @@ msgstr "Enter a valid AWS region, e.g. us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "Enter an API version such as v1 or 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:224
+#: src/features/auth/components/organization/billing-settings-card.tsx:241
 msgid "Enter billing email"
 msgstr "Enter billing email"
 
@@ -12449,7 +12449,7 @@ msgstr "Frames"
 msgid "France"
 msgstr "France"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:114
 #: src/features/marketing/components/landing-page.tsx:326
 #: src/features/settings/components/chat/models-settings.tsx:39
@@ -16510,7 +16510,7 @@ msgstr "Manage participants"
 msgid "Manage Publication"
 msgstr "Manage Publication"
 
-#: src/features/billing/components/personal-plan-card.tsx:35
+#: src/features/billing/components/personal-plan-card.tsx:37
 msgid "Manage subscription"
 msgstr "Manage subscription"
 
@@ -16523,7 +16523,7 @@ msgstr "Manage tags"
 msgid "Manage tags…"
 msgstr "Manage tags…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:197
+#: src/features/auth/components/organization/billing-settings-card.tsx:199
 msgid "Manage Team subscription"
 msgstr "Manage Team subscription"
 
@@ -19396,7 +19396,7 @@ msgstr "Only 3B activated per token for efficiency"
 msgid "Only in one run"
 msgstr "Only in one run"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:134
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
 msgid "Only organization owners can manage billing settings"
 msgstr "Only organization owners can manage billing settings"
 
@@ -20569,6 +20569,11 @@ msgstr "Paused"
 msgid "Pay for what <0>you use.</0>"
 msgstr "Pay for what <0>you use.</0>"
 
+#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/billing/components/personal-plan-card.tsx:52
+msgid "Pay yearly"
+msgstr "Pay yearly"
+
 #: src/features/settings/components/chat/mcp/popular-servers.ts:210
 msgid "Payments, orders, invoices, and subscriptions via PayPal"
 msgstr "Payments, orders, invoices, and subscriptions via PayPal"
@@ -21452,6 +21457,8 @@ msgstr "Private by default"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
 #: src/components/model-picker/model-picker.tsx:313
 #: src/features/billing/components/personal-plan-card.tsx:23
+#: src/components/model-picker/model-picker.tsx:268
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:556
@@ -21459,7 +21466,7 @@ msgstr "Private by default"
 msgid "Pro"
 msgstr "Pro"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro is your own plan: every model and 1,000 messages a day."
 
@@ -22726,7 +22733,7 @@ msgstr "Remove {fileName}"
 msgid "Remove {label}"
 msgstr "Remove {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:245
+#: src/features/auth/components/organization/billing-settings-card.tsx:262
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "Remove {model}"
@@ -23709,8 +23716,8 @@ msgstr "Saudi Arabia"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:160
-#: src/features/auth/components/organization/billing-settings-card.tsx:291
+#: src/features/auth/components/organization/billing-settings-card.tsx:162
+#: src/features/auth/components/organization/billing-settings-card.tsx:308
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -24404,7 +24411,7 @@ msgstr "Select to last column"
 msgid "Select to top of table"
 msgstr "Select to top of table"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:238
+#: src/features/auth/components/organization/billing-settings-card.tsx:255
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 
@@ -29309,14 +29316,22 @@ msgstr "Updates"
 msgid "Upgrade"
 msgstr "Upgrade"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:208
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
 msgid "Upgrade organization to Team"
 msgstr "Upgrade organization to Team"
 
-#: src/features/billing/components/personal-plan-card.tsx:47
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
+msgid "Upgrade organization to Team, monthly"
+msgstr "Upgrade organization to Team, monthly"
+
+#: src/features/billing/components/personal-plan-card.tsx:63
 #: src/features/layout/components/nav-user.tsx:255
 msgid "Upgrade to Pro"
 msgstr "Upgrade to Pro"
+
+#: src/features/billing/components/personal-plan-card.tsx:63
+msgid "Upgrade to Pro, monthly"
+msgstr "Upgrade to Pro, monthly"
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:472
 #: src/features/auth/components/organization/create-organization-dialog.tsx:255
@@ -31380,11 +31395,11 @@ msgstr "Your own OpenAI key — used for OpenAI models and required to delegate 
 msgid "Your pages"
 msgstr "Your pages"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Your plan"
 msgstr "Your plan"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:188
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "Your plan and credit allowance follow your subscription."
 

@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import SettingsCard from "@/components/settings/settings-card";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import useBillingOptions from "../hooks/use-billing-options";
 import useCheckout from "../hooks/use-checkout";
 
 /** The caller's own plan: Pro is bought per user, independent of any organization. */
@@ -14,6 +15,7 @@ const PersonalPlanCard = () => {
     const crpc = useCRPC();
     const { data: plan, isPending } = useQuery(crpc.billing.checkout.getMyPlan.queryOptions({}));
     const { isPending: checkoutPending, openPortal, startCheckout } = useCheckout();
+    const { yearly } = useBillingOptions();
     const isPro = plan?.baseTier === "pro";
 
     return (
@@ -36,16 +38,31 @@ const PersonalPlanCard = () => {
                     </Button>
                 ) : null}
                 {isPro || isPending ? null : (
-                    <Button
-                        disabled={checkoutPending}
-                        onClick={() => {
-                            void startCheckout("pro");
-                        }}
-                        size="sm"
-                        type="button"
-                    >
-                        {t`Upgrade to Pro`}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {yearly.pro ? (
+                            <Button
+                                disabled={checkoutPending}
+                                onClick={() => {
+                                    void startCheckout("pro", "year");
+                                }}
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                            >
+                                {t`Pay yearly`}
+                            </Button>
+                        ) : null}
+                        <Button
+                            disabled={checkoutPending}
+                            onClick={() => {
+                                void startCheckout("pro");
+                            }}
+                            size="sm"
+                            type="button"
+                        >
+                            {yearly.pro ? t`Upgrade to Pro, monthly` : t`Upgrade to Pro`}
+                        </Button>
+                    </div>
                 )}
             </CardContent>
         </SettingsCard>

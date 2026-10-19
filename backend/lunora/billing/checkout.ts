@@ -19,9 +19,10 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
 import { getOrganization, getUser } from "../auth/lib/better-auth-queries";
-import { CREEM_API_KEY, CREEM_PRODUCT_PRO, CREEM_PRODUCT_TEAM, SITE_URL } from "../env";
+import { CREEM_API_KEY, SITE_URL } from "../env";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
-import { billingOrganizationOf, portalCustomerFor } from "./plans";
+import { billingOrganizationOf, portalCustomerFor, productFor } from "./plans";
+import { planProducts } from "./products";
 
 const TRAILING_SLASH = /\/$/u;
 
@@ -111,16 +112,32 @@ export const getTeamPlansIPay = authQuery
     });
 
 /**
+ * Which plans can be bought yearly: the plan's yearly product is configured. The billing cards
+ * show a "yearly" button only for those. The prices themselves live in Creem.
+ */
+export const getBillingOptions = authQuery.output(v.object({ yearly: v.object({ pro: v.boolean(), team: v.boolean() }) })).query(() => {
+    const { yearly } = planProducts();
+
+    return { yearly: { pro: Boolean(yearly?.pro), team: Boolean(yearly?.team) } };
+});
+
+/**
  * Start a Creem checkout and return the hosted checkout URL to redirect to.
  * `pro`: for the caller, any signed-in (non-guest) user. `team`: for the
- * caller's active organization, owner only, billed per member.
+ * caller's active organization, owner only, billed per member. `interval`
+ * defaults to monthly; `year` needs the plan's yearly product to be configured.
+ * A yearly subscription grants the same tier (`plans.ts`).
  */
 export const createCheckout = authAction
     .use(rateLimit("billing/checkout"))
-    .input({ plan: v.union(v.literal("pro"), v.literal("team")) })
+    .input({ interval: v.optional(v.union(v.literal("month"), v.literal("year"))), plan: v.union(v.literal("pro"), v.literal("team")) })
     .output(v.object({ url: v.string() }))
-    .action(async ({ args: { plan }, ctx }) => {
-        const productId = plan === "pro" ? CREEM_PRODUCT_PRO : CREEM_PRODUCT_TEAM;
+    .action(async ({ args: { interval = "month", plan }, ctx }) => {
+        const productId = productFor(plan, interval, planProducts());
+
+        if (interval === "year" && productId === "") {
+            throw new LunoraError("SERVICE_UNAVAILABLE", "Yearly billing is not available");
+        }
 
         assertConfigured(productId);
 
@@ -146,7 +163,7 @@ export const createCheckout = authAction
             successUrl: billingPageUrl(),
         });
 
-        ctx.log.event("billing.create_checkout", { plan, seats: subject.seats });
+        ctx.log.event("billing.create_checkout", { interval, plan, seats: subject.seats });
 
         return { url };
     });

@@ -1695,7 +1695,7 @@ msgstr "Adicionar um comentário"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "Adicione um membro da sua organização a <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:266
+#: src/features/auth/components/organization/billing-settings-card.tsx:283
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "Adicionar um modelo..."
@@ -2672,7 +2672,7 @@ msgstr "Permitir \"{tool}\"?"
 msgid "Allow this site ({0})"
 msgstr "Permitir este site ({0})"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:236
+#: src/features/auth/components/organization/billing-settings-card.tsx:253
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "Modelos de IA permitidos"
@@ -3945,17 +3945,17 @@ msgstr "Cobrado na sua própria chave de API, não nos seus créditos."
 msgid "Billing"
 msgstr "Cobrança"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:217
+#: src/features/auth/components/organization/billing-settings-card.tsx:234
 msgid "Billing Email"
 msgstr "E-mail de cobrança"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:135
-#: src/features/auth/components/organization/billing-settings-card.tsx:166
-#: src/features/auth/components/organization/billing-settings-card.tsx:296
+#: src/features/auth/components/organization/billing-settings-card.tsx:137
+#: src/features/auth/components/organization/billing-settings-card.tsx:168
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
 msgid "Billing Settings"
 msgstr "Configurações de cobrança"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:89
+#: src/features/auth/components/organization/billing-settings-card.tsx:91
 msgid "Billing settings updated successfully"
 msgstr "Configurações de cobrança atualizadas com sucesso"
 
@@ -6005,8 +6005,8 @@ msgstr "Configure a equipe \"{teamName}\""
 msgid "Configure team settings"
 msgstr "Configurar a equipe"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:163
-#: src/features/auth/components/organization/billing-settings-card.tsx:294
+#: src/features/auth/components/organization/billing-settings-card.tsx:165
+#: src/features/auth/components/organization/billing-settings-card.tsx:311
 msgid "Configure the billing contact and available AI models"
 msgstr "Configure o contato de cobrança e os modelos de IA disponíveis"
 
@@ -7370,8 +7370,8 @@ msgstr "Criadores que querem gerar e editar imagens com um único modelo de qual
 msgid "Credits"
 msgstr "Créditos"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:143
-#: src/features/auth/components/organization/billing-settings-card.tsx:184
+#: src/features/auth/components/organization/billing-settings-card.tsx:145
+#: src/features/auth/components/organization/billing-settings-card.tsx:186
 msgid "Credits per user:"
 msgstr "Créditos por usuário:"
 
@@ -7460,7 +7460,7 @@ msgstr "Senha atual"
 msgid "Current password is required"
 msgstr "A senha atual é obrigatória"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 msgid "Current plan:"
 msgstr "Plano atual:"
 
@@ -7468,8 +7468,8 @@ msgstr "Plano atual:"
 msgid "Current Prompt Variables"
 msgstr "Variáveis do prompt atual"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:140
-#: src/features/auth/components/organization/billing-settings-card.tsx:181
+#: src/features/auth/components/organization/billing-settings-card.tsx:142
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 msgid "Current tier:"
 msgstr "Plano atual:"
 
@@ -9888,7 +9888,7 @@ msgstr "Informe uma região da AWS válida, ex.: us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "Informe uma versão de API como v1 ou 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:224
+#: src/features/auth/components/organization/billing-settings-card.tsx:241
 msgid "Enter billing email"
 msgstr "Digite o e-mail de cobrança"
 
@@ -12450,7 +12450,7 @@ msgstr "Quadros"
 msgid "France"
 msgstr "França"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:114
 #: src/features/marketing/components/landing-page.tsx:326
 #: src/features/settings/components/chat/models-settings.tsx:39
@@ -16511,7 +16511,7 @@ msgstr "Gerenciar participantes"
 msgid "Manage Publication"
 msgstr "Gerenciar publicação"
 
-#: src/features/billing/components/personal-plan-card.tsx:35
+#: src/features/billing/components/personal-plan-card.tsx:37
 msgid "Manage subscription"
 msgstr "Gerenciar assinatura"
 
@@ -16524,7 +16524,7 @@ msgstr "Gerenciar tags"
 msgid "Manage tags…"
 msgstr "Gerenciar tags…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:197
+#: src/features/auth/components/organization/billing-settings-card.tsx:199
 msgid "Manage Team subscription"
 msgstr "Gerenciar assinatura Team"
 
@@ -19397,7 +19397,7 @@ msgstr "Apenas 3B ativados por token, para mais eficiência"
 msgid "Only in one run"
 msgstr "Só em uma execução"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:134
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
 msgid "Only organization owners can manage billing settings"
 msgstr "Somente proprietários da organização podem gerenciar as configurações de cobrança"
 
@@ -20570,6 +20570,11 @@ msgstr "Pausado"
 msgid "Pay for what <0>you use.</0>"
 msgstr "Pague só <0>pelo que usar.</0>"
 
+#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/billing/components/personal-plan-card.tsx:52
+msgid "Pay yearly"
+msgstr ""
+
 #: src/features/settings/components/chat/mcp/popular-servers.ts:210
 msgid "Payments, orders, invoices, and subscriptions via PayPal"
 msgstr "Pagamentos, pedidos, faturas e assinaturas via PayPal"
@@ -21453,6 +21458,8 @@ msgstr "Privado por padrão"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
 #: src/components/model-picker/model-picker.tsx:313
 #: src/features/billing/components/personal-plan-card.tsx:23
+#: src/components/model-picker/model-picker.tsx:268
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:556
@@ -21460,7 +21467,7 @@ msgstr "Privado por padrão"
 msgid "Pro"
 msgstr "Pro"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro é o seu plano pessoal: todos os modelos e 1.000 mensagens por dia."
 
@@ -22727,7 +22734,7 @@ msgstr "Remover {fileName}"
 msgid "Remove {label}"
 msgstr "Remover {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:245
+#: src/features/auth/components/organization/billing-settings-card.tsx:262
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "Remover {model}"
@@ -23710,8 +23717,8 @@ msgstr "Arábia Saudita"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:160
-#: src/features/auth/components/organization/billing-settings-card.tsx:291
+#: src/features/auth/components/organization/billing-settings-card.tsx:162
+#: src/features/auth/components/organization/billing-settings-card.tsx:308
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -24405,7 +24412,7 @@ msgstr "Selecionar até a última coluna"
 msgid "Select to top of table"
 msgstr "Selecionar até o topo da tabela"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:238
+#: src/features/auth/components/organization/billing-settings-card.tsx:255
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "Selecione quais modelos de IA os membros da organização podem usar. Deixe em branco no plano Enterprise para permitir todos os modelos."
 
@@ -29310,14 +29317,22 @@ msgstr "Novidades"
 msgid "Upgrade"
 msgstr "Fazer upgrade"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:208
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
 msgid "Upgrade organization to Team"
 msgstr "Fazer upgrade da organização para Team"
 
-#: src/features/billing/components/personal-plan-card.tsx:47
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
+msgid "Upgrade organization to Team, monthly"
+msgstr ""
+
+#: src/features/billing/components/personal-plan-card.tsx:63
 #: src/features/layout/components/nav-user.tsx:255
 msgid "Upgrade to Pro"
 msgstr "Fazer upgrade para o Pro"
+
+#: src/features/billing/components/personal-plan-card.tsx:63
+msgid "Upgrade to Pro, monthly"
+msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:472
 #: src/features/auth/components/organization/create-organization-dialog.tsx:255
@@ -31381,11 +31396,11 @@ msgstr "Sua própria chave da OpenAI — usada nos modelos da OpenAI e necessár
 msgid "Your pages"
 msgstr "Suas páginas"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Your plan"
 msgstr "Seu plano"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:188
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "Seu plano e sua cota de créditos acompanham sua assinatura."
 

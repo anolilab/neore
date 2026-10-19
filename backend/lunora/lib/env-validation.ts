@@ -95,7 +95,9 @@ const optionalEnvSchema = z.object({
     // CREEM_WEBHOOK_SECRET. `CREEM_TEST_MODE=true` targets test-api.creem.io.
     CREEM_API_KEY: z.string().trim().optional(),
     CREEM_PRODUCT_PRO: z.string().trim().optional(),
+    CREEM_PRODUCT_PRO_YEARLY: z.string().trim().optional(),
     CREEM_PRODUCT_TEAM: z.string().trim().optional(),
+    CREEM_PRODUCT_TEAM_YEARLY: z.string().trim().optional(),
     CREEM_TEST_MODE: z.string().trim().optional(),
     CREEM_WEBHOOK_SECRET: z.string().trim().optional(),
     DPO_EMAIL: z.string().trim().optional(),

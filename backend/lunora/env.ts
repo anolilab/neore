@@ -26,6 +26,9 @@ export const SITE_URL = read("SITE_URL");
 export const CREEM_API_KEY = read("CREEM_API_KEY");
 export const CREEM_PRODUCT_PRO = read("CREEM_PRODUCT_PRO");
 export const CREEM_PRODUCT_TEAM = read("CREEM_PRODUCT_TEAM");
+/** The yearly products of the same plans. Empty = no yearly option; a yearly subscription grants the same tier. */
+export const CREEM_PRODUCT_PRO_YEARLY = read("CREEM_PRODUCT_PRO_YEARLY");
+export const CREEM_PRODUCT_TEAM_YEARLY = read("CREEM_PRODUCT_TEAM_YEARLY");
 export const CREEM_WEBHOOK_SECRET = read("CREEM_WEBHOOK_SECRET");
 /** `true` targets test-api.creem.io (test-mode keys and products). */
 export const CREEM_TEST_MODE = read("CREEM_TEST_MODE");
