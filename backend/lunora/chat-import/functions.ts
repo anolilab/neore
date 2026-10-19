@@ -82,7 +82,7 @@ export const getImportStatus = authQuery
 export const startImportJob = authMutation
     .use(rateLimit("chat-import/start"))
     .input({
-        provider: v.union(v.literal("chatgpt"), v.literal("gemini"), v.literal("claude"), v.literal("claude-code"), v.literal("codex")),
+        provider: v.union(v.literal("chatgpt"), v.literal("gemini"), v.literal("claude"), v.literal("claude-code"), v.literal("codex"), v.literal("neore")),
         totalConversations: v.number(),
         uploadId: v.string().max(MAX_LENGTH.id),
     })

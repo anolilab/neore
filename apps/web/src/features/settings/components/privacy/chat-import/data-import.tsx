@@ -36,6 +36,7 @@ const PROVIDER_LABELS: Record<ImportProvider, string> = {
     "claude-code": "Claude Code",
     codex: "Codex CLI",
     gemini: "Google Gemini",
+    neore: "Neore",
 };
 
 /** The normalised conversations as the one JSON file the import uploads. */

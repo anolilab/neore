@@ -47,6 +47,7 @@ describe("collectConversations", () => {
 
                     for (let m = 0; m < MESSAGES_PER_THREAD; m += 1) {
                         await context.db.insert("messages", {
+                            message: { content: `t${String(t)}-m${String(m)}`, role: m % 2 === 0 ? "user" : "assistant" },
                             order: m,
                             status: "success",
                             stepOrder: 0,
@@ -79,6 +80,11 @@ describe("collectConversations", () => {
             expect(exported).toHaveLength(THREADS);
             expect(exported.flatMap((conversation) => conversation.messages)).toHaveLength(THREADS * MESSAGES_PER_THREAD);
             expect(exported.map((conversation) => conversation.thread.title)).not.toContain("Not mine");
+
+            // The row has no role column; the export reads it from the stored UI message so a re-import can tell a reply that opens its own order from a prompt.
+            const roles = exported[0]?.messages.map((message) => (message as { role?: string }).role);
+
+            expect(roles?.slice(0, 2)).toEqual(["user", "assistant"]);
 
             for (const conversation of exported) {
                 // Ascending, complete, in order.

@@ -85,12 +85,22 @@ export const collectSettings = internalQuery
  * only what the projection reads keeps the field TYPES tied to the schema
  * without inheriting the brands the wire has already erased.
  */
-const projectMessage = (message: Pick<Doc<"messages">, "_creationTime" | "model" | "order" | "status" | "stepOrder" | "text" | "tool"> & { _id: string }) => {
+/** `user` | `assistant` | `system` | `tool`, from the stored UI message; the row itself has no role column. */
+const roleOf = (message: unknown): string | undefined => {
+    const role = (message as { role?: unknown } | null | undefined)?.role;
+
+    return typeof role === "string" ? role : undefined;
+};
+
+const projectMessage = (
+    message: Pick<Doc<"messages">, "_creationTime" | "message" | "model" | "order" | "status" | "stepOrder" | "text" | "tool"> & { _id: string },
+) => {
     return {
         _id: message._id,
         createdAt: message._creationTime,
         model: message.model,
         order: message.order,
+        role: roleOf(message.message),
         status: message.status,
         stepOrder: message.stepOrder,
         text: message.text,
@@ -150,7 +160,17 @@ export const collectConversations = internalAction.input({ userId: v.string() })
     // `thread.summaryTYPO` an error; this annotation only has to describe the
     // wire shape.
     const conversations: {
-        messages: { _id: string; createdAt: number; model?: string; order?: number; status?: string; stepOrder?: number; text?: string; tool?: boolean }[];
+        messages: {
+            _id: string;
+            createdAt: number;
+            model?: string;
+            order?: number;
+            role?: string;
+            status?: string;
+            stepOrder?: number;
+            text?: string;
+            tool?: boolean;
+        }[];
         thread: {
             _id: string;
             category?: string;

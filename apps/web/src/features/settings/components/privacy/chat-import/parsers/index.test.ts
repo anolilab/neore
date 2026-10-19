@@ -125,6 +125,33 @@ describe("parseExportFile", () => {
             expect(result.provider).toBe("chatgpt");
         });
 
+        it("detects a Neore export from a bare root object and from the array a .json file arrives in", () => {
+            const root = {
+                conversations: [
+                    {
+                        messages: [{ createdAt: 1, order: 0, stepOrder: 0, status: "success", text: "Hi", tool: false }],
+                        thread: { createdAt: 1, title: "Neore" },
+                    },
+                ],
+                exportVersion: "1.0",
+            };
+
+            expect(parseExportFile(root).provider).toBe("neore");
+            expect(parseExportFile([root]).provider).toBe("neore");
+            expect(parseExportFile([root]).conversations).toHaveLength(1);
+        });
+
+        it("detects an empty Neore export as neore with nothing to import", () => {
+            const result = parseExportFile([{ conversations: [], exportVersion: "1.0" }]);
+
+            expect(result.provider).toBe("neore");
+            expect(result.conversations).toEqual([]);
+        });
+
+        it("does not detect a conversations array without exportVersion as Neore", () => {
+            expect(() => parseExportFile([{ conversations: [{ messages: [], thread: {} }] }])).toThrow("Could not detect the chat provider");
+        });
+
         it("throws for unrecognized data format", () => {
             expect(() => parseExportFile({ unknown: "format" })).toThrow("Could not detect the chat provider");
         });
