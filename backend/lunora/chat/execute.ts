@@ -345,6 +345,19 @@ export const runStreamingAgent = internalAction
             let piped: PipedStream;
 
             // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
+            const recordRun = (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
+                afterRun(ctx, {
+                    knowledgeSources: runContext.knowledgeSources,
+                    retrievedMemories: runContext.retrievedMemories,
+                    savedMessages: result.savedMessages,
+                    ...(invokedSkill && { skill: { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } }),
+                    threadId,
+                    ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
+                    timingStart,
+                    userId,
+                    ...extra,
+                });
+            };
             const stoppedAt = async (error: unknown) => {
                 await endStoppedRun(ctx, error, {
                     continuation: false,
@@ -354,6 +367,9 @@ export const runStreamingAgent = internalAction
                     stop: stopping,
                     streamId,
                 });
+
+                // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
+                recordRun({ extractMemory: false, firstTokenTime: undefined, prompt: "" });
             };
 
             try {
@@ -405,20 +421,12 @@ export const runStreamingAgent = internalAction
             }
 
             // Post-stream work: timing and memory extraction, then follow-ups.
-            afterRun(ctx, {
+            recordRun({
                 botId: runContext.botId,
                 // A locked chat's content is never mined into memory.
                 extractMemory: runContext.memoryEnabled && !isThreadLocked(thread),
                 firstTokenTime,
-                knowledgeSources: runContext.knowledgeSources,
                 prompt,
-                retrievedMemories: runContext.retrievedMemories,
-                savedMessages: result.savedMessages,
-                ...(invokedSkill && { skill: { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } }),
-                threadId,
-                ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
-                timingStart,
-                userId,
             });
 
             void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {

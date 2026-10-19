@@ -578,7 +578,7 @@ export const resolveRetrievalScope = internalQuery
         admittedRun: v.optional(v.boolean()),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
-        userId: v.string(),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(
         v.object({

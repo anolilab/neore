@@ -420,4 +420,33 @@ describe(useUpdateModelFilterRules, () => {
         expect(server.sent).toEqual([{ rules: { blockedRegions: ["EU"], requireZDR: true }, userId: "account-a" }]);
         expect(JSON.stringify(queryClient.getQueryData(PREFERENCES_KEY))).not.toContain("groq");
     });
+
+    it("after an account switch an edit waits for the new account's rules and never builds on the old ones", async () => {
+        server.rules = { requireZDR: true };
+
+        const queryClient = newClient();
+        const { rerender, result: page } = renderHook(() => useUpdateModelFilterRules(), { wrapper: wrapperFor(queryClient) });
+
+        await waitFor(() => {
+            expect(page.current.isLoaded).toBe(true);
+        });
+
+        server.userId = "account-b";
+        server.rules = { blockedProviders: ["groq"] };
+        rerender();
+
+        // The old account's cached rules are gone, so an edit before the new account's rules load is refused.
+        const early = page.current.updateRules((current) => blockRegions(current, ["US"]));
+
+        await expect(early).rejects.toThrow("have not loaded");
+
+        await waitFor(() => {
+            expect(page.current.rules).toEqual({ blockedProviders: ["groq"] });
+        });
+        await act(async () => {
+            await page.current.updateRules((current) => blockRegions(current, ["EU"]));
+        });
+
+        expect(server.sent).toEqual([{ rules: { blockedProviders: ["groq"], blockedRegions: ["EU"] }, userId: "account-b" }]);
+    });
 });

@@ -330,6 +330,22 @@ const runSpeaker = async (
                 });
             }
         };
+        // Timing only: memory is not extracted from group turns — the exchange
+        // is several participants' voices, not the user talking to one assistant.
+        const recordRun = (firstTokenTime: number | undefined) => {
+            afterRun(ctx, {
+                extractMemory: false,
+                firstTokenTime,
+                prompt: "",
+                savedMessages: result.savedMessages,
+                skill: { id: speaker.skillId, name: speaker.name },
+                threadId: turn.threadId,
+                ...(turn.prefs.timezone && { timeZone: turn.prefs.timezone }),
+                timingStart,
+                userId: turn.userId,
+            });
+        };
+
         // A stop ends the turn here, with the reply this speaker still owed saved and stamped as its own.
         const stoppedAt = async (error: unknown) => {
             const stoppedIds = await endStoppedRun(ctx, error, {
@@ -344,6 +360,9 @@ const runSpeaker = async (
             });
 
             await markSpeaker([...stoppedIds, ...(result.savedMessages ?? []).map((m) => m._id as string)]);
+
+            // What the speaker finished before the stop is a reply like any other on the usage page.
+            recordRun(undefined);
 
             return { lastMessageId: undefined, paused: false, stopped: true };
         };
@@ -395,19 +414,7 @@ const runSpeaker = async (
             return await stoppedAt(error);
         }
 
-        // Timing only: memory is not extracted from group turns — the exchange
-        // is several participants' voices, not the user talking to one assistant.
-        afterRun(ctx, {
-            extractMemory: false,
-            firstTokenTime,
-            prompt: "",
-            savedMessages: result.savedMessages,
-            skill: { id: speaker.skillId, name: speaker.name },
-            threadId: turn.threadId,
-            ...(turn.prefs.timezone && { timeZone: turn.prefs.timezone }),
-            timingStart,
-            userId: turn.userId,
-        });
+        recordRun(firstTokenTime);
 
         return { lastMessageId: savedIds.at(-1), paused, stopped: false };
     } finally {

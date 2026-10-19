@@ -532,6 +532,9 @@ describe("runGroupTurn — stop", () => {
             ["WRITER", skillIds.writer, "success", "Hi there"],
         ]);
         expect(await streamStatus()).toBe("done");
+
+        // The stopped reply is on the usage page, once.
+        expect(harness.scheduler.list().filter((job) => "replyKey" in ((job.args ?? {}) as object))).toHaveLength(1);
     });
 
     it("does not carry a stop from an earlier turn into the next one", async () => {

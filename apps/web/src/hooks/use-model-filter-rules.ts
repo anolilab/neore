@@ -228,7 +228,7 @@ export const useUpdateModelFilterRules = () => {
     const rules = data?.modelFilterRules as ModelFilterRules | undefined;
     const { isPending, mutateAsync } = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
 
-    // A new account starts with no edits; the cache still shows the old account's rules until it refetches.
+    // A new account starts with no edits and no cached rules: the old account's rules must not become its save base.
     useEffect(() => {
         if (!adoptAccount(queryClient, userId)) {
             return;
@@ -236,25 +236,26 @@ export const useUpdateModelFilterRules = () => {
 
         const { queryKey } = crpc.auth.functions.getAIUserPreferences.queryOptions({});
 
-        void queryClient.invalidateQueries({ queryKey });
+        void queryClient.resetQueries({ queryKey });
     }, [crpc, queryClient, userId]);
 
     // The key is built inside the callback: a fresh array each render would make `updateRules` change identity every render.
     const updateRules = useCallback(
         async (update: (current: ModelFilterRules) => ModelFilterRules) => {
             const { queryKey } = crpc.auth.functions.getAIUserPreferences.queryOptions({});
-            const cached = queryClient.getQueryData<PreferencesCache>(queryKey);
-
-            // Before the preferences load there is nothing to build on, and saving would replace the user's other filters.
-            if (cached === undefined) {
-                throw new Error("The model filter rules have not loaded yet");
-            }
 
             // A caller rendered before an account switch must not edit the account that replaced it.
             const edits = editsByClient.get(queryClient);
 
             if (userId === undefined || edits?.userId !== userId) {
                 throw new Error("The signed-in account changed; the edit was not saved");
+            }
+
+            const cached = queryClient.getQueryData<PreferencesCache>(queryKey);
+
+            // Before the preferences load there is nothing to build on, and saving would replace the user's other filters.
+            if (cached === undefined) {
+                throw new Error("The model filter rules have not loaded yet");
             }
 
             if (edits.pending.length === 0) {
