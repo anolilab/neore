@@ -538,10 +538,10 @@ written here is what is not.
   is a CONFLICT (`data.code = PAGE_REVISION_CONFLICT`) only if content moved
   past it — comment activity alone never makes a collaborator's save stale.
 
-- **Native shell** (`apps/native`, Tauri v2) loads the deployed app from a
-  COMPILE-TIME `NEORE_SITE_URL` and grants IPC to that origin only, through a
-  runtime `CapabilityBuilder` (four commands + event listen, plus on desktop the
-  five `device_*` relay commands; no plugin command is reachable from the page). The web side is `apps/web/src/lib/native/bridge.ts`,
+- **Native shell** (`apps/desktop`, Electron 44) loads the deployed app from a
+  BUILD-TIME `NEORE_SITE_URL` and exposes `window.neoreNative` only on that
+  origin, through a sandboxed preload; every IPC handler checks the sender's
+  origin in the main process. Device execution sits behind `packages/device-core`. The web side is `apps/web/src/lib/native/bridge.ts`,
   a no-op outside the shell — call `notifyNative` from any long-running flow.
   **The web CSP deliberately does not allow `ipc:`**: Tauri falls back to
   `postMessage` IPC when the fetch is blocked, so do not "fix" the resulting

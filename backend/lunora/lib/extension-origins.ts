@@ -69,7 +69,7 @@ export const SHIPPED_FIREFOX_EXTENSION_ID = "anole-chat@neore.ai";
 export const SHIPPED_FIREFOX_REDIRECT_URI = "https://c64d88ed4645bb5915bc267506fbc3dcd4a1da90.extensions.allizom.org/";
 
 /**
- * The native shell's (`apps/native`) system-browser sign-in callback. Unlike
+ * The native shell's (`apps/desktop`) system-browser sign-in callback. Unlike
  * the extension URIs it is NOT exclusive — any app on the device can register
  * the `neore:` scheme — so it is never in the default: an operator opts in by
  * listing it. What keeps an interceptor from using a code is PKCE (RFC 8252

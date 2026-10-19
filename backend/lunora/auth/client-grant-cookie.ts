@@ -2,7 +2,7 @@
  * `POST /api/auth/client-grant/cookie` — finishes the native shell's
  * system-browser sign-in by turning a one-time code into a session COOKIE.
  *
- * The native shell (`apps/native`) cannot use Google sign-in inside its webview
+ * The native shell (`apps/desktop`) cannot use Google sign-in inside its webview
  * (Google refuses embedded webviews), so it runs the extension grant from
  * `extension-grant.ts` in the system browser with the redirect URI
  * `neore://auth/callback` and receives the code back through the OS. The

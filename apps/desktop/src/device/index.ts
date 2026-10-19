@@ -1,0 +1,262 @@
+/**
+ * Device execution in the Electron main process (port of `device/mod.rs`'s
+ * windows, commands and events; the logic lives in `device-core`).
+ *
+ * Two sets of channels, two trust checks:
+ * - `DEVICE_CHANNEL` (relay): reachable from the site window only, through
+ *   `options.isTrusted`. The site may verify and relay; it cannot approve.
+ * - `LOCAL_CHANNEL` (approvals, folders, MCP servers, audit): reachable from the
+ *   device window alone, which is a separate BrowserWindow with its own preload
+ *   and a file: URL. The site cannot reach these, and the device window cannot
+ *   reach the relay (`isTrusted` rejects its frame).
+ */
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
+
+import { loadDeviceCore } from "./addon";
+import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
+import type { CoreEvent, DeviceCore, Prompt, Signed } from "./types";
+import { readPairing, readPromptAnswer, readSettingsUpdate, readSigned } from "./validate";
+
+export interface DeviceIpcOptions {
+    /** True when the sender is the site's main window (see `trust.ts`). */
+    isTrusted: (event: IpcMainInvokeEvent) => boolean;
+}
+
+/** Stopping idle MCP servers runs once a minute, as the Tauri shell did. */
+const REAP_INTERVAL_MS = 60_000;
+const WINDOW_DIR = path.join(__dirname, "device-window");
+const LOCAL_PAGE = path.join(WINDOW_DIR, "device.html");
+const LOCAL_PRELOAD = path.join(WINDOW_DIR, "preload.cjs");
+
+/**
+ * Registers the device handlers. Returns whether the core loaded: the shell advertises `device` only then
+ * (`main.ts`), so the page never sees a relay that would only answer "unavailable".
+ */
+export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
+    const state: {
+        core?: DeviceCore;
+        coreError?: unknown;
+        local?: BrowserWindowInstance;
+        /** The site frame that last made a trusted relay call: progress and changes go there. */
+        site?: WebContents;
+    } = {};
+    const localUrl = pathToFileURL(LOCAL_PAGE).href;
+
+    const requireCore = (): DeviceCore => {
+        if (state.core === undefined) {
+            throw new Error(`device execution is unavailable: ${String(state.coreError)}`);
+        }
+
+        return state.core;
+    };
+
+    const send = (target: WebContents | undefined, channel: string, payload?: unknown): void => {
+        if (target !== undefined && !target.isDestroyed()) {
+            target.send(channel, payload);
+        }
+    };
+
+    /** The device window while it is open; a dialog without a live window has no parent. */
+    const liveLocal = (): BrowserWindowInstance | undefined => (state.local === undefined || state.local.isDestroyed() ? undefined : state.local);
+
+    const openLocalWindow = (): void => {
+        const live = liveLocal();
+
+        if (live !== undefined) {
+            if (live.isMinimized()) {
+                live.restore();
+            }
+
+            live.show();
+            live.focus();
+
+            return;
+        }
+
+        const win = new BrowserWindow({
+            alwaysOnTop: true,
+            center: true,
+            height: 600,
+            minHeight: 420,
+            minWidth: 420,
+            title: "Neore — this computer",
+            webPreferences: {
+                contextIsolation: true,
+                nodeIntegration: false,
+                preload: LOCAL_PRELOAD,
+                sandbox: true,
+                webSecurity: true,
+                webviewTag: false,
+            },
+            width: 560,
+        });
+
+        win.webContents.setWindowOpenHandler(() => {
+            return { action: "deny" };
+        });
+        win.webContents.on("will-navigate", (event) => event.preventDefault());
+        win.on("closed", () => {
+            // Closing the window is a "no" to everything it was asking.
+            state.local = undefined;
+            state.core?.denyPrompts();
+        });
+        void win.loadFile(LOCAL_PAGE);
+        state.local = win;
+    };
+
+    /** The device window's own main frame, loaded from our page and nothing else. */
+    const isLocal = (event: IpcMainInvokeEvent): boolean => {
+        const win = state.local;
+
+        return (
+            win !== undefined &&
+            !win.isDestroyed() &&
+            event.sender === win.webContents &&
+            event.senderFrame !== null &&
+            event.senderFrame === win.webContents.mainFrame &&
+            event.senderFrame.url === localUrl
+        );
+    };
+
+    const relay = <Result>(channel: string, handler: (event: IpcMainInvokeEvent, ...args: unknown[]) => Result): void => {
+        ipcMain.handle(channel, (event, ...args) => {
+            if (!options.isTrusted(event)) {
+                throw new Error("device: untrusted sender");
+            }
+
+            state.site = event.sender;
+
+            return handler(event, ...args);
+        });
+    };
+
+    const local = <Result>(channel: string, handler: (...args: unknown[]) => Result): void => {
+        ipcMain.handle(channel, (event, ...args) => {
+            if (!isLocal(event)) {
+                throw new Error("device: not the device window");
+            }
+
+            return handler(...args);
+        });
+    };
+
+    const onEvent = (json: string): void => {
+        const event = JSON.parse(json) as CoreEvent;
+
+        switch (event.type) {
+            case "changed": {
+                send(state.site, DEVICE_CHANNEL.changed);
+                break;
+            }
+            case "progress": {
+                // The signed report; the page forwards it to the backend, which verifies it.
+                send(state.site, DEVICE_CHANNEL.progress, { callId: event.callId, payload: event.payload, signature: event.signature });
+                break;
+            }
+            case "prompt": {
+                showPrompt(event.prompt);
+                break;
+            }
+        }
+    };
+
+    const showPrompt = (prompt: Prompt): void => {
+        openLocalWindow();
+        send(state.local?.webContents, LOCAL_EVENT.prompt);
+
+        const body = prompt.body.kind === "pairing" ? "Confirm pairing this computer" : `${prompt.body.tool} — ${prompt.body.threadTitle}`;
+
+        if (Notification.isSupported()) {
+            new Notification({ body, title: "Neore is asking for your approval" }).show();
+        }
+    };
+
+    try {
+        const DeviceCoreClass = loadDeviceCore();
+
+        state.core = new DeviceCoreClass(app.getPath("userData"), onEvent);
+    } catch (error) {
+        // Register the handlers anyway: they reject with the reason, and the shell keeps running.
+        state.coreError = error;
+        console.error("[neore-desktop] device execution unavailable", error);
+    }
+
+    const reap = setInterval(() => state.core?.reapIdleServers(), REAP_INTERVAL_MS);
+
+    reap.unref();
+    app.on("will-quit", () => {
+        clearInterval(reap);
+        state.core?.stop();
+    });
+
+    // ─── Relay (site window) ───────────────────────────────────────────────
+
+    relay(DEVICE_CHANNEL.status, () => JSON.parse(requireCore().status()) as unknown);
+
+    relay(DEVICE_CHANNEL.pair, (_event, pairing) => {
+        const { accountLabel, deviceId, secret } = readPairing(pairing);
+
+        return requireCore().pair(deviceId, secret, accountLabel);
+    });
+
+    relay(DEVICE_CHANNEL.manifest, async () => JSON.parse(await requireCore().manifest()) as Signed);
+
+    relay(DEVICE_CHANNEL.execute, async (_event, call) => {
+        const { envelope, signature } = readSigned(call);
+
+        return JSON.parse(await requireCore().execute(envelope, signature)) as Signed;
+    });
+
+    relay(DEVICE_CHANNEL.openSettings, () => {
+        openLocalWindow();
+    });
+
+    // ─── Local window (approvals, folders, MCP servers, audit) ─────────────
+
+    local(LOCAL_CHANNEL.promptCurrent, () => {
+        const json = requireCore().promptCurrent();
+
+        return json === null ? null : (JSON.parse(json) as Prompt);
+    });
+
+    local(LOCAL_CHANNEL.promptAnswer, (id, answer) => {
+        const checked = readPromptAnswer(id, answer);
+
+        requireCore().promptAnswer(checked.id, checked.answer);
+    });
+
+    local(LOCAL_CHANNEL.settingsGet, () => JSON.parse(requireCore().settingsGet()) as unknown);
+
+    local(
+        LOCAL_CHANNEL.settingsUpdate,
+        (update) =>
+            // The core emits `changed` itself, so the site resends its manifest.
+            JSON.parse(requireCore().settingsUpdate(readSettingsUpdate(update))) as unknown,
+    );
+
+    local(LOCAL_CHANNEL.pickFolder, async () => {
+        const options = { properties: ["openDirectory" as const] };
+        const parent = liveLocal();
+        const result = parent === undefined ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(parent, options);
+
+        return result.canceled ? null : (result.filePaths[0] ?? null);
+    });
+
+    // A native dialog, so the page cannot draw a confirmation that looks like one.
+    local(LOCAL_CHANNEL.confirm, async (message) => {
+        const text = typeof message === "string" && message.length <= 1000 ? message : "";
+        const options = { buttons: ["Cancel", "OK"], cancelId: 0, defaultId: 1, message: text, type: "question" as const };
+        const parent = liveLocal();
+        const result = parent === undefined ? await dialog.showMessageBox(options) : await dialog.showMessageBox(parent, options);
+
+        return result.response === 1;
+    });
+
+    local(LOCAL_CHANNEL.auditTail, () => requireCore().auditTail());
+
+    return state.core !== undefined;
+};

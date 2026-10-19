@@ -1,5 +1,5 @@
 /**
- * Device execution limits. The device (`apps/native/src-tauri/src/device/`)
+ * Device execution limits. The device (`packages/device-core/src/`)
  * enforces its own copies of the size caps; the backend re-applies them and
  * never trusts the device's own count.
  */

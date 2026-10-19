@@ -3,145 +3,132 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     completeNativeSignIn,
     executeOnNativeDevice,
-    getNativeDeviceManifest,
     getNativeDeviceStatus,
     isNativeShell,
     LONG_REPLY_MS,
-    NATIVE_COMPOSE_EVENT,
-    NATIVE_DEVICE_CHANGED_EVENT,
     NATIVE_SIGN_IN_COOKIE_PATH,
-    NATIVE_SIGN_IN_EVENT,
     notifyNative,
     onNativeCompose,
-    onNativeDeviceChanged,
     onNativeSignIn,
-    pairNativeDevice,
     shouldNotifyReplyFinished,
     startNativeBrowserSignIn,
     takePendingCompose,
     takePendingSignIn,
 } from "./bridge";
 
-const DESKTOP_APP_ERROR = /desktop app/u;
-const NO_RESULT_ERROR = /no result/u;
-
-const flush = async () => {
-    for (let index = 0; index < 5; index += 1) {
-        await Promise.resolve();
-    }
+type Native = {
+    capabilities: string[];
+    notify: ReturnType<typeof vi.fn>;
+    onCompose: ReturnType<typeof vi.fn>;
+    onSignIn?: ReturnType<typeof vi.fn>;
+    startBrowserSignIn?: ReturnType<typeof vi.fn>;
+    takePendingCompose: ReturnType<typeof vi.fn>;
+    takePendingSignIn?: ReturnType<typeof vi.fn>;
 };
 
-const installTauri = (invokeImpl: (command: string) => Promise<unknown>) => {
-    const listeners = new Map<string, (event: unknown) => void>();
-    const unlisten = vi.fn();
-    const invoke = vi.fn(invokeImpl);
-    const listen = vi.fn(async (event: string, handler: (event: unknown) => void) => {
-        listeners.set(event, handler);
+const installNative = (overrides: Partial<Native> = {}): Native => {
+    const native: Native = {
+        capabilities: ["notifications", "compose"],
+        notify: vi.fn(async () => undefined),
+        onCompose: vi.fn(() => () => {}),
+        takePendingCompose: vi.fn(async () => null),
+        ...overrides,
+    };
 
-        return unlisten;
-    });
+    (globalThis as { neoreNative?: Native }).neoreNative = native;
 
-    vi.stubGlobal("__TAURI__", { core: { invoke }, event: { listen } });
-
-    return { emit: (event: string) => listeners.get(event)?.({}), invoke, listen, unlisten };
+    return native;
 };
 
 afterEach(() => {
-    vi.unstubAllGlobals();
+    delete (globalThis as { neoreNative?: Native }).neoreNative;
 });
 
-describe("outside the native shell", () => {
+describe("outside the desktop shell", () => {
     it("is not detected", () => {
         expect(isNativeShell()).toBe(false);
     });
 
-    it("does not detect a partial or foreign __TAURI__ global", () => {
-        vi.stubGlobal("__TAURI__", { core: {} });
-
-        expect(isNativeShell()).toBe(false);
-
-        vi.stubGlobal("__TAURI__", "tauri");
+    it("ignores a partial bridge", () => {
+        (globalThis as { neoreNative?: unknown }).neoreNative = { capabilities: ["notifications"] };
 
         expect(isNativeShell()).toBe(false);
     });
 
     it("makes every call a no-op", async () => {
-        await expect(notifyNative({ title: "x" })).resolves.toBeUndefined();
-        await expect(takePendingCompose()).resolves.toBeUndefined();
-        await expect(takePendingSignIn()).resolves.toBeUndefined();
-        await expect(startNativeBrowserSignIn()).resolves.toBeUndefined();
-
         const handler = vi.fn();
-        const stop = onNativeCompose(handler);
 
-        await flush();
-        stop();
-
+        await notifyNative({ title: "Done" });
+        expect(await takePendingCompose()).toBeUndefined();
+        expect(await getNativeDeviceStatus()).toBeUndefined();
+        expect(onNativeCompose(handler)).toBeTypeOf("function");
         expect(handler).not.toHaveBeenCalled();
     });
 });
 
-describe("inside the native shell", () => {
+describe("inside the desktop shell", () => {
     it("is detected", () => {
-        installTauri(async () => undefined);
+        installNative();
 
         expect(isNativeShell()).toBe(true);
     });
 
-    it("sends notifications through the notify command", async () => {
-        const { invoke } = installTauri(async () => undefined);
+    it("sends notifications through the bridge, with an optional body", async () => {
+        const native = installNative();
 
-        await notifyNative({ body: "done", title: "Reply ready" });
+        await notifyNative({ body: "Reply ready", title: "Neore" });
+        await notifyNative({ title: "Only a title" });
 
-        expect(invoke).toHaveBeenCalledWith("notify", { body: "done", title: "Reply ready" });
+        expect(native.notify).toHaveBeenNthCalledWith(1, "Neore", "Reply ready");
+        expect(native.notify).toHaveBeenNthCalledWith(2, "Only a title", undefined);
     });
 
-    it("swallows a rejected notify (e.g. IPC denied for this origin)", async () => {
-        installTauri(async () => {
-            throw new Error("not allowed");
-        });
+    it("swallows a rejected notify", async () => {
+        installNative({ notify: vi.fn(async () => Promise.reject(new Error("denied"))) });
 
         await expect(notifyNative({ title: "x" })).resolves.toBeUndefined();
     });
 
     it("treats an empty pending compose as none", async () => {
-        installTauri(async () => " ".repeat(3));
+        installNative({ takePendingCompose: vi.fn(async () => "   ") });
 
-        await expect(takePendingCompose()).resolves.toBeUndefined();
+        expect(await takePendingCompose()).toBeUndefined();
     });
 
     it("drains text that arrived before the page listened, then text announced by the event", async () => {
-        const queue: (string | null)[] = ["from a cold start", null, "from the quick composer"];
-        const { emit, listen } = installTauri(async (command) => (command === "take_pending_compose" ? queue.shift() : undefined));
         const handler = vi.fn();
+        let announce: (() => void) | undefined;
+        const native = installNative({
+            onCompose: vi.fn((listener: () => void) => {
+                announce = listener;
 
-        const stop = onNativeCompose(handler);
+                return () => {};
+            }),
+            takePendingCompose: vi.fn().mockResolvedValueOnce("early").mockResolvedValueOnce("later").mockResolvedValue(null),
+        });
 
-        await flush();
+        onNativeCompose(handler);
+        await vi.waitFor(() => expect(handler).toHaveBeenCalledWith("early"));
 
-        expect(listen).toHaveBeenCalledWith(NATIVE_COMPOSE_EVENT, expect.any(Function));
-        expect(handler).toHaveBeenCalledWith("from a cold start");
-
-        emit(NATIVE_COMPOSE_EVENT);
-        await flush();
-
-        emit(NATIVE_COMPOSE_EVENT);
-        await flush();
-
-        expect(handler.mock.calls).toEqual([["from a cold start"], ["from the quick composer"]]);
-
-        stop();
+        announce?.();
+        await vi.waitFor(() => expect(handler).toHaveBeenCalledWith("later"));
+        expect(native.takePendingCompose).toHaveBeenCalledTimes(2);
     });
 
-    it("unlistens on dispose, even when disposed before listen resolved", async () => {
-        const { unlisten } = installTauri(async () => null);
+    it("stops delivering after dispose", async () => {
+        const handler = vi.fn();
+        const stop = vi.fn();
+        installNative({
+            onCompose: vi.fn(() => stop),
+            takePendingCompose: vi.fn().mockResolvedValue("late"),
+        });
 
-        const stop = onNativeCompose(vi.fn());
+        const dispose = onNativeCompose(handler);
 
-        stop();
-        await flush();
-
-        expect(unlisten).toHaveBeenCalledOnce();
+        dispose();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(handler).not.toHaveBeenCalled();
+        expect(stop).toHaveBeenCalledTimes(1);
     });
 });
 
@@ -149,105 +136,108 @@ describe(shouldNotifyReplyFinished, () => {
     it("notifies for long replies or when the page is hidden", () => {
         expect(shouldNotifyReplyFinished(LONG_REPLY_MS, false)).toBe(true);
         expect(shouldNotifyReplyFinished(LONG_REPLY_MS - 1, false)).toBe(false);
-        expect(shouldNotifyReplyFinished(0, true)).toBe(true);
+        expect(shouldNotifyReplyFinished(1000, true)).toBe(true);
+    });
+});
+
+describe("browser sign-in", () => {
+    it("posts code, verifier and redirect URI to the same-origin cookie endpoint", async () => {
+        const fetchImpl = vi.fn(async () => new Response(null, { status: 200 }));
+
+        const ok = await completeNativeSignIn({ code: "c", codeVerifier: "v", redirectUri: "neore://auth/callback" }, fetchImpl);
+
+        expect(ok).toBe(true);
+        expect(fetchImpl).toHaveBeenCalledWith(NATIVE_SIGN_IN_COOKIE_PATH, expect.objectContaining({ credentials: "same-origin", method: "POST" }));
+    });
+
+    it("reports a refused exchange or a network failure as false", async () => {
+        expect(
+            await completeNativeSignIn(
+                { code: "c", codeVerifier: "v", redirectUri: "r" },
+                vi.fn(async () => new Response(null, { status: 401 })),
+            ),
+        ).toBe(false);
+        expect(
+            await completeNativeSignIn(
+                { code: "c", codeVerifier: "v", redirectUri: "r" },
+                vi.fn(async () => Promise.reject(new Error("net"))),
+            ),
+        ).toBe(false);
     });
 });
 
 describe("browser sign-in handoff", () => {
-    const signIn = { code: "c".repeat(43), codeVerifier: "v".repeat(43), redirectUri: "neore://auth/callback" };
+    const signIn = { code: "c", codeVerifier: "v", redirectUri: "neore://auth/callback" };
 
-    it("delivers a sign-in the shell received before and after the page listened", async () => {
-        const queue: unknown[] = [signIn, null, { ...signIn, code: "second" }];
-        const { emit } = installTauri(async (command) => (command === "take_pending_sign_in" ? queue.shift() : undefined));
+    it("does nothing without the sign-in capability, even when the bridge exists", async () => {
+        const native = installNative({ capabilities: ["notifications", "compose"] });
         const handler = vi.fn();
 
-        const stop = onNativeSignIn(handler);
-
-        await flush();
-        emit(NATIVE_SIGN_IN_EVENT);
-        await flush();
-        emit(NATIVE_SIGN_IN_EVENT);
-        await flush();
-
-        expect(handler.mock.calls).toEqual([[signIn], [{ ...signIn, code: "second" }]]);
-
-        stop();
-    });
-
-    it("ignores a malformed handoff", async () => {
-        installTauri(async () => {
-            return { code: "c" };
-        });
-
-        await expect(takePendingSignIn()).resolves.toBeUndefined();
-    });
-
-    it("asks the shell to start the browser flow", async () => {
-        const { invoke } = installTauri(async () => undefined);
-
+        onNativeSignIn(handler);
         await startNativeBrowserSignIn();
 
-        expect(invoke).toHaveBeenCalledWith("start_browser_sign_in_command");
+        expect(native.onSignIn).toBeUndefined();
+        expect(await takePendingSignIn()).toBeUndefined();
+        expect(handler).not.toHaveBeenCalled();
     });
 
-    it("posts code, verifier and redirect URI to the same-origin cookie endpoint", async () => {
-        const fetchImpl = vi.fn(async () => Response.json({ user: {} }));
+    it("delivers a sign-in that arrived before the page subscribed, and each later one", async () => {
+        let listener: () => void = () => {};
+        const native = installNative({
+            capabilities: ["notifications", "compose", "sign-in"],
+            onSignIn: vi.fn((next: () => void) => {
+                listener = next;
 
-        await expect(completeNativeSignIn(signIn, fetchImpl)).resolves.toBe(true);
-
-        expect(fetchImpl).toHaveBeenCalledWith(NATIVE_SIGN_IN_COOKIE_PATH, expect.objectContaining({ credentials: "same-origin", method: "POST" }));
-        expect(JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual(signIn);
-    });
-
-    it("reports a refused exchange or a network failure as false", async () => {
-        await expect(completeNativeSignIn(signIn, async () => new Response("{}", { status: 400 }))).resolves.toBe(false);
-        await expect(
-            completeNativeSignIn(signIn, async () => {
-                throw new TypeError("offline");
+                return () => {};
             }),
-        ).resolves.toBe(false);
+            takePendingSignIn: vi.fn(async () => signIn),
+        } as Partial<Native>);
+        const handler = vi.fn();
+
+        onNativeSignIn(handler);
+        await vi.waitFor(() => expect(handler).toHaveBeenCalledWith(signIn));
+
+        native.takePendingSignIn = vi.fn(async () => ({ ...signIn, code: "later" }));
+        listener();
+        await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(2));
+    });
+
+    it("reads nothing when the shell holds no sign-in, and treats a failure as nothing", async () => {
+        installNative({ capabilities: ["sign-in"], onSignIn: vi.fn(() => () => {}), takePendingSignIn: vi.fn(async () => null) } as Partial<Native>);
+
+        expect(await takePendingSignIn()).toBeUndefined();
+
+        installNative({
+            capabilities: ["sign-in"],
+            onSignIn: vi.fn(() => () => {}),
+            takePendingSignIn: vi.fn(async () => {
+                throw new Error("ipc");
+            }),
+        } as Partial<Native>);
+
+        expect(await takePendingSignIn()).toBeUndefined();
+    });
+
+    it("asks the shell to open the browser when it advertises sign-in", async () => {
+        const startBrowserSignIn = vi.fn(async () => undefined);
+
+        installNative({ capabilities: ["sign-in"], startBrowserSignIn } as Partial<Native>);
+        await startNativeBrowserSignIn();
+
+        expect(startBrowserSignIn).toHaveBeenCalledTimes(1);
     });
 });
 
-describe("device relay commands", () => {
-    it("are inert outside the shell", async () => {
-        await expect(getNativeDeviceStatus()).resolves.toBeUndefined();
-        await expect(getNativeDeviceManifest()).resolves.toBeUndefined();
-        await expect(pairNativeDevice({ accountLabel: "me", deviceId: "d", secret: "s" })).resolves.toBe(false);
-        await expect(executeOnNativeDevice({ envelope: "{}", signature: "s" })).rejects.toThrow(DESKTOP_APP_ERROR);
+describe("device execution (not in the Electron shell yet)", () => {
+    it("reads no status even inside the shell", async () => {
+        installNative();
+
+        expect(await getNativeDeviceStatus()).toBeUndefined();
     });
 
-    it("read no status on a shell without device tools (mobile: the command is not granted)", async () => {
-        installTauri(async () => {
-            throw new Error("not allowed");
-        });
+    it("rejects a call with a clear message instead of failing inside the shell", async () => {
+        installNative();
 
-        await expect(getNativeDeviceStatus()).resolves.toBeUndefined();
-    });
-
-    it("pass the envelope through untouched and return only a signed result", async () => {
-        const { invoke } = installTauri(async (command) => (command === "device_execute" ? { payload: "p", signature: "s" } : undefined));
-
-        await expect(executeOnNativeDevice({ envelope: "E", signature: "S" })).resolves.toEqual({ payload: "p", signature: "s" });
-        expect(invoke).toHaveBeenCalledWith("device_execute", { envelope: "E", signature: "S" });
-    });
-
-    it("refuse a result that is not a signed payload", async () => {
-        installTauri(async () => "nope");
-
-        await expect(executeOnNativeDevice({ envelope: "E", signature: "S" })).rejects.toThrow(NO_RESULT_ERROR);
-        await expect(getNativeDeviceManifest()).resolves.toBeUndefined();
-    });
-
-    it("report a tool-set change once on subscribe and on every event", async () => {
-        const { emit } = installTauri(async () => undefined);
-        const handler = vi.fn();
-        const stop = onNativeDeviceChanged(handler);
-
-        await flush();
-        emit(NATIVE_DEVICE_CHANGED_EVENT);
-        await flush();
-        expect(handler).toHaveBeenCalledTimes(2);
-        stop();
+        await expect(executeOnNativeDevice({ envelope: "e", signature: "s" })).rejects.toThrow("no device execution yet");
     });
 });
