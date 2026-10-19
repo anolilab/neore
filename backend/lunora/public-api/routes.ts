@@ -55,6 +55,7 @@ import { collectStream, pollStream, toNdjsonStream } from "./stream";
 import { shardContext } from "../lib/http-shard";
 import { threadShardFor } from "../lib/thread-shard";
 import { isThreadLocked, THREAD_LOCKED_CODE } from "../lib/thread-lock";
+import { collectUnlockedThreads } from "./thread-page";
 
 export interface RouteInput {
     body: unknown;
@@ -423,14 +424,16 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
     },
     {
         handler: async ({ ctx, query }) => {
-            const page = await ctx.runQuery(api.chat.functions.getThreads, {
-                excludeTemporary: true,
-                paginationOpts: { cursor: decodeNativeCursor(query["cursor"]), numItems: parseLimit(query["limit"]) },
-            });
+            const page = await collectUnlockedThreads(
+                async (cursor, numberItems) =>
+                    await ctx.runQuery(api.chat.functions.getThreads, { excludeTemporary: true, paginationOpts: { cursor, numItems: numberItems } }),
+                decodeNativeCursor(query["cursor"]),
+                parseLimit(query["limit"]),
+            );
 
             return {
                 data: {
-                    data: page.page.filter((thread) => !isThreadLocked(thread)).map((thread) => toThread(thread)),
+                    data: page.threads.map((thread) => toThread(thread)),
                     nextCursor: encodeNativeCursor(page.continueCursor, page.isDone),
                 },
             };
