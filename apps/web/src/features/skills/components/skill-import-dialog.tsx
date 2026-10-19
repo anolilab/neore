@@ -168,6 +168,9 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                             {isFetching && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
                             {t`Fetch`}
                         </Button>
+                        <span aria-live="polite" className="sr-only" role="status">
+                            {isFetching ? t`Fetching link…` : ""}
+                        </span>
                     </div>
                     <p className="text-muted-foreground text-xs">
                         {t`A GitHub link to a skill folder or its SKILL.md, or a skills.sh link. Only the SKILL.md is imported; scripts and other files in the skill are not.`}
