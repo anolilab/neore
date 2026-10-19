@@ -74,6 +74,12 @@ describe(applyRerank, () => {
         expect(applyRerank(candidates(12), reversed).map((h) => h.chunkId)).toContain("c1");
     });
 
+    it("keeps the fused order when the reranker scored only some of the candidates", () => {
+        const ids = applyRerank(candidates(12), [{ index: 11, score: 0.01 }]).map((h) => h.chunkId);
+
+        expect(ids).toEqual(["c1", "c2", "c3", "c4", "c5"]);
+    });
+
     it("ignores scores for candidates that do not exist", () => {
         const ids = applyRerank(candidates(8), [
             { index: 99, score: 1 },
@@ -104,17 +110,23 @@ describe("searchKnowledgeBase reranking", () => {
     });
 
     it("sends the candidates to the gateway and returns five", async () => {
-        mocks.gateway.mockResolvedValue(Response.json({ results: [{ index: 12, score: 0.99 }] }));
+        mocks.gateway.mockResolvedValue(
+            Response.json({
+                results: Array.from({ length: RERANK_CANDIDATES }, (_, index) => {
+                    return { index, score: index === 9 ? 0.99 : 0.1 };
+                }),
+            }),
+        );
 
-        const hits = await searchKnowledgeBase(ctx, { query: "what is c13", userId: "u" });
+        const hits = await searchKnowledgeBase(ctx, { query: "what is c10", userId: "u" });
         const [url, init] = mocks.gateway.mock.calls[0] as [string, { body: string }];
         const body = JSON.parse(init.body) as { documents: string[]; query: string };
 
         expect(url).toContain("/internal/rerank");
         expect(body.documents).toHaveLength(RERANK_CANDIDATES);
-        expect(body.query).toBe("what is c13");
+        expect(body.query).toBe("what is c10");
         expect(hits).toHaveLength(5);
-        expect(hits.map((h) => h.chunkId)).toContain("c13");
+        expect(hits.map((h) => h.chunkId)).toContain("c10");
     });
 
     it.each([

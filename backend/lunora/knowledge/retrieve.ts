@@ -228,7 +228,8 @@ export interface RerankScore {
  * fused order, i.e. what retrieval returned before reranking existed.
  */
 export const applyRerank = (candidates: ReadonlyArray<Hit>, scores: ReadonlyArray<RerankScore> | null): Hit[] => {
-    if (!scores || scores.length === 0 || candidates.length <= MAX_RESULTS) {
+    // A partial answer would hand its first scored hit the top reranker rank over candidates it never saw.
+    if (!scores || new Set(scores.map(({ index }) => index)).size !== candidates.length || candidates.length <= MAX_RESULTS) {
         return candidates.slice(0, MAX_RESULTS);
     }
 
