@@ -4,6 +4,7 @@ import type { ChatCompletion } from "../routes/v1/responses-map.js";
 import {
     chatCompletionToResponse,
     createResponsesStream,
+    endOnReadError,
     isResponsesRequestError,
     passthroughHeaders,
     takeSseData,
@@ -32,8 +33,17 @@ const callChunk = (id: string, name: string, args: string) => {
     };
 };
 
+type StreamEvent = { sequence_number: number; type: string };
+
+/** The events in a Responses SSE transcript, without `[DONE]`. */
+const eventsOf = (raw: string): StreamEvent[] =>
+    raw
+        .split("\n\n")
+        .filter((frame) => frame.includes("\ndata: ") && !frame.endsWith("[DONE]"))
+        .map((frame) => JSON.parse(frame.slice(frame.indexOf("data: ") + 6)) as StreamEvent);
+
 /** Runs SSE text through the real transform in pieces of `size` bytes and returns the parsed events. */
-const runStream = async (model: string, text: string, size = text.length): Promise<{ events: { sequence_number: number; type: string }[]; raw: string }> => {
+const runStream = async (model: string, text: string, size = text.length): Promise<{ events: StreamEvent[]; raw: string }> => {
     const bytes = encoder.encode(text);
     const chunks: Uint8Array[] = [];
 
@@ -51,12 +61,15 @@ const runStream = async (model: string, text: string, size = text.length): Promi
         },
     });
     const out = await new Response(source.pipeThrough(createResponsesStream(model))).text();
-    const events = out
-        .split("\n\n")
-        .filter((frame) => frame.includes("\ndata: ") && !frame.endsWith("[DONE]"))
-        .map((frame) => JSON.parse(frame.slice(frame.indexOf("data: ") + 6)) as { sequence_number: number; type: string });
 
-    return { events, raw: out };
+    return { events: eventsOf(out), raw: out };
+};
+
+/** The `response` object of the terminal event named `type`, parsed from the transcript. */
+const terminalResponseOf = (raw: string, type: string): { incomplete_details: unknown; model: string; output: unknown[] } => {
+    const frame = raw.split("\n\n").find((part) => part.startsWith(`event: ${type}`)) ?? "";
+
+    return (JSON.parse(frame.slice(frame.indexOf("data: ") + 6)) as { response: { incomplete_details: unknown; model: string; output: unknown[] } }).response;
 };
 
 const typesOf = (events: { type: string }[]): string[] => events.map((event) => event.type);
@@ -430,6 +443,41 @@ describe("createResponsesStream — event order", () => {
         const { events } = await runStream("m", text);
 
         expect(events.at(-1)?.type).toBe("response.completed");
+    });
+
+    it("reports the model the chat stream routed to, and the requested one when no chunk names it", async () => {
+        const routed = await runStream("auto", sse({ ...textChunk("Hi"), model: "gpt-routed" }, { ...finishChunk("stop"), model: "gpt-routed" }));
+        const unnamed = await runStream("auto", sse(textChunk("Hi"), finishChunk("stop")));
+
+        expect(terminalResponseOf(routed.raw, "response.completed").model).toBe("gpt-routed");
+        expect(terminalResponseOf(unnamed.raw, "response.completed").model).toBe("auto");
+    });
+
+    it("ends as incomplete with stream_ended when the upstream stops without a finish_reason", async () => {
+        const { events, raw } = await runStream("m", sse(textChunk("cut off")));
+
+        expect(typesOf(events).at(-1)).toBe("response.incomplete");
+        expect(terminalResponseOf(raw, "response.incomplete")).toMatchObject({
+            incomplete_details: { reason: "stream_ended" },
+            output: [{ content: [{ text: "cut off" }] }],
+        });
+    });
+
+    it("ends as response.failed when the upstream body errors mid-stream, even mid-frame", async () => {
+        const body = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                controller.error(new Error("socket reset"));
+            },
+            start(controller) {
+                controller.enqueue(encoder.encode(`${sse(textChunk("par"))}data: {"choices":[{"del`));
+            },
+        });
+        const raw = await new Response(endOnReadError(body).pipeThrough(createResponsesStream("m"))).text();
+        const types = typesOf(eventsOf(raw));
+
+        expect(types).not.toContain("response.completed");
+        expect(types.at(-1)).toBe("response.failed");
+        expect(raw.endsWith("data: [DONE]\n\n")).toBe(true);
     });
 });
 

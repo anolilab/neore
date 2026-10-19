@@ -144,20 +144,19 @@ const parseArguments = (raw: string): unknown => {
  * Convert OpenAI-format messages to AI SDK ModelMessage format. An assistant's
  * `tool_calls` become tool-call parts, and each tool result takes its tool's name
  * from the call it answers, matched by id: the AI SDK needs both to replay a
- * tool round trip.
+ * tool round trip. Ids are reused across turns (`call_0` every time), so the
+ * map follows the walk: a result takes the nearest call before it with its id.
  */
 export const convertMessages = (messages: RequestMessage[]): ModelMessage[] => {
     const toolNames = new Map<string, string>();
 
-    for (const message of messages) {
+    return messages.map((message): ModelMessage => {
         const calls = message.tool_calls ?? [];
 
         for (const call of calls) {
             toolNames.set(call.id, call.function.name);
         }
-    }
 
-    return messages.map((message): ModelMessage => {
         if (message.role === "tool") {
             const toolCallId = message.tool_call_id ?? "";
             const value = typeof message.content === "string" || message.content == null ? (message.content ?? "") : JSON.stringify(message.content);
@@ -419,6 +418,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                 messages: effectiveMessages as Parameters<typeof streamText>[0]["messages"],
                 model,
                 temperature: body.temperature,
+                topP: body.top_p,
                 ...toolOptions,
             } as Parameters<typeof streamText>[0]);
 
@@ -648,6 +648,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
             messages: effectiveMessages as Parameters<typeof generateText>[0]["messages"],
             model,
             temperature: body.temperature,
+            topP: body.top_p,
             ...toolOptions,
         } as Parameters<typeof generateText>[0]);
 
@@ -827,6 +828,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                         messages: fallbackMessages as Parameters<typeof streamText>[0]["messages"],
                         model: fallbackModel,
                         temperature: body.temperature,
+                        topP: body.top_p,
                         ...toolOptions,
                     } as Parameters<typeof streamText>[0]);
 
@@ -955,6 +957,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                     messages: fallbackMessages as Parameters<typeof generateText>[0]["messages"],
                     model: fallbackModel,
                     temperature: body.temperature,
+                    topP: body.top_p,
                     ...toolOptions,
                 } as Parameters<typeof generateText>[0]);
 

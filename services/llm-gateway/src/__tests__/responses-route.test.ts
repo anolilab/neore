@@ -187,6 +187,40 @@ describe("POST /v1/responses — non-streaming with tools", () => {
     });
 });
 
+describe("POST /v1/responses — streaming", () => {
+    const sseReply = () =>
+        new Response(
+            'data: {"choices":[{"delta":{"content":"pong"},"finish_reason":null,"index":0}]}\n\n' +
+                'data: {"choices":[{"delta":{},"finish_reason":"stop","index":0}]}\n\n' +
+                "data: [DONE]\n\n",
+            { headers: { "Content-Type": "text/event-stream" } },
+        );
+
+    it("translates an event-stream reply for a stream request", async () => {
+        const { calls, dispatch } = stubDispatch(sseReply);
+        const response = await appWith(dispatch).fetch(post({ input: "ping", model: "gpt-x", stream: true }), env, ctx);
+        const text = await response.text();
+
+        expect(calls[0].body.stream).toBe(true);
+        expect(response.headers.get("Content-Type")).toBe("text/event-stream");
+        expect(text).toContain("event: response.output_text.delta");
+        expect(text).toContain("event: response.completed");
+    });
+
+    it("answers a stream request with a cached JSON reply as JSON, not as an empty stream", async () => {
+        const { dispatch } = stubDispatch(jsonReply(CHAT_REPLY));
+        const response = await appWith(dispatch).fetch(post({ input: "ping", model: "gpt-x", stream: true }), env, ctx);
+
+        expect(response.headers.get("Content-Type")).toContain("application/json");
+
+        const body = (await response.json()) as { object: string; output: { content: { text: string }[] }[]; status: string };
+
+        expect(body.object).toBe("response");
+        expect(body.status).toBe("completed");
+        expect(body.output[0].content[0].text).toBe("pong");
+    });
+});
+
 describe("POST /v1/responses — dispatch through the top-level app", () => {
     it("runs the app-level middleware for the inner request, and the route middleware once", async () => {
         const seen = { inner: [] as string[], rateLimitHits: 0 };

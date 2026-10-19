@@ -26,6 +26,7 @@ import type { ChatCompletion, ChatRequestBody } from "./responses-map.js";
 import {
     chatCompletionToResponse,
     createResponsesStream,
+    endOnReadError,
     isResponsesRequestError,
     passthroughHeaders,
     responsesError,
@@ -86,8 +87,12 @@ export const createResponsesRouter = (dispatch: Dispatch): OpenAPIHono<HonoEnv> 
             return c.json(upstreamError(upstream.status, text), upstream.status as ContentfulStatusCode, kept);
         }
 
-        if (chat.stream && upstream.body) {
-            return new Response(upstream.body.pipeThrough(createResponsesStream(chat.model)), {
+        // A reused Idempotency-Key can replay a cached JSON reply for a stream request. Only an
+        // event-stream body is translated; anything else takes the JSON path below.
+        const isEventStream = upstream.headers.get("content-type")?.startsWith("text/event-stream") === true;
+
+        if (isEventStream && upstream.body && chat.stream) {
+            return new Response(endOnReadError(upstream.body).pipeThrough(createResponsesStream(chat.model)), {
                 headers: {
                     "Cache-Control": "no-cache",
                     Connection: "keep-alive",

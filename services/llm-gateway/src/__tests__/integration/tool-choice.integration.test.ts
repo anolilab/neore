@@ -3,6 +3,7 @@
  * mock model and records the `toolChoice` the AI SDK hands it. The two routes use
  * different wire shapes (chat `{ type, function: { name } }`, Responses
  * `{ type, name }`), so each named form is asserted on what the model receives.
+ * `top_p` is checked the same way, on both the streamed and the non-streamed call.
  */
 import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provider";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +12,7 @@ import { createMockEnv, makeVirtualKeyRow } from "../helpers/mock-env.js";
 import { useTrackedAppFetch } from "../helpers/tracked-app-fetch.js";
 
 const state = vi.hoisted(() => {
-    return { toolChoices: [] as unknown[] };
+    return { toolChoices: [] as unknown[], topPs: [] as unknown[] };
 });
 
 vi.mock("../../providers/factory.js", async (importOriginal) => {
@@ -26,8 +27,14 @@ vi.mock("../../providers/factory.js", async (importOriginal) => {
                 ...model,
                 doGenerate: async (options: LanguageModelV3CallOptions) => {
                     state.toolChoices.push(options.toolChoice);
+                    state.topPs.push(options.topP);
 
                     return model.doGenerate(options);
+                },
+                doStream: async (options: LanguageModelV3CallOptions) => {
+                    state.topPs.push(options.topP);
+
+                    return model.doStream(options);
                 },
             };
         }),
@@ -55,6 +62,7 @@ const post = (path: string, body: Record<string, unknown>): Request =>
 
 beforeEach(() => {
     state.toolChoices.length = 0;
+    state.topPs.length = 0;
 });
 
 describe("tool_choice on /v1/chat/completions", () => {
@@ -91,6 +99,24 @@ describe("tool_choice on /v1/chat/completions", () => {
 
         expect(res.status).toBe(200);
         expect(state.toolChoices).toEqual([{ type: "auto" }]);
+    });
+});
+
+describe("top_p on /v1/chat/completions", () => {
+    it("passes top_p to the model on a non-streamed call", async () => {
+        const res = await fetchApp(post("/v1/chat/completions", { messages: [{ content: "Hi", role: "user" }], top_p: 0.5 }), await env());
+
+        expect(res.status).toBe(200);
+        expect(state.topPs).toEqual([0.5]);
+    });
+
+    it("passes top_p to the model on a streamed call", async () => {
+        const res = await fetchApp(post("/v1/chat/completions", { messages: [{ content: "Hi", role: "user" }], stream: true, top_p: 0.5 }), await env());
+
+        await res.text();
+
+        expect(res.status).toBe(200);
+        expect(state.topPs).toEqual([0.5]);
     });
 });
 

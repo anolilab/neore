@@ -6,13 +6,14 @@
  * The primary's model creation is made to fail once. The retry then gets the
  * mock model, which is the real factory's answer under MOCK_LLM.
  */
+import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provider";
 import { describe, expect, it, vi } from "vitest";
 
 import { createMockEnv, makeVirtualKeyRow } from "../helpers/mock-env.js";
 import { useTrackedAppFetch } from "../helpers/tracked-app-fetch.js";
 
 const state = vi.hoisted(() => {
-    return { failNextModel: false };
+    return { failNextModel: false, topPs: [] as unknown[] };
 });
 
 vi.mock("../../providers/factory.js", async (importOriginal) => {
@@ -27,7 +28,21 @@ vi.mock("../../providers/factory.js", async (importOriginal) => {
                 throw Object.assign(new Error("upstream unavailable"), { statusCode: 503 });
             }
 
-            return actual.createProviderModelForEnv(...args);
+            const model = (await actual.createProviderModelForEnv(...args)) as LanguageModelV3;
+
+            return {
+                ...model,
+                doGenerate: async (options: LanguageModelV3CallOptions) => {
+                    state.topPs.push(options.topP);
+
+                    return model.doGenerate(options);
+                },
+                doStream: async (options: LanguageModelV3CallOptions) => {
+                    state.topPs.push(options.topP);
+
+                    return model.doStream(options);
+                },
+            };
         }),
         resolveApiKey: vi.fn().mockReturnValue("test-api-key"),
     };
@@ -63,6 +78,26 @@ const framesOf = async (res: Response): Promise<string[]> => {
 };
 
 const toolPrompt = { content: 'Weather? [[tool:get_weather {"city":"Oslo"}]]', role: "user" };
+
+describe("chat fallback: top_p", () => {
+    it("passes top_p to the fallback model, streamed and not", async () => {
+        const fixture = await env();
+
+        state.topPs.length = 0;
+        state.failNextModel = true;
+        const plain = await fetchApp(chat({ messages: [{ content: "ping", role: "user" }], top_p: 0.25 }), fixture);
+
+        await plain.json();
+
+        state.failNextModel = true;
+
+        const streamed = await fetchApp(chat({ messages: [{ content: "ping", role: "user" }], stream: true, top_p: 0.25 }), fixture);
+
+        await streamed.text();
+
+        expect(state.topPs).toEqual([0.25, 0.25]);
+    });
+});
 
 describe("chat fallback: non-streaming", () => {
     it("retries on the fallback model and returns its tool calls", async () => {

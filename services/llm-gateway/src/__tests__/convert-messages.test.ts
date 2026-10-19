@@ -90,6 +90,19 @@ describe("convertMessages — tool round trip", () => {
         expect(unnamed).toMatchObject({ content: [{ toolName: "lookup" }] });
     });
 
+    it("names each result from the call before it when two turns reuse one call id", () => {
+        const converted = convertMessages([
+            { content: null, role: "assistant", tool_calls: [{ ...CALL, function: { arguments: "{}", name: "get_weather" } }] },
+            { content: "{}", role: "tool", tool_call_id: "call_1" },
+            { content: "Now the time?", role: "user" },
+            { content: null, role: "assistant", tool_calls: [{ ...CALL, function: { arguments: "{}", name: "get_time" } }] },
+            { content: "{}", role: "tool", tool_call_id: "call_1" },
+        ]);
+
+        expect(converted[1]).toMatchObject({ content: [{ toolName: "get_weather" }] });
+        expect(converted[4]).toMatchObject({ content: [{ toolName: "get_time" }] });
+    });
+
     it("treats a null content on a plain assistant message as empty text", () => {
         expect(convertMessages([{ content: null, role: "assistant" }])).toEqual([{ content: "", role: "assistant" }]);
     });

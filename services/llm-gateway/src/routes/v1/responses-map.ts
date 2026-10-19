@@ -8,6 +8,8 @@
  */
 import { z } from "zod";
 
+import { ResponsesRequestError } from "./responses-request-error.js";
+
 /** A Chat Completions request body, as far as this translator emits it. */
 export interface ChatRequestBody {
     max_tokens?: number;
@@ -57,6 +59,8 @@ export interface ChatCompletion {
 export interface ChatCompletionChunk {
     choices?: { delta?: { content?: string | null; tool_calls?: PartialToolCall[] }; finish_reason?: string | null }[];
     error?: { message?: string };
+    /** The routed model, which a fallback or router may make differ from the one requested. */
+    model?: string;
     usage?: ChatUsage;
 }
 
@@ -110,16 +114,9 @@ export interface ResponsesErrorBody {
     error: { code: string | null; message: string; param: string | null; type: string };
 }
 
-/** A 400 for a field the gateway cannot honour. `param` names the offending field. */
-export interface ResponsesRequestError extends Error {
-    param: string | null;
-    refusal: true;
-}
+const refusal = (message: string, path: string | null): ResponsesRequestError => new ResponsesRequestError(message, path);
 
-const refusal = (message: string, path: string | null): ResponsesRequestError => Object.assign(new Error(message), { param: path, refusal: true as const });
-
-export const isResponsesRequestError = (error: unknown): error is ResponsesRequestError =>
-    error instanceof Error && "refusal" in error && error.refusal === true;
+export const isResponsesRequestError = (error: unknown): error is ResponsesRequestError => error instanceof ResponsesRequestError;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -449,7 +446,7 @@ export const chatCompletionToResponse = (completion: ChatCompletion): ResponseOb
         model: completion.model,
         object: "response",
         output,
-        status: reason === null ? "completed" : "incomplete",
+        status: terminalStatus(false, reason),
         usage: completion.usage ? toUsage(completion.usage) : null,
     };
 };
@@ -481,28 +478,31 @@ interface OpenFunctionCall {
  * completed one.
  */
 export class ResponsesStreamTranslator {
-    readonly createdAt = Math.floor(Date.now() / 1000);
+    private failure: string | null = null;
 
-    readonly id = newId("resp");
+    private finished = false;
 
-    readonly model: string;
+    private finishReason: string | null = null;
 
-    failure: string | null = null;
+    /** The routed model, from the first chunk that names one. Until then, the requested model. */
+    private model: string | null = null;
 
-    finished = false;
+    private open: OpenMessage | OpenFunctionCall | null = null;
 
-    finishReason: string | null = null;
+    private readonly output: ResponseOutputItem[] = [];
 
-    open: OpenMessage | OpenFunctionCall | null = null;
+    private readonly requestedModel: string;
 
-    readonly output: ResponseOutputItem[] = [];
+    private sequence = 0;
 
-    sequence = 0;
+    private readonly createdAt = Math.floor(Date.now() / 1000);
 
-    usage: ResponseUsage | null = null;
+    private readonly id = newId("resp");
 
-    constructor(model: string) {
-        this.model = model;
+    private usage: ResponseUsage | null = null;
+
+    constructor(requestedModel: string) {
+        this.requestedModel = requestedModel;
     }
 
     start(): ResponseStreamEvent[] {
@@ -510,6 +510,10 @@ export class ResponsesStreamTranslator {
     }
 
     push(chunk: ChatCompletionChunk): ResponseStreamEvent[] {
+        if (chunk.model) {
+            this.model ??= chunk.model;
+        }
+
         if (chunk.error) {
             this.failure ??= chunk.error.message ?? "The model provider failed while streaming.";
 
@@ -669,7 +673,7 @@ export class ResponsesStreamTranslator {
             error: failure === null ? null : { code: "server_error", message: failure },
             id: this.id,
             incomplete_details: incomplete,
-            model: this.model,
+            model: this.model ?? this.requestedModel,
             object: "response",
             output: [...this.output],
             status,
@@ -694,7 +698,8 @@ export class ResponsesStreamTranslator {
         this.finished = true;
 
         const events = this.closeOpen();
-        const reason = incompleteReason(this.finishReason);
+        // No finish_reason and no error frame means the upstream stopped early. That is not a completed reply.
+        const reason = this.finishReason === null && this.failure === null ? "stream_ended" : incompleteReason(this.finishReason);
         const status = terminalStatus(this.failure !== null, reason);
         const incomplete = status === "incomplete" && reason !== null ? { reason } : null;
         const response = this.snapshot(status, incomplete, this.failure);
@@ -708,12 +713,12 @@ export class ResponsesStreamTranslator {
 /** One SSE frame for a Responses event: `event:` names the type, as the Responses API does. */
 export const encodeSseEvent = (event: ResponseStreamEvent): string => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 
+const LEADING_SPACE = /^ /;
+
 /**
  * Splits complete SSE frames out of `buffer`. Returns each frame's `data:`
  * payload and the unfinished tail to keep for the next chunk.
  */
-const LEADING_SPACE = /^ /;
-
 export const takeSseData = (buffer: string): { data: string[]; rest: string } => {
     const frames = buffer.split("\n\n");
     const rest = frames.pop() ?? "";
@@ -733,13 +738,6 @@ export const takeSseData = (buffer: string): { data: string[]; rest: string } =>
 
     return { data, rest };
 };
-
-/**
- * A transform from the completions route's chat SSE bytes to Responses SSE
- * bytes. Frames split across chunks are buffered. Cancelling the readable side
- * cancels the upstream read, which is how a client disconnect reaches the
- * provider call.
- */
 
 /**
  * Feeds the complete frames in `buffer` through the translator and returns the
@@ -769,6 +767,12 @@ const drain = (translator: ResponsesStreamTranslator, buffer: string): { events:
     return { events, rest };
 };
 
+/**
+ * A transform from the completions route's chat SSE bytes to Responses SSE
+ * bytes. Frames split across chunks are buffered. Cancelling the readable side
+ * cancels the upstream read, which is how a client disconnect reaches the
+ * provider call.
+ */
 export const createResponsesStream = (model: string): TransformStream<Uint8Array, Uint8Array> => {
     const translator = new ResponsesStreamTranslator(model);
     const decoder = new TextDecoder();
@@ -798,6 +802,39 @@ export const createResponsesStream = (model: string): TransformStream<Uint8Array
 
             buffer = drained.rest;
             write(controller, drained.events);
+        },
+    });
+};
+
+/**
+ * The upstream body, ended by a terminal frame when it errors. A TransformStream
+ * never flushes once its input errors, so the error is turned into the chat
+ * `{ error }` frame the translator maps to `response.failed`. The leading blank
+ * line closes a frame that was cut off mid-line.
+ */
+export const endOnReadError = (body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> => {
+    const reader = body.getReader();
+    const encoder = new TextEncoder();
+
+    return new ReadableStream<Uint8Array>({
+        async cancel(reason) {
+            await reader.cancel(reason);
+        },
+        async pull(controller) {
+            try {
+                const { done, value } = await reader.read();
+
+                if (done) {
+                    controller.close();
+
+                    return;
+                }
+
+                controller.enqueue(value);
+            } catch {
+                controller.enqueue(encoder.encode(`\n\ndata: ${JSON.stringify({ error: { message: "The model provider stream was interrupted." } })}\n\n`));
+                controller.close();
+            }
         },
     });
 };
