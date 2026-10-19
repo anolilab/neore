@@ -1,0 +1,95 @@
+import { tokenRefreshDelayMs } from "@neore/client-runtime";
+import type { ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+
+import { loadConfig } from "../lib/config";
+import { getClient } from "../lib/lunora";
+import type { GrantUser } from "./grant";
+import { fetchAccessToken, signOutGrant } from "./grant";
+import { secureGrantStore } from "./secure-store";
+import { signInWithBrowser } from "./sign-in";
+
+export type AuthStatus = "loading" | "signed-in" | "signed-out";
+
+interface AuthValue {
+    signIn: () => Promise<void>;
+    signOut: () => Promise<void>;
+    status: AuthStatus;
+    user: GrantUser | null;
+}
+
+const AuthContext = createContext<AuthValue | null>(null);
+
+/** Re-mint the JWT this long before the client's own refresh point, if `exp` is unknown. */
+const FALLBACK_REFRESH_MS = 60_000;
+
+/**
+ * Keeps the Lunora client's bearer in step with the stored grant. The JWT lives in
+ * memory only; it is re-minted when client-runtime says the current one is due.
+ */
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+    const [status, setStatus] = useState<AuthStatus>("loading");
+    const [user, setUser] = useState<GrantUser | null>(null);
+    const [refreshTick, setRefreshTick] = useState(0);
+    const config = useMemo(() => loadConfig(), []);
+    const client = useMemo(() => getClient(), []);
+
+    useEffect(() => {
+        let isCancelled = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+
+        const run = async () => {
+            const jwt = await fetchAccessToken({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
+
+            if (isCancelled) {
+                return;
+            }
+
+            client.setAuthToken(jwt);
+
+            if (jwt === null) {
+                setUser(null);
+                setStatus("signed-out");
+
+                return;
+            }
+
+            setUser((await secureGrantStore.get())?.user ?? null);
+            setStatus("signed-in");
+            timer = setTimeout(() => setRefreshTick((tick) => tick + 1), tokenRefreshDelayMs(jwt) ?? FALLBACK_REFRESH_MS);
+        };
+
+        void run();
+
+        return () => {
+            isCancelled = true;
+            clearTimeout(timer);
+        };
+    }, [client, config.lunoraUrl, refreshTick]);
+
+    const signIn = useCallback(async () => {
+        await signInWithBrowser({ appUrl: config.appUrl, lunoraUrl: config.lunoraUrl });
+        setRefreshTick((tick) => tick + 1);
+    }, [config.appUrl, config.lunoraUrl]);
+
+    const signOut = useCallback(async () => {
+        await signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
+        client.setAuthToken(null);
+        setUser(null);
+        setStatus("signed-out");
+    }, [client, config.lunoraUrl]);
+
+    const value = useMemo(() => { return { signIn, signOut, status, user }; }, [signIn, signOut, status, user]);
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = (): AuthValue => {
+    const value = useContext(AuthContext);
+
+    if (!value) {
+        throw new Error("useAuth must be used inside AuthProvider");
+    }
+
+    return value;
+};
