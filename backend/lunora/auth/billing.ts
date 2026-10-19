@@ -426,7 +426,12 @@ export const reserveGatewayCredits = internalMutation
         requestId: v.string().max(MAX_LENGTH.long),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.union(v.literal("taken"), v.literal("already"), v.literal("refused"), v.literal("busy")))
+    .output(
+        v.object({
+            outcome: v.union(v.literal("taken"), v.literal("already"), v.literal("refused"), v.literal("busy")),
+            rowId: v.optional(v.string()),
+        }),
+    )
     .mutation(async ({ args, ctx: context }) => {
         const prior = await context.db
             .query("gatewayUsageDeductions")
@@ -440,7 +445,7 @@ export const reserveGatewayCredits = internalMutation
                 .withIndex("by_scope_key", (q) => q.eq("scope", VIDEO_RESERVATION_SCOPE).eq("key", args.requestId))
                 .first();
 
-            return lease?.leaseExpiresAt === undefined ? "already" : "busy";
+            return { outcome: lease?.leaseExpiresAt === undefined ? "already" : "busy" };
         }
 
         const record = await context.db.memberCredits.findFirst({ where: { organizationId: args.orgId, userId: args.userId } });
@@ -450,11 +455,17 @@ export const reserveGatewayCredits = internalMutation
             const credits = computeGatewayCredits({ billingMode: "platform", costMicrodollars: args.costMicrodollars });
 
             if (credits > settings.credits - (record.usedCredits ?? 0)) {
-                return "refused";
+                return { outcome: "refused" };
             }
         }
 
-        await applyGatewayDeduction(context, { ...args, billingMode: "platform" });
+        const deduction = await applyGatewayDeduction(context, { ...args, billingMode: "platform" });
+
+        // Only a deduction writes a ledger row. Without one (no credit record, a free cost, no organization) nothing was taken
+        // and nothing needs a lease: the clip is charged to nothing, as in chat.
+        if (deduction !== "deducted") {
+            return { outcome: "taken" };
+        }
 
         const reservation = await context.db
             .query("gatewayUsageDeductions")
@@ -478,7 +489,7 @@ export const reserveGatewayCredits = internalMutation
             userId: args.userId,
         });
 
-        return "taken";
+        return { outcome: "taken", rowId: String(reservation._id) };
     });
 
 /**

@@ -37,7 +37,7 @@ const makeCtx = ({ creditsLeft = null, limitOk = true }: Answers = {}) => {
     });
     const runMutation = vi.fn(async (reference: unknown, _args?: unknown) => {
         if (reference === internal.auth.billing.reserveGatewayCredits) {
-            return "taken";
+            return { outcome: "taken" };
         }
 
         if (reference === internal.chat.daily_charge.chargeDailyUnit) {
@@ -100,7 +100,7 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
         }
 
         if (reference === internal.auth.billing.reserveGatewayCredits) {
-            return "taken";
+            return { outcome: "taken" };
         }
 
         if (reference === internal.chat.daily_charge.chargeDailyUnit) {
@@ -370,20 +370,20 @@ const balanceCtx = ({
     const runMutation = vi.fn(async (reference: unknown, args?: any) => {
         if (reference === internal.auth.billing.reserveGatewayCredits) {
             if (reserved.has(args.requestId)) {
-                return "already";
+                return { outcome: "already" };
             }
 
             // 1 credit is 1,000 microdollars.
             const credits = args.costMicrodollars / 1000;
 
             if (credits > left) {
-                return "refused";
+                return { outcome: "refused" };
             }
 
             left -= credits;
             reserved.set(args.requestId, credits);
 
-            return "taken";
+            return { outcome: "taken" };
         }
 
         if (reference === internal.auth.billing.releaseGatewayCredits) {
@@ -547,8 +547,11 @@ describe("the clip's reservation against the real ledger", () => {
 
                     return (record as { usedCredits?: number }).usedCredits ?? 0;
                 };
-                const reserve = async (costMicrodollars: number, requestId: string): Promise<boolean> =>
-                    await ctx.runMutation(reserveGatewayCredits, { costMicrodollars, modelId: PAID, orgId, requestId, userId: "u1" });
+                const reserve = async (costMicrodollars: number, requestId: string): Promise<string> => {
+                    const result = await ctx.runMutation(reserveGatewayCredits, { costMicrodollars, modelId: PAID, orgId, requestId, userId: "u1" });
+
+                    return result.outcome;
+                };
                 const ledgerRowOf = async (requestId: string): Promise<unknown> =>
                     await ctx.db
                         .query("gatewayUsageDeductions")
@@ -616,8 +619,17 @@ describe("the reservation's lease against the real ledger", () => {
 
                 await ctx.db.insert("memberCredits", { creditOverride: 1000, memberId: "member-1", organizationId: orgId, usedCredits: 0, userId: "u1" });
 
-                const reserve = async (): Promise<string> =>
-                    await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-1", userId: "u1" });
+                const reserve = async (): Promise<string> => {
+                    const result = await ctx.runMutation(reserveGatewayCredits, {
+                        costMicrodollars: 500_000,
+                        modelId: PAID,
+                        orgId,
+                        requestId: "r-1",
+                        userId: "u1",
+                    });
+
+                    return result.outcome;
+                };
 
                 const first = await reserve();
                 const second = await reserve();
@@ -722,6 +734,22 @@ describe("the reservation's lease against the real ledger", () => {
             });
 
             expect(staleArgs).toStrictEqual({ row: true, usedCredits: 500 });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("takes nothing and refuses nothing for a member with no credit record, so the video node still runs", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const outcome = await harness.run(async (ctx: any) => {
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                return await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-5", userId: "u1" });
+            });
+
+            expect(outcome).toStrictEqual({ outcome: "taken" });
         } finally {
             harness.close();
         }

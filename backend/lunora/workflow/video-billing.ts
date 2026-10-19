@@ -38,6 +38,12 @@ import type { RunAccount } from "./run-setup";
 /** The part of an action or HTTP action context a run's charges go through. */
 type RunContext = Pick<ActionCtx, "runMutation" | "runQuery">;
 
+/** A reservation this attempt holds: its request id, and the ledger row it took (none when nothing was deducted). */
+interface Reservation {
+    requestId: string;
+    rowId?: string;
+}
+
 /** The paid calls one node run makes, in microdollars: its clip, and the frame it extracts when it is the first to need it. */
 export interface VideoRunCosts {
     clipMicrodollars: number | undefined;
@@ -79,7 +85,7 @@ const beginVideoRun = async (
     node: WorkflowNode,
     userId: string,
     costs: VideoRunCosts,
-): Promise<string | undefined> => {
+): Promise<Reservation | undefined> => {
     const calls = [costs.clipMicrodollars, costs.extractionMicrodollars].filter((cost): cost is number => cost !== undefined);
 
     if (calls.length > 0 && run.orgId) {
@@ -95,7 +101,7 @@ const beginVideoRun = async (
 
     // The clip is taken with its own check in one mutation, so two runs cannot both pass the snapshot above on one balance.
     // A node whose request id is already settled (an earlier attempt charged its clip) reserves this clip under a key of its own.
-    let reservation: string | undefined;
+    let reservation: Reservation | undefined;
 
     const { clipMicrodollars } = costs;
     const { orgId } = run;
@@ -112,22 +118,22 @@ const beginVideoRun = async (
             });
 
         let key = requestId;
-        let outcome = await reserve(key);
+        let taken = await reserve(key);
 
-        if (outcome === "already") {
+        if (taken.outcome === "already") {
             key = `${requestId}:retry:${crypto.randomUUID()}`;
-            outcome = await reserve(key);
+            taken = await reserve(key);
         }
 
-        if (outcome === "busy") {
+        if (taken.outcome === "busy") {
             throw new Error(`The "${String(node.data.label ?? node.type)}" video is already being generated`);
         }
 
-        if (outcome !== "taken") {
+        if (taken.outcome !== "taken") {
             throw new Error(`Not enough credits for the "${String(node.data.label ?? node.type)}" video`);
         }
 
-        reservation = key;
+        reservation = { requestId: key, rowId: taken.rowId };
     }
 
     // The same unit `/chat/media` charges: the tier and the admin exemption are read where the quota is kept. Keyed on the node run,
@@ -164,14 +170,17 @@ const clipModelIdOf = (node: WorkflowNode): string => {
  * member is charged for a clip they did not get. It is tried twice, like a deduction; a release that fails both
  * times is logged, and its lease stays, so the sweep gives the reservation back when the lease lapses (a residual ceiling).
  */
-const releaseClip = async (context: Pick<ActionCtx, "runMutation">, requestId: string | undefined): Promise<void> => {
-    if (requestId === undefined) {
+const releaseClip = async (context: Pick<ActionCtx, "runMutation">, reservation: Reservation | undefined): Promise<void> => {
+    if (reservation === undefined) {
         return;
     }
 
+    const { requestId, rowId } = reservation;
+
     for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
-            await context.runMutation(internal.auth.billing.releaseGatewayCredits, { requestId });
+            // Named by its row, so a repeat of this release after the row was released and taken again does nothing to the newer one.
+            await context.runMutation(internal.auth.billing.releaseGatewayCredits, { requestId, ...(rowId !== undefined && { rowId }) });
 
             return;
         } catch (error) {
@@ -311,16 +320,17 @@ export const runBilledVideo = async <T>(
                 costMicrodollars: costs.clipMicrodollars,
                 modelId: clipModelIdOf(node),
                 orgId: run.orgId,
-                requestId: reservation,
+                requestId: reservation.requestId,
             },
             userId,
         );
+
         try {
-            await context.runMutation(internal.lib.claim_once.completeKey, { key: reservation, scope: VIDEO_RESERVATION_SCOPE });
+            await context.runMutation(internal.lib.claim_once.completeKey, { key: reservation.requestId, scope: VIDEO_RESERVATION_SCOPE });
         } catch (error) {
             // The clip is made and charged, so a failed settle must not lose it. The lease then lapses and the sweep gives the
             // reservation back: an under-charge, which is the accepted ceiling.
-            chatLogger.error("[workflow] video reservation could not be settled", { error, requestId: reservation });
+            chatLogger.error("[workflow] video reservation could not be settled", { error, requestId: reservation.requestId });
         }
     }
 
