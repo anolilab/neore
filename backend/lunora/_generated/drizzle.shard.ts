@@ -1322,6 +1322,7 @@ export const threadPasscodes = sqliteTable("threadPasscodes", {
     createdAt: real("createdAt").notNull(),
     epoch: text("epoch").notNull(),
     failedAttempts: real("failedAttempts").notNull(),
+    filesIndexedAt: real("filesIndexedAt"),
     hash: text("hash").notNull(),
     iterations: real("iterations").notNull(),
     lockoutUntil: real("lockoutUntil"),

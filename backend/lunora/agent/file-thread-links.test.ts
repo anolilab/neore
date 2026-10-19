@@ -9,8 +9,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
 import { addMessagesHandler, cloneMessageBatch, updateMessage } from "./messages";
-import { deleteChatFileLinksForThread, fileGatedByLockedChat } from "./files";
+import { LINK_BATCH, deleteChatFileLinksForThread, fileGatedByLockedChat } from "./files";
 import { eraseChatFileThreadsForUser } from "./gdpr";
+import { _deletePageForThreadId } from "./threads";
 
 const OWNER = "owner-links";
 const COLLABORATOR = "collaborator-links";
@@ -135,6 +136,38 @@ describe("chatFileThreads is written by the message writers", () => {
         );
 
         await expect(linksOf({ threadId: copy })).resolves.toMatchObject([{ fileId, threadId: copy, userId: OWNER }]);
+    });
+});
+
+describe("a permanent delete of a chat with many linked files", () => {
+    it("drops one batch per call and keeps the thread row until its links are gone", async () => {
+        const gone = await newThread(OWNER);
+        const files = [] as string[];
+
+        for (let index = 0; index < LINK_BATCH + 50; index += 1) {
+            files.push(await newFile(`links-bulk-${index}`));
+        }
+
+        await send(OWNER, gone, files);
+
+        expect(await linksOf({ threadId: gone })).toHaveLength(LINK_BATCH + 50);
+
+        const first = await run(async (ctx) => await ctx.runMutation(_deletePageForThreadId, { threadId: gone as never }));
+
+        expect(first.isDone).toBe(false);
+        expect(await linksOf({ threadId: gone })).toHaveLength(50);
+        await expect(run(async (ctx) => await ctx.db.get(gone))).resolves.not.toBeNull();
+
+        // The continuation is the same call with the returned cursor, as the paged delete chains it.
+        let result = first;
+
+        for (let round = 0; round < 5 && !result.isDone; round += 1) {
+            result = await run(async (ctx) => await ctx.runMutation(_deletePageForThreadId, { cursor: result.cursor ?? undefined, threadId: gone as never }));
+        }
+
+        expect(result.isDone).toBe(true);
+        await expect(linksOf({ threadId: gone })).resolves.toStrictEqual([]);
+        await expect(run(async (ctx) => await ctx.db.get(gone))).resolves.toBeNull();
     });
 });
 

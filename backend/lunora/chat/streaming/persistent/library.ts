@@ -6,11 +6,13 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import { addMessagesHandler } from "../../../agent/messages";
+import { addMessagesHandler, deleteMessage } from "../../../agent/messages";
+import { parentOf } from "../../../agent/branch-rows";
 import { patchThread } from "../../../agent/table-writes";
 import { internal } from "../../../_generated/internal";
 import type { Doc, Id } from "../../../_generated/dataModel";
-import { internalMutation, internalQuery } from "../../../_generated/server";
+import { internalMutation, internalQuery, type MutationCtx } from "../../../_generated/server";
+import { patchRow } from "../../../lib/patch";
 import { MAX_LENGTH } from "../../../lib/validators";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
@@ -205,6 +207,21 @@ export const stopActiveForThread = internalMutation
     });
 
 /**
+ * Deletes an empty pending row and moves the thread's leaf off it onto the row before it, so no branch is left on a
+ * deleted row. The parent is read first: an implicit parent cannot be found once its child is gone.
+ */
+const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pending: Doc<"messages">) => {
+    const parent = await parentOf(ctx, threadId, pending);
+    const thread = await ctx.db.get(threadId);
+
+    await deleteMessage(ctx, pending);
+
+    if (thread?.activeLeafMessageId === pending._id) {
+        await patchRow(ctx.db, thread, { activeLeafMessageId: parent?._id });
+    }
+};
+
+/**
  * The run a sidebar stop refused saves the text it still owes its reply: what it wrote since its last
  * finished step (`text`, `reasoning`). Each finished step is already a saved message, so no chunk is read here.
  *
@@ -238,11 +255,18 @@ export const finishStoppedReply = internalMutation
         const threadId = stream.threadId as Id<"threads">;
         let messageId: Id<"messages"> | undefined;
 
-        if (args.pendingText.length > 0 || args.pendingReasoning.length > 0) {
-            const pending = await ctx.db.messages.findFirst({
-                orderBy: [{ stepOrder: "desc" }],
-                where: { order: args.order, status: "pending", threadId, tool: false },
-            });
+        const pending = await ctx.db.messages.findFirst({
+            orderBy: [{ stepOrder: "desc" }],
+            where: { order: args.order, status: "pending", threadId, tool: false },
+        });
+
+        if (args.pendingText.length === 0 && args.pendingReasoning.length === 0) {
+            // Nothing owed: the step in flight wrote no text, so its empty placeholder goes. Left pending, the abort
+            // that ends the run would mark it failed, and the reply would reload as an error.
+            if (pending) {
+                await removeEmptyPending(ctx, threadId, pending);
+            }
+        } else {
             const content = [
                 ...(args.pendingReasoning ? [{ text: args.pendingReasoning, type: "reasoning" as const }] : []),
                 ...(args.pendingText ? [{ text: args.pendingText, type: "text" as const }] : []),

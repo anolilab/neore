@@ -447,14 +447,18 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         // Approval snapshots hold the run's system prompt; they go with the thread.
         await deleteToolApprovalRunsForThread(context, args.threadId);
 
+        // One batch of links per call. While links remain this page reports "not done" and the
+        // chain re-runs it, so the thread row (deleted last) and its links never outlive a partial delete.
+        if (await deleteChatFileLinksForThread(context, args.threadId)) {
+            return { cursor: messages.continueCursor, isDone: false };
+        }
+
         const thread = await context.db.get(args.threadId);
 
         if (thread) {
             // Remove from aggregates before deleting
             await context.db.delete(args.threadId);
         }
-
-        await deleteChatFileLinksForThread(context, args.threadId);
 
         // The temporary-chat marker goes with the thread on EVERY delete path.
         // Only the expiry cron removed it, so a temporary chat deleted any other

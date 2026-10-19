@@ -44,6 +44,10 @@ export interface InternalApiTypes {
             default: FunctionReference<"action", { fileId: Id<"chatFiles">; mediaType: string; storageId: string }, void>;
             extractDocumentText: FunctionReference<"action", { fileId: Id<"chatFiles">; mediaType: string; storageId: string }, void>;
         };
+        file_link_backfill: {
+            backfillChatFileLinks: FunctionReference<"mutation", { cursor?: string; threadId: Id<"threads"> }, null>;
+            backfillUnindexedFileLinks: FunctionReference<"mutation", {}, null>;
+        };
         files: {
             addFile: FunctionReference<"mutation", { filename?: string; hash: string; mediaType: string; storageId: string; userId?: string }, { fileId: Id<"chatFiles">; storageId: string }>;
             copyFile: FunctionReference<"mutation", { fileId: Id<"chatFiles"> }, null>;
@@ -1036,6 +1040,10 @@ export const internal: InternalApiTypes = {
         extraction: {
             default: { __lunoraRef: "agent_extraction:default" },
             extractDocumentText: { __lunoraRef: "agent_extraction:extractDocumentText" },
+        },
+        file_link_backfill: {
+            backfillChatFileLinks: { __lunoraRef: "agent_file_link_backfill:backfillChatFileLinks" },
+            backfillUnindexedFileLinks: { __lunoraRef: "agent_file_link_backfill:backfillUnindexedFileLinks" },
         },
         files: {
             addFile: { __lunoraRef: "agent_files:addFile" },

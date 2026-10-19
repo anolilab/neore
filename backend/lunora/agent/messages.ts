@@ -483,7 +483,12 @@ export const finalizeMessage = internalMutation
     .mutation(async ({ args: { messageId, result }, ctx }) => {
         const message = await ctx.db.get(messageId);
 
-        assert(message, `Message ${messageId} not found`);
+        // A stop deletes an empty pending row before it aborts the model (chat/streaming/persistent/library.ts), so the abort's fail finds none.
+        if (!message) {
+            console.debug("Trying to finalize a message that no longer exists");
+
+            return null;
+        }
 
         if (message.status !== "pending") {
             console.debug("Trying to finalize a message that's already", message.status);

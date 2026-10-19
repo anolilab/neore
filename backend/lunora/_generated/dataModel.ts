@@ -1607,6 +1607,7 @@ export interface Doc_threadPasscodes {
     createdAt: number;
     epoch: string;
     failedAttempts: number;
+    filesIndexedAt?: number;
     hash: string;
     iterations: number;
     lockoutUntil?: number;
@@ -4328,6 +4329,7 @@ export interface Insert_threadPasscodes {
     createdAt: number;
     epoch: string;
     failedAttempts: number;
+    filesIndexedAt?: number;
     hash: string;
     iterations: number;
     lockoutUntil?: number;

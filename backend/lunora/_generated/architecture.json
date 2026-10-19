@@ -186,6 +186,16 @@
       "to": "function:agent_files:saveExtractedText"
     },
     {
+      "from": "function:agent_file_link_backfill:backfillChatFileLinks",
+      "kind": "read",
+      "to": "table:messages"
+    },
+    {
+      "from": "function:agent_file_link_backfill:backfillUnindexedFileLinks",
+      "kind": "read",
+      "to": "table:threadPasscodes"
+    },
+    {
       "from": "function:agent_files:deleteFiles",
       "kind": "write",
       "to": "table:chatFileAccess"
@@ -6949,6 +6959,20 @@
       "id": "function:agent_extraction:extractDocumentText",
       "kind": "function",
       "name": "agent.extraction.extractDocumentText",
+      "module": "agent"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:agent_file_link_backfill:backfillChatFileLinks",
+      "kind": "function",
+      "name": "agent.file_link_backfill.backfillChatFileLinks",
+      "module": "agent"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:agent_file_link_backfill:backfillUnindexedFileLinks",
+      "kind": "function",
+      "name": "agent.file_link_backfill.backfillUnindexedFileLinks",
       "module": "agent"
     },
     {
@@ -16055,37 +16079,43 @@
     {
       "file": "agent/files",
       "kind": "read",
-      "line": 160,
+      "line": 156,
       "reason": "\"fileGatedByLockedChat\" is not a registered function"
     },
     {
       "file": "agent/files",
       "kind": "read",
-      "line": 407,
-      "reason": "\"changeMessageFiles\" is not a registered function"
-    },
-    {
-      "file": "agent/files",
-      "kind": "write",
-      "line": 413,
-      "reason": "\"changeMessageFiles\" is not a registered function"
+      "line": 194,
+      "reason": "\"fileGatedByLockedChat\" is not a registered function"
     },
     {
       "file": "agent/files",
       "kind": "read",
-      "line": 443,
+      "line": 449,
+      "reason": "\"linkChatFiles\" is not a registered function"
+    },
+    {
+      "file": "agent/files",
+      "kind": "write",
+      "line": 455,
+      "reason": "\"linkChatFiles\" is not a registered function"
+    },
+    {
+      "file": "agent/files",
+      "kind": "read",
+      "line": 487,
       "reason": "\"deleteChatFileLinksForThread\" is not a registered function"
     },
     {
       "file": "agent/files",
       "kind": "write",
-      "line": 451,
+      "line": 492,
       "reason": "\"deleteChatFileLinksForThread\" is not a registered function"
     },
     {
       "file": "agent/files",
       "kind": "write",
-      "line": 471,
+      "line": 511,
       "reason": "\"copyFileHandler\" is not a registered function"
     },
     {
@@ -16421,19 +16451,19 @@
     {
       "file": "agent/thread-lock",
       "kind": "write",
-      "line": 268,
+      "line": 277,
       "reason": "\"inheritPasscodeHandler\" is not a registered function"
     },
     {
       "file": "agent/thread-lock",
       "kind": "read",
-      "line": 291,
+      "line": 301,
       "reason": "\"dropPasscodeRowsHandler\" is not a registered function"
     },
     {
       "file": "agent/thread-lock",
       "kind": "write",
-      "line": 297,
+      "line": 307,
       "reason": "\"dropPasscodeRowsHandler\" is not a registered function"
     },
     {
@@ -16457,7 +16487,7 @@
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1421,
+      "line": 1425,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -18785,31 +18815,31 @@
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 119,
+      "line": 120,
       "reason": "\"noteShardActivity\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 121,
+      "line": 122,
       "reason": "\"noteShardActivity\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 139,
+      "line": 140,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "write",
-      "line": 145,
+      "line": 146,
       "reason": "\"noteShardDue\" is not a registered function"
     },
     {
       "file": "lib/shard-housekeeping",
       "kind": "call",
-      "line": 245,
+      "line": 246,
       "reason": "the function reference is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {

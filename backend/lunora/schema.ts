@@ -2479,6 +2479,8 @@ export const schema = defineSchema({
         createdAt: v.number(),
         epoch: v.string(),
         failedAttempts: v.number(),
+        // Set once the chat's file links are indexed (`agent/file-link-backfill.ts`). Unset: the lock gate scans messages.
+        filesIndexedAt: v.optional(v.number()),
         hash: v.string(),
         iterations: v.number(),
         lockoutUntil: v.optional(v.number()),

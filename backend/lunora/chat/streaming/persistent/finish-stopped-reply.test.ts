@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { finalizeMessage } from "../../../agent/messages";
 import schema from "../../../schema";
 import { finishStoppedReply, stopActiveForThread } from "./library";
 
@@ -144,6 +145,33 @@ describe("finishStoppedReply", () => {
 
         expect(await assistantRowsOf(threadId)).toHaveLength(0);
         expect(await statusOf(threadId)).toBe("active");
+    });
+
+    it("with no owed text, removes the empty pending row and moves the leaf back onto the row before it", async () => {
+        const { pendingId, promptId, streamId, threadId } = await seed("done", { pendingRow: true });
+
+        await run(async (context) => await context.db.patch(threadId, { activeLeafMessageId: pendingId }));
+
+        expect(await stop(streamId, { pendingText: "", promptMessageId: promptId })).toBe(true);
+
+        expect(await statusOf(pendingId)).toBeUndefined();
+        expect(await assistantRowsOf(threadId)).toHaveLength(0);
+
+        const thread = await run(async (context) => await context.db.get(threadId));
+
+        expect((thread as { activeLeafMessageId?: string } | null)?.activeLeafMessageId).toBe(promptId);
+        expect(await statusOf(threadId)).toBe("active");
+    });
+
+    it("the abort that follows a stop finds the removed row and fails nothing", async () => {
+        const { pendingId, promptId, streamId } = await seed("done", { pendingRow: true });
+
+        expect(await stop(streamId, { pendingText: "", promptMessageId: promptId })).toBe(true);
+
+        // The agent's abort handler calls `finalizeMessage(fail)` on the pending row it still holds.
+        await expect(
+            run(async (context) => await context.runMutation(finalizeMessage, { messageId: pendingId, result: { error: "aborted", status: "failed" } })),
+        ).resolves.toBeNull();
     });
 
     it("saves nothing for a stream that was not ended by a stop", async () => {
