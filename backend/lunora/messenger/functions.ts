@@ -11,7 +11,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { changeRefcount } from "../agent/files";
 import { insertMessageRow, insertThread, patchMessage, patchThread } from "../agent/table-writes";
-import { AI_DISCLOSURE_CLAIM_TTL_MS, claimOnce, MESSENGER_CLAIM_TTL_MS, releaseClaim } from "../lib/claim-once";
+import { AI_DISCLOSURE_CLAIM_TTL_MS, claimOnce, hasClaim, MESSENGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { timingSafeEqual } from "../lib/crypto";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { getUserTier } from "../lib/rate-limiter";
@@ -619,22 +619,22 @@ export const claimThreadReply = internalMutation
 
 const AI_DISCLOSURE_SCOPE = "messenger-ai-disclosure";
 
-/**
- * `true` the first time a chat (thread) gets a reply that carries the AI
- * disclosure, `false` after. Called right before the reply is sent, so a
- * reply that never went out does not use it up.
- */
-export const claimAiDisclosure = internalMutation
-    .input({ threadId: v.id("threads"), userId: v.string() })
-    .output(v.boolean())
-    .mutation(async ({ args: { threadId, userId }, ctx }) => await claimOnce(ctx, AI_DISCLOSURE_SCOPE, threadId, AI_DISCLOSURE_CLAIM_TTL_MS, userId));
-
-/** Give the disclosure back when the reply it was claimed for did not reach the contact. */
-export const releaseAiDisclosure = internalMutation
+/** Whether a chat has already been told its replies come from an AI. */
+export const aiDisclosureSent = internalQuery
     .input({ threadId: v.id("threads") })
+    .output(v.boolean())
+    .query(async ({ args: { threadId }, ctx }) => await hasClaim(ctx, AI_DISCLOSURE_SCOPE, threadId));
+
+/**
+ * Record that a chat has been told. Called only after the disclosure-bearing
+ * reply was delivered, so a refused or crashed send leaves the chat still due.
+ * A concurrent sender that also got through just finds it set.
+ */
+export const markAiDisclosed = internalMutation
+    .input({ threadId: v.id("threads"), userId: v.string() })
     .output(v.null())
-    .mutation(async ({ args: { threadId }, ctx }) => {
-        await releaseClaim(ctx, AI_DISCLOSURE_SCOPE, threadId);
+    .mutation(async ({ args: { threadId, userId }, ctx }) => {
+        await claimOnce(ctx, AI_DISCLOSURE_SCOPE, threadId, AI_DISCLOSURE_CLAIM_TTL_MS, userId);
 
         return null;
     });

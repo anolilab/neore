@@ -18,8 +18,8 @@ const state = vi.hoisted(() => {
     return {
         afterRun: undefined as (() => void) | undefined,
         charge: "charged" as "charged" | "limit" | "unavailable",
-        /** Whether this chat's AI disclosure is still unsent (the claim succeeds). */
-        disclose: false,
+        /** Whether this chat has already been told its replies come from an AI. */
+        disclosed: false,
         /** Discord and Slack: `true` delivered, `false` refused. */
         discord: true,
         mutations: [] as { args: unknown; path: string }[],
@@ -153,13 +153,10 @@ const ctx = () =>
                 case "messenger_functions:chargeReplyToolRound": {
                     return state.charge;
                 }
-                case "messenger_functions:claimAiDisclosure": {
-                    return state.disclose;
-                }
                 case "messenger_functions:claimThreadReply": {
                     return { claimed: true };
                 }
-                case "messenger_functions:releaseAiDisclosure": {
+                case "messenger_functions:markAiDisclosed": {
                     return null;
                 }
                 default: {
@@ -171,6 +168,9 @@ const ctx = () =>
             switch (path) {
                 case "auth_functions:getDecryptedMessengerKeysQuery": {
                     return KEYS;
+                }
+                case "messenger_functions:aiDisclosureSent": {
+                    return state.disclosed;
                 }
                 case "messenger_functions:getReplyToolSetting": {
                     state.settingArgs.push(args);
@@ -206,7 +206,7 @@ beforeEach(() => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     state.afterRun = undefined;
     state.charge = "charged";
-    state.disclose = false;
+    state.disclosed = true;
     state.mutations = [];
     state.telegram = true;
     state.discord = true;
@@ -301,72 +301,61 @@ describe("messenger replies with tools", () => {
 
 describe("AI disclosure", () => {
     it("prepends the disclosure to a chat's first reply, in the same message", async () => {
-        state.disclose = true;
+        state.disclosed = false;
 
         await respond();
 
         expect(state.sentText).toStrictEqual([{ chatId: "chat-1", platform: "telegram", text: `${AI_DISCLOSURE}\n\nHere is your picture.` }]);
     });
 
+    it("records the disclosure for the thread's owner once the reply is delivered", async () => {
+        state.disclosed = false;
+
+        await respond();
+
+        expect(state.mutations.filter((entry) => entry.path === "messenger_functions:markAiDisclosed")).toStrictEqual([
+            { args: { threadId: "thread-1", userId: "owner" }, path: "messenger_functions:markAiDisclosed" },
+        ]);
+    });
+
     it("leaves later replies unchanged once the chat has been told", async () => {
-        state.disclose = false;
+        state.disclosed = true;
 
         await respond();
 
         expect(state.sentText.map((sent) => sent.text)).toStrictEqual(["Here is your picture."]);
+        expect(mutationPaths()).not.toContain("messenger_functions:markAiDisclosed");
     });
 
-    it("claims the disclosure per thread, for the thread's owner", async () => {
-        state.disclose = true;
+    it.each(["telegram", "discord", "slack"] as const)("does not record the disclosure when %s refuses the send", async (platform) => {
+        state.disclosed = false;
 
-        await respond();
-
-        expect(state.mutations.filter((entry) => entry.path === "messenger_functions:claimAiDisclosure")).toStrictEqual([
-            { args: { threadId: "thread-1", userId: "owner" }, path: "messenger_functions:claimAiDisclosure" },
-        ]);
-    });
-
-    it("gives the disclosure back when the platform refuses the send", async () => {
-        state.disclose = true;
-        state.telegram = false;
-
-        await respond();
-
-        expect(mutationPaths()).toContain("messenger_functions:releaseAiDisclosure");
-    });
-
-    it.each(["discord", "slack"] as const)("gives the disclosure back when %s refuses the send", async (platform) => {
-        state.disclose = true;
-        state[platform] = false;
+        if (platform === "telegram") {
+            state.telegram = false;
+        } else {
+            state[platform] = false;
+        }
 
         await respond({ platform });
 
-        expect(mutationPaths()).toContain("messenger_functions:releaseAiDisclosure");
+        expect(mutationPaths()).not.toContain("messenger_functions:markAiDisclosed");
     });
 
-    it("gives the disclosure back when the send throws", async () => {
-        state.disclose = true;
+    it("does not record the disclosure when the send throws", async () => {
+        state.disclosed = false;
         state.telegram = "throw";
 
         await respond();
 
-        expect(mutationPaths()).toContain("messenger_functions:releaseAiDisclosure");
+        expect(mutationPaths()).not.toContain("messenger_functions:markAiDisclosed");
     });
 
-    it("keeps the disclosure claim once the reply has been delivered", async () => {
-        state.disclose = true;
-
-        await respond();
-
-        expect(mutationPaths()).not.toContain("messenger_functions:releaseAiDisclosure");
-    });
-
-    it("does not claim it when the reply window has closed, so the next reply still discloses", async () => {
-        state.disclose = true;
+    it("does not record the disclosure when the reply window has closed, so the next reply still discloses", async () => {
+        state.disclosed = false;
 
         await respond({ inboundAt: NOW - 25 * HOUR, platform: "whatsapp" });
 
-        expect(mutationPaths()).not.toContain("messenger_functions:claimAiDisclosure");
+        expect(mutationPaths()).not.toContain("messenger_functions:markAiDisclosed");
     });
 });
 

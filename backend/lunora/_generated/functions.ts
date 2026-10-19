@@ -1044,8 +1044,8 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "memory_reflection:saveMemoryDigest": lunora_memory_reflection_123.saveMemoryDigest as unknown as RegisteredLunoraFunction,
     "memory_retrieve:default": lunora_memory_retrieve_124.default as unknown as RegisteredLunoraFunction,
     "memory_retrieve:retrieveRelevantMemories": lunora_memory_retrieve_124.retrieveRelevantMemories as unknown as RegisteredLunoraFunction,
+    "messenger_functions:aiDisclosureSent": lunora_messenger_functions_125.aiDisclosureSent as unknown as RegisteredLunoraFunction,
     "messenger_functions:chargeReplyToolRound": lunora_messenger_functions_125.chargeReplyToolRound as unknown as RegisteredLunoraFunction,
-    "messenger_functions:claimAiDisclosure": lunora_messenger_functions_125.claimAiDisclosure as unknown as RegisteredLunoraFunction,
     "messenger_functions:claimThreadReply": lunora_messenger_functions_125.claimThreadReply as unknown as RegisteredLunoraFunction,
     "messenger_functions:completeMessengerMessage": lunora_messenger_functions_125.completeMessengerMessage as unknown as RegisteredLunoraFunction,
     "messenger_functions:createConnection": lunora_messenger_functions_125.createConnection as unknown as RegisteredLunoraFunction,
@@ -1058,9 +1058,9 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "messenger_functions:getOwnerRateLimitTier": lunora_messenger_functions_125.getOwnerRateLimitTier as unknown as RegisteredLunoraFunction,
     "messenger_functions:getReplyToolSetting": lunora_messenger_functions_125.getReplyToolSetting as unknown as RegisteredLunoraFunction,
     "messenger_functions:listReplyMedia": lunora_messenger_functions_125.listReplyMedia as unknown as RegisteredLunoraFunction,
+    "messenger_functions:markAiDisclosed": lunora_messenger_functions_125.markAiDisclosed as unknown as RegisteredLunoraFunction,
     "messenger_functions:pairConnection": lunora_messenger_functions_125.pairConnection as unknown as RegisteredLunoraFunction,
     "messenger_functions:regeneratePairingCode": lunora_messenger_functions_125.regeneratePairingCode as unknown as RegisteredLunoraFunction,
-    "messenger_functions:releaseAiDisclosure": lunora_messenger_functions_125.releaseAiDisclosure as unknown as RegisteredLunoraFunction,
     "messenger_functions:saveMessengerMessage": lunora_messenger_functions_125.saveMessengerMessage as unknown as RegisteredLunoraFunction,
     "messenger_functions:saveMessengerNotice": lunora_messenger_functions_125.saveMessengerNotice as unknown as RegisteredLunoraFunction,
     "messenger_functions:threadHasRecentMedia": lunora_messenger_functions_125.threadHasRecentMedia as unknown as RegisteredLunoraFunction,
@@ -6236,18 +6236,17 @@ if (typeof source["searchText"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "botId": __val1 } : {}), "searchText": source["searchText"], "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_messenger_functions_125.aiDisclosureSent.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "threadId": source["threadId"] };
+});
 installCompiledValidatorMap(lunora_messenger_functions_125.chargeReplyToolRound.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
-});
-installCompiledValidatorMap(lunora_messenger_functions_125.claimAiDisclosure.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["threadId"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "threadId": source["threadId"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_messenger_functions_125.claimThreadReply.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -6312,6 +6311,13 @@ if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "threadId": source["threadId"], "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_messenger_functions_125.markAiDisclosed.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "threadId": source["threadId"], "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_messenger_functions_125.pairConnection.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -6340,12 +6346,6 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["connectionId"] !== "string") return DEFER;
 return { "connectionId": source["connectionId"] };
-});
-installCompiledValidatorMap(lunora_messenger_functions_125.releaseAiDisclosure.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["threadId"] !== "string") return DEFER;
-return { "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_messenger_functions_125.saveMessengerNotice.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8941,8 +8941,8 @@ export interface Caller {
     };
     messenger: {
         functions: {
+            aiDisclosureSent: (args: { threadId: Id<"threads"> }) => Promise<boolean>;
             chargeReplyToolRound: (args: { userId: string }) => Promise<"charged" | "limit" | "unavailable">;
-            claimAiDisclosure: (args: { threadId: Id<"threads">; userId: string }) => Promise<boolean>;
             claimThreadReply: (args: { threadId: Id<"threads">; userId: string }) => Promise<{ claimed: true; newestUserMessageId: string } | { claimed: false }>;
             completeMessengerMessage: (args: { fileIds?: Array<Id<"chatFiles">>; messageId: Id<"messages">; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; text: string }) => Promise<boolean>;
             createConnection: (args: { displayName?: string; platform: "telegram" | "slack" | "discord" | "whatsapp" | "line" | "feishu" | "teams" | "wechat" }) => Promise<{ connectionId: string; pairingCode: string | null; pairingCodeExpiresAt: number | null }>;
@@ -8955,9 +8955,9 @@ export interface Caller {
             getOwnerRateLimitTier: (args: { userId: string }) => Promise<"free" | "premium">;
             getReplyToolSetting: (args: { threadId: Id<"threads">; userId: string }) => Promise<null | { enabled: boolean; groups?: Array<string> }>;
             listReplyMedia: (args: { threadId: Id<"threads">; userId: string }) => Promise<Array<{ filename?: string; key: string; mediaType: string }>>;
+            markAiDisclosed: (args: { threadId: Id<"threads">; userId: string }) => Promise<null>;
             pairConnection: (args: { codeHash: string; connectionId: Id<"messengerConnections">; displayName?: string; platformChatId: string; platformUserId: string; platformUsername?: string }) => Promise<boolean>;
             regeneratePairingCode: (args: { connectionId: Id<"messengerConnections"> }) => Promise<{ pairingCode: string; pairingCodeExpiresAt: number }>;
-            releaseAiDisclosure: (args: { threadId: Id<"threads"> }) => Promise<null>;
             saveMessengerMessage: (args: { fileIds?: Array<Id<"chatFiles">>; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; pending?: boolean; text: string; threadId: Id<"threads">; userId: string }) => Promise<{ messageId: Id<"messages">; order: number }>;
             saveMessengerNotice: (args: { text: string; threadId: Id<"threads">; userId: string }) => Promise<null>;
             threadHasRecentMedia: (args: { threadId: Id<"threads"> }) => Promise<boolean>;
@@ -10548,8 +10548,8 @@ export const createCaller = (context: CallerCtx): Caller => ({
     },
     messenger: {
         functions: {
+            aiDisclosureSent: (args) => callRegistered(context, "messenger_functions:aiDisclosureSent", args),
             chargeReplyToolRound: (args) => callRegistered(context, "messenger_functions:chargeReplyToolRound", args),
-            claimAiDisclosure: (args) => callRegistered(context, "messenger_functions:claimAiDisclosure", args),
             claimThreadReply: (args) => callRegistered(context, "messenger_functions:claimThreadReply", args),
             completeMessengerMessage: (args) => callRegistered(context, "messenger_functions:completeMessengerMessage", args),
             createConnection: (args) => callRegistered(context, "messenger_functions:createConnection", args),
@@ -10562,9 +10562,9 @@ export const createCaller = (context: CallerCtx): Caller => ({
             getOwnerRateLimitTier: (args) => callRegistered(context, "messenger_functions:getOwnerRateLimitTier", args),
             getReplyToolSetting: (args) => callRegistered(context, "messenger_functions:getReplyToolSetting", args),
             listReplyMedia: (args) => callRegistered(context, "messenger_functions:listReplyMedia", args),
+            markAiDisclosed: (args) => callRegistered(context, "messenger_functions:markAiDisclosed", args),
             pairConnection: (args) => callRegistered(context, "messenger_functions:pairConnection", args),
             regeneratePairingCode: (args) => callRegistered(context, "messenger_functions:regeneratePairingCode", args),
-            releaseAiDisclosure: (args) => callRegistered(context, "messenger_functions:releaseAiDisclosure", args),
             saveMessengerMessage: (args) => callRegistered(context, "messenger_functions:saveMessengerMessage", args),
             saveMessengerNotice: (args) => callRegistered(context, "messenger_functions:saveMessengerNotice", args),
             threadHasRecentMedia: (args) => callRegistered(context, "messenger_functions:threadHasRecentMedia", args),

@@ -745,8 +745,8 @@ export interface InternalApiTypes {
     };
     messenger: {
         functions: {
+            aiDisclosureSent: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
             chargeReplyToolRound: FunctionReference<"mutation", { userId: string }, "charged" | "limit" | "unavailable">;
-            claimAiDisclosure: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, boolean>;
             claimThreadReply: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, { claimed: true; newestUserMessageId: string } | { claimed: false }>;
             completeMessengerMessage: FunctionReference<"mutation", { fileIds?: Array<Id<"chatFiles">>; messageId: Id<"messages">; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; text: string }, boolean>;
             findOrCreateMessengerThread: FunctionReference<"mutation", { externalThreadId: string; messengerConnectionId: Id<"messengerConnections">; source: string; title?: string; userId: string }, { isNew: boolean; threadId: Id<"threads">; }>;
@@ -756,8 +756,8 @@ export interface InternalApiTypes {
             getOwnerRateLimitTier: FunctionReference<"query", { userId: string }, "free" | "premium">;
             getReplyToolSetting: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, null | { enabled: boolean; groups?: Array<string> }>;
             listReplyMedia: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, Array<{ filename?: string; key: string; mediaType: string }>>;
+            markAiDisclosed: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, null>;
             pairConnection: FunctionReference<"mutation", { codeHash: string; connectionId: Id<"messengerConnections">; displayName?: string; platformChatId: string; platformUserId: string; platformUsername?: string }, boolean>;
-            releaseAiDisclosure: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
             saveMessengerMessage: FunctionReference<"mutation", { fileIds?: Array<Id<"chatFiles">>; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; pending?: boolean; text: string; threadId: Id<"threads">; userId: string }, { messageId: Id<"messages">; order: number }>;
             saveMessengerNotice: FunctionReference<"mutation", { text: string; threadId: Id<"threads">; userId: string }, null>;
             threadHasRecentMedia: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
@@ -1733,8 +1733,8 @@ export const internal: InternalApiTypes = {
     },
     messenger: {
         functions: {
+            aiDisclosureSent: { __lunoraRef: "messenger_functions:aiDisclosureSent" },
             chargeReplyToolRound: { __lunoraRef: "messenger_functions:chargeReplyToolRound" },
-            claimAiDisclosure: { __lunoraRef: "messenger_functions:claimAiDisclosure" },
             claimThreadReply: { __lunoraRef: "messenger_functions:claimThreadReply" },
             completeMessengerMessage: { __lunoraRef: "messenger_functions:completeMessengerMessage" },
             findOrCreateMessengerThread: { __lunoraRef: "messenger_functions:findOrCreateMessengerThread" },
@@ -1744,8 +1744,8 @@ export const internal: InternalApiTypes = {
             getOwnerRateLimitTier: { __lunoraRef: "messenger_functions:getOwnerRateLimitTier" },
             getReplyToolSetting: { __lunoraRef: "messenger_functions:getReplyToolSetting" },
             listReplyMedia: { __lunoraRef: "messenger_functions:listReplyMedia" },
+            markAiDisclosed: { __lunoraRef: "messenger_functions:markAiDisclosed" },
             pairConnection: { __lunoraRef: "messenger_functions:pairConnection" },
-            releaseAiDisclosure: { __lunoraRef: "messenger_functions:releaseAiDisclosure" },
             saveMessengerMessage: { __lunoraRef: "messenger_functions:saveMessengerMessage" },
             saveMessengerNotice: { __lunoraRef: "messenger_functions:saveMessengerNotice" },
             threadHasRecentMedia: { __lunoraRef: "messenger_functions:threadHasRecentMedia" },

@@ -45,7 +45,7 @@
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { patchRow } from "./patch";
 
@@ -89,7 +89,7 @@ interface ClaimOptions {
     userId?: string;
 }
 
-const findClaim = async (ctx: ClaimCtx, scope: string, key: string) =>
+const findClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string) =>
     await ctx.db
         .query("idempotencyClaims")
         .withIndex("by_scope_key", (q) => q.eq("scope", scope).eq("key", key))
@@ -118,6 +118,13 @@ const claim = async (ctx: ClaimCtx, scope: string, key: string, { leaseMs, onLap
     });
 
     return true;
+};
+
+/** `true` while an unexpired claim for `(scope, key)` exists. Reads only, so a caller can decide before it acts. */
+export const hasClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string): Promise<boolean> => {
+    const existing = await findClaim(ctx, scope, key);
+
+    return existing !== null && existing.expiresAt > Date.now();
 };
 
 /** `true` for the first claim of `(scope, key)` within `ttlMs`, `false` for every later one. */

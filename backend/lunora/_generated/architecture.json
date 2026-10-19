@@ -12201,17 +12201,17 @@
       "module": "memory"
     },
     {
-      "detail": "mutation",
-      "id": "function:messenger_functions:chargeReplyToolRound",
+      "detail": "query",
+      "id": "function:messenger_functions:aiDisclosureSent",
       "kind": "function",
-      "name": "messenger.functions.chargeReplyToolRound",
+      "name": "messenger.functions.aiDisclosureSent",
       "module": "messenger"
     },
     {
       "detail": "mutation",
-      "id": "function:messenger_functions:claimAiDisclosure",
+      "id": "function:messenger_functions:chargeReplyToolRound",
       "kind": "function",
-      "name": "messenger.functions.claimAiDisclosure",
+      "name": "messenger.functions.chargeReplyToolRound",
       "module": "messenger"
     },
     {
@@ -12300,6 +12300,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:messenger_functions:markAiDisclosed",
+      "kind": "function",
+      "name": "messenger.functions.markAiDisclosed",
+      "module": "messenger"
+    },
+    {
+      "detail": "mutation",
       "id": "function:messenger_functions:pairConnection",
       "kind": "function",
       "name": "messenger.functions.pairConnection",
@@ -12310,13 +12317,6 @@
       "id": "function:messenger_functions:regeneratePairingCode",
       "kind": "function",
       "name": "messenger.functions.regeneratePairingCode",
-      "module": "messenger"
-    },
-    {
-      "detail": "mutation",
-      "id": "function:messenger_functions:releaseAiDisclosure",
-      "kind": "function",
-      "name": "messenger.functions.releaseAiDisclosure",
       "module": "messenger"
     },
     {
@@ -18493,6 +18493,12 @@
       "file": "lib/claim-once",
       "kind": "read",
       "line": 93,
+      "reason": "\"hasClaim\" is not a registered function"
+    },
+    {
+      "file": "lib/claim-once",
+      "kind": "read",
+      "line": 93,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
@@ -18522,13 +18528,13 @@
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 150,
+      "line": 157,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 211,
+      "line": 218,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -18768,43 +18774,37 @@
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 230,
+      "line": 226,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 237,
+      "line": 261,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 272,
+      "line": 276,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 287,
+      "line": 284,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 295,
+      "line": 311,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 322,
-      "reason": "\"respondToInbound\" is not a registered function"
-    },
-    {
-      "file": "messenger/respond",
-      "kind": "call",
-      "line": 331,
+      "line": 320,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {

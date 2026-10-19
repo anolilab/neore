@@ -208,10 +208,10 @@ const generateReply = async (ctx: ActionCtx, threadId: Id<"threads">, userId: st
 type SendOutcome = Awaited<ReturnType<typeof sendPlatformMessage>>;
 
 /**
- * Art. 50(1): the chat's first reply says it comes from an AI. The claim is
- * taken right before the send and given back unless the reply reached the
- * contact, so a burst, a closed window or a failed send leaves the disclosure
- * due for the next reply.
+ * Art. 50(1): the chat's first delivered reply says it comes from an AI. The
+ * disclosure is recorded only once a reply carrying it was sent, so a refused,
+ * failed or crashed send leaves the chat due for the next reply. Two replies
+ * racing past the check may both carry it; that repeats a notice, never drops one.
  */
 const sendWithAiDisclosure = async (
     ctx: ActionCtx,
@@ -219,19 +219,14 @@ const sendWithAiDisclosure = async (
     messengerKeys: Record<string, string>,
     options: { text: string; threadId: Id<"threads">; userId: string },
 ): Promise<SendOutcome> => {
-    const first = await ctx.runMutation(internal.messenger.functions.claimAiDisclosure, { threadId: options.threadId, userId: options.userId });
-    const text = first ? `${AI_DISCLOSURE}\n\n${options.text}` : options.text;
-    let outcome: SendOutcome | undefined;
+    const disclosed = await ctx.runQuery(internal.messenger.functions.aiDisclosureSent, { threadId: options.threadId });
+    const outcome = await sendPlatformMessage(delivery, disclosed ? options.text : `${AI_DISCLOSURE}\n\n${options.text}`, messengerKeys);
 
-    try {
-        outcome = await sendPlatformMessage(delivery, text, messengerKeys);
-
-        return outcome;
-    } finally {
-        if (first && outcome !== "sent") {
-            await ctx.runMutation(internal.messenger.functions.releaseAiDisclosure, { threadId: options.threadId });
-        }
+    if (!disclosed && outcome === "sent") {
+        await ctx.runMutation(internal.messenger.functions.markAiDisclosed, { threadId: options.threadId, userId: options.userId });
     }
+
+    return outcome;
 };
 
 /**
@@ -326,7 +321,7 @@ export const respondToInbound = async (ctx: ActionCtx, args: RespondArgs): Promi
                 userId,
             });
 
-            await sendPlatformMessage(delivery, errorMessage, messengerKeys);
+            await sendWithAiDisclosure(ctx, delivery, messengerKeys, { text: errorMessage, threadId, userId });
         } catch {
             // If we can't even send the error message, just log it
             console.error(`[Messenger] Failed to send error message to ${platform}`);
