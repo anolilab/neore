@@ -806,7 +806,12 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                 }
 
                 // Art. 50(4): generated media is labelled where it is shown, not only on hover.
-                if (message.role === "assistant" && isGeneratedMediaType(filePart.mediaType) && fileUrl) {
+                const isGeneratedFile =
+                    isGeneratedMediaType(filePart.mediaType) ||
+                    isVideoFile(filePart.mediaType, filePart.filename) ||
+                    isAudioFile(filePart.mediaType, filePart.filename);
+
+                if (message.role === "assistant" && isGeneratedFile && fileUrl) {
                     renderedParts.push(<AiGeneratedLabel key={`${key}-ai-label`} />);
                 }
 
