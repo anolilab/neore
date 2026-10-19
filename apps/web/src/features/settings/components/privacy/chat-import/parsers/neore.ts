@@ -4,9 +4,12 @@
  *
  * The export root carries `exportVersion` and `conversations: [{ thread, messages }]`.
  * Fields the normalised shape cannot hold are dropped: files, memories, usage, tags,
- * model and settings, and the active-branch pointer. The export publishes EVERY row of a
- * thread, including the sibling replies of regenerated or edited turns, and nothing that
- * says which one is active, so those siblings import as one linear sequence.
+ * model and settings. The export publishes EVERY row of a thread, including the sibling
+ * replies of regenerated or edited turns. An export that names the active branch
+ * (`thread.activeLeafMessageId`, with each row's `parentMessageId`) imports only the path
+ * the user saw, by the rule the backend displays it with (`agent/branch-tree.ts`). An
+ * export from before those fields existed has no way to tell the siblings apart, so they
+ * import as one linear sequence, as they always did.
  *
  * A row's `role` is used when the export has it, and a row with any role other than user or
  * assistant (system and tool rows) is not a turn and is skipped. Exports made before that field
@@ -20,12 +23,16 @@
  * Rows are kept by their text, whatever their status: a failed or interrupted reply keeps
  * its partial text as an ordinary reply, rather than dropping a prompt along with it.
  */
+import { buildBranchTree, resolveActivePath } from "@neore/backend/agent/branch-tree";
+
 import { asRecord, buildSession } from "./local-session";
 import type { NormalizedConversation, NormalizedMessage } from "./types";
 
 interface NeoreExportMessage {
+    _id?: string;
     createdAt?: number;
     order?: number;
+    parentMessageId?: string;
     role?: string;
     stepOrder?: number;
     text?: string;
@@ -33,7 +40,7 @@ interface NeoreExportMessage {
 
 interface NeoreExportConversation {
     messages?: NeoreExportMessage[];
-    thread?: { createdAt?: number; title?: string };
+    thread?: { activeLeafMessageId?: string; createdAt?: number; title?: string };
 }
 
 interface NeoreExportRoot {
@@ -73,6 +80,36 @@ const roleOfRow = (row: NeoreExportMessage): NormalizedMessage["role"] | undefin
     return row.stepOrder === 0 ? "user" : "assistant";
 };
 
+/**
+ * The rows on the path the user saw. A thread without an active leaf (never branched,
+ * or an export from before the pointer existed) keeps every row, as it always has.
+ * Rows without a string `_id` cannot be linked, so they are keyed by position; a real id
+ * never starts with `#`.
+ */
+const activePathRows = (thread: NeoreExportConversation["thread"], rows: NeoreExportMessage[]): NeoreExportMessage[] => {
+    const leafId = thread?.activeLeafMessageId;
+
+    if (typeof leafId !== "string") {
+        return rows;
+    }
+
+    const keyOf = (row: NeoreExportMessage, index: number): string => (typeof row._id === "string" ? row._id : `#${String(index)}`);
+    const tree = buildBranchTree(
+        rows.map((row, index) => {
+            return {
+                _id: keyOf(row, index),
+                order: row.order ?? 0,
+                parentMessageId: row.parentMessageId,
+                stepOrder: row.stepOrder ?? 0,
+            };
+        }),
+    );
+    // A leaf the file no longer contains degrades to the latest path from the top, as the backend shows it.
+    const onPath = new Set(resolveActivePath(tree, leafId));
+
+    return rows.filter((row, index) => onPath.has(keyOf(row, index)));
+};
+
 const parseConversation = (conversation: NeoreExportConversation): NormalizedConversation | null => {
     if (!conversation.thread || !Array.isArray(conversation.messages)) {
         return null;
@@ -80,9 +117,11 @@ const parseConversation = (conversation: NeoreExportConversation): NormalizedCon
 
     // Rows arrive in (order, stepOrder) order already; the sort keeps that true for any reordering of the file.
     // A null or non-object row is skipped on its own rather than failing the conversation.
-    const rows = conversation.messages
+    const sorted = conversation.messages
         .filter((row) => asRecord(row) !== undefined)
         .toSorted((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.stepOrder ?? 0) - (b.stepOrder ?? 0));
+    // The active path is chosen over every row, tool and empty steps included, because they are links in the chain.
+    const rows = activePathRows(conversation.thread, sorted);
 
     const messages: NormalizedMessage[] = [];
 

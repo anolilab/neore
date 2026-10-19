@@ -80,7 +80,7 @@ The import tool handles the entire process:
 **How it works:** The export lists each conversation with its thread and messages. The importer keeps the text, order and timestamps of each message. Files, memories, usage history, settings and other data are not part of a chat import; they stay in the export.
 
 **Limits:**
-- An export keeps every reply you regenerated or edited, and does not record which one you kept. The alternatives are combined into one message rather than imported separately.
+- An export made now imports the branch you were looking at: the replies you regenerated or edited and did not keep are left out. An export made before Neore recorded which branch you were on still contains every alternative, and the import combines them into one message. Request a new export to avoid that.
 - Exports made before Neore recorded each message's role do not say who wrote it. Replies that did not follow one of your prompts are then imported as your messages: results of sub-agent and coding-agent runs, the text after a tool approval or an answered question, and the replies of later speakers in a group chat. Request a new export to avoid this.
 - A failed or interrupted reply keeps the text it had.
 - A message keeps the time it was imported with (its original time when it came from another platform), and the time Neore created it otherwise. A conversation's time is the creation time Neore recorded.

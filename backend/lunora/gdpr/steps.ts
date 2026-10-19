@@ -93,7 +93,10 @@ const roleOf = (message: unknown): string | undefined => {
 };
 
 const projectMessage = (
-    message: Pick<Doc<"messages">, "_creationTime" | "createdAt" | "message" | "model" | "order" | "status" | "stepOrder" | "text" | "tool"> & { _id: string },
+    message: Pick<
+        Doc<"messages">,
+        "_creationTime" | "createdAt" | "message" | "model" | "order" | "parentMessageId" | "status" | "stepOrder" | "text" | "tool"
+    > & { _id: string },
 ) => {
     return {
         _id: message._id,
@@ -101,6 +104,8 @@ const projectMessage = (
         createdAt: message.createdAt ?? message._creationTime,
         model: message.model,
         order: message.order,
+        // As stored, so `"root"` (a top-level sibling) stays distinct from an id that is simply missing.
+        parentMessageId: message.parentMessageId,
         role: roleOf(message.message),
         status: message.status,
         stepOrder: message.stepOrder,
@@ -114,11 +119,16 @@ const projectMessage = (
  * to names — the ids alone mean nothing to the data subject.
  */
 const projectThread = (
-    thread: Pick<Doc<"threads">, "_creationTime" | "category" | "model" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"> & { _id: string },
+    thread: Pick<Doc<"threads">, "_creationTime" | "activeLeafMessageId" | "category" | "model" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"> & {
+        _id: string;
+    },
     tagNames: ReadonlyMap<string, string>,
 ) => {
     return {
         _id: thread._id,
+        // Where the user last pointed the branch switcher. Unset for a thread that never branched. A re-import
+        // uses it to keep only the replies the user kept, rather than every alternative (`parsers/neore.ts`).
+        activeLeafMessageId: thread.activeLeafMessageId,
         category: thread.category,
         createdAt: thread._creationTime,
         model: thread.model,
@@ -166,6 +176,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
             createdAt: number;
             model?: string;
             order?: number;
+            parentMessageId?: string;
             role?: string;
             status?: string;
             stepOrder?: number;
@@ -174,6 +185,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
         }[];
         thread: {
             _id: string;
+            activeLeafMessageId?: string;
             category?: string;
             createdAt: number;
             model?: string;

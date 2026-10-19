@@ -103,4 +103,97 @@ describe("collectConversations", () => {
             harness.close();
         }
     });
+    it("exports each message's parent and each thread's active leaf, so a re-import can keep the active branch", async () => {
+        registry.set("agent_messages:listMessagesByThreadIdInternal", listMessagesByThreadIdInternal);
+        registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
+        registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
+
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids: Record<string, string> = {};
+
+            await harness.run(async (context: any) => {
+                // A prompt with two replies (a regenerate); the switcher points at the second.
+                const threadId = await context.db.insert("threads", { status: "active", title: "Branched", userId: "user-b" });
+
+                ids.thread = String(threadId);
+                const prompt = await context.db.insert("messages", {
+                    message: { content: "Plan", role: "user" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 0,
+                    text: "Plan",
+                    threadId,
+                    tool: false,
+                    userId: "user-b",
+                });
+                const first = await context.db.insert("messages", {
+                    message: { content: "A", role: "assistant" },
+                    order: 0,
+                    parentMessageId: prompt,
+                    status: "success",
+                    stepOrder: 1,
+                    text: "A",
+                    threadId,
+                    tool: false,
+                    userId: "user-b",
+                });
+                const second = await context.db.insert("messages", {
+                    message: { content: "B", role: "assistant" },
+                    order: 0,
+                    parentMessageId: prompt,
+                    status: "success",
+                    stepOrder: 1,
+                    text: "B",
+                    threadId,
+                    tool: false,
+                    userId: "user-b",
+                });
+
+                await context.db.patch(threadId, { activeLeafMessageId: second });
+                ids.first = String(first);
+                ids.second = String(second);
+                ids.prompt = String(prompt);
+
+                const plain = await context.db.insert("threads", { status: "active", title: "Plain", userId: "user-b" });
+
+                await context.db.insert("messages", {
+                    message: { content: "Hi", role: "user" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 0,
+                    text: "Hi",
+                    threadId: plain,
+                    tool: false,
+                    userId: "user-b",
+                });
+                ids.plain = String(plain);
+            });
+
+            const conversations = await harness.action(async (context: any) => await context.runAction(collectConversations, { userId: "user-b" }));
+            const exported = conversations as {
+                messages: { _id: string; parentMessageId?: string; text?: string }[];
+                thread: { _id: string; activeLeafMessageId?: string; title?: string };
+            }[];
+
+            const branched = exported.find((conversation) => conversation.thread.title === "Branched");
+            const plain = exported.find((conversation) => conversation.thread.title === "Plain");
+
+            // The ids in the export resolve within the same export: the leaf and the parents name exported rows.
+            expect(branched?.thread._id).toBe(ids.thread);
+            expect(branched?.thread.activeLeafMessageId).toBe(ids.second);
+            expect(branched?.messages.map((message) => message._id)).toEqual(expect.arrayContaining([ids.prompt, ids.first, ids.second]));
+            expect(branched?.messages.find((message) => message._id === ids.first)?.parentMessageId).toBe(ids.prompt);
+            expect(branched?.messages.find((message) => message._id === ids.second)?.parentMessageId).toBe(ids.prompt);
+            expect(branched?.messages.find((message) => message._id === ids.prompt)?.parentMessageId).toBeUndefined();
+
+            // A thread that never branched has no leaf, and its rows have no parent.
+            expect(plain?.thread._id).toBe(ids.plain);
+            expect(plain?.thread.activeLeafMessageId).toBeUndefined();
+            expect(plain?.messages.every((message) => message.parentMessageId === undefined)).toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
 });

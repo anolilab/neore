@@ -3,8 +3,18 @@ import { describe, expect, it } from "vitest";
 import parseNeore, { isNeoreExport } from "./neore";
 
 // The export shape, as `collectConversations` (backend/lunora/gdpr/steps.ts) projects it:
-// `projectMessage` and `projectThread` keep only these fields. `role` is absent from exports made before it was added.
-const row = (fields: { createdAt: number; order: number; role?: string; stepOrder: number; text?: string; tool?: boolean }) => {
+// `projectMessage` and `projectThread` keep only these fields. `role` is absent from exports made before it was added,
+// and so are `parentMessageId` (messages) and `activeLeafMessageId` (threads): the branch fields the importer reads.
+const row = (fields: {
+    _id?: string;
+    createdAt: number;
+    order: number;
+    parentMessageId?: string;
+    role?: string;
+    stepOrder: number;
+    text?: string;
+    tool?: boolean;
+}) => {
     return {
         _id: `m_${fields.order}_${fields.stepOrder}`,
         model: undefined,
@@ -55,6 +65,17 @@ const threadWithTurns = {
         updatedAt: 1_700_000_001_100,
         userTags: [],
     },
+};
+
+/** A thread whose rows carry ids and parents, as an export made now writes them. `activeLeafMessageId` is the switcher's pointer. */
+const branchedThread = (messages: ReturnType<typeof row>[], activeLeafMessageId?: string) => {
+    return { messages, thread: { activeLeafMessageId, createdAt: 1_700_000_000_000, title: "Branches" } };
+};
+
+const textsOf = (thread: unknown) => {
+    const [conversation] = parseNeore([exportRoot([thread])]);
+
+    return conversation?.messages.map((message) => `${message.role}:${message.content}`);
 };
 
 describe("isNeoreExport", () => {
@@ -180,5 +201,105 @@ describe("parseNeore", () => {
 
         expect(conversation?.createdAt).toBeUndefined();
         expect(conversation?.messages[0]?.createdAt).toBeUndefined();
+    });
+});
+
+describe("parseNeore with an active branch", () => {
+    // A prompt with two replies (a regenerate: both are children of the prompt, sharing its order).
+    const twoReplies = (leaf?: string) =>
+        branchedThread(
+            [
+                row({ _id: "p", createdAt: 1, order: 0, role: "user", stepOrder: 0, text: "Plan a trip" }),
+                row({ _id: "a", createdAt: 2, order: 0, parentMessageId: "p", role: "assistant", stepOrder: 1, text: "Option A" }),
+                row({ _id: "b", createdAt: 3, order: 0, parentMessageId: "p", role: "assistant", stepOrder: 1, text: "Option B" }),
+            ],
+            leaf,
+        );
+
+    it("imports only the reply on the active branch", () => {
+        expect(textsOf(twoReplies("a"))).toEqual(["user:Plan a trip", "assistant:Option A"]);
+        expect(textsOf(twoReplies("b"))).toEqual(["user:Plan a trip", "assistant:Option B"]);
+    });
+
+    it("keeps the active branch when the prompt was edited", () => {
+        const edited = branchedThread(
+            [
+                row({ _id: "p1", createdAt: 1, order: 0, role: "user", stepOrder: 0, text: "Hi" }),
+                row({ _id: "r1", createdAt: 2, order: 0, parentMessageId: "p1", role: "assistant", stepOrder: 1, text: "Hello" }),
+                // The original prompt and its edit are siblings under the same reply, and each has its own answer.
+                row({ _id: "po", createdAt: 3, order: 1, parentMessageId: "r1", role: "user", stepOrder: 0, text: "Plan a trip" }),
+                row({ _id: "ro", createdAt: 4, order: 1, parentMessageId: "po", role: "assistant", stepOrder: 1, text: "Reply to the original" }),
+                row({ _id: "pe", createdAt: 5, order: 1, parentMessageId: "r1", role: "user", stepOrder: 0, text: "Plan a trip, please" }),
+                row({ _id: "re", createdAt: 6, order: 1, parentMessageId: "pe", role: "assistant", stepOrder: 1, text: "Reply to the edit" }),
+            ],
+            "re",
+        );
+
+        expect(textsOf(edited)).toEqual(["user:Hi", "assistant:Hello", "user:Plan a trip, please", "assistant:Reply to the edit"]);
+    });
+
+    it("follows an edit of the first prompt that is stored as a top-level sibling, not as a dangling id", () => {
+        const firstPromptEdited = branchedThread(
+            [
+                row({ _id: "q0", createdAt: 1, order: 0, role: "user", stepOrder: 0, text: "Original" }),
+                row({ _id: "r0", createdAt: 2, order: 0, parentMessageId: "q0", role: "assistant", stepOrder: 1, text: "Answer to original" }),
+                row({ _id: "q1", createdAt: 3, order: 0, parentMessageId: "root", role: "user", stepOrder: 0, text: "Edited" }),
+                row({ _id: "r1", createdAt: 4, order: 0, parentMessageId: "q1", role: "assistant", stepOrder: 1, text: "Answer to edit" }),
+            ],
+            "r1",
+        );
+
+        expect(textsOf(firstPromptEdited)).toEqual(["user:Edited", "assistant:Answer to edit"]);
+    });
+
+    it("keeps every step of the active reply, even when the leaf is its first step", () => {
+        const multiStep = branchedThread(
+            [
+                row({ _id: "p", createdAt: 1, order: 0, role: "user", stepOrder: 0, text: "Look it up" }),
+                row({ _id: "s1", createdAt: 2, order: 0, parentMessageId: "p", role: "assistant", stepOrder: 1, text: "Checking" }),
+                row({ _id: "s2", createdAt: 3, order: 0, role: "assistant", stepOrder: 2, tool: true }),
+                row({ _id: "s3", createdAt: 4, order: 0, role: "assistant", stepOrder: 3, text: "Found it" }),
+                row({ _id: "q", createdAt: 5, order: 1, role: "user", stepOrder: 0, text: "Thanks" }),
+                row({ _id: "y", createdAt: 6, order: 1, role: "assistant", stepOrder: 1, text: "Welcome" }),
+            ],
+            // The stored leaf points at the first step, which the rest of the turn descends from.
+            "s1",
+        );
+
+        expect(textsOf(multiStep)).toEqual(["user:Look it up", "assistant:Checking\n\nFound it", "user:Thanks", "assistant:Welcome"]);
+    });
+
+    it("keeps a dangling parent on the previous row, as the backend displays it", () => {
+        const dangling = branchedThread(
+            [
+                row({ _id: "p", createdAt: 1, order: 0, role: "user", stepOrder: 0, text: "Hi" }),
+                row({ _id: "a", createdAt: 2, order: 0, parentMessageId: "p", role: "assistant", stepOrder: 1, text: "A" }),
+                row({ _id: "b", createdAt: 3, order: 0, parentMessageId: "deleted", role: "assistant", stepOrder: 1, text: "B" }),
+            ],
+            "b",
+        );
+
+        // `B` hangs off `A` (the row before it), so the two are one reply's steps, as the backend shows them.
+        expect(textsOf(dangling)).toEqual(["user:Hi", "assistant:A\n\nB"]);
+    });
+
+    it("terminates on rows that name each other as parents", () => {
+        const mutual = branchedThread(
+            [
+                row({ _id: "a", createdAt: 1, order: 0, parentMessageId: "b", role: "user", stepOrder: 0, text: "First" }),
+                row({ _id: "b", createdAt: 2, order: 0, parentMessageId: "a", role: "assistant", stepOrder: 1, text: "Second" }),
+            ],
+            "b",
+        );
+
+        expect(textsOf(mutual)).toEqual(["user:First", "assistant:Second"]);
+    });
+
+    it("shows the latest reply when the stored leaf is no longer in the file", () => {
+        expect(textsOf(twoReplies("deleted"))).toEqual(["user:Plan a trip", "assistant:Option B"]);
+    });
+
+    it("imports a never-branched thread exactly as before, with no leaf", () => {
+        expect(textsOf(branchedThread([...threadWithTurns.messages], undefined))).toEqual(textsOf(threadWithTurns));
     });
 });
