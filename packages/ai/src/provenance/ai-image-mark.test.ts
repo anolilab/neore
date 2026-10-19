@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/prefer-https -- the IPTC identifier is an http URI that readers match byte for byte */
 /* eslint-disable no-bitwise -- byte-level PNG/JPEG/CRC work is bitwise by nature */
 import { describe, expect, it } from "vitest";
 
@@ -144,7 +145,7 @@ describe("markAiGeneratedImage", () => {
     });
 
     it("still marks a PNG whose XMP mentions the source type only inside a comment", () => {
-        const xmp = `<x:xmpmeta xmlns:x="adobe:ns:meta/"><!-- Iptc4xmpExt:DigitalSourceType="https://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia" --></x:xmpmeta>`;
+        const xmp = `<x:xmpmeta xmlns:x="adobe:ns:meta/"><!-- Iptc4xmpExt:DigitalSourceType="http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia" --></x:xmpmeta>`;
         const keyword = enc.encode("XML:com.adobe.xmp\0\0\0\0\0");
         const itxt = chunk("iTXt", new Uint8Array([...keyword, ...enc.encode(xmp)]));
         const png = makePng([itxt]);
@@ -155,7 +156,7 @@ describe("markAiGeneratedImage", () => {
     });
 
     it("still marks a JPEG whose XMP mentions the source type only inside a comment", () => {
-        const xmp = `<?xpacket begin=""?><x:xmpmeta xmlns:x="adobe:ns:meta/"><!-- Iptc4xmpExt:DigitalSourceType="https://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia" --></x:xmpmeta>`;
+        const xmp = `<?xpacket begin=""?><x:xmpmeta xmlns:x="adobe:ns:meta/"><!-- Iptc4xmpExt:DigitalSourceType="http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia" --></x:xmpmeta>`;
         const header = enc.encode("https://ns.adobe.com/xap/1.0/\0");
         const app1 = [0xff, 0xe1, 0x00, 0x00, ...header, ...enc.encode(xmp)];
 
@@ -165,6 +166,15 @@ describe("markAiGeneratedImage", () => {
         const marked = markAiGeneratedImage(jpeg);
 
         expect(marked.byteLength).toBeGreaterThan(jpeg.byteLength);
+    });
+
+    it("still marks a PNG whose iTXt language tag carries the source-type attribute", () => {
+        const keyword = enc.encode("XML:com.adobe.xmp\0\0\0");
+        const language = enc.encode('<a Iptc4xmpExt:DigitalSourceType="http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia">\0\0plain text');
+        const png = makePng([chunk("iTXt", new Uint8Array([...keyword, ...language]))]);
+        const marked = markAiGeneratedImage(png);
+
+        expect(marked.byteLength).toBeGreaterThan(png.byteLength);
     });
 
     it("keeps bytes appended after IEND", () => {
@@ -217,6 +227,15 @@ describe("markAiGeneratedImage", () => {
 
     it("skips fill bytes before a marker in a JPEG header", () => {
         const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xff, 0xdb, 0x00, 0x03, 0x00, 0xff, 0xda, 0x00, 0x02, 0x01, 0xff, 0xd9]);
+        const marked = markAiGeneratedImage(jpeg);
+
+        expect(marked[2]).toBe(0xff);
+        expect(marked[3]).toBe(0xe1);
+        expect(dec.decode(marked)).toContain("trainedAlgorithmicMedia");
+    });
+
+    it("skips a standalone TEM marker before the scan instead of reading a length", () => {
+        const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0x01, 0xff, 0xdb, 0x00, 0x03, 0x00, 0xff, 0xda, 0x00, 0x02, 0x01, 0xff, 0xd9]);
         const marked = markAiGeneratedImage(jpeg);
 
         expect(marked[2]).toBe(0xff);

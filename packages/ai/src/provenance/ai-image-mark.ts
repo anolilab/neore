@@ -25,29 +25,61 @@ const XAP_NAMESPACE = "http://ns.adobe.com/xap/1.0/";
 const XAP_HEADER = `${XAP_NAMESPACE}\0`;
 
 // The PNG iTXt keyword under which XMP is stored.
-const XMP_KEYWORD = "XML:com.adobe.xmp";
+const XMP_KEYWORD = "XML:com.adobe.xmp"; // secret-scanner:allow -- the PNG iTXt keyword for XMP, not a credential
 
-// The attribute must sit inside a start tag, so text in a node does not count.
 const DIGITAL_SOURCE_TYPE_ATTRIBUTE = /\sIptc4xmpExt:DigitalSourceType="([^"]*)"/;
 
-const XML_COMMENT_OR_CDATA = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>/g;
+/**
+ * The start tags of an XML document, in order. Comments and CDATA sections are
+ * skipped by position, not by a pattern, so nesting cannot leave a comment behind.
+ */
+const xmlStartTags = (xml: string): string[] => {
+    const tags: string[] = [];
+    let index = xml.indexOf("<");
+
+    while (index !== -1) {
+        if (xml.startsWith("<!--", index)) {
+            const end = xml.indexOf("-->", index + 4);
+
+            if (end === -1) {
+                break;
+            }
+
+            index = xml.indexOf("<", end + 3);
+        } else if (xml.startsWith("<![CDATA[", index)) {
+            const end = xml.indexOf("]]>", index + 9);
+
+            if (end === -1) {
+                break;
+            }
+
+            index = xml.indexOf("<", end + 3);
+        } else {
+            const close = xml.indexOf(">", index + 1);
+
+            if (close === -1) {
+                break;
+            }
+
+            const next = xml[index + 1];
+
+            if (next !== "!" && next !== "?" && next !== "/") {
+                tags.push(xml.slice(index + 1, close));
+            }
+
+            index = xml.indexOf("<", close + 1);
+        }
+    }
+
+    return tags;
+};
 
 /**
  * True only when the XMP already declares OUR source type as an attribute of a tag.
  * An unrelated text chunk, a comment that mentions the URI, or a camera's own source
  * type does not count.
  */
-const xmpAlreadyMarked = (xmp: string): boolean => {
-    // Each element start tag is checked on its own, so text in a node cannot count as an attribute.
-    const tags = xmp
-        .replaceAll(XML_COMMENT_OR_CDATA, "")
-        .split("<")
-        .slice(1)
-        .filter((piece) => piece[0] !== "!" && piece[0] !== "?" && piece[0] !== "/")
-        .map((piece) => piece.split(">", 1)[0]!);
-
-    return tags.some((tag) => DIGITAL_SOURCE_TYPE_ATTRIBUTE.exec(tag)?.[1] === DIGITAL_SOURCE_TYPE);
-};
+const xmpAlreadyMarked = (xmp: string): boolean => xmlStartTags(xmp).some((tag) => DIGITAL_SOURCE_TYPE_ATTRIBUTE.exec(tag)?.[1] === DIGITAL_SOURCE_TYPE);
 
 const XMP_PACKET = [
     `<?xpacket begin="\u{FEFF}" id="W5M0MpCehiHzreSzNTczkc9d"?>`,
@@ -127,6 +159,24 @@ const pngXmpChunk = (): Uint8Array => {
     return pngChunk("iTXt", data);
 };
 
+/**
+ * The text of an uncompressed XMP iTXt chunk: keyword, NUL, compression flag, method,
+ * language tag, NUL, translated keyword, NUL, then the text. Only that text is XMP,
+ * so the other fields never count. Undefined for any other chunk or a compressed one.
+ */
+const xmpItxtText = (data: Uint8Array): string | undefined => {
+    const keywordEnd = data.indexOf(0);
+
+    if (keywordEnd === -1 || decoder.decode(data.subarray(0, keywordEnd)) !== XMP_KEYWORD || data[keywordEnd + 1] === 1) {
+        return undefined;
+    }
+
+    const languageEnd = data.indexOf(0, keywordEnd + 3);
+    const translatedEnd = languageEnd === -1 ? -1 : data.indexOf(0, languageEnd + 1);
+
+    return translatedEnd < 0 ? undefined : decoder.decode(data.subarray(translatedEnd + 1));
+};
+
 const markPng = (bytes: Uint8Array): Uint8Array => {
     const chunks: Uint8Array[] = [bytes.subarray(0, 8)];
     let offset = 8;
@@ -143,10 +193,9 @@ const markPng = (bytes: Uint8Array): Uint8Array => {
 
         // Already marked by an upstream that wrote the same field: nothing to add.
         if (type === "iTXt") {
-            const data = bytes.subarray(offset + 8, offset + 8 + length);
-            const keywordEnd = data.indexOf(0);
+            const text = xmpItxtText(bytes.subarray(offset + 8, offset + 8 + length));
 
-            if (keywordEnd > 0 && decoder.decode(data.subarray(0, keywordEnd)) === XMP_KEYWORD && xmpAlreadyMarked(decoder.decode(data))) {
+            if (text !== undefined && xmpAlreadyMarked(text)) {
                 return bytes;
             }
         }
@@ -277,6 +326,12 @@ const markJpeg = (bytes: Uint8Array): Uint8Array => {
         if (marker === 0xda || marker === 0xd9) {
             reachedScan = true;
             break;
+        }
+
+        // TEM is standalone: no length bytes follow it.
+        if (marker === 0x01) {
+            offset += 2;
+            continue;
         }
 
         // A header segment needs its two length bytes.
