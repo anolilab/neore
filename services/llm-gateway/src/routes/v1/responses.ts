@@ -38,15 +38,24 @@ import {
 export type Dispatch = (request: Request, env: AppEnv, ctx: Context["executionCtx"]) => Response | Promise<Response>;
 
 /** Request headers the completions route reads: its bearer auth, its idempotency cache and the stream's CORS origin. */
-const FORWARDED_HEADERS = ["authorization", "idempotency-key", "origin"] as const;
+const FORWARDED_HEADERS = ["authorization", "origin"] as const;
+
+const GATEWAY_KEY_AUTHORIZATION_PREFIX = "Bearer gk_";
+
+/**
+ * The chat route's idempotency cache is keyed by user and key alone, so a key a caller also used on
+ * `/v1/chat/completions` would replay that route's reply here. A prefix keeps the two namespaces apart.
+ */
+const IDEMPOTENCY_KEY_PREFIX = "responses:";
 
 export const createResponsesRouter = (dispatch: Dispatch): OpenAPIHono<HonoEnv> => {
     const responsesRouter = new OpenAPIHono<HonoEnv>();
 
     responsesRouter.post("/v1/responses", async (c) => {
-        // Refuse an anonymous caller before any work: the body is parsed and translated
-        // here, and only the dispatched chat request checks the key itself.
-        if (!c.req.header("Authorization")) {
+        // Refuse a caller that cannot hold a key before any work: the body is parsed and translated
+        // here, and only the dispatched chat request checks the key itself. The shape is the one
+        // `bearerAuth` demands first (`Bearer gk_…`), so a stray header does not buy a parse.
+        if (!c.req.header("Authorization")?.startsWith(GATEWAY_KEY_AUTHORIZATION_PREFIX)) {
             return c.json(responsesError("Missing or invalid Authorization header."), 401);
         }
 
@@ -78,6 +87,12 @@ export const createResponsesRouter = (dispatch: Dispatch): OpenAPIHono<HonoEnv> 
             if (value !== undefined) {
                 headers.set(name, value);
             }
+        }
+
+        const idempotencyKey = c.req.header("idempotency-key");
+
+        if (idempotencyKey !== undefined) {
+            headers.set("idempotency-key", `${IDEMPOTENCY_KEY_PREFIX}${idempotencyKey}`);
         }
 
         const upstream = await dispatch(

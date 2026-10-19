@@ -85,7 +85,8 @@ describe("POST /v1/responses — forwarding", () => {
 
         expect(call.path).toBe("/v1/chat/completions");
         expect(call.headers.authorization).toBe("Bearer gk_test_key");
-        expect(call.headers["idempotency-key"]).toBe("idem-1");
+        // Namespaced, so it cannot replay a reply cached by /v1/chat/completions under the same key.
+        expect(call.headers["idempotency-key"]).toBe("responses:idem-1");
         expect(call.headers.origin).toBe("https://app.example");
         expect(call.body).toEqual({
             messages: [
@@ -115,6 +116,30 @@ describe("POST /v1/responses — forwarding", () => {
         expect(response.status).toBe(401);
         expect(calls).toHaveLength(0);
         expect(((await response.json()) as { error: { type: string } }).error.type).toBe("invalid_request_error");
+    });
+
+    it.each([["Bearer not_a_gateway_key"], ["Basic abc"], ["gk_without_scheme"]])(
+        "refuses %j, which cannot be a gateway key, before parsing or dispatching",
+        async (authorization) => {
+            const { calls, dispatch } = stubDispatch(jsonReply(CHAT_REPLY));
+            const request = new Request("https://gateway.test/v1/responses", {
+                body: "not json",
+                headers: { Authorization: authorization, "Content-Type": "application/json" },
+                method: "POST",
+            });
+            const response = await appWith(dispatch).fetch(request, env, ctx);
+
+            expect(response.status).toBe(401);
+            expect(calls).toHaveLength(0);
+        },
+    );
+
+    it("sends no Idempotency-Key when the caller sent none", async () => {
+        const { calls, dispatch } = stubDispatch(jsonReply(CHAT_REPLY));
+
+        await appWith(dispatch).fetch(post({ input: "x", model: "gpt-x" }), env, ctx);
+
+        expect(calls[0]?.headers["idempotency-key"]).toBeUndefined();
     });
 
     it("refuses previous_response_id with a 400 and never dispatches", async () => {
