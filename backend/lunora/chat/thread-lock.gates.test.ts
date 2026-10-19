@@ -15,6 +15,7 @@ import { readMessagesByIds } from "../agent/messages";
 import { lockThread } from "../agent/thread-lock";
 import { createPin, getThreadPins } from "./pins/functions";
 import { abortThreadStream, branchThread, getCachedFollowupSuggestions, getThread, getThreadUIMessages, gateThreadActionHandler } from "./functions";
+import { getThreadWithData } from "./composite";
 import { getGroupChat } from "./group/functions";
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { claimToolApproval } from "./lib/tool-approval-claim";
@@ -41,6 +42,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_messages", await import("../agent/messages"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "agent_branches", await import("../agent/branches"));
+    registerModule(registry, "agent_thread_lock", await import("../agent/thread-lock"));
     registerModule(registry, "lib_document_history", await import("../lib/document-history"));
 }, 30_000);
 
@@ -214,6 +216,14 @@ describe("the shared gate outcome", () => {
         expect(lockedAfterCreation({ lockedAt: null }, 100)).toBe(false);
     });
 
+    it("fails closed when the lock and the row share a millisecond", () => {
+        expect(lockedAfterCreation({ lockedAt: 100 }, 100)).toBe(true);
+    });
+
+    it("admits a row created strictly after the lock", () => {
+        expect(lockedAfterCreation({ lockedAt: 100 }, 101)).toBe(false);
+    });
+
     it("shows a locked row in a list as its stub, and an unlocked row as itself", () => {
         const row = { _creationTime: 1, _id: "t1", lockedAt: 5, status: "active", title: "Secret" };
 
@@ -381,6 +391,35 @@ describe("branching a locked chat", () => {
         expect(forkId).toEqual(expect.any(String));
         expect(forkId).not.toBe(threadId);
     });
+
+    it("the fork is locked: refused for the owner without its own proof, readable with one", async () => {
+        const forkId = (await as(OWNER).action(branchThread as never, { threadId, unlockProof: proof } as never)) as string;
+
+        const forkRow = await harness.run(
+            async (context: any) =>
+                await context.db
+                    .query("threadPasscodes")
+                    .withIndex("by_thread", (q: any) => q.eq("threadId", forkId))
+                    .first(),
+        );
+        const minted = await mintUnlockProof({ epoch: forkRow.epoch, threadId: forkId, userId: OWNER }, SECRET, Date.now());
+        const forkProof = minted.proof;
+
+        const refused = await harness.run(
+            async (context: any) => await threadGateOutcome(context, { level: "read", threadId: forkId as never, userId: OWNER }),
+        );
+        const opened = await harness.run(
+            async (context: any) => await threadGateOutcome(context, { level: "read", threadId: forkId as never, unlockProof: forkProof, userId: OWNER }),
+        );
+        // The PARENT's proof does not open the fork.
+        const parentOpensFork = await harness.run(
+            async (context: any) => await threadGateOutcome(context, { level: "read", threadId: forkId as never, unlockProof: proof, userId: OWNER }),
+        );
+
+        expect(refused).toBe("locked");
+        expect(opened).toBe("ok");
+        expect(parentOpensFork).toBe("locked");
+    });
 });
 
 describe("attaching a file to a locked chat", () => {
@@ -481,5 +520,17 @@ describe("runs and stream reads", () => {
 
         expect(await harness.run(async (context: any) => await streamRunThreadHandler(context, { streamId, userId: OWNER }))).toBeNull();
         expect(await harness.run(async (context: any) => await streamLockedSinceStartHandler(context, { streamId }))).toBe(true);
+    });
+});
+
+describe("an unlocked chat returns its content through the composite read", () => {
+    it("the composite thread view lists the messages with the owner's proof", async () => {
+        const result = await as(OWNER).query(getThreadWithData as never, { threadId, unlockProof: proof } as never);
+
+        expect(JSON.stringify((result as { messages: unknown }).messages)).toContain("secret question");
+    });
+
+    it("and refuses the same read without a proof, with the locked code", async () => {
+        await expect(as(OWNER).query(getThreadWithData as never, { threadId } as never)).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
     });
 });

@@ -1695,6 +1695,7 @@ export const schema = defineSchema({
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId_status", ["userId", "status"])
         .index("by_threadId", ["threadId"])
+        .index("by_threadId_status", ["threadId", "status"])
         .relations((r) => {
             return {
                 chunks: r.many("persistentChunks", { field: "streamId" }),

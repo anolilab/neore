@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { enableThreadLock } from "../agent/thread-lock";
 import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { runInShard } from "../lib/shard-context";
+import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
 import { threadIdOfLink } from "./locked-link";
 import { granteesOf, REDACT_BATCH, redactLockedLinks, scheduleGranteeRedaction } from "./locked-redact";
@@ -130,7 +131,10 @@ describe("the per-user redaction job", () => {
         const continuation = harness.scheduler.list().filter((job) => job.functionPath?.includes("redactLockedLinks") === true);
 
         expect(continuation).toHaveLength(1);
-        expect((continuation[0]?.args as { cursor?: string }).cursor).toBeTypeOf("string");
+        const { cursor } = (continuation[0]?.args ?? {}) as { cursor?: string };
+
+        expect(cursor).toBeTypeOf("string");
+        expect(cursor?.length).toBeLessThan(MAX_LENGTH.cursor);
 
         await runQueuedRedactions();
 
@@ -145,6 +149,12 @@ describe("the per-user redaction job", () => {
 
         expect(titles).toHaveLength(REDACT_BATCH + 1);
         expect(titles.every((title: string) => title === LOCKED_THREAD_TITLE)).toBe(true);
+    });
+
+    it("refuses a cursor longer than the cursor bound", async () => {
+        await expect(
+            harness.run(async (ctx: any) => await ctx.runMutation(redactLockedLinks, { cursor: "c".repeat(MAX_LENGTH.cursor + 1), threadId, userId: GRANTEE })),
+        ).rejects.toThrow();
     });
 
     it("redacts pending outbox mail for the notification but not mail already sent", async () => {
@@ -197,6 +207,56 @@ describe("locking a chat that had collaborators", () => {
         expect(runAfter).toHaveBeenCalledTimes(1);
         expect(runAfter.mock.calls[0]?.[3]).toEqual({ shardKey: GRANTEE });
         expect(runAfter.mock.calls[0]?.[2]).toEqual({ threadId, userId: GRANTEE });
+    });
+
+    it("schedules every collaborator past the first page, once each, dispatched at once", async () => {
+        // 150 accepted invites, more than one page. The last one repeats the first collaborator.
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 150; index += 1) {
+                await ctx.db.insert("threadInvites", {
+                    acceptedBy: index === 149 ? "user-0" : `user-${index}`,
+                    expiresAt: Date.now() + 1e6,
+                    invitedBy: OWNER,
+                    invitedEmail: `${index}@x`,
+                    inviteToken: `t${index}`,
+                    permission: "read",
+                    status: "accepted",
+                    threadId,
+                });
+            }
+        });
+
+        const runAfter = vi.fn<(...args: unknown[]) => Promise<string>>(async () => "job");
+
+        await harness.run(async (ctx: any) => await scheduleGranteeRedaction({ db: ctx.db, scheduler: { runAfter } } as never, threadId as never, OWNER));
+
+        const users = runAfter.mock.calls.map((call) => (call[2] as { userId: string }).userId);
+
+        expect(users).toHaveLength(149);
+        expect(new Set(users).size).toBe(149);
+        expect(users).toContain("user-148");
+        expect(runAfter.mock.calls.every((call) => call[0] === 0)).toBe(true);
+    });
+
+    it("schedules nothing for a chat whose invites belong to another chat", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("threadInvites", {
+                acceptedBy: GRANTEE,
+                expiresAt: Date.now() + 1e6,
+                invitedBy: OWNER,
+                invitedEmail: "a@x",
+                inviteToken: "t-other",
+                permission: "read",
+                status: "accepted",
+                threadId: otherThreadId,
+            });
+        });
+
+        const runAfter = vi.fn<(...args: unknown[]) => Promise<string>>(async () => "job");
+
+        await harness.run(async (ctx: any) => await scheduleGranteeRedaction({ db: ctx.db, scheduler: { runAfter } } as never, threadId as never, OWNER));
+
+        expect(runAfter).not.toHaveBeenCalled();
     });
 
     it("redacts a former collaborator's earlier notification when the owner locks the chat", async () => {

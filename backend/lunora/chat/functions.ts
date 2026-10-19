@@ -834,6 +834,8 @@ export const getThreadMessages = authQuery
         return await agent.listMessages(context, {
             paginationOpts,
             threadId,
+            // The gate above admitted this proof.
+            unlockProof,
         });
     });
 
@@ -2653,6 +2655,7 @@ export const getFullThreadForExport = authQuery
             const currentMessages = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10_000 },
                 threadId,
+                unlockProof,
             });
 
             // `branchPoint` is a DISPLAY position on the parent's active path
@@ -2673,6 +2676,7 @@ export const getFullThreadForExport = authQuery
             const messages = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10_000 }, // Fetch all
                 threadId,
+                unlockProof,
             });
 
             allMessages = messages.page;
@@ -2751,6 +2755,23 @@ export const branchThread = authAction
             });
         }
 
+        // A branch of a locked chat is locked before any message is copied into it,
+        // so the copy is never readable without the branch's own unlock.
+        if (isThreadLocked(parentThread)) {
+            try {
+                await context.runMutation(internal.agent.thread_lock.inheritThreadPasscode, {
+                    sourceThreadId: threadId as Id<"threads">,
+                    targetThreadId: newThreadId as Id<"threads">,
+                });
+            } catch (error) {
+                chatLogger.error("Failed to lock the branch of a locked chat:", error);
+
+                await context.runMutation(internal.agent.thread_lock.dropThreadPasscodeRows, { threadId: newThreadId as Id<"threads"> });
+                await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId as Id<"threads"> });
+                throw new LunoraError("INTERNAL_SERVER_ERROR", "Failed to lock the branch");
+            }
+        }
+
         // Create the relationship record (for UI display of branch hierarchy)
         await context.runMutation(internal.chat.functions.createThreadRelationship, {
             // The fork's DISPLAY position on the parent's active path, which
@@ -2781,6 +2802,7 @@ export const branchThread = authAction
                 await context.runMutation(internal.chat.functions.deleteThreadRelationship, {
                     threadId: newThreadId,
                 });
+                await context.runMutation(internal.agent.thread_lock.dropThreadPasscodeRows, { threadId: newThreadId as Id<"threads"> });
                 await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId as Id<"threads"> });
                 throw new LunoraError("INTERNAL_SERVER_ERROR", "Failed to copy messages to branch");
             }
@@ -3457,6 +3479,8 @@ export const getFollowupSuggestions = authAction
         const messagesResult = await agent.listMessages(context, {
             paginationOpts: { cursor: null, numItems: 10 },
             threadId,
+            // The gate above admitted this proof: without it a locked chat has no turns to suggest from.
+            unlockProof,
         });
 
         const filteredMessageDocuments = (messagesResult.page || []).filter((messageDocument) => {

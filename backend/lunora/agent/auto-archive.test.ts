@@ -6,7 +6,8 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { archiveIfStillIdle } from "./auto-archive";
+import { MAX_LENGTH } from "../lib/validators";
+import { archiveIfStillIdle, autoArchiveContinue } from "./auto-archive";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -61,5 +62,37 @@ describe("archiveIfStillIdle and live streams", () => {
         const statuses = [...finishedStreams(FINISHED_STREAMS), "streaming"];
 
         expect(await archiveAfter(statuses)).toBe(false);
+    });
+
+    it("keeps a thread with a pending stream behind finished ones", async () => {
+        const statuses = [...finishedStreams(FINISHED_STREAMS), "pending"];
+
+        expect(await archiveAfter(statuses)).toBe(false);
+    });
+});
+
+describe("autoArchiveContinue cursor", () => {
+    it("refuses a cursor longer than the cursor bound", async () => {
+        await expect(
+            harness.run(async (ctx: any) => await ctx.runMutation(autoArchiveContinue, { cursor: "c".repeat(MAX_LENGTH.cursor + 1) })),
+        ).rejects.toThrow();
+    });
+
+    it("issues pagination cursors well under the bound", async () => {
+        const cursor = await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 2; index += 1) {
+                await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: index + 1, userId: OWNER });
+            }
+
+            const { continueCursor } = await ctx.db
+                .query("threads")
+                .withIndex("by_user_and_updatedAt", (q: any) => q.eq("userId", OWNER).lt("updatedAt", CUTOFF))
+                .order("desc")
+                .paginate({ cursor: null, numItems: 1 });
+
+            return continueCursor as string;
+        });
+
+        expect(cursor.length).toBeLessThan(MAX_LENGTH.cursor);
     });
 });

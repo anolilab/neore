@@ -16,7 +16,7 @@ import type { QueryCtx } from "../_generated/server";
 import { repoLabel } from "../coding-agents/repo-label";
 import { vCodingAgentId } from "../coding-agents/validators";
 import { authQuery } from "../lib/crpc";
-import { isThreadLocked } from "../lib/thread-lock";
+import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { loadUnread, toRedactedNotificationViews, UNREAD_COUNT_CAP } from "../notifications/functions";
 import { vNotificationView } from "../notifications/validators";
 
@@ -31,6 +31,13 @@ const HOME_NOTIFICATIONS = 5;
 const TITLE_MAX = 160;
 
 const clip = (text: string): string => (text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX - 1)}…` : text);
+
+/** The ids in `threadIds` that name a locked chat. A missing or unreadable thread is not locked here. */
+const lockedThreadIds = async (ctx: Pick<QueryCtx, "db">, threadIds: string[]): Promise<Set<string>> => {
+    const threads = await Promise.all([...new Set(threadIds)].map(async (id) => [id, await ctx.db.get(id as Id<"threads">)] as const));
+
+    return new Set(threads.flatMap(([id, thread]) => (thread && isThreadLocked(thread) ? [id] : [])));
+};
 
 export const vHomeOverview = v.object({
     approvals: v.array(v.object({ approvalId: v.string(), createdAt: v.number(), threadId: v.string(), threadTitle: v.optional(v.string()) })),
@@ -110,6 +117,12 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
         approvalThreads.flatMap((thread) => (thread?.title && !isThreadLocked(thread) ? [[thread._id as string, thread.title] as const] : [])),
     );
 
+    // A run's prompt or task is the text of the chat that started it, so it shows the lock while that chat is locked.
+    const lockedRunThreads = await lockedThreadIds(ctx, [
+        ...agentRows.page.flatMap((run) => (run.threadId ? [run.threadId] : [])),
+        ...subAgentRows.page.flatMap((run) => [run.parentThreadId, ...(run.childThreadId ? [run.childThreadId] : [])]),
+    ]);
+
     return {
         approvals: [...approvalsByThread.values()].map((row) => {
             const title = threadTitle.get(row.threadId);
@@ -121,7 +134,7 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
                 _id: run._id as string,
                 agent: run.agent,
                 createdAt: run.createdAt,
-                prompt: clip(run.prompt),
+                prompt: run.threadId && lockedRunThreads.has(run.threadId) ? LOCKED_THREAD_TITLE : clip(run.prompt),
                 repo: repoLabel(run.repoUrl),
                 status: run.status as "queued" | "running",
                 ...(run.threadId && { threadId: run.threadId }),
@@ -146,12 +159,14 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
             return { _id: task._id as string, status: task.status as "queued" | "running", title: clip(task.title), updatedAt: task.updatedAt };
         }),
         subAgents: subAgentRows.page.map((run) => {
+            const locked = lockedRunThreads.has(run.parentThreadId) || (run.childThreadId !== undefined && lockedRunThreads.has(run.childThreadId));
+
             return {
                 _id: run._id as string,
                 createdAt: run.createdAt,
                 parentThreadId: run.parentThreadId,
                 status: run.status as "queued" | "running",
-                task: clip(run.task),
+                task: locked ? LOCKED_THREAD_TITLE : clip(run.task),
             };
         }),
         unreadCount: unread.length,

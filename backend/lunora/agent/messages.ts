@@ -866,6 +866,14 @@ export const listMessagesByThreadIdHandler = async (
         return { continueCursor: "", isDone: true, page: [] };
     }
 
+    return await listMessagesPage(context, args);
+};
+
+/**
+ * The page read itself, with NO lock check. Only for a caller that has already
+ * admitted the run under the thread's lock state (`listMessagesByThreadIdAdmitted`).
+ */
+const listMessagesPage = async (context: QueryContext, args: InferArgs<typeof listMessagesByThreadIdArgs>): Promise<PaginationResult<Doc<"messages">>> => {
     const allStatuses = messageStatuses;
     const statuses = args.statuses ?? allStatuses;
     const last = args.upToAndIncludingMessageId && (await context.db.get(args.upToAndIncludingMessageId));
@@ -954,6 +962,22 @@ export const readMessagesByIds = async (
 
     return rows.map((m) => (m && visible.has(m._id) ? publicMessage(m) : null));
 };
+
+/**
+ * Recent messages for a RUN ALREADY ADMITTED under the thread's lock state: its
+ * stream was started with a valid proof, or after the lock (`streamRunThread`,
+ * `lockedAfterCreation`). Internal only. Callers are the background run and the
+ * group turn, which pass `admittedRun` to the agent (`agent/client/search.ts`).
+ * A client-reachable read never comes here.
+ */
+export const listMessagesByThreadIdAdmitted = internalQuery
+    .input(listMessagesByThreadIdArgs)
+    .output(v.from(vPaginationResult(vMessageDocument)))
+    .query(async ({ args, ctx }) => {
+        const messages = await listMessagesPage(ctx, args);
+
+        return { ...messages, page: (messages.page as unknown as Doc<"messages">[]).map((item) => publicMessage(item)) };
+    });
 
 /**
  * Raw rows for SERVER code that decides the thread's access itself: a background

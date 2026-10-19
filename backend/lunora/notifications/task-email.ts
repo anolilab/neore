@@ -17,8 +17,10 @@ import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { patchById } from "../lib/patch";
+import { linksToLockedThread } from "./locked-link";
 
 /** Pending rows one send run takes; the rest wait for the next sweep. */
 export const SEND_BATCH = 20;
@@ -90,9 +92,14 @@ export const listPendingOutcomeEmails = internalQuery
             where: { claimedAt: { lt: cutoff }, status: "sending" },
         });
 
-        return [...pending, ...abandoned].slice(0, SEND_BATCH).map(({ _id, link, title, userId }) => {
-            return { id: _id, link, title, userId };
-        });
+        // The subject and the template carry this title. A chat locked after the row was queued sends the generic one.
+        return await Promise.all(
+            [...pending, ...abandoned].slice(0, SEND_BATCH).map(async ({ _id, link, title, userId }) => {
+                const shown = (await linksToLockedThread(ctx.db, link)) ? LOCKED_THREAD_TITLE : title;
+
+                return { id: _id, link, title: shown, userId };
+            }),
+        );
     });
 
 /**

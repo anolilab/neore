@@ -1548,6 +1548,16 @@
     {
       "from": "function:chat_functions:branchThread",
       "kind": "call",
+      "to": "function:agent_thread_lock:dropThreadPasscodeRows"
+    },
+    {
+      "from": "function:chat_functions:branchThread",
+      "kind": "call",
+      "to": "function:agent_thread_lock:inheritThreadPasscode"
+    },
+    {
+      "from": "function:chat_functions:branchThread",
+      "kind": "call",
       "to": "function:agent_threads:createThread"
     },
     {
@@ -6976,6 +6986,13 @@
     },
     {
       "detail": "query",
+      "id": "function:agent_messages:listMessagesByThreadIdAdmitted",
+      "kind": "function",
+      "name": "agent.messages.listMessagesByThreadIdAdmitted",
+      "module": "agent"
+    },
+    {
+      "detail": "query",
       "id": "function:agent_messages:listMessagesByThreadIdInternal",
       "kind": "function",
       "name": "agent.messages.listMessagesByThreadIdInternal",
@@ -7354,9 +7371,23 @@
     },
     {
       "detail": "mutation",
+      "id": "function:agent_thread_lock:dropThreadPasscodeRows",
+      "kind": "function",
+      "name": "agent.thread_lock.dropThreadPasscodeRows",
+      "module": "agent"
+    },
+    {
+      "detail": "mutation",
       "id": "function:agent_thread_lock:enableThreadLock",
       "kind": "function",
       "name": "agent.thread_lock.enableThreadLock",
+      "module": "agent"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:agent_thread_lock:inheritThreadPasscode",
+      "kind": "function",
+      "name": "agent.thread_lock.inheritThreadPasscode",
       "module": "agent"
     },
     {
@@ -15540,127 +15571,133 @@
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1052,
+      "line": 1053,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1084,
+      "line": 1085,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1175,
+      "line": 1176,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1218,
+      "line": 1219,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1246,
+      "line": 1247,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1286,
+      "line": 1287,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1304,
+      "line": 1305,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1316,
+      "line": 1317,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1368,
+      "line": 1369,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1385,
+      "line": 1386,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1399,
+      "line": 1400,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/messages",
       "kind": "call",
-      "line": 59,
+      "line": 62,
       "reason": "\"listMessages\" is not a registered function"
     },
     {
       "file": "agent/client/messages",
       "kind": "call",
-      "line": 156,
+      "line": 160,
       "reason": "\"saveMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 104,
+      "line": 110,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 114,
+      "line": 134,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 148,
+      "line": 135,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 176,
+      "line": 159,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 179,
+      "line": 187,
       "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 508,
+      "line": 190,
+      "reason": "\"fetchRecentAndSearchMessages\" is not a registered function"
+    },
+    {
+      "file": "agent/client/search",
+      "kind": "call",
+      "line": 522,
       "reason": "\"generateAndSaveEmbeddings\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 642,
+      "line": 657,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
       "file": "agent/client/search",
       "kind": "call",
-      "line": 643,
+      "line": 658,
       "reason": "\"fetchContextWithPrompt\" is not a registered function"
     },
     {
@@ -16108,6 +16145,24 @@
       "reason": "\"deleteVectorRow\" is not a registered function"
     },
     {
+      "file": "agent/thread-lock",
+      "kind": "write",
+      "line": 268,
+      "reason": "\"inheritPasscodeHandler\" is not a registered function"
+    },
+    {
+      "file": "agent/thread-lock",
+      "kind": "read",
+      "line": 291,
+      "reason": "\"dropPasscodeRowsHandler\" is not a registered function"
+    },
+    {
+      "file": "agent/thread-lock",
+      "kind": "write",
+      "line": 297,
+      "reason": "\"dropPasscodeRowsHandler\" is not a registered function"
+    },
+    {
       "file": "agent/thread-passcode",
       "kind": "read",
       "line": 18,
@@ -16530,109 +16585,109 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 316,
+      "line": 320,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 316,
+      "line": 320,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 445,
+      "line": 449,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 445,
+      "line": 449,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 454,
+      "line": 458,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 454,
+      "line": 458,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 479,
+      "line": 483,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 479,
+      "line": 483,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 487,
+      "line": 491,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 487,
+      "line": 491,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 515,
+      "line": 519,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 515,
+      "line": 519,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 516,
+      "line": 520,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 516,
+      "line": 520,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 563,
+      "line": 567,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 651,
+      "line": 655,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 667,
+      "line": 671,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 677,
+      "line": 681,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -17484,13 +17539,13 @@
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 248,
+      "line": 249,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 271,
+      "line": 280,
       "reason": "the default export is not a registered function"
     },
     {

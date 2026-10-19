@@ -16,6 +16,7 @@ import { internal } from "../_generated/internal";
 import { internalMutation, type MutationCtx } from "../_generated/server";
 import { currentUserShard } from "../lib/shard-context";
 import type { ScanPage } from "../lib/scan-pages";
+import { MAX_LENGTH } from "../lib/validators";
 import { type AutoArchiveCandidate, autoArchiveCutoff, isAutoArchiveDays, runArchivePass, selectAutoArchiveDue } from "./auto-archive-logic";
 import { markThreadArchived } from "./threads";
 
@@ -42,25 +43,19 @@ const candidateOf = (thread: Doc<"threads">): AutoArchiveCandidate => {
 };
 
 /**
- * True when the thread has a pending or streaming stream. Pages the thread's own
- * stream rows until the first live one, so finished streams never hide it.
+ * True when the thread has a pending or streaming stream. One indexed `first()`
+ * per live status, so the thread's finished streams are never read.
  */
 const threadHasLiveStream = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
-    let cursor: string | null = null;
-    let isDone = false;
-
-    while (!isDone) {
-        const page = await ctx.db
+    for (const status of ["pending", "streaming"]) {
+        const stream = await ctx.db
             .query("persistentStreams")
-            .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
-            .paginate({ cursor, numItems: 50 });
+            .withIndex("by_threadId_status", (q) => q.eq("threadId", threadId).eq("status", status))
+            .first();
 
-        if (page.page.some((stream) => stream.status === "pending" || stream.status === "streaming")) {
+        if (stream) {
             return true;
         }
-
-        cursor = page.continueCursor;
-        isDone = page.isDone;
     }
 
     return false;
@@ -81,23 +76,14 @@ export const archiveIfStillIdle = internalMutation
             return false;
         }
 
-        const hasLiveStream = await threadHasLiveStream(ctx, args.threadId);
-
         // The project pin is read per thread, not from a capped list of pinned projects.
         const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;
         const pinnedProjectIds = new Set<string>(project && project.pinnedAt !== undefined && thread.projectId ? [thread.projectId] : []);
 
-        const due = selectAutoArchiveDue(
-            [candidateOf(thread)],
-            args.cutoff,
-            {
-                liveThreadIds: new Set(hasLiveStream ? [args.threadId] : []),
-                pinnedProjectIds,
-            },
-            1,
-        );
+        // The row checks run first, so a thread that is not due never reads its streams.
+        const due = selectAutoArchiveDue([candidateOf(thread)], args.cutoff, { liveThreadIds: new Set<string>(), pinnedProjectIds }, 1);
 
-        if (due.length === 0) {
+        if (due.length === 0 || (await threadHasLiveStream(ctx, args.threadId))) {
             return false;
         }
 
@@ -167,7 +153,7 @@ export const autoArchiveInactiveThreads = internalMutation
 
 /** Resumes a pass that ran out of read budget, from the cursor it stopped at. */
 export const autoArchiveContinue = internalMutation
-    .input({ cursor: v.string() })
+    .input({ cursor: v.string().max(MAX_LENGTH.cursor) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await runAutoArchivePass(ctx, args.cursor);

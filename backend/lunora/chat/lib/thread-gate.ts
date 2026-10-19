@@ -57,15 +57,16 @@ export const throwUnlessGranted = (outcome: ThreadGateOutcome, deniedMessage?: s
 };
 
 /**
- * True when the thread was locked AFTER a row was created. Every request that
+ * True when the thread was locked at or after a row was created. Every request that
  * writes into a locked thread must first verify the passcode proof, so a row
- * created after the lock was written under a proof; a lock newer than the row
- * means the proof that started the row predates the lock, and nothing may
- * continue on it. Used for stream rows (`createStreamWithMessage` runs only after
- * the gate) and for background jobs that carry a stream id.
+ * created after the lock was written under a proof; a lock at or newer than the row
+ * means the proof that started the row may predate the lock, and nothing may
+ * continue on it. Equal timestamps fail closed: a lock and a row in the same
+ * millisecond cannot be ordered. Used for stream rows (`createStreamWithMessage`
+ * runs only after the gate) and for background jobs that carry a stream id.
  */
 export const lockedAfterCreation = (thread: { lockedAt?: number | null }, createdAt: number): boolean =>
-    isThreadLocked(thread) && (thread.lockedAt ?? 0) > createdAt;
+    isThreadLocked(thread) && (thread.lockedAt ?? 0) >= createdAt;
 
 /**
  * A thread row as a list shows it: a locked row becomes its stub, anything else

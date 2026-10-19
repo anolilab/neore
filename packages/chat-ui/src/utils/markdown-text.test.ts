@@ -57,6 +57,14 @@ describe("markdownToPlainText", () => {
         expect(markdownToPlainText("| Name | Qty |\n|:-----|----:|\n| **apple** | 2 |")).toBe("Name\tQty\napple\t2");
     });
 
+    it("reads an escaped pipe in a header cell as text, not a cell boundary", () => {
+        expect(markdownToPlainText("| a \\| b | Qty |\n|---|---|\n| 1 | 2 |")).toBe("a | b\tQty\n1\t2");
+    });
+
+    it("reads an escaped pipe in a body cell as text, and an escaped backslash before a delimiter as a backslash", () => {
+        expect(markdownToPlainText("| Expr | Note |\n|---|---|\n| x \\| y | z |\n| a\\\\ | b |")).toBe("Expr\tNote\nx | y\tz\na\\\tb");
+    });
+
     it("keeps pipes in prose and in shell pipelines, which are not tables", () => {
         expect(markdownToPlainText("a | b | c")).toBe("a | b | c");
         expect(markdownToPlainText("Run this:\n\n$ cat log.txt | grep error | wc -l")).toBe("Run this:\n\n$ cat log.txt | grep error | wc -l");

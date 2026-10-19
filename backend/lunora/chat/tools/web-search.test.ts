@@ -98,6 +98,21 @@ describe("web search provider requests", () => {
         });
     });
 
+    it("Exa with both include and exclude lists still drops results from a model-excluded domain", async () => {
+        stubProvider({
+            results: [
+                { text: "a", title: "a", url: "https://spam.io/x" },
+                { text: "b", title: "b", url: "https://python.org/y" },
+                { text: "c", title: "c", url: "https://blog.spam.io/z" },
+            ],
+        });
+
+        const output = await run([], { excludeDomains: ["https://Spam.io/path"], includeDomains: ["python.org", "spam.io"], maxResults: 7, provider: "exa" });
+
+        expect(sent[0]?.body).toMatchObject({ includeDomains: ["python.org", "spam.io"] });
+        expect(output.results[0]?.results.map((r) => r.url)).toStrictEqual(["https://python.org/y"]);
+    });
+
     it("Tavily gets the merged blocklist as exclude_domains", async () => {
         stubProvider({ results: [{ content: "a", title: "a", url: "https://ok.org/y" }] });
 

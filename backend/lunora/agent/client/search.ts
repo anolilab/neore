@@ -44,7 +44,10 @@ export const fetchContextMessages = async (
     ctx: QueryContext | MutationContext | ActionContext,
     component: AgentComponent,
     args: {
+        /** Set only by an already-admitted background run (see `Options.admittedRun`). */
+        admittedRun?: boolean;
         contextOptions: ContextOptions;
+
         getEmbedding?: GetEmbedding;
 
         /**
@@ -52,13 +55,13 @@ export const fetchContextMessages = async (
          * for text and vector search
          */
         searchText?: string;
-
         /**
          * If provided, it will use this message for text/vector search (if enabled)
          * and will only fetch messages up to (and including) this message's "order"
          */
         targetMessageId?: string;
         threadId: string | undefined;
+        unlockProof?: string;
         userId: string | undefined;
     },
 ): Promise<MessageDocument[]> => {
@@ -72,7 +75,10 @@ export const fetchRecentAndSearchMessages = async (
     // Kept for the call signature; reads go through `internal` now.
     _component: AgentComponent,
     args: {
+        /** Set only by an already-admitted background run (see `Options.admittedRun`). */
+        admittedRun?: boolean;
         contextOptions: ContextOptions;
+
         getEmbedding?: GetEmbedding;
 
         /**
@@ -80,13 +86,13 @@ export const fetchRecentAndSearchMessages = async (
          * for text and vector search
          */
         searchText?: string;
-
         /**
          * If provided, it will use this message for text/vector search (if enabled)
          * and will only fetch messages up to (and including) this message's "order"
          */
         targetMessageId?: string;
         threadId: string | undefined;
+        unlockProof?: string;
         userId: string | undefined;
     },
 ): Promise<{ recentMessages: MessageDocument[]; searchMessages: MessageDocument[] }> => {
@@ -110,18 +116,23 @@ export const fetchRecentAndSearchMessages = async (
 
     if (args.threadId && options.recentMessages !== 0) {
         // Internal for the same reason as `listMessages`: the thread is already
-        // authorized, and background runs carry no identity.
-        const { page } = await context.runQuery(internal.agent.messages.listMessagesByThreadIdInternal, {
+        // authorized, and background runs carry no identity. A run admitted under
+        // the lock state reads without a proof (`admittedRun`); any other read
+        // carries the caller's validated proof, or the guard answers empty.
+        const recentArgs = {
             excludeToolMessages: options.excludeToolMessages,
-            order: "desc",
+            order: "desc" as const,
             paginationOpts: {
                 cursor: null,
                 numItems: options.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             },
-            statuses: ["success"],
+            statuses: ["success" as const],
             threadId: args.threadId as Id<"threads">,
             upToAndIncludingMessageId: targetMessageId as Id<"messages"> | undefined,
-        });
+        };
+        const { page } = args.admittedRun
+            ? await context.runQuery(internal.agent.messages.listMessagesByThreadIdAdmitted, recentArgs)
+            : await context.runQuery(internal.agent.messages.listMessagesByThreadIdInternal, { ...recentArgs, unlockProof: args.unlockProof });
 
         const pathPage = onPath ? page.filter((m) => onPath.has(m._id)) : page;
 
@@ -485,9 +496,12 @@ export const generateAndSaveEmbeddings = async (
     ctx: ActionContext,
     _component: AgentComponent,
     args: Pick<Config, "usageHandler" | "callSettings"> & {
+        /** Set only by an already-admitted background run (see `Options.admittedRun`). */
+        admittedRun?: boolean;
         agentName?: string;
         embeddingModel: EmbeddingModel;
         threadId: string | undefined;
+        unlockProof?: string;
         userId: string | undefined;
     },
     messages: MessageDocument[],
@@ -579,6 +593,7 @@ export const fetchContextWithPrompt = async (
 
     // If only a messageId is provided, this will add that message to the end.
     const { recentMessages, searchMessages } = await fetchRecentAndSearchMessages(context, component, {
+        admittedRun: args.admittedRun,
         contextOptions: args.contextOptions ?? {},
         getEmbedding: async (text) => {
             assert(embeddingModel, "An embeddingModel is required to be set on the Agent that you're doing vector search with");

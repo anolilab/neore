@@ -24,8 +24,10 @@ describe("summarizeThreadStats", () => {
         expect(summarizeThreadStats([])).toEqual({
             averageTokensPerSecond: undefined,
             cost: undefined,
+            costIsPartial: false,
             inputTokens: 0,
             outputTokens: 0,
+            unpricedReplies: 0,
         });
     });
 
@@ -56,6 +58,34 @@ describe("summarizeThreadStats", () => {
 
         expect(stats.averageTokensPerSecond).toBeUndefined();
         expect(stats.outputTokens).toBe(50);
+    });
+
+    it("reports the total as exact when every reply that spent tokens is priced", () => {
+        const stats = summarizeThreadStats([
+            reply({ cost: { byok: false, microdollars: 1000, pricingAvailable: true }, usage: { completionTokens: 5, promptTokens: 9 } }),
+            reply({ usage: { completionTokens: 0, promptTokens: 0 } }),
+        ]);
+
+        expect(stats.costIsPartial).toBe(false);
+        expect(stats.unpricedReplies).toBe(0);
+    });
+
+    it("marks the total partial when a reply that spent tokens has no cost, and counts it", () => {
+        const stats = summarizeThreadStats([
+            reply({ cost: { byok: false, microdollars: 1000, pricingAvailable: true }, usage: { completionTokens: 5, promptTokens: 9 } }),
+            reply({ usage: { completionTokens: 7, promptTokens: 3 } }),
+        ]);
+
+        expect(stats.cost).toEqual({ byok: false, microdollars: 1000, pricingAvailable: true });
+        expect(stats.costIsPartial).toBe(true);
+        expect(stats.unpricedReplies).toBe(1);
+    });
+
+    it("marks the total partial when a priced reply is missing prices", () => {
+        const stats = summarizeThreadStats([reply({ cost: { byok: false, microdollars: 0, pricingAvailable: false }, usage: { completionTokens: 2 } })]);
+
+        expect(stats.costIsPartial).toBe(true);
+        expect(stats.unpricedReplies).toBe(0);
     });
 
     it("sums cost and keeps the byok and unpriced flags", () => {

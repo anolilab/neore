@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import schema from "../schema";
 import { getHomeOverview } from "./overview";
 
@@ -114,6 +115,62 @@ describe("getHomeOverview", () => {
         const result = await overview(USER);
 
         expect(result.recentThreads.map((thread: { title: string }) => thread.title)).toEqual(["Old but active", "Newer, quiet"]);
+    });
+
+    it("hides the prompt and task of a run whose chat is locked, and shows the rest", async () => {
+        await harness.run(async (ctx: any) => {
+            const now = Date.now();
+            const lockedThreadId = await ctx.db.insert("threads", { lockedAt: now, status: "regular", title: "Salary", userId: USER });
+            const openThreadId = await ctx.db.insert("threads", { status: "regular", title: "Lint", userId: USER });
+            const run = { createdAt: now, log: "", openPr: false, repoUrl: "https://github.com/a/b.git", status: "running", updatedAt: now, userId: USER };
+
+            await ctx.db.insert("codingAgentRuns", { ...run, agent: "claude_code", prompt: "Rotate the prod keys", threadId: lockedThreadId });
+            await ctx.db.insert("codingAgentRuns", { ...run, agent: "claude_code", prompt: "Fix the lint", threadId: openThreadId });
+            await ctx.db.insert("subAgentRuns", {
+                createdAt: now,
+                depth: 1,
+                parentThreadId: lockedThreadId,
+                status: "running",
+                task: "Read the salary sheet",
+                updatedAt: now,
+                userId: USER,
+            });
+
+            // The child thread is locked; the parent is not.
+            const lockedChildId = await ctx.db.insert("threads", { lockedAt: now, status: "regular", title: "Child", userId: USER });
+
+            await ctx.db.insert("subAgentRuns", {
+                childThreadId: lockedChildId,
+                createdAt: now,
+                depth: 1,
+                parentThreadId: openThreadId,
+                status: "running",
+                task: "Child task",
+                updatedAt: now,
+                userId: USER,
+            });
+            await ctx.db.insert("subAgentRuns", {
+                createdAt: now,
+                depth: 1,
+                parentThreadId: openThreadId,
+                status: "running",
+                task: "Summarise the docs",
+                updatedAt: now,
+                userId: USER,
+            });
+        });
+
+        const result = await overview(USER);
+        const prompts = result.codingAgents.map((run: { prompt: string }) => run.prompt);
+        const tasks = result.subAgents.map((run: { task: string }) => run.task);
+
+        expect(prompts).toContain(LOCKED_THREAD_TITLE);
+        expect(prompts).toContain("Fix the lint");
+        expect(prompts.join("\n")).not.toContain("Rotate the prod keys");
+        expect(tasks).toContain(LOCKED_THREAD_TITLE);
+        expect(tasks).toContain("Summarise the docs");
+        expect(tasks.join("\n")).not.toContain("Read the salary sheet");
+        expect(tasks.join("\n")).not.toContain("Child task");
     });
 
     it("shows nothing of another user's", async () => {

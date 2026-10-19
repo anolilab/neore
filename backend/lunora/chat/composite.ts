@@ -112,6 +112,8 @@ export const getThreadWithData = liteAuthQuery
                 },
                 statuses: ["success", "pending", "failed"],
                 threadId: threadId as Id<"threads">,
+                // Admitted above: a locked chat's page is empty without the proof this read was given.
+                unlockProof,
             }),
             // Usage of up to the 1000 most recent rows that carry any (the walk
             // of `threadId_status_tool_order_stepOrder`, descending). Only

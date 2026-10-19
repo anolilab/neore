@@ -19,7 +19,6 @@ const TABLE_CELL_SEPARATOR_RE = /^ *:?-+:? *$/;
 const RULE_MARKS_RE = /^(?:-+|\*+|_+)$/;
 const SPACE_OR_TAB_RE = /[ \t]/g;
 const LEADING_PIPE_RE = /^\|/;
-const TRAILING_PIPE_RE = /\|$/;
 const BLANK_RUN_RE = /\n{3,}/g;
 const CRLF_RE = /\r\n/g;
 
@@ -40,16 +39,56 @@ const ESCAPE_MARK = "";
 const CODE_RESTORE_RE = new RegExp(String.raw`${CODE_MARK}(\d+)${CODE_MARK}`, "g");
 const ESCAPE_RESTORE_RE = new RegExp(String.raw`${ESCAPE_MARK}(\d+)${ESCAPE_MARK}`, "g");
 
-const pipeCount = (line: string): number => line.split("|").length - 1;
+/** Number of pipes that delimit cells: a `\|` is cell text, and `\\|` is an escaped backslash before a delimiter. */
+const pipeCount = (line: string): number => {
+    let count = 0;
+
+    for (let index = 0; index < line.length; index += 1) {
+        if (line[index] === "\\") {
+            index += 1;
+        } else if (line[index] === "|") {
+            count += 1;
+        }
+    }
+
+    return count;
+};
+
+/** Splits row text on its unescaped pipes. Escapes stay in the cell; `stripInline` turns `\|` into `|`. */
+const splitCells = (text: string): string[] => {
+    const cells: string[] = [];
+    let current = "";
+
+    for (let index = 0; index < text.length; index += 1) {
+        const character = text[index] ?? "";
+
+        if (character === "\\" && index + 1 < text.length) {
+            current += character + (text[index + 1] ?? "");
+            index += 1;
+        } else if (character === "|") {
+            cells.push(current);
+            current = "";
+        } else {
+            current += character;
+        }
+    }
+
+    cells.push(current);
+
+    return cells;
+};
 
 /** A table row without its outer pipes, split into trimmed cells. */
-const tableCells = (line: string): string[] =>
-    line
-        .trim()
-        .replace(LEADING_PIPE_RE, "")
-        .replace(TRAILING_PIPE_RE, "")
-        .split("|")
-        .map((cell) => cell.trim());
+const tableCells = (line: string): string[] => {
+    const cells = splitCells(line.trim().replace(LEADING_PIPE_RE, "")).map((cell) => cell.trim());
+
+    // A trailing delimiter pipe leaves an empty last cell; an escaped one never does.
+    if (cells.length > 1 && cells[cells.length - 1] === "") {
+        cells.pop();
+    }
+
+    return cells;
+};
 
 const isTableSeparator = (line: string): boolean => tableCells(line).every((cell) => TABLE_CELL_SEPARATOR_RE.test(cell));
 
@@ -205,6 +244,22 @@ const tableRowText = (line: string): string =>
         .join("\t");
 
 /**
+ * The table whose header is `lines[start]`: its text rows, and the index of its last
+ * line. The separator row is markup; the body rows run until a row without pipes.
+ */
+const readTable = (lines: string[], start: number): { end: number; rows: string[] } => {
+    const rows = [tableRowText(lines[start] ?? "")];
+    let end = start + 1;
+
+    while (end + 1 < lines.length && pipeCount(lines[end + 1] ?? "") >= 1) {
+        end += 1;
+        rows.push(tableRowText(lines[end] ?? ""));
+    }
+
+    return { end, rows };
+};
+
+/**
  * Plain text of a markdown string. Lists keep their bullets and numbers, link
  * and image text is kept, code fences keep their code, and table rows become
  * tab-separated cells.
@@ -214,7 +269,14 @@ export const markdownToPlainText = (markdown: string): string => {
     const lines = markdown.replaceAll(CRLF_RE, "\n").split("\n");
     let fence: string | undefined;
 
+    // Last line of the table already written out; its rows are skipped below.
+    let tableEnd = -1;
+
     for (let index = 0; index < lines.length; index += 1) {
+        if (index <= tableEnd) {
+            continue;
+        }
+
         const line = lines[index] ?? "";
 
         if (fence !== undefined) {
@@ -235,14 +297,10 @@ export const markdownToPlainText = (markdown: string): string => {
         }
 
         if (isTableStart(line, lines[index + 1])) {
-            output.push(tableRowText(line));
-            // The separator row is markup; the body rows run until a row without pipes.
-            index += 1;
+            const table = readTable(lines, index);
 
-            while (index + 1 < lines.length && pipeCount(lines[index + 1] ?? "") >= 1) {
-                index += 1;
-                output.push(tableRowText(lines[index] ?? ""));
-            }
+            output.push(...table.rows);
+            tableEnd = table.end;
 
             continue;
         }

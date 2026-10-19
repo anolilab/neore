@@ -1,6 +1,8 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { forgetAllUnlockProofs, rememberUnlockProof } from "@/lib/lunora/unlock-proofs";
+
 import { useModelStore } from "../stores/model-store";
 import useComparisonChat from "./use-comparison-chat";
 
@@ -134,5 +136,30 @@ describe("useComparisonChat temporary choice", () => {
         for (const args of createdThreads()) {
             expect(args).not.toHaveProperty("temporary");
         }
+    });
+});
+
+describe("useComparisonChat follow-ups to existing children", () => {
+    it("sends each locked child its own unlock proof, and sends none to an open child", async () => {
+        rememberUnlockProof("child-locked", "proof-child", Date.now() + 60_000);
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt", parentThreadId: "parent" }));
+
+        await act(async () => {
+            await result.current.sendToExistingChildren("follow-up", [
+                { model: "model-a", threadId: "child-locked" },
+                { model: "model-b", threadId: "child-open" },
+            ]);
+        });
+
+        const bodies = vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
+        const locked = bodies.find((body) => body.threadId === "child-locked");
+        const open = bodies.find((body) => body.threadId === "child-open");
+
+        expect(locked).toMatchObject({ prompt: "follow-up", unlockProof: "proof-child" });
+        expect(open).toBeDefined();
+        expect(open).not.toHaveProperty("unlockProof");
+
+        forgetAllUnlockProofs();
     });
 });

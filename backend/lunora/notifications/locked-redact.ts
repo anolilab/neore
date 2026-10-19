@@ -21,29 +21,48 @@ import { internalMutation } from "../_generated/server";
 import { patchRow } from "../lib/patch";
 import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { MAX_LENGTH } from "../lib/validators";
 import { threadIdOfLink } from "./locked-link";
 
 /** Notification rows one job rewrites. A user with more continues in the next job. */
 export const REDACT_BATCH = 200;
-/** Invites read per lock. ponytail: a chat with more than this many invites keeps the rest's titles; add a page loop when one has. */
-const INVITE_LIMIT = 100;
-/**
- * The fan-out waits this long, so a notification scheduled before the lock lands
- * first. A grace period, not a guarantee: a write delivered later keeps its title.
- */
-const FANOUT_DELAY_MS = 30_000;
+/** Invites read per page while finding the chat's collaborators. */
+const INVITE_PAGE = 100;
 
 /** The users who accepted an invite to `threadId`, other than its owner. A revoked grant still counts: the invite keeps `acceptedBy`. */
 export const granteesOf = (invites: ReadonlyArray<{ acceptedBy?: string }>, ownerId: string): string[] => [
     ...new Set(invites.flatMap((invite) => (invite.acceptedBy && invite.acceptedBy !== ownerId ? [invite.acceptedBy] : []))),
 ];
 
-/** Schedules one redaction job per former or current collaborator, each on that user's shard. Call from the owner's lock mutation. */
+/**
+ * Schedules one redaction job per former or current collaborator, each on that
+ * user's shard, dispatched as the lock commits. Reads every page of the chat's
+ * invites, so no collaborator is left with the title. Call from the owner's lock mutation.
+ */
 export const scheduleGranteeRedaction = async (ctx: Pick<MutationCtx, "db" | "scheduler">, threadId: Id<"threads">, ownerId: string): Promise<void> => {
-    const { page } = await ctx.db.threadInvites.findMany({ limit: INVITE_LIMIT, where: { threadId } });
+    const grantees = new Set<string>();
+    let cursor: string | null = null;
 
-    for (const userId of granteesOf(page, ownerId)) {
-        await runAfterOnShard(ctx.scheduler, FANOUT_DELAY_MS, internal.notifications.locked_redact.redactLockedLinks, { threadId, userId }, userId);
+    for (;;) {
+        const batch: { continueCursor: string | null; isDone: boolean; page: { acceptedBy?: string }[] } = await ctx.db.threadInvites.findMany({
+            cursor,
+            limit: INVITE_PAGE,
+            where: { threadId },
+        });
+
+        for (const userId of granteesOf(batch.page, ownerId)) {
+            grantees.add(userId);
+        }
+
+        if (batch.isDone || batch.continueCursor === null) {
+            break;
+        }
+
+        cursor = batch.continueCursor;
+    }
+
+    for (const userId of grantees) {
+        await runAfterOnShard(ctx.scheduler, 0, internal.notifications.locked_redact.redactLockedLinks, { threadId, userId }, userId);
     }
 };
 
@@ -68,7 +87,7 @@ const redactPendingMail = async (ctx: MutationCtx, notificationId: Id<"notificat
  */
 export const redactLockedLinks = internalMutation
     .input({
-        cursor: v.optional(v.string()),
+        cursor: v.optional(v.string().max(MAX_LENGTH.cursor)),
         threadId: v.id("threads"),
         userId: v.string(),
     })

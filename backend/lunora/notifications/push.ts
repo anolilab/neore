@@ -16,6 +16,7 @@ import { internal } from "../_generated/internal";
 import { internalAction, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { linksToLockedThread, redactForLockedThread } from "./locked-link";
 import { webPushConfig } from "./push-config";
 import { isAllowedPushEndpoint } from "./push-endpoint";
 import { pushTitle, pushUrgency } from "./push-text";
@@ -155,12 +156,15 @@ export const loadPushNotification = internalQuery
             return null;
         }
 
+        // Queued before its chat was locked, the push still carries the title: redact it as the inbox does.
+        const shown = (await linksToLockedThread(ctx.db, notification.link)) ? redactForLockedThread(notification) : notification;
+
         return {
-            title: notification.title,
-            type: notification.type,
-            ...(notification.body !== undefined && { body: notification.body }),
-            ...(notification.link !== undefined && { link: notification.link }),
-            ...(notification.outcome !== undefined && { outcome: notification.outcome }),
+            title: shown.title,
+            type: shown.type,
+            ...(shown.body !== undefined && { body: shown.body }),
+            ...(shown.link !== undefined && { link: shown.link }),
+            ...(shown.outcome !== undefined && { outcome: shown.outcome }),
         };
     });
 

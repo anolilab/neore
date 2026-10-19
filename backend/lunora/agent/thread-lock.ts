@@ -11,7 +11,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import { internalMutation, type MutationCtx } from "../_generated/server";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { throwThreadNotFound } from "../lib/error-helpers";
 import { patchRow } from "../lib/patch";
@@ -247,3 +247,60 @@ export const removeThreadPasscode = authMutation
 
         return { ok: true };
     });
+
+/**
+ * A branch of a locked chat is locked too. The branch gets the parent's passcode
+ * (same hash, salt and iteration count, so the same passcode opens it) under a
+ * NEW epoch: a proof for the parent does not open the branch, and the branch
+ * needs its own unlock. Called by `branchThread` after the branch is created and
+ * before any message is copied, so no content lands in an unlocked branch.
+ */
+export const inheritPasscodeHandler = async (ctx: MutationCtx, args: { sourceThreadId: Id<"threads">; targetThreadId: Id<"threads"> }): Promise<null> => {
+    const source = await readPasscodeRow(ctx.db, args.sourceThreadId);
+    const target = await ctx.db.get(args.targetThreadId);
+
+    if (!source || !target) {
+        throw new LunoraError("INTERNAL", "The locked chat's passcode is missing; the branch was not created.");
+    }
+
+    const now = Date.now();
+
+    await ctx.db.insert("threadPasscodes", {
+        createdAt: now,
+        epoch: newPasscodeEpoch(),
+        failedAttempts: 0,
+        hash: source.hash,
+        iterations: source.iterations,
+        salt: source.salt,
+        threadId: args.targetThreadId,
+        updatedAt: now,
+        userId: target.userId ?? source.userId,
+    });
+    await patchRow(ctx.db, target, { lockedAt: now, updatedAt: now });
+
+    return null;
+};
+
+export const inheritThreadPasscode = internalMutation
+    .input({ sourceThreadId: v.id("threads"), targetThreadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => await inheritPasscodeHandler(ctx, args));
+
+/** Removes a thread's passcode rows: the cleanup when a branch cannot be completed. */
+export const dropPasscodeRowsHandler = async (ctx: MutationCtx, args: { threadId: Id<"threads"> }): Promise<null> => {
+    const rows = await ctx.db
+        .query("threadPasscodes")
+        .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+        .collect();
+
+    for (const row of rows) {
+        await ctx.db.delete(row._id);
+    }
+
+    return null;
+};
+
+export const dropThreadPasscodeRows = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => await dropPasscodeRowsHandler(ctx, args));

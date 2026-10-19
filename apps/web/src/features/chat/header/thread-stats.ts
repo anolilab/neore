@@ -31,8 +31,12 @@ export type ThreadStats = {
     averageTokensPerSecond?: number;
     /** Undefined when no reply carried a cost. */
     cost?: { byok: boolean; microdollars: number; pricingAvailable: boolean };
+    /** The cost total is a floor: some reply is unpriced, or a priced one is not fully priced. */
+    costIsPartial: boolean;
     inputTokens: number;
     outputTokens: number;
+    /** Replies that spent tokens but carry no cost. A reply that spent nothing (a local model) is free, not unpriced. */
+    unpricedReplies: number;
 };
 
 const assistantRowsInOrder = (rows: ReadonlyArray<ReplyRow>): ReplyRow[] =>
@@ -85,6 +89,7 @@ export const summarizeThreadStats = (messages: ReadonlyArray<StatsMessage>): Thr
     let timedTokens = 0;
     let timedMs = 0;
     let cost: ThreadStats["cost"];
+    let unpricedReplies = 0;
 
     for (const reply of replies) {
         const { usage } = reply;
@@ -92,6 +97,10 @@ export const summarizeThreadStats = (messages: ReadonlyArray<StatsMessage>): Thr
 
         inputTokens += usage?.promptTokens ?? 0;
         outputTokens += completionTokens;
+
+        if (!reply.cost && (completionTokens > 0 || (usage?.promptTokens ?? 0) > 0)) {
+            unpricedReplies += 1;
+        }
 
         if (completionTokens > 0 && usage?.durationMs !== undefined && usage.durationMs > 0) {
             timedTokens += completionTokens;
@@ -113,7 +122,9 @@ export const summarizeThreadStats = (messages: ReadonlyArray<StatsMessage>): Thr
     return {
         averageTokensPerSecond: timedMs > 0 ? (timedTokens / timedMs) * 1000 : undefined,
         cost,
+        costIsPartial: cost !== undefined && (!cost.pricingAvailable || unpricedReplies > 0),
         inputTokens,
         outputTokens,
+        unpricedReplies,
     };
 };

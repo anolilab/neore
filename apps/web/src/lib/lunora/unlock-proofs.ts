@@ -8,6 +8,8 @@
  * no call site has to remember it.
  */
 
+import { useSyncExternalStore } from "react";
+
 /** Forget a chat's proof after this long without using it. */
 export const UNLOCK_IDLE_MS = 15 * 60 * 1000;
 
@@ -23,7 +25,17 @@ interface ProofEntry {
 const proofs = new Map<string, ProofEntry>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const relockListeners = new Set<(threadId: string) => void>();
+const changeListeners = new Set<() => void>();
 const activity = { listening: false };
+
+/** Called whenever a proof is stored or forgotten. Returns the unsubscribe (for `useUnlockProof`). */
+export const subscribeUnlockProofs = (listener: () => void): (() => void) => {
+    changeListeners.add(listener);
+
+    return () => {
+        changeListeners.delete(listener);
+    };
+};
 
 /**
  * Called with a chat's id each time it is relocked: by expiry or idle timeout,
@@ -51,6 +63,10 @@ const clearTimer = (threadId: string): void => {
 const relock = (threadId: string): void => {
     clearTimer(threadId);
     proofs.delete(threadId);
+
+    for (const listener of changeListeners) {
+        listener();
+    }
 
     for (const listener of relockListeners) {
         listener(threadId);
@@ -113,6 +129,10 @@ export const rememberUnlockProof = (threadId: string, proof: string, expiresAt: 
     proofs.set(threadId, entry);
     arm(threadId, entry, now);
     installActivityListeners();
+
+    for (const listener of changeListeners) {
+        listener();
+    }
 };
 
 /** The live proof for `threadId`, or undefined once it expired or sat idle. */
@@ -137,6 +157,17 @@ export const currentUnlockProof = (threadId: string, now: number = Date.now()): 
 
     return entry.proof;
 };
+
+/**
+ * The live proof for a chat, re-rendering when it changes: a view that was refused
+ * (`THREAD_LOCKED`) picks up the proof the moment the unlock lands.
+ */
+export const useUnlockProof = (threadId: string | undefined): string | undefined =>
+    useSyncExternalStore(
+        subscribeUnlockProofs,
+        () => (threadId === undefined ? undefined : currentUnlockProof(threadId)),
+        () => undefined,
+    );
 
 /** Re-locks one chat now. */
 export const forgetUnlockProof = (threadId: string): void => {

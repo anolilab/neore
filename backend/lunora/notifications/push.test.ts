@@ -8,8 +8,9 @@ import { createNotify, defineNotify, memorySubscriptionStore } from "@lunora/not
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import schema from "../schema";
-import { getPushSubscriptionStatus, MAX_PUSH_SUBSCRIPTIONS_PER_USER, subscribePush, unsubscribePush } from "./push";
+import { getPushSubscriptionStatus, loadPushNotification, MAX_PUSH_SUBSCRIPTIONS_PER_USER, subscribePush, unsubscribePush } from "./push";
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     const sessionFrom = async (context: { auth: { userId?: string | null } }) =>
@@ -104,5 +105,41 @@ describe("push subscriptions", () => {
         expect(devices).toHaveLength(MAX_PUSH_SUBSCRIPTIONS_PER_USER);
         expect(devices.map((device) => device.endpoint)).not.toContain(`${ENDPOINT}-0`);
         expect(devices.map((device) => device.endpoint)).toContain(ENDPOINT);
+    });
+});
+
+describe("the push for a notification linked to a chat", () => {
+    const loadPush = async (notificationId: unknown): Promise<Record<string, unknown> | null> =>
+        await harness.run(
+            async (ctx: object) =>
+                await (loadPushNotification as unknown as Handler<Record<string, unknown> | null>).handler(ctx, { notificationId, userId: USER }),
+        );
+
+    const seed = async (lockedAt: number | undefined) =>
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { ...(lockedAt !== undefined && { lockedAt }), status: "regular", title: "Salary", userId: USER });
+
+            return await ctx.db.insert("notifications", {
+                body: "reply text",
+                createdAt: 1,
+                link: `/chat/${threadId}`,
+                title: "Salary",
+                type: "task",
+                userId: USER,
+            });
+        });
+
+    it("carries the generic title and no body once its chat is locked", async () => {
+        const notificationId = await seed(Date.now());
+        const pushed = await loadPush(notificationId);
+
+        expect(pushed).toMatchObject({ link: expect.stringContaining("/chat/"), title: LOCKED_THREAD_TITLE, type: "task" });
+        expect(pushed).not.toHaveProperty("body");
+    });
+
+    it("keeps the title and body of a chat that is not locked", async () => {
+        const notificationId = await seed(undefined);
+
+        expect(await loadPush(notificationId)).toMatchObject({ body: "reply text", title: "Salary" });
     });
 });

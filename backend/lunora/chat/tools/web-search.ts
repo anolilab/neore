@@ -19,6 +19,7 @@ import {
     mergeExcludeDomains,
     TAVILY_MAX_EXCLUDE_DOMAINS,
     TAVILY_MAX_INCLUDE_DOMAINS,
+    toSearchDomain,
 } from "./search-domains";
 import { deduplicateByDomainAndUrl, fetchWithTimeout, formatError, withRetry } from "./utilities";
 
@@ -129,7 +130,7 @@ const searchWithExa = async (
 
     // Exa's REST API is camelCase (https://exa.ai/docs/reference/search). Its docs do not
     // say whether includeDomains and excludeDomains combine, so excludes go only when there
-    // is no include list. The post-filter still drops any blocked result.
+    // is no include list. The caller's post-filter enforces the excludes either way.
     const excludeDomains = domainFilter?.includeDomains?.length ? undefined : domainFilter?.excludeDomains;
 
     const response = await fetchWithTimeout("https://api.exa.ai/search", {
@@ -263,6 +264,14 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
                 ? { excludeDomains: mergeExcludeDomains(excludeDomains, blocklist), includeDomains: keptIncludes }
                 : undefined;
 
+        // What the post-filter drops: the model's excludes as hostnames (the filter matches
+        // hostnames, so `https://Spam.io/x` becomes `spam.io`) plus the user's blocklist. Applied
+        // to every provider, because a provider may ignore exclude_domains or drop it beside include_domains.
+        const enforcedExcludes = mergeExcludeDomains(
+            (excludeDomains ?? []).flatMap((entry) => toSearchDomain(entry) ?? []),
+            blocklist,
+        );
+
         // Lazy fetch user's Tavily key (BYOK), fall back to env key
         let userTavilyKey: string | undefined;
 
@@ -321,7 +330,7 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
                 });
 
                 // Post-filter too: a provider may ignore `exclude_domains`, and `parallel` takes none.
-                return { query, results: deduplicateByDomainAndUrl(filterBlockedResults(results, blocklist)) };
+                return { query, results: deduplicateByDomainAndUrl(filterBlockedResults(results, enforcedExcludes)) };
             } catch (error) {
                 toolsLogger.error(`Search failed for query "${query}":`, formatError(error));
 

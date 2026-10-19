@@ -947,6 +947,7 @@ export class Agent<
             paginationOpts: PaginationOptions;
             statuses?: MessageStatus[];
             threadId: string;
+            unlockProof?: string;
         },
     ): Promise<PaginationResult<MessageDoc>> {
         return listMessages(ctx, this.component, args);

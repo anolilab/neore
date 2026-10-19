@@ -304,7 +304,11 @@ const runSpeaker = async (
             text: "",
         });
 
-        const result = await agent.streamText(ctx, { threadId: turn.threadId, userId: turn.userId }, streamTextArgs as never, { saveStreamDeltas: false });
+        // Admitted by the stream this turn runs on (`streamRunThread`): the context is read without a proof.
+        const result = await agent.streamText(ctx, { threadId: turn.threadId, userId: turn.userId }, streamTextArgs as never, {
+            admittedRun: true,
+            saveStreamDeltas: false,
+        });
         const timingStart = Date.now();
         const { firstTokenTime, pending } = await pipeToPersistentChunks(ctx, turn.streamId, result.fullStream);
 

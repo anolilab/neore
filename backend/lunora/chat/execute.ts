@@ -328,7 +328,9 @@ export const runStreamingAgent = internalAction
             }
 
             // Stream text
+            // Admitted by `streamRunThread` above: the run reads its context without a proof.
             const result = await threadObject.streamText(streamTextArgs, {
+                admittedRun: true,
                 statelessMode: threadStatelessMode,
             });
 

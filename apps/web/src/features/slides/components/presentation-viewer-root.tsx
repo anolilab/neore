@@ -49,7 +49,8 @@ const PresentationViewerRoot = () => {
         }
     }, [generatingPresentation, isOpen, openPresentation]);
 
-    const { isLoading, presentation, slides } = usePresentationData(isOpen ? presentationId : undefined);
+    // The deck belongs to the chat it was generated in (`threadId`), whose proof opens it.
+    const { isLoading, presentation, slides } = usePresentationData(isOpen ? presentationId : undefined, threadId);
 
     if (!isOpen) {
         return null;

@@ -56,8 +56,16 @@ const ThreadStatsDialog: FC<ThreadStatsDialogProps> = ({ model, onOpenChange, op
                     <DialogTitle>{t`Thread statistics`}</DialogTitle>
                     <DialogDescription>{t`Totals across every reply in this thread, including regenerated alternatives.`}</DialogDescription>
                 </DialogHeader>
-                {isPending && !isError && <p className="text-muted-foreground text-sm">{t`Loading statistics…`}</p>}
-                {isError && <p className="text-destructive text-sm">{t`Could not load statistics for this thread.`}</p>}
+                {isPending && !isError && (
+                    <p aria-live="polite" className="text-muted-foreground text-sm" role="status">
+                        {t`Loading statistics…`}
+                    </p>
+                )}
+                {isError && (
+                    <p className="text-destructive text-sm" role="alert">
+                        {t`Could not load statistics for this thread.`}
+                    </p>
+                )}
                 {stats && (
                     <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm tabular-nums">
                         <dt className="text-muted-foreground">{t`Replies`}</dt>
@@ -78,8 +86,11 @@ const ThreadStatsDialog: FC<ThreadStatsDialogProps> = ({ model, onOpenChange, op
                                 none
                             ) : (
                                 <>
-                                    {stats.cost.pricingAvailable ? "" : "≥ "}
+                                    {stats.costIsPartial ? "≥ " : ""}
                                     {formatCostUsd(stats.cost.microdollars)}
+                                    {stats.unpricedReplies > 0 && (
+                                        <span className="text-muted-foreground block text-xs">{t`+ unpriced replies, not counted in this total`}</span>
+                                    )}
                                     {stats.cost.byok && (
                                         <span className="text-muted-foreground block text-xs">{t`Includes replies billed to your own API key.`}</span>
                                     )}
