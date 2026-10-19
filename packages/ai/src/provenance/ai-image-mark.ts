@@ -1,4 +1,5 @@
 /* eslint-disable no-bitwise -- byte-level PNG/JPEG/CRC work is bitwise by nature */
+/* eslint-disable unicorn/prefer-https, sonarjs/no-clear-text-protocols -- the IPTC and XMP identifiers are http URIs that readers match byte for byte */
 
 /**
  * Machine-readable marking for AI-generated still images (EU AI Act Art. 50(2)).
@@ -15,12 +16,12 @@
  *   docs/ before claiming coverage for them.
  */
 
-const DIGITAL_SOURCE_TYPE = "https://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia";
+const DIGITAL_SOURCE_TYPE = "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia";
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-// Adobe's XMP namespace identifier. Not a fetch; it is a fixed string in the file.
-const XAP_NAMESPACE = "https://ns.adobe.com/xap/1.0/";
+// Adobe's XMP namespace identifier.
+const XAP_NAMESPACE = "http://ns.adobe.com/xap/1.0/";
 
 const XMP_PACKET = [
     `<?xpacket begin="\u{FEFF}" id="W5M0MpCehiHzreSzNTczkc9d"?>`,
