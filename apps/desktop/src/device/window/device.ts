@@ -21,7 +21,7 @@ const TAINT_LABELS: Record<string, string> = {
 };
 
 const $ = (id: string): HTMLElement => {
-    const element = document.getElementById(id);
+    const element = document.querySelector<HTMLElement>(`#${id}`);
 
     if (element === null) {
         throw new Error(`missing #${id}`);
@@ -30,27 +30,29 @@ const $ = (id: string): HTMLElement => {
     return element;
 };
 
-let current: Prompt | null = null;
-let expiryTimer: ReturnType<typeof setInterval> | undefined;
-let settings: SettingsView | null = null;
+// Page-wide state, kept on one object so the functions below assign properties rather than module bindings.
+const state: { current: Prompt | null; expiryTimer?: ReturnType<typeof setInterval>; settings: SettingsView | null } = {
+    current: null,
+    settings: null,
+};
 
 const setText = (id: string, text: string): void => {
     $(id).textContent = text;
 };
 
-const setHidden = (id: string, hidden: boolean): void => {
-    $(id).hidden = hidden;
+const setHidden = (id: string, isHidden: boolean): void => {
+    $(id).hidden = isHidden;
 };
 
 const renderPrompt = (prompt: Prompt | null): void => {
-    current = prompt;
+    state.current = prompt;
     setHidden("prompt", !prompt);
     setHidden("settings", Boolean(prompt));
     setText("prompt-error", "");
-    clearInterval(expiryTimer);
+    clearInterval(state.expiryTimer);
 
     if (prompt === null) {
-        void loadSettings();
+        loadSettings();
 
         return;
     }
@@ -60,9 +62,12 @@ const renderPrompt = (prompt: Prompt | null): void => {
 
     if (body.kind === "pairing") {
         setText("prompt-heading", "Pair this computer?");
+        // A new pairing replaces the stored one; say so when settings show one.
+        const replaces = state.settings?.paired ? ` This replaces the current pairing (“${state.settings.accountLabel ?? "your account"}”).` : "";
+
         setText(
             "prompt-context",
-            `The Neore account “${body.accountLabel}” wants to use this computer for agent tools. Every action will still ask you here first, and you can unpair at any time.`,
+            `The Neore account “${body.accountLabel}” wants to use this computer for agent tools.${replaces} Every action will still ask you here first, and you can unpair at any time.`,
         );
         setHidden("prompt-warning", true);
         setText("prompt-detail", "Nothing runs now. Pairing only lets the agent ASK.");
@@ -85,7 +90,7 @@ const renderPrompt = (prompt: Prompt | null): void => {
         setText("prompt-detail", body.detail);
 
         // The shell's detail starts with the sandbox verdict on its first line.
-        const sandboxLine = body.toolKind === "shell" ? body.detail.split("\n", 1)[0] ?? "" : "";
+        const sandboxLine = body.toolKind === "shell" ? (body.detail.split("\n", 1)[0] ?? "") : "";
 
         setHidden("prompt-sandbox", !sandboxLine);
         $("prompt-sandbox").className = sandboxLine.startsWith("Sandboxed") ? "muted" : "warning";
@@ -102,7 +107,7 @@ const renderPrompt = (prompt: Prompt | null): void => {
     }
 
     setTimeout(() => {
-        if (current?.id === prompt.id) {
+        if (state.current?.id === prompt.id) {
             for (const button of buttons) {
                 button.disabled = false;
             }
@@ -116,7 +121,7 @@ const renderPrompt = (prompt: Prompt | null): void => {
     };
 
     tick();
-    expiryTimer = setInterval(tick, 1000);
+    state.expiryTimer = setInterval(tick, 1000);
     $("deny").focus();
 };
 
@@ -125,12 +130,12 @@ const refreshPrompt = async (): Promise<void> => {
 };
 
 const answer = async (value: "always" | "deny" | "once"): Promise<void> => {
-    if (current === null) {
+    if (state.current === null) {
         return;
     }
 
     try {
-        await globalThis.neoreDevice.promptAnswer(current.id, value);
+        await globalThis.neoreDevice.promptAnswer(state.current.id, value);
     } catch (error) {
         setText("prompt-error", String(error));
     }
@@ -138,9 +143,9 @@ const answer = async (value: "always" | "deny" | "once"): Promise<void> => {
     await refreshPrompt();
 };
 
-$("deny").addEventListener("click", () => void answer("deny"));
-$("once").addEventListener("click", () => void answer("once"));
-$("always").addEventListener("click", () => void answer("always"));
+$("deny").addEventListener("click", () => answer("deny"));
+$("once").addEventListener("click", () => answer("once"));
+$("always").addEventListener("click", () => answer("always"));
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -168,7 +173,7 @@ const listItem = (label: string, action?: string, onAction?: () => void): HTMLLI
 
 const update = async (changes: Record<string, unknown>): Promise<void> => {
     try {
-        settings = await globalThis.neoreDevice.settingsUpdate(changes);
+        state.settings = await globalThis.neoreDevice.settingsUpdate(changes);
         status("Saved.");
         renderSettings();
     } catch (error) {
@@ -177,41 +182,39 @@ const update = async (changes: Record<string, unknown>): Promise<void> => {
 };
 
 const renderSettings = (): void => {
-    if (settings === null) {
+    if (state.settings === null) {
         return;
     }
 
-    const view = settings;
+    const view = state.settings;
 
-    setText(
-        "pairing",
-        view.paired ? `Paired with ${view.accountLabel ?? "your account"}.` : "Not paired. Pair from Settings → Devices in the Neore app.",
-    );
+    setText("pairing", view.paired ? `Paired with ${view.accountLabel ?? "your account"}.` : "Not paired. Pair from Settings → Devices in the Neore app.");
     setHidden("unpair", !view.paired);
 
     ($("require-sandbox") as HTMLInputElement).checked = view.requireShellSandbox;
+    ($("allow-network") as HTMLInputElement).checked = view.allowShellNetwork;
+    const network = view.allowShellNetwork ? "allowed" : "blocked where the sandbox can enforce it (macOS). Linux and Windows do not restrict it";
+    const unsandboxed = view.requireShellSandbox ? "Shell commands are refused." : "Shell commands run with your full access.";
+
     setText(
         "sandbox-status",
         view.sandboxUnavailable === null
-            ? "Shell commands can change files only in the shared folders. See the sandbox note in each approval for what else they can reach. Network access is not restricted."
-            : `Not available on this computer: ${view.sandboxUnavailable}. ${view.requireShellSandbox ? "Shell commands are refused." : "Shell commands run with your full access."}`,
+            ? `Shell commands can change files only in the shared folders. See the sandbox note in each approval for what else they can reach. Network access is ${network}.`
+            : `Not available on this computer: ${view.sandboxUnavailable}. ${unsandboxed}`,
     );
 
-    $("roots").replaceChildren(
-        ...view.roots.map((root) => listItem(root, "Remove", () => void update({ roots: view.roots.filter((other) => other !== root) }))),
-    );
+    $("roots").replaceChildren(...view.roots.map((root) => listItem(root, "Remove", () => update({ roots: view.roots.filter((other) => other !== root) }))));
     $("servers").replaceChildren(
         ...view.mcpServers.map((server) =>
             listItem(`${server.name}: ${[server.command, ...server.args].join(" ")}`, "Remove", () =>
-                void update({ mcpServers: view.mcpServers.filter((other) => other.name !== server.name) })),
+                update({ mcpServers: view.mcpServers.filter((other) => other.name !== server.name) }),
+            ),
         ),
     );
     $("rules").replaceChildren(
-        ...view.allowRules.length === 0
+        ...(view.allowRules.length === 0
             ? [listItem("None — every action asks.")]
-            : view.allowRules.map((rule) =>
-                listItem(rule, "Remove", () => void update({ allowRules: view.allowRules.filter((other) => other !== rule) })),
-            ),
+            : view.allowRules.map((rule) => listItem(rule, "Remove", () => update({ allowRules: view.allowRules.filter((other) => other !== rule) })))),
     );
     setText("audit-path", `Full log: ${view.auditPath}`);
 };
@@ -232,17 +235,17 @@ const loadAudit = async (): Promise<void> => {
     );
 };
 
-async function loadSettings(): Promise<void> {
-    settings = await globalThis.neoreDevice.settingsGet();
+const loadSettings = async (): Promise<void> => {
+    state.settings = await globalThis.neoreDevice.settingsGet();
     renderSettings();
     await loadAudit();
-}
+};
 
 const addRoot = async (path: string): Promise<void> => {
     const trimmed = path.trim();
 
-    if (trimmed && settings !== null) {
-        await update({ roots: [...settings.roots, trimmed] });
+    if (trimmed && state.settings !== null) {
+        await update({ roots: [...state.settings.roots, trimmed] });
     }
 };
 
@@ -265,13 +268,34 @@ $("require-sandbox").addEventListener("change", async (event) => {
     const checkbox = event.target as HTMLInputElement;
     const required = checkbox.checked;
 
-    if (!required && !await globalThis.neoreDevice.confirm("Allow shell commands to run WITHOUT a sandbox where this computer has none? They would run with your full access.")) {
+    if (
+        !required &&
+        !(await globalThis.neoreDevice.confirm(
+            "Allow shell commands to run WITHOUT a sandbox where this computer has none? They would run with your full access.",
+        ))
+    ) {
         checkbox.checked = true;
 
         return;
     }
 
     await update({ requireShellSandbox: required });
+});
+
+$("allow-network").addEventListener("change", async (event) => {
+    const checkbox = event.target as HTMLInputElement;
+    const allowed = checkbox.checked;
+
+    if (
+        allowed &&
+        !(await globalThis.neoreDevice.confirm("Allow shell commands to use the network? An approved command could then send files or data to any server."))
+    ) {
+        checkbox.checked = false;
+
+        return;
+    }
+
+    await update({ allowShellNetwork: allowed });
 });
 
 $("unpair").addEventListener("click", async () => {
@@ -286,10 +310,23 @@ $("server-form").addEventListener("submit", async (event) => {
     const field = (id: string) => ($(id) as HTMLInputElement | HTMLTextAreaElement).value;
     const name = field("server-name").trim();
     const command = field("server-command").trim();
+
+    if (!name || !command || state.settings === null) {
+        status("A name and a command are required.");
+
+        return;
+    }
+
     const args = field("server-args")
         .split("\n")
         .map((line) => line.trim())
         .filter(Boolean);
+
+    // The exact command line, confirmed once more: it will run as you.
+    if (!(await globalThis.neoreDevice.confirm(`Add “${name}”? This computer will run:\n\n${[command, ...args].join(" ")}`))) {
+        return;
+    }
+
     const env = Object.fromEntries(
         field("server-env")
             .split("\n")
@@ -298,21 +335,10 @@ $("server-form").addEventListener("submit", async (event) => {
             .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
     );
 
-    if (!name || !command || settings === null) {
-        status("A name and a command are required.");
-
-        return;
-    }
-
-    // The exact command line, confirmed once more: it will run as you.
-    if (!await globalThis.neoreDevice.confirm(`Add “${name}”? This computer will run:\n\n${[command, ...args].join(" ")}`)) {
-        return;
-    }
-
-    await update({ mcpServers: [...settings.mcpServers, { args, command, env, name }] });
+    await update({ mcpServers: [...state.settings.mcpServers, { args, command, env, name }] });
     (event.target as HTMLFormElement).reset();
 });
 
-globalThis.neoreDevice.onPromptQueued(() => void refreshPrompt());
-window.addEventListener("focus", () => void refreshPrompt());
-void refreshPrompt();
+globalThis.neoreDevice.onPromptQueued(() => refreshPrompt());
+window.addEventListener("focus", () => refreshPrompt());
+refreshPrompt();

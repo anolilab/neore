@@ -19,15 +19,15 @@ export interface Prompt {
     body:
         | { accountLabel: string; kind: "pairing" }
         | {
-            allowAlways: boolean;
-            detail: string;
-            input: string;
-            kind: "call";
-            taintedBy: string[];
-            threadTitle: string;
-            tool: string;
-            toolKind: string;
-        };
+              allowAlways: boolean;
+              detail: string;
+              input: string;
+              kind: "call";
+              taintedBy: string[];
+              threadTitle: string;
+              tool: string;
+              toolKind: string;
+          };
     expiresAt: number;
     id: number;
 }
@@ -35,6 +35,7 @@ export interface Prompt {
 export interface SettingsView {
     accountLabel: string | null;
     allowRules: string[];
+    allowShellNetwork: boolean;
     auditPath: string;
     mcpServers: { args: string[]; command: string; env: Record<string, string>; name: string }[];
     paired: boolean;
@@ -44,10 +45,7 @@ export interface SettingsView {
 }
 
 /** What the engine emits, parsed from the addon's JSON event strings. */
-export type CoreEvent
-    = | { prompt: Prompt; type: "prompt" }
-        | { callId: string; payload: string; signature: string; type: "progress" }
-        | { type: "changed" };
+export type CoreEvent = { prompt: Prompt; type: "prompt" } | { callId: string; payload: string; signature: string; type: "progress" } | { type: "changed" };
 
 /** The surface of the native `DeviceCore` class. */
 export interface DeviceCore {
@@ -65,4 +63,4 @@ export interface DeviceCore {
     stop: () => void;
 }
 
-export type DeviceCoreConstructor = new (dataDir: string, onEvent: (json: string) => void) => DeviceCore;
+export type DeviceCoreConstructor = new (dataDirectory: string, onEvent: (json: string) => void) => DeviceCore;

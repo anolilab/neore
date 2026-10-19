@@ -6,13 +6,12 @@
  */
 
 /** Matches the backend's per-call input cap with room for the envelope. */
-export const MAX_ENVELOPE_BYTES = 256 * 1024;
+const MAX_ENVELOPE_BYTES = 256 * 1024;
 const MAX_SIGNATURE_LENGTH = 64;
 const MAX_SETTINGS_BYTES = 256 * 1024;
 const PROMPT_ANSWERS = new Set(["always", "deny", "once"]);
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === "object" && value !== null && !Array.isArray(value);
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 const text = (value: unknown, name: string, max: number): string => {
     if (typeof value !== "string" || value.length === 0 || value.length > max) {
@@ -71,3 +70,5 @@ export const readPromptAnswer = (id: unknown, answer: unknown): { answer: string
 
     return { answer, id };
 };
+
+export { MAX_ENVELOPE_BYTES };

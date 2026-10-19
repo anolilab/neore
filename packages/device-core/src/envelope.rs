@@ -8,11 +8,13 @@
 //! one-time nonce are all checked here.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::hmac::{constant_time_eq, hmac_sha256, to_hex};
+use super::store;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Domain {
@@ -80,20 +82,45 @@ pub struct CallEnvelope {
 /// one past its 5-minute deadline; the rest is clock skew.
 pub const MAX_ENVELOPE_AHEAD_MS: u64 = 15 * 60 * 1000;
 
-/// Nonces seen, kept until their envelope would have expired anyway.
+/// Nonces seen, kept until their envelope would have expired anyway. A persisted
+/// set reloads them, so a restart cannot replay an envelope still inside its window.
 #[derive(Default)]
-pub struct NonceSet(HashMap<String, u64>);
+pub struct NonceSet {
+    entries: HashMap<String, u64>,
+    path: Option<PathBuf>,
+}
 
 impl NonceSet {
-    /// `false` when the nonce was already used (a replay).
-    pub fn insert(&mut self, nonce: &str, expires_at: u64, now: u64) -> bool {
-        self.0.retain(|_, expiry| *expiry > now);
+    /// Loads the stored nonces, dropping those whose envelope has expired.
+    pub fn persisted(path: &Path, now: u64) -> Self {
+        let mut entries = store::load_nonces(path);
 
-        if self.0.contains_key(nonce) {
+        entries.retain(|_, expiry| *expiry > now);
+
+        NonceSet {
+            entries,
+            path: Some(path.to_owned()),
+        }
+    }
+
+    /// `false` when the nonce was already used (a replay), or when it cannot be
+    /// recorded: a nonce that is not on disk would not survive a restart.
+    pub fn insert(&mut self, nonce: &str, expires_at: u64, now: u64) -> bool {
+        self.entries.retain(|_, expiry| *expiry > now);
+
+        if self.entries.contains_key(nonce) {
             return false;
         }
 
-        self.0.insert(nonce.to_owned(), expires_at);
+        self.entries.insert(nonce.to_owned(), expires_at);
+
+        if let Some(path) = &self.path {
+            if store::save_nonces(path, &self.entries).is_err() {
+                self.entries.remove(nonce);
+
+                return false;
+            }
+        }
 
         true
     }
@@ -126,7 +153,7 @@ pub fn verify_call(
     }
 
     if call.nonce.is_empty() || !nonces.insert(&call.nonce, call.expires_at, now) {
-        return Err("the request was already used".into());
+        return Err("the request was already used or could not be recorded".into());
     }
 
     Ok(call)
@@ -189,6 +216,40 @@ mod tests {
         let call = verify_call(SECRET, "dev1", &signed, 2_000, &mut nonces).unwrap();
         assert_eq!(call.tool, "fs_read");
         assert!(verify_call(SECRET, "dev1", &signed, 2_000, &mut nonces).is_err());
+    }
+
+    fn nonce_file(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("neore-device-nonces-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir.join("device-nonces.json")
+    }
+
+    #[test]
+    fn a_stored_nonce_is_still_refused_after_a_restart() {
+        let path = nonce_file("reload");
+        let mut before = NonceSet::persisted(&path, 1_000);
+
+        assert!(before.insert("n1", 10_000, 1_000));
+
+        let mut after = NonceSet::persisted(&path, 2_000);
+        assert!(!after.insert("n1", 10_000, 2_000));
+        assert!(after.insert("n2", 10_000, 2_000));
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn an_expired_nonce_is_pruned_on_load() {
+        let path = nonce_file("prune");
+        let mut before = NonceSet::persisted(&path, 1_000);
+
+        assert!(before.insert("old", 5_000, 1_000));
+
+        let mut after = NonceSet::persisted(&path, 6_000);
+        assert!(after.insert("old", 20_000, 6_000));
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]

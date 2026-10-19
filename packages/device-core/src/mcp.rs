@@ -68,6 +68,8 @@ type Pending = Arc<Mutex<HashMap<u64, Sender<Value>>>>;
 
 pub struct McpProcess {
     child: Child,
+    /// The config it was started from; a changed config in settings means a restart.
+    config: McpServerConfig,
     /// Set by the reader once the server's output closed.
     closed: Arc<AtomicBool>,
     last_used: Instant,
@@ -175,6 +177,7 @@ impl McpProcess {
 
         let mut process = McpProcess {
             child,
+            config: config.clone(),
             closed,
             last_used: Instant::now(),
             next_id: 1,
@@ -361,7 +364,10 @@ impl McpManager {
         let mut processes = self.processes.lock().unwrap();
 
         if let Some(process) = processes.get(&config.name) {
-            if process.lock().unwrap().is_alive() {
+            let mut running = process.lock().unwrap();
+
+            // Same name, edited command/args/env: the old process is not the server settings describe.
+            if running.config == *config && running.is_alive() {
                 return Ok(process.clone());
             }
         }
@@ -450,6 +456,24 @@ sleep 1
             .unwrap();
         assert_eq!(text, "hi\n[image content]");
         assert!(!is_error);
+    }
+
+    /// A fake server that completes the handshake and then stays up.
+    #[cfg(unix)]
+    #[test]
+    fn restarts_a_server_whose_config_changed() {
+        let script = r#"read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"fake","version":"1"}}}'; sleep 30"#;
+        let config = |mark: &str| McpServerConfig {
+            args: vec!["-c".into(), script.into()],
+            command: "sh".into(),
+            env: BTreeMap::from([("MARK".to_owned(), mark.to_owned())]),
+            name: "fake".into(),
+        };
+        let manager = McpManager::default();
+
+        let first = manager.process(&config("1")).unwrap();
+        assert!(Arc::ptr_eq(&first, &manager.process(&config("1")).unwrap()));
+        assert!(!Arc::ptr_eq(&first, &manager.process(&config("2")).unwrap()));
     }
 
     #[cfg(unix)]

@@ -10,15 +10,19 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import type { BrowserWindowConstructorOptions, IpcMainInvokeEvent } from "electron";
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notification, session, shell, Tray } from "electron";
+import type { BrowserWindowConstructorOptions, IpcMainInvokeEvent, WebPreferences } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, session, shell, Tray } from "electron";
 
+import { createSetBadgeHandler } from "./badge.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { registerDeviceIpc } from "./device/index.js";
+import { loginItemMenuState } from "./login-item.js";
 import type { PendingSignIn, SignInHandoff } from "./sign-in.js";
 import { beginSignIn, completeSignIn, isBlockedOauthUrl, parseSignInCallback } from "./sign-in.js";
 import { clampText, isSameOrigin, MAX_COMPOSE_CHARS, newChatUrl, parseDeepLink, SCHEME, siteOrigin } from "./site.js";
+import { threadWindowUrl } from "./thread-window.js";
 import { isLocalPage, isTrustedUrl } from "./trust.js";
+import { createDebouncer, DEFAULT_SIZE, readWindowState, restorableState, SAVE_DEBOUNCE_MS, WINDOW_STATE_FILE, writeWindowState } from "./window-state.js";
 
 interface ShellState {
     composer?: BrowserWindow;
@@ -58,7 +62,12 @@ const TITLE_BAR_SCRIPT = `(() => {
     });
     document.body.append(strip);
     // Content starts below the title bar, so the traffic lights never sit on the page's own controls.
-    document.documentElement.style.paddingTop = "${TITLE_BAR_HEIGHT}px";
+    // Full-height elements shrink by the same amount; without this the page is taller than the window.
+    const style = document.createElement("style");
+    style.textContent = \`html { padding-top: ${TITLE_BAR_HEIGHT}px !important; }
+.h-dvh, .h-screen, .h-svh { height: calc(100dvh - ${TITLE_BAR_HEIGHT}px) !important; }
+.min-h-svh, .min-h-screen { min-height: calc(100dvh - ${TITLE_BAR_HEIGHT}px) !important; }\`;
+    document.head.append(style);
 })();`;
 const SCHEME_PREFIX = `${SCHEME}://`;
 
@@ -124,7 +133,7 @@ const guardNavigation = (event: { preventDefault: () => void }, url: string): vo
  * answer "unavailable" to every call.
  */
 const siteCapabilities = (): string[] => {
-    const capabilities = ["notifications", "compose", "sign-in"];
+    const capabilities = ["notifications", "compose", "sign-in", "thread-windows"];
 
     if (state.deviceReady && existsSync(path.join(__dirname, "device-window", "device.html"))) {
         capabilities.push("device");
@@ -135,25 +144,36 @@ const siteCapabilities = (): string[] => {
     return capabilities;
 };
 
-const createMainWindow = (): BrowserWindow => {
-    const win = new BrowserWindow({
-        height: 820,
-        minHeight: 560,
-        minWidth: 420,
-        title: "Neore",
-        ...macTitleBar,
-        webPreferences: {
-            additionalArguments: [`${SITE_ORIGIN_ARG}${origin.origin}`, `${CAPABILITIES_ARG}${siteCapabilities().join(",")}`],
-            contextIsolation: true,
-            nodeIntegration: false,
-            preload: path.join(__dirname, "preload.cjs"),
-            sandbox: true,
-            webSecurity: true,
-            webviewTag: false,
-        },
-        width: 1200,
-    });
+const windowStateFile = (): string => path.join(app.getPath("userData"), WINDOW_STATE_FILE);
 
+/** Writes the main window's normal (not maximized) bounds. A failed write is logged; it never stops a close. */
+const saveWindowState = (win: BrowserWindow): void => {
+    if (win.isDestroyed()) {
+        return;
+    }
+
+    const { height, width, x, y } = win.getNormalBounds();
+
+    try {
+        writeWindowState(windowStateFile(), { bounds: { height, width, x, y }, maximized: win.isMaximized() });
+    } catch (error) {
+        log(`could not save the window state: ${String(error)}`);
+    }
+};
+
+/** What every site window gets: the site preload, isolated and sandboxed. */
+const siteWebPreferences = (): WebPreferences => ({
+    additionalArguments: [`${SITE_ORIGIN_ARG}${origin.origin}`, `${CAPABILITIES_ARG}${siteCapabilities().join(",")}`],
+    contextIsolation: true,
+    nodeIntegration: false,
+    preload: path.join(__dirname, "preload.cjs"),
+    sandbox: true,
+    webSecurity: true,
+    webviewTag: false,
+});
+
+/** Popups, navigation and webviews of a site window: same-origin stays in the app, sign-in goes to the system browser, the rest is refused. */
+const guardSiteWindow = (win: BrowserWindow): void => {
     const contents = win.webContents;
 
     contents.setWindowOpenHandler(({ url }) => {
@@ -179,12 +199,62 @@ const createMainWindow = (): BrowserWindow => {
         contents.on("did-finish-load", () => {
             // Only the site gets the strip: the page is ours, and the script is ours too.
             if (isTrustedUrl(origin, contents.getURL())) {
-                void contents.executeJavaScript(TITLE_BAR_SCRIPT);
+                contents.executeJavaScript(TITLE_BAR_SCRIPT);
             }
         });
     }
+};
+
+/** A thread in its own window: no state file, no tray, closing it really closes it. */
+const openThreadWindow = (url: URL): void => {
+    const win = new BrowserWindow({
+        height: DEFAULT_SIZE.height,
+        minHeight: 560,
+        minWidth: 420,
+        title: "Neore",
+        ...macTitleBar,
+        webPreferences: siteWebPreferences(),
+        width: DEFAULT_SIZE.width,
+    });
+
+    guardSiteWindow(win);
+    win.loadURL(url.href);
+};
+
+const createMainWindow = (): BrowserWindow => {
+    // Restored only if it still lies on a connected display; otherwise the defaults, centred.
+    const saved = restorableState(
+        readWindowState(windowStateFile()),
+        screen.getAllDisplays().map((display) => display.workArea),
+    );
+    const win = new BrowserWindow({
+        height: saved?.bounds.height ?? DEFAULT_SIZE.height,
+        minHeight: 560,
+        minWidth: 420,
+        title: "Neore",
+        ...macTitleBar,
+        ...(saved === undefined ? {} : { x: saved.bounds.x, y: saved.bounds.y }),
+        webPreferences: siteWebPreferences(),
+        width: saved?.bounds.width ?? DEFAULT_SIZE.width,
+    });
+
+    if (saved?.maximized) {
+        win.maximize();
+    }
+
+    // Move and resize fire many times a second; one write after the last one is enough.
+    const stateSaver = createDebouncer(() => saveWindowState(win), SAVE_DEBOUNCE_MS);
+
+    win.on("move", () => stateSaver.call());
+    win.on("resize", () => stateSaver.call());
+
+    guardSiteWindow(win);
 
     win.on("close", (event) => {
+        // Saved here too: a hide keeps the window alive, but the next launch should still start where it was left.
+        stateSaver.cancel();
+        saveWindowState(win);
+
         if (state.isQuitting || !canHideOnClose()) {
             return;
         }
@@ -194,6 +264,7 @@ const createMainWindow = (): BrowserWindow => {
     });
 
     win.on("closed", () => {
+        stateSaver.cancel();
         state.mainWindow = undefined;
     });
 
@@ -363,21 +434,37 @@ const registerQuickComposerShortcut = (): void => {
     }
 };
 
+const buildTrayMenu = (): Menu => {
+    const login = loginItemMenuState({
+        isPackaged: app.isPackaged,
+        openAtLogin: app.isPackaged && app.getLoginItemSettings().openAtLogin,
+        platform: process.platform,
+    });
+
+    return Menu.buildFromTemplate([
+        { click: () => focusMain(), label: "Open Neore" },
+        { accelerator: QUICK_COMPOSER_SHORTCUT, click: () => toggleQuickComposer(), label: "Quick Composer" },
+        { click: () => startBrowserSignIn(), label: "Sign in with browser" },
+        { type: "separator" },
+        { checked: login.checked, click: () => toggleLoginItem(), enabled: login.enabled, label: "Start at login", type: "checkbox" },
+        { type: "separator" },
+        { click: () => app.quit(), label: "Quit Neore" },
+    ]);
+};
+
+/** Flips the OS login item, then rebuilds the menu so the check mark follows what the OS now says. */
+const toggleLoginItem = (): void => {
+    app.setLoginItemSettings({ openAtLogin: !app.getLoginItemSettings().openAtLogin });
+    state.tray?.setContextMenu(buildTrayMenu());
+};
+
 const createTray = (): void => {
     try {
         const icon = nativeImage.createFromPath(path.join(__dirname, "icon.png")).resize({ height: 18 });
         const tray = new Tray(icon);
 
         tray.setToolTip("Neore");
-        tray.setContextMenu(
-            Menu.buildFromTemplate([
-                { click: () => focusMain(), label: "Open Neore" },
-                { accelerator: QUICK_COMPOSER_SHORTCUT, click: () => toggleQuickComposer(), label: "Quick Composer" },
-                { click: () => startBrowserSignIn(), label: "Sign in with browser" },
-                { type: "separator" },
-                { click: () => app.quit(), label: "Quit Neore" },
-            ]),
-        );
+        tray.setContextMenu(buildTrayMenu());
         tray.on("click", () => focusMain());
 
         state.tray = tray;
@@ -415,6 +502,29 @@ const registerIpc = (): void => {
         const clampedBody = typeof body === "string" ? clampText(body, 300) : "";
 
         showNotification(clampedTitle, clampedBody || undefined);
+    });
+
+    ipcMain.handle(
+        CHANNEL.setBadge,
+        createSetBadgeHandler({
+            isTrusted,
+            platform: process.platform,
+            setBadgeCount: (count) => app.setBadgeCount(count),
+        }),
+    );
+
+    ipcMain.handle(CHANNEL.openThreadWindow, (event, threadId: unknown): void => {
+        if (!isTrusted(event)) {
+            throw new Error("open-thread-window: untrusted sender");
+        }
+
+        const url = threadWindowUrl(origin, threadId);
+
+        if (url === undefined) {
+            throw new Error("open-thread-window: invalid thread id");
+        }
+
+        openThreadWindow(url);
     });
 
     ipcMain.handle(CHANNEL.takePendingCompose, (event): string | undefined => {

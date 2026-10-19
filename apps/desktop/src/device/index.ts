@@ -3,12 +3,11 @@
  * windows, commands and events; the logic lives in `device-core`).
  *
  * Two sets of channels, two trust checks:
- * - `DEVICE_CHANNEL` (relay): reachable from the site window only, through
- *   `options.isTrusted`. The site may verify and relay; it cannot approve.
- * - `LOCAL_CHANNEL` (approvals, folders, MCP servers, audit): reachable from the
- *   device window alone, which is a separate BrowserWindow with its own preload
- *   and a file: URL. The site cannot reach these, and the device window cannot
- *   reach the relay (`isTrusted` rejects its frame).
+ * - `DEVICE_CHANNEL` (relay): reachable from the site window only, through `options.isTrusted`.
+ * The site may verify and relay; it cannot approve.
+ * - `LOCAL_CHANNEL` (approvals, folders, MCP servers, audit): reachable from the device window alone,
+ * which is a separate BrowserWindow with its own preload and a file: URL. The site cannot reach these,
+ * and the device window cannot reach the relay (`isTrusted` rejects its frame).
  */
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -20,11 +19,6 @@ import { loadDeviceCore } from "./addon";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import type { CoreEvent, DeviceCore, Prompt, Signed } from "./types";
 import { readPairing, readPromptAnswer, readSettingsUpdate, readSigned } from "./validate";
-
-export interface DeviceIpcOptions {
-    /** True when the sender is the site's main window (see `trust.ts`). */
-    isTrusted: (event: IpcMainInvokeEvent) => boolean;
-}
 
 /** Stopping idle MCP servers runs once a minute, as the Tauri shell did. */
 const REAP_INTERVAL_MS = 60_000;
@@ -61,7 +55,13 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     };
 
     /** The device window while it is open; a dialog without a live window has no parent. */
-    const liveLocal = (): BrowserWindowInstance | undefined => (state.local === undefined || state.local.isDestroyed() ? undefined : state.local);
+    const liveLocal = (): BrowserWindowInstance | undefined => {
+        if (state.local === undefined || state.local.isDestroyed()) {
+            return undefined;
+        }
+
+        return state.local;
+    };
 
     const openLocalWindow = (): void => {
         const live = liveLocal();
@@ -104,7 +104,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             state.local = undefined;
             state.core?.denyPrompts();
         });
-        void win.loadFile(LOCAL_PAGE);
+        win.loadFile(LOCAL_PAGE);
         state.local = win;
     };
 
@@ -144,6 +144,17 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         });
     };
 
+    const showPrompt = (prompt: Prompt): void => {
+        openLocalWindow();
+        send(state.local?.webContents, LOCAL_EVENT.prompt);
+
+        const body = prompt.body.kind === "pairing" ? "Confirm pairing this computer" : `${prompt.body.tool} — ${prompt.body.threadTitle}`;
+
+        if (Notification.isSupported()) {
+            new Notification({ body, title: "Neore is asking for your approval" }).show();
+        }
+    };
+
     const onEvent = (json: string): void => {
         const event = JSON.parse(json) as CoreEvent;
 
@@ -161,17 +172,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
                 showPrompt(event.prompt);
                 break;
             }
-        }
-    };
-
-    const showPrompt = (prompt: Prompt): void => {
-        openLocalWindow();
-        send(state.local?.webContents, LOCAL_EVENT.prompt);
-
-        const body = prompt.body.kind === "pairing" ? "Confirm pairing this computer" : `${prompt.body.tool} — ${prompt.body.threadTitle}`;
-
-        if (Notification.isSupported()) {
-            new Notification({ body, title: "Neore is asking for your approval" }).show();
+            default: {
+                break;
+            }
         }
     };
 
@@ -239,9 +242,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     );
 
     local(LOCAL_CHANNEL.pickFolder, async () => {
-        const options = { properties: ["openDirectory" as const] };
+        const dialogOptions = { properties: ["openDirectory" as const] };
         const parent = liveLocal();
-        const result = parent === undefined ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(parent, options);
+        const result = parent === undefined ? await dialog.showOpenDialog(dialogOptions) : await dialog.showOpenDialog(parent, dialogOptions);
 
         return result.canceled ? null : (result.filePaths[0] ?? null);
     });
@@ -249,9 +252,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     // A native dialog, so the page cannot draw a confirmation that looks like one.
     local(LOCAL_CHANNEL.confirm, async (message) => {
         const text = typeof message === "string" && message.length <= 1000 ? message : "";
-        const options = { buttons: ["Cancel", "OK"], cancelId: 0, defaultId: 1, message: text, type: "question" as const };
+        const dialogOptions = { buttons: ["Cancel", "OK"], cancelId: 0, defaultId: 1, message: text, type: "question" as const };
         const parent = liveLocal();
-        const result = parent === undefined ? await dialog.showMessageBox(options) : await dialog.showMessageBox(parent, options);
+        const result = parent === undefined ? await dialog.showMessageBox(dialogOptions) : await dialog.showMessageBox(parent, dialogOptions);
 
         return result.response === 1;
     });
@@ -260,3 +263,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     return state.core !== undefined;
 };
+
+export interface DeviceIpcOptions {
+    /** True when the sender is the site's main window (see `trust.ts`). */
+    isTrusted: (event: IpcMainInvokeEvent) => boolean;
+}

@@ -34,55 +34,47 @@ const fake = vi.hoisted(() => {
 
 vi.mock("electron", () => {
     const contentsOf = (): WebContents => {
-        return {
+        const contents: WebContents = {
             destroyed: false,
-            isDestroyed() {
-                return this.destroyed;
-            },
+            isDestroyed: () => contents.destroyed,
             mainFrame: { url: "file:///app/device.html" },
             send: vi.fn(),
         };
+
+        return contents;
     };
 
-    class BrowserWindow {
-        public readonly webContents: WebContents & { on: () => void; setWindowOpenHandler: () => void };
+    // A constructor function returning an object hands that object back as the instance.
+    const BrowserWindow = function () {
+        const listeners = new Map<string, () => void>();
+        const win = {
+            close() {
+                win.destroyed = true;
+                listeners.get("closed")?.();
+            },
+            destroyed: false,
+            focus: (): void => {},
+            isDestroyed: (): boolean => win.destroyed,
+            isMinimized: (): boolean => false,
+            loadFile: (): Promise<void> => Promise.resolve(),
+            on: (event: string, listener: () => void): void => {
+                listeners.set(event, listener);
+            },
+            restore: (): void => {},
+            show: (): void => {},
+            webContents: Object.assign(contentsOf(), { on: vi.fn(), setWindowOpenHandler: vi.fn() }),
+        };
 
-        public destroyed = false;
+        fake.windows.push(win);
 
-        private readonly listeners = new Map<string, () => void>();
+        return win;
+    };
 
-        constructor() {
-            this.webContents = Object.assign(contentsOf(), { on: vi.fn(), setWindowOpenHandler: vi.fn() });
-            fake.windows.push(this);
-        }
+    const NotificationStub = function (options: { body?: string; title: string }) {
+        fake.notifications.push(options);
 
-        loadFile(): Promise<void> {
-            return Promise.resolve();
-        }
-
-        isDestroyed(): boolean {
-            return this.destroyed;
-        }
-
-        isMinimized(): boolean {
-            return false;
-        }
-
-        restore(): void {}
-
-        show(): void {}
-
-        focus(): void {}
-
-        on(event: string, listener: () => void): void {
-            this.listeners.set(event, listener);
-        }
-
-        close(): void {
-            this.destroyed = true;
-            this.listeners.get("closed")?.();
-        }
-    }
+        return { options, show: () => {} };
+    };
 
     return {
         app: {
@@ -90,38 +82,32 @@ vi.mock("electron", () => {
             on: (event: string, listener: () => void) => fake.appListeners.set(event, listener),
         },
         BrowserWindow,
-        dialog: { showOpenDialog: vi.fn(async () => { return { canceled: false, filePaths: ["/shared/picked"] }; }) },
+        dialog: {
+            showOpenDialog: vi.fn(async () => {
+                return { canceled: false, filePaths: ["/shared/picked"] };
+            }),
+        },
         ipcMain: {
             handle: (channel: string, handler: (...args: unknown[]) => unknown) => fake.handlers.set(channel, handler),
         },
-        Notification: Object.assign(
-            class {
-                constructor(public readonly options: { body?: string; title: string }) {
-                    fake.notifications.push(options);
-                }
-
-                show(): void {}
-            },
-            { isSupported: () => true },
-        ),
+        Notification: Object.assign(NotificationStub, { isSupported: () => true }),
     };
 });
 
 vi.mock("./addon", () => {
+    const CoreStub = function (_dataDirectory: string, onEvent: (json: string) => void) {
+        fake.coreEmit = onEvent;
+
+        return fake.coreImpl as never;
+    };
+
     return {
         loadDeviceCore: () => {
             if (fake.coreThrows) {
                 throw new Error("Cannot find module '@neore/device-core-node'");
             }
 
-            // A constructor returning an object hands that object back as the instance.
-            return class {
-                constructor(_dataDir: string, onEvent: (json: string) => void) {
-                    fake.coreEmit = onEvent;
-
-                    return fake.coreImpl as never;
-                }
-            };
+            return CoreStub;
         },
     };
 });
@@ -134,7 +120,9 @@ const options: DeviceIpcOptions = {
 };
 
 let siteContents: WebContents;
-const siteEvent = (): IpcEvent => { return { sender: siteContents, senderFrame: { url: "https://neore.example/chat" } }; };
+const siteEvent = (): IpcEvent => {
+    return { sender: siteContents, senderFrame: { url: "https://neore.example/chat" } };
+};
 const foreignEvent = (): IpcEvent => {
     return {
         sender: { ...siteContents, send: vi.fn() },

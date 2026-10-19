@@ -345,8 +345,49 @@ jobs:
                   path: "apps/web/e2e/.report"
                   retention-days: 7
 
+    # packages/device-core is the Rust core of the desktop shell's device execution. The
+    # `test` job covers the Worker only, so the core's own tests run here on each OS it
+    # targets. Toolchain and cache pins match desktop.yml.
+    device-core:
+        name: "Rust device-core tests (${{ matrix.os }})"
+        runs-on: "${{ matrix.os }}"
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            matrix:
+                os: ["ubuntu-22.04", "windows-latest", "macos-latest"]
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Install Rust (stable)"
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
+              with:
+                  toolchain: "stable"
+
+            - name: "Cache Rust build"
+              uses: "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6" # v2.9.2
+              with:
+                  workspaces: "packages/device-core -> target"
+
+            # The Linux keyring backend (`keyring`'s Secret Service) links libdbus at build time.
+            - name: "Install libdbus for the Linux keyring"
+              if: "matrix.os == 'ubuntu-22.04'"
+              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+
+            - name: "Run cargo test"
+              shell: "bash"
+              run: "cargo test --manifest-path packages/device-core/Cargo.toml"
+
     test-required-check:
-        needs: ["files-changed", "test", "e2e"]
+        needs: ["files-changed", "test", "e2e", "device-core"]
         name: "Check Test Run"
         # `always()` and nothing else: a job skipped by its own `if:` reports
         # success to a ruleset, so gating this one on its needs' results made the

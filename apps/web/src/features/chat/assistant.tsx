@@ -15,6 +15,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import usePromptLoader from "@/features/prompts/hooks/use-prompt-loader";
 
 import ChatSiteHeader from "./header/chat-header";
+import RunningThreadsRail from "./running-threads/running-threads-rail";
 import ThreadSidebar from "./sidebar/thread-sidebar";
 import Thread from "./thread/thread";
 import ThreadList from "./thread-list/thread-list";
@@ -60,6 +61,7 @@ const AssistantContent: FC<{
             <AppSidebar content={<ThreadList />} header={<ThreadListHeader />} name="assistant" />
             <SidebarInset className="dark:bg-brand-obsidian md:peer-data-[variant=inset]:m-1">
                 <ChatSiteHeader threadId={threadId} />
+                <RunningThreadsRail />
                 {isCanvasOpen ? (
                     <ResizablePanelGroup className="h-[calc(100%-40px)]">
                         <ResizablePanel defaultSize={50} minSize={30}>

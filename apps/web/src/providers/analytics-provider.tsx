@@ -3,6 +3,8 @@ import { PostHogProvider } from "posthog-js/react";
 import type { FC, PropsWithChildren } from "react";
 import { useEffect } from "react";
 
+import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
+
 /**
  * Apply a consent decision to PostHog.
  *
@@ -76,6 +78,9 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                     ph.opt_in_capturing();
                     ph.debug();
                 }
+
+                // Here, not in an effect: AnalyticsProvider wraps the app, so child effects run before PostHog loads.
+                reportFirstNativeLaunch();
             },
             person_profiles: "always",
         });

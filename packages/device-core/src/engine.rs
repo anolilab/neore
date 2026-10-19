@@ -56,7 +56,7 @@ pub struct DeviceState {
     last_manifest_at: Mutex<u64>,
     mcp: McpManager,
     /// Manifest tool name → (server, the server's own tool name).
-    mcp_tools: Mutex<HashMap<String, (String, String)>>,
+    mcp_tools: Mutex<HashMap<String, (String, String, bool)>>,
     nonces: Mutex<NonceSet>,
     prompts: Prompts,
     settings: Mutex<Settings>,
@@ -67,15 +67,25 @@ pub struct DeviceState {
 impl DeviceState {
     pub fn new(data_dir: &Path, sink: Sink) -> Self {
         let settings_path = data_dir.join("device.json");
+        let mut settings = store::load(&settings_path);
+
+        // Roots the home guard refuses are dropped here; the next save writes the list without them.
+        let home = canonical_home();
+        settings
+            .roots
+            .retain(|root| refused_root(Path::new(root), home.as_deref()).is_none());
 
         DeviceState {
             audit_path: data_dir.join("device-audit.jsonl"),
             last_manifest_at: Mutex::new(0),
             mcp: McpManager::default(),
             mcp_tools: Mutex::default(),
-            nonces: Mutex::default(),
+            nonces: Mutex::new(NonceSet::persisted(
+                &data_dir.join("device-nonces.json"),
+                now_ms(),
+            )),
             prompts: Prompts::default(),
-            settings: Mutex::new(store::load(&settings_path)),
+            settings: Mutex::new(settings),
             settings_path,
             sink,
         }
@@ -112,11 +122,19 @@ impl DeviceState {
             let _ = stdfs::rename(&self.audit_path, self.audit_path.with_extension("jsonl.1"));
         }
 
-        if let Ok(mut file) = stdfs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.audit_path)
+        let mut options = stdfs::OpenOptions::new();
+
+        options.create(true).append(true);
+
+        // Owner-only when created, like the device store; an existing file keeps its mode.
+        #[cfg(unix)]
         {
+            use std::os::unix::fs::OpenOptionsExt;
+
+            options.mode(0o600);
+        }
+
+        if let Ok(mut file) = options.open(&self.audit_path) {
             let _ = writeln!(file, "{entry}");
         }
     }
@@ -206,6 +224,7 @@ impl DeviceState {
                 .as_ref()
                 .map(|pairing| pairing.account_label.clone()),
             allow_rules: settings.allow_rules,
+            allow_shell_network: settings.allow_shell_network,
             audit_path: self.audit_path.to_string_lossy().into_owned(),
             mcp_servers: settings.mcp_servers,
             paired: settings.pairing.is_some(),
@@ -232,6 +251,10 @@ impl DeviceState {
 
         if let Some(required) = update.require_shell_sandbox {
             settings.allow_unsandboxed_shell = !required;
+        }
+
+        if let Some(allowed) = update.allow_shell_network {
+            settings.allow_shell_network = allowed;
         }
 
         // Rules are only ever REMOVED here; one is added by answering "Always allow".
@@ -291,8 +314,12 @@ impl DeviceState {
             Ok(action) => {
                 detail = action.detail();
 
-                let (skip_prompt, offer_always) =
-                    decide(&call.tool, tainted, &settings.allow_rules);
+                let (skip_prompt, offer_always) = decide(
+                    &call.tool,
+                    tainted,
+                    action.read_only(),
+                    &settings.allow_rules,
+                );
                 let answer = if skip_prompt {
                     Answer::Once
                 } else {
@@ -418,7 +445,7 @@ impl DeviceState {
                             "name": name, "kind": "mcp", "readOnly": tool.read_only, "inputSchema": tool.input_schema,
                             "description": format!("[Local MCP server \"{}\"] {}", server.name, cap_utf8(&tool.description, 1800).0),
                         }));
-                        mcp_tools.insert(name, (server.name.clone(), tool.name));
+                        mcp_tools.insert(name, (server.name.clone(), tool.name, tool.read_only));
                     }
                 }
                 Err(error) => eprintln!("[device-core] MCP server {} unavailable: {error}", server.name),
@@ -468,9 +495,10 @@ pub fn can_always_allow(tool: &str) -> bool {
     !matches!(tool, "shell_run" | "fs_write")
 }
 
-/// `(skip the prompt, offer "Always allow")` for one call.
-pub fn decide(tool: &str, tainted: bool, allow_rules: &[String]) -> (bool, bool) {
-    let eligible = can_always_allow(tool) && !tainted;
+/// `(skip the prompt, offer "Always allow")` for one call. Only a read-only tool
+/// (the MCP `readOnly` annotation, exactly true) can be allowed; a tainted call never.
+pub fn decide(tool: &str, tainted: bool, read_only: bool, allow_rules: &[String]) -> (bool, bool) {
+    let eligible = can_always_allow(tool) && read_only && !tainted;
 
     (
         eligible && allow_rules.iter().any(|rule| rule == tool),
@@ -504,7 +532,7 @@ fn builtin_tools(roots: &[PathBuf]) -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": { "path": path, "content": { "type": "string" },
                 "overwrite": { "type": "boolean", "description": "Replace an existing file" } }, "required": ["path", "content"] } }),
         json!({ "name": "shell_run", "kind": "shell", "readOnly": false,
-            "description": format!("Run one shell command on the user's computer and return its output (first 64 KiB). The working folder must be inside a shared folder: {shared}."),
+            "description": format!("Run one shell command on the user's computer and return its output (first 64 KiB). The working folder must be inside a shared folder: {shared}. The sandbox may block network access; if a command fails for lack of network, say so instead of retrying."),
             "inputSchema": { "type": "object", "properties": { "command": { "type": "string" }, "cwd": path,
                 "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 600 } }, "required": ["command"] } }),
     ]
@@ -531,12 +559,21 @@ enum Action {
     },
     Mcp {
         arguments: Value,
+        read_only: bool,
         server: McpServerConfig,
         tool: String,
     },
 }
 
 impl Action {
+    fn read_only(&self) -> bool {
+        match self {
+            Action::List(_) | Action::Read(_) => true,
+            Action::Write { .. } | Action::Shell { .. } => false,
+            Action::Mcp { read_only, .. } => *read_only,
+        }
+    }
+
     fn kind(&self) -> &'static str {
         match self {
             Action::List(_) | Action::Read(_) | Action::Write { .. } => "fs",
@@ -577,6 +614,7 @@ impl Action {
                 arguments,
                 server,
                 tool,
+                ..
             } => {
                 format!(
                     "Call {tool} on the local MCP server \"{}\" ({} {})",
@@ -600,7 +638,7 @@ fn plan(
     tool: &str,
     input: &Value,
     settings: &Settings,
-    mcp_tools: &HashMap<String, (String, String)>,
+    mcp_tools: &HashMap<String, (String, String, bool)>,
 ) -> Result<Action, String> {
     let roots = fs::canonical_roots(&settings.roots);
 
@@ -653,6 +691,7 @@ fn plan(
             let policy = sandbox::policy_for_call(
                 &support,
                 settings.allow_unsandboxed_shell,
+                settings.allow_shell_network,
                 &roots,
                 sandbox::home().as_deref(),
             )?;
@@ -666,7 +705,7 @@ fn plan(
             })
         }
         name => {
-            let (server, tool) = mcp_tools
+            let (server, tool, read_only) = mcp_tools
                 .get(name)
                 .ok_or_else(|| format!("{name} is not a tool of this device"))?;
             let server = settings
@@ -678,6 +717,7 @@ fn plan(
 
             Ok(Action::Mcp {
                 arguments: input.clone(),
+                read_only: *read_only,
                 server,
                 tool: tool.clone(),
             })
@@ -780,6 +820,7 @@ fn run_action(
             arguments,
             server,
             tool,
+            ..
         } => {
             match state.mcp.with(&server, |process| {
                 process.call_tool(&tool, arguments.clone(), MCP_CALL_TIMEOUT.min(remaining))
@@ -860,6 +901,7 @@ fn valid_pairing(device_id: &str, secret: &str, account_label: &str) -> bool {
 pub struct SettingsView {
     pub account_label: Option<String>,
     pub allow_rules: Vec<String>,
+    pub allow_shell_network: bool,
     pub audit_path: String,
     pub mcp_servers: Vec<McpServerConfig>,
     pub paired: bool,
@@ -873,6 +915,7 @@ pub struct SettingsView {
 #[serde(rename_all = "camelCase")]
 pub struct SettingsUpdate {
     pub allow_rules: Option<Vec<String>>,
+    pub allow_shell_network: Option<bool>,
     pub mcp_servers: Option<Vec<McpServerConfig>>,
     pub require_shell_sandbox: Option<bool>,
     pub roots: Option<Vec<String>>,
@@ -880,12 +923,30 @@ pub struct SettingsUpdate {
     pub unpair: bool,
 }
 
-/// Validates a new folder list: existing folders, canonical, never a filesystem root.
+/// Why a canonical folder may not be shared, if it may not. The sandbox re-allows
+/// reads and writes under every root, so a root holding `$HOME` would expose
+/// `~/.ssh` and friends. A root INSIDE home is the user's choice.
+fn refused_root(path: &Path, home: Option<&Path>) -> Option<&'static str> {
+    if path.parent().is_none() {
+        return Some("sharing a whole drive is not allowed");
+    }
+
+    home.filter(|home| home.starts_with(path))
+        .map(|_| "sharing your home folder or one of its parents is not allowed")
+}
+
+fn canonical_home() -> Option<PathBuf> {
+    sandbox::home().and_then(|home| stdfs::canonicalize(home).ok())
+}
+
+/// Validates a new folder list: existing folders, canonical, never a filesystem root
+/// or a folder holding the home folder.
 pub fn validate_roots(roots: &[String]) -> Result<Vec<String>, String> {
     if roots.len() > MAX_ROOTS {
         return Err(format!("at most {MAX_ROOTS} folders"));
     }
 
+    let home = canonical_home();
     let mut valid: Vec<String> = Vec::new();
 
     for root in roots {
@@ -895,8 +956,8 @@ pub fn validate_roots(roots: &[String]) -> Result<Vec<String>, String> {
             return Err(format!("{root}: not a folder"));
         }
 
-        if path.parent().is_none() {
-            return Err(format!("{root}: sharing a whole drive is not allowed"));
+        if let Some(reason) = refused_root(&path, home.as_deref()) {
+            return Err(format!("{root}: {reason}"));
         }
 
         let path = path.to_string_lossy().into_owned();
@@ -938,6 +999,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_shell_network_setting_is_a_boolean_on_the_wire() {
+        let on: SettingsUpdate = serde_json::from_str(r#"{"allowShellNetwork":true}"#).unwrap();
+
+        assert_eq!(on.allow_shell_network, Some(true));
+        assert!(serde_json::from_str::<SettingsUpdate>(r#"{"allowShellNetwork":"yes"}"#).is_err());
+    }
+
+    #[test]
     fn shell_and_writes_are_never_always_allowed() {
         let rules = vec![
             "shell_run".to_owned(),
@@ -945,22 +1014,63 @@ mod tests {
             "fs_read".to_owned(),
         ];
 
-        assert_eq!(decide("shell_run", false, &rules), (false, false));
-        assert_eq!(decide("fs_write", false, &rules), (false, false));
-        assert_eq!(decide("fs_read", false, &rules), (true, true));
+        assert_eq!(decide("shell_run", false, false, &rules), (false, false));
+        assert_eq!(decide("fs_write", false, false, &rules), (false, false));
+        assert_eq!(decide("fs_read", false, true, &rules), (true, true));
     }
 
     #[test]
     fn a_tainted_call_always_asks_and_never_offers_always() {
         let rules = vec!["fs_read".to_owned()];
 
-        assert_eq!(decide("fs_read", true, &rules), (false, false));
-        assert_eq!(decide("mcp__git__status", true, &[]), (false, false));
+        assert_eq!(decide("fs_read", true, true, &rules), (false, false));
+        assert_eq!(decide("mcp__git__status", true, true, &[]), (false, false));
     }
 
     #[test]
     fn an_untainted_call_without_a_rule_asks_and_offers_always() {
-        assert_eq!(decide("mcp__git__status", false, &[]), (false, true));
+        assert_eq!(decide("mcp__git__status", false, true, &[]), (false, true));
+    }
+
+    #[test]
+    fn a_read_only_mcp_tool_can_be_always_allowed() {
+        let rules = vec!["mcp__git__status".to_owned()];
+
+        assert_eq!(decide("mcp__git__status", false, true, &[]), (false, true));
+        assert_eq!(
+            decide("mcp__git__status", false, true, &rules),
+            (true, true)
+        );
+    }
+
+    #[test]
+    fn a_non_read_only_mcp_tool_is_never_offered_always_nor_skips_its_prompt() {
+        let rules = vec!["mcp__git__push".to_owned()];
+
+        assert_eq!(decide("mcp__git__push", false, false, &[]), (false, false));
+        assert_eq!(
+            decide("mcp__git__push", false, false, &rules),
+            (false, false)
+        );
+    }
+
+    #[test]
+    fn an_mcp_action_takes_its_read_only_flag_from_the_manifest() {
+        let server = McpServerConfig {
+            args: Vec::new(),
+            command: "git".into(),
+            env: Default::default(),
+            name: "git".into(),
+        };
+        let mcp = |read_only| Action::Mcp {
+            arguments: json!({}),
+            read_only,
+            server: server.clone(),
+            tool: "status".into(),
+        };
+
+        assert!(mcp(true).read_only());
+        assert!(!mcp(false).read_only());
     }
 
     #[test]
@@ -983,6 +1093,18 @@ mod tests {
     fn refuses_a_whole_drive_as_a_root() {
         assert!(validate_roots(&["/".to_owned()]).is_err());
         assert!(validate_roots(&[std::env::temp_dir().to_string_lossy().into_owned()]).is_ok());
+    }
+
+    #[test]
+    fn refuses_a_root_that_holds_the_home_folder() {
+        let home = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+        assert!(refused_root(home, Some(home)).is_some());
+        assert!(refused_root(home.parent().unwrap(), Some(home)).is_some());
+        assert!(refused_root(&home.join("src"), Some(home)).is_none());
+        // No home to protect: only the drive check applies.
+        assert!(refused_root(home, None).is_none());
+        assert!(refused_root(Path::new("/"), None).is_some());
     }
 
     #[test]
@@ -1099,6 +1221,8 @@ mod tests {
     fn a_call_runs_only_after_a_person_approves_it() {
         use std::sync::mpsc::channel;
         use std::sync::Arc;
+
+        crate::store::test_keychain::install();
 
         let dir = std::env::temp_dir().join(format!("neore-device-gate-{}", std::process::id()));
         let _ = stdfs::remove_dir_all(&dir);

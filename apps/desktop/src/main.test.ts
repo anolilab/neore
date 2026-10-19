@@ -70,8 +70,12 @@ vi.mock("electron", () => {
                 window.hidden = true;
             },
             id,
+            isDestroyed: () => false,
             isFocused: () => window.focused,
+            isMaximized: () => false,
             isMinimized: () => false,
+            getNormalBounds: () => ({ height: 820, width: 1200, x: 0, y: 0 }),
+            maximize: () => {},
             isVisible: () => window.shown,
             loaded: [] as string[],
             loadURL: (url: string) => {
@@ -171,6 +175,9 @@ vi.mock("electron", () => {
             },
         },
         Notification: FakeNotification,
+        screen: {
+            getAllDisplays: () => [{ workArea: { height: 1080, width: 1920, x: 0, y: 0 } }],
+        },
         session: {
             defaultSession: {
                 setPermissionCheckHandler: (listener: Fake["permissionCheck"]) => {
@@ -338,9 +345,14 @@ describe("permissions", () => {
         const decide = (permission: string, requestingUrl: string) => {
             let isAllowed: boolean | undefined;
 
-            fake().permissionRequest?.({}, permission, (value) => {
-                isAllowed = value;
-            }, { requestingUrl });
+            fake().permissionRequest?.(
+                {},
+                permission,
+                (value) => {
+                    isAllowed = value;
+                },
+                { requestingUrl },
+            );
 
             return isAllowed;
         };

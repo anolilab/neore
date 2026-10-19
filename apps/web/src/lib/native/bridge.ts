@@ -4,8 +4,9 @@
  *
  * The shell's preload exposes `window.neoreNative` on the site origin only, and
  * it lists in `capabilities` what this build can do. Anything not listed here
- * (sign-in in the system browser, device execution) is inert until its port
- * lands; see `docs/plans/desktop-and-mobile-apps.md` §4.
+ * (sign-in in the system browser, device execution) is inert: device calls
+ * reach the shell only when it advertises `device`, and `device` is the relay
+ * in `apps/desktop/src/preload.ts`. See `docs/plans/desktop-and-mobile-apps.md` §4.
  */
 
 type UnlistenFunction = () => void;
@@ -13,12 +14,25 @@ type UnlistenFunction = () => void;
 /** What the Electron preload exposes (`apps/desktop/src/preload.ts`). */
 interface NativeBridge {
     capabilities: ReadonlyArray<string>;
+    device?: NativeDeviceRelay;
     notify: (title: string, body?: string) => Promise<void>;
     onCompose: (handler: () => void) => UnlistenFunction;
+    openThreadWindow: (threadId: string) => Promise<void>;
     onSignIn: (handler: () => void) => UnlistenFunction;
     startBrowserSignIn: () => Promise<void>;
     takePendingCompose: () => Promise<string | undefined>;
     takePendingSignIn: () => Promise<NativeSignIn | undefined>;
+}
+
+/** The device relay the shell exposes when it advertises `device` (`apps/desktop/src/preload.ts`). Relay only. */
+interface NativeDeviceRelay {
+    execute: (call: { envelope: string; signature: string }) => Promise<NativeSigned>;
+    manifest: () => Promise<NativeSigned>;
+    onChanged: (handler: () => void) => UnlistenFunction;
+    onProgress: (handler: (report: NativeDeviceProgress) => void) => UnlistenFunction;
+    openSettings: () => Promise<void>;
+    pair: (pairing: { accountLabel: string; deviceId: string; secret: string }) => Promise<boolean>;
+    status: () => Promise<NativeDeviceStatus | null>;
 }
 
 /** A reply shorter than this finished while the user was probably still watching. */
@@ -57,6 +71,24 @@ export const notifyNative = async ({ body, title }: NativeNotification): Promise
  * was not visible when it finished.
  */
 export const shouldNotifyReplyFinished = (durationMs: number, documentHidden: boolean): boolean => documentHidden || durationMs >= LONG_REPLY_MS;
+
+/** Whether the shell can open a thread in its own window. Known synchronously, so a menu can show or hide the item. */
+export const supportsThreadWindows = (): boolean => getNative()?.capabilities.includes("thread-windows") === true;
+
+/** Opens the thread in its own shell window. `false` unless the shell advertises `thread-windows`, or when it refuses the id. */
+export const openThreadWindow = async (threadId: string): Promise<boolean> => {
+    if (!supportsThreadWindows()) {
+        return false;
+    }
+
+    try {
+        await getNative()?.openThreadWindow(threadId);
+
+        return true;
+    } catch {
+        return false;
+    }
+};
 
 /** Takes (and clears) the text the shell is holding for a new chat, if any. */
 export const takePendingCompose = async (): Promise<string | undefined> => {
@@ -213,35 +245,67 @@ export interface NativeSigned {
     signature: string;
 }
 
+/** Only a shell that advertises `device` has the relay; anywhere else every device call is inert. */
+const getDeviceBridge = (): NativeDeviceRelay | undefined => {
+    const native = getNative();
+    const relay = native?.capabilities.includes("device") ? native.device : undefined;
+
+    return relay !== undefined && typeof relay.execute === "function" ? relay : undefined;
+};
+
+/** `undefined` until the shell advertises `device`; also `undefined` when the core failed to load. */
+export const getNativeDeviceStatus = async (): Promise<NativeDeviceStatus | undefined> => {
+    try {
+        return (await getDeviceBridge()?.status()) ?? undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+/** `false` until the shell advertises `device`, and when the shell refuses the pairing. */
+export const pairNativeDevice = async (pairing: { accountLabel: string; deviceId: string; secret: string }): Promise<boolean> => {
+    try {
+        return (await getDeviceBridge()?.pair(pairing)) === true;
+    } catch {
+        return false;
+    }
+};
+
 /** `undefined` until the shell advertises `device`. */
-export const getNativeDeviceStatus = async (): Promise<NativeDeviceStatus | undefined> => undefined;
+export const getNativeDeviceManifest = async (): Promise<NativeSigned | undefined> => getDeviceBridge()?.manifest();
 
-/** `false` until the shell advertises `device`. */
-export const pairNativeDevice = async (_pairing: { accountLabel: string; deviceId: string; secret: string }): Promise<boolean> => false;
+/** Rejects until the shell advertises `device`; otherwise the shell's own rejection reaches the caller. */
+export const executeOnNativeDevice = async (call: { envelope: string; signature: string }): Promise<NativeSigned> => {
+    const relay = getDeviceBridge();
 
-/** `undefined` until the shell advertises `device`. */
-export const getNativeDeviceManifest = async (): Promise<NativeSigned | undefined> => undefined;
+    if (relay === undefined) {
+        throw new Error("This desktop app has no device execution yet");
+    }
 
-/** Rejects until the shell advertises `device`. */
-export const executeOnNativeDevice = async (_call: { envelope: string; signature: string }): Promise<NativeSigned> => {
-    throw new Error("This desktop app has no device execution yet");
+    return relay.execute(call);
 };
 
 /** Opens the shell's local window. A no-op until the shell advertises `device`. */
-export const openNativeDeviceSettings = async (): Promise<void> => {};
+export const openNativeDeviceSettings = async (): Promise<void> => {
+    try {
+        await getDeviceBridge()?.openSettings();
+    } catch {
+        // The window did not open; the user can still open it from the shell's menu.
+    }
+};
 
 /** A signed "prompting" / "running" report for one call, relayed as-is to `reportDeviceCallProgress`. */
 export interface NativeDeviceProgress extends NativeSigned {
     callId: string;
 }
 
-export const onNativeDeviceProgress =
-    (_handler: (report: NativeDeviceProgress) => void): UnlistenFunction =>
-    () => {};
+/** Signed progress reports for calls this page relayed; a no-op until the shell advertises `device`. */
+export const onNativeDeviceProgress = (handler: (report: NativeDeviceProgress) => void): UnlistenFunction =>
+    getDeviceBridge()?.onProgress(handler) ?? (() => {});
 
-/** Calls `handler` once on subscribe; no further events until the shell advertises `device`. */
+/** Calls `handler` once on subscribe, then on each shell change; only the one call outside the shell. */
 export const onNativeDeviceChanged = (handler: () => void): UnlistenFunction => {
     handler();
 
-    return () => {};
+    return getDeviceBridge()?.onChanged(handler) ?? (() => {});
 };

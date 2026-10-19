@@ -13,6 +13,8 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 
+import ConnectionBanner from "@/features/connection/components/connection-banner";
+
 export type ComposerMode = "text" | "image" | "video" | "audio";
 
 export interface ComposerBaseRef {
@@ -144,13 +146,15 @@ const ComposerBase = ({
                 type: "spring",
             }}
         >
+            <ConnectionBanner />
+
             {/* Main composer container — single clean border */}
             <motion.div
                 className={clsx(
                     "bg-card/70 w-full overflow-hidden rounded-xl backdrop-blur-xl",
                     "border transition-[border-color,box-shadow] duration-300",
                     "data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50 data-[dragging=true]:border-dashed",
-                    "relative",
+                    "relative z-10",
                 )}
                 data-dragging={isDragging}
                 data-view-transition={viewTransitionName}

@@ -33,26 +33,40 @@ const common = {
     logLevel: "info",
 };
 
+/**
+ * A sandboxed preload runs with Node's built-ins unavailable, so its only import may be `electron`.
+ * esbuild marks the built-ins it leaves alone as external, so any `fs`, `child_process`, … shows up here.
+ */
+const assertSandboxedPreload = (name, result) => {
+    const forbidden = Object.values(result.metafile.outputs)
+        .flatMap((output) => output.imports)
+        .filter((imported) => imported.external && imported.path !== "electron")
+        .map((imported) => imported.path);
+
+    if (forbidden.length > 0) {
+        throw new Error(`${name} imports ${[...new Set(forbidden)].join(", ")}; a sandboxed preload may import only "electron"`);
+    }
+};
+
+const preloadEntries = [
+    ["site preload", path.join(root, "src/preload.ts"), path.join(dist, "preload.cjs")],
+    ["Quick Composer preload", path.join(root, "src/quick-composer/preload.ts"), path.join(dist, "quick-composer", "preload.cjs")],
+    ["device window preload", path.join(root, "src/device/window/preload.ts"), path.join(dist, "device-window", "preload.cjs")],
+];
+
 await esbuild.build({ ...common, entryPoints: [path.join(root, "src/main.ts")], outfile: path.join(dist, "main.cjs") });
-await esbuild.build({ ...common, entryPoints: [path.join(root, "src/preload.ts")], outfile: path.join(dist, "preload.cjs") });
-await esbuild.build({
-    ...common,
-    entryPoints: [path.join(root, "src/quick-composer/preload.ts")],
-    outfile: path.join(dist, "quick-composer", "preload.cjs"),
-});
+
+for (const [name, entryPoint, outfile] of preloadEntries) {
+    assertSandboxedPreload(name, await esbuild.build({ ...common, entryPoints: [entryPoint], outfile, metafile: true }));
+}
 
 // The Quick Composer page is plain HTML/JS (as in the Tauri shell): copied, not bundled.
 for (const file of ["index.html", "quick-composer.css", "quick-composer.js"]) {
     copyFileSync(path.join(root, "src/quick-composer", file), path.join(dist, "quick-composer", file));
 }
 
-// The local device window: its own sandboxed preload, and a classic script for the page (no module
-// scripts from file://). The page and its stylesheet are copied as they are.
-await esbuild.build({
-    ...common,
-    entryPoints: [path.join(root, "src/device/window/preload.ts")],
-    outfile: path.join(dist, "device-window", "preload.cjs"),
-});
+// The local device window's page: a classic script (no module scripts from file://). Its sandboxed
+// preload is built with the others above. The page and its stylesheet are copied as they are.
 await esbuild.build({
     bundle: true,
     format: "iife",

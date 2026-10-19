@@ -20,6 +20,9 @@ pub struct ShellOutput {
     pub truncated: bool,
 }
 
+/// How long a finished command may keep its output pipes open (a background child) before we return what we have.
+const READER_GRACE: Duration = Duration::from_millis(500);
+
 /// Reads a stream to the end (so the child never blocks on a full pipe) and
 /// keeps at most `cap` bytes of it.
 fn drain(
@@ -334,8 +337,19 @@ pub fn run(
         }
     };
 
+    // A background child can inherit stdout and hold the pipe open after the
+    // shell exits, so wait for the readers only up to a deadline. Unfinished
+    // readers are left to end on their own; they write only into the capped buffer.
+    let deadline = Instant::now() + READER_GRACE;
+
     for reader in readers {
-        let _ = reader.join();
+        while !reader.is_finished() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(10));
+        }
+
+        if reader.is_finished() {
+            let _ = reader.join();
+        }
     }
 
     let (bytes, truncated) = std::mem::take(&mut *buffer.lock().unwrap());
@@ -351,6 +365,23 @@ pub fn run(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn returns_when_a_background_child_holds_stdout() {
+        let started = Instant::now();
+        let result = run(
+            "sleep 30 & echo done",
+            Path::new("/"),
+            Duration::from_secs(10),
+            64 * 1024,
+            None,
+        )
+        .unwrap();
+
+        assert!(result.output.contains("done"));
+        assert!(!result.timed_out);
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
 
     #[test]
     fn captures_output_and_exit_code() {
@@ -533,6 +564,37 @@ mod tests {
         assert!(!sandboxed.output.contains("lctl=0"), "{}", sandboxed.output);
 
         let _ = std::fs::remove_dir_all(shared.parent().unwrap());
+    }
+
+    // Only macOS enforces the network setting (see `sandbox.rs`).
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_sandboxed_command_cannot_reach_the_network_unless_allowed() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        // Loopback is network too: a listener this test owns accepts the connect.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let command = format!(
+            "exec 3<>/dev/tcp/127.0.0.1/{} && echo CONNECTED",
+            listener.local_addr().unwrap().port()
+        );
+        let (shared, _) = folders("network");
+        let blocked = Policy::for_roots(std::slice::from_ref(&shared), None);
+        let allowed = Policy {
+            network: true,
+            ..blocked.clone()
+        };
+        let run_with = |policy: &Policy| {
+            run(&command, &shared, Duration::from_secs(10), 4096, Some(policy)).unwrap()
+        };
+
+        let refused = run_with(&blocked);
+        let open = run_with(&allowed);
+
+        assert!(!refused.output.contains("CONNECTED"), "{}", refused.output);
+        assert!(open.output.contains("CONNECTED"), "{}", open.output);
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
