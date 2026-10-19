@@ -236,11 +236,17 @@ describe("POST /v1/chat/completions (stream=true) with a provider error mid-stre
                 env,
             );
 
-            await res.text();
+            const body = await res.text();
 
             const [entry] = recordSpy.mock.calls.map(([usageEntry]) => usageEntry);
+            const finishReasons = body
+                .matchAll(/"finish_reason":"(\w+)"/g)
+                .map((match) => match[1])
+                .toArray();
 
             expect(entry?.errorCode).toBe("PROVIDER_ERROR");
+            // The error finish chunk is the only one: a later "stop" would read as a normal end.
+            expect(finishReasons).toEqual(["error"]);
         } finally {
             recordSpy.mockRestore();
         }

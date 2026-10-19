@@ -176,6 +176,8 @@ describe("chat fallback: streaming", () => {
             expect(entries).toContainEqual(expect.objectContaining({ errorCode: "PROVIDER_ERROR", fallbackReason: "infra" }));
             // The client sees the same error finish chunk the primary stream sends.
             expect(streamedFinishReasons).toContain("error");
+            // ...and nothing after it that reads as a normal end.
+            expect(streamedFinishReasons).not.toContain("stop");
         } finally {
             recordSpy.mockRestore();
         }

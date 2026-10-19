@@ -516,13 +516,16 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                         const finalUsage = await result.usage;
                         const tokens = extractTokenCounts(finalUsage);
 
-                        sendChunk({
-                            choices: [{ delta: {}, finish_reason: mapFinishReason(finishReason), index: 0 }],
-                            created,
-                            id: completionId,
-                            model: modelId,
-                            object: "chat.completion.chunk",
-                        });
+                        // A failed reply already ended with its error finish chunk: a second one would read as a normal stop.
+                        if (!hasFailed) {
+                            sendChunk({
+                                choices: [{ delta: {}, finish_reason: mapFinishReason(finishReason), index: 0 }],
+                                created,
+                                id: completionId,
+                                model: modelId,
+                                object: "chat.completion.chunk",
+                            });
+                        }
 
                         if (isUsageRequested) {
                             sendChunk({ choices: [], created, id: completionId, model: modelId, object: "chat.completion.chunk", usage: usageJson(tokens) });
@@ -913,13 +916,16 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                 const finalUsage = await fbResult.usage;
                                 const tokens = extractTokenCounts(finalUsage);
 
-                                sendChunk({
-                                    choices: [{ delta: {}, finish_reason: mapFinishReason(finishReason), index: 0 }],
-                                    created: fallbackCreated,
-                                    id: fallbackCompletionId,
-                                    model: fallbackCandidate.modelId,
-                                    object: "chat.completion.chunk",
-                                });
+                                // A failed reply already ended with its error finish chunk: a second one would read as a normal stop.
+                                if (!hasFailed) {
+                                    sendChunk({
+                                        choices: [{ delta: {}, finish_reason: mapFinishReason(finishReason), index: 0 }],
+                                        created: fallbackCreated,
+                                        id: fallbackCompletionId,
+                                        model: fallbackCandidate.modelId,
+                                        object: "chat.completion.chunk",
+                                    });
+                                }
 
                                 if (isUsageRequested) {
                                     sendChunk({
