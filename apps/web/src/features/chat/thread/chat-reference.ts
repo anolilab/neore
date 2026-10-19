@@ -31,7 +31,8 @@ const UNSAFE_FILE_NAME_CHARACTERS = /[^\p{L}\p{N}]+/gu;
 /**
  * The chats the "@" menu offers, newest first. A locked chat is never offered
  * (its title is its content, and the unlock proof is not this menu's to ask for),
- * and neither is the chat being typed into.
+ * and neither is the chat being typed into. `threads` is the caller's own list
+ * (`getThreadListData` reads by user id), so a chat shared with them never appears.
  */
 export const mentionableChats = (threads: ReadonlyArray<ThreadRow>, currentThreadId?: string): ChatReference[] =>
     threads

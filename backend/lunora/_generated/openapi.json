@@ -6451,6 +6451,12 @@
                       "codeLineNumbers": {
                         "type": "boolean"
                       },
+                      "composerAutocompleteEnabled": {
+                        "type": "boolean"
+                      },
+                      "composerVimMode": {
+                        "type": "boolean"
+                      },
                       "contrast": {
                         "anyOf": [
                           {
@@ -6466,12 +6472,6 @@
                             "type": "string"
                           }
                         ]
-                      },
-                      "composerAutocompleteEnabled": {
-                        "type": "boolean"
-                      },
-                      "composerVimMode": {
-                        "type": "boolean"
                       },
                       "customInstructions": {
                         "type": "string"

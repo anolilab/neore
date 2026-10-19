@@ -79,6 +79,13 @@ describe("contrast setting", () => {
     });
 });
 
+describe("dimmed theme colours", () => {
+    it("are restored to the full token", () => {
+        expect(CSS).toContain('[class*="text-muted-foreground/"]');
+        expect(CSS).toContain('[class*="border-border/"]');
+    });
+});
+
 describe("forced colours", () => {
     it("restores a visible keyboard focus where box-shadow rings are dropped", () => {
         expect(CSS).toContain("@media (forced-colors: active)");

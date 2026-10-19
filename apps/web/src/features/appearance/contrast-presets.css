@@ -59,6 +59,19 @@
 }
 
 /*
+ * Much of the UI dims the theme colours with an opacity modifier (`text-muted-foreground/50`,
+ * `border-border/40`), which mixes them with transparency and undoes the tokens above.
+ * In high contrast the full token wins. Hard-coded palette colours (some badges) are not adjusted.
+ */
+:root[data-contrast="high"] [class*="text-muted-foreground/"] {
+    color: var(--muted-foreground);
+}
+
+:root[data-contrast="high"] [class*="border-border/"] {
+    border-color: var(--border);
+}
+
+/*
  * Windows High Contrast / forced colours: the browser replaces colours and drops
  * box-shadow, which is how the ring focus styles draw, so keyboard focus would vanish.
  */
