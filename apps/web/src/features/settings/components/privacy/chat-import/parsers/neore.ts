@@ -83,8 +83,8 @@ const roleOfRow = (row: NeoreExportMessage): NormalizedMessage["role"] | undefin
 /**
  * The rows on the path the user saw. A thread without an active leaf (never branched,
  * or an export from before the pointer existed) keeps every row, as it always has.
- * Rows without a string `_id` cannot be linked, so they are keyed by position; a real id
- * never starts with `#`.
+ * Rows without a string `_id`, or repeating one, cannot be linked, so they are keyed by position;
+ * a real id never starts with `#`. A repeated id would make a row its own parent, and the walk down never ends.
  */
 const activePathRows = (thread: NeoreExportConversation["thread"], rows: NeoreExportMessage[]): NeoreExportMessage[] => {
     const leafId = thread?.activeLeafMessageId;
@@ -93,11 +93,18 @@ const activePathRows = (thread: NeoreExportConversation["thread"], rows: NeoreEx
         return rows;
     }
 
-    const keyOf = (row: NeoreExportMessage, index: number): string => (typeof row._id === "string" ? row._id : `#${String(index)}`);
+    const seen = new Set<string>();
+    const keys = rows.map((row, index) => {
+        const key = typeof row._id === "string" && !seen.has(row._id) ? row._id : `#${String(index)}`;
+
+        seen.add(key);
+
+        return key;
+    });
     const tree = buildBranchTree(
         rows.map((row, index) => {
             return {
-                _id: keyOf(row, index),
+                _id: keys[index] as string,
                 order: row.order ?? 0,
                 parentMessageId: row.parentMessageId,
                 stepOrder: row.stepOrder ?? 0,
@@ -107,7 +114,7 @@ const activePathRows = (thread: NeoreExportConversation["thread"], rows: NeoreEx
     // A leaf the file no longer contains degrades to the latest path from the top, as the backend shows it.
     const onPath = new Set(resolveActivePath(tree, leafId));
 
-    return rows.filter((row, index) => onPath.has(keyOf(row, index)));
+    return rows.filter((_row, index) => onPath.has(keys[index] as string));
 };
 
 const parseConversation = (conversation: NeoreExportConversation): NormalizedConversation | null => {

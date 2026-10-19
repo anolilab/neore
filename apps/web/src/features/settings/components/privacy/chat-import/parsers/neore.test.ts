@@ -295,6 +295,18 @@ describe("parseNeore with an active branch", () => {
         expect(textsOf(mutual)).toEqual(["user:First", "assistant:Second"]);
     });
 
+    it("terminates on rows that share an id", () => {
+        const repeated = branchedThread(
+            [
+                row({ _id: "a", createdAt: 1, order: 0, role: "user", stepOrder: 0, text: "First" }),
+                row({ _id: "a", createdAt: 2, order: 1, role: "assistant", stepOrder: 1, text: "Second" }),
+            ],
+            "a",
+        );
+
+        expect(textsOf(repeated)).toEqual(["user:First", "assistant:Second"]);
+    });
+
     it("shows the latest reply when the stored leaf is no longer in the file", () => {
         expect(textsOf(twoReplies("deleted"))).toEqual(["user:Plan a trip", "assistant:Option B"]);
     });
