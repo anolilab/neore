@@ -34,8 +34,17 @@ const MAX_FILE_SIZE = MAX_EXTRACTION_DOCUMENT_BYTES;
 // Services
 // ============================================================================
 
+/**
+ * Above this size a document is extracted as plain text. Markdown output costs
+ * roughly twice the memory of plain on a text-dense PDF (87 MiB against 45 MiB at
+ * 6 MB), so past about 9 MB it no longer fits the Worker's 128 MiB, while plain
+ * text goes on to about 17 MB. A large file keeps what it could always do and
+ * loses only its headings and pages.
+ */
+export const MARKDOWN_EXTRACTION_MAX_BYTES = 5 * 1024 * 1024;
+
 /** The document-parser Worker as a {@link ParseDocument}, or `undefined` when its binding is absent. */
-const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
+export const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
     if (!isServiceBound(ctx, "documentParser")) {
         return undefined;
     }
@@ -43,15 +52,25 @@ const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
     return async (bytes, mimeType) => {
         const { createDocumentParserClient, extractDocument } = await import("@neore/service-sdk/document-parser");
         const parserClient = createDocumentParserClient({ fetch: serviceFetch(ctx, "documentParser") });
-        const { data, error, response } = await extractDocument({
-            body: new Blob([bytes], { type: mimeType }),
-            client: parserClient,
-            headers: { "content-type": mimeType },
-            // Markdown keeps the headings the chunker's section paths come from, and
-            // splits PDF and PPTX content into pages. Only knowledge asks for it.
-            query: { format: "markdown" },
-            signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
-        });
+        // Markdown keeps the headings the chunker's section paths come from, and
+        // splits PDF and PPTX content into pages. Only knowledge asks for it.
+        const extract = async (asMarkdown: boolean) =>
+            await extractDocument({
+                body: new Blob([bytes], { type: mimeType }),
+                client: parserClient,
+                headers: { "content-type": mimeType },
+                ...(asMarkdown && { query: { format: "markdown" as const } }),
+                signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
+            });
+        const wantsMarkdown = bytes.byteLength <= MARKDOWN_EXTRACTION_MAX_BYTES;
+        let result = await extract(wantsMarkdown);
+
+        // The Worker running out of memory or time on a Markdown render is a 5xx, not a verdict on the file.
+        if (wantsMarkdown && (result.response?.status ?? 500) >= 500) {
+            result = await extract(false);
+        }
+
+        const { data, error, response } = result;
 
         if (response?.status === 413) {
             throw new LunoraError(
