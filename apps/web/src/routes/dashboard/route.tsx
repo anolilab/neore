@@ -1,5 +1,5 @@
 import type { MessageDescriptor } from "@lingui/core";
-import { Trans, useLingui } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import { Authenticated } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@neore/ui/components/breadcrumb";
@@ -19,7 +19,6 @@ import {
     LayoutDashboard,
     Lock,
     MessageCircle,
-    MessageSquare,
     Settings,
     Shield,
     Sparkles,
@@ -42,22 +41,6 @@ import SiteHeader from "@/features/layout/components/site-header";
 import { breadcrumbLabel, DASHBOARD_PAGE_NAMES } from "@/features/layout/lib/dashboard-page-names";
 import { requireSession } from "@/lib/auth/route-guard";
 import { createLunoraQueryOptions } from "@/lib/lunora/crpc";
-
-const sidebarHeader = (
-    <div className="flex items-center gap-2 px-4 py-2">
-        <div className="dark:bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-            <MessageSquare className="size-4" />
-        </div>
-        <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">
-                <Trans>AI Chat</Trans>
-            </span>
-            <span className="truncate text-xs">
-                <Trans>Dashboard</Trans>
-            </span>
-        </div>
-    </div>
-);
 
 /** The page names, as descriptors: this runs outside a component, so the caller translates them (`i18n._`). */
 const getNavigationItems = (
@@ -239,7 +222,7 @@ const RouteComponent = () => {
             >
                 {/* The inset's margins sit inside the viewport height; clip them so the page does not scroll. */}
                 <div className="flex h-dvh w-full overflow-hidden">
-                    <AppSidebar content={sidebarContent} header={sidebarHeader} name="overlay" />
+                    <AppSidebar content={sidebarContent} name="overlay" />
                     <SidebarInset className="dark:bg-sidebar-foreground bg-white md:peer-data-[variant=inset]:m-1">
                         <SiteHeader>
                             <Breadcrumb>
