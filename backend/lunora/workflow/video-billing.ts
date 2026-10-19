@@ -68,7 +68,7 @@ const creditsOf = (costMicrodollars: number): number => computeGatewayCredits({ 
  * Refuses a video node run before its paid work: the credits its paid calls cost, then the daily quota.
  * Throws the message the run reports.
  */
-const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: WorkflowNode, userId: string, costs: VideoRunCosts): Promise<void> => {
+const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: WorkflowNode, userId: string, costs: VideoRunCosts): Promise<boolean> => {
     const calls = [costs.clipMicrodollars, costs.extractionMicrodollars].filter((cost): cost is number => cost !== undefined);
 
     if (calls.length > 0 && run.orgId) {
@@ -83,8 +83,11 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
     }
 
     // The clip is taken with its own check in one mutation, so two runs cannot both pass the snapshot above on one balance.
+    // `reserved` is true only when this attempt took the reservation: a retry finds an earlier attempt's, and gives nothing back.
+    let reserved = false;
+
     if (costs.clipMicrodollars !== undefined && run.orgId) {
-        const reserved = await context.runMutation(internal.auth.billing.reserveGatewayCredits, {
+        const outcome = await context.runMutation(internal.auth.billing.reserveGatewayCredits, {
             costMicrodollars: costs.clipMicrodollars,
             modelId: clipModelIdOf(node),
             orgId: run.orgId,
@@ -92,9 +95,11 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
             userId,
         });
 
-        if (!reserved) {
+        if (outcome === "refused") {
             throw new Error(`Not enough credits for the "${String(node.data.label ?? node.type)}" video`);
         }
+
+        reserved = outcome === "taken";
     }
 
     // The same unit `/chat/media` charges: the tier and the admin exemption are read where the quota is kept. Keyed on the node run,
@@ -111,10 +116,12 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
             throw new Error("You've reached your daily video generation limit.");
         }
     } catch (error) {
-        await releaseClip(context, run, node, costs);
+        await releaseClip(context, run, node, reserved);
 
         throw error;
     }
+
+    return reserved;
 };
 
 /** The model the clip is charged to, as the ledger records it. */
@@ -129,8 +136,8 @@ const clipModelIdOf = (node: WorkflowNode): string => {
  * member is charged for a clip they did not get. It is tried twice, like a deduction; a release that fails both
  * times is logged, and is a residual ceiling.
  */
-const releaseClip = async (context: Pick<ActionCtx, "runMutation">, run: ExecutionContext, node: WorkflowNode, costs: VideoRunCosts): Promise<void> => {
-    if (costs.clipMicrodollars === undefined || !run.orgId) {
+const releaseClip = async (context: Pick<ActionCtx, "runMutation">, run: ExecutionContext, node: WorkflowNode, reserved: boolean): Promise<void> => {
+    if (!reserved) {
         return;
     }
 
@@ -257,14 +264,14 @@ export const runBilledVideo = async <T>(
     costs: VideoRunCosts,
     dispatch: () => Promise<T>,
 ): Promise<T> => {
-    await beginVideoRun(context, run, node, userId, costs);
+    const reserved = await beginVideoRun(context, run, node, userId, costs);
 
     let result: T;
 
     try {
         result = await dispatch();
     } catch (error) {
-        await releaseClip(context, run, node, costs);
+        await releaseClip(context, run, node, reserved);
 
         throw error;
     }

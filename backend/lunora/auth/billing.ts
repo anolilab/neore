@@ -399,26 +399,26 @@ export const deductCreditsFromGateway = internalMutation
  * Takes a platform run's clip cost from the member's credits before the paid call, and refuses when they
  * have fewer left. The check and the deduction are one mutation, so two runs cannot both pass on the same
  * balance. The deduction is the one `deductCreditsFromGateway` makes, keyed on `requestId`, so the charge
- * made after the run is then a no-op. `false` is a refusal. No organization or no credit record is not refused, as in chat.
+ * made after the run is then a no-op. `"refused"` is a refusal. `"already"` means this request id was reserved by an earlier attempt,
+ * so this attempt took nothing and must not give anything back. No organization or no credit record is not refused, as in chat.
  */
 export const reserveGatewayCredits = internalMutation
     .input({
-        costMicrodollars: v.number(),
+        costMicrodollars: v.number().check((value) => value >= 0, { message: "Negative cost" }),
         modelId: v.string().max(MAX_LENGTH.short),
         orgId: v.string().max(MAX_LENGTH.id),
         requestId: v.string().max(MAX_LENGTH.long),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.boolean())
+    .output(v.union(v.literal("taken"), v.literal("already"), v.literal("refused")))
     .mutation(async ({ args, ctx: context }) => {
         const prior = await context.db
             .query("gatewayUsageDeductions")
             .withIndex("by_requestId", (q) => q.eq("requestId", args.requestId))
             .first();
 
-        // A retry of the node: its reservation is already taken.
         if (prior) {
-            return true;
+            return "already";
         }
 
         const record = await context.db.memberCredits.findFirst({ where: { organizationId: args.orgId, userId: args.userId } });
@@ -428,13 +428,13 @@ export const reserveGatewayCredits = internalMutation
             const credits = computeGatewayCredits({ billingMode: "platform", costMicrodollars: args.costMicrodollars });
 
             if (credits > settings.credits - (record.usedCredits ?? 0)) {
-                return false;
+                return "refused";
             }
         }
 
         await applyGatewayDeduction(context, { ...args, billingMode: "platform" });
 
-        return true;
+        return "taken";
     });
 
 /**

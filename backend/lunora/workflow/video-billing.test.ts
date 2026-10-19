@@ -36,7 +36,7 @@ const makeCtx = ({ creditsLeft = null, limitOk = true }: Answers = {}) => {
     });
     const runMutation = vi.fn(async (reference: unknown, _args?: unknown) => {
         if (reference === internal.auth.billing.reserveGatewayCredits) {
-            return true;
+            return "taken";
         }
 
         if (reference === internal.chat.daily_charge.chargeDailyUnit) {
@@ -91,7 +91,7 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
         }
 
         if (reference === internal.auth.billing.reserveGatewayCredits) {
-            return true;
+            return "taken";
         }
 
         if (reference === internal.chat.daily_charge.chargeDailyUnit) {
@@ -358,17 +358,21 @@ const balanceCtx = ({
     const reserved = new Map<string, number>();
     const runMutation = vi.fn(async (reference: unknown, args?: any) => {
         if (reference === internal.auth.billing.reserveGatewayCredits) {
+            if (reserved.has(args.requestId)) {
+                return "already";
+            }
+
             // 1 credit is 1,000 microdollars.
             const credits = args.costMicrodollars / 1000;
 
             if (credits > left) {
-                return false;
+                return "refused";
             }
 
             left -= credits;
             reserved.set(args.requestId, credits);
 
-            return true;
+            return "taken";
         }
 
         if (reference === internal.auth.billing.releaseGatewayCredits) {
@@ -453,6 +457,21 @@ describe("the clip's credit reservation", () => {
         expect(ctx.left()).toBe(1000);
     });
 
+    it("does not give back an earlier attempt's reservation when a retry of the node fails", async () => {
+        const ctx = balanceCtx({ balance: 1000 });
+        const run = executionContextOf({ orgId: "org-1", runId: "run-a" });
+
+        await expect(runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => "clip")).resolves.toBe("clip");
+        expect(ctx.left()).toBe(500);
+
+        await expect(
+            runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => {
+                throw new Error("fal is down");
+            }),
+        ).rejects.toThrow("fal is down");
+        expect(ctx.left()).toBe(500);
+    });
+
     it("gives the reservation back when the daily quota refuses the run", async () => {
         const ctx = balanceCtx({ balance: 1000, quotaOk: false });
 
@@ -509,12 +528,27 @@ describe("the clip's reservation against the real ledger", () => {
                 afterRefusal: 1000,
                 afterRelease: 500,
                 afterSecond: 1000,
-                first: true,
-                second: true,
-                third: false,
+                first: "taken",
+                second: "taken",
+                third: "refused",
             });
             expect(observed.rowAfterRelease).toBeFalsy();
             expect(observed.afterSecondRelease).toBe(500);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a negative cost, so a reservation can never take nothing and pass", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await expect(
+                harness.run(
+                    async (ctx: any) =>
+                        await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: -1, modelId: PAID, orgId: "org-1", requestId: "r-neg", userId: "u1" }),
+                ),
+            ).rejects.toThrow();
         } finally {
             harness.close();
         }
