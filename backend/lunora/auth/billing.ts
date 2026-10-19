@@ -11,7 +11,9 @@ import type { Infer } from "lunorash/server";
 import { LunoraError } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { claimLease, releaseClaim } from "../lib/claim-once";
 import { adminMutation, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { getMemberByOrganizationAndUser, getOrganization, getUser } from "./lib/better-auth-queries";
 import { getUserEffectiveSettings } from "./lib/settings-resolver";
@@ -365,22 +367,6 @@ export const creditsLeftQuery = internalQuery
     });
 
 /**
- * Whether a ledger row already holds this request id: a reservation or charge an earlier attempt of the same node made.
- * Read before the snapshot check, so a retry is not refused for credits its own earlier reservation already took.
- */
-export const gatewayDeductionTakenQuery = internalQuery
-    .input({ requestId: v.string().max(MAX_LENGTH.long) })
-    .output(v.boolean())
-    .query(async ({ args: { requestId }, ctx: context }) => {
-        const row = await context.db
-            .query("gatewayUsageDeductions")
-            .withIndex("by_requestId", (q) => q.eq("requestId", requestId))
-            .first();
-
-        return Boolean(row);
-    });
-
-/**
  * The run plan for a run acting in one organization: its paid tier when the user is still a member, or the
  * user's own Pro, or `null` for a personal run (`organizationId: null`). Admins run any model. The same
  * organization decides the gate, the quota and the credits, so none of them can disagree.
@@ -411,12 +397,26 @@ export const deductCreditsFromGateway = internalMutation
         await applyGatewayDeduction(context, args);
     });
 
+/** The claim scope a taken video reservation holds its lease under. Its key is the reservation's request id. */
+export const VIDEO_RESERVATION_SCOPE = "video-reservation";
+
+/**
+ * A ceiling past the fal poll's worst case (60 status checks, each a fetch with its own deadline, plus a second each). A run still
+ * waiting on fal past it is swept as lost, and its reservation is given back (an under-charge, never an over-charge).
+ */
+const VIDEO_RESERVATION_LEASE_MS = 60 * 60 * 1000;
+
+/** Long enough for the sweep to find a lapsed lease, and for a repeat of the request to find the reservation settled. */
+const VIDEO_RESERVATION_TTL_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Takes a platform run's clip cost from the member's credits before the paid call, and refuses when they
  * have fewer left. The check and the deduction are one mutation, so two runs cannot both pass on the same
  * balance. The deduction is the one `deductCreditsFromGateway` makes, keyed on `requestId`, so the charge
- * made after the run is then a no-op. `"refused"` is a refusal. `"already"` means this request id was reserved by an earlier attempt,
- * so this attempt took nothing and must not give anything back. No organization or no credit record is not refused, as in chat.
+ * made after the run is then a no-op. A taken reservation is also leased in the same mutation (`VIDEO_RESERVATION_SCOPE`).
+ * `"refused"` is a refusal. `"busy"` means the reservation is still leased by a run in flight. `"already"` means it is
+ * reserved and settled (its clip was charged), so this request id must not reserve again. No organization or no
+ * credit record is not refused, as in chat.
  */
 export const reserveGatewayCredits = internalMutation
     .input({
@@ -426,7 +426,7 @@ export const reserveGatewayCredits = internalMutation
         requestId: v.string().max(MAX_LENGTH.long),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.union(v.literal("taken"), v.literal("already"), v.literal("refused")))
+    .output(v.union(v.literal("taken"), v.literal("already"), v.literal("refused"), v.literal("busy")))
     .mutation(async ({ args, ctx: context }) => {
         const prior = await context.db
             .query("gatewayUsageDeductions")
@@ -434,7 +434,13 @@ export const reserveGatewayCredits = internalMutation
             .first();
 
         if (prior) {
-            return "already";
+            // A lease still on the reservation means its run is in flight (or died and is not yet swept): refuse the second run.
+            const lease = await context.db
+                .query("idempotencyClaims")
+                .withIndex("by_scope_key", (q) => q.eq("scope", VIDEO_RESERVATION_SCOPE).eq("key", args.requestId))
+                .first();
+
+            return lease?.leaseExpiresAt === undefined ? "already" : "busy";
         }
 
         const record = await context.db.memberCredits.findFirst({ where: { organizationId: args.orgId, userId: args.userId } });
@@ -449,18 +455,29 @@ export const reserveGatewayCredits = internalMutation
         }
 
         await applyGatewayDeduction(context, { ...args, billingMode: "platform" });
+        // The lease is taken in the same mutation as the deduction, so a run evicted in between leaves neither half.
+        await releaseClaim(context, VIDEO_RESERVATION_SCOPE, args.requestId);
+        await claimLease(context, VIDEO_RESERVATION_SCOPE, args.requestId, {
+            leaseMs: VIDEO_RESERVATION_LEASE_MS,
+            onLapse: { args: JSON.stringify({ requestId: args.requestId }), target: internal.auth.billing.releaseGatewayCredits.__lunoraRef },
+            ttlMs: VIDEO_RESERVATION_TTL_MS,
+            userId: args.userId,
+        });
 
         return "taken";
     });
 
 /**
  * Gives back a reservation from `reserveGatewayCredits` whose paid work produced no clip: removes its ledger
- * row and the credits it took. With no row (never taken, or already released) it does nothing.
+ * row and the credits it took, and its lease. With no row (never taken, or already released) it does nothing.
+ * The lease is cleared even then, so a lapse the sweep schedules for a released reservation does nothing.
  */
 export const releaseGatewayCredits = internalMutation
     .input({ requestId: v.string().max(MAX_LENGTH.long) })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
+        await releaseClaim(context, VIDEO_RESERVATION_SCOPE, args.requestId);
+
         const row = await context.db
             .query("gatewayUsageDeductions")
             .withIndex("by_requestId", (q) => q.eq("requestId", args.requestId))

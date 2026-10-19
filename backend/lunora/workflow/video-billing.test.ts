@@ -1,7 +1,8 @@
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
-import { deductCreditsFromGateway, releaseGatewayCredits, reserveGatewayCredits } from "../auth/billing";
+import { deductCreditsFromGateway, releaseGatewayCredits, reserveGatewayCredits, VIDEO_RESERVATION_SCOPE } from "../auth/billing";
+import { completeKey, reapLapsedClaims } from "../lib/claim-once";
 import schema from "../schema";
 import { internal } from "../_generated/internal";
 import type { WorkflowNode } from "./core";
@@ -32,10 +33,6 @@ const makeCtx = ({ creditsLeft = null, limitOk = true }: Answers = {}) => {
             return { creditsLeft };
         }
 
-        if (reference === internal.auth.billing.gatewayDeductionTakenQuery) {
-            return false;
-        }
-
         throw new Error("unexpected query");
     });
     const runMutation = vi.fn(async (reference: unknown, _args?: unknown) => {
@@ -58,13 +55,15 @@ const REQUEST_ID = 'workflow-video:["run","gen"]';
 
 /**
  * A deduction ledger keyed on the request id, as `applyGatewayDeduction` is: a repeat of a request id posts nothing.
- * `deductFailures` makes the first deductions throw; `recordFails` makes the claim write throw.
+ * `deductFailures` makes the first deductions throw; `recordFails` makes the charge-record claim write throw.
+ * `claims` holds the charge records; `leases` holds the reservation leases.
  */
 const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures?: number; recordFails?: boolean } = {}) => {
     const ledger = new Map<string, number>();
     const posted: string[] = [];
     const deductions: Record<string, unknown>[] = [];
     const claims: unknown[] = [];
+    const leases: unknown[] = [];
     let failures = deductFailures;
     const runMutation = vi.fn(async (reference: unknown, args?: any) => {
         if (reference === internal.auth.billing.deductCreditsFromGateway) {
@@ -85,6 +84,12 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
         }
 
         if (reference === internal.lib.claim_once.claimKey) {
+            if (args.scope === "video-reservation") {
+                leases.push(args);
+
+                return true;
+            }
+
             if (recordFails) {
                 throw new Error("claims unavailable");
             }
@@ -104,15 +109,9 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
 
         return undefined;
     });
-    const runQuery = vi.fn(async (reference: unknown) => {
-        if (reference === internal.auth.billing.gatewayDeductionTakenQuery) {
-            return false;
-        }
+    const runQuery = vi.fn(async () => {return { creditsLeft: null }});
 
-        return { creditsLeft: null };
-    });
-
-    return { claims, deductions, ledger, posted, runMutation, runQuery };
+    return { claims, deductions, leases, ledger, posted, runMutation, runQuery };
 };
 
 const videoNode = node("gen", "video", { label: "Hero", mode: "text-to-video", model: PAID });
@@ -409,13 +408,7 @@ const balanceCtx = ({
         return undefined;
     });
     // Answers the balance as it stands when `liveSnapshot` is set, and as it stood when the run started otherwise.
-    const runQuery = vi.fn(async (reference: unknown, args?: any) => {
-        if (reference === internal.auth.billing.gatewayDeductionTakenQuery) {
-            return reserved.has(args.requestId);
-        }
-
-        return { creditsLeft: liveSnapshot ? left : balance };
-    });
+    const runQuery = vi.fn(async () => {return { creditsLeft: liveSnapshot ? left : balance }});
 
     return { left: () => left, runMutation, runQuery };
 };
@@ -487,36 +480,41 @@ describe("the clip's credit reservation", () => {
         expect(ctx.left()).toBe(500);
     });
 
-    it("lets a retry use its own earlier reservation, even when that reservation took the last credits", async () => {
+    it("refuses a retry of a settled node whose clip the balance cannot pay for again, before its paid call", async () => {
         const ctx = balanceCtx({ balance: 500, liveSnapshot: true });
         const run = executionContextOf({ orgId: "org-1", runId: "run-a" });
+        const dispatch = vi.fn(async () => "clip");
 
-        await expect(runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => "clip")).resolves.toBe("clip");
+        await expect(runBilledVideo(ctx, run, videoNode, "u1", costs(), dispatch)).resolves.toBe("clip");
         expect(ctx.left()).toBe(0);
 
-        await expect(
-            runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => {
-                throw new Error("fal is down");
-            }),
-        ).rejects.toThrow("fal is down");
+        await expect(runBilledVideo(ctx, run, videoNode, "u1", costs(), dispatch)).rejects.toThrow("Not enough credits");
+        expect(dispatch).toHaveBeenCalledTimes(1);
         expect(ctx.left()).toBe(0);
     });
 
-    it("charges a clip made while an earlier attempt holds the reservation under that clip's own key", async () => {
-        const ctx = balanceCtx({ balance: 2000 });
-        const run = executionContextOf({ orgId: "org-1", runId: "run-a" });
+    it("settles the lease once the clip is charged, so a later lapse no longer gives the reservation back", async () => {
+        const ctx = ledgerCtx();
 
-        await runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => {
-            return { assets: [{ fileId: "file-1" }] };
-        });
-        await runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => {
-            return { assets: [{ fileId: "file-2" }] };
+        await runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip");
+
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.lib.claim_once.completeKey, { key: REQUEST_ID, scope: "video-reservation" });
+    });
+
+    it("returns the finished clip even when its reservation cannot be settled", async () => {
+        const base = ledgerCtx();
+        const runMutation = vi.fn(async (reference: unknown, args?: any) => {
+            if (reference === internal.lib.claim_once.completeKey) {
+                throw new Error("claims down");
+            }
+
+            return await base.runMutation(reference, args);
         });
 
-        expect(ctx.runMutation).toHaveBeenCalledWith(
-            internal.auth.billing.deductCreditsFromGateway,
-            expect.objectContaining({ costMicrodollars: CLIP, requestId: 'workflow-video:["run-a","gen"]:clip:file-2' }),
-        );
+        await expect(
+            runBilledVideo({ ...base, runMutation }, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip"),
+        ).resolves.toBe("clip");
+        expect(base.posted).toStrictEqual([REQUEST_ID]);
     });
 
     it("gives the reservation back when the daily quota refuses the run", async () => {
@@ -598,6 +596,87 @@ describe("the clip's reservation against the real ledger", () => {
             ).rejects.toThrow();
         } finally {
             harness.close();
+        }
+    });
+});
+
+describe("the reservation's lease against the real ledger", () => {
+    const NOW = 1_800_000_000_000;
+
+    it("refuses a leased reservation as busy, a settled one as already, and takes a released one again", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const outcomes = await harness.run(async (ctx: any) => {
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                await ctx.db.insert("memberCredits", { creditOverride: 1000, memberId: "member-1", organizationId: orgId, usedCredits: 0, userId: "u1" });
+
+                const reserve = async (): Promise<string> =>
+                    await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-1", userId: "u1" });
+
+                const first = await reserve();
+                const second = await reserve();
+
+                await ctx.runMutation(completeKey, { key: "r-1", scope: VIDEO_RESERVATION_SCOPE });
+                const settled = await reserve();
+
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-1" });
+                const released = await reserve();
+
+                return { first, released, second, settled };
+            });
+
+            expect(outcomes).toStrictEqual({ first: "taken", released: "taken", second: "busy", settled: "already" });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("gives a lapsed reservation back through the sweep, and the scheduled release accepts the sweep's claim key", async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (ctx: any) => {
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                await ctx.db.insert("memberCredits", { creditOverride: 1000, memberId: "member-1", organizationId: orgId, usedCredits: 0, userId: "u1" });
+                await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-2", userId: "u1" });
+            });
+
+            // Past the reservation's lease: the run that took it is gone.
+            vi.setSystemTime(NOW + 61 * 60 * 1000);
+
+            const swept = await harness.run(async (ctx: any) => {
+                const calls: { args: Record<string, unknown>; target: string }[] = [];
+
+                ctx.scheduler.runAfter = async (_delay: number, target: string, args: Record<string, unknown>) => {
+                    calls.push({ args, target });
+                };
+
+                await ctx.runMutation(reapLapsedClaims, {});
+
+                return calls;
+            });
+
+            expect(swept).toStrictEqual([
+                { args: { claimKey: "r-2", requestId: "r-2" }, target: internal.auth.billing.releaseGatewayCredits.__lunoraRef },
+            ]);
+
+            const after = await harness.run(async (ctx: any) => {
+                await ctx.runMutation(releaseGatewayCredits, swept[0]!.args);
+
+                const record = await ctx.db.memberCredits.findFirst({ where: { userId: "u1" } });
+                const row = await ctx.db.query("gatewayUsageDeductions").withIndex("by_requestId", (q: any) => q.eq("requestId", "r-2")).first();
+
+                return { row, usedCredits: (record as { usedCredits?: number }).usedCredits ?? 0 };
+            });
+
+            expect(after).toStrictEqual({ row: null, usedCredits: 0 });
+        } finally {
+            harness.close();
+            vi.useRealTimers();
         }
     });
 });

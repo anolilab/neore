@@ -201,10 +201,9 @@ export interface InternalApiTypes {
             applyCreemSubscription: FunctionReference<"mutation", { baseTier: "free" | "pro"; creemCustomerId?: string; creemPurchaserId?: string; creemSubscriptionId: string; referenceId: string; subject: "organization" | "user" }, null>;
             creditsLeftQuery: FunctionReference<"query", { orgId: string; userId: string }, { creditsLeft: number | null }>;
             deductCreditsFromGateway: FunctionReference<"mutation", { billingMode?: "custom" | "platform" | "byok"; byokFeeRate?: number; costMicrodollars: number; modelId: string; orgId?: string; requestId: string; userId: string }, void>;
-            gatewayDeductionTakenQuery: FunctionReference<"query", { requestId: string }, boolean>;
             getRunPlanForOrganizationQuery: FunctionReference<"query", { organizationId: string | null; userId: string }, { isAdmin: boolean; plan: "premium" | null }>;
             releaseGatewayCredits: FunctionReference<"mutation", { requestId: string }, null>;
-            reserveGatewayCredits: FunctionReference<"mutation", { costMicrodollars: number; modelId: string; orgId: string; requestId: string; userId: string }, "taken" | "already" | "refused">;
+            reserveGatewayCredits: FunctionReference<"mutation", { costMicrodollars: number; modelId: string; orgId: string; requestId: string; userId: string }, "taken" | "already" | "refused" | "busy">;
         };
         functions: {
             getActiveOrganizationQuery: FunctionReference<"query", { organizationId: string; userId: string }, { id: string; name: string; role: string; slug: string | null } | null>;
@@ -1192,7 +1191,6 @@ export const internal: InternalApiTypes = {
             applyCreemSubscription: { __lunoraRef: "auth_billing:applyCreemSubscription" },
             creditsLeftQuery: { __lunoraRef: "auth_billing:creditsLeftQuery" },
             deductCreditsFromGateway: { __lunoraRef: "auth_billing:deductCreditsFromGateway" },
-            gatewayDeductionTakenQuery: { __lunoraRef: "auth_billing:gatewayDeductionTakenQuery" },
             getRunPlanForOrganizationQuery: { __lunoraRef: "auth_billing:getRunPlanForOrganizationQuery" },
             releaseGatewayCredits: { __lunoraRef: "auth_billing:releaseGatewayCredits" },
             reserveGatewayCredits: { __lunoraRef: "auth_billing:reserveGatewayCredits" },

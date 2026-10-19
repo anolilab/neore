@@ -10,9 +10,13 @@
  *   to need it in the run, the frame extracted for it. The node run takes one unit of the daily video quota that
  *   `/chat/media` and the chat video tool take, once: a retry of the same node finds it taken (frame extraction takes none);
  * - per node, the clip's cost is reserved from the account's credits in the same mutation as its check
- *   (`reserveGatewayCredits`), so two runs cannot both spend one balance. A run that makes no clip gives the
- *   reservation back (`releaseGatewayCredits`), so a failed generation is not charged. Once a clip is made, its
- *   charge is posted under the reservation's request id, and `chargePaidCall` is then a no-op. A deduction that
+ *   (`reserveGatewayCredits`), so two runs cannot both spend one balance. The reservation is leased in that
+ *   mutation, so a run that dies before its clip is charged gives it back when the lease lapses (`reapLapsedClaims`).
+ *   A run that makes no clip gives the reservation back (`releaseGatewayCredits`), so a failed generation is not
+ *   charged. A reservation still leased by a run in flight refuses a second run of the node. A node whose earlier
+ *   clip was already charged reserves its new clip under a key of its own, checked like any other.
+ *   The clip is charged under the reservation's request id, which the ledger already holds, so `chargePaidCall`
+ *   is then a no-op, and the reservation is settled. A deduction that
  *   fails is retried once, then recorded as a claim the next sweep deducts again; the clip is returned either way,
  *   since the paid work is done.
  * - per frame extraction: charged by the extraction action (`media-ops.ts`) once fal has accepted the request,
@@ -23,6 +27,7 @@
  */
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
+import { VIDEO_RESERVATION_SCOPE } from "../auth/billing";
 import { computeGatewayCredits } from "../auth/lib/gateway-credits";
 import { chatLogger } from "../lib/logger";
 import type { ExecutionContext, WorkflowEdge, WorkflowNode } from "./core";
@@ -66,15 +71,10 @@ const creditsOf = (costMicrodollars: number): number => computeGatewayCredits({ 
 
 /**
  * Refuses a video node run before its paid work: the credits its paid calls cost, then the daily quota.
- * Throws the message the run reports.
+ * Throws the message the run reports. Returns the request id of the reservation this attempt holds, if any.
  */
-const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: WorkflowNode, userId: string, costs: VideoRunCosts): Promise<boolean> => {
-    // A retry of the node finds its clip already reserved by an earlier attempt, so the snapshot counts only what is still to be taken.
-    const clipTaken =
-        costs.clipMicrodollars !== undefined &&
-        !!run.orgId &&
-        (await context.runQuery(internal.auth.billing.gatewayDeductionTakenQuery, { requestId: videoRequestId(run.runId, node.id) }));
-    const calls = [clipTaken ? undefined : costs.clipMicrodollars, costs.extractionMicrodollars].filter((cost): cost is number => cost !== undefined);
+const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: WorkflowNode, userId: string, costs: VideoRunCosts): Promise<string | undefined> => {
+    const calls = [costs.clipMicrodollars, costs.extractionMicrodollars].filter((cost): cost is number => cost !== undefined);
 
     if (calls.length > 0 && run.orgId) {
         const { creditsLeft } = await context.runQuery(internal.auth.billing.creditsLeftQuery, { orgId: run.orgId, userId });
@@ -88,23 +88,40 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
     }
 
     // The clip is taken with its own check in one mutation, so two runs cannot both pass the snapshot above on one balance.
-    // `reserved` is true only when this attempt took the reservation: a retry finds an earlier attempt's, and gives nothing back.
-    let reserved = false;
+    // A node whose request id is already settled (an earlier attempt charged its clip) reserves this clip under a key of its own.
+    let reservation: string | undefined;
 
-    if (costs.clipMicrodollars !== undefined && run.orgId) {
-        const outcome = await context.runMutation(internal.auth.billing.reserveGatewayCredits, {
-            costMicrodollars: costs.clipMicrodollars,
-            modelId: clipModelIdOf(node),
-            orgId: run.orgId,
-            requestId: videoRequestId(run.runId, node.id),
-            userId,
-        });
+    const { clipMicrodollars } = costs;
+    const { orgId } = run;
 
-        if (outcome === "refused") {
+    if (clipMicrodollars !== undefined && orgId) {
+        const requestId = videoRequestId(run.runId, node.id);
+        const reserve = async (key: string) =>
+            await context.runMutation(internal.auth.billing.reserveGatewayCredits, {
+                costMicrodollars: clipMicrodollars,
+                modelId: clipModelIdOf(node),
+                orgId,
+                requestId: key,
+                userId,
+            });
+
+        let key = requestId;
+        let outcome = await reserve(key);
+
+        if (outcome === "already") {
+            key = `${requestId}:retry:${crypto.randomUUID()}`;
+            outcome = await reserve(key);
+        }
+
+        if (outcome === "busy") {
+            throw new Error(`The "${String(node.data.label ?? node.type)}" video is already being generated`);
+        }
+
+        if (outcome !== "taken") {
             throw new Error(`Not enough credits for the "${String(node.data.label ?? node.type)}" video`);
         }
 
-        reserved = outcome === "taken";
+        reservation = key;
     }
 
     // The same unit `/chat/media` charges: the tier and the admin exemption are read where the quota is kept. Keyed on the node run,
@@ -121,27 +138,12 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
             throw new Error("You've reached your daily video generation limit.");
         }
     } catch (error) {
-        await releaseClip(context, run, node, reserved);
+        await releaseClip(context, reservation);
 
         throw error;
     }
 
-    return reserved;
-};
-
-/** The stored file a clip was saved as, or else its URL: unique to one generation, so it keys that clip's charge. */
-const clipIdOf = (result: unknown): string | undefined => {
-    if (typeof result !== "object" || result === null || !("assets" in result) || !Array.isArray(result.assets)) {
-        return undefined;
-    }
-
-    const [first] = result.assets as { fileId?: unknown; videoUrl?: unknown }[];
-
-    if (typeof first?.fileId === "string") {
-        return first.fileId;
-    }
-
-    return typeof first?.videoUrl === "string" ? first.videoUrl : undefined;
+    return reservation;
 };
 
 /** The model the clip is charged to, as the ledger records it. */
@@ -154,14 +156,12 @@ const clipModelIdOf = (node: WorkflowNode): string => {
 /**
  * Gives back the clip's reservation when no clip was made. A failed release leaves the reservation taken, so the
  * member is charged for a clip they did not get. It is tried twice, like a deduction; a release that fails both
- * times is logged, and is a residual ceiling.
+ * times is logged, and its lease stays, so the sweep gives the reservation back when the lease lapses (a residual ceiling).
  */
-const releaseClip = async (context: Pick<ActionCtx, "runMutation">, run: ExecutionContext, node: WorkflowNode, reserved: boolean): Promise<void> => {
-    if (!reserved) {
+const releaseClip = async (context: Pick<ActionCtx, "runMutation">, requestId: string | undefined): Promise<void> => {
+    if (requestId === undefined) {
         return;
     }
-
-    const requestId = videoRequestId(run.runId, node.id);
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
@@ -284,34 +284,38 @@ export const runBilledVideo = async <T>(
     costs: VideoRunCosts,
     dispatch: () => Promise<T>,
 ): Promise<T> => {
-    const reserved = await beginVideoRun(context, run, node, userId, costs);
+    const reservation = await beginVideoRun(context, run, node, userId, costs);
 
     let result: T;
 
     try {
         result = await dispatch();
     } catch (error) {
-        await releaseClip(context, run, node, reserved);
+        await releaseClip(context, reservation);
 
         throw error;
     }
 
-    if (costs.clipMicrodollars !== undefined) {
-        // A clip made under this attempt's own reservation is charged by that reservation, so the ledger makes this a no-op. A clip
-        // made when an earlier attempt already held the reservation is a clip of its own: it is charged under its own key, so the
-        // earlier attempt's release cannot remove the only record of it.
-        const clipId = reserved ? undefined : clipIdOf(result);
-
+    if (costs.clipMicrodollars !== undefined && reservation !== undefined) {
+        // The clip is charged under the request id its reservation holds, so the ledger makes this a no-op. Then the reservation is
+        // settled: a lapse of its lease must no longer give the clip's credits back.
         await chargePaidCall(
             context,
             {
                 costMicrodollars: costs.clipMicrodollars,
                 modelId: clipModelIdOf(node),
                 orgId: run.orgId,
-                requestId: clipId === undefined ? videoRequestId(run.runId, node.id) : `${videoRequestId(run.runId, node.id)}:clip:${clipId}`,
+                requestId: reservation,
             },
             userId,
         );
+        try {
+            await context.runMutation(internal.lib.claim_once.completeKey, { key: reservation, scope: VIDEO_RESERVATION_SCOPE });
+        } catch (error) {
+            // The clip is made and charged, so a failed settle must not lose it. The lease then lapses and the sweep gives the
+            // reservation back: an under-charge, which is the accepted ceiling.
+            chatLogger.error("[workflow] video reservation could not be settled", { error, requestId: reservation });
+        }
     }
 
     return result;
