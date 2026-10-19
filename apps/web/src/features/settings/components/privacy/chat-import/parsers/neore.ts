@@ -49,15 +49,16 @@ export const isNeoreExport = (record: unknown): boolean => {
         return false;
     }
 
-    // The parser skips null and non-object entries, so detection reads the first real one.
-    const first = asRecord((root.conversations as unknown[]).find((entry) => asRecord(entry) !== undefined));
+    // The parser skips null, non-object and damaged entries, so one well-formed conversation anywhere
+    // in the file is enough: a damaged first entry must not hide the ones after it.
+    const entries = (root.conversations as unknown[]).map((entry) => asRecord(entry)).filter((entry) => entry !== undefined);
 
     // An export of an account with no threads is valid and still detected; it imports nothing.
-    if (first === undefined) {
+    if (entries.length === 0) {
         return true;
     }
 
-    return asRecord(first.thread) !== undefined && Array.isArray(first.messages);
+    return entries.some((entry) => asRecord(entry.thread) !== undefined && Array.isArray(entry.messages));
 };
 
 const validTime = (time: unknown): number | undefined => (typeof time === "number" && Number.isFinite(time) && time > 0 ? time : undefined);

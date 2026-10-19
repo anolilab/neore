@@ -127,6 +127,15 @@ describe("parseNeore", () => {
         ]);
     });
 
+    it("detects an export whose first conversation is damaged but a later one is whole", () => {
+        expect(isNeoreExport(exportRoot([{ thread: "oops" }, threadWithTurns]))).toBe(true);
+        expect(parseNeore([exportRoot([{ thread: "oops" }, threadWithTurns])])).toHaveLength(1);
+    });
+
+    it("does not detect a file whose every conversation is damaged", () => {
+        expect(isNeoreExport(exportRoot([{ thread: "oops" }, { messages: "no" }]))).toBe(false);
+    });
+
     it("skips a null or non-object conversation and keeps the rest of the file", () => {
         const [conversation, ...rest] = parseNeore([exportRoot([null, "oops", threadWithTurns, 7])]);
 
