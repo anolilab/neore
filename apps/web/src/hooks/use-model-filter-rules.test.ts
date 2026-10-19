@@ -6,11 +6,29 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelFilterRules } from "./use-model-filter-rules";
 
 // What the backend holds for the user's rules. A save whose rules `refuse` accepts is refused, as the backend would.
+// `sent` records each save the backend received, with the account whose session carried it. `hold` keeps a save in flight.
 const server = vi.hoisted(() => {
     return {
+        hold: undefined as Promise<void> | undefined,
         noRow: false,
         refuse: (_rules: ModelFilterRules): boolean => false,
         rules: undefined as ModelFilterRules | undefined,
+        sent: [] as { rules: ModelFilterRules; userId: string | undefined }[],
+        userId: "account-a" as string | undefined,
+    };
+});
+
+vi.mock("@/features/auth/lib/auth-ui-provider", () => {
+    return {
+        useAuth: () => {
+            return {
+                hooks: {
+                    useSession: () => {
+                        return { data: server.userId === undefined ? null : { user: { id: server.userId } } };
+                    },
+                },
+            };
+        },
     };
 });
 
@@ -32,6 +50,9 @@ vi.mock("@/lib/lunora/crpc", () => {
                             mutationOptions: () => {
                                 return {
                                     mutationFn: async (input: { modelFilterRules: ModelFilterRules }) => {
+                                        server.sent.push({ rules: input.modelFilterRules, userId: server.userId });
+                                        await server.hold;
+
                                         if (server.refuse(input.modelFilterRules)) {
                                             throw new Error("save refused");
                                         }
@@ -65,7 +86,10 @@ const wrapperFor =
 const mount = () => renderHook(() => useBlockedCreators(), { wrapper: wrapperFor(newClient()) });
 
 afterEach(() => {
+    server.hold = undefined;
     server.refuse = () => false;
+    server.sent = [];
+    server.userId = "account-a";
 });
 
 describe(useBlockedCreators, () => {
@@ -347,5 +371,53 @@ describe(useUpdateModelFilterRules, () => {
         });
 
         expect(server.rules).toEqual({});
+    });
+
+    it("an account switch drops the first account's queued edit, and no save reaches the second account", async () => {
+        server.rules = { requireZDR: true };
+        let release!: () => void;
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
+        server.hold = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        const queryClient = newClient();
+        const { rerender, result: page } = renderHook(() => useUpdateModelFilterRules(), { wrapper: wrapperFor(queryClient) });
+
+        await waitFor(() => {
+            expect(page.current.isLoaded).toBe(true);
+        });
+
+        const staleUpdate = page.current.updateRules;
+        let first!: Promise<unknown>;
+        let second!: Promise<unknown>;
+
+        act(() => {
+            first = page.current.updateRules((current) => blockRegions(current, ["EU"]));
+            second = page.current.updateRules((current) => {
+                return { ...current, blockedProviders: ["groq"] };
+            });
+        });
+        const outcomes = Promise.all([settle(first), settle(second)]);
+
+        // The first save is in flight under account A; the second is queued behind it.
+        await waitFor(() => {
+            expect(server.sent).toHaveLength(1);
+        });
+
+        server.userId = "account-b";
+        rerender();
+
+        // An edit from a render before the switch is refused outright.
+        await expect(staleUpdate((current) => blockRegions(current, ["US"]))).rejects.toThrow("signed-in account changed");
+
+        await act(async () => {
+            release();
+        });
+
+        expect(await outcomes).toStrictEqual(["saved", "The signed-in account changed; the edit was not saved"]);
+        expect(server.sent).toEqual([{ rules: { blockedRegions: ["EU"], requireZDR: true }, userId: "account-a" }]);
+        expect(JSON.stringify(queryClient.getQueryData(PREFERENCES_KEY))).not.toContain("groq");
     });
 });

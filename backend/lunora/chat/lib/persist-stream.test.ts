@@ -72,6 +72,31 @@ describe(pipeToPersistentChunks, () => {
         expect(piped.pending).toStrictEqual({ reasoning: "", text: "" });
     });
 
+    it("a refusal at a finished step's flush owes nothing, since the agent saves that step itself", async () => {
+        const { ctx } = ctxAccepting(1);
+
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. ", "Two", "finish-step"])).catch((error_: unknown) => error_);
+
+        expect(isStreamWriteRefused(error)).toBe(true);
+        expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "" });
+    });
+
+    it("rethrows a non-refusal failure at a finished step's flush as it was", async () => {
+        const boom = new Error("database down");
+        let calls = 0;
+        const ctx = {
+            runMutation: async () => {
+                calls += 1;
+
+                if (calls > 1) {
+                    throw boom;
+                }
+            },
+        };
+
+        await expect(pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. ", "Two", "finish-step"]))).rejects.toBe(boom);
+    });
+
     it("rethrows any other write failure as it was", async () => {
         const boom = new Error("database down");
         const ctx = {

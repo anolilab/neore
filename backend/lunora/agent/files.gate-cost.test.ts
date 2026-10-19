@@ -1,21 +1,20 @@
 /**
  * What `fileGatedByLockedChat` reads, asserted on the code path with a fake
- * `db` that records every table it queries and every page it asks for. The
- * reactive read set of the chat-file readers follows these reads, so the cost
- * is part of the contract: no message read for a user with no locked chat, and
- * no page after the one that holds the file.
+ * `db` that records every table it queries. The reactive read set of the
+ * chat-file readers follows these reads, so the cost is part of the contract:
+ * no read for a user with no locked chat, one point lookup per locked chat, and
+ * never a message.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { fileGatedByLockedChat } from "./files";
 
-type Page = { continueCursor: string; isDone: boolean; page: { fileIds?: string[] }[] };
-
 const FILE = "file-1" as never;
 
-const fakeContext = (passcodes: { threadId: string }[], pages: Page[], threads: Record<string, { lockedAt?: number }> = {}) => {
+/** `holds`: the `chatFileThreads` links that exist, as `threadId`s of `FILE`. */
+const fakeContext = (passcodes: { threadId: string }[], holds: string[], threads: Record<string, { lockedAt?: number }> = {}) => {
     const tables: string[] = [];
-    const paginate = vi.fn(async () => pages.shift() ?? { continueCursor: "", isDone: true, page: [] });
+    let lookup: { table: string; threadId?: string } = { table: "" };
     const db = {
         get: async (id: string) => threads[id] ?? null,
         query: (table: string) => {
@@ -23,59 +22,57 @@ const fakeContext = (passcodes: { threadId: string }[], pages: Page[], threads: 
 
             const chain = {
                 collect: async () => passcodes,
-                order: () => chain,
-                paginate,
-                withIndex: () => chain,
+                first: async () => (table === "chatFileThreads" && holds.includes(lookup.threadId ?? "") ? { _id: "link" } : null),
+                withIndex: (_name: string, build: (q: { eq: (field: string, value: unknown) => unknown }) => unknown) => {
+                    const fields: Record<string, unknown> = {};
+                    const q = {
+                        eq(field: string, value: unknown) {
+                            fields[field] = value;
+
+                            return q;
+                        },
+                    };
+
+                    build(q);
+                    lookup = { table, threadId: fields.threadId as string | undefined };
+
+                    return chain;
+                },
             };
 
             return chain;
         },
     };
 
-    return { context: { db } as never, paginate, tables };
+    return { context: { db } as never, tables };
 };
 
 describe(fileGatedByLockedChat, () => {
-    it("reads only the passcode index for a user with no locked chat: no message is read (positive)", async () => {
-        const { context, paginate, tables } = fakeContext([], []);
+    it("reads only the passcode index for a user with no locked chat (positive)", async () => {
+        const { context, tables } = fakeContext([], []);
 
         await expect(fileGatedByLockedChat(context, { fileId: FILE, userId: "u" })).resolves.toBe(false);
         expect(tables).toStrictEqual(["threadPasscodes"]);
-        expect(paginate).not.toHaveBeenCalled();
     });
 
-    it("stops at the first page that holds the file, without reading the rest (positive)", async () => {
-        const { context, paginate } = fakeContext(
-            [{ threadId: "locked-1" }],
-            [
-                { continueCursor: "next", isDone: false, page: [{ fileIds: [FILE] as never }] },
-                { continueCursor: "", isDone: true, page: [] },
-            ],
-            { "locked-1": { lockedAt: 1 } },
-        );
+    it("gates a file whose link exists in a locked chat, with one point lookup and no message read (positive)", async () => {
+        const { context, tables } = fakeContext([{ threadId: "locked-1" }], ["locked-1"], { "locked-1": { lockedAt: 1 } });
 
         await expect(fileGatedByLockedChat(context, { fileId: FILE, userId: "u" })).resolves.toBe(true);
-        expect(paginate).toHaveBeenCalledOnce();
+        expect(tables).toStrictEqual(["threadPasscodes", "chatFileThreads"]);
     });
 
-    it("reads every page of a locked chat that does not hold the file (the scan is not bounded, so a file further back is still found)", async () => {
-        const { context, paginate } = fakeContext(
-            [{ threadId: "locked-1" }],
-            [
-                { continueCursor: "next", isDone: false, page: [{ fileIds: [] }] },
-                { continueCursor: "", isDone: true, page: [{ fileIds: [] }] },
-            ],
-            { "locked-1": { lockedAt: 1 } },
-        );
+    it("does not gate a file that no link places in the locked chat", async () => {
+        const { context, tables } = fakeContext([{ threadId: "locked-1" }], [], { "locked-1": { lockedAt: 1 } });
 
         await expect(fileGatedByLockedChat(context, { fileId: FILE, userId: "u" })).resolves.toBe(false);
-        expect(paginate).toHaveBeenCalledTimes(2);
+        expect(tables).not.toContain("messages");
     });
 
-    it("skips a locked chat whose row is no longer locked, so it reads no message (positive)", async () => {
-        const { context, paginate } = fakeContext([{ threadId: "unlocked-1" }], [], { "unlocked-1": {} });
+    it("skips a locked chat whose row is no longer locked, so it looks up no link (positive)", async () => {
+        const { context, tables } = fakeContext([{ threadId: "unlocked-1" }], ["unlocked-1"], { "unlocked-1": {} });
 
         await expect(fileGatedByLockedChat(context, { fileId: FILE, userId: "u" })).resolves.toBe(false);
-        expect(paginate).not.toHaveBeenCalled();
+        expect(tables).not.toContain("chatFileThreads");
     });
 });

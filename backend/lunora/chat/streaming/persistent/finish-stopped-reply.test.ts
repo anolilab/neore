@@ -88,17 +88,18 @@ const statusOf = async (id: string): Promise<unknown> =>
     });
 
 const stop = (streamId: string, args: { continuation?: boolean; order?: number; pendingReasoning?: string; pendingText: string; promptMessageId: string }) =>
-    run(
-        async (context) =>
-            await context.runMutation(finishStoppedReply, {
-                continuation: args.continuation ?? false,
-                order: args.order ?? 1,
-                pendingReasoning: args.pendingReasoning ?? "",
-                pendingText: args.pendingText,
-                promptMessageId: args.promptMessageId,
-                streamId,
-            }),
-    );
+    run(async (context) => {
+        const { stopped } = await context.runMutation(finishStoppedReply, {
+            continuation: args.continuation ?? false,
+            order: args.order ?? 1,
+            pendingReasoning: args.pendingReasoning ?? "",
+            pendingText: args.pendingText,
+            promptMessageId: args.promptMessageId,
+            streamId,
+        });
+
+        return stopped;
+    });
 
 describe("finishStoppedReply", () => {
     beforeEach(() => {

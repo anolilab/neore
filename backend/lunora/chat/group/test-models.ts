@@ -90,6 +90,32 @@ export const stalledModel = (text: string, onText: () => Promise<void>) =>
         },
     });
 
+/**
+ * A step whose text lands on both sides of a stop: `first` is written, `beforeStop` runs, then `after` is
+ * streamed (still owed, unwritten) and the step finishes, as a model does when its last chunk follows a stop.
+ */
+export const stoppedStep = (first: string, after: string, beforeStop: () => Promise<void>) =>
+    new MockLanguageModelV3({
+        doStream: async () => {
+            const stream = new ReadableStream<LanguageModelV3StreamPart>({
+                async start(controller) {
+                    controller.enqueue({ type: "stream-start", warnings: [] });
+                    controller.enqueue({ id: "t", type: "text-start" });
+                    controller.enqueue({ delta: first, id: "t", type: "text-delta" });
+
+                    await beforeStop();
+
+                    controller.enqueue({ delta: after, id: "t", type: "text-delta" });
+                    controller.enqueue({ id: "t", type: "text-end" });
+                    controller.enqueue(finish("stop"));
+                    controller.close();
+                },
+            });
+
+            return { stream };
+        },
+    });
+
 /** The supervisor's routing call (`generateText` with structured output). */
 export const routerModel = (speakers: string[]) =>
     new MockLanguageModelV3({

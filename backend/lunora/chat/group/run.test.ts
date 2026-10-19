@@ -151,7 +151,7 @@ let promptId: string;
 let streamId: string;
 const skillIds: Record<string, string> = {};
 
-const { scriptedModel, stalledModel, textStep, toolCallStep } = await import("./test-models");
+const { scriptedModel, stalledModel, stoppedStep, textStep, toolCallStep } = await import("./test-models");
 
 type ScriptedModel = ReturnType<typeof scriptedModel>;
 
@@ -468,6 +468,69 @@ describe("runGroupTurn — stop", () => {
         expect(replies.map((row) => row.agentName)).toStrictEqual(["WRITER"]);
         expect(JSON.stringify(replies[0].message.content)).toContain("writer says hi.");
         expect((speakerModels.get("INSTR:checker") as ScriptedModel).doStreamCalls).toHaveLength(0);
+        expect(await streamStatus()).toBe("done");
+    });
+
+    it("stopping a later speaker saves its reply in its own order, after the first speaker's, and stamped as its own", async () => {
+        await setGroup("supervisor", ["writer", "checker"]);
+        routerScript.speakers = ["p1", "p2"];
+
+        speakerModels.set(
+            "INSTR:checker",
+            stalledModel("checker says hi.", async () => {
+                const { stopActiveForThread } = await import("../streaming/persistent/library");
+
+                await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId }));
+            }),
+        );
+
+        await runTurn();
+
+        const replies = await assistantRows();
+
+        expect(replies.map((row) => [row.agentName, row.speakerSkillId, row.text])).toStrictEqual([
+            ["WRITER", skillIds.writer, "writer says hi."],
+            ["CHECKER", skillIds.checker, "checker says hi."],
+        ]);
+        // A continuation: its own order, branching from the first speaker's row.
+        expect(replies[1].order).toBeGreaterThan(replies[0].order);
+        expect(replies[1].parentMessageId).toBe(replies[0]._id);
+        expect(await streamStatus()).toBe("done");
+    });
+
+    it("a step whose last text lands after the stop is saved once, as the speaker's own", async () => {
+        await setGroup("supervisor", ["writer"]);
+        routerScript.speakers = ["p1"];
+
+        // "Hi" is written before the stop; " there" is buffered and owed, and the step finishes after the stop.
+        speakerModels.set(
+            "INSTR:writer",
+            stoppedStep("Hi", " there", async () => {
+                const { stopActiveForThread } = await import("../streaming/persistent/library");
+
+                for (let attempt = 0; attempt < 400; attempt += 1) {
+                    const written = await chunks();
+
+                    if (written.some((chunk) => chunk.text === "Hi")) {
+                        break;
+                    }
+
+                    await new Promise<void>((resolve) => {
+                        setTimeout(resolve, 5);
+                    });
+                }
+
+                await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId }));
+            }),
+        );
+
+        await runTurn();
+
+        const replies = await assistantRows();
+
+        expect(replies.map((row) => [row.agentName, row.speakerSkillId, row.status, row.text])).toStrictEqual([
+            ["WRITER", skillIds.writer, "success", "Hi there"],
+        ]);
         expect(await streamStatus()).toBe("done");
     });
 

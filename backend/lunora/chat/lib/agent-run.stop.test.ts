@@ -43,7 +43,7 @@ const stoppedCtx = (saved: boolean) => {
             }
 
             if (ref === internal.chat.streaming.persistent.library.finishStoppedReply) {
-                return saved;
+                return { messageId: saved ? "stopped-1" : undefined, stopped: saved };
             }
 
             return null;
@@ -53,7 +53,14 @@ const stoppedCtx = (saved: boolean) => {
     return { ctx, mutations };
 };
 
-const STOP_ARGS = { continuation: false, order: 1, promptMessageId: "prompt-1", stop: new AbortController(), streamId: "stream-1" };
+const STOP_ARGS = {
+    continuation: false,
+    order: 1,
+    promptMessageId: "prompt-1",
+    result: { consumeStream: async () => undefined },
+    stop: new AbortController(),
+    streamId: "stream-1",
+};
 
 describe(endStoppedRun, () => {
     it("saves the owed text of a refused write, then aborts the model call", async () => {
@@ -66,6 +73,25 @@ describe(endStoppedRun, () => {
         expect(mutations[0]?.ref).toBe(internal.chat.streaming.persistent.library.finishStoppedReply);
         expect(mutations[0]?.args).toMatchObject({ continuation: false, order: 1, pendingText: "Hello.", promptMessageId: "prompt-1" });
         expect(stop.signal.aborted).toBe(true);
+    });
+
+    it("returns the row it saved, and drains the aborted result only after the abort", async () => {
+        const { ctx } = stoppedCtx(true);
+        const stop = new AbortController();
+        const drained: boolean[] = [];
+
+        const saved = await endStoppedRun(ctx as never, streamWriteRefused({ reasoning: "", text: "Hello." }, conflict()), {
+            ...STOP_ARGS,
+            result: {
+                consumeStream: async () => {
+                    drained.push(stop.signal.aborted);
+                },
+            },
+            stop,
+        });
+
+        expect(saved).toStrictEqual(["stopped-1"]);
+        expect(drained).toStrictEqual([true]);
     });
 
     it("rethrows the original error when nothing was stopped, and does not abort", async () => {

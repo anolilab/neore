@@ -319,16 +319,31 @@ const runSpeaker = async (
             saveStreamDeltas: false,
         });
         const timingStart = Date.now();
-        // A stop ends the turn here, with the reply this speaker still owed saved.
+        const markSpeaker = async (messageIds: string[]) => {
+            if (messageIds.length > 0) {
+                await ctx.runMutation(internal.chat.group.functions.markSpeakerMessages, {
+                    agentName: speaker.name,
+                    messageIds,
+                    skillId: speaker.skillId,
+                    threadId: turn.threadId,
+                    userId: turn.userId,
+                });
+            }
+        };
+        // A stop ends the turn here, with the reply this speaker still owed saved and stamped as its own.
         const stoppedAt = async (error: unknown) => {
-            await endStoppedRun(ctx, error, {
+            const stoppedIds = await endStoppedRun(ctx, error, {
                 agentName: speaker.name,
-                continuation: false,
+                // A later speaker runs under `forceNewOrder`: its reply takes its own order, as a continuation does.
+                continuation: !isFirstSpeaker,
                 order: result.order,
                 promptMessageId: result.promptMessageId,
+                result,
                 stop: stopping,
                 streamId: turn.streamId,
             });
+
+            await markSpeaker([...stoppedIds, ...(result.savedMessages ?? []).map((m) => m._id as string)]);
 
             return { lastMessageId: undefined, paused: false, stopped: true };
         };
@@ -346,15 +361,7 @@ const runSpeaker = async (
 
         const savedIds = (result.savedMessages ?? []).map((m) => m._id as string);
 
-        if (savedIds.length > 0) {
-            await ctx.runMutation(internal.chat.group.functions.markSpeakerMessages, {
-                agentName: speaker.name,
-                messageIds: savedIds,
-                skillId: speaker.skillId,
-                threadId: turn.threadId,
-                userId: turn.userId,
-            });
-        }
+        await markSpeaker(savedIds);
 
         const snapshot: ToolRunConfig = {
             autoMediaEnrichment: turn.agentPrefs.autoMediaEnrichment ?? false,

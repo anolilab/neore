@@ -664,7 +664,10 @@ export const finishRun = async (
 /**
  * A sidebar stop refused one of this run's chunk writes. The text the reply still owes is saved first
  * (`finishStoppedReply`), and only then is the model call aborted: the agent marks its pending row failed on
- * abort, which would undo the save. Any other error, and a refusal that was not a stop, is rethrown as it was.
+ * abort, which would undo the save. The aborted result is then drained, so a step the agent was saving when the
+ * stop landed is written before this returns. Any other error, and a refusal that was not a stop, is rethrown as it was.
+ *
+ * Returns the ids of the rows this saved (none when no text was owed).
  */
 export const endStoppedRun = async (
     ctx: Pick<ActionCtx, "runMutation">,
@@ -675,10 +678,11 @@ export const endStoppedRun = async (
         continuation: boolean;
         order: number | undefined;
         promptMessageId: string | undefined;
+        result: { consumeStream: () => PromiseLike<unknown> };
         stop: AbortController;
         streamId: string;
     },
-): Promise<void> => {
+): Promise<string[]> => {
     if (!isStreamWriteRefused(error)) {
         throw error;
     }
@@ -698,11 +702,15 @@ export const endStoppedRun = async (
         streamId: args.streamId as Id<"persistentStreams">,
     });
 
-    if (!stopped) {
+    if (!stopped.stopped) {
         throw originalWriteError(error);
     }
 
     args.stop.abort();
+    // Errors are reported on the result, not thrown; the abort ends the stream, so this returns once the save is done.
+    await args.result.consumeStream();
+
+    return stopped.messageId === undefined ? [] : [stopped.messageId];
 };
 
 /**
@@ -843,6 +851,7 @@ export const resumeApprovedRun = async (
                 continuation: true,
                 order: result.order,
                 promptMessageId: result.promptMessageId,
+                result,
                 stop: stopping,
                 streamId,
             });

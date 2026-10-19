@@ -213,7 +213,7 @@ export const stopActiveForThread = internalMutation
  * `promptMessageId`, the way the agent saves a continuation's rows. No text, no row.
  *
  * Only a stream a stop ended counts: a timeout or a failure is left to the run's own error path. The thread
- * leaves `running` in every case it returns true. Returns whether the stream was stopped.
+ * leaves `running` in every case it returns true. Returns whether the stream was stopped, and the id of the row it saved.
  * Called once per run: a redelivery never gets here (`claimStreamRun`), and a second Stop finds no live stream.
  */
 export const finishStoppedReply = internalMutation
@@ -227,15 +227,16 @@ export const finishStoppedReply = internalMutation
         promptMessageId: v.string().max(MAX_LENGTH.id),
         streamId: v.id("persistentStreams"),
     })
-    .output(v.boolean())
+    .output(v.object({ messageId: v.optional(v.id("messages")), stopped: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
 
         if (!stream || stream.status !== "done") {
-            return false;
+            return { stopped: false };
         }
 
         const threadId = stream.threadId as Id<"threads">;
+        let messageId: Id<"messages"> | undefined;
 
         if (args.pendingText.length > 0 || args.pendingReasoning.length > 0) {
             const pending = await ctx.db.messages.findFirst({
@@ -250,7 +251,7 @@ export const finishStoppedReply = internalMutation
                 ? { overrideOrder: args.order, parentMessageId: args.promptMessageId, promptMessageId: undefined }
                 : { overrideOrder: undefined, parentMessageId: undefined, promptMessageId: args.promptMessageId as Id<"messages"> };
 
-            await addMessagesHandler(ctx, {
+            const saved = await addMessagesHandler(ctx, {
                 agentName: args.agentName,
                 failPendingSteps: false,
                 messages: [{ message: { content, role: "assistant" }, status: "success" }],
@@ -259,11 +260,13 @@ export const finishStoppedReply = internalMutation
                 userId: stream.userId,
                 ...placement,
             });
+
+            messageId = saved.messages[0]?._id as Id<"messages"> | undefined;
         }
 
         await patchThread(ctx.db, threadId, { status: "active", updatedAt: ctx.now });
 
-        return true;
+        return { stopped: true, ...(messageId !== undefined && { messageId }) };
     });
 
 export const getStreamStatus = internalQuery

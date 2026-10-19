@@ -237,6 +237,27 @@ describe("compressContextMessages", () => {
 
         expect(compressedCount).toBeGreaterThan(10);
     });
+
+    it("elides a long run of tool outputs oldest first, stopping as soon as the prompt fits", () => {
+        // 300 steps of 1000-character results: elision runs through hundreds of messages before the prompt fits.
+        const wide = 100_000;
+        const steps = Array.from({ length: 300 }, (_, i) => [call(`c${i}`), result(`c${i}`, "z".repeat(1000))]).flat();
+        const messages = [system("sys"), user("latest"), ...steps];
+        const output = compressContextMessages(messages, wide);
+        const threshold = wide * 0.8;
+        const elided = output.flatMap((m, i) => (m.role === "tool" && valueOf(m) === ELIDED ? [i] : []));
+        const toolIndexes = output.flatMap((m, i) => (m.role === "tool" ? [i] : []));
+        const lastElided = elided.at(-1)!;
+        // The original message back in place of the last elision: the prompt must be over the threshold without it.
+        const withoutLastElision = output.map((m, i) => (i === lastElided ? messages[i]! : m));
+
+        expect(elided.length).toBeGreaterThan(0);
+        expect(elided).toEqual(toolIndexes.slice(0, elided.length));
+        expect(estimateTokens(output)).toBeLessThan(threshold);
+        expect(estimateTokens(withoutLastElision)).toBeGreaterThanOrEqual(threshold);
+        expect(output.at(-1)).toBe(messages.at(-1));
+        assertWellFormed(messages, output);
+    });
 });
 
 describe("applyLateCompression", () => {

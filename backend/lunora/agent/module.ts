@@ -5,6 +5,7 @@ export default defineModule({
         "The agent runtime's storage: threads, messages, streams, in-thread branches, files, documents, projects and vectors. Other modules write these only through agent/table-writes.ts.",
     tables: [
         "chatFileAccess",
+        "chatFileThreads",
         "chatFiles",
         "documentVersions",
         "documents",

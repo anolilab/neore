@@ -3,8 +3,9 @@
 import type { GatewayModel } from "@neore/ai/models";
 import type { QueryClient } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 const NO_BLOCKED_CREATORS: string[] = [];
@@ -164,24 +165,31 @@ interface Edit {
  * with its own edit applied, so an edit that fails is never saved by a later one,
  * and a later edit is not lost to an earlier failure. A failed edit is removed and
  * the cache recomputed; a saved one becomes `confirmed`.
+ *
+ * One object per signed-in account. A change of account replaces it, so a save
+ * queued for the previous account finds it is no longer the live one and never
+ * reaches the new account's session.
  */
 interface PreferencesEdits {
     confirmed: ModelFilterRules | undefined;
     pending: Edit[];
     queue: Promise<unknown>;
+    userId: string | undefined;
 }
 
 const editsByClient = new WeakMap<QueryClient, PreferencesEdits>();
 
-const editsOf = (queryClient: QueryClient): PreferencesEdits => {
-    let edits = editsByClient.get(queryClient);
+/** Makes `userId` the live account. Returns true when the account changed from a known one. */
+const adoptAccount = (queryClient: QueryClient, userId: string | undefined): boolean => {
+    const current = editsByClient.get(queryClient);
 
-    if (!edits) {
-        edits = { confirmed: undefined, pending: [], queue: Promise.resolve() };
-        editsByClient.set(queryClient, edits);
+    if (current?.userId === userId) {
+        return false;
     }
 
-    return edits;
+    editsByClient.set(queryClient, { confirmed: undefined, pending: [], queue: Promise.resolve(), userId });
+
+    return current !== undefined;
 };
 
 /** What the cache shows: `confirmed` with every pending edit applied in order. */
@@ -213,10 +221,23 @@ const visibleRules = (edits: PreferencesEdits): ModelFilterRules | undefined => 
 export const useUpdateModelFilterRules = () => {
     const crpc = useCRPC();
     const queryClient = useQueryClient();
+    const { hooks } = useAuth();
+    const userId = hooks.useSession().data?.user.id;
     const preferences = crpc.auth.functions.getAIUserPreferences.queryOptions({});
     const { data, isSuccess: isLoaded } = useQuery(preferences);
     const rules = data?.modelFilterRules as ModelFilterRules | undefined;
     const { isPending, mutateAsync } = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
+
+    // A new account starts with no edits; the cache still shows the old account's rules until it refetches.
+    useEffect(() => {
+        if (!adoptAccount(queryClient, userId)) {
+            return;
+        }
+
+        const { queryKey } = crpc.auth.functions.getAIUserPreferences.queryOptions({});
+
+        void queryClient.invalidateQueries({ queryKey });
+    }, [crpc, queryClient, userId]);
 
     // The key is built inside the callback: a fresh array each render would make `updateRules` change identity every render.
     const updateRules = useCallback(
@@ -229,7 +250,12 @@ export const useUpdateModelFilterRules = () => {
                 throw new Error("The model filter rules have not loaded yet");
             }
 
-            const edits = editsOf(queryClient);
+            // A caller rendered before an account switch must not edit the account that replaced it.
+            const edits = editsByClient.get(queryClient);
+
+            if (userId === undefined || edits?.userId !== userId) {
+                throw new Error("The signed-in account changed; the edit was not saved");
+            }
 
             if (edits.pending.length === 0) {
                 edits.confirmed = cached?.modelFilterRules as ModelFilterRules | undefined;
@@ -237,6 +263,11 @@ export const useUpdateModelFilterRules = () => {
 
             const edit: Edit = { update };
             const show = () => {
+                // An account that was replaced must not overwrite the cache of the one that replaced it.
+                if (editsByClient.get(queryClient) !== edits) {
+                    return;
+                }
+
                 const shown = visibleRules(edits);
 
                 queryClient.setQueryData<PreferencesCache>(queryKey, (old) => {
@@ -249,6 +280,11 @@ export const useUpdateModelFilterRules = () => {
 
             // Each save waits for the one before it, so it sends the value that save left.
             const save = async () => {
+                // This save may have waited behind an earlier one while the account changed: it must not reach the new session.
+                if (editsByClient.get(queryClient) !== edits) {
+                    throw new Error("The signed-in account changed; the edit was not saved");
+                }
+
                 const payload = cleanRules(update(edits.confirmed ?? {}));
 
                 try {
@@ -265,7 +301,7 @@ export const useUpdateModelFilterRules = () => {
 
             return saved;
         },
-        [crpc, mutateAsync, queryClient],
+        [crpc, mutateAsync, queryClient, userId],
     );
 
     return { isLoaded, isPending, rules, updateRules };

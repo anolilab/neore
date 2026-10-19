@@ -9,7 +9,7 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { changeRefcount } from "../agent/files";
+import { changeMessageFiles } from "../agent/files";
 import { insertMessageRow, insertThread, patchMessage, patchThread } from "../agent/table-writes";
 import { AI_DISCLOSURE_CLAIM_TTL_MS, claimOnce, hasClaim, MESSENGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { timingSafeEqual } from "../lib/crypto";
@@ -510,7 +510,7 @@ export const saveMessengerMessage = internalMutation
         });
 
         if (attached) {
-            await changeRefcount(ctx, [], attached);
+            await changeMessageFiles(ctx, threadId, [], attached);
         }
 
         // Update thread timestamp
@@ -549,7 +549,7 @@ export const completeMessengerMessage = internalMutation
         });
 
         if (attached) {
-            await changeRefcount(ctx, (row.fileIds ?? []) as Id<"chatFiles">[], attached);
+            await changeMessageFiles(ctx, row.threadId, (row.fileIds ?? []) as Id<"chatFiles">[], attached);
         }
 
         return true;

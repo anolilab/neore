@@ -350,6 +350,7 @@ export const runStreamingAgent = internalAction
                     continuation: false,
                     order: result.order,
                     promptMessageId: result.promptMessageId,
+                    result,
                     stop: stopping,
                     streamId,
                 });

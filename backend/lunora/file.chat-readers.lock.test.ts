@@ -8,7 +8,9 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mintUnlockProof, newPasscodeEpoch } from "./lib/thread-lock";
+import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { changeMessageFiles } from "./agent/files";
 import { getChatFileExtraction, getChatFileImageUrl } from "./file";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -75,6 +77,7 @@ const lockedThread = async () =>
         return threadId;
     });
 
+/** Attaches through the message writer, which records the chat's link to the file. */
 const attach = async (threadId: string, fileId: string) =>
     await run(async (ctx) => {
         await ctx.db.insert("messages", {
@@ -88,6 +91,7 @@ const attach = async (threadId: string, fileId: string) =>
             tool: false,
             userId: OWNER,
         });
+        await changeMessageFiles(ctx, threadId as Id<"threads">, [], [fileId as Id<"chatFiles">]);
     });
 
 const proofFor = async (threadId: string) => {

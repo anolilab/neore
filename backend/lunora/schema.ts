@@ -375,6 +375,25 @@ export const schema = defineSchema({
         .index("hash_filename", ["hash", "filename"])
         .index("refcount", ["refcount"]),
 
+    /**
+     * Which of an owner's chats hold which chat files. Written with every message
+     * `fileIds` write (`changeMessageFiles`), read by the password-lock gate
+     * (`fileGatedByLockedChat`) as one point lookup per locked chat. Keyed by the
+     * thread OWNER and sharded with the owner's messages and passcodes. A link
+     * stays after its message goes, which only over-gates; permanent thread
+     * deletion and GDPR remove them.
+     */
+    chatFileThreads: defineTable({
+        createdAt: v.number(),
+        fileId: v.id("chatFiles"),
+        threadId: v.id("threads"),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_fileId_threadId", ["fileId", "threadId"])
+        .index("by_threadId", ["threadId"])
+        .index("by_userId", ["userId"]),
+
     chatImportJobs: defineTable({
         completedAt: v.optional(v.number()),
         createdAt: v.number(),

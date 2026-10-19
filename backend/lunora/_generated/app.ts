@@ -574,6 +574,7 @@ class AppBuilder<Env extends object> {
             ["changelogCache", { mode: { kind: "global" } }],
             ["chatFileAccess", { mode: { kind: "global" } }],
             ["chatFiles", { mode: { kind: "global" } }],
+            ["chatFileThreads", { mode: { field: "userId", kind: "shardBy" } }],
             ["chatImportJobs", { mode: { field: "userId", kind: "shardBy" } }],
             ["cleanupConfigs", { mode: { kind: "global" } }],
             ["cleanupLogs", { mode: { kind: "global" } }],

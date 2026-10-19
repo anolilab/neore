@@ -62,13 +62,11 @@ const toolResultText = (part: { content?: unknown; output?: unknown; result?: un
     }
 };
 
-/**
- * Fast approximate token count. Avoids tiktoken dependency.
- * Rough estimate: 1 token ≈ 4 characters for English text.
- * Applies a 15% safety margin to guard against estimation error.
- * Images and files get fixed estimates.
- */
-export const estimateTokens = (messages: ModelMessage[]): number => {
+/** Tokens for a character count, with the safety margin. */
+const charsToTokens = (chars: number): number => Math.ceil((chars / CHARS_PER_TOKEN) * ESTIMATION_SAFETY_MARGIN);
+
+/** The characters `estimateTokens` counts for a prompt. */
+const estimateChars = (messages: ModelMessage[]): number => {
     let totalChars = 0;
 
     for (const message of messages) {
@@ -135,9 +133,16 @@ export const estimateTokens = (messages: ModelMessage[]): number => {
         }
     }
 
-    // Apply safety margin to avoid context overflow from estimation error
-    return Math.ceil((totalChars / CHARS_PER_TOKEN) * ESTIMATION_SAFETY_MARGIN);
+    return totalChars;
 };
+
+/**
+ * Fast approximate token count. Avoids tiktoken dependency.
+ * Rough estimate: 1 token ≈ 4 characters for English text.
+ * Applies a 15% safety margin to guard against estimation error.
+ * Images and files get fixed estimates.
+ */
+export const estimateTokens = (messages: ModelMessage[]): number => charsToTokens(estimateChars(messages));
 
 // ─── Context Window Sizes ───────────────────────────────────────────────────
 
@@ -280,33 +285,47 @@ const elideToolOutputs = (messages: ModelMessage[], threshold: number): ModelMes
         }
     }
 
-    let next = messages;
+    // Counted once. Each replacement lowers the count by the characters it saves, which is what a re-count would give.
+    let chars = estimateChars(messages);
+    const elided = new Map<number, ModelMessage>();
 
-    for (let index = 0; index < lastTool && estimateTokens(next) >= threshold; index += 1) {
-        const message = next[index];
+    for (let index = 0; index < lastTool && charsToTokens(chars) >= threshold; index += 1) {
+        const message = messages[index];
 
         if (message?.role !== "tool" || !Array.isArray(message.content)) {
             continue;
         }
 
-        let changed = false;
+        let saved = 0;
 
         const content = message.content.map((part) => {
-            if (part.type !== "tool-result" || toolResultText(part).length <= ELIDED_TOOL_OUTPUT.length) {
+            if (part.type !== "tool-result") {
                 return part;
             }
 
-            changed = true;
+            const { length } = toolResultText(part);
+
+            if (length <= ELIDED_TOOL_OUTPUT.length) {
+                return part;
+            }
+
+            saved += length - ELIDED_TOOL_OUTPUT.length;
 
             return { ...part, output: { type: "text" as const, value: ELIDED_TOOL_OUTPUT } };
         });
 
-        if (changed) {
-            next = next.map((m, i) => (i === index ? ({ ...m, content } as ModelMessage) : m));
+        if (saved > 0) {
+            chars -= saved;
+            elided.set(index, { ...message, content } as ModelMessage);
         }
     }
 
-    return next;
+    if (elided.size === 0) {
+        return messages;
+    }
+
+    // One copy of the array, with only the changed messages swapped in.
+    return messages.map((m, i) => elided.get(i) ?? m);
 };
 
 /** Summary of the messages being dropped, capped at ~20% of the context window. */

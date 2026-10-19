@@ -158,7 +158,12 @@ export const pipeToPersistentChunks = async (
                 // A finished step is saved as its own message by the agent, so from here on its text is not the reply's to keep.
                 if (part.type === "finish-step") {
                     if (pending.text || pending.reasoning) {
-                        await flush();
+                        try {
+                            await flush();
+                        } catch (error) {
+                            // The agent saves this step itself, so a refusal here owes nothing.
+                            throw isStreamWriteRefused(error) ? streamWriteRefused({ reasoning: "", text: "" }, error.cause) : error;
+                        }
                     }
 
                     unsaved = { reasoning: "", text: "" };

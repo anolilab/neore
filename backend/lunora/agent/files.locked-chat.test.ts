@@ -8,9 +8,10 @@
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import type { Id } from "../_generated/dataModel";
 import { mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
-import { getFileForUser } from "./files";
+import { changeMessageFiles, getFileForUser } from "./files";
 
 const SECRET = "test-storage-signing-secret";
 const OWNER = "owner-files";
@@ -39,21 +40,22 @@ const insertFile = async (filename: string, hash: string) =>
             }),
     );
 
+/** Attaches through the message writer, which records the chat's link to the file. */
 const messageWith = async (threadId: string, fileId: string, order: number) =>
-    await run(
-        async (ctx) =>
-            await ctx.db.insert("messages", {
-                fileIds: [fileId],
-                message: { content: "attached", role: "user" },
-                order,
-                status: "success",
-                stepOrder: 0,
-                text: "attached",
-                threadId,
-                tool: false,
-                userId: OWNER,
-            }),
-    );
+    await run(async (ctx) => {
+        await ctx.db.insert("messages", {
+            fileIds: [fileId],
+            message: { content: "attached", role: "user" },
+            order,
+            status: "success",
+            stepOrder: 0,
+            text: "attached",
+            threadId,
+            tool: false,
+            userId: OWNER,
+        });
+        await changeMessageFiles(ctx, threadId as Id<"threads">, [], [fileId as Id<"chatFiles">]);
+    });
 
 const lockedThread = async (lockedAt: number) =>
     await run(async (ctx) => {

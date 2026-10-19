@@ -104,6 +104,19 @@ export const browserSessions = sqliteTable("browserSessions", {
     by_userId: index("by_userId").on(t.userId),
 }));
 
+export const chatFileThreads = sqliteTable("chatFileThreads", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    fileId: text("fileId").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_threadId: index("by_threadId").on(t.threadId),
+    by_fileId_threadId: index("by_fileId_threadId").on(t.fileId, t.threadId),
+}));
+
 export const chatImportJobs = sqliteTable("chatImportJobs", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

@@ -17,6 +17,7 @@ import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, partial, MAX_LENGTH } from "../lib/validators";
 import { deleteMessage } from "./messages";
+import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
 import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
@@ -452,6 +453,8 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
             // Remove from aggregates before deleting
             await context.db.delete(args.threadId);
         }
+
+        await deleteChatFileLinksForThread(context, args.threadId);
 
         // The temporary-chat marker goes with the thread on EVERY delete path.
         // Only the expiry cron removed it, so a temporary chat deleted any other

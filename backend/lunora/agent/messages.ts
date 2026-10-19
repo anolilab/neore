@@ -37,7 +37,7 @@ import {
 } from "./validators";
 import { loadBranchTree, parentOf, resolveLeafRow } from "./branch-rows";
 import { BRANCH_ROOT, resolveActivePath, resolveBranchParent } from "./branch-tree";
-import { changeRefcount } from "./files";
+import { changeMessageFiles, changeRefcount } from "./files";
 import { resolveThreadReadAccess } from "./thread-read-access";
 import { isLockedWithoutProof, isUnlockProofValid } from "./thread-passcode";
 import { getStreamingMessagesWithMetadata } from "./streams";
@@ -313,7 +313,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
             }
 
             if (message.fileIds) {
-                await changeRefcount(context, pendingMessage.fileIds ?? [], message.fileIds);
+                await changeMessageFiles(context, threadId, pendingMessage.fileIds ?? [], message.fileIds);
             }
 
             // Other undefined fields mean "unchanged" — the shard engine rejects
@@ -376,7 +376,7 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
         }
 
         if (message.fileIds) {
-            await changeRefcount(context, [], message.fileIds);
+            await changeMessageFiles(context, threadId, [], message.fileIds);
         }
 
         toReturn.push((await context.db.get(messageId))!);
@@ -542,7 +542,7 @@ export const updateMessage = internalMutation
         assert(message, `Message ${args.messageId} not found`);
 
         if (args.patch.fileIds) {
-            await changeRefcount(ctx, message.fileIds ?? [], args.patch.fileIds as unknown as Id<"chatFiles">[]); // fileIds may be typed as string[] from validator
+            await changeMessageFiles(ctx, message.threadId, message.fileIds ?? [], args.patch.fileIds as unknown as Id<"chatFiles">[]); // fileIds may be typed as string[] from validator
         }
 
         // `omit(args.patch, ["_id", "_creationTime"])`: the patch validator is
@@ -678,7 +678,7 @@ export const cloneMessageBatch = internalMutation
                 .filter((m) => existing.every((existingMessage) => !(existingMessage.order === m.order && existingMessage.stepOrder === m.stepOrder)))
                 .map(async (m) => {
                     if (m.fileIds) {
-                        await changeRefcount(ctx, [], m.fileIds);
+                        await changeMessageFiles(ctx, args.targetThreadId, [], m.fileIds);
                     }
 
                     let embeddingId: VectorTableId | undefined;
