@@ -91,3 +91,54 @@ registry models accept it today.
 The gateway proxies OpenAI Realtime, but the web client has no call UI and the
 backend has no session ticket for it. **Not built:** needs billing per minute,
 ticketing and a UI.
+
+## Audit of the remaining items (2026-10-19)
+
+Checked against the code. "Decision" means a product call is needed first.
+
+- **Capability inheritance for custom models: absent, by design.** A custom
+  model id (`custom:<provider>:<model>`) never matches the registry
+  (`chat/lib/get-agent.ts`), the picker hard-sets text-only
+  (`features/settings/lib/custom-models.ts`) and no reasoning options are sent.
+  Fix: copy `mode`/capability flags from the registry entry matching
+  `modelApiId`, or per-model toggles on the provider row. Decision: infer from
+  the name (fast, sometimes wrong for a proxy that reuses a name) or ask the user.
+- **Configuration as code: partial.** Skills (`skills/io.ts`) and workflows
+  (`workflow-bundle.ts`) import and export; prompts, system-prompt presets and
+  evals export do not, and nothing is YAML. Fix: mirror `importSkill` /
+  `exportSkill` for prompts and presets as JSON. Decision: format, and whether
+  org-shared prompts and variable defaults travel.
+- **Backups: partial.** The data export (`gdpr/functions.ts`) is user-triggered
+  and now re-importable as a chat source (`chat-import`, provider `neore`). No
+  schedule (not in `PERIODIC_JOBS`; a `shardSweeps()` entry could enqueue one)
+  and no per-chat or Markdown export. Decision: retention and storage cost,
+  whether the link is emailed. The import side does not dedupe: importing a file
+  twice duplicates its conversations.
+- **Per-key spend limits: per-user only.** Per-key request rates exist
+  (`public-api/router.ts`, same limits for every key, tier hard-coded to free).
+  better-auth's `remaining`/`refill*` fields are unused, and they are a D1
+  read-modify-write, which our rate-limit notes avoid. The gateway's `gk_`
+  virtual-key path is effectively unused: the daily caps count by user. Fix:
+  a per-key budget on the key row, checked in the router, which first needs
+  `apiKeyId` on usage rows. Decision: enforce in the backend (where the key
+  lives) or the gateway (where cost lands).
+- **MCP beyond tools: tools only.** Resources are read only for MCP Apps UI;
+  prompts, sampling and elicitation are absent. Resources/prompts pickers are
+  small. Sampling spends the user's credits through the gateway, so it needs a
+  deliberate decision. Progress notifications are not possible with
+  `@ai-sdk/mcp` 2.0.73 (`RequestOptions` has no `onprogress`, so no
+  `progressToken` is sent).
+- **A2A / ACP: absent.** Speculative; no plan.
+- **Observability backends.** Langfuse reads `gen_ai.request.model` /
+  `gen_ai.response.model` and `gen_ai.usage.*`, needs
+  `x-langfuse-ingestion-version=4` (otherwise data can lag up to ten minutes) and
+  `Authorization=Basic <base64 public:secret>` against `…/api/public/otel`.
+  LangSmith maps `gen_ai.operation.name` `chat`/`completion` to an LLM run and
+  `embedding` (singular) to an embedding run, and `gen_ai.system` to the
+  provider; our `embeddings` follows the OpenTelemetry convention and may not
+  map there. Sources: langfuse.com/integrations/native/opentelemetry and
+  docs.langchain.com/langsmith/trace-with-opentelemetry. Not verified against a
+  live backend.
+- **Rerankers on Workers AI.** Only `@cf/baai/bge-reranker-base` is listed
+  (`query` and `contexts[{text}]` required, `top_k` optional). No multilingual
+  reranker was found, so German retrieval stays on the blended order.
