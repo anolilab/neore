@@ -44,6 +44,12 @@ interface SkillImportDialogProps {
 const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClose, onImported }) => {
     const { t } = useLingui();
     const [upload, setUpload] = useState<SkillUpload>({ filename: "SKILL.md", files: [], markdown: "" });
+    // Bumped by every edit of the upload. A link fetch that was started before a later edit is stale and must not replace it.
+    const uploadRevision = useRef(0);
+    const replaceUpload = (next: SkillUpload) => {
+        uploadRevision.current += 1;
+        setUpload(next);
+    };
     const [readError, setReadError] = useState<string | null>(null);
     const fileInput = useRef<HTMLInputElement>(null);
     const markdownId = useId();
@@ -74,7 +80,7 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
         }
 
         try {
-            setUpload(await readSkillUpload(file, loadJsZip));
+            replaceUpload(await readSkillUpload(file, loadJsZip));
             setReadError(null);
         } catch (error) {
             setReadError(describeReadError(error, t`This file could not be read.`, (megabytes) => t`The file is larger than ${megabytes} MB.`));
@@ -84,9 +90,14 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
     // The server reads the SKILL.md (GitHub links only); it lands in the box below for the same preview and checks as pasted text.
     const handleFetchLink = async () => {
         try {
+            const revision = uploadRevision.current;
             const fetched = await fetchSkill({ url: link });
 
-            setUpload({ filename: fetched.filename, files: [], markdown: fetched.markdown });
+            if (revision !== uploadRevision.current) {
+                return;
+            }
+
+            replaceUpload({ filename: fetched.filename, files: [], markdown: fetched.markdown });
             setReadError(null);
         } catch (error) {
             setReadError(error instanceof Error && error.message ? error.message : t`That link could not be read.`);
@@ -167,7 +178,7 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                     <Textarea
                         className="max-h-72 font-mono text-xs"
                         id={markdownId}
-                        onChange={(event) => setUpload({ filename: "SKILL.md", files: [], markdown: event.target.value })}
+                        onChange={(event) => replaceUpload({ filename: "SKILL.md", files: [], markdown: event.target.value })}
                         placeholder={"---\nname: my-skill\ndescription: What it does and when to use it.\n---\n\nInstructions…"}
                         rows={10}
                         value={upload.markdown}
