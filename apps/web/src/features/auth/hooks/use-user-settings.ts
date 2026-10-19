@@ -19,10 +19,10 @@ export const useUserSettings = () => {
 };
 
 /**
- * Tail of the settings writes in this tab. Each `updateLatest` write waits for the one before it,
- * so the patch it builds sees the settings as the earlier write left them.
+ * The settings writes `updateLatest` has queued in this tab. Each waits for the one before it;
+ * `pending` counts the ones not yet finished.
  */
-const settingsWrites = { tail: Promise.resolve() as Promise<unknown> };
+const settingsWrites = { pending: 0, tail: Promise.resolve() as Promise<unknown> };
 
 /**
  * Hook to update user settings with optimistic updates.
@@ -66,15 +66,52 @@ export const useUpdateUserSettings = () => {
         // setting read from it (e.g. `onboardingCompleted` behind "Skip tour")
         // never changed on screen. Re-read the server's row either way.
         onSettled: async () => {
+            // A queued write is still behind this one: a refetch now would bring back the server row and hide the edits queued after it.
+            if (settingsWrites.pending > 0) {
+                return;
+            }
+
             await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
         },
     });
 
-    const updateLatest = (build: (current: UserSettingsRow | undefined) => Parameters<typeof mutation.mutateAsync>[0]) => {
-        const run = settingsWrites.tail.then(() => mutation.mutateAsync(build(queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey))));
+    type Patch = Parameters<typeof mutation.mutateAsync>[0];
 
-        // The catch both keeps a failed write from stalling the queue and marks `run` handled (`mutate` swallows errors too).
-        settingsWrites.tail = run.catch(() => undefined);
+    /**
+     * Applies `build` to the cached settings at once, so the UI updates now, then queues the write.
+     * When its turn comes the write sends the fields' values as the cache holds them then, which
+     * include every edit queued before it. A patch that depends on the current value (a list
+     * reorder, a map entry) therefore never overwrites another edit made meanwhile.
+     */
+    const updateLatest = (build: (current: UserSettingsRow | undefined) => Patch) => {
+        const before = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
+        const patch = build(before);
+        const fields = Object.keys(patch) as (keyof UserSettingsRow)[];
+
+        if (before !== undefined) {
+            queryClient.setQueryData(queryOptions.queryKey, { ...before, ...patch });
+        }
+
+        settingsWrites.pending += 1;
+
+        const run = settingsWrites.tail.then(() => {
+            const latest = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
+            const body = latest ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
+
+            return mutation.mutateAsync(body as Patch);
+        });
+
+        // The catch keeps a failed write from stalling the queue and marks `run` handled (`mutate` swallows errors too).
+        // The last write to finish refetches after a failure, so the cache matches the server again.
+        settingsWrites.tail = run
+            .catch(() => {
+                if (settingsWrites.pending === 1) {
+                    void queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+                }
+            })
+            .finally(() => {
+                settingsWrites.pending -= 1;
+            });
     };
 
     return { ...mutation, updateLatest };
