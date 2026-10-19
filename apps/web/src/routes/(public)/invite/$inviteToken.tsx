@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { requireSession } from "@/lib/auth/route-guard";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { noteThreadShard } from "@/lib/lunora/shard-routing";
+import { noteThreadShard } from "@neore/client-runtime";
 
 const InvitePage = () => {
     const { t } = useLingui();

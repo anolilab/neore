@@ -3,7 +3,7 @@
 import { useLocation } from "@tanstack/react-router";
 import { useShallow } from "zustand/react/shallow";
 
-import { LUNORA_ID_SOURCE } from "@/lib/lunora/ids";
+import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
 
 import useThreadStore from "./thread-store";
 

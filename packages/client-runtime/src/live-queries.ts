@@ -158,6 +158,8 @@ export class LiveQueryManager {
         private readonly client: LiveQueryClient,
         private readonly queryClient: QueryClient,
         private readonly mintWsTicket: WsTicketMinter,
+        /** Warn about a live query that is not live. The web app passes its build's dev flag; a `vite` build reads `import.meta.env.DEV`. */
+        private readonly dev: boolean = false,
     ) {}
 
     /** Starts watching the cache and wires the socket's credential. Returns `disconnect`. */
@@ -420,7 +422,7 @@ export class LiveQueryManager {
                         entry.fail(error);
                         this.settle(entry);
 
-                        if (import.meta.env?.DEV) {
+                        if (this.dev) {
                             console.warn(`[lunora] live query ${path} is not live: ${error.code ?? "ERROR"} ${error.message}`);
                         }
                     },
@@ -431,7 +433,7 @@ export class LiveQueryManager {
         } catch (error) {
             this.release(hash);
 
-            if (import.meta.env?.DEV) {
+            if (this.dev) {
                 console.warn(`[lunora] could not subscribe to ${path}`, error);
             }
         }
@@ -456,12 +458,17 @@ const managers = new WeakMap<object, LiveQueryManager>();
  * Installs the manager for a client/QueryClient pair. Browser only: on the server
  * a query fetches once and is dehydrated, and the browser subscribes on hydrate.
  */
-export const connectLiveQueries = (client: LiveQueryClient, queryClient: QueryClient, mintWsTicket: WsTicketMinter): (() => void) => {
+export const connectLiveQueries = (
+    client: LiveQueryClient,
+    queryClient: QueryClient,
+    mintWsTicket: WsTicketMinter,
+    { dev = false }: { dev?: boolean } = {},
+): (() => void) => {
     if (typeof window === "undefined" || managers.has(client)) {
         return () => {};
     }
 
-    const manager = new LiveQueryManager(client, queryClient, mintWsTicket);
+    const manager = new LiveQueryManager(client, queryClient, mintWsTicket, dev);
 
     managers.set(client, manager);
 

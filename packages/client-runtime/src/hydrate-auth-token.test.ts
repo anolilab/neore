@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { seedHydratedAuthToken } from "./hydrate-auth-token";
 
@@ -14,6 +14,15 @@ const createClient = (initial: string | null = null) => {
 };
 
 describe(seedHydratedAuthToken, () => {
+    // The seed runs only in a browser (`typeof window`); the web tests ran under jsdom, so give node the same global.
+    beforeEach(() => {
+        vi.stubGlobal("window", globalThis);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
     it("hands a tokenless client the SSR token", () => {
         const client = createClient();
 

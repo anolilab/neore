@@ -9,8 +9,7 @@
  *
  * ✅ Safe to import anywhere
  */
-import type { SharedSessionRead } from "./session-read";
-import { createSessionReadFetch, createSharedSessionRead } from "./session-read";
+import { type SharedSessionRead, createSessionReadFetch, createSharedSessionRead } from "@neore/client-runtime";
 
 /** better-auth's cross-tab channel (`better-auth/client` `WindowBroadcastChannel`): another tab signed out or updated the user. */
 const BETTER_AUTH_BROADCAST_KEY = "better-auth.message";

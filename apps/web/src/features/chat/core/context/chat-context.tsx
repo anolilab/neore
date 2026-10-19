@@ -33,8 +33,7 @@ import env from "@/lib/env";
 import { AppError, ErrorFactory, RateLimitError } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
 import { useCRPC, useLunora } from "@/lib/lunora/crpc";
-import { registerStreamOfThread } from "@/lib/lunora/shard-routing";
-import { withUnlockProofBody } from "@/lib/lunora/unlock-proofs";
+import { registerStreamOfThread, withUnlockProofBody } from "@neore/client-runtime";
 import { notifyNative, shouldNotifyReplyFinished } from "@/lib/native/bridge";
 
 import { DEFAULT_MESSAGE_OPTS } from "../constants/query-options";

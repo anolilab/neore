@@ -10,8 +10,7 @@ import { combineUIMessages } from "@neore/backend/agent/ui-messages";
 import type { StreamArgs } from "@neore/backend/agent/validators";
 import { useLayoutEffect, useMemo, useRef } from "react";
 
-import { shardOptionsFor } from "@/lib/lunora/shard-routing";
-import { withUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
 
 import { shareUnchangedMessages } from "./share-unchanged-messages";
 import type { BetterOmit, ErrorMessage, Expand } from "./type-utilities";

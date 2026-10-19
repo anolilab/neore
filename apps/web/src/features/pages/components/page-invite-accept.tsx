@@ -8,7 +8,7 @@ import type { FC } from "react";
 import { useEffect, useRef } from "react";
 
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
-import { notePageShard } from "@/lib/lunora/shard-routing";
+import { notePageShard } from "@neore/client-runtime";
 
 /** Spends a page invite link for the signed-in user, then opens the page. */
 const PageInviteAccept: FC<{ token: string }> = ({ token }) => {

@@ -16,7 +16,7 @@ import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { createLunoraActionQueryOptions, useLunora } from "@/lib/lunora/crpc";
-import { LIVE_META_KEY } from "@/lib/lunora/live-queries";
+import { LIVE_META_KEY } from "@neore/client-runtime";
 
 /** Start loading a little before the card is on screen. */
 const ROOT_MARGIN = "200px 0px";

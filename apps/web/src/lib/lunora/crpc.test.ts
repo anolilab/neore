@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiPath } from "./crpc";
 import { runLunoraAction, useCRPC } from "./crpc";
-import { connectLiveQueries } from "./live-queries";
-import { forgetAllUnlockProofs, rememberUnlockProof } from "./unlock-proofs";
+import { connectLiveQueries } from "@neore/client-runtime";
+import { forgetAllUnlockProofs, rememberUnlockProof } from "@neore/client-runtime";
 
 const harness = vi.hoisted(() => {
     const client = {

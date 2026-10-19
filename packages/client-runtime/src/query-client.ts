@@ -16,7 +16,7 @@ import { getErrorCode, isForbiddenError, isRateLimitedError } from "@lunora/reac
 import type { Query } from "@tanstack/react-query";
 import { defaultShouldDehydrateQuery, QueryCache, QueryClient } from "@tanstack/react-query";
 
-import { isAuthError } from "../utilities";
+import { isAuthError } from "./auth-errors";
 
 /**
  * Hydration configuration for TanStack Query.

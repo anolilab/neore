@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { trackCredentialRequest } from "@/lib/auth/sign-in-lock";
+import { trackCredentialRequest } from "@neore/client-runtime";
 
 import {
     adoptSessionToken,

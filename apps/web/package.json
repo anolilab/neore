@@ -71,6 +71,7 @@
         "@lingui/detect-locale": "catalog:i18n",
         "@lingui/react": "catalog:i18n",
         "@lobehub/icons": "catalog:icons",
+        "@neore/client-runtime": "workspace:*",
         "@lunora/client": "catalog:",
         "@lunora/notify": "catalog:lunora",
         "@lunora/react": "catalog:",

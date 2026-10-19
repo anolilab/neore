@@ -15,10 +15,15 @@ import { adminClient, anonymousClient, emailOTPClient, magicLinkClient, organiza
 import { createAuthClient } from "better-auth/react";
 
 import environment from "../env";
-import type { SessionAtomLike } from "./session-read";
-import { createSessionReadFetch, isSessionChangingRequest, keepRetryingFailedSessionReads } from "./session-read";
+import {
+    type SessionAtomLike,
+    createSessionReadFetch,
+    isSessionChangingRequest,
+    keepRetryingFailedSessionReads,
+    isCredentialRequest,
+    trackCredentialRequest,
+} from "@neore/client-runtime";
 import { getSharedSessionRead } from "./shared-session";
-import { isCredentialRequest, trackCredentialRequest } from "./sign-in-lock";
 
 /**
  * A `get-session` read that got a 429/5xx/network failure is retried here, and
