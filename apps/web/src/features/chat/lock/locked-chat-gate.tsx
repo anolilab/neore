@@ -58,11 +58,23 @@ export const LockedChatGate = ({ children, threadId }: { children: ReactNode; th
         }
     }, [staleProof, threadId]);
 
-    // A refusal hides the chat whether or not a proof is held. A relocked chat whose passcode
-    // was removed answers the read with no proof, so it shows again.
-    const hidden = isThreadLockedError(error) || (proof === undefined && relocked && !isSuccess);
+    // A refusal hides the chat whether or not a proof is held. A relocked chat stays hidden
+    // while its read is pending. A relocked chat whose passcode was removed answers the read
+    // with no proof, so it shows again.
+    const refused = isThreadLockedError(error);
+    const relockedAndPending = proof === undefined && relocked && !isSuccess && !error;
 
-    if (!hidden) {
+    if (!refused && !relockedAndPending) {
+        // A relocked chat whose read fails for another reason shows that error, not the prompt,
+        // and its content stays unmounted.
+        if (proof === undefined && relocked && error) {
+            return (
+                <section className="flex h-full flex-col items-center justify-center p-6 text-center" role="alert">
+                    <p className="text-destructive text-sm">{error.message}</p>
+                </section>
+            );
+        }
+
         return children;
     }
 

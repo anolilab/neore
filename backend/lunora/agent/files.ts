@@ -167,8 +167,14 @@ const threadHoldsFile = async (context: Pick<QueryCtx, "db">, threadId: Id<"thre
  * chat's valid proof. The caller's own passcode rows name their locked chats
  * (shard-local, owner-scoped), so no write path has to record a source.
  *
- * ponytail: scans every page of each locked chat on each call. Record the
- * source thread on the grant if this shows up in profiles.
+ * Cost: one indexed read when the user has no locked chat; otherwise each locked
+ * chat's messages are read page by page until the file is found. The scan is NOT
+ * bounded: a bound would let a file attached further back through the chat pass,
+ * which is the bypass this check exists to stop. The web callers read these
+ * procedures one-shot (`live: false`), so no subscription re-runs the scan.
+ * ponytail: to make the lookup O(1), record the source thread on the grant
+ * (an optional field on `chatFileAccess`, a `.global()` table, written from the
+ * message save paths in `agent/messages.ts` and `messenger/functions.ts`).
  */
 export const fileGatedByLockedChat = async (
     context: Pick<QueryCtx, "db">,
@@ -178,6 +184,11 @@ export const fileGatedByLockedChat = async (
         .query("threadPasscodes")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .collect();
+
+    // The common case: no locked chat, so no message is read and the reactive read set is this one index range.
+    if (passcodes.length === 0) {
+        return false;
+    }
 
     for (const { threadId: lockedId } of passcodes) {
         // The chat the request names is opened by its own valid proof; any other locked chat is not.

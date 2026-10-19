@@ -1,6 +1,7 @@
 "use client";
 
 import type { GatewayModel } from "@neore/ai/models";
+import type { QueryClient } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
@@ -136,9 +137,13 @@ const cleanRules = (rules: ModelFilterRules): ModelFilterRules => {
         }
     }
 
-    if (rules.requireZDR) cleaned.requireZDR = true;
+    if (rules.requireZDR) {
+        cleaned.requireZDR = true;
+    }
 
-    if (rules.denyDataCollection) cleaned.denyDataCollection = true;
+    if (rules.denyDataCollection) {
+        cleaned.denyDataCollection = true;
+    }
 
     return cleaned;
 };
@@ -146,17 +151,64 @@ const cleanRules = (rules: ModelFilterRules): ModelFilterRules => {
 /** The preferences as the query cache holds them. `undefined` until the first load. */
 type PreferencesCache = { modelFilterRules?: unknown } | null | undefined;
 
+/** One edit: how it changes the rules it is applied to. */
+interface Edit {
+    update: (current: ModelFilterRules) => ModelFilterRules;
+}
+
+/**
+ * The edits of one QueryClient, shared by every hook instance on it (the picker and the filters page).
+ *
+ * `confirmed` is the last value the server accepted. The cache shows it with every
+ * pending edit applied in order. Saves run one at a time: each sends `confirmed`
+ * with its own edit applied, so an edit that fails is never saved by a later one,
+ * and a later edit is not lost to an earlier failure. A failed edit is removed and
+ * the cache recomputed; a saved one becomes `confirmed`.
+ */
+interface PreferencesEdits {
+    confirmed: ModelFilterRules | undefined;
+    pending: Edit[];
+    queue: Promise<unknown>;
+}
+
+const editsByClient = new WeakMap<QueryClient, PreferencesEdits>();
+
+const editsOf = (queryClient: QueryClient): PreferencesEdits => {
+    let edits = editsByClient.get(queryClient);
+
+    if (!edits) {
+        edits = { confirmed: undefined, pending: [], queue: Promise.resolve() };
+        editsByClient.set(queryClient, edits);
+    }
+
+    return edits;
+};
+
+/** What the cache shows: `confirmed` with every pending edit applied in order. */
+const visibleRules = (edits: PreferencesEdits): ModelFilterRules | undefined => {
+    if (edits.pending.length === 0) {
+        return edits.confirmed;
+    }
+
+    let rules = edits.confirmed ?? {};
+
+    for (const edit of edits.pending) {
+        rules = cleanRules(edit.update(rules));
+    }
+
+    return rules;
+};
+
 /**
  * The user's model filter rules, and the one way to save them. `updateRules`
  * takes an updater and applies it to the NEWEST rules, not to the caller's
  * render snapshot, so two edits in flight both survive.
  *
- * The newest rules are the query cache: a save writes its result there at once,
- * and every caller (the picker's "Hide", the filters page) reads it when it
- * saves. A failed save restores what it replaced, unless a later save has built
- * on it since.
+ * The cache shows the edits not yet refused, on top of the last saved value; a
+ * refused edit is dropped from it. A user with no preferences row caches `null`:
+ * the first edit builds on nothing and its save creates the row.
  *
- * ponytail: a live push or refetch that lands mid-save resets the cache to the server copy, which can lack that save. Serialise saves if that bites.
+ * ponytail: a live push or refetch that lands while edits are pending is overwritten by the next edit or settlement. Serialise the edits if that bites.
  */
 export const useUpdateModelFilterRules = () => {
     const crpc = useCRPC();
@@ -177,23 +229,41 @@ export const useUpdateModelFilterRules = () => {
                 throw new Error("The model filter rules have not loaded yet");
             }
 
-            const previous = cached?.modelFilterRules;
-            const next = cleanRules(update((previous as ModelFilterRules | undefined) ?? {}));
-            // A user with no preferences row caches `null`: the write creates the value, so the next edit builds on this one.
-            const write = (value: unknown) =>
+            const edits = editsOf(queryClient);
+
+            if (edits.pending.length === 0) {
+                edits.confirmed = cached?.modelFilterRules as ModelFilterRules | undefined;
+            }
+
+            const edit: Edit = { update };
+            const show = () => {
+                const shown = visibleRules(edits);
+
                 queryClient.setQueryData<PreferencesCache>(queryKey, (old) => {
-                    return { ...old, modelFilterRules: value };
+                    return { ...old, modelFilterRules: shown };
                 });
+            };
 
-            write(next);
+            edits.pending.push(edit);
+            show();
 
-            return mutateAsync({ modelFilterRules: next }).catch((error: unknown) => {
-                if (queryClient.getQueryData<PreferencesCache>(queryKey)?.modelFilterRules === next) {
-                    write(previous);
+            // Each save waits for the one before it, so it sends the value that save left.
+            const save = async () => {
+                const payload = cleanRules(update(edits.confirmed ?? {}));
+
+                try {
+                    await mutateAsync({ modelFilterRules: payload });
+                    edits.confirmed = payload;
+                } finally {
+                    edits.pending = edits.pending.filter((pending) => pending !== edit);
+                    show();
                 }
+            };
+            const saved = edits.queue.then(save);
 
-                throw error;
-            });
+            edits.queue = saved.catch(() => undefined);
+
+            return saved;
         },
         [crpc, mutateAsync, queryClient],
     );

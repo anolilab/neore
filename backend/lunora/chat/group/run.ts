@@ -670,6 +670,8 @@ export const continueGroupAfterToolApproval = async (
         ctx,
         { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
         {
+            // Reached only through `continueAfterToolApproval`, after its stream gate.
+            admittedRun: true,
             afterSaved: async ({ messageIds, toolResultId }) => {
                 await ctx.runMutation(internal.chat.group.functions.markSpeakerMessages, {
                     agentName: speaker.name,

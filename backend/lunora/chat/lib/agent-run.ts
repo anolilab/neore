@@ -688,6 +688,11 @@ export const resumeApprovedRun = async (
         userId: string;
     },
     options: {
+        /**
+         * The caller passed the stream gate for this run (`streamRunThread`), so the knowledge tool may
+         * search the chat's own files. Only a continuation that passed the gate may set it.
+         */
+        admittedRun?: boolean;
         afterSaved?: (saved: { messageIds: string[]; toolResultId: string | undefined }) => Promise<void>;
         agentName?: string;
         beforeStream?: () => Promise<void>;
@@ -699,6 +704,7 @@ export const resumeApprovedRun = async (
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     const [toolResult, userProviderKeys] = await Promise.all([
         buildAgentTools(ctx, {
+            ...(options.admittedRun && { admittedRun: true }),
             autoMediaEnrichment: config.autoMediaEnrichment,
             // A person just answered in the chat, so this run is interactive.
             deviceThreadId: threadId,
@@ -826,10 +832,11 @@ export const failRun = async (
 
     // `done` means someone else ended the stream: the sidebar's stop (`stopActiveForThread`),
     // or a finish whose tail threw. Such a run gets no error line, and the thread just leaves `running`.
-    const status = await ctx
-        .runQuery(internal.chat.streaming.persistent.library.getStreamStatus, { streamId: streamId as Id<"persistentStreams"> })
-        .catch(() => undefined);
-    const endedElsewhere = status === "done";
+    const readStatus = async () =>
+        await ctx
+            .runQuery(internal.chat.streaming.persistent.library.getStreamStatus, { streamId: streamId as Id<"persistentStreams"> })
+            .catch(() => undefined);
+    let endedElsewhere = (await readStatus()) === "done";
 
     if (!endedElsewhere) {
         try {
@@ -839,10 +846,16 @@ export const failRun = async (
                 text: `\n\nError: ${safeMessage}`,
             });
         } catch {
-            await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
-                status: "error",
-                streamId: streamId as Id<"persistentStreams">,
-            });
+            // A stop can land between the read above and the write, which then refuses it. Read again before
+            // calling it a failure, so a stopped run never ends in `error`.
+            endedElsewhere = (await readStatus()) === "done";
+
+            if (!endedElsewhere) {
+                await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
+                    status: "error",
+                    streamId: streamId as Id<"persistentStreams">,
+                });
+            }
         }
     }
 

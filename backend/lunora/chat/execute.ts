@@ -509,7 +509,8 @@ export const continueAfterToolApproval = internalAction
                 return;
             }
 
-            await resumeApprovedRun(ctx, { answer, approvalId, approved, config, denyReason, streamId, threadId, userId });
+            // The gate above admitted this continuation, so its knowledge search may read the chat's own files.
+            await resumeApprovedRun(ctx, { answer, approvalId, approved, config, denyReason, streamId, threadId, userId }, { admittedRun: true });
 
             await setThreadStatus(ctx, threadId, "active");
         } catch (error) {

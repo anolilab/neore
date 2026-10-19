@@ -264,17 +264,22 @@ export class LiveQueryManager {
     }
 
     /**
-     * Drops the cached answers of one chat, which were read with its proof. The
-     * query key carries the args, so the chat's id is in it. A read that names only
-     * the proof (a deck's `unlockProof` arg) is matched by the proof itself. Removing
-     * a query fires `removed`, which releases its live subscription (`onCacheEvent`).
+     * Drops the cached answers of one chat, which were read with its proof: the
+     * Lunora reads that name the chat (`threadId` / `chatId`) and the ones that carry
+     * the proof itself (a deck's `unlockProof` arg, which names no chat). Matched on the
+     * decoded call args, never on the key text, and only for Lunora keys. Removing a
+     * query fires `removed`, which releases its live subscription (`onCacheEvent`).
      */
     private dropThreadCache(threadId: string, proof: string): void {
         this.queryClient.removeQueries({
             predicate: (query) => {
-                const text = JSON.stringify(query.queryKey);
+                if (!isLunoraKey(query.queryKey)) {
+                    return false;
+                }
 
-                return text.includes(threadId) || text.includes(proof);
+                const args = argsOf(query);
+
+                return args.threadId === threadId || args.chatId === threadId || args.unlockProof === proof;
             },
         });
     }

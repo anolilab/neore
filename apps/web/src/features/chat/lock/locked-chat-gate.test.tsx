@@ -15,13 +15,21 @@ import { LockedChatGate } from "./locked-chat-gate";
 
 const harness = vi.hoisted(() => {
     // `validProof` is the passcode epoch: null accepts any proof, a string accepts only that one.
-    const state = { passcodeRemoved: false, validProof: null as string | null };
+    const state = { failNetwork: false, hang: false, passcodeRemoved: false, validProof: null as string | null };
     const client = {
         action: vi.fn(),
         getAuthToken: () => null,
         mutation: vi.fn(),
         onAuthTokenChange: () => () => {},
         query: vi.fn(async (_reference: unknown, args: { unlockProof?: string }) => {
+            if (state.hang) {
+                return new Promise<never>(() => {});
+            }
+
+            if (state.failNetwork) {
+                throw new Error("network down");
+            }
+
             const accepted = state.passcodeRemoved || (args.unlockProof !== undefined && (state.validProof === null || args.unlockProof === state.validProof));
 
             if (!accepted) {
@@ -86,6 +94,8 @@ beforeEach(() => {
     harness.client.query.mockClear();
     harness.state.passcodeRemoved = false;
     harness.state.validProof = null;
+    harness.state.failNetwork = false;
+    harness.state.hang = false;
 });
 
 afterEach(() => {
@@ -239,6 +249,44 @@ describe("a stale proof behind its gate (the passcode epoch rotated elsewhere)",
 
         expect(screen.getByText("chat body")).toBeTruthy();
         expect(currentUnlockProof("thread-1")).toBe("proof-ok");
+    });
+});
+
+describe("a relocked chat whose read is pending or fails", () => {
+    it("stays hidden behind the prompt while the read is pending", async () => {
+        renderGate();
+        await promptHeading();
+        act(() => {
+            rememberUnlockProof("thread-1", "proof-1", Date.now() + 60_000);
+        });
+        expect(await screen.findByText("chat body")).toBeTruthy();
+
+        harness.state.hang = true;
+        act(() => {
+            forgetUnlockProof("thread-1");
+        });
+
+        expect(await promptHeading()).toBeTruthy();
+        expect(screen.queryByText("chat body")).toBeNull();
+    });
+
+    it("shows the read's own error, not the unlock prompt, for a failure that is not a lock refusal", async () => {
+        renderGate();
+        await promptHeading();
+        act(() => {
+            rememberUnlockProof("thread-1", "proof-1", Date.now() + 60_000);
+        });
+        expect(await screen.findByText("chat body")).toBeTruthy();
+
+        harness.state.failNetwork = true;
+        act(() => {
+            forgetUnlockProof("thread-1");
+        });
+
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(screen.getByText("network down")).toBeTruthy();
+        expect(screen.queryByRole("heading", { name: "This chat is locked" })).toBeNull();
+        expect(screen.queryByText("chat body")).toBeNull();
     });
 });
 

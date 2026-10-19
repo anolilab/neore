@@ -16053,13 +16053,13 @@
     {
       "file": "agent/files",
       "kind": "read",
-      "line": 177,
+      "line": 183,
       "reason": "\"fileGatedByLockedChat\" is not a registered function"
     },
     {
       "file": "agent/files",
       "kind": "write",
-      "line": 411,
+      "line": 422,
       "reason": "\"copyFileHandler\" is not a registered function"
     },
     {
@@ -16917,13 +16917,13 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 674,
+      "line": 676,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 684,
+      "line": 686,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -17151,20 +17151,14 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 717,
+      "line": 723,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 810,
+      "line": 816,
       "reason": "\"setThreadStatus\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 829,
-      "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
@@ -17175,7 +17169,13 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 842,
+      "line": 843,
+      "reason": "\"failRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 854,
       "reason": "\"failRun\" is not a registered function"
     },
     {

@@ -96,7 +96,7 @@ const useDeltaStreams = <Query extends StreamQuery<any> = StreamQuery<object>>(
         query,
         args === "skip" || !streamMessages?.length
             ? ("skip" as const)
-            : ({
+            : withUnlockProof({
                   ...args,
                   streamArgs: {
                       cursors: streamMessages.map(({ streamId }) => {
