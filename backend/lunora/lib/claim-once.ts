@@ -13,6 +13,7 @@
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
+ * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  *
@@ -44,7 +45,7 @@
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { patchRow } from "./patch";
 
@@ -53,6 +54,13 @@ import { patchRow } from "./patch";
  * accepts (WhatsApp's 24h service window, Telegram's 24h retention).
  */
 export const MESSENGER_CLAIM_TTL_MS = 25 * 60 * 60 * 1000;
+
+/**
+ * A chat's AI disclosure, sent once with its first reply. Effectively forever:
+ * a re-disclosure is harmless but noisy, and the row is tagged with the owner,
+ * so account deletion clears it.
+ */
+export const AI_DISCLOSURE_CLAIM_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 
 /** Trigger webhooks: must outlast the signed-timestamp window on either side (`lib/crypto.ts`). */
 export const TRIGGER_CLAIM_TTL_MS = 15 * 60 * 1000;
@@ -81,7 +89,7 @@ interface ClaimOptions {
     userId?: string;
 }
 
-const findClaim = async (ctx: ClaimCtx, scope: string, key: string) =>
+const findClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string) =>
     await ctx.db
         .query("idempotencyClaims")
         .withIndex("by_scope_key", (q) => q.eq("scope", scope).eq("key", key))
@@ -110,6 +118,13 @@ const claim = async (ctx: ClaimCtx, scope: string, key: string, { leaseMs, onLap
     });
 
     return true;
+};
+
+/** `true` while an unexpired claim for `(scope, key)` exists. Reads only, so a caller can decide before it acts. */
+export const hasClaim = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string): Promise<boolean> => {
+    const existing = await findClaim(ctx, scope, key);
+
+    return existing !== null && existing.expiresAt > Date.now();
 };
 
 /** `true` for the first claim of `(scope, key)` within `ttlMs`, `false` for every later one. */

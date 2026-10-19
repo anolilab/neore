@@ -11,7 +11,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { changeRefcount } from "../agent/files";
 import { insertMessageRow, insertThread, patchMessage, patchThread } from "../agent/table-writes";
-import { claimOnce, MESSENGER_CLAIM_TTL_MS } from "../lib/claim-once";
+import { AI_DISCLOSURE_CLAIM_TTL_MS, claimOnce, hasClaim, MESSENGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { timingSafeEqual } from "../lib/crypto";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { getUserTier } from "../lib/rate-limiter";
@@ -615,6 +615,28 @@ export const claimThreadReply = internalMutation
         const claimed = await claimOnce(ctx, MESSENGER_REPLY_SCOPE, `${threadId}:${plan.newestUserMessageId}`, MESSENGER_CLAIM_TTL_MS, userId);
 
         return claimed ? { claimed: true as const, newestUserMessageId: plan.newestUserMessageId } : { claimed: false as const };
+    });
+
+const AI_DISCLOSURE_SCOPE = "messenger-ai-disclosure";
+
+/** Whether a chat has already been told its replies come from an AI. */
+export const aiDisclosureSent = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.boolean())
+    .query(async ({ args: { threadId }, ctx }) => await hasClaim(ctx, AI_DISCLOSURE_SCOPE, threadId));
+
+/**
+ * Record that a chat has been told. Called only after the disclosure-bearing
+ * reply was delivered, so a refused or crashed send leaves the chat still due.
+ * A concurrent sender that also got through just finds it set.
+ */
+export const markAiDisclosed = internalMutation
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { threadId, userId }, ctx }) => {
+        await claimOnce(ctx, AI_DISCLOSURE_SCOPE, threadId, AI_DISCLOSURE_CLAIM_TTL_MS, userId);
+
+        return null;
     });
 
 /**

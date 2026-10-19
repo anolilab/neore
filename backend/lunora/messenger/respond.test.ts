@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../test/registered-api";
 
+import { AI_DISCLOSURE } from "./lib/pairing";
 import { MESSENGER_MEDIA_MODEL, MESSENGER_TOOL_REPLY_MAX_STEPS, MESSENGER_TOOL_SYSTEM } from "./lib/reply-tools";
 
 // A reference is read as its dispatch key, which the fake ctx below switches on.
@@ -17,6 +18,10 @@ const state = vi.hoisted(() => {
     return {
         afterRun: undefined as (() => void) | undefined,
         charge: "charged" as "charged" | "limit" | "unavailable",
+        /** Whether this chat has already been told its replies come from an AI. */
+        disclosed: false,
+        /** Discord and Slack: `true` delivered, `false` refused. */
+        discord: true,
         mutations: [] as { args: unknown; path: string }[],
         replyFiles: [] as { filename?: string; key: string; mediaType: string }[],
         runs: [] as Record<string, unknown>[],
@@ -24,6 +29,9 @@ const state = vi.hoisted(() => {
         sentText: [] as { chatId: string; platform: string; text: string }[],
         setting: null as { enabled: boolean; groups?: string[] } | null,
         settingArgs: [] as unknown[],
+        slack: true,
+        /** Telegram's send result: `true` delivered, `false` refused, `"throw"` a network error. */
+        telegram: true as boolean | "throw",
     };
 });
 
@@ -34,6 +42,28 @@ vi.mock("../chat/lib/headless-run", () => {
             state.afterRun?.();
 
             return { text: "Here is your picture.", threadId: "thread-1" };
+        },
+    };
+});
+
+vi.mock("./platforms/discord", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./platforms/discord")>()),
+        sendDiscordMessage: async (_token: string, chatId: string, text: string) => {
+            state.sentText.push({ chatId, platform: "discord", text });
+
+            return state.discord;
+        },
+    };
+});
+
+vi.mock("./platforms/slack", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./platforms/slack")>()),
+        sendSlackMessage: async (_token: string, chatId: string, text: string) => {
+            state.sentText.push({ chatId, platform: "slack", text });
+
+            return state.slack;
         },
     };
 });
@@ -49,7 +79,11 @@ vi.mock("./platforms/telegram", async (importOriginal) => {
         sendTelegramMessage: async (_token: string, chatId: string, text: string) => {
             state.sentText.push({ chatId, platform: "telegram", text });
 
-            return true;
+            if (state.telegram === "throw") {
+                throw new Error("network");
+            }
+
+            return state.telegram;
         },
     };
 });
@@ -100,7 +134,15 @@ const { respondToInbound } = await import("./respond");
 const NOW = 1_800_000_000_000;
 const HOUR = 3_600_000;
 
-const KEYS = { telegram_bot_token: "tg", wechat_app_id: "wx", wechat_app_secret: "wx-secret", whatsapp_access_token: "wa", whatsapp_phone_number_id: "phone" };
+const KEYS = {
+    discord_bot_token: "dc",
+    slack_bot_token: "sl",
+    telegram_bot_token: "tg",
+    wechat_app_id: "wx",
+    wechat_app_secret: "wx-secret",
+    whatsapp_access_token: "wa",
+    whatsapp_phone_number_id: "phone",
+};
 
 const ctx = () =>
     ({
@@ -114,6 +156,9 @@ const ctx = () =>
                 case "messenger_functions:claimThreadReply": {
                     return { claimed: true };
                 }
+                case "messenger_functions:markAiDisclosed": {
+                    return null;
+                }
                 default: {
                     return null;
                 }
@@ -123,6 +168,9 @@ const ctx = () =>
             switch (path) {
                 case "auth_functions:getDecryptedMessengerKeysQuery": {
                     return KEYS;
+                }
+                case "messenger_functions:aiDisclosureSent": {
+                    return state.disclosed;
                 }
                 case "messenger_functions:getReplyToolSetting": {
                     state.settingArgs.push(args);
@@ -158,7 +206,11 @@ beforeEach(() => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     state.afterRun = undefined;
     state.charge = "charged";
+    state.disclosed = true;
     state.mutations = [];
+    state.telegram = true;
+    state.discord = true;
+    state.slack = true;
     state.replyFiles = [{ filename: "cat.png", key: "agent-files/cat", mediaType: "image/png" }];
     state.runs = [];
     state.sentMedia = [];
@@ -244,6 +296,66 @@ describe("messenger replies with tools", () => {
         expect(state.runs[0]).toMatchObject({ tools: "none" });
         expect(state.sentText).toHaveLength(1);
         expect(state.sentMedia).toStrictEqual([]);
+    });
+});
+
+describe("AI disclosure", () => {
+    it("prepends the disclosure to a chat's first reply, in the same message", async () => {
+        state.disclosed = false;
+
+        await respond();
+
+        expect(state.sentText).toStrictEqual([{ chatId: "chat-1", platform: "telegram", text: `${AI_DISCLOSURE}\n\nHere is your picture.` }]);
+    });
+
+    it("records the disclosure for the thread's owner once the reply is delivered", async () => {
+        state.disclosed = false;
+
+        await respond();
+
+        expect(state.mutations.filter((entry) => entry.path === "messenger_functions:markAiDisclosed")).toStrictEqual([
+            { args: { threadId: "thread-1", userId: "owner" }, path: "messenger_functions:markAiDisclosed" },
+        ]);
+    });
+
+    it("leaves later replies unchanged once the chat has been told", async () => {
+        state.disclosed = true;
+
+        await respond();
+
+        expect(state.sentText.map((sent) => sent.text)).toStrictEqual(["Here is your picture."]);
+        expect(mutationPaths()).not.toContain("messenger_functions:markAiDisclosed");
+    });
+
+    it.each(["telegram", "discord", "slack"] as const)("does not record the disclosure when %s refuses the send", async (platform) => {
+        state.disclosed = false;
+
+        if (platform === "telegram") {
+            state.telegram = false;
+        } else {
+            state[platform] = false;
+        }
+
+        await respond({ platform });
+
+        expect(mutationPaths()).not.toContain("messenger_functions:markAiDisclosed");
+    });
+
+    it("does not record the disclosure when the send throws", async () => {
+        state.disclosed = false;
+        state.telegram = "throw";
+
+        await respond();
+
+        expect(mutationPaths()).not.toContain("messenger_functions:markAiDisclosed");
+    });
+
+    it("does not record the disclosure when the reply window has closed, so the next reply still discloses", async () => {
+        state.disclosed = false;
+
+        await respond({ inboundAt: NOW - 25 * HOUR, platform: "whatsapp" });
+
+        expect(mutationPaths()).not.toContain("messenger_functions:markAiDisclosed");
     });
 });
 

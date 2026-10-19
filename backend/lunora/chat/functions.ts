@@ -14,6 +14,7 @@ import type { ImageSize, ModelDefinition } from "@neore/ai/models";
 import { exceedsFreePlanCap, FAL_IMAGE, MODEL_LOOKUP, REFERENCE_MEDIA_CAPS, resolveWorkflowModel, WORKFLOW_KIND_ACCEPTS } from "@neore/ai/models";
 import { getFollowupSuggestionsPrompt, getThreadTitlePrompt } from "@neore/ai/prompts";
 import { buildCinemaPrompt } from "@neore/ai/prompts/cinema";
+import { markAiGeneratedImage, sniffImageMediaType, withPngOutput } from "@neore/ai/provenance";
 import {
     buildIteratePrompt,
     buildSystemOptimizerPrompt,
@@ -338,6 +339,39 @@ const bytesToBlob = (imageData: Uint8Array, mimeType: string): Blob => {
     new Uint8Array(buffer).set(imageData);
 
     return new Blob([buffer], { type: mimeType });
+};
+
+/**
+ * Stores an AI-generated still: marks it (Art. 50(2)), stores it, and queues the
+ * NSFW check. Every generated image goes through here, so no path can skip the
+ * marker or the check. Edits of a user's own photo are included: that is the
+ * path that can turn a real person into an explicit image.
+ */
+const storeGeneratedImage = async (
+    context: ActionContext,
+    bytes: Uint8Array,
+    mimeType: string,
+    scope: { threadId?: string; userId?: string },
+): Promise<Awaited<ReturnType<typeof storeFile>> & { mediaType: string }> => {
+    // The bytes say what they are; the declared type can be a CDN's generic octet-stream,
+    // which the NSFW check would skip as "not an image".
+    const mediaType = sniffImageMediaType(bytes) ?? (mimeType.startsWith("image/") ? mimeType : "image/png");
+    const stored = await storeFile(context, new Blob([markAiGeneratedImage(bytes)], { type: mediaType }), scope);
+    const fileId = stored.file.fileId as Id<"chatFiles">;
+
+    try {
+        await context.scheduler.runAfter(0, internal.agent.nsfw_check.checkImageNsfwForChatFile, {
+            fileId,
+            mediaType,
+            storageId: String(stored.file.storageId),
+        });
+    } catch (error) {
+        // Fail closed: a stored image whose check never queued must not show as cleared.
+        console.error(`[image] NSFW check could not be scheduled for chat file ${fileId}:`, error);
+        await context.runMutation(internal.agent.files.markNsfwFailed, { fileId });
+    }
+
+    return { ...stored, mediaType };
 };
 
 /**
@@ -4081,7 +4115,12 @@ export const generateImage = internalAction
                         ...(size ? { size } : { aspectRatio }),
                         n: numberImages,
                         ...(seed !== undefined && { seed }),
-                        ...(Object.keys(providerOptions).length > 0 && providerName && { providerOptions: { [providerName]: providerOptions } }),
+                        // PNG where the provider takes a format: the marker cannot mark WebP (Art. 50(2)).
+                        providerOptions: withPngOutput(
+                            Object.keys(providerOptions).length > 0 ? { [providerName]: providerOptions } : {},
+                            modelDefinition.provider,
+                            modelDefinition.modelApiId,
+                        ),
                     });
 
                     images = result.images || [];
@@ -4096,23 +4135,14 @@ export const generateImage = internalAction
                 // Store all generated images
                 const storedImages = await Promise.all(
                     images.map(async (image) => {
-                        const mimeType = image.mimeType || "image/png";
-                        const blob = bytesToBlob(image.uint8Array, mimeType);
-                        const { file, filePart } = await storeFile(context, blob, { threadId, userId });
+                        const { file, filePart, mediaType } = await storeGeneratedImage(context, image.uint8Array, image.mimeType || "image/png", {
+                            threadId,
+                            userId,
+                        });
 
-                        return { file, filePart, mimeType };
+                        // The type the stored bytes actually have, not the provider's declaration.
+                        return { file, filePart, mimeType: mediaType };
                     }),
-                );
-
-                // Schedule NSFW checks for all generated images
-                await Promise.all(
-                    storedImages.map(({ file, mimeType }) =>
-                        context.scheduler.runAfter(0, internal.agent.nsfw_check.checkImageNsfwForChatFile, {
-                            fileId: file.fileId as Id<"chatFiles">,
-                            mediaType: mimeType,
-                            storageId: String(file.storageId),
-                        }),
-                    ),
                 );
 
                 // Serialize warnings to the format expected by the validator
@@ -4968,13 +4998,15 @@ export const generateImg2Img = internalAction
         const [generatedImage] = result.images;
         const imageResponse = await fetchWithDeadline(generatedImage!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = generatedImage!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: modelId,
         };
     });
@@ -5051,13 +5083,15 @@ export const generateUpscale = internalAction
         // Store the upscaled image
         const imageResponse = await fetchWithDeadline(result.image.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = result.image.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: modelId,
             scale: requestedScale,
         };
@@ -5118,13 +5152,15 @@ export const generateInpaint = internalAction
         const [imageSource] = result.images;
         const imageResponse = await fetchWithDeadline(imageSource!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = imageSource!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: modelId,
         };
     });
@@ -5232,13 +5268,15 @@ export const generateCharacterRef = internalAction
         const [generatedImage] = result.images;
         const imageResponse = await fetchWithDeadline(generatedImage!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = generatedImage!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             mode,
             model: modelId,
         };
@@ -5347,13 +5385,15 @@ export const generateStyleRef = internalAction
         const [generatedImage] = result.images;
         const imageResponse = await fetchWithDeadline(generatedImage!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = generatedImage!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: modelId,
         };
     });
@@ -5450,13 +5490,15 @@ export const generateParallelCompare = internalAction
                 const [imageSource] = result.images;
                 const imageResponse = await fetchWithDeadline(imageSource!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
                 const imageBlob = await imageResponse.blob();
-                const mimeType = imageSource!.content_type ?? "image/png";
 
-                const { file } = await storeFile(context, imageBlob, { threadId, userId });
+                const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+                    threadId,
+                    userId,
+                });
 
                 return {
                     imageUrl: file.url,
-                    mimeType,
+                    mimeType: mediaType,
                     modelId,
                     modelName: modelDefinition.name ?? modelId,
                     success: true,
@@ -5584,13 +5626,15 @@ export const generateOutpaint = internalAction
         const [imageSource] = result.images;
         const imageResponse = await fetchWithDeadline(imageSource!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = imageSource!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: endpoint,
         };
     });
@@ -5648,13 +5692,15 @@ export const generateBackgroundRemoval = internalAction
 
         const imageResponse = await fetchWithDeadline(result.image.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = result.image.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: endpoint,
         };
     });
@@ -5723,15 +5769,17 @@ export const generateObjectEdit = internalAction
             throw new LunoraError("BAD_REQUEST", "No result from object editing");
         }
 
-        const contentType = result.image?.content_type ?? result.images?.[0]?.content_type ?? "image/png";
         const imageResponse = await fetchWithDeadline(outputUrl, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             imageUrl: file.url,
-            mimeType: contentType,
+            mimeType: mediaType,
             model: endpoint,
         };
     });
@@ -5888,14 +5936,16 @@ export const generateControlNet = internalAction
         const [imageSource] = result.images;
         const imageResponse = await fetchWithDeadline(imageSource!.url, { timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const imageBlob = await imageResponse.blob();
-        const mimeType = imageSource!.content_type ?? "image/png";
 
-        const { file } = await storeFile(context, imageBlob, { threadId, userId });
+        const { file, mediaType } = await storeGeneratedImage(context, new Uint8Array(await imageBlob.arrayBuffer()), imageBlob.type || "image/png", {
+            threadId,
+            userId,
+        });
 
         return {
             controlType,
             imageUrl: file.url,
-            mimeType,
+            mimeType: mediaType,
             model: endpoint,
         };
     });

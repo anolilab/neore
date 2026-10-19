@@ -57,6 +57,10 @@
         "./utils": {
             "types": "./dist/utils/index.d.ts",
             "default": "./dist/utils/index.js"
+        },
+        "./provenance": {
+            "types": "./dist/provenance/index.d.ts",
+            "default": "./dist/provenance/index.js"
         }
     },
     "files": [

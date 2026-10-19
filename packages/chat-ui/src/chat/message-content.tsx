@@ -333,6 +333,14 @@ const FileLoadingFallback: FC<{ name?: string }> = memo(({ name }) => {
 
 FileLoadingFallback.displayName = "FileLoadingFallback";
 
+const AiGeneratedLabel: FC = memo(() => {
+    const { t } = useLingui();
+
+    return <span className="text-muted-foreground block text-xs">{t`AI-generated`}</span>;
+});
+
+AiGeneratedLabel.displayName = "AiGeneratedLabel";
+
 /**
  * Placeholder shown when an image is blocked by the NSFW classifier
  * or is still being checked.
@@ -796,6 +804,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                     );
                 }
 
+                // Art. 50(4): assistant output is labelled where it is shown, not only on hover.
+                if (message.role === "assistant" && fileUrl) {
+                    renderedParts.push(<AiGeneratedLabel key={`${key}-ai-label`} />);
+                }
+
                 break;
             }
 
@@ -803,6 +816,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                 const imagePart = part as unknown as ImagePart;
 
                 renderedParts.push(<Image key={key} part={generationPrompt ? { ...imagePart, prompt: generationPrompt } : imagePart} />);
+
+                if (message.role === "assistant") {
+                    renderedParts.push(<AiGeneratedLabel key={`${key}-ai-label`} />);
+                }
+
                 break;
             }
 

@@ -37,8 +37,9 @@ export const MAX_PUBLIC_THREAD_ROWS = 200;
 /** Placeholder texts the streaming path writes while media is generating. */
 const GENERATION_MARKERS = new Set(["__AUDIO_GENERATING__", "__IMAGE_GENERATING__", "__VIDEO_GENERATING__"]);
 
+// "failed" is uncleared too: a check that errored or never ran must not pass a file into a public share.
 /** NSFW states under which a file must not be shown to an anonymous viewer. */
-const UNCLEARED_NSFW_STATUSES = new Set(["blocked", "checking", "pending"]);
+const UNCLEARED_NSFW_STATUSES = new Set(["blocked", "checking", "failed", "pending"]);
 
 const SAFE_URL_PROTOCOLS = new Set(["http:", "https:"]);
 

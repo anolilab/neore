@@ -29,6 +29,7 @@ import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import type { Delivery } from "./lib/platform-media";
 import { requireKey } from "./lib/platform-media";
+import { AI_DISCLOSURE } from "./lib/pairing";
 import type { ReplyToolPlan } from "./lib/reply-tools";
 import { chooseReplyModel, MESSENGER_TEXT_REPLY_MAX_STEPS, MESSENGER_TOOL_REPLY_MAX_STEPS, MESSENGER_TOOL_SYSTEM, planReplyTools } from "./lib/reply-tools";
 import { ingestAttachments, sendReplyMedia } from "./media";
@@ -204,6 +205,35 @@ const generateReply = async (ctx: ActionCtx, threadId: Id<"threads">, userId: st
     return { replyTools, text: result.text || "I couldn't generate a response. Please try again." };
 };
 
+type SendOutcome = Awaited<ReturnType<typeof sendPlatformMessage>>;
+
+/**
+ * Art. 50(1): the chat's first delivered reply says it comes from an AI. The
+ * disclosure is recorded only once a reply carrying it was sent, so a refused,
+ * failed or crashed send leaves the chat due for the next reply. Two replies
+ * racing past the check may both carry it; that repeats a notice, never drops one.
+ */
+const sendWithAiDisclosure = async (
+    ctx: ActionCtx,
+    delivery: Delivery,
+    messengerKeys: Record<string, string>,
+    options: { text: string; threadId: Id<"threads">; userId: string },
+): Promise<SendOutcome> => {
+    const disclosed = await ctx.runQuery(internal.messenger.functions.aiDisclosureSent, { threadId: options.threadId });
+    const outcome = await sendPlatformMessage(delivery, disclosed ? options.text : `${AI_DISCLOSURE}\n\n${options.text}`, messengerKeys);
+
+    if (!disclosed && outcome === "sent") {
+        // The reply is delivered already: a failure here must not turn it into an error reply.
+        try {
+            await ctx.runMutation(internal.messenger.functions.markAiDisclosed, { threadId: options.threadId, userId: options.userId });
+        } catch (error) {
+            console.error("[Messenger] Failed to record the AI disclosure; the next reply will carry it again", error);
+        }
+    }
+
+    return outcome;
+};
+
 /**
  * Upload the files a tool reply produced. A tool run can outlast the window it
  * started in, so the window is checked again before any upload; the platform
@@ -275,7 +305,7 @@ export const respondToInbound = async (ctx: ActionCtx, args: RespondArgs): Promi
         }
 
         // Send response back to the platform using per-user BYOK tokens
-        let outcome = await sendPlatformMessage(delivery, responseText, messengerKeys);
+        let outcome = await sendWithAiDisclosure(ctx, delivery, messengerKeys, { text: responseText, threadId, userId });
 
         // Only a reply with tools can have produced files.
         if (outcome === "sent" && replyTools) {
@@ -296,7 +326,7 @@ export const respondToInbound = async (ctx: ActionCtx, args: RespondArgs): Promi
                 userId,
             });
 
-            await sendPlatformMessage(delivery, errorMessage, messengerKeys);
+            await sendWithAiDisclosure(ctx, delivery, messengerKeys, { text: errorMessage, threadId, userId });
         } catch {
             // If we can't even send the error message, just log it
             console.error(`[Messenger] Failed to send error message to ${platform}`);
@@ -356,9 +386,10 @@ const sendPlatformMessage = async (delivery: Delivery, text: string, messengerKe
 
     switch (platform) {
         case "discord": {
-            await sendDiscordMessage(requireKey(messengerKeys, "discord_bot_token", "Discord bot token"), chatId, text);
+            const delivered = await sendDiscordMessage(requireKey(messengerKeys, "discord_bot_token", "Discord bot token"), chatId, text);
 
-            return "sent";
+            // A tool reply with no text still ships its files, so an empty send is not a refusal.
+            return delivered || text.trim() === "" ? "sent" : "not_sent";
         }
         case "feishu": {
             await sendFeishuMessage(
@@ -379,9 +410,9 @@ const sendPlatformMessage = async (delivery: Delivery, text: string, messengerKe
             return "sent";
         }
         case "slack": {
-            await sendSlackMessage(requireKey(messengerKeys, "slack_bot_token", "Slack bot token"), chatId, text, delivery.platformThreadTs);
+            const delivered = await sendSlackMessage(requireKey(messengerKeys, "slack_bot_token", "Slack bot token"), chatId, text, delivery.platformThreadTs);
 
-            return "sent";
+            return delivered || text.trim() === "" ? "sent" : "not_sent";
         }
         case "teams": {
             if (!delivery.serviceUrl || !delivery.replyToId) {
