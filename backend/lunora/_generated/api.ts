@@ -281,6 +281,9 @@ export interface ApiTypes {
                 updatePinSelectedText: FunctionReference<"mutation", { pinId: string; selectedText: string }, void>;
             };
         };
+        prompt_outline: {
+            getThreadPromptOutline: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { items: Array<{ id: string; text: string }>; truncated: boolean }>;
+        };
         resume: {
             latestResumableThread: FunctionReference<"query", { organizationId: string | null; teamId?: string }, string | null>;
         };
@@ -1034,6 +1037,9 @@ export const api: ApiTypes = {
                 updatePinNote: { __lunoraRef: "chat_pins_functions:updatePinNote" },
                 updatePinSelectedText: { __lunoraRef: "chat_pins_functions:updatePinSelectedText" },
             },
+        },
+        prompt_outline: {
+            getThreadPromptOutline: { __lunoraRef: "chat_prompt_outline:getThreadPromptOutline" },
         },
         resume: {
             latestResumableThread: { __lunoraRef: "chat_resume:latestResumableThread" },

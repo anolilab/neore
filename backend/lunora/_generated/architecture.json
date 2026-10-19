@@ -9777,6 +9777,13 @@
     },
     {
       "detail": "query",
+      "id": "function:chat_prompt_outline:getThreadPromptOutline",
+      "kind": "function",
+      "name": "chat.prompt_outline.getThreadPromptOutline",
+      "module": "chat"
+    },
+    {
+      "detail": "query",
       "id": "function:chat_resume:latestResumableThread",
       "kind": "function",
       "name": "chat.resume.latestResumableThread",

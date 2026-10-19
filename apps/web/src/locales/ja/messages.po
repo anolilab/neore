@@ -3332,7 +3332,7 @@ msgstr "添付ファイル"
 msgid "Attachment (hidden)"
 msgstr "添付ファイル（非表示）"
 
-#: src/features/chat/thread/thread-minimap.tsx:42
+#: src/features/chat/thread/thread-minimap.tsx:55
 msgid "Attachment only"
 msgstr ""
 
@@ -15016,7 +15016,7 @@ msgstr "ジャッジスコア"
 msgid "Judge: {0}"
 msgstr "ジャッジ：{0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:50
+#: src/features/chat/thread/thread-minimap.tsx:63
 msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr ""
 
@@ -21591,7 +21591,7 @@ msgstr "プロンプト変数"
 msgid "Prompts"
 msgstr "プロンプト"
 
-#: src/features/chat/thread/thread-minimap.tsx:37
+#: src/features/chat/thread/thread-minimap.tsx:50
 msgid "Prompts in this conversation"
 msgstr ""
 

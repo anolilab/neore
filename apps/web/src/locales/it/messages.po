@@ -3332,7 +3332,7 @@ msgstr "Allegato"
 msgid "Attachment (hidden)"
 msgstr "Allegato (nascosto)"
 
-#: src/features/chat/thread/thread-minimap.tsx:42
+#: src/features/chat/thread/thread-minimap.tsx:55
 msgid "Attachment only"
 msgstr ""
 
@@ -15016,7 +15016,7 @@ msgstr "Punteggio del giudice"
 msgid "Judge: {0}"
 msgstr "Giudice: {0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:50
+#: src/features/chat/thread/thread-minimap.tsx:63
 msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr ""
 
@@ -21591,7 +21591,7 @@ msgstr "Variabili del prompt"
 msgid "Prompts"
 msgstr "Prompt"
 
-#: src/features/chat/thread/thread-minimap.tsx:37
+#: src/features/chat/thread/thread-minimap.tsx:50
 msgid "Prompts in this conversation"
 msgstr ""
 

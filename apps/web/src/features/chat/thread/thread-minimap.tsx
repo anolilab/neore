@@ -7,15 +7,18 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
 import { useMemo } from "react";
 
 import { useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import { scrollToMessage } from "./message-list";
-import { buildMinimapItems, shouldShowMinimap } from "./minimap-items";
+import { buildMinimapItems, mergeOutline, shouldShowMinimap } from "./minimap-items";
 
 interface ThreadMinimapProps {
     className?: string;
@@ -23,10 +26,20 @@ interface ThreadMinimapProps {
 
 const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
     const { t } = useLingui();
-    const { messages } = useChatMessages();
+    const { messages, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
+    const crpc = useCRPC();
 
-    const items = useMemo(() => buildMinimapItems(messages), [messages]);
+    // Only a chat with older pages still to load needs the server outline; a fully loaded one already has every prompt.
+    // One read per chat (not live: a live query would re-run on every streamed write), and merged with what is loaded.
+    const hasUnloadedHistory = messagesStatus === "CanLoadMore" || messagesStatus === "LoadingMore";
+    const { data: outline } = useQuery(
+        crpc.chat.prompt_outline.getThreadPromptOutline.queryOptions(hasUnloadedHistory && threadId ? { threadId: threadId as Id<"threads"> } : skipToken, {
+            live: false,
+        }),
+    );
+
+    const items = useMemo(() => mergeOutline(outline?.items, buildMinimapItems(messages)), [outline, messages]);
 
     if (!shouldShowMinimap(items)) {
         return null;

@@ -3332,7 +3332,7 @@ msgstr "Załącznik"
 msgid "Attachment (hidden)"
 msgstr "Załącznik (ukryty)"
 
-#: src/features/chat/thread/thread-minimap.tsx:42
+#: src/features/chat/thread/thread-minimap.tsx:55
 msgid "Attachment only"
 msgstr ""
 
@@ -15016,7 +15016,7 @@ msgstr "Ocena sędziego"
 msgid "Judge: {0}"
 msgstr "Sędzia: {0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:50
+#: src/features/chat/thread/thread-minimap.tsx:63
 msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr ""
 
@@ -21591,7 +21591,7 @@ msgstr "Zmienne promptu"
 msgid "Prompts"
 msgstr "Prompty"
 
-#: src/features/chat/thread/thread-minimap.tsx:37
+#: src/features/chat/thread/thread-minimap.tsx:50
 msgid "Prompts in this conversation"
 msgstr ""
 

@@ -342,6 +342,7 @@ for a schema table that is neither policed nor listed:
 | `chat_pins_functions.deletePin` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `chat_pins_functions.getThreadPins` | query | authQuery | threads | caller-scoped (ctx.user) | ok |
 | `chat_pins_functions.updatePinNote` | mutation | authMutation + RL | — | row.userId == caller | ok |
+| `chat_prompt_outline.getThreadPromptOutline` | query | liteAuthQuery | messages, threads | thread read access (`resolveThreadReadAccess`: owner or live grantee); a locked chat is refused without its proof; a public viewer without a grant gets an empty outline; bounded scan, reads text only | ok |
 | `chat_pins_functions.updatePinSelectedText` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `chat_sharing.acceptThreadInvite` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | accepted — the token is a bearer link; it is no longer visible to non-admins |
 | `chat_sharing.createThreadInvite` | mutation | authMutation + RL | threads | caller-scoped (ctx.user) | ok |

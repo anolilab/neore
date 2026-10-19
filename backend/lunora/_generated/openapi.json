@@ -17010,6 +17010,99 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#chat_prompt_outline:getThreadPromptOutline": {
+      "post": {
+        "description": "Invoke the `query` `chat_prompt_outline:getThreadPromptOutline` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_prompt_outline:getThreadPromptOutline",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_prompt_outline:getThreadPromptOutline",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "truncated"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: chat_prompt_outline:getThreadPromptOutline",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#chat_resume:latestResumableThread": {
       "post": {
         "description": "Invoke the `query` `chat_resume:latestResumableThread` over the Lunora RPC envelope (POST /_lunora/rpc).",

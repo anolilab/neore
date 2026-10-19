@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMinimapItems, MINIMAP_PREVIEW_CHARS, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
+import { buildMinimapItems, mergeOutline, MINIMAP_PREVIEW_CHARS, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
 
 describe("toMinimapPreview", () => {
     it("collapses whitespace and newlines to one line", () => {
@@ -56,5 +56,46 @@ describe("shouldShowMinimap", () => {
 
     it("shows from three prompts", () => {
         expect(shouldShowMinimap(prompts(3))).toBe(true);
+    });
+});
+
+describe("mergeOutline", () => {
+    const loaded = [
+        { id: "p4", preview: "fourth" },
+        { id: "p5", preview: "fifth" },
+    ];
+
+    it("lists the older prompts before the loaded ones, once each", () => {
+        const outline = [
+            { id: "p1", text: "first\nprompt" },
+            { id: "p2", text: "second" },
+            { id: "p3", text: "third" },
+            { id: "p4", text: "fourth" },
+        ];
+
+        expect(mergeOutline(outline, loaded).map((item) => item.id)).toStrictEqual(["p1", "p2", "p3", "p4", "p5"]);
+        expect(mergeOutline(outline, loaded)[0]?.preview).toBe("first prompt");
+    });
+
+    it("puts a prompt sent after the outline was read at the end", () => {
+        expect(mergeOutline([{ id: "p1", text: "first" }], [{ id: "p1", preview: "first" }, ...loaded]).map((item) => item.id)).toStrictEqual([
+            "p1",
+            "p4",
+            "p5",
+        ]);
+    });
+
+    it("falls back to the loaded prompts until the outline arrives, or when it is empty", () => {
+        expect(mergeOutline(undefined, loaded)).toStrictEqual(loaded);
+        expect(mergeOutline([], loaded)).toStrictEqual(loaded);
+    });
+
+    it("lets the outline make a short loaded window show the rail", () => {
+        const outline = Array.from({ length: 6 }, (_, index) => {
+            return { id: `o${index}`, text: `prompt ${index}` };
+        });
+
+        expect(shouldShowMinimap([{ id: "x", preview: "only one loaded" }])).toBe(false);
+        expect(shouldShowMinimap(mergeOutline(outline, [{ id: "x", preview: "only one loaded" }]))).toBe(true);
     });
 });
