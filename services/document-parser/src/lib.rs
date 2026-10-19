@@ -224,12 +224,19 @@ async fn read_capped(req: &mut Request, max: usize, capacity: usize) -> Result<O
 }
 
 async fn handle_extract(mut req: Request) -> Result<Response> {
-    let format = req
+    let formats: Vec<String> = req
         .url()?
         .query_pairs()
-        .find(|(key, _)| key == "format")
-        .map(|(_, value)| value.into_owned());
-    let Some(format) = parse_format(format.as_deref()) else {
+        .filter(|(key, _)| key == "format")
+        .map(|(_, value)| value.into_owned())
+        .collect();
+    // A repeated `format` is ambiguous, so it is refused whatever the order.
+    let format = match formats.as_slice() {
+        [] => parse_format(None),
+        [only] => parse_format(Some(only)),
+        _ => None,
+    };
+    let Some(format) = format else {
         return error(
             400,
             "Unknown format",

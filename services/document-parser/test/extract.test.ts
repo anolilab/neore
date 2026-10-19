@@ -175,6 +175,18 @@ describe("document-parser Worker", () => {
         await expect(response.json()).resolves.toMatchObject({ error: "Unknown format" });
     });
 
+    it("refuses a repeated format whatever the order", async () => {
+        for (const query of ["format=markdown&format=html", "format=html&format=markdown", "format=markdown&format=markdown"]) {
+            const response = await server.fetch(`https://document-parser.internal/extract?${query}`, {
+                body: fixture("sample.pdf"),
+                headers: { "content-type": "application/pdf" },
+                method: "POST",
+            });
+
+            expect(response.status).toBe(400);
+        }
+    });
+
     it("extracts an XLSX with its table", async () => {
         const response = await extract(fixture("sample.xlsx"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         const body = (await response.json()) as ExtractBody;
