@@ -21,12 +21,12 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
+import { isLockedWithoutProof } from "../agent/thread-passcode";
 import { requireOwnedThread, requireThreadPermission } from "../agent/thread-read-access";
 import { getMemberByOrganizationAndUser, getMembersByUserId } from "../auth/lib/better-auth-queries";
 import { callOnShard } from "../lib/cross-shard";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
-import { isThreadLocked } from "../lib/thread-lock";
 import { DELETING_STATUS } from "./file-removal";
 import { canReadCollection, planRetrievalScope } from "./scope";
 import { MAX_LENGTH } from "../lib/validators";
@@ -572,7 +572,13 @@ export const listCollectionFiles = authAction
  * owner's shard.
  */
 export const resolveRetrievalScope = internalQuery
-    .input({ threadId: v.id("threads"), userId: v.string() })
+    .input({
+        /** Set only by an already-admitted run (`admittedRun`) or a caller that holds a proof. */
+        admittedRun: v.optional(v.boolean()),
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        userId: v.string(),
+    })
     .output(
         v.object({
             fileIds: v.array(v.string()),
@@ -580,12 +586,13 @@ export const resolveRetrievalScope = internalQuery
             hasExplicitScope: v.boolean(),
         }),
     )
-    .query(async ({ args: { threadId, userId }, ctx }) => {
+    .query(async ({ args: { admittedRun, threadId, unlockProof, userId }, ctx }) => {
         const thread = await ctx.db.get(threadId);
 
-        // A locked chat's attachments are its content: the search falls back to
-        // nothing (an explicit, empty scope), not to the whole knowledge base.
-        if (thread && isThreadLocked(thread)) {
+        // A locked chat's attachments are its content. Without a proof, or an
+        // admitted run, the search gets an explicit, empty scope rather than the
+        // whole knowledge base. With either, the chat's own scope applies.
+        if (thread && !admittedRun && (await isLockedWithoutProof(ctx, threadId, unlockProof))) {
             return { fileIds: [], foreign: [], hasExplicitScope: true };
         }
 

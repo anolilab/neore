@@ -14,8 +14,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
 
-import { listMessagesByThreadIdInternal } from "../agent/messages";
-import { listThreadsByUserIdInternal } from "../agent/threads";
+import { listMessagesByThreadIdAdmitted } from "../agent/messages";
+import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
 import schema from "../schema";
 import { collectConversations, collectThreadTags } from "./steps";
 
@@ -34,7 +34,7 @@ const MESSAGES_PER_THREAD = 12;
 
 describe("collectConversations", () => {
     it("exports all messages of all the user's threads, and nobody else's", async () => {
-        registry.set("agent_messages:listMessagesByThreadIdInternal", listMessagesByThreadIdInternal);
+        registry.set("agent_messages:listMessagesByThreadIdAdmitted", listMessagesByThreadIdAdmitted);
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
 
@@ -104,7 +104,7 @@ describe("collectConversations", () => {
         }
     });
     it("exports each message's parent and each thread's active leaf, so a re-import can keep the active branch", async () => {
-        registry.set("agent_messages:listMessagesByThreadIdInternal", listMessagesByThreadIdInternal);
+        registry.set("agent_messages:listMessagesByThreadIdAdmitted", listMessagesByThreadIdAdmitted);
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
 
@@ -192,6 +192,80 @@ describe("collectConversations", () => {
             expect(plain?.thread._id).toBe(ids.plain);
             expect(plain?.thread.activeLeafMessageId).toBeUndefined();
             expect(plain?.messages.every((message) => message.parentMessageId === undefined)).toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+/**
+ * A locked chat is the owner's own data-access right: the export carries its
+ * title and every message, while the list stays a stub for clients. The lock
+ * protects against someone using an already-signed-in browser, not against the
+ * owner's export (plan note, GDPR open question 5). The export is only ever
+ * built for the user the workflow names, so another user's locked chat stays out.
+ */
+describe("collectConversations: a locked chat", () => {
+    const LOCKED_TITLE = "Secret plan";
+
+    const registerReaders = () => {
+        registry.set("agent_messages:listMessagesByThreadIdAdmitted", listMessagesByThreadIdAdmitted);
+        registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
+        registry.set("agent_threads:getThreadInternal", getThreadInternal);
+        registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
+    };
+
+    it("exports the owner's locked chat with its title and every message", async () => {
+        registerReaders();
+
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const threadId = await context.db.insert("threads", { lockedAt: 1_700_000_000_000, status: "active", title: LOCKED_TITLE, userId: "user-1" });
+
+                for (let m = 0; m < 3; m += 1) {
+                    await context.db.insert("messages", {
+                        message: { content: `secret-${String(m)}`, role: "user" },
+                        order: m,
+                        status: "success",
+                        stepOrder: 0,
+                        text: `secret-${String(m)}`,
+                        threadId,
+                        tool: false,
+                        userId: "user-1",
+                    });
+                }
+            });
+
+            const conversations = (await harness.action(async (context: any) => await context.runAction(collectConversations, { userId: "user-1" }))) as {
+                messages: { text?: string }[];
+                thread: { title?: string };
+            }[];
+            const locked = conversations.find((conversation) => conversation.thread.title === LOCKED_TITLE);
+
+            expect(locked?.messages.map((message) => message.text)).toEqual(["secret-0", "secret-1", "secret-2"]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("does not export a locked chat to another user", async () => {
+        registerReaders();
+
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("threads", { lockedAt: 1_700_000_000_000, status: "active", title: LOCKED_TITLE, userId: "user-1" });
+                await context.db.insert("threads", { status: "active", title: "Mine", userId: "user-2" });
+            });
+
+            const conversations = (await harness.action(async (context: any) => await context.runAction(collectConversations, { userId: "user-2" }))) as {
+                thread: { title?: string };
+            }[];
+
+            expect(conversations.map((conversation) => conversation.thread.title)).toEqual(["Mine"]);
         } finally {
             harness.close();
         }

@@ -9,7 +9,6 @@ import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { Globe, RotateCcw, Shield, X } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
@@ -17,8 +16,14 @@ import { toast } from "sonner";
 
 import { getCreatorDisplayName } from "@/components/model-picker/utilities";
 import type { ModelFilterRules } from "@/hooks/use-model-filter-rules";
-import { useBlockedCreators, withoutCreator } from "@/hooks/use-model-filter-rules";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useBlockedCreators, useUpdateModelFilterRules, withoutCreator } from "@/hooks/use-model-filter-rules";
+
+/** The list with `value` removed when present, added when not. */
+const toggled = (list: ReadonlyArray<string> | undefined, value: string) => {
+    const current = list ?? [];
+
+    return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+};
 
 const REGIONS = [
     { code: "US", description: msg`Models hosted in US data centers`, label: msg`United States` },
@@ -36,13 +41,11 @@ const PROVIDERS = [
 
 const ModelFilterSettings: FC = () => {
     const { i18n, t } = useLingui();
-    const crpc = useCRPC();
-    const { data: aiPreferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
-    const updateMutation = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
+    const { rules: storedRules, updateRules: saveRules } = useUpdateModelFilterRules();
 
     const [modelInput, setModelInput] = useState("");
 
-    const rules: ModelFilterRules = (aiPreferences?.modelFilterRules as ModelFilterRules) ?? {};
+    const rules: ModelFilterRules = storedRules ?? {};
     const { blockedCreators, isPending: blockedCreatorsPending, setBlockedCreators } = useBlockedCreators();
 
     const restoreCreator = async (slug: string) => {
@@ -54,34 +57,10 @@ const ModelFilterSettings: FC = () => {
         }
     };
 
-    const updateRules = async (newRules: ModelFilterRules) => {
+    // Each edit is applied to the newest saved rules, so a lab hidden in the picker a moment ago is not lost.
+    const updateRules = async (update: (current: ModelFilterRules) => ModelFilterRules) => {
         try {
-            // Clean up empty arrays before saving
-            const cleaned: ModelFilterRules = {};
-
-            if (newRules.allowedRegions && newRules.allowedRegions.length > 0) cleaned.allowedRegions = newRules.allowedRegions;
-
-            if (newRules.blockedRegions && newRules.blockedRegions.length > 0) cleaned.blockedRegions = newRules.blockedRegions;
-
-            if (newRules.allowedModels && newRules.allowedModels.length > 0) cleaned.allowedModels = newRules.allowedModels;
-
-            if (newRules.blockedModels && newRules.blockedModels.length > 0) cleaned.blockedModels = newRules.blockedModels;
-
-            if (newRules.blockedCreators && newRules.blockedCreators.length > 0) cleaned.blockedCreators = newRules.blockedCreators;
-
-            if (newRules.allowedProviders && newRules.allowedProviders.length > 0) cleaned.allowedProviders = newRules.allowedProviders;
-
-            if (newRules.blockedProviders && newRules.blockedProviders.length > 0) cleaned.blockedProviders = newRules.blockedProviders;
-
-            if (newRules.requireZDR) cleaned.requireZDR = true;
-
-            if (newRules.denyDataCollection) cleaned.denyDataCollection = true;
-
-            const hasRules = Object.keys(cleaned).length > 0;
-
-            await updateMutation.mutateAsync({
-                modelFilterRules: hasRules ? cleaned : undefined,
-            });
+            await saveRules(update);
 
             toast.success(t`Filter rules updated`);
         } catch {
@@ -90,17 +69,15 @@ const ModelFilterSettings: FC = () => {
     };
 
     const toggleRegion = (regionCode: string, listType: "allowedRegions" | "blockedRegions") => {
-        const current = rules[listType] ?? [];
-        const updated = current.includes(regionCode) ? current.filter((r) => r !== regionCode) : [...current, regionCode];
-
-        updateRules({ ...rules, [listType]: updated });
+        updateRules((current) => {
+            return { ...current, [listType]: toggled(current[listType], regionCode) };
+        });
     };
 
     const toggleProvider = (providerId: string, listType: "allowedProviders" | "blockedProviders") => {
-        const current = rules[listType] ?? [];
-        const updated = current.includes(providerId) ? current.filter((p) => p !== providerId) : [...current, providerId];
-
-        updateRules({ ...rules, [listType]: updated });
+        updateRules((current) => {
+            return { ...current, [listType]: toggled(current[listType], providerId) };
+        });
     };
 
     const addBlockedModel = () => {
@@ -108,27 +85,29 @@ const ModelFilterSettings: FC = () => {
 
         if (!modelId) return;
 
-        const current = rules.blockedModels ?? [];
-
-        if (current.includes(modelId)) {
+        if (rules.blockedModels?.includes(modelId)) {
             toast.error(t`Model already blocked`);
 
             return;
         }
 
-        updateRules({ ...rules, blockedModels: [...current, modelId] });
+        updateRules((current) => {
+            return { ...current, blockedModels: [...(current.blockedModels ?? []).filter((m) => m !== modelId), modelId] };
+        });
         setModelInput("");
     };
 
     const removeBlockedModel = (modelId: string) => {
-        const current = rules.blockedModels ?? [];
-
-        updateRules({ ...rules, blockedModels: current.filter((m) => m !== modelId) });
+        updateRules((current) => {
+            return { ...current, blockedModels: (current.blockedModels ?? []).filter((m) => m !== modelId) };
+        });
     };
 
     const resetAll = async () => {
         try {
-            await updateMutation.mutateAsync({ modelFilterRules: undefined });
+            await saveRules(() => {
+                return {};
+            });
             toast.success(t`All filter rules cleared`);
         } catch {
             toast.error(t`Failed to clear filter rules`);
@@ -396,7 +375,11 @@ const ModelFilterSettings: FC = () => {
                         <Switch
                             aria-label={t`Zero Data Retention (ZDR)`}
                             checked={rules.requireZDR ?? false}
-                            onCheckedChange={(checked) => updateRules({ ...rules, requireZDR: checked || undefined })}
+                            onCheckedChange={(checked) =>
+                                updateRules((current) => {
+                                    return { ...current, requireZDR: checked || undefined };
+                                })
+                            }
                         />
                     </div>
 
@@ -410,7 +393,11 @@ const ModelFilterSettings: FC = () => {
                         <Switch
                             aria-label={t`Deny Data Collection`}
                             checked={rules.denyDataCollection ?? false}
-                            onCheckedChange={(checked) => updateRules({ ...rules, denyDataCollection: checked || undefined })}
+                            onCheckedChange={(checked) =>
+                                updateRules((current) => {
+                                    return { ...current, denyDataCollection: checked || undefined };
+                                })
+                            }
                         />
                     </div>
                 </CardContent>

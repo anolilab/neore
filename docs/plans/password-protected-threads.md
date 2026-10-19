@@ -201,8 +201,11 @@ public API and GDPR export.
 3. **Collaborators.** Does a grantee need the passcode, or is a locked thread
    simply not shareable?
 4. **Forks.** Does a fork of a locked thread inherit the lock?
-5. **GDPR export.** The owner's export includes locked content. Require an
-   unlock at request time, or always include it? Erasure must still work.
+5. **GDPR export.** Decided: **included**. The owner's export carries a locked
+   chat's title and every message, with no proof, because the export is the
+   owner's own data-access right and is authenticated and rate-limited. The lock
+   protects against a signed-in browser, not against that right. Erasure still
+   deletes them (`gdpr/steps.ts`, `gdpr/collect-conversations.test.ts`).
 6. **Group chats.** One passcode per thread, or per participant?
 7. **Server secret.** Which secret signs the proof, and how is it rotated?
 8. **Live-query expiry.** Client-side drop plus a re-lock bump, or a shorter
@@ -262,10 +265,18 @@ public API and GDPR export.
 | Skill draft writes | refused as not found | code only |
 | Lock management (enable, unlock, lock now, change, remove) | owner only; failures counted on the row; lockout after 5 failures, reset on success | `agent/thread-lock.test.ts` (attempt accounting, backoff curve, edit refused without proof) |
 | Trash, delete, restore | not gated (the recovery path), passcode row removed on permanent delete | none |
+| Tool-approval continuation locked after its stream started | refused after the claim, through `failRun` (stream closed, thread out of `running`) | `chat/execute.continuation-lock.test.ts` |
+| Attached files: a grant used on a chat other than a locked chat that holds the file | `getFileForUser` refuses a file on another locked chat of the caller's | `agent/files.locked-chat.test.ts` |
+| Knowledge scope of a locked chat's own files | `resolveRetrievalScope` takes `unlockProof` / `admittedRun` | `knowledge/retrieval-scope.lock.test.ts` |
+| GDPR export of a locked chat | `collectConversations` reads the full row and the admitted message reader | `gdpr/collect-conversations.test.ts` |
 
 ### Known gaps
 
-- **GDPR export** of a locked chat returns NO messages: the export reads through the guarded list (`gdpr/steps.ts`), which answers empty without the owner's proof. Erasure still deletes them. Open question 5 is not decided: the export should either carry the content under a fresh unlock, or say in the export that locked chats were left out.
+- **GDPR export** includes a locked chat's title and messages (open question 5, decided: included). `collectConversations` reads the full row (`getThreadInternal`) and the admitted message reader, and the list and every client read stay guarded. Erasure deletes them as before.
+- **Attachments of a locked chat** (`agent/files.ts#getFileForUser`): a grant alone no longer serves a file that sits on a locked chat of the caller's, in any chat other than that one with its proof. The check reads the caller's own passcode rows and scans each locked chat's messages (`fileIds`) page by page. A file never attached to a message (a stored file that the caller did not save into a message) is not seen by the check. Attaching a file that is also in a locked chat is refused in any other chat, unlocked ones included. A deleted source chat is not checked. **Shared chats are NOT covered:** `/chat/start` runs on the thread OWNER's shard (`chat/http.ts`, `threadShardFor`), where the collaborator's passcode rows do not exist, so a collaborator attaching a file from their own locked chat into the owner's shared chat is still served. Closing it needs the check run on the caller's shard from the HTTP action.
+- **Chat-file readers** `file.ts#getChatFileExtraction` and `file.ts#getChatFileImageUrl` take an optional `threadId` and `unlockProof` and gate through the same `fileGatedByLockedChat` as `getFileForUser`: a file on one of the caller's locked chats is refused unless the named chat's valid proof is sent. Test: `file.chat-readers.lock.test.ts`.
+  - **Web follow-up (not done):** the composer's extraction chip (`features/chat/thread/use-attachment-extraction.ts`) passes no `threadId`, so for a locked chat's file it reads `null` and shows no "reading" hint; sending still works through `/chat/start`. Passing the chat id there needs the chip to receive the thread (it sits below `useChatThread`'s provider boundary, which throws outside it). The workflow image callers (`features/workflow/hooks/use-workflow-transfer.ts`, `use-resolve-workflow-images.ts`, `backend/lunora/workflow/media-args.ts`) carry no chat id, so a workflow image that sits in a locked chat is refused there too.
+- **Knowledge search for a locked chat's own files.** `resolveRetrievalScope` and `knowledge.retrieve.search` accept `unlockProof` and `admittedRun` and search the chat's attachments when either holds. Neither caller passes them yet: the `knowledge_search` tool has no proof or admission in its context, and the run's context retrieval (`chat/lib/agent-run.ts`, `retrieveKnowledgeContext`) is not wired. Both stay empty for a locked chat, as before.
 - **Deck proof follows the viewer's chat.** `usePresentationData` takes the chat the viewer is on. A deck opened from another chat is refused until that chat is unlocked (fail closed), not opened by the wrong proof.
 - **Branch lock is two writes, not one.** `branchThread` is an action, so the lock copy (`inheritThreadPasscode`) runs as its own mutation right after the branch is created and before any message is copied. A failure drops the branch's passcode rows and the branch, and no content is copied first. The two steps are not one transaction.
 - **Admitted runs read only recent turns without a proof.** Their text and vector search still exclude the locked chat's own older rows (`agent/client/search.ts`), so generation context can be shorter than the chat's history.
@@ -276,7 +287,6 @@ public API and GDPR export.
 - **Document history** keeps the chat's title after a delete (`recordHistory` on `deleteThread`).
 - **Title, category, summary and followup jobs** skip locked chats in code; no test covers it.
 - **List, search, export and visibility procedures** are not tested through the procedure harness (`runQuery` cannot be dispatched there).
-- **`getFileForUser`** on the grant path without a `threadId` still returns file metadata.
 - **Vector search** filters after fetch, so a top-K result can come back short.
 - **Thread page cost** is one row and two statements higher per page (the lock lookup in `withoutLockedThreads`); the read-cost budget was raised to 37 with the reason in the test.
 - **Browser behaviour is unverified:** the lock menu, the unlock prompt, the locked row, the tab title and live-query expiry were not driven in a browser. The lingui catalogs are not extracted.

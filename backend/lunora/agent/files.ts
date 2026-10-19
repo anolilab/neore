@@ -8,7 +8,8 @@ import type { InferArgs } from "lunorash/server";
 import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery, type MutationCtx as MutationContext } from "../_generated/server";
+import { internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx } from "../_generated/server";
+import { isThreadLocked } from "../lib/thread-lock";
 import { checkThreadAccessBatchHandler } from "./threads";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { paginatedDocsOf } from "../lib/output-validators";
@@ -131,6 +132,69 @@ export async function addFileHandler(context: MutationContext, args: InferArgs<t
  */
 const THREAD_FILE_SCAN_LIMIT = 1000;
 
+/** Messages read per page when a locked chat is searched for a file. */
+const LOCKED_CHAT_SCAN_PAGE = 500;
+
+/** True when `fileId` is on any message of `threadId`, read through every page of the thread. */
+const threadHoldsFile = async (context: Pick<QueryCtx, "db">, threadId: Id<"threads">, fileId: Id<"chatFiles">): Promise<boolean> => {
+    let cursor: string | null = null;
+    let done = false;
+
+    while (!done) {
+        const result = await context.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .order("desc")
+            .paginate({ cursor, numItems: LOCKED_CHAT_SCAN_PAGE });
+
+        if (result.page.some((message) => message.fileIds?.includes(fileId))) {
+            return true;
+        }
+
+        cursor = result.continueCursor;
+        done = result.isDone;
+    }
+
+    return false;
+};
+
+/**
+ * True when `fileId` is GATED for this request: it sits on a locked chat of
+ * `userId` that the request does not open. A file in a locked chat is that
+ * chat's content, so a grant alone must not carry it into any other chat (a new
+ * one, an unlocked one) nor out through a reader that returns its bytes, text or
+ * URL. The request opens a locked chat only by naming it (`threadId`) WITH that
+ * chat's valid proof. The caller's own passcode rows name their locked chats
+ * (shard-local, owner-scoped), so no write path has to record a source.
+ *
+ * ponytail: scans every page of each locked chat on each call. Record the
+ * source thread on the grant if this shows up in profiles.
+ */
+export const fileGatedByLockedChat = async (
+    context: Pick<QueryCtx, "db">,
+    { fileId, threadId, unlockProof, userId }: { fileId: Id<"chatFiles">; threadId?: Id<"threads">; unlockProof?: string; userId: string },
+): Promise<boolean> => {
+    const passcodes = await context.db
+        .query("threadPasscodes")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .collect();
+
+    for (const { threadId: lockedId } of passcodes) {
+        // The chat the request names is opened by its own valid proof; any other locked chat is not.
+        if (lockedId === threadId && !(await isLockedWithoutProof(context, lockedId, unlockProof))) {
+            continue;
+        }
+
+        const thread = await context.db.get(lockedId);
+
+        if (thread && isThreadLocked(thread) && (await threadHoldsFile(context, lockedId, fileId))) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 /**
  * The file, if `userId` may attach it: they stored the bytes themselves
  * (a `chatFileAccess` grant), or it is already attached to a message in
@@ -193,6 +257,12 @@ export const getFileForUser = internalQuery
         const grant = await ctx.db.chatFileAccess.findFirst({ where: { fileId: args.fileId, userId: args.userId } });
 
         if (grant) {
+            // The grant proves the caller stored the bytes, not that they may read them here: a file
+            // in another locked chat of theirs is that chat's content, whatever chat it is attached to.
+            if (await fileGatedByLockedChat(ctx, { fileId: args.fileId, threadId: args.threadId, unlockProof: args.unlockProof, userId: args.userId })) {
+                return null;
+            }
+
             return file;
         }
 

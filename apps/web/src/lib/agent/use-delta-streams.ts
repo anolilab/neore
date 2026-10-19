@@ -6,6 +6,7 @@ import type { StreamArgs, StreamDelta, StreamMessage } from "@neore/backend/agen
 import { useState } from "react";
 
 import { shardOptionsFor } from "@/lib/lunora/shard-routing";
+import { withUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 import { assert } from "./type-utilities";
 import type { StreamQuery, StreamQueryArgs } from "./types";
@@ -66,7 +67,7 @@ const useDeltaStreams = <Query extends StreamQuery<any> = StreamQuery<object>>(
         query,
         args === "skip"
             ? args
-            : ({
+            : withUnlockProof({
                   ...args,
                   streamArgs: {
                       kind: "list",

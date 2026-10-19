@@ -1,8 +1,8 @@
 "use client";
 
 import type { GatewayModel } from "@neore/ai/models";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -117,51 +117,101 @@ export const withCreatorHidden = (blocked: ReadonlyArray<string>, slug: string):
 /** The hidden list with one lab removed; every other entry stays as it is. */
 export const withoutCreator = (blocked: ReadonlyArray<string>, slug: string): string[] => blocked.filter((s) => s !== slug);
 
+/** The list-valued rules. An empty list is dropped, so a saved object carries only the rules that are set. */
+const LIST_RULES = ["allowedModels", "allowedProviders", "allowedRegions", "blockedCreators", "blockedModels", "blockedProviders", "blockedRegions"] as const;
+
 /**
- * The labs hidden from the model picker, and an updater for them. The mutation
- * replaces the whole `modelFilterRules` object, so the other rules are carried
- * over. Shared by the picker's "Hide" action and the filters page.
- *
- * The updater is applied to the newest rules this hook knows, not to the
- * render's snapshot, so two edits in flight both survive.
+ * The rules as they are saved. Empty values are dropped and the result is always
+ * an object: `undefined` is no save at all (JSON drops the key, so the server's
+ * patch keeps the stored rules), so clearing the last rule must write `{}`.
  */
-export const useBlockedCreators = () => {
+const cleanRules = (rules: ModelFilterRules): ModelFilterRules => {
+    const cleaned: ModelFilterRules = {};
+
+    for (const key of LIST_RULES) {
+        const list = rules[key];
+
+        if (list && list.length > 0) {
+            cleaned[key] = list;
+        }
+    }
+
+    if (rules.requireZDR) cleaned.requireZDR = true;
+
+    if (rules.denyDataCollection) cleaned.denyDataCollection = true;
+
+    return cleaned;
+};
+
+/** The preferences as the query cache holds them. `undefined` until the first load. */
+type PreferencesCache = { modelFilterRules?: unknown } | null | undefined;
+
+/**
+ * The user's model filter rules, and the one way to save them. `updateRules`
+ * takes an updater and applies it to the NEWEST rules, not to the caller's
+ * render snapshot, so two edits in flight both survive.
+ *
+ * The newest rules are the query cache: a save writes its result there at once,
+ * and every caller (the picker's "Hide", the filters page) reads it when it
+ * saves. A failed save restores what it replaced, unless a later save has built
+ * on it since.
+ *
+ * ponytail: a live push or refetch that lands mid-save resets the cache to the server copy, which can lack that save. Serialise saves if that bites.
+ */
+export const useUpdateModelFilterRules = () => {
     const crpc = useCRPC();
-    const { data: aiPreferences, isSuccess: isLoaded } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
-    const rules = aiPreferences?.modelFilterRules as ModelFilterRules | undefined;
-    const updateMutation = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
-    const { mutateAsync } = updateMutation;
-    // ponytail: a refetch that lands mid-save resets this to the server copy, which can lack that save. Serialise saves if that bites.
-    const newest = useRef(rules);
-    const loaded = useRef(isLoaded);
+    const queryClient = useQueryClient();
+    const preferences = crpc.auth.functions.getAIUserPreferences.queryOptions({});
+    const { data, isSuccess: isLoaded } = useQuery(preferences);
+    const rules = data?.modelFilterRules as ModelFilterRules | undefined;
+    const { isPending, mutateAsync } = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
 
-    useEffect(() => {
-        newest.current = rules;
-        loaded.current = isLoaded;
-    }, [isLoaded, rules]);
+    // The key is built inside the callback: a fresh array each render would make `updateRules` change identity every render.
+    const updateRules = useCallback(
+        async (update: (current: ModelFilterRules) => ModelFilterRules) => {
+            const { queryKey } = crpc.auth.functions.getAIUserPreferences.queryOptions({});
+            const cached = queryClient.getQueryData<PreferencesCache>(queryKey);
 
-    const setBlockedCreators = useCallback(
-        async (update: (current: ReadonlyArray<string>) => string[]) => {
-            // Before the preferences load there are no rules to carry over, and saving would replace the user's other filters.
-            if (!loaded.current) {
+            // Before the preferences load there is nothing to build on, and saving would replace the user's other filters.
+            if (cached === undefined) {
                 throw new Error("The model filter rules have not loaded yet");
             }
 
-            const base = newest.current;
-            const next: ModelFilterRules = { ...base, blockedCreators: update(base?.blockedCreators ?? NO_BLOCKED_CREATORS) };
+            const previous = cached?.modelFilterRules;
+            const next = cleanRules(update((previous as ModelFilterRules | undefined) ?? {}));
+            const write = (value: unknown) => queryClient.setQueryData<PreferencesCache>(queryKey, (old) => (old ? { ...old, modelFilterRules: value } : old));
 
-            newest.current = next;
+            write(next);
 
             return mutateAsync({ modelFilterRules: next }).catch((error: unknown) => {
-                if (newest.current === next) {
-                    newest.current = base;
+                if (queryClient.getQueryData<PreferencesCache>(queryKey)?.modelFilterRules === next) {
+                    write(previous);
                 }
 
                 throw error;
             });
         },
-        [mutateAsync],
+        [crpc, mutateAsync, queryClient],
     );
 
-    return { blockedCreators: rules?.blockedCreators ?? NO_BLOCKED_CREATORS, isLoaded, isPending: updateMutation.isPending, setBlockedCreators };
+    return { isLoaded, isPending, rules, updateRules };
+};
+
+/**
+ * The labs hidden from the model picker, and an updater for them. Shared by the
+ * picker's "Hide" action and the filters page; saving goes through
+ * `useUpdateModelFilterRules`, so the other rules are carried over.
+ */
+export const useBlockedCreators = () => {
+    const { isLoaded, isPending, rules, updateRules } = useUpdateModelFilterRules();
+
+    const setBlockedCreators = useCallback(
+        (update: (current: ReadonlyArray<string>) => string[]) =>
+            updateRules((current) => {
+                return { ...current, blockedCreators: update(current.blockedCreators ?? NO_BLOCKED_CREATORS) };
+            }),
+        [updateRules],
+    );
+
+    return { blockedCreators: rules?.blockedCreators ?? NO_BLOCKED_CREATORS, isLoaded, isPending, setBlockedCreators };
 };

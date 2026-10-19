@@ -379,6 +379,7 @@ export interface InternalApiTypes {
                     getStreamStatus: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, "streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, { messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: FunctionReference<"mutation", { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }, void>;
+                    stopActiveForThread: FunctionReference<"mutation", { threadId: string }, boolean>;
                 };
             };
         };
@@ -608,7 +609,7 @@ export interface InternalApiTypes {
         collections: {
             getCollectionOwner: FunctionReference<"query", { collectionId: Id<"knowledgeCollections"> }, null | string>;
             listFilesInCollection: FunctionReference<"query", { collectionId: Id<"knowledgeCollections">; requesterId: string }, null | Array<{ _id: Id<"knowledgeFiles">; chunkCount?: number; createdAt: number; mimeType: string; name: string; relativePath?: string; size: number; sourceUrl?: string; status: string }>>;
-            resolveRetrievalScope: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, { fileIds: Array<string>; foreign: Array<{ collectionIds: Array<string>; ownerId: string }>; hasExplicitScope: boolean }>;
+            resolveRetrievalScope: FunctionReference<"query", { admittedRun?: boolean; threadId: Id<"threads">; unlockProof?: string; userId: string }, { fileIds: Array<string>; foreign: Array<{ collectionIds: Array<string>; ownerId: string }>; hasExplicitScope: boolean }>;
             resolveSharedCollectionFiles: FunctionReference<"query", { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; requesterId: string }, Array<string>>;
         };
         delete_embeddings: {
@@ -639,8 +640,8 @@ export interface InternalApiTypes {
             ingestFile: FunctionReference<"action", { knowledgeFileId: Id<"knowledgeFiles">; userId: string }, void>;
         };
         retrieve: {
-            default: FunctionReference<"action", { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
-            search: FunctionReference<"action", { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
+            default: FunctionReference<"action", { admittedRun?: boolean; fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; unlockProof?: string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
+            search: FunctionReference<"action", { admittedRun?: boolean; fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; unlockProof?: string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
             searchSharedCollections: FunctionReference<"action", { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; query: string; queryVector: Array<number> | null; requesterId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
         };
         summarize: {
@@ -1369,6 +1370,7 @@ export const internal: InternalApiTypes = {
                     getStreamStatus: { __lunoraRef: "chat_streaming_persistent_library:getStreamStatus" },
                     getStreamText: { __lunoraRef: "chat_streaming_persistent_library:getStreamText" },
                     setStreamStatus: { __lunoraRef: "chat_streaming_persistent_library:setStreamStatus" },
+                    stopActiveForThread: { __lunoraRef: "chat_streaming_persistent_library:stopActiveForThread" },
                 },
             },
         },

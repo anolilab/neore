@@ -30,8 +30,6 @@ const RECENT_MESSAGES_TO_KEEP = 6;
 const SUMMARY_TRUNCATION_LENGTH = 200;
 /** Replaces the output of a tool result that compression elides. The call keeps its id. */
 const ELIDED_TOOL_OUTPUT = "[Tool output removed to fit the context window]";
-/** Tool outputs at or under this length are kept: eliding them would save nothing. */
-const ELIDE_MIN_CHARS = 200;
 /** Stands in for the summary when the summary alone would not fit. */
 const DROPPED_SUMMARY_NOTE = "[Earlier conversation was removed to fit the context window]";
 
@@ -265,13 +263,14 @@ const findRecentStart = (conversation: ModelMessage[], keep: number): number => 
 };
 
 /**
- * Replaces the output of tool results with a short note, except those in the
- * final tool message, which the model is reacting to now. Each call keeps its
- * id and name, so every result still answers its call. Returns the input array
- * when nothing was replaced.
+ * Replaces tool outputs with a short note, oldest first, until the prompt is
+ * under `threshold` tokens. The final tool message is kept, since the model is
+ * reacting to it now. An output no longer than the note is kept too: eliding it
+ * would save nothing. Each call keeps its id and name, so every result still
+ * answers its call. Returns the input array when nothing was replaced.
  */
 // ponytail: only the final tool message is protected. If that one message alone exceeds the window, nothing more can be elided.
-const elideToolOutputs = (messages: ModelMessage[]): ModelMessage[] => {
+const elideToolOutputs = (messages: ModelMessage[], threshold: number): ModelMessage[] => {
     let lastTool = -1;
 
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -281,15 +280,19 @@ const elideToolOutputs = (messages: ModelMessage[]): ModelMessage[] => {
         }
     }
 
-    let changed = false;
+    let next = messages;
 
-    const next = messages.map((message, index) => {
-        if (message.role !== "tool" || index === lastTool || !Array.isArray(message.content)) {
-            return message;
+    for (let index = 0; index < lastTool && estimateTokens(next) >= threshold; index += 1) {
+        const message = next[index];
+
+        if (message?.role !== "tool" || !Array.isArray(message.content)) {
+            continue;
         }
 
+        let changed = false;
+
         const content = message.content.map((part) => {
-            if (part.type !== "tool-result" || toolResultText(part).length <= ELIDE_MIN_CHARS) {
+            if (part.type !== "tool-result" || toolResultText(part).length <= ELIDED_TOOL_OUTPUT.length) {
                 return part;
             }
 
@@ -298,10 +301,12 @@ const elideToolOutputs = (messages: ModelMessage[]): ModelMessage[] => {
             return { ...part, output: { type: "text" as const, value: ELIDED_TOOL_OUTPUT } };
         });
 
-        return changed ? ({ ...message, content } as ModelMessage) : message;
-    });
+        if (changed) {
+            next = next.map((m, i) => (i === index ? ({ ...m, content } as ModelMessage) : m));
+        }
+    }
 
-    return changed ? next : messages;
+    return next;
 };
 
 /** Summary of the messages being dropped, capped at ~20% of the context window. */
@@ -405,11 +410,7 @@ export const compressContextMessages = (messages: ModelMessage[], contextLimit: 
         }
     }
 
-    if (estimateTokens(compressed) >= threshold) {
-        compressed = elideToolOutputs(compressed);
-    }
-
-    return compressed;
+    return elideToolOutputs(compressed, threshold);
 };
 
 // ─── Auto-Continue Configuration ────────────────────────────────────────────

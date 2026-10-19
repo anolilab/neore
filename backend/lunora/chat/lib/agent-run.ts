@@ -293,7 +293,7 @@ export const retrieveMemoryContext = async (ctx: ActionCtx, userId: string, sear
  */
 const retrieveKnowledgeContext = async (
     ctx: Pick<ActionCtx, "runAction">,
-    args: { query: string; threadId: string; userId: string },
+    args: { admittedRun?: boolean; query: string; threadId: string; userId: string },
 ): Promise<{ context: string | undefined; sources: KnowledgeSource[] }> => {
     try {
         return buildKnowledgeCitations(await ctx.runAction(internal.knowledge.retrieve.search, args));
@@ -316,6 +316,8 @@ const retrieveKnowledgeContext = async (
 export const loadRunContext = async (
     ctx: ActionCtx,
     args: {
+        /** Set only by a caller whose run was admitted by the stream gate: a locked chat's knowledge scope is empty without it. */
+        admittedRun?: boolean;
         customSystemPrompt?: string;
         promptText?: string;
         researchDepth?: string;
@@ -356,7 +358,7 @@ export const loadRunContext = async (
 
             return await retrieveMemories(ctx, userId, retrievalText, memoryBot?.botId);
         }),
-        retrievalText ? retrieveKnowledgeContext(ctx, { query: retrievalText, threadId, userId }) : undefined,
+        retrievalText ? retrieveKnowledgeContext(ctx, { ...(args.admittedRun && { admittedRun: true }), query: retrievalText, threadId, userId }) : undefined,
         threadSettingsPromise.then(async (settings) =>
             settings?.projectId ? await ctx.runQuery(api.agent.projects.getProject, { projectId: settings.projectId as Id<"projects"> }) : null,
         ),
@@ -817,26 +819,35 @@ export const setThreadStatus = async (ctx: Pick<ActionCtx, "runMutation">, threa
  * and the thread leaves `running`.
  */
 export const failRun = async (
-    ctx: Pick<ActionCtx, "runMutation">,
+    ctx: Pick<ActionCtx, "runMutation" | "runQuery">,
     args: { safeMessage: string; streamId: string; threadId: string; threadStatus: "active" | "error" },
 ): Promise<void> => {
     const { safeMessage, streamId, threadId, threadStatus } = args;
 
-    try {
-        await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-            final: true,
-            streamId: streamId as Id<"persistentStreams">,
-            text: `\n\nError: ${safeMessage}`,
-        });
-    } catch {
-        await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
-            status: "error",
-            streamId: streamId as Id<"persistentStreams">,
-        });
+    // `done` means someone else ended the stream: the sidebar's stop (`stopActiveForThread`),
+    // or a finish whose tail threw. Such a run gets no error line, and the thread just leaves `running`.
+    const status = await ctx
+        .runQuery(internal.chat.streaming.persistent.library.getStreamStatus, { streamId: streamId as Id<"persistentStreams"> })
+        .catch(() => undefined);
+    const endedElsewhere = status === "done";
+
+    if (!endedElsewhere) {
+        try {
+            await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+                final: true,
+                streamId: streamId as Id<"persistentStreams">,
+                text: `\n\nError: ${safeMessage}`,
+            });
+        } catch {
+            await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
+                status: "error",
+                streamId: streamId as Id<"persistentStreams">,
+            });
+        }
     }
 
     try {
-        await setThreadStatus(ctx, threadId, threadStatus);
+        await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus);
     } catch {
         // Ignore cleanup errors
     }

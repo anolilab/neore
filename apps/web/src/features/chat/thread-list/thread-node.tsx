@@ -52,7 +52,7 @@ import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { LUNORA_ID_SOURCE } from "@/lib/lunora/ids";
-import { currentUnlockProof, forgetUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { forgetUnlockProof, useUnlockProof } from "@/lib/lunora/unlock-proofs";
 import { showError } from "@/lib/toast";
 
 import MessageSearchMatches from "./message-search-matches";
@@ -241,7 +241,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
         }),
     );
     const isLocked = node.lockedAt !== undefined && node.lockedAt !== null;
-    const isUnlocked = isLocked && currentUnlockProof(node.threadId) !== undefined;
+    const unlockProof = useUnlockProof(node.threadId);
+    const isUnlocked = isLocked && unlockProof !== undefined;
     // A locked chat shows no title: the list never has one for it.
     const displayTitle = isLocked ? t`Locked chat` : node.title;
     const setShowManageTagsDialog = useThreadListUIStore(selectSetShowManageTagsDialog);

@@ -14,6 +14,7 @@ import { LockedChatGate } from "@/features/chat/lock/locked-chat-gate";
 import { useThreadShard } from "@/features/chat/sharing/use-thread-shard";
 import { createLunoraActionQueryOptions, createLunoraQueryOptions, useCRPC } from "@/lib/lunora/crpc";
 import { isLunoraId, LUNORA_ID_SOURCE } from "@/lib/lunora/ids";
+import { useUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 const CHAT_THREAD_PATH_RE = new RegExp(`/chat/(${LUNORA_ID_SOURCE})(?:/|$)`);
 
@@ -44,6 +45,10 @@ const ChatPage = () => {
     // belongs on the read-only share page, not in a composer they cannot use.
     const crpc = useCRPC();
     const navigate = useNavigate();
+
+    // Re-renders on unlock and relock, so the thread read below is rebuilt with the chat's proof.
+    useUnlockProof(threadId);
+
     // A thread shared with the caller lives on its owner's shard; nothing about
     // it may be queried until that is settled (`use-thread-shard.ts`).
     const shardReady = useThreadShard(threadId, initialThread === null);

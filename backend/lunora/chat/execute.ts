@@ -122,11 +122,9 @@ export const runStreamingAgent = internalAction
 
             // The thread, read with the caller's access checked.
             if (!thread) {
-                await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-                    final: true,
-                    streamId: streamId as Id<"persistentStreams">,
-                    text: "\n\nError: Thread not found",
-                });
+                // Through `failRun`, not a bare chunk: the thread was set to `running` when the run started,
+                // and only `failRun` takes it back out.
+                await failRun(ctx, { safeMessage: "Thread not found", streamId, threadId, threadStatus: "active" });
 
                 return;
             }
@@ -159,6 +157,7 @@ export const runStreamingAgent = internalAction
             // below — so they load while those do. Awaited with the tools; the
             // catch only marks it handled should a skill error end the run first.
             const runContextPromise = loadRunContext(ctx, {
+                admittedRun: true,
                 customSystemPrompt,
                 promptText: prompt,
                 researchDepth: streamingConfig.researchDepth,
@@ -445,14 +444,23 @@ export const continueAfterToolApproval = internalAction
             return;
         }
 
-        // A locked chat resumes only under a stream started after its lock (`streamRunThread`).
-        if (!(await ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }))) {
-            streamLogger.warn(`[ToolApproval] Stream ${streamId} belongs to a locked or unreachable chat — not resumed`);
-
-            return;
-        }
-
         try {
+            // A locked chat resumes only under a stream started after its lock (`streamRunThread`).
+            // Checked AFTER the claim, inside the try: a refusal or a failed read must close the
+            // claimed stream and leave the thread out of `running`, not strand both.
+            if (!(await ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }))) {
+                streamLogger.warn(`[ToolApproval] Stream ${streamId} belongs to a locked or unreachable chat — not resumed`);
+
+                await failRun(ctx, {
+                    safeMessage: "This chat can no longer continue the response.",
+                    streamId,
+                    threadId,
+                    threadStatus: "active",
+                });
+
+                return;
+            }
+
             // A group-chat participant paused: resume it, then the rest of its turn.
             if (config.group) {
                 await continueGroupAfterToolApproval(ctx, {

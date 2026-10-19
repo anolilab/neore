@@ -722,6 +722,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_streaming_persistent_library:getStreamStatus": lunora_chat_streaming_persistent_library_64.getStreamStatus as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:getStreamText": lunora_chat_streaming_persistent_library_64.getStreamText as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:setStreamStatus": lunora_chat_streaming_persistent_library_64.setStreamStatus as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:stopActiveForThread": lunora_chat_streaming_persistent_library_64.stopActiveForThread as unknown as RegisteredLunoraFunction,
     "chat_tags_functions:createThreadTag": lunora_chat_tags_functions_65.createThreadTag as unknown as RegisteredLunoraFunction,
     "chat_tags_functions:deleteThreadTag": lunora_chat_tags_functions_65.deleteThreadTag as unknown as RegisteredLunoraFunction,
     "chat_tags_functions:reorderThreadTags": lunora_chat_tags_functions_65.reorderThreadTags as unknown as RegisteredLunoraFunction,
@@ -2569,12 +2570,6 @@ if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_auth_functions_25.getMCPServersQuery.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "userId": source["userId"] };
-});
-installCompiledValidatorMap(lunora_auth_functions_25.getSearchDomainBlocklistQuery.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
@@ -4864,18 +4859,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["resultId"] !== "string") return DEFER;
 return { "resultId": source["resultId"] };
 });
-installCompiledValidatorMap(lunora_file_88.getChatFileExtraction.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["fileId"] !== "string") return DEFER;
-return { "fileId": source["fileId"] };
-});
-installCompiledValidatorMap(lunora_file_88.getChatFileImageUrl.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["fileId"] !== "string") return DEFER;
-return { "fileId": source["fileId"] };
-});
 installCompiledValidatorMap(lunora_file_88.purgeStagedChatUploads.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -5325,13 +5308,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["collectionId"] !== "string") return DEFER;
 if (typeof source["requesterId"] !== "string") return DEFER;
 return { "collectionId": source["collectionId"], "requesterId": source["requesterId"] };
-});
-installCompiledValidatorMap(lunora_knowledge_collections_101.resolveRetrievalScope.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["threadId"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "threadId": source["threadId"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_knowledge_collections_101.resolveSharedCollectionFiles.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8451,6 +8427,7 @@ export interface Caller {
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: (args: { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }) => Promise<void>;
+                    stopActiveForThread: (args: { threadId: string }) => Promise<boolean>;
                 };
             };
         };
@@ -8666,8 +8643,8 @@ export interface Caller {
     file: {
         finalizeChatUpload: (args: { filename: string; uploadId: string }) => Promise<{ fileId: Id<"chatFiles">; url: string }>;
         finalizeReferenceMedia: (args: { filename: string; uploadId: string }) => Promise<{ fileId: Id<"chatFiles">; url: string }>;
-        getChatFileExtraction: (args: { fileId: Id<"chatFiles"> }) => Promise<null | { status: "pending" | "processing" | "completed" | "failed" | "unsupported" }>;
-        getChatFileImageUrl: (args: { fileId: Id<"chatFiles"> }) => Promise<null | string>;
+        getChatFileExtraction: (args: { fileId: Id<"chatFiles">; threadId?: Id<"threads">; unlockProof?: string }) => Promise<null | { status: "pending" | "processing" | "completed" | "failed" | "unsupported" }>;
+        getChatFileImageUrl: (args: { fileId: Id<"chatFiles">; threadId?: Id<"threads">; unlockProof?: string }) => Promise<null | string>;
         purgeStagedChatUploads: (args: { userId: string }) => Promise<{ deleted: number }>;
         sweepStagedChatUploads: (args?: {}) => Promise<null>;
     };
@@ -8781,7 +8758,7 @@ export interface Caller {
             listCollectionFiles: (args: { collectionId: Id<"knowledgeCollections"> }) => Promise<Array<{ _id: Id<"knowledgeFiles">; chunkCount?: number; createdAt: number; mimeType: string; name: string; relativePath?: string; size: number; sourceUrl?: string; status: string }>>;
             listCollections: (args?: {}) => Promise<Array<{ _id: Id<"knowledgeCollections">; createdAt: number; description?: string; isOwner: boolean; name: string; shared: boolean; updatedAt: number }>>;
             listFilesInCollection: (args: { collectionId: Id<"knowledgeCollections">; requesterId: string }) => Promise<null | Array<{ _id: Id<"knowledgeFiles">; chunkCount?: number; createdAt: number; mimeType: string; name: string; relativePath?: string; size: number; sourceUrl?: string; status: string }>>;
-            resolveRetrievalScope: (args: { threadId: Id<"threads">; userId: string }) => Promise<{ fileIds: Array<string>; foreign: Array<{ collectionIds: Array<string>; ownerId: string }>; hasExplicitScope: boolean }>;
+            resolveRetrievalScope: (args: { admittedRun?: boolean; threadId: Id<"threads">; unlockProof?: string; userId: string }) => Promise<{ fileIds: Array<string>; foreign: Array<{ collectionIds: Array<string>; ownerId: string }>; hasExplicitScope: boolean }>;
             resolveSharedCollectionFiles: (args: { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; requesterId: string }) => Promise<Array<string>>;
             setFileCollection: (args: { collectionId?: Id<"knowledgeCollections">; fileIds: Array<Id<"knowledgeFiles">> }) => Promise<{ updated: number }>;
             updateCollection: (args: { collectionId: Id<"knowledgeCollections">; description?: string; name?: string; shareWithOrganization?: boolean }) => Promise<null>;
@@ -8822,8 +8799,8 @@ export interface Caller {
             ingestFile: (args: { knowledgeFileId: Id<"knowledgeFiles">; userId: string }) => Promise<void>;
         };
         retrieve: {
-            default: (args: { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
-            search: (args: { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
+            default: (args: { admittedRun?: boolean; fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; unlockProof?: string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
+            search: (args: { admittedRun?: boolean; fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; unlockProof?: string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
             searchKnowledge: (args: { query: string }) => Promise<Array<{ chunkIndex: number; content: string; fileName: string; pageNumber?: number; score: number }>>;
             searchSharedCollections: (args: { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; query: string; queryVector: Array<number> | null; requesterId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
         };
@@ -10060,6 +10037,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
                     getStreamStatus: (args) => callRegistered(context, "chat_streaming_persistent_library:getStreamStatus", args),
                     getStreamText: (args) => callRegistered(context, "chat_streaming_persistent_library:getStreamText", args),
                     setStreamStatus: (args) => callRegistered(context, "chat_streaming_persistent_library:setStreamStatus", args),
+                    stopActiveForThread: (args) => callRegistered(context, "chat_streaming_persistent_library:stopActiveForThread", args),
                 },
             },
         },

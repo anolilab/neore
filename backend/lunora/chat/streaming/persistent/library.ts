@@ -6,8 +6,11 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import { patchThread } from "../../../agent/table-writes";
+import { internal } from "../../../_generated/internal";
 import type { Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery } from "../../../_generated/server";
+import { MAX_LENGTH } from "../../../lib/validators";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
 
@@ -150,6 +153,38 @@ export const setStreamStatus = internalMutation
         await ctx.db.patch(args.streamId, {
             status: args.status,
         });
+    });
+
+/**
+ * The sidebar's stop for a persistent reply. Each live stream of the thread ends
+ * `done` with the chunks it already has, so the run's next chunk write is refused
+ * (`CONFLICT`), which stops generation; `failRun` sees `done` and writes no error
+ * line. The thread leaves `running` the way a legacy abort does: `abort`, then
+ * back to `active` a second later. Returns whether anything was stopped.
+ *
+ * ponytail: the stop lands at the run's next chunk write, so a long tool step keeps running (and billing) until then. Abort the in-flight call if that bites.
+ */
+export const stopActiveForThread = internalMutation
+    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const { page: streams } = await ctx.db.persistentStreams.findMany({
+            limit: 100,
+            where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
+        });
+
+        for (const stream of streams) {
+            await ctx.db.patch(stream._id, { status: "done" });
+        }
+
+        if (streams.length > 0) {
+            const threadId = args.threadId as Id<"threads">;
+
+            await patchThread(ctx.db, threadId, { status: "abort", updatedAt: ctx.now });
+            await ctx.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
+        }
+
+        return streams.length > 0;
     });
 
 export const getStreamStatus = internalQuery

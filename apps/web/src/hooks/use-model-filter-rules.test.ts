@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ModelFilterRules } from "./use-model-filter-rules";
 
-// What the backend holds for the user's rules; the fake saves whatever the mutation sends.
+// What the backend holds for the user's rules; the fake saves whatever the mutation sends, or refuses while `failSaves` is set.
 const server = vi.hoisted(() => {
-    return { rules: undefined as ModelFilterRules | undefined };
+    return { failSaves: false, rules: undefined as ModelFilterRules | undefined };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -30,6 +30,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                             mutationOptions: () => {
                                 return {
                                     mutationFn: async (input: { modelFilterRules: ModelFilterRules }) => {
+                                        if (server.failSaves) {
+                                            throw new Error("save refused");
+                                        }
+
                                         server.rules = input.modelFilterRules;
 
                                         return {};
@@ -44,14 +48,16 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
-const { useBlockedCreators, withCreatorHidden, withoutCreator } = await import("./use-model-filter-rules");
+const { useBlockedCreators, useUpdateModelFilterRules, withCreatorHidden, withoutCreator } = await import("./use-model-filter-rules");
 
-const mount = () => {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: React.ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-    return renderHook(() => useBlockedCreators(), { wrapper });
-};
+const wrapperFor =
+    (queryClient: QueryClient) =>
+    ({ children }: { children: React.ReactNode }) =>
+        createElement(QueryClientProvider, { client: queryClient }, children);
+
+const mount = () => renderHook(() => useBlockedCreators(), { wrapper: wrapperFor(newClient()) });
 
 describe(useBlockedCreators, () => {
     it("undoing the first hide removes only its lab and keeps a later hide", async () => {
@@ -106,5 +112,95 @@ describe(useBlockedCreators, () => {
     it("hiding a lab that is already hidden does not repeat it", () => {
         expect(withCreatorHidden(["meta"], "meta")).toEqual(["meta"]);
         expect(withCreatorHidden(["meta"], "openai")).toEqual(["meta", "openai"]);
+    });
+});
+
+describe(useUpdateModelFilterRules, () => {
+    // The picker and the filters page are separate hook instances on one query cache.
+    const mountBoth = async (queryClient: QueryClient) => {
+        const { result: picker } = renderHook(() => useBlockedCreators(), { wrapper: wrapperFor(queryClient) });
+        const { result: page } = renderHook(() => useUpdateModelFilterRules(), { wrapper: wrapperFor(queryClient) });
+
+        await waitFor(() => {
+            expect(page.current.isLoaded).toBe(true);
+        });
+
+        return { page, picker };
+    };
+
+    it("a filter edit made from an outdated snapshot keeps a lab hidden a moment earlier", async () => {
+        server.rules = { requireZDR: true };
+
+        const { page, picker } = await mountBoth(newClient());
+        // Both edits hold the functions from before the other one ran: their renders are stale.
+        const stalePicker = picker.current.setBlockedCreators;
+        const stalePage = page.current.updateRules;
+
+        await act(async () => {
+            await stalePicker((current) => withCreatorHidden(current, "meta"));
+        });
+        await act(async () => {
+            await stalePage((current) => {
+                return { ...current, blockedRegions: ["EU"] };
+            });
+        });
+
+        expect(server.rules).toEqual({ blockedCreators: ["meta"], blockedRegions: ["EU"], requireZDR: true });
+    });
+
+    it("a hide made from an outdated snapshot keeps a filter saved a moment earlier", async () => {
+        server.rules = { requireZDR: true };
+
+        const { page, picker } = await mountBoth(newClient());
+        const stalePicker = picker.current.setBlockedCreators;
+        const stalePage = page.current.updateRules;
+
+        await act(async () => {
+            await stalePage((current) => {
+                return { ...current, blockedRegions: ["EU"] };
+            });
+        });
+        await act(async () => {
+            await stalePicker((current) => withCreatorHidden(current, "meta"));
+        });
+
+        expect(server.rules).toEqual({ blockedCreators: ["meta"], blockedRegions: ["EU"], requireZDR: true });
+    });
+
+    it("a refused save puts back the rules it replaced", async () => {
+        server.rules = { requireZDR: true };
+
+        const { page } = await mountBoth(newClient());
+
+        server.failSaves = true;
+
+        try {
+            await act(async () => {
+                await expect(
+                    page.current.updateRules((current) => {
+                        return { ...current, blockedRegions: ["EU"] };
+                    }),
+                ).rejects.toThrow("save refused");
+            });
+        } finally {
+            server.failSaves = false;
+        }
+
+        expect(page.current.rules).toEqual({ requireZDR: true });
+        expect(server.rules).toEqual({ requireZDR: true });
+    });
+
+    it("clearing the last rule saves an empty object, which the server stores", async () => {
+        server.rules = { blockedRegions: ["EU"] };
+
+        const { page } = await mountBoth(newClient());
+
+        await act(async () => {
+            await page.current.updateRules(() => {
+                return {};
+            });
+        });
+
+        expect(server.rules).toEqual({});
     });
 });

@@ -3832,38 +3832,43 @@ export const abortStreamByMessageId = authMutation
 
         throwUnlessGranted(await threadGateOutcome(context, { level: "write", threadId, unlockProof, userId }), "Write access denied to this thread");
 
-        // Get the message to find its order
-        const messages = await context.runQuery(internal.agent.messages.getMessagesByIds, {
-            messageIds: [messageId as Id<"messages">],
-            threadId: threadId as Id<"threads">,
-            unlockProof,
-        });
+        // The id is a prompt row, or a placeholder key that is not one (the first reply of a new thread). A
+        // persistent reply is found by thread, so it stops either way. Only a row of this thread gives a legacy order.
+        const messages = await context
+            .runQuery(internal.agent.messages.getMessagesByIds, {
+                messageIds: [messageId as Id<"messages">],
+                threadId: threadId as Id<"threads">,
+                unlockProof,
+            })
+            .catch(() => []);
         const message = messages[0];
+        let legacy = false;
 
-        if (!message) {
-            throw new LunoraError("NOT_FOUND", `Message ${messageId} not found`);
+        if (message) {
+            // Verify the message belongs to this thread
+            if (message.threadId !== threadId) {
+                throw new LunoraError("BAD_REQUEST", `Message ${messageId} does not belong to thread ${threadId}`);
+            }
+
+            // Get the order - streams are associated with the order of the user message
+            const { order } = message;
+
+            if (order === undefined || order < 0) {
+                throw new LunoraError("BAD_REQUEST", `Cannot determine order for message ${messageId}`);
+            }
+
+            legacy = await context.runMutation(internal.agent.streams.abortByOrder, {
+                order,
+                reason: "Aborted by user",
+                threadId: threadId as Id<"threads">,
+            });
         }
 
-        // Verify the message belongs to this thread
-        if (message.threadId !== threadId) {
-            throw new LunoraError("BAD_REQUEST", `Message ${messageId} does not belong to thread ${threadId}`);
-        }
+        // Persistent replies (the normal path) have no streamingMessages row to find by order.
+        const persistent = await context.runMutation(internal.chat.streaming.persistent.library.stopActiveForThread, { threadId });
+        const aborted = legacy || persistent;
 
-        // Get the order - streams are associated with the order of the user message
-        const { order } = message;
-
-        if (order === undefined || order < 0) {
-            throw new LunoraError("BAD_REQUEST", `Cannot determine order for message ${messageId}`);
-        }
-
-        // Abort the stream by order
-        const aborted = await context.runMutation(internal.agent.streams.abortByOrder, {
-            order,
-            reason: "Aborted by user",
-            threadId: threadId as Id<"threads">,
-        });
-
-        context.log.event("chat.abort_stream_by_message_id", { aborted });
+        context.log.event("chat.abort_stream_by_message_id", { aborted, legacy, persistent });
 
         return { aborted };
     });
@@ -3882,9 +3887,12 @@ export const abortThreadStream = authMutation
 
         throwUnlessGranted(await threadGateOutcome(context, { level: "write", threadId, unlockProof, userId }), "Write access denied to this thread");
 
-        const aborted = await context.runMutation(internal.agent.streams.abortActiveForThread, { threadId: threadId as Id<"threads"> });
+        // Legacy streamingMessages runs and persistent (edge-streamed) replies both count.
+        const legacy = await context.runMutation(internal.agent.streams.abortActiveForThread, { threadId: threadId as Id<"threads"> });
+        const persistent = await context.runMutation(internal.chat.streaming.persistent.library.stopActiveForThread, { threadId });
+        const aborted = legacy || persistent;
 
-        context.log.event("chat.abort_thread_stream", { aborted });
+        context.log.event("chat.abort_thread_stream", { aborted, legacy, persistent });
 
         return { aborted };
     });

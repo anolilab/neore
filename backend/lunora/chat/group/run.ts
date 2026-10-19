@@ -520,6 +520,7 @@ const loadTurnContext = async (
         ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }),
     ]);
     const runContext = await loadRunContext(ctx, {
+        admittedRun: true,
         customSystemPrompt: args.customSystemPrompt,
         promptText: args.promptText,
         researchDepth: args.researchDepth,

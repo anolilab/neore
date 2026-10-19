@@ -196,7 +196,7 @@ msgid "{0, plural, one {# line} other {# lines}}"
 msgstr "{0, plural, other {# 行}}"
 
 #. placeholder {0}: node.relevantMessages.length
-#: src/features/chat/thread-list/thread-node.tsx:890
+#: src/features/chat/thread-list/thread-node.tsx:891
 msgid "{0, plural, one {# match} other {# matches}}"
 msgstr "{0, plural, other {# 个匹配}}"
 
@@ -299,7 +299,7 @@ msgstr "{0, plural, other {再显示 # 个视频}}"
 
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
-#: src/routes/(chat)/chat/$threadId.tsx:82
+#: src/routes/(chat)/chat/$threadId.tsx:87
 #: src/routes/(chat)/chat/index.tsx:153
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, other {不支持的查询参数}}：{1}"
@@ -546,7 +546,7 @@ msgid "{0} to review"
 msgstr "{0} 个待审核"
 
 #. placeholder {0}: formatNumber(Math.round(stats.averageTokensPerSecond * 10) / 10, locale)
-#: src/features/chat/header/thread-stats-dialog.tsx:73
+#: src/features/chat/header/thread-stats-dialog.tsx:81
 msgid "{0} tok/s"
 msgstr ""
 
@@ -769,7 +769,7 @@ msgstr "{fps} fps"
 msgid "{hours} hours"
 msgstr "{hours} 小时"
 
-#: src/features/chat/thread-list/thread-node.tsx:287
+#: src/features/chat/thread-list/thread-node.tsx:288
 msgid "{hours}h {minutes}m"
 msgstr "{hours} 小时 {minutes} 分钟"
 
@@ -818,7 +818,7 @@ msgstr "{mins} 分"
 msgid "{mins}m {secs}s"
 msgstr "{mins} 分 {secs} 秒"
 
-#: src/features/chat/thread-list/thread-node.tsx:290
+#: src/features/chat/thread-list/thread-node.tsx:291
 msgid "{minutes}m"
 msgstr "{minutes} 分钟"
 
@@ -1073,6 +1073,10 @@ msgstr "+ 知识：约 2,600 个 token（+100）"
 #: src/features/settings/components/chat/agent-settings.tsx:185
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ 任务规划：约 2,500 个 token（+200）"
+
+#: src/features/chat/header/thread-stats-dialog.tsx:92
+msgid "+ unpriced replies, not counted in this total"
+msgstr ""
 
 #. placeholder {0}: selectedVersion.content.length - prompt.content.length
 #: src/features/prompts/components/prompt-history-dialog.tsx:182
@@ -1611,8 +1615,8 @@ msgid "active"
 msgstr "活跃"
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
-#: src/features/settings/components/chat/model-filter-settings.tsx:199
-#: src/features/settings/components/chat/model-filter-settings.tsx:260
+#: src/features/settings/components/chat/model-filter-settings.tsx:178
+#: src/features/settings/components/chat/model-filter-settings.tsx:239
 #: src/features/settings/components/chat/trigger-settings.tsx:724
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
@@ -2351,6 +2355,10 @@ msgstr "AI 视频生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "借助完整录制上下文进行 AI 辅助的缺陷分诊"
 
+#: ../../packages/chat-ui/src/chat/message-content.tsx:339
+msgid "AI-generated"
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:74
 msgid "AI-optimized web search for real-time information retrieval"
 msgstr "为实时信息检索优化的 AI 网络搜索"
@@ -2536,7 +2544,7 @@ msgstr "所有文件（{0}）"
 msgid "All files removed from knowledge base"
 msgstr "已从知识库中移除所有文件"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:132
+#: src/features/settings/components/chat/model-filter-settings.tsx:111
 msgid "All filter rules cleared"
 msgstr "已清除所有筛选规则"
 
@@ -2647,11 +2655,11 @@ msgstr "允许此网站（{0}）"
 msgid "Allowed AI Models"
 msgstr "允许的 AI 模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:245
+#: src/features/settings/components/chat/model-filter-settings.tsx:224
 msgid "Allowed Providers"
 msgstr "允许的提供商"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:183
+#: src/features/settings/components/chat/model-filter-settings.tsx:162
 msgid "Allowed Regions"
 msgstr "允许的地区"
 
@@ -2735,7 +2743,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1049
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1067
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -3145,7 +3153,7 @@ msgstr "确定要删除此 API 密钥吗？此操作无法撤销。"
 msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "确定要删除此项吗？此操作无法撤销。"
 
-#: src/features/chat/thread-list/thread-node.tsx:846
+#: src/features/chat/thread-list/thread-node.tsx:847
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "确定要删除此对话吗？此操作无法撤销，并将永久删除此对话中的所有消息。"
 
@@ -3562,7 +3570,7 @@ msgstr "平均延迟"
 msgid "Average score"
 msgstr "平均得分"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:69
+#: src/features/chat/header/thread-stats-dialog.tsx:77
 msgid "Average speed"
 msgstr ""
 
@@ -3933,11 +3941,11 @@ msgstr "账单设置已更新"
 msgid "Black"
 msgstr "黑色"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:353
+#: src/features/settings/components/chat/model-filter-settings.tsx:332
 msgid "Block"
 msgstr "屏蔽"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:408
+#: src/features/settings/components/chat/model-filter-settings.tsx:391
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "屏蔽可能使用你的数据进行训练或收集使用数据的提供商。"
 
@@ -3945,25 +3953,25 @@ msgstr "屏蔽可能使用你的数据进行训练或收集使用数据的提供
 msgid "Block requests"
 msgstr "阻止请求"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:332
+#: src/features/settings/components/chat/model-filter-settings.tsx:311
 msgid "Block specific models by their ID. These models will never be used."
 msgstr "按 ID 屏蔽特定模型。这些模型将永远不会被使用。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:225
-#: src/features/settings/components/chat/model-filter-settings.tsx:285
+#: src/features/settings/components/chat/model-filter-settings.tsx:204
+#: src/features/settings/components/chat/model-filter-settings.tsx:264
 #: src/features/tasks/components/task-status.tsx:15
 msgid "Blocked"
 msgstr "已屏蔽"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:331
+#: src/features/settings/components/chat/model-filter-settings.tsx:310
 msgid "Blocked Models"
 msgstr "已屏蔽的模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:270
+#: src/features/settings/components/chat/model-filter-settings.tsx:249
 msgid "Blocked Providers"
 msgstr "已屏蔽的提供商"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:209
+#: src/features/settings/components/chat/model-filter-settings.tsx:188
 msgid "Blocked Regions"
 msgstr "已屏蔽的地区"
 
@@ -4179,11 +4187,11 @@ msgstr "浏览并恢复工作流的历史版本。"
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:666
+#: ../../packages/chat-ui/src/chat/message-content.tsx:674
 msgid "Browser"
 msgstr "浏览器"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:688
+#: ../../packages/chat-ui/src/chat/message-content.tsx:696
 msgid "Browser action failed"
 msgstr "浏览器操作失败"
 
@@ -4191,7 +4199,7 @@ msgstr "浏览器操作失败"
 msgid "Browser Automation"
 msgstr "浏览器自动化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:686
+#: ../../packages/chat-ui/src/chat/message-content.tsx:694
 msgid "Browser error"
 msgstr "浏览器错误"
 
@@ -4200,7 +4208,7 @@ msgid "Browser notes"
 msgstr "浏览器说明"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
-#: ../../packages/chat-ui/src/chat/message-content.tsx:649
+#: ../../packages/chat-ui/src/chat/message-content.tsx:657
 msgid "Browser screenshot"
 msgstr "浏览器截图"
 
@@ -4208,7 +4216,7 @@ msgstr "浏览器截图"
 msgid "Browser Session"
 msgstr "浏览器会话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:607
+#: ../../packages/chat-ui/src/chat/message-content.tsx:615
 msgid "Browser working..."
 msgstr "浏览器运行中..."
 
@@ -4775,7 +4783,7 @@ msgid "Change colors"
 msgstr "更改颜色"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
-#: src/features/chat/thread-list/thread-node.tsx:718
+#: src/features/chat/thread-list/thread-node.tsx:719
 msgid "Change passcode"
 msgstr ""
 
@@ -4889,12 +4897,12 @@ msgstr "对话导入失败"
 msgid "Chat import finished"
 msgstr "对话导入完成"
 
-#: src/features/chat/thread-list/thread-node.tsx:685
-#: src/features/chat/thread-list/thread-node.tsx:699
+#: src/features/chat/thread-list/thread-node.tsx:686
+#: src/features/chat/thread-list/thread-node.tsx:700
 msgid "Chat lock"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:685
+#: src/features/chat/thread-list/thread-node.tsx:686
 msgid "Chat lock: locked"
 msgstr ""
 
@@ -4966,7 +4974,7 @@ msgstr "复选框"
 msgid "Checked integrations are offered for setup after you save. Nothing connects until you confirm it there."
 msgstr "勾选的集成会在保存后提供设置。在你确认之前不会建立任何连接。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:348
+#: ../../packages/chat-ui/src/chat/message-content.tsx:356
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
@@ -5218,7 +5226,7 @@ msgstr "清除"
 msgid "Clear all"
 msgstr "全部清除"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:163
+#: src/features/settings/components/chat/model-filter-settings.tsx:142
 msgid "Clear All"
 msgstr "全部清除"
 
@@ -5321,7 +5329,7 @@ msgstr "点击编辑"
 msgid "Click to edit..."
 msgstr "点击编辑..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:599
+#: ../../packages/chat-ui/src/chat/message-content.tsx:607
 msgid "Clicking element..."
 msgstr "正在点击元素..."
 
@@ -5420,7 +5428,7 @@ msgstr "代码执行"
 msgid "Code execution and sandbox files"
 msgstr "代码执行和沙盒文件"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:578
+#: ../../packages/chat-ui/src/chat/message-content.tsx:586
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
@@ -5444,7 +5452,7 @@ msgstr "代码高亮主题已更新"
 msgid "Code is required"
 msgstr "代码为必填项"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:537
+#: ../../packages/chat-ui/src/chat/message-content.tsx:545
 msgid "Code output"
 msgstr "代码输出"
 
@@ -6415,7 +6423,7 @@ msgstr "对比度"
 msgid "Contrast Ratio"
 msgstr "对比度"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:385
+#: src/features/settings/components/chat/model-filter-settings.tsx:364
 msgid "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 msgstr "控制 AI 提供商的数据处理和保留策略。隐私设置目前仅对通过 OpenRouter 路由的模型生效。"
 
@@ -6447,11 +6455,11 @@ msgstr "控制类型"
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "控制 ControlNet 在生成过程中何时生效"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:157
+#: src/features/settings/components/chat/model-filter-settings.tsx:136
 msgid "Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences."
 msgstr "根据地理区域、合规要求和隐私偏好控制可使用的 AI 模型和提供商。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:241
+#: src/features/settings/components/chat/model-filter-settings.tsx:220
 msgid "Control which AI providers can serve your requests."
 msgstr "控制哪些 AI 提供商可以处理你的请求。"
 
@@ -6510,7 +6518,7 @@ msgstr "转换为附件以便阅读？"
 msgid "Convert to Full Account"
 msgstr "转换为正式账号"
 
-#: src/features/chat/thread-list/thread-node.tsx:822
+#: src/features/chat/thread-list/thread-node.tsx:823
 msgid "Convert to permanent"
 msgstr "转为永久对话"
 
@@ -6522,7 +6530,7 @@ msgstr "转换以保存你的数据"
 msgid "Convert to TypeScript"
 msgstr "转换为 TypeScript"
 
-#: src/features/chat/thread-list/thread-node.tsx:822
+#: src/features/chat/thread-list/thread-node.tsx:823
 msgid "Converting..."
 msgstr "正在转换..."
 
@@ -6817,7 +6825,7 @@ msgstr "无法导入工作流"
 msgid "Could not load image"
 msgstr "无法加载图片"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:60
+#: src/features/chat/header/thread-stats-dialog.tsx:66
 msgid "Could not load statistics for this thread."
 msgstr ""
 
@@ -6942,7 +6950,7 @@ msgstr "无法开始试运行。"
 msgid "Could not stop the conversation"
 msgstr "无法停止对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:521
+#: src/features/chat/thread-list/thread-node.tsx:522
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
@@ -7077,7 +7085,7 @@ msgstr ""
 
 #: src/components/command-palette.tsx:313
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:93
-#: src/features/chat/thread-list/thread-node.tsx:623
+#: src/features/chat/thread-list/thread-node.tsx:624
 msgid "Create branch"
 msgstr "创建分支"
 
@@ -7228,7 +7236,7 @@ msgstr "创建时间：{createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "创建一个一次性链接，有效期 7 天。任何已登录的人打开它即可获得访问权限。"
 
-#: src/features/chat/thread-list/thread-node.tsx:623
+#: src/features/chat/thread-list/thread-node.tsx:624
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
@@ -8151,12 +8159,12 @@ msgstr "删除此用例？"
 #: src/components/command-palette.tsx:331
 #: src/components/command-palette.tsx:457
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:85
-#: src/features/chat/thread-list/thread-node.tsx:843
+#: src/features/chat/thread-list/thread-node.tsx:844
 #: src/features/pages/components/page-comments-panel.tsx:188
 msgid "Delete thread"
 msgstr "删除对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:858
+#: src/features/chat/thread-list/thread-node.tsx:859
 msgid "Delete Thread"
 msgstr "删除对话"
 
@@ -8184,7 +8192,7 @@ msgstr "{0, plural, other {已删除 # 个提示词}}"
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1473
 #: src/components/delete-confirmation-dialog.tsx:65
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:285
-#: src/features/chat/thread-list/thread-node.tsx:843
+#: src/features/chat/thread-list/thread-node.tsx:844
 msgid "Deleting..."
 msgstr "正在删除..."
 
@@ -8252,8 +8260,8 @@ msgstr "拒绝"
 msgid "Deny {tool}"
 msgstr "拒绝 {tool}"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:407
-#: src/features/settings/components/chat/model-filter-settings.tsx:411
+#: src/features/settings/components/chat/model-filter-settings.tsx:390
+#: src/features/settings/components/chat/model-filter-settings.tsx:394
 msgid "Deny Data Collection"
 msgstr "拒绝数据收集"
 
@@ -8840,7 +8848,7 @@ msgstr "下载文档"
 msgid "Download Export"
 msgstr "下载导出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:404
+#: ../../packages/chat-ui/src/chat/message-content.tsx:412
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:85
 msgid "Download file"
 msgstr "下载文件"
@@ -8869,11 +8877,11 @@ msgstr "已开始下载"
 msgid "Download Text"
 msgstr "下载文本"
 
-#: src/features/chat/thread-list/thread-node.tsx:747
+#: src/features/chat/thread-list/thread-node.tsx:748
 msgid "Download thread"
 msgstr "下载对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:747
+#: src/features/chat/thread-list/thread-node.tsx:748
 msgid "Downloading..."
 msgstr "正在下载..."
 
@@ -9836,11 +9844,11 @@ msgstr "输入默认值..."
 msgid "Enter email address"
 msgstr "输入邮箱地址"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:49
+#: src/features/chat/lock/locked-chat-gate.tsx:62
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:349
+#: src/features/settings/components/chat/model-filter-settings.tsx:328
 msgid "Enter model ID (e.g., \"llama-4-scout\")..."
 msgstr "输入模型 ID（例如“llama-4-scout”）..."
 
@@ -10127,7 +10135,7 @@ msgstr "Escape"
 msgid "Est. provider cost"
 msgstr "预估提供商费用"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:75
+#: src/features/chat/header/thread-stats-dialog.tsx:83
 msgid "Estimated cost"
 msgstr ""
 
@@ -10151,7 +10159,7 @@ msgstr "爱沙尼亚语"
 msgid "Estonian (Estonia)"
 msgstr "爱沙尼亚语（爱沙尼亚）"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:25
+#: src/features/settings/components/chat/model-filter-settings.tsx:30
 msgid "European Union"
 msgstr "欧盟"
 
@@ -10363,7 +10371,7 @@ msgstr "正在执行工具..."
 msgid "Execution"
 msgstr "执行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:568
+#: ../../packages/chat-ui/src/chat/message-content.tsx:576
 msgid "Execution failed"
 msgstr "执行失败"
 
@@ -10491,7 +10499,7 @@ msgstr "有效期已更新为 {0}"
 msgid "expired"
 msgstr "已过期"
 
-#: src/features/chat/thread-list/thread-node.tsx:280
+#: src/features/chat/thread-list/thread-node.tsx:281
 #: src/features/devices/components/devices-settings.tsx:134
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
@@ -10520,7 +10528,7 @@ msgstr "过期时间"
 msgid "Expires {date}"
 msgstr "{date} 过期"
 
-#: src/features/chat/thread-list/thread-node.tsx:884
+#: src/features/chat/thread-list/thread-node.tsx:885
 msgid "Expires in {remainingTime}"
 msgstr "{remainingTime} 后过期"
 
@@ -10691,11 +10699,11 @@ msgstr "提取页面"
 msgid "Extract subject"
 msgstr "提取主体"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:657
+#: ../../packages/chat-ui/src/chat/message-content.tsx:665
 msgid "Extracted"
 msgstr "已提取"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:600
+#: ../../packages/chat-ui/src/chat/message-content.tsx:608
 msgid "Extracting content..."
 msgstr "正在提取内容..."
 
@@ -10745,7 +10753,7 @@ msgstr "失败"
 msgid "failed"
 msgstr "失败"
 
-#: src/features/chat/thread-list/thread-node.tsx:491
+#: src/features/chat/thread-list/thread-node.tsx:492
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/devices/components/devices-settings.tsx:135
 #: src/features/evals/components/model-comparison.tsx:112
@@ -10809,7 +10817,7 @@ msgstr "取消任务失败"
 msgid "Failed to change tag color"
 msgstr "更改标签颜色失败"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:134
+#: src/features/settings/components/chat/model-filter-settings.tsx:113
 msgid "Failed to clear filter rules"
 msgstr "清除筛选规则失败"
 
@@ -11386,8 +11394,8 @@ msgstr "更新收藏状态失败"
 
 #: src/components/model-picker/model-picker.tsx:628
 #: src/components/model-picker/model-picker.tsx:637
-#: src/features/settings/components/chat/model-filter-settings.tsx:53
-#: src/features/settings/components/chat/model-filter-settings.tsx:88
+#: src/features/settings/components/chat/model-filter-settings.tsx:56
+#: src/features/settings/components/chat/model-filter-settings.tsx:67
 msgid "Failed to update filter rules"
 msgstr "更新筛选规则失败"
 
@@ -12032,8 +12040,8 @@ msgstr "按类型筛选"
 msgid "Filter memories by type"
 msgstr "按类型筛选记忆"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:51
-#: src/features/settings/components/chat/model-filter-settings.tsx:86
+#: src/features/settings/components/chat/model-filter-settings.tsx:54
+#: src/features/settings/components/chat/model-filter-settings.tsx:65
 msgid "Filter rules updated"
 msgstr "筛选规则已更新"
 
@@ -12878,7 +12886,7 @@ msgstr "生成的视频"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:419
+#: ../../packages/chat-ui/src/chat/message-content.tsx:427
 msgid "Generating audio..."
 msgstr "正在生成音频..."
 
@@ -12886,7 +12894,7 @@ msgstr "正在生成音频..."
 msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:420
+#: ../../packages/chat-ui/src/chat/message-content.tsx:428
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating image..."
 msgstr "正在生成图像..."
@@ -12899,7 +12907,7 @@ msgstr "正在生成演示文稿..."
 msgid "Generating response"
 msgstr "正在生成回复"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:421
+#: ../../packages/chat-ui/src/chat/message-content.tsx:429
 #: src/features/chat/thread/media-gallery-view.tsx:395
 msgid "Generating video..."
 msgstr "正在生成视频..."
@@ -13634,7 +13642,7 @@ msgstr "分享一些关于你的信息，帮助 AI 更好地了解你。这些�
 msgid "Here they are: planning, budget and next steps."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:297
+#: src/features/settings/components/chat/model-filter-settings.tsx:276
 msgid "Hidden in Model Picker"
 msgstr ""
 
@@ -14049,7 +14057,7 @@ msgid "illustration"
 msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:376
+#: ../../packages/chat-ui/src/chat/message-content.tsx:384
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:641
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -14487,7 +14495,7 @@ msgstr "Inception 基于扩散的语言模型"
 msgid "Includes audio generation"
 msgstr "包含音频生成"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:84
+#: src/features/chat/header/thread-stats-dialog.tsx:95
 msgid "Includes replies billed to your own API key."
 msgstr ""
 
@@ -14580,7 +14588,7 @@ msgstr "输入或转换文本"
 msgid "Input Template"
 msgstr "输入模板"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:65
+#: src/features/chat/header/thread-stats-dialog.tsx:73
 #: src/features/chat/thread/message-cost-badge.tsx:52
 msgid "Input tokens"
 msgstr "输入 token"
@@ -14910,7 +14918,7 @@ msgstr "它可能已被删除，或者你已无权访问。"
 msgid "It may have expired, been revoked, or already been used. Ask for a new link."
 msgstr "它可能已过期、被撤销或已被使用。请索取新的链接。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:354
+#: ../../packages/chat-ui/src/chat/message-content.tsx:362
 msgid "It will be visible once approved by a moderator"
 msgstr "经审核员批准后即可显示"
 
@@ -15218,7 +15226,7 @@ msgstr "吉尔吉斯斯坦"
 msgid "Label"
 msgstr "标签"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:298
+#: src/features/settings/components/chat/model-filter-settings.tsx:277
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
 msgstr ""
 
@@ -15990,7 +15998,7 @@ msgstr "正在加载技能…"
 msgid "Loading spreadsheet…"
 msgstr "正在加载电子表格…"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:59
+#: src/features/chat/header/thread-stats-dialog.tsx:61
 msgid "Loading statistics…"
 msgstr ""
 
@@ -16071,7 +16079,7 @@ msgstr "位置"
 msgid "Location updated"
 msgstr "位置已更新"
 
-#: src/features/chat/thread-list/thread-node.tsx:722
+#: src/features/chat/thread-list/thread-node.tsx:723
 msgid "Lock chat"
 msgstr ""
 
@@ -16084,7 +16092,7 @@ msgstr "锁定分组"
 msgid "Lock node"
 msgstr "锁定节点"
 
-#: src/features/chat/thread-list/thread-node.tsx:714
+#: src/features/chat/thread-list/thread-node.tsx:715
 msgid "Lock now"
 msgstr ""
 
@@ -16092,7 +16100,7 @@ msgstr ""
 msgid "Lock this chat"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:246
+#: src/features/chat/thread-list/thread-node.tsx:247
 msgid "Locked chat"
 msgstr ""
 
@@ -16860,8 +16868,8 @@ msgstr "消息"
 msgid "Messages API (/v1/messages) — Anthropic and services that mirror it."
 msgstr "Messages API（/v1/messages）——Anthropic 及与其兼容的服务。"
 
-#: src/features/chat/thread-list/thread-node.tsx:550
-#: src/features/chat/thread-list/thread-node.tsx:562
+#: src/features/chat/thread-list/thread-node.tsx:551
+#: src/features/chat/thread-list/thread-node.tsx:563
 msgid "Messages from {sourceName}"
 msgstr "来自 {sourceName} 的消息"
 
@@ -17141,7 +17149,7 @@ msgstr "模式："
 msgid "Model"
 msgstr "模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:114
+#: src/features/settings/components/chat/model-filter-settings.tsx:89
 msgid "Model already blocked"
 msgstr "模型已被屏蔽"
 
@@ -17149,11 +17157,11 @@ msgstr "模型已被屏蔽"
 msgid "Model Breakdown"
 msgstr "模型明细"
 
-#: src/features/chat/thread-list/thread-node.tsx:492
+#: src/features/chat/thread-list/thread-node.tsx:493
 msgid "Model comparison"
 msgstr "模型对比"
 
-#: src/features/chat/core/hooks/use-comparison-chat.ts:112
+#: src/features/chat/core/hooks/use-comparison-chat.ts:113
 #: src/features/workflow/templates/index.ts:258
 msgid "Model Comparison"
 msgstr "模型对比"
@@ -17183,7 +17191,7 @@ msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost cal
 msgstr "模型价格来自 models.dev，KV 缓存 24 小时。以微美元自动计算成本。"
 
 #: src/features/layout/lib/dashboard-page-names.ts:30
-#: src/features/settings/components/chat/model-filter-settings.tsx:155
+#: src/features/settings/components/chat/model-filter-settings.tsx:134
 msgid "Model Restrictions"
 msgstr "模型限制"
 
@@ -17209,7 +17217,7 @@ msgstr "模型：OpenAI Whisper"
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:262
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/chat/header/thread-stats-dialog.tsx:89
+#: src/features/chat/header/thread-stats-dialog.tsx:100
 #: src/features/evals/components/dataset-panel.tsx:132
 #: src/features/layout/lib/dashboard-page-names.ts:31
 #: src/features/marketing/components/landing-footer.tsx:111
@@ -17228,15 +17236,15 @@ msgstr "模型"
 msgid "Models enabled in your AWS account, in one region. Bedrock API key or IAM access keys."
 msgstr "在你的 AWS 账户中某一区域已启用的模型。使用 Bedrock API 密钥或 IAM 访问密钥。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:210
+#: src/features/settings/components/chat/model-filter-settings.tsx:189
 msgid "Models hosted exclusively in these regions will be unavailable."
 msgstr "仅托管在这些地区的模型将不可用。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:25
+#: src/features/settings/components/chat/model-filter-settings.tsx:30
 msgid "Models hosted in EU data centers (GDPR compliant)"
 msgstr "托管在欧盟数据中心的模型（符合 GDPR）"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:24
+#: src/features/settings/components/chat/model-filter-settings.tsx:29
 msgid "Models hosted in US data centers"
 msgstr "托管在美国数据中心的模型"
 
@@ -17504,7 +17512,7 @@ msgstr "移到下一个单元格"
 msgid "Move to previous cell"
 msgstr "移到上一个单元格"
 
-#: src/features/chat/thread-list/thread-node.tsx:642
+#: src/features/chat/thread-list/thread-node.tsx:643
 msgid "Move to project"
 msgstr "移动到项目"
 
@@ -17791,11 +17799,11 @@ msgstr "浏览对话"
 msgid "navigate within each column"
 msgstr "在每列中导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:658
+#: ../../packages/chat-ui/src/chat/message-content.tsx:666
 msgid "Navigated"
 msgstr "已导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:607
+#: ../../packages/chat-ui/src/chat/message-content.tsx:615
 msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
@@ -18438,7 +18446,7 @@ msgstr "无项目"
 msgid "No knowledge base files yet. Upload files in Settings."
 msgstr "还没有知识库文件。请在设置中上传文件。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:302
+#: src/features/settings/components/chat/model-filter-settings.tsx:281
 msgid "No labs are hidden."
 msgstr ""
 
@@ -19298,7 +19306,7 @@ msgstr ""
 msgid "Only the owner can change who sees this skill."
 msgstr "只有所有者可以更改谁能看到此技能。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:393
+#: src/features/settings/components/chat/model-filter-settings.tsx:372
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "仅使用保证零数据保留的提供商——你的提示词绝不会被存储。"
 
@@ -19323,7 +19331,7 @@ msgstr "哎呀！出错了"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:644
+#: ../../packages/chat-ui/src/chat/message-content.tsx:652
 #: src/components/command-palette.tsx:496
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/tasks/hooks/use-task-notifications.ts:30
@@ -20037,7 +20045,7 @@ msgstr ""
 msgid "Outpaint"
 msgstr "扩图"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:515
+#: ../../packages/chat-ui/src/chat/message-content.tsx:523
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
@@ -20062,7 +20070,7 @@ msgstr "输出格式"
 msgid "Output Mode"
 msgstr "输出模式"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:67
+#: src/features/chat/header/thread-stats-dialog.tsx:75
 #: src/features/chat/thread/message-cost-badge.tsx:60
 msgid "Output tokens"
 msgstr "输出 token"
@@ -20115,7 +20123,7 @@ msgstr "所有者"
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:606
+#: ../../packages/chat-ui/src/chat/message-content.tsx:614
 msgid "page"
 msgstr "页面"
 
@@ -21254,7 +21262,7 @@ msgstr "优先支持"
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
 #: src/features/settings/components/account/account-settings.tsx:136
-#: src/features/settings/components/chat/model-filter-settings.tsx:382
+#: src/features/settings/components/chat/model-filter-settings.tsx:361
 msgid "Privacy"
 msgstr "隐私"
 
@@ -21645,7 +21653,7 @@ msgstr "提供商健康状况"
 msgid "Provider removed"
 msgstr "已移除提供商"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:239
+#: src/features/settings/components/chat/model-filter-settings.tsx:218
 msgid "Provider Restrictions"
 msgstr "提供商限制"
 
@@ -22380,7 +22388,7 @@ msgstr "重新生成回复"
 msgid "Regex"
 msgstr "正则表达式"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:175
+#: src/features/settings/components/chat/model-filter-settings.tsx:154
 msgid "Region Restrictions"
 msgstr "地区限制"
 
@@ -22562,7 +22570,7 @@ msgstr "移除 {label}"
 msgid "Remove {model}"
 msgstr "移除 {model}"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:363
+#: src/features/settings/components/chat/model-filter-settings.tsx:342
 msgid "Remove {modelId} from blocked list"
 msgstr "从屏蔽列表中移除 {modelId}"
 
@@ -22669,7 +22677,7 @@ msgid "Remove or add objects in an image"
 msgstr "移除或添加图像中的物体"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:151
-#: src/features/chat/thread-list/thread-node.tsx:719
+#: src/features/chat/thread-list/thread-node.tsx:720
 msgid "Remove passcode"
 msgstr ""
 
@@ -22765,7 +22773,7 @@ msgstr "重新播放新手引导"
 msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "重新播放欢迎导览，回顾 Neore 的核心功能。"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:63
+#: src/features/chat/header/thread-stats-dialog.tsx:71
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:144
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:246
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
@@ -22983,7 +22991,7 @@ msgstr "资源"
 msgid "Response"
 msgstr "响应"
 
-#: src/features/chat/thread-list/thread-node.tsx:501
+#: src/features/chat/thread-list/thread-node.tsx:502
 msgid "Response failed - try again"
 msgstr "回复失败——请重试"
 
@@ -23024,7 +23032,7 @@ msgstr "已恢复到版本 {0}"
 msgid "Restoring..."
 msgstr "正在恢复..."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:178
+#: src/features/settings/components/chat/model-filter-settings.tsx:157
 msgid "Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements."
 msgstr "限制模型可以托管的地区。适用于 GDPR、数据驻留和合规要求。"
 
@@ -23418,7 +23426,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 msgid "Running"
 msgstr "运行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:476
+#: ../../packages/chat-ui/src/chat/message-content.tsx:484
 msgid "Running code..."
 msgstr "正在运行代码..."
 
@@ -23737,7 +23745,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:640
+#: ../../packages/chat-ui/src/chat/message-content.tsx:648
 msgid "Screenshot"
 msgstr "截图"
 
@@ -24570,7 +24578,7 @@ msgstr "短文本"
 msgid "Show {hidden} more lines"
 msgstr "再显示 {hidden} 行"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:312
+#: src/features/settings/components/chat/model-filter-settings.tsx:291
 msgid "Show {name} in model picker"
 msgstr ""
 
@@ -25031,7 +25039,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:994
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1012
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -25231,7 +25239,7 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1119
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1137
 #: src/features/chat/thread/message-content.tsx:114
 msgid "Source {index}"
 msgstr "来源 {index}"
@@ -25784,8 +25792,8 @@ msgstr "停止"
 msgid "Stop after the current speaker"
 msgstr "在当前发言者之后停止"
 
-#: src/features/chat/thread-list/thread-node.tsx:510
-#: src/features/chat/thread-list/thread-node.tsx:532
+#: src/features/chat/thread-list/thread-node.tsx:511
+#: src/features/chat/thread-list/thread-node.tsx:533
 #: src/features/chat/thread/composer-input-area.tsx:298
 #: src/features/chat/thread/composer-input-area.tsx:311
 msgid "Stop generating"
@@ -25840,11 +25848,11 @@ msgstr "讲故事"
 msgid "Streamable HTTP (Recommended)"
 msgstr "Streamable HTTP（推荐）"
 
-#: src/features/chat/thread-list/thread-node.tsx:490
+#: src/features/chat/thread-list/thread-node.tsx:491
 msgid "Streaming"
 msgstr "流式输出中"
 
-#: src/features/chat/thread-list/thread-node.tsx:500
+#: src/features/chat/thread-list/thread-node.tsx:501
 msgid "Streaming..."
 msgstr "流式输出中..."
 
@@ -26524,7 +26532,7 @@ msgstr "标签是你自己给聊天加的标记。你可以结合自动分类，
 msgid "Tags for {threadTitle}"
 msgstr "{threadTitle} 的标签"
 
-#: src/features/chat/thread-list/thread-node.tsx:653
+#: src/features/chat/thread-list/thread-node.tsx:654
 msgid "Tags unavailable for temporary chats"
 msgstr "临时聊天不可使用标签"
 
@@ -26544,7 +26552,7 @@ msgstr "输入一张图像，移除背景，然后应用风格迁移"
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:601
+#: ../../packages/chat-ui/src/chat/message-content.tsx:609
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
@@ -26789,7 +26797,7 @@ msgstr "模板"
 msgid "Temporary"
 msgstr "临时"
 
-#: src/features/chat/thread-list/thread-node.tsx:884
+#: src/features/chat/thread-list/thread-node.tsx:885
 msgid "Temporary chat"
 msgstr "临时聊天"
 
@@ -26805,7 +26813,7 @@ msgstr "临时聊天模式"
 msgid "Temporary Chat Retention (hours)"
 msgstr "临时聊天保留时长（小时）"
 
-#: src/features/chat/thread-list/thread-node.tsx:665
+#: src/features/chat/thread-list/thread-node.tsx:666
 msgid "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
 msgstr "临时聊天会过期，因此无法添加标签。将其转为永久聊天即可添加标签。"
 
@@ -27443,7 +27451,7 @@ msgstr "你的网络连接或我们的服务器出现问题。"
 msgid "These memories were added to the AI's context for this reply because they matched your message."
 msgstr "这些记忆因与你的消息相关，已被加入此回复的 AI 上下文。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:271
+#: src/features/settings/components/chat/model-filter-settings.tsx:250
 msgid "These providers will never be used for your requests."
 msgstr "这些提供商将永远不会用于处理你的请求。"
 
@@ -27505,7 +27513,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1045
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1063
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:99
 #: src/features/chat/thread/streaming-placeholder.tsx:701
 msgid "Thinking..."
@@ -27529,7 +27537,7 @@ msgstr "此操作无法撤销。这将永久删除该组织及所有相关数据
 msgid "This browser cannot receive push notifications here."
 msgstr "此浏览器无法在此处接收推送通知。"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:47
+#: src/features/chat/lock/locked-chat-gate.tsx:60
 msgid "This chat is locked"
 msgstr ""
 
@@ -27631,7 +27639,7 @@ msgstr "此文件过大（{0} KB），无法在浏览器中预览或编辑。为
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "此文件过大（约 {0} 个 token），超出了模型的上下文窗口。模型可能无法有效处理此文件。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:353
+#: ../../packages/chat-ui/src/chat/message-content.tsx:361
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
@@ -28632,7 +28640,7 @@ msgstr "输入你的消息..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:602
+#: ../../packages/chat-ui/src/chat/message-content.tsx:610
 msgid "Typing text..."
 msgstr "正在输入文本..."
 
@@ -28833,7 +28841,7 @@ msgstr "已卸载“{0}”"
 msgid "Unique approach to language modeling"
 msgstr "独特的语言建模方法"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:24
+#: src/features/settings/components/chat/model-filter-settings.tsx:29
 msgid "United States"
 msgstr "美国"
 
@@ -28863,8 +28871,8 @@ msgstr "无限请求"
 msgid "Unlink"
 msgstr "取消关联"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:51
-#: src/features/chat/thread-list/thread-node.tsx:717
+#: src/features/chat/lock/locked-chat-gate.tsx:64
+#: src/features/chat/thread-list/thread-node.tsx:718
 msgid "Unlock chat"
 msgstr ""
 
@@ -29083,11 +29091,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:992
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1010
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:992
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1010
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -30571,11 +30579,11 @@ msgstr "WhatsApp 电话号码 ID"
 msgid "WhatsApp Verify Token"
 msgstr "WhatsApp 验证令牌"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:184
+#: src/features/settings/components/chat/model-filter-settings.tsx:163
 msgid "When set, only models hosted in these regions will be available."
 msgstr "设置后，只有托管在这些地区的模型可用。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:246
+#: src/features/settings/components/chat/model-filter-settings.tsx:225
 msgid "When set, only these providers will be used. Leave empty to allow all."
 msgstr "设置后，只会使用这些提供商。留空则允许全部。"
 
@@ -31259,8 +31267,8 @@ msgstr "Z.AI 最强大的旗舰模型"
 msgid "Z.AI's vision-enhanced flagship model"
 msgstr "Z.AI 视觉增强的旗舰模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:391
-#: src/features/settings/components/chat/model-filter-settings.tsx:397
+#: src/features/settings/components/chat/model-filter-settings.tsx:370
+#: src/features/settings/components/chat/model-filter-settings.tsx:376
 msgid "Zero Data Retention (ZDR)"
 msgstr "零数据保留（ZDR）"
 

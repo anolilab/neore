@@ -302,7 +302,10 @@ export const searchSharedCollections = internalAction
     });
 
 /** What {@link search} does, callable with any action context (tested directly). */
-export const searchKnowledgeBase = async (ctx: ActionCtx, args: { fileIds?: string[]; query: string; threadId?: string; userId: string }): Promise<Hit[]> => {
+export const searchKnowledgeBase = async (
+    ctx: ActionCtx,
+    args: { admittedRun?: boolean; fileIds?: string[]; query: string; threadId?: string; unlockProof?: string; userId: string },
+): Promise<Hit[]> => {
     // 1. Find what to search: explicit files; else what the thread and its
     // project have attached (files and collections); else everything indexed.
     let knowledgeFileIds: string[] | undefined;
@@ -318,7 +321,9 @@ export const searchKnowledgeBase = async (ctx: ActionCtx, args: { fileIds?: stri
         // also pass raw thread strings, so it has to be re-branded for the query. This
         // runs in an action context, where `ctx.db.asId` is not available.
         const scope = await ctx.runQuery(internal.knowledge.collections.resolveRetrievalScope, {
+            ...(args.admittedRun && { admittedRun: true }),
             threadId: args.threadId as Id<"threads">,
+            ...(args.unlockProof && { unlockProof: args.unlockProof }),
             userId: args.userId,
         });
 
@@ -372,9 +377,12 @@ export const searchKnowledgeBase = async (ctx: ActionCtx, args: { fileIds?: stri
 
 export const search = internalAction
     .input({
+        /** Set only by a run already admitted under the thread's lock (`streamRunThread`). Internal callers only. */
+        admittedRun: v.optional(v.boolean()),
         fileIds: v.optional(v.array(v.string())),
         query: v.string(),
         threadId: v.optional(v.union(v.id("threads"), v.string())),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         userId: v.string(),
     })
     .output(v.array(vHit))

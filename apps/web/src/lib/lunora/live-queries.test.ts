@@ -479,6 +479,21 @@ describe(LiveQueryManager, () => {
         unobserveOther();
     });
 
+    it("drops a read that names only the proof, a deck's, when its chat relocks", () => {
+        const deck = key("chat_slides:getPresentation", { presentationId: "deck-1", unlockProof: "deck-proof" });
+        const unobserve = observe(deck);
+
+        queryClient.setQueryData(deck, { slides: ["secret"] });
+        rememberUnlockProof("deck-chat", "deck-proof", Date.now() + 1000);
+
+        vi.advanceTimersByTime(1000);
+
+        expect(queryClient.getQueryData(deck)).toBeUndefined();
+        expect(manager.isSubscribed(hashKey(deck))).toBe(false);
+
+        unobserve();
+    });
+
     it("relocks a proof a render found lapsed before its timer fired, and drops the cache", async () => {
         const locked = key("chat:getThreadWithData", { threadId: "render-chat" });
         const unobserve = observe(locked);
