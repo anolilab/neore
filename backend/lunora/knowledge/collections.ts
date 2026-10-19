@@ -671,7 +671,7 @@ export const gatedKnowledgeFileIds = internalQuery
         admittedRun: v.optional(v.boolean()),
         threadId: v.optional(v.id("threads")),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
-        userId: v.string(),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.array(v.string()))
     .query(async ({ args, ctx }) => {
