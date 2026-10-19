@@ -1,0 +1,62 @@
+# Packaging for the Neore desktop shell. Built by `pnpm --filter @neore/desktop run dist`
+# (after `NEORE_SITE_URL` is set; see scripts/build.mjs). Signing is picked up from the
+# environment, not from this file: the variable names are in `.env.signing.example`.
+# With none of them set the build is unsigned, and unsigned builds run only where the
+# OS allows it (on macOS: right-click → Open; SmartScreen warns on Windows).
+appId: de.anolilab.neore
+productName: Neore
+copyright: Copyright © Anolilab
+directories:
+    buildResources: build
+    output: release
+# Everything the app loads at runtime lives in dist/ (main, preloads, Quick Composer page, tray icon).
+files:
+    - dist/**/*
+    - package.json
+asar: true
+afterPack: scripts/after-pack.cjs
+# The custom scheme: installers register it (macOS from Info.plist, Windows in the installer, Linux via the .desktop file).
+protocols:
+    - name: Neore
+      role: Viewer
+      schemes:
+          - neore
+mac:
+    category: public.app-category.productivity
+    icon: build/icon.png
+    target:
+        - target: dmg
+          arch: [arm64, x64]
+        # The zip is what the macOS updater downloads; electron-updater needs it next to the dmg.
+        - target: zip
+          arch: [arm64, x64]
+    hardenedRuntime: true
+    entitlements: build/entitlements.mac.plist
+    entitlementsInherit: build/entitlements.mac.plist
+    extendInfo:
+        # The web app's voice input asks for the microphone; without this key macOS denies it silently.
+        NSMicrophoneUsageDescription: Neore uses the microphone for voice input when you start dictation.
+win:
+    icon: build/icon.ico
+    target:
+        - target: nsis
+          arch: [x64, arm64]
+nsis:
+    oneClick: false
+    perMachine: false
+    allowToChangeInstallationDirectory: true
+linux:
+    executableName: neore
+    category: Office
+    icon: build/icon.png
+    target:
+        - target: AppImage
+          arch: [x64, arm64]
+        - target: deb
+          arch: [x64, arm64]
+# The update feed: GitHub Releases, read by electron-updater as latest*.yml. Local builds never publish.
+publish:
+    provider: github
+    owner: anolilab
+    repo: neore
+    releaseType: draft

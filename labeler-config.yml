@@ -4,6 +4,12 @@
 "package: chat-ui":
     - changed-files:
           - any-glob-to-any-file: "packages/chat-ui/**/*"
+"package: client-runtime":
+    - changed-files:
+          - any-glob-to-any-file: "packages/client-runtime/**/*"
+"package: device-core-node":
+    - changed-files:
+          - any-glob-to-any-file: "packages/device-core-node/**/*"
 "package: service-sdk":
     - changed-files:
           - any-glob-to-any-file: "packages/service-sdk/**/*"

@@ -31,7 +31,6 @@ export default defineConfig({
                     "@neore/browser-extension",
                     "@neore/chat-ui",
                     "@neore/cli",
-                    "@neore/native",
                     "@neore/service-sdk",
                     "@neore/ui",
                     "@neore/web",

@@ -1,0 +1,135 @@
+# Packages the Electron desktop shell (`apps/desktop`) for macOS (arm64 and x64),
+# Windows and Linux when a `desktop-v*` tag is pushed, and attaches the installers
+# to a DRAFT prerelease. Replaces `native.yml` (the Tauri shell, now deleted).
+#
+# UNSIGNED. Unsigned macOS builds are blocked by Gatekeeper and unsigned Windows
+# installers trip SmartScreen, so treat the output as internal test builds until
+# the signing accounts exist (docs/plans/desktop-and-mobile-apps.md §3: an Apple
+# Developer ID with notarization, and Windows code signing, Authenticode or Azure
+# Trusted Signing). Once the owner has them, add the secrets to the build job's
+# `env` here (names come from the owner's accounts, not from this file), add a
+# notarization step, and drop the "unsigned" wording from the release notes.
+#
+# Known blocker: the macOS packaging depends on the `@xmldom/xmldom` override in
+# `pnpm-workspace.yaml`. If the packager fails there, the macOS leg fails until the
+# owner decides how to resolve it. The other legs are not affected by it.
+#
+# The update feed (`latest*.yml`) is produced by electron-builder in one run per
+# platform. Only the macOS leg builds both architectures in one run, so its
+# `latest-mac.yml` is not duplicated across jobs.
+
+name: "Desktop build"
+
+on: # yamllint disable-line rule:truthy
+    push:
+        tags:
+            - "desktop-v*"
+
+concurrency:
+    group: "${{ github.workflow }}-${{ github.ref }}"
+    cancel-in-progress: false
+
+permissions:
+    contents: "read"
+
+jobs:
+    build:
+        name: "Package (${{ matrix.name }})"
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - name: "macos"
+                      runner: "macos-latest"
+                      # arm64 and x64 both come from `mac.target` in electron-builder.yml.
+                      args: "--mac"
+                    - name: "windows"
+                      runner: "windows-latest"
+                      args: "--win"
+                    - name: "linux"
+                      runner: "ubuntu-22.04"
+                      args: "--linux"
+        runs-on: "${{ matrix.runner }}"
+        timeout-minutes: 60
+        env:
+            # Set on the build so `scripts/build.mjs` refuses to produce a release
+            # without the site origin, and bakes the origin in.
+            NEORE_RELEASE: "1"
+            # The deployment the shell wraps. A repository VARIABLE, not a secret:
+            # it is the site's public URL.
+            NEORE_SITE_URL: "${{ vars.DESKTOP_SITE_URL }}"
+        permissions:
+            contents: "read"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@995b5d6f54bf41c2b33dddade556c723ba3003ad" # v24.1.1
+              with:
+                  node-version: "22"
+                  skip-playwright: "true"
+
+            - name: "Bundle the main process and preloads"
+              run: "pnpm --filter @neore/desktop run build"
+
+            - name: "Package with electron-builder"
+              run: "pnpm --filter @neore/desktop exec electron-builder --config electron-builder.yml --publish never ${{ matrix.args }}"
+
+            - name: "Upload installers"
+              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              with:
+                  name: "desktop-${{ matrix.name }}"
+                  if-no-files-found: "error"
+                  retention-days: 7
+                  path: |
+                      apps/desktop/release/*.dmg
+                      apps/desktop/release/*.zip
+                      apps/desktop/release/*.exe
+                      apps/desktop/release/*.AppImage
+                      apps/desktop/release/*.deb
+                      apps/desktop/release/latest*.yml
+                      apps/desktop/release/*.blockmap
+
+    release:
+        name: "Draft prerelease"
+        needs: build
+        runs-on: "ubuntu-latest"
+        timeout-minutes: 15
+        # Reading the run's artifacts needs `actions: read`; writing the release needs `contents: write`.
+        permissions:
+            contents: "write"
+            actions: "read"
+        env:
+            GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+            GH_REPO: "${{ github.repository }}"
+            RUN_ID: "${{ github.run_id }}"
+            TAG: "${{ github.ref_name }}"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411" # v2.19.4
+              with:
+                  egress-policy: "audit"
+
+            - name: "Download the installers from this run"
+              run: |
+                  gh run download "$RUN_ID" --pattern "desktop-*" --dir assets
+                  find assets -type f | sort
+
+            - name: "Create the draft prerelease, or refresh its assets"
+              run: |
+                  if ! gh release view "$TAG" >/dev/null 2>&1; then
+                      gh release create "$TAG" \
+                          --draft \
+                          --prerelease \
+                          --title "Neore desktop $TAG" \
+                          --notes "Unsigned test build. See apps/desktop/electron-builder.yml."
+                  fi
+                  gh release upload "$TAG" assets/*/* --clobber
