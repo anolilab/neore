@@ -22,8 +22,9 @@ test.describe("Models page (public)", () => {
         await expect(page.getByRole("heading", { name: "Video generation" })).toBeVisible();
     });
 
-    test("offers a sign-up call to action", async ({ page }) => {
-        await expect(page.getByText("Try it free").first()).toBeVisible();
+    // CI runs with SIGNUP_INVITE_ONLY unset, so sign-up calls to action are hidden.
+    test("hides the sign-up call to action while invite-only", async ({ page }) => {
+        await expect(page.getByText("Try it free")).toHaveCount(0);
     });
 
     test("renders the navbar", async ({ page }) => {
@@ -47,7 +48,11 @@ test.describe("Landing page", () => {
 
         expect(response?.status()).toBe(200);
         await expect(page).not.toHaveURL(AUTH_URL_RE);
-        await expect(page.getByText("Try it free").first()).toBeVisible();
+        // Invite-only hides the sign-up CTAs, but the Free tier's /chat link browses anonymously and stays.
+        await expect(page.getByText("Try it free")).toHaveCount(0);
+        const freeTierLink = page.getByRole("link", { name: "Get started", exact: true }).first();
+        await expect(freeTierLink).toBeVisible();
+        await expect(freeTierLink).toHaveAttribute("href", "/chat");
     });
 
     test("serves the metadata that sitemap.xml promises crawlers", async ({ page, request }) => {
