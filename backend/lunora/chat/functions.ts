@@ -356,7 +356,7 @@ const storeGeneratedImage = async (
     // The bytes say what they are; the declared type can be a CDN's generic octet-stream,
     // which the NSFW check would skip as "not an image".
     const mediaType = sniffImageMediaType(bytes) ?? (mimeType.startsWith("image/") ? mimeType : "image/png");
-    const stored = await storeFile(context, bytesToBlob(markAiGeneratedImage(bytes), mediaType), scope);
+    const stored = await storeFile(context, new Blob([markAiGeneratedImage(bytes)], { type: mediaType }), scope);
     const fileId = stored.file.fileId as Id<"chatFiles">;
 
     try {
