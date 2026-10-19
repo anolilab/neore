@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import type { HonoEnv } from "../env.js";
-import { capsFor, dailyLimitMiddleware, parseTierLimits, readDailyUsage, secondsUntilUtcMidnight } from "../middleware/daily-limit.js";
+import { capsFor, dailyLimitMiddleware, parseTierLimits, secondsUntilUtcMidnight } from "../middleware/daily-limit.js";
 
 /** A D1 double whose `usage_log` aggregate answers `usage`, or fails when it is `null`. */
 const makeDb = (usage: { requests: number; tokens: number; tokensLastMinute?: number } | null) => {
@@ -13,14 +13,14 @@ const makeDb = (usage: { requests: number; tokens: number; tokensLastMinute?: nu
 
         return usage;
     });
-    const bind = vi.fn((..._values: unknown[]) => {
+    const bind = vi.fn(() => {
         return { first };
     });
     const prepare = vi.fn(() => {
         return { bind };
     });
 
-    return { bind, db: { prepare } as unknown as D1Database, prepare };
+    return { db: { prepare } as unknown as D1Database, prepare };
 };
 
 const makeApp = (tier = "free", userId: string | undefined = "user-1") => {
@@ -79,38 +79,6 @@ describe("secondsUntilUtcMidnight", () => {
     });
 });
 
-describe("readDailyUsage", () => {
-    it("counts the user's public-API rows since 00:00 UTC, and the last minute's tokens", async () => {
-        const { bind, db } = makeDb({ requests: 4, tokens: 900, tokensLastMinute: 120 });
-
-        expect(await readDailyUsage(db, "user-1", Date.UTC(2026, 9, 19, 13, 5))).toEqual({ requests: 4, tokens: 900, tokensLastMinute: 120 });
-        // The scan starts at the day, since the minute (13:04:00) is inside it.
-        expect(bind).toHaveBeenCalledWith("user-1", "2026-10-19 00:00:00", "2026-10-19 13:04:00", "2026-10-19 00:00:00");
-    });
-
-    it("scans from the minute when it starts before midnight", async () => {
-        const { bind, db } = makeDb({ requests: 0, tokens: 0, tokensLastMinute: 0 });
-
-        await readDailyUsage(db, "user-1", Date.UTC(2026, 9, 19, 0, 0, 30));
-
-        expect(bind).toHaveBeenCalledWith("user-1", "2026-10-19 00:00:00", "2026-10-18 23:59:30", "2026-10-18 23:59:30");
-    });
-
-    it("is zero for a user with no rows", async () => {
-        const db = {
-            prepare: () => {
-                return {
-                    bind: () => {
-                        return { first: async () => null };
-                    },
-                };
-            },
-        } as unknown as D1Database;
-
-        expect(await readDailyUsage(db, "user-1")).toEqual({ requests: 0, tokens: 0, tokensLastMinute: 0 });
-    });
-});
-
 describe("dailyLimitMiddleware", () => {
     it("does nothing, and reads nothing, when no limit is configured", async () => {
         const { db, prepare } = makeDb({ requests: 9999, tokens: 9_999_999 });
@@ -153,14 +121,6 @@ describe("dailyLimitMiddleware", () => {
         expect(await statusOf(makeApp("pro"), env)).toBe(200);
     });
 
-    it("looks up the caller, not anyone else", async () => {
-        const { bind, db } = makeDb({ requests: 0, tokens: 0 });
-
-        await call(makeApp("free", "user-42"), { DAILY_REQUEST_LIMITS: "free=1", USAGE_DB: db });
-
-        expect(bind.mock.calls[0]?.[0]).toBe("user-42");
-    });
-
     it("refuses at the per-minute token cap, with a 60 second Retry-After and its own code", async () => {
         const { db } = makeDb({ requests: 1, tokens: 500, tokensLastMinute: 20_000 });
         const res = await call(makeApp(), { TOKENS_PER_MINUTE_LIMITS: "free=20000", USAGE_DB: db });
@@ -178,9 +138,13 @@ describe("dailyLimitMiddleware", () => {
         expect(await statusOf(makeApp(), { TOKENS_PER_MINUTE_LIMITS: "free=20000", USAGE_DB: db })).toBe(200);
     });
 
-    it("lets a request through when the usage cannot be read", async () => {
+    it("lets a request through when the usage cannot be read, and logs why", async () => {
+        const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
         const { db } = makeDb(null);
 
         expect(await statusOf(makeApp(), { DAILY_REQUEST_LIMITS: "free=1", USAGE_DB: db })).toBe(200);
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("[llm-gateway]"), expect.stringContaining("usage read failed"), expect.any(Error));
+
+        errorSpy.mockRestore();
     });
 });

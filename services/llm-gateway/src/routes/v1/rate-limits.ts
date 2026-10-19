@@ -1,10 +1,15 @@
 /**
- * GET /v1/rate-limits — Current limit status for a user.
+ * GET /v1/rate-limits — Limit status for a user.
  *
- * Returns the user's current RPM usage and limit (read from RATE_LIMIT_KV, the
- * store the rate-limit middleware writes), and the day's request and token counts
- * with the caps configured for the caller's tier. The counts come from `usage_log`
- * (see `middleware/daily-limit.ts`); a `used` of null means the read failed.
+ * `rpm.limit` is the tier's per-minute limit, from the same table the limiter enforces
+ * (`rpmFor` in `middleware/rate-limit.ts`). `rpm.current` is always 0: the per-minute
+ * count lives in the native Rate Limiting binding, which only answers allowed or not,
+ * so it is not tracked here. The field stays so the response shape does not change.
+ *
+ * `blocked` and `blockedUntil` come from RATE_LIMIT_KV (`blocked:<userId>`, written when
+ * a budget rule fires). The day's request and token counts with the caps configured for
+ * the caller's tier come from `usage_log` (see `middleware/daily-limit.ts`); a `used` of
+ * null means the read failed.
  *
  * Auth: Bearer token (gk_*) for SaaS API users.
  *       HMAC for internal/admin access (userId passed as query param).
@@ -15,16 +20,9 @@ import { z } from "zod";
 import type { AppEnv, HonoEnv } from "../../env.js";
 import { bearerAuth, internalAuth } from "../../middleware/auth.js";
 import { capsFor, secondsUntilUtcMidnight, tryReadDailyUsage } from "../../middleware/daily-limit.js";
+import { rpmFor } from "../../middleware/rate-limit.js";
 
 const rateLimitsRouter = new OpenAPIHono<HonoEnv>();
-
-const TIER_RPM: Record<string, number> = {
-    enterprise: 600,
-    free: 20,
-    pro: 120,
-};
-
-const DEFAULT_RPM = 60;
 
 const quotaSchema = z.object({
     /** The configured cap; null when the tier is uncapped. */
@@ -59,23 +57,17 @@ const rateLimitStatusSchema = z.object({
 // ── Helper to fetch rate limit status for a user ────────────────────────────
 
 async function getRateLimitStatus(env: AppEnv, userId: string, tier: string) {
-    const rpm = TIER_RPM[tier] ?? DEFAULT_RPM;
+    const rpm = rpmFor(tier);
     const minuteBucket = Math.floor(Date.now() / 60_000);
-    const key = `rl:${userId}:${minuteBucket}`;
 
     // Current minute window boundaries
     const windowStartMs = minuteBucket * 60_000;
     const windowEndMs = windowStartMs + 60_000;
     const secondsRemaining = Math.ceil((windowEndMs - Date.now()) / 1000);
 
-    const [currentString, blockedUntilString, usage] = await Promise.all([
-        env.RATE_LIMIT_KV.get(key),
-        env.RATE_LIMIT_KV.get(`blocked:${userId}`),
-        tryReadDailyUsage(env.USAGE_DB, userId),
-    ]);
+    const [blockedUntilString, usage] = await Promise.all([env.RATE_LIMIT_KV.get(`blocked:${userId}`), tryReadDailyUsage(env.USAGE_DB, userId)]);
     const caps = capsFor(env, tier);
 
-    const current = Number(currentString ?? "0");
     const isBlocked = blockedUntilString ? new Date(blockedUntilString).getTime() > Date.now() : false;
 
     return {
@@ -86,10 +78,11 @@ async function getRateLimitStatus(env: AppEnv, userId: string, tier: string) {
             resetsAt: new Date(Date.now() + secondsUntilUtcMidnight() * 1000).toISOString(),
             tokens: { limit: caps.dailyTokens, used: usage?.tokens ?? null },
         },
+        // Not tracked (see the header): always 0, so the whole limit reads as remaining.
         rpm: {
-            current,
+            current: 0,
             limit: rpm,
-            remaining: Math.max(0, rpm - current),
+            remaining: rpm,
         },
         tier,
         tokensPerMinute: { limit: caps.tokensPerMinute, used: usage?.tokensLastMinute ?? null },

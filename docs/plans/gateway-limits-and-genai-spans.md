@@ -61,3 +61,8 @@ backends that ingest OTLP show it as a generation:
   secrets, forwarded by `deploy.yml`) at the backend's OTLP endpoint. Whether a given backend maps these keys to its
   generation view is the backend's contract, not verified here.
 - Still operator-level: there is no per-user or per-organization export.
+- **Export timing.** `RequestTelemetry.flush()` drains what it sends, usage is
+  recorded before the first `await`, and the tracker flushes once more after its
+  D1 write, so a streamed reply (recorded after the middleware's flush) is still
+  exported exactly once. `integration/otel-export.integration.test.ts` drives the
+  real app to pin it.

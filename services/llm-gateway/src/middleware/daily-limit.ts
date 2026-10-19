@@ -22,6 +22,7 @@
 import { createMiddleware } from "hono/factory";
 
 import type { AppEnv, HonoEnv } from "../env.js";
+import { logger } from "../lib/logger.js";
 
 type TierLimits = Readonly<Record<string, number>>;
 
@@ -104,11 +105,17 @@ export const readDailyUsage = async (db: D1Database, userId: string, now: number
     };
 };
 
-/** The usage, or undefined when D1 cannot answer: a read that fails must not refuse a request that may be within its limit. */
+/**
+ * The usage, or undefined when D1 cannot answer: a read that fails must not refuse a
+ * request that may be within its limit. Logged, so a broken query shows up rather than
+ * quietly disabling every cap.
+ */
 export const tryReadDailyUsage = async (db: D1Database, userId: string): Promise<DailyUsage | undefined> => {
     try {
         return await readDailyUsage(db, userId);
-    } catch {
+    } catch (error) {
+        logger.error("[daily-limit] usage read failed; letting the request through", error);
+
         return undefined;
     }
 };
@@ -131,7 +138,13 @@ export const dailyLimitMiddleware = createMiddleware<HonoEnv>(async (c, next) =>
 
     const usage = await tryReadDailyUsage(c.env.USAGE_DB, userId);
 
-    if (usage && caps.dailyRequests !== null && usage.requests >= caps.dailyRequests) {
+    if (!usage) {
+        await next();
+
+        return undefined;
+    }
+
+    if (caps.dailyRequests !== null && usage.requests >= caps.dailyRequests) {
         return refuse(
             "DAILY_LIMIT_EXCEEDED",
             `Daily request limit reached: ${caps.dailyRequests} requests per day on the ${tier} tier. It resets at 00:00 UTC.`,
@@ -139,7 +152,7 @@ export const dailyLimitMiddleware = createMiddleware<HonoEnv>(async (c, next) =>
         );
     }
 
-    if (usage && caps.dailyTokens !== null && usage.tokens >= caps.dailyTokens) {
+    if (caps.dailyTokens !== null && usage.tokens >= caps.dailyTokens) {
         return refuse(
             "DAILY_LIMIT_EXCEEDED",
             `Daily token limit reached: ${caps.dailyTokens} tokens per day on the ${tier} tier. It resets at 00:00 UTC.`,
@@ -148,7 +161,7 @@ export const dailyLimitMiddleware = createMiddleware<HonoEnv>(async (c, next) =>
     }
 
     // The minute's tokens leave the window within 60 seconds, so that is the honest retry hint.
-    if (usage && caps.tokensPerMinute !== null && usage.tokensLastMinute >= caps.tokensPerMinute) {
+    if (caps.tokensPerMinute !== null && usage.tokensLastMinute >= caps.tokensPerMinute) {
         return refuse(
             "TOKENS_PER_MINUTE_EXCEEDED",
             `Token rate limit reached: ${caps.tokensPerMinute} tokens per minute on the ${tier} tier.`,
