@@ -206,14 +206,38 @@ const generateReply = async (ctx: ActionCtx, threadId: Id<"threads">, userId: st
 };
 
 /**
- * Art. 50(1): the chat's first reply says it comes from an AI. Claimed only
- * here, right before the send and after the reply exists, so a burst, a closed
- * window or a failed run never uses it up.
+ * Art. 50(1): the chat's first reply says it comes from an AI. The claim is
+ * taken right before the send and given back unless the reply reached the
+ * contact, so a burst, a closed window or a failed send leaves the disclosure
+ * due for the next reply.
  */
-const withAiDisclosure = async (ctx: ActionCtx, options: { text: string; threadId: Id<"threads">; userId: string }): Promise<string> => {
-    const first = await ctx.runMutation(internal.messenger.functions.claimAiDisclosure, { threadId: options.threadId, userId: options.userId });
+type SendOutcome = Awaited<ReturnType<typeof sendPlatformMessage>>;
 
-    return first ? `${AI_DISCLOSURE}\n\n${options.text}` : options.text;
+const sendWithAiDisclosure = async (
+    ctx: ActionCtx,
+    delivery: Delivery,
+    messengerKeys: Record<string, string>,
+    options: { text: string; threadId: Id<"threads">; userId: string },
+): Promise<SendOutcome> => {
+    const first = await ctx.runMutation(internal.messenger.functions.claimAiDisclosure, { threadId: options.threadId, userId: options.userId });
+    const text = first ? `${AI_DISCLOSURE}\n\n${options.text}` : options.text;
+    let outcome: SendOutcome;
+
+    try {
+        outcome = await sendPlatformMessage(delivery, text, messengerKeys);
+    } catch (error) {
+        if (first) {
+            await ctx.runMutation(internal.messenger.functions.releaseAiDisclosure, { threadId: options.threadId });
+        }
+
+        throw error;
+    }
+
+    if (first && outcome !== "sent") {
+        await ctx.runMutation(internal.messenger.functions.releaseAiDisclosure, { threadId: options.threadId });
+    }
+
+    return outcome;
 };
 
 /**
@@ -287,7 +311,7 @@ export const respondToInbound = async (ctx: ActionCtx, args: RespondArgs): Promi
         }
 
         // Send response back to the platform using per-user BYOK tokens
-        let outcome = await sendPlatformMessage(delivery, await withAiDisclosure(ctx, { text: responseText, threadId, userId }), messengerKeys);
+        let outcome = await sendWithAiDisclosure(ctx, delivery, messengerKeys, { text: responseText, threadId, userId });
 
         // Only a reply with tools can have produced files.
         if (outcome === "sent" && replyTools) {

@@ -1060,6 +1060,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "messenger_functions:listReplyMedia": lunora_messenger_functions_125.listReplyMedia as unknown as RegisteredLunoraFunction,
     "messenger_functions:pairConnection": lunora_messenger_functions_125.pairConnection as unknown as RegisteredLunoraFunction,
     "messenger_functions:regeneratePairingCode": lunora_messenger_functions_125.regeneratePairingCode as unknown as RegisteredLunoraFunction,
+    "messenger_functions:releaseAiDisclosure": lunora_messenger_functions_125.releaseAiDisclosure as unknown as RegisteredLunoraFunction,
     "messenger_functions:saveMessengerMessage": lunora_messenger_functions_125.saveMessengerMessage as unknown as RegisteredLunoraFunction,
     "messenger_functions:saveMessengerNotice": lunora_messenger_functions_125.saveMessengerNotice as unknown as RegisteredLunoraFunction,
     "messenger_functions:threadHasRecentMedia": lunora_messenger_functions_125.threadHasRecentMedia as unknown as RegisteredLunoraFunction,
@@ -6340,6 +6341,12 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["connectionId"] !== "string") return DEFER;
 return { "connectionId": source["connectionId"] };
 });
+installCompiledValidatorMap(lunora_messenger_functions_125.releaseAiDisclosure.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "threadId": source["threadId"] };
+});
 installCompiledValidatorMap(lunora_messenger_functions_125.saveMessengerNotice.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8950,6 +8957,7 @@ export interface Caller {
             listReplyMedia: (args: { threadId: Id<"threads">; userId: string }) => Promise<Array<{ filename?: string; key: string; mediaType: string }>>;
             pairConnection: (args: { codeHash: string; connectionId: Id<"messengerConnections">; displayName?: string; platformChatId: string; platformUserId: string; platformUsername?: string }) => Promise<boolean>;
             regeneratePairingCode: (args: { connectionId: Id<"messengerConnections"> }) => Promise<{ pairingCode: string; pairingCodeExpiresAt: number }>;
+            releaseAiDisclosure: (args: { threadId: Id<"threads"> }) => Promise<null>;
             saveMessengerMessage: (args: { fileIds?: Array<Id<"chatFiles">>; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; pending?: boolean; text: string; threadId: Id<"threads">; userId: string }) => Promise<{ messageId: Id<"messages">; order: number }>;
             saveMessengerNotice: (args: { text: string; threadId: Id<"threads">; userId: string }) => Promise<null>;
             threadHasRecentMedia: (args: { threadId: Id<"threads"> }) => Promise<boolean>;
@@ -10556,6 +10564,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             listReplyMedia: (args) => callRegistered(context, "messenger_functions:listReplyMedia", args),
             pairConnection: (args) => callRegistered(context, "messenger_functions:pairConnection", args),
             regeneratePairingCode: (args) => callRegistered(context, "messenger_functions:regeneratePairingCode", args),
+            releaseAiDisclosure: (args) => callRegistered(context, "messenger_functions:releaseAiDisclosure", args),
             saveMessengerMessage: (args) => callRegistered(context, "messenger_functions:saveMessengerMessage", args),
             saveMessengerNotice: (args) => callRegistered(context, "messenger_functions:saveMessengerNotice", args),
             threadHasRecentMedia: (args) => callRegistered(context, "messenger_functions:threadHasRecentMedia", args),

@@ -757,6 +757,7 @@ export interface InternalApiTypes {
             getReplyToolSetting: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, null | { enabled: boolean; groups?: Array<string> }>;
             listReplyMedia: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, Array<{ filename?: string; key: string; mediaType: string }>>;
             pairConnection: FunctionReference<"mutation", { codeHash: string; connectionId: Id<"messengerConnections">; displayName?: string; platformChatId: string; platformUserId: string; platformUsername?: string }, boolean>;
+            releaseAiDisclosure: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
             saveMessengerMessage: FunctionReference<"mutation", { fileIds?: Array<Id<"chatFiles">>; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; pending?: boolean; text: string; threadId: Id<"threads">; userId: string }, { messageId: Id<"messages">; order: number }>;
             saveMessengerNotice: FunctionReference<"mutation", { text: string; threadId: Id<"threads">; userId: string }, null>;
             threadHasRecentMedia: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
@@ -1744,6 +1745,7 @@ export const internal: InternalApiTypes = {
             getReplyToolSetting: { __lunoraRef: "messenger_functions:getReplyToolSetting" },
             listReplyMedia: { __lunoraRef: "messenger_functions:listReplyMedia" },
             pairConnection: { __lunoraRef: "messenger_functions:pairConnection" },
+            releaseAiDisclosure: { __lunoraRef: "messenger_functions:releaseAiDisclosure" },
             saveMessengerMessage: { __lunoraRef: "messenger_functions:saveMessengerMessage" },
             saveMessengerNotice: { __lunoraRef: "messenger_functions:saveMessengerNotice" },
             threadHasRecentMedia: { __lunoraRef: "messenger_functions:threadHasRecentMedia" },

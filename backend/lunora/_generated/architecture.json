@@ -12314,6 +12314,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:messenger_functions:releaseAiDisclosure",
+      "kind": "function",
+      "name": "messenger.functions.releaseAiDisclosure",
+      "module": "messenger"
+    },
+    {
+      "detail": "mutation",
       "id": "function:messenger_functions:saveMessengerMessage",
       "kind": "function",
       "name": "messenger.functions.saveMessengerMessage",
@@ -18755,37 +18762,49 @@
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 214,
+      "line": 222,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 248,
+      "line": 230,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 263,
+      "line": 237,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 271,
+      "line": 272,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 298,
+      "line": 287,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 307,
+      "line": 295,
+      "reason": "\"respondToInbound\" is not a registered function"
+    },
+    {
+      "file": "messenger/respond",
+      "kind": "call",
+      "line": 322,
+      "reason": "\"respondToInbound\" is not a registered function"
+    },
+    {
+      "file": "messenger/respond",
+      "kind": "call",
+      "line": 331,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {

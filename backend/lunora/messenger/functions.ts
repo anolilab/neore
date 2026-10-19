@@ -11,7 +11,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { changeRefcount } from "../agent/files";
 import { insertMessageRow, insertThread, patchMessage, patchThread } from "../agent/table-writes";
-import { AI_DISCLOSURE_CLAIM_TTL_MS, claimOnce, MESSENGER_CLAIM_TTL_MS } from "../lib/claim-once";
+import { AI_DISCLOSURE_CLAIM_TTL_MS, claimOnce, MESSENGER_CLAIM_TTL_MS, releaseClaim } from "../lib/claim-once";
 import { timingSafeEqual } from "../lib/crypto";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { getUserTier } from "../lib/rate-limiter";
@@ -628,6 +628,16 @@ export const claimAiDisclosure = internalMutation
     .input({ threadId: v.id("threads"), userId: v.string() })
     .output(v.boolean())
     .mutation(async ({ args: { threadId, userId }, ctx }) => await claimOnce(ctx, AI_DISCLOSURE_SCOPE, threadId, AI_DISCLOSURE_CLAIM_TTL_MS, userId));
+
+/** Give the disclosure back when the reply it was claimed for did not reach the contact. */
+export const releaseAiDisclosure = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args: { threadId }, ctx }) => {
+        await releaseClaim(ctx, AI_DISCLOSURE_SCOPE, threadId);
+
+        return null;
+    });
 
 /**
  * Append an assistant-side note to a messenger thread — used when a reply could

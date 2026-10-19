@@ -27,6 +27,8 @@ const state = vi.hoisted(() => {
         sentText: [] as { chatId: string; platform: string; text: string }[],
         setting: null as { enabled: boolean; groups?: string[] } | null,
         settingArgs: [] as unknown[],
+        /** Telegram's send result: `true` delivered, `false` refused, `"throw"` a network error. */
+        telegram: true as boolean | "throw",
     };
 });
 
@@ -52,7 +54,11 @@ vi.mock("./platforms/telegram", async (importOriginal) => {
         sendTelegramMessage: async (_token: string, chatId: string, text: string) => {
             state.sentText.push({ chatId, platform: "telegram", text });
 
-            return true;
+            if (state.telegram === "throw") {
+                throw new Error("network");
+            }
+
+            return state.telegram;
         },
     };
 });
@@ -120,6 +126,9 @@ const ctx = () =>
                 case "messenger_functions:claimThreadReply": {
                     return { claimed: true };
                 }
+                case "messenger_functions:releaseAiDisclosure": {
+                    return null;
+                }
                 default: {
                     return null;
                 }
@@ -166,6 +175,7 @@ beforeEach(() => {
     state.charge = "charged";
     state.disclose = false;
     state.mutations = [];
+    state.telegram = true;
     state.replyFiles = [{ filename: "cat.png", key: "agent-files/cat", mediaType: "image/png" }];
     state.runs = [];
     state.sentMedia = [];
@@ -279,6 +289,32 @@ describe("AI disclosure", () => {
         expect(state.mutations.filter((entry) => entry.path === "messenger_functions:claimAiDisclosure")).toStrictEqual([
             { args: { threadId: "thread-1", userId: "owner" }, path: "messenger_functions:claimAiDisclosure" },
         ]);
+    });
+
+    it("gives the disclosure back when the platform refuses the send", async () => {
+        state.disclose = true;
+        state.telegram = false;
+
+        await respond();
+
+        expect(mutationPaths()).toContain("messenger_functions:releaseAiDisclosure");
+    });
+
+    it("gives the disclosure back when the send throws", async () => {
+        state.disclose = true;
+        state.telegram = "throw";
+
+        await respond();
+
+        expect(mutationPaths()).toContain("messenger_functions:releaseAiDisclosure");
+    });
+
+    it("keeps the disclosure claim once the reply has been delivered", async () => {
+        state.disclose = true;
+
+        await respond();
+
+        expect(mutationPaths()).not.toContain("messenger_functions:releaseAiDisclosure");
     });
 
     it("does not claim it when the reply window has closed, so the next reply still discloses", async () => {
