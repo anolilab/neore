@@ -27,13 +27,27 @@ const XAP_HEADER = `${XAP_NAMESPACE}\0`;
 // The PNG iTXt keyword under which XMP is stored.
 const XMP_KEYWORD = "XML:com.adobe.xmp";
 
-const DIGITAL_SOURCE_TYPE_ATTRIBUTE = /Iptc4xmpExt:DigitalSourceType="([^"]*)"/;
+// The attribute must sit inside a start tag, so text in a node does not count.
+const DIGITAL_SOURCE_TYPE_ATTRIBUTE = /\sIptc4xmpExt:DigitalSourceType="([^"]*)"/;
+
+const XML_COMMENT_OR_CDATA = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>/g;
 
 /**
- * True only when the XMP already declares OUR source type. An unrelated text chunk
- * that merely mentions the URI, or a camera's own source type, does not count.
+ * True only when the XMP already declares OUR source type as an attribute of a tag.
+ * An unrelated text chunk, a comment that mentions the URI, or a camera's own source
+ * type does not count.
  */
-const xmpAlreadyMarked = (xmp: string): boolean => DIGITAL_SOURCE_TYPE_ATTRIBUTE.exec(xmp)?.[1] === DIGITAL_SOURCE_TYPE;
+const xmpAlreadyMarked = (xmp: string): boolean => {
+    // Each element start tag is checked on its own, so text in a node cannot count as an attribute.
+    const tags = xmp
+        .replaceAll(XML_COMMENT_OR_CDATA, "")
+        .split("<")
+        .slice(1)
+        .filter((piece) => piece[0] !== "!" && piece[0] !== "?" && piece[0] !== "/")
+        .map((piece) => piece.split(">", 1)[0]!);
+
+    return tags.some((tag) => DIGITAL_SOURCE_TYPE_ATTRIBUTE.exec(tag)?.[1] === DIGITAL_SOURCE_TYPE);
+};
 
 const XMP_PACKET = [
     `<?xpacket begin="\u{FEFF}" id="W5M0MpCehiHzreSzNTczkc9d"?>`,

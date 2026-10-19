@@ -143,6 +143,30 @@ describe("markAiGeneratedImage", () => {
         expect(dec.decode(readPngChunks(marked)[2]!.data)).toContain("DigitalSourceType");
     });
 
+    it("still marks a PNG whose XMP mentions the source type only inside a comment", () => {
+        const xmp = `<x:xmpmeta xmlns:x="adobe:ns:meta/"><!-- Iptc4xmpExt:DigitalSourceType="https://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia" --></x:xmpmeta>`;
+        const keyword = enc.encode("XML:com.adobe.xmp\0\0\0\0\0");
+        const itxt = chunk("iTXt", new Uint8Array([...keyword, ...enc.encode(xmp)]));
+        const png = makePng([itxt]);
+        const marked = markAiGeneratedImage(png);
+
+        expect(marked.byteLength).toBeGreaterThan(png.byteLength);
+        expect(dec.decode(marked)).toContain("<rdf:Description");
+    });
+
+    it("still marks a JPEG whose XMP mentions the source type only inside a comment", () => {
+        const xmp = `<?xpacket begin=""?><x:xmpmeta xmlns:x="adobe:ns:meta/"><!-- Iptc4xmpExt:DigitalSourceType="https://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia" --></x:xmpmeta>`;
+        const header = enc.encode("https://ns.adobe.com/xap/1.0/\0");
+        const app1 = [0xff, 0xe1, 0x00, 0x00, ...header, ...enc.encode(xmp)];
+
+        app1[2] = (app1.length - 2) >> 8;
+        app1[3] = (app1.length - 2) & 0xff;
+        const jpeg = new Uint8Array([0xff, 0xd8, ...app1, 0xff, 0xdb, 0x00, 0x03, 0x00, 0xff, 0xd9]);
+        const marked = markAiGeneratedImage(jpeg);
+
+        expect(marked.byteLength).toBeGreaterThan(jpeg.byteLength);
+    });
+
     it("keeps bytes appended after IEND", () => {
         const trailer = enc.encode("trailing data");
         const png = new Uint8Array([...makePng(), ...trailer]);
