@@ -87,7 +87,8 @@ export const runStreamingAgent = internalAction
             // Group chat: its participants take the turn (`group/run.ts`) — unless
             // the user invoked one skill directly with `/<slug>`.
             isSkillCommand ? null : ctx.runQuery(internal.chat.group.functions.getGroupRunConfig, { organizationId, threadId, userId }),
-            ctx.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [messageId as Id<"messages">] }),
+            // Raw row: the stream above was admitted under the thread's lock state (`streamRunThread`).
+            ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] }),
             ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId }),
         ]);
 

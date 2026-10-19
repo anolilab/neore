@@ -7,6 +7,8 @@
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readMessagesByIds } from "../agent/messages";
+import { lockThread } from "../agent/thread-lock";
 import { createPin, getThreadPins } from "./pins/functions";
 import { abortThreadStream, getCachedFollowupSuggestions, getThread, getThreadUIMessages, gateThreadActionHandler } from "./functions";
 import { getGroupChat } from "./group/functions";
@@ -300,6 +302,31 @@ describe("writes into a locked chat", () => {
         expect(await as(OWNER).query(getThreadPins as never, { threadId } as never)).toEqual([]);
     });
 
+    it("the message read of a locked chat is null without a proof and the row with a valid one", async () => {
+        const messageId = await harness.run(
+            async (context: any) =>
+                await context.db.insert("messages", {
+                    message: { content: "reply in progress", role: "assistant" },
+                    order: 1,
+                    status: "streaming",
+                    stepOrder: 0,
+                    text: "reply in progress",
+                    threadId,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+        const read = (unlockProof?: string) =>
+            harness.run(async (context: any) => await readMessagesByIds(context, { messageIds: [messageId], threadId: threadId as never, unlockProof }));
+
+        // Abort, regenerate and edit read the row with the proof they were sent; without it the row is hidden.
+        const [hidden] = await read();
+        const [visible] = await read(proof);
+
+        expect(hidden).toBeNull();
+        expect(visible).toMatchObject({ _id: messageId, threadId });
+    });
+
     it("abortThreadStream refuses the owner without a proof", async () => {
         await expect(as(OWNER).mutation(abortThreadStream as never, { threadId } as never)).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
     });
@@ -368,5 +395,30 @@ describe("runs and stream reads", () => {
 
         expect(await harness.run(async (context: any) => await streamLockedSinceStartHandler(context, { streamId: before }))).toBe(false);
         expect(await harness.run(async (context: any) => await streamLockedSinceStartHandler(context, { streamId: after }))).toBe(true);
+    });
+
+    it("a stream started under a proof stops after 'lock now' locks the chat again", async () => {
+        const streamId = await harness.run(
+            async (context: any) =>
+                await context.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "m-relock",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "gpt-4o" },
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await harness.run(async (context: any) => await streamRunThreadHandler(context, { streamId, userId: OWNER }))).not.toBeNull();
+
+        // The stream must be created strictly before the re-lock, or the comparison cannot tell them apart.
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 5);
+        });
+        await as(OWNER).mutation(lockThread as never, { threadId } as never);
+
+        expect(await harness.run(async (context: any) => await streamRunThreadHandler(context, { streamId, userId: OWNER }))).toBeNull();
+        expect(await harness.run(async (context: any) => await streamLockedSinceStartHandler(context, { streamId }))).toBe(true);
     });
 });

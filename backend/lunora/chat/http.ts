@@ -657,16 +657,8 @@ const runChatStartOnShard = async (
         // Regenerate: a SIBLING reply to the same prompt row (see
         // `agent/branch-tree.ts`). This used to save a copy of the prompt, which
         // appended a duplicate turn at the end and left the old reply behind it.
-        const [[prompt], regenerateThread] = await Promise.all([
-            context.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [body.parentId as Id<"messages">] }),
-            context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> }),
-        ]);
-
-        if (!prompt || prompt.threadId !== validThreadId || prompt.message?.role !== "user" || regenerateThread?.userId !== userId) {
-            return Response.json({ error: "Invalid regenerate target" }, { status: 400 });
-        }
-
         // A regenerate writes a sibling reply, so a locked chat needs its proof here.
+        // The gate runs first: with a valid proof the prompt read below passes the lock filter.
         const regenerateGate = await context.runQuery(internal.chat.functions.gateThreadAction, {
             level: "write",
             threadId: validThreadId as Id<"threads">,
@@ -676,6 +668,19 @@ const runChatStartOnShard = async (
 
         if (regenerateGate.outcome === "locked") {
             return threadLockedResponse();
+        }
+
+        const [[prompt], regenerateThread] = await Promise.all([
+            context.runQuery(internal.agent.messages.getMessagesByIds, {
+                messageIds: [body.parentId as Id<"messages">],
+                threadId: validThreadId as Id<"threads">,
+                unlockProof: body.unlockProof,
+            }),
+            context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> }),
+        ]);
+
+        if (!prompt || prompt.threadId !== validThreadId || prompt.message?.role !== "user" || regenerateThread?.userId !== userId) {
+            return Response.json({ error: "Invalid regenerate target" }, { status: 400 });
         }
 
         // The new reply will be the prompt's latest child, so pointing the
@@ -858,8 +863,8 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
     }
 
     try {
-        // Get the message to find its thread
-        const messages = await context.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [messageId as Id<"messages">] });
+        // Get the message to find its thread. The thread is not known yet, so the raw row is read and the gate below decides.
+        const messages = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] });
 
         if (!messages || messages.length === 0) {
             return Response.json({ error: "Message not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
@@ -1145,8 +1150,8 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
         return Response.json({ error: "User ID not found" }, { headers: { "Content-Type": "application/json" }, status: 401 });
     }
 
-    // Get message to retrieve threadId and prompt content
-    const messages = await context.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [messageId as Id<"messages">] });
+    // Get message to retrieve threadId and prompt content. The gate below refuses a locked thread without its proof.
+    const messages = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] });
     const message = messages?.[0];
 
     if (!message) {

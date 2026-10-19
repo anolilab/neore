@@ -17,7 +17,7 @@ import { toast } from "sonner";
 
 import { getCreatorDisplayName } from "@/components/model-picker/utilities";
 import type { ModelFilterRules } from "@/hooks/use-model-filter-rules";
-import { useBlockedCreators } from "@/hooks/use-model-filter-rules";
+import { useBlockedCreators, withoutCreator } from "@/hooks/use-model-filter-rules";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 const REGIONS = [
@@ -47,7 +47,7 @@ const ModelFilterSettings: FC = () => {
 
     const restoreCreator = async (slug: string) => {
         try {
-            await setBlockedCreators(blockedCreators.filter((s) => s !== slug));
+            await setBlockedCreators((current) => withoutCreator(current, slug));
             toast.success(t`Filter rules updated`);
         } catch {
             toast.error(t`Failed to update filter rules`);

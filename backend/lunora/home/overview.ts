@@ -17,7 +17,7 @@ import { repoLabel } from "../coding-agents/repo-label";
 import { vCodingAgentId } from "../coding-agents/validators";
 import { authQuery } from "../lib/crpc";
 import { isThreadLocked } from "../lib/thread-lock";
-import { loadUnread, toNotificationView, UNREAD_COUNT_CAP } from "../notifications/functions";
+import { loadUnread, toRedactedNotificationViews, UNREAD_COUNT_CAP } from "../notifications/functions";
 import { vNotificationView } from "../notifications/validators";
 
 /** Rows per section. The page shows fewer; the rest is one click away. */
@@ -128,7 +128,7 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
             };
         }),
         dailyBriefEnabled: settings?.dailyBriefEnabled === true,
-        notifications: unread.slice(0, HOME_NOTIFICATIONS).map((row) => toNotificationView(row)),
+        notifications: await toRedactedNotificationViews(ctx.db, unread.slice(0, HOME_NOTIFICATIONS)),
         recentThreads: threadRows.page
             .filter((thread) => thread.deleted !== true && thread.isTemporary !== true)
             .slice(0, RECENT_THREADS)

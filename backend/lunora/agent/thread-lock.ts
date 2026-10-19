@@ -167,8 +167,9 @@ export const lockThread = authMutation
 
         const row = await requireLockedRow(context, threadId);
 
+        // `lockedAt` moves too: a stream or background run started under the earlier proof is "created before the lock" and stops (`lockedAfterCreation`).
         await patchRow(context.db, row, { epoch: newPasscodeEpoch(), updatedAt: now });
-        await patchRow(context.db, thread, { updatedAt: now });
+        await patchRow(context.db, thread, { lockedAt: now, updatedAt: now });
 
         return { ok: true };
     });
@@ -206,7 +207,7 @@ export const changeThreadPasscode = authMutation
         const { hash, iterations, salt } = await hashPasscode(newPasscode);
 
         await patchRow(context.db, row, { epoch, failedAttempts: 0, hash, iterations, lockoutUntil: undefined, salt, updatedAt: now });
-        await patchRow(context.db, thread, { updatedAt: now });
+        await patchRow(context.db, thread, { lockedAt: now, updatedAt: now });
 
         const { expiresAt, proof } = await mintUnlockProof({ epoch, threadId, userId }, unlockSecret(), now);
 

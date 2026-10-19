@@ -3628,7 +3628,8 @@ export const streamAsync = internalAction
         // The edit that queued this run was written under the lock gate. A lock
         // applied since the edited prompt was saved means that proof predates it.
         if (isThreadLocked(thread)) {
-            const [editedPrompt] = await context.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [messageId as Id<"messages">] });
+            // Raw row: the locked-chat check below is this run's own admission (the edit's proof predates the lock or not).
+            const [editedPrompt] = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] });
 
             if (!editedPrompt || lockedAfterCreation(thread, editedPrompt._creationTime)) {
                 return null;
@@ -3772,6 +3773,8 @@ export const abortStreamByMessageId = authMutation
         // Get the message to find its order
         const messages = await context.runQuery(internal.agent.messages.getMessagesByIds, {
             messageIds: [messageId as Id<"messages">],
+            threadId: threadId as Id<"threads">,
+            unlockProof,
         });
         const message = messages[0];
 

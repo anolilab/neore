@@ -276,15 +276,19 @@ export { LunoraProvider as CRPCProvider, type LunoraClient as LunoraReactClient,
 // ---------------------------------------------------------------------------
 
 /**
+ * One action call, for both hooks: a locked chat's args carry its in-memory
+ * proof (`unlock-proofs.ts`), and the call goes to the chat owner's shard.
+ */
+export const runLunoraAction = async (client: LunoraClient, reference: FunctionReference, args: unknown): Promise<unknown> =>
+    await client.action(reference as never, withUnlockProof(args) as never, shardOptionsFor(args));
+
+/**
  * `useAction(ref)` — Lunora action invocation hook.
  */
 export const useAction = <F extends FunctionReference>(reference: F): ((args: ArgsOf<F>) => Promise<ReturnOf<F>>) => {
     const client = useLunora();
 
-    return useMemo(
-        () => async (args: ArgsOf<F>) => await client.action(reference as never, withUnlockProof(args) as never, shardOptionsFor(args)),
-        [client, reference],
-    );
+    return useMemo(() => async (args: ArgsOf<F>) => (await runLunoraAction(client, reference, args)) as ReturnOf<F>, [client, reference]);
 };
 
 /**
@@ -294,7 +298,7 @@ export const useLunoraActionOptions = <F extends FunctionReference>(reference: F
     const client = useLunora();
 
     return useMemo(() => {
-        return { mutationFn: async (args: ArgsOf<F>) => await client.action(reference as never, args as never, shardOptionsFor(args)) };
+        return { mutationFn: async (args: ArgsOf<F>) => (await runLunoraAction(client, reference, args)) as ReturnOf<F> };
     }, [client, reference]);
 };
 

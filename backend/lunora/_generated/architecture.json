@@ -1458,7 +1458,7 @@
     {
       "from": "function:chat_execute:runStreamingAgent",
       "kind": "call",
-      "to": "function:agent_messages:getMessagesByIds"
+      "to": "function:agent_messages:getMessagesByIdsUnfiltered"
     },
     {
       "from": "function:chat_execute:runStreamingAgent",
@@ -2008,7 +2008,7 @@
     {
       "from": "function:chat_functions:streamAsync",
       "kind": "call",
-      "to": "function:agent_messages:getMessagesByIds"
+      "to": "function:agent_messages:getMessagesByIdsUnfiltered"
     },
     {
       "from": "function:chat_functions:streamAsync",
@@ -6907,6 +6907,13 @@
       "id": "function:agent_messages:getMessagesByIds",
       "kind": "function",
       "name": "agent.messages.getMessagesByIds",
+      "module": "agent"
+    },
+    {
+      "detail": "query",
+      "id": "function:agent_messages:getMessagesByIdsUnfiltered",
+      "kind": "function",
+      "name": "agent.messages.getMessagesByIdsUnfiltered",
       "module": "agent"
     },
     {
@@ -15488,61 +15495,61 @@
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1083,
+      "line": 1084,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1174,
+      "line": 1175,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1217,
+      "line": 1218,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1245,
+      "line": 1246,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1285,
+      "line": 1286,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1303,
+      "line": 1304,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1315,
+      "line": 1316,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1367,
+      "line": 1368,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1384,
+      "line": 1385,
       "reason": "at module scope"
     },
     {
       "file": "agent/client/index",
       "kind": "call",
-      "line": 1398,
+      "line": 1399,
       "reason": "at module scope"
     },
     {
@@ -16550,25 +16557,25 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 562,
+      "line": 563,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 650,
+      "line": 651,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 666,
+      "line": 667,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 676,
+      "line": 677,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -16616,79 +16623,79 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 661,
-      "reason": "\"runChatStart\" is not a registered function"
-    },
-    {
-      "file": "chat/http",
-      "kind": "call",
       "line": 662,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 670,
+      "line": 674,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 683,
+      "line": 679,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 720,
+      "line": 688,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 749,
+      "line": 725,
       "reason": "\"runChatStart\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 862,
+      "line": 754,
+      "reason": "\"runChatStart\" is not a registered function"
+    },
+    {
+      "file": "chat/http",
+      "kind": "call",
+      "line": 867,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 877,
+      "line": 882,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 889,
+      "line": 894,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1000,
+      "line": 1005,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1008,
+      "line": 1013,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1149,
+      "line": 1154,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1175,
+      "line": 1180,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {

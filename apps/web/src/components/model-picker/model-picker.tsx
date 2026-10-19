@@ -26,7 +26,7 @@ import { toast } from "sonner";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
-import { useBlockedCreators } from "@/hooks/use-model-filter-rules";
+import { useBlockedCreators, withCreatorHidden, withoutCreator } from "@/hooks/use-model-filter-rules";
 import { trackEvent } from "@/lib/analytics";
 import { localizeModelDescription } from "@/lib/model-descriptions";
 
@@ -614,17 +614,16 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const handleProviderSelectAll = useCallback(() => handleProviderSelect(null), [handleProviderSelect]);
 
     // Hides a lab through the same `modelFilterRules` the filters page edits, so the picker
-    // and the page cannot disagree. The toast's undo restores the list as it was.
+    // and the page cannot disagree. Hide and Undo each change only their own lab, against the
+    // current rules, so an earlier Undo never unhides a later hide.
     const handleHideCreator = useCallback(
         async (slug: string, name: string) => {
-            const previous = blockedCreators;
-
             if (selectedProvider === slug) {
                 handleProviderSelectAll();
             }
 
             try {
-                await setBlockedCreators([...previous, slug]);
+                await setBlockedCreators((current) => withCreatorHidden(current, slug));
             } catch {
                 toast.error(t`Failed to update filter rules`);
 
@@ -635,13 +634,13 @@ const ModelPicker: FC<ModelPickerProps> = ({
                 action: {
                     label: t`Undo`,
                     onClick: () => {
-                        setBlockedCreators(previous).catch(() => toast.error(t`Failed to update filter rules`));
+                        setBlockedCreators((current) => withoutCreator(current, slug)).catch(() => toast.error(t`Failed to update filter rules`));
                     },
                 },
                 description: <Link to="/dashboard/settings/chat/model-filters">{t`Manage hidden labs`}</Link>,
             });
         },
-        [blockedCreators, handleProviderSelectAll, selectedProvider, setBlockedCreators, t],
+        [handleProviderSelectAll, selectedProvider, setBlockedCreators, t],
     );
 
     const handleTabChange = useCallback((tab: ModelPickerTab) => {

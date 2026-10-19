@@ -559,7 +559,8 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
         throw new AgentRunError("skill", "None of this group's participants are available. Enable their skills in Settings, or change the participants.");
     }
 
-    const [message] = await ctx.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [messageId as Id<"messages">] });
+    // Raw row: a group turn runs on a stream admitted under the thread's lock state (`streamRunThread`).
+    const [message] = await ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] });
     const promptText = message?.text ?? "";
     const participants = toInfo(config.participants);
 

@@ -1080,7 +1080,8 @@ export class Agent<
      * @param args The messageIds to generate embeddings for.
      */
     async generateAndSaveEmbeddings(ctx: ActionContext, args: { messageIds: string[] }) {
-        const fetched = await ctx.runQuery(internal.agent.messages.getMessagesByIds, {
+        // Raw rows: embeddings are stored with their thread's id and search already filters locked threads.
+        const fetched = await ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, {
             messageIds: asIdArray<"messages">(args.messageIds),
         });
         const messages = fetched.filter((m): m is NonNullable<typeof m> => m !== null);

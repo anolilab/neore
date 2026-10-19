@@ -940,13 +940,35 @@ export const getMessagesByIds = internalQuery
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(v.array(v.union(v.null(), vMessageDocument))))
+    .query(async ({ args, ctx }) => await readMessagesByIds(ctx, args));
+
+/** `getMessagesByIds`'s read: a locked chat's rows come back null unless the proof for `threadId` is valid. */
+export const readMessagesByIds = async (
+    ctx: Pick<QueryContext, "db">,
+    args: { messageIds: Id<"messages">[]; threadId?: Id<"threads">; unlockProof?: string },
+): Promise<(ReturnType<typeof publicMessage> | null)[]> => {
+    const rows = await Promise.all(args.messageIds.map((id) => ctx.db.get(id)));
+    const found = rows.filter((m): m is Doc<"messages"> => m !== null);
+    const unlocked = await withoutLockedThreads(ctx, found, { threadId: args.threadId, unlockProof: args.unlockProof });
+    const visible = new Set(unlocked.map((m) => m._id));
+
+    return rows.map((m) => (m && visible.has(m._id) ? publicMessage(m) : null));
+};
+
+/**
+ * Raw rows for SERVER code that decides the thread's access itself: a background
+ * run admitted by its stream (`streamRunThread`), or an edit, regenerate, media
+ * or abort path that runs the lock gate on the thread right after this read.
+ * Internal only, never a client surface. `getMessagesByIds` above is the
+ * filtered read: it hides a locked thread's rows unless a proof is passed.
+ */
+export const getMessagesByIdsUnfiltered = internalQuery
+    .input({ messageIds: v.array(v.id("messages")) })
+    .output(v.from(v.array(v.union(v.null(), vMessageDocument))))
     .query(async ({ args, ctx }) => {
         const rows = await Promise.all(args.messageIds.map((id) => ctx.db.get(id)));
-        const found = rows.filter((m): m is Doc<"messages"> => m !== null);
-        const unlocked = await withoutLockedThreads(ctx, found, { threadId: args.threadId, unlockProof: args.unlockProof });
-        const visible = new Set(unlocked.map((m) => m._id));
 
-        return rows.map((m) => (m && visible.has(m._id) ? publicMessage(m) : null));
+        return rows.map((m) => (m ? publicMessage(m) : null));
     });
 
 export const searchMessages = internalAction

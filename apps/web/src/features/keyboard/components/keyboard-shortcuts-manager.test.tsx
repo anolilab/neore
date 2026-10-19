@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { KeyboardShortcutsManager, useKeyboardShortcuts } from "./keyboard-shortcuts-manager";
@@ -101,5 +101,35 @@ describe("KeyboardShortcutsManager", () => {
         );
 
         expect(screen.getByTestId("child").textContent).toBe("Hello");
+    });
+
+    it("leaves a bare-key copy binding to the field it is typed into", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ copyLastCodeBlock: "x" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const notPrevented = fireEvent.keyDown(screen.getByLabelText("composer"), { code: "KeyX", key: "x" });
+
+        expect(onShortcut).not.toHaveBeenCalled();
+        expect(notPrevented).toBe(true);
+    });
+
+    it("still runs a modifier chord copy binding from the composer", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ copyLastCodeBlock: "ctrl+shift+x" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const notPrevented = fireEvent.keyDown(screen.getByLabelText("composer"), { code: "KeyX", ctrlKey: true, key: "X", shiftKey: true });
+
+        expect(onShortcut).toHaveBeenCalledWith("copyLastCodeBlock", expect.anything());
+        expect(notPrevented).toBe(false);
     });
 });
