@@ -172,6 +172,15 @@ describe("markAiGeneratedImage", () => {
         expect(markAiGeneratedImage(jpeg)).toBe(jpeg);
     });
 
+    it("marks a JPEG whose Exif payload contains the C2PA byte pattern", () => {
+        const exif = [0xff, 0xe1, 0x00, 0x0e, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0xff, 0xeb, 0x00, 0x04, 0x4a, 0x50];
+        const jpeg = new Uint8Array([0xff, 0xd8, ...exif, 0xff, 0xdb, 0x00, 0x03, 0x00, 0xff, 0xd9]);
+        const marked = markAiGeneratedImage(jpeg);
+
+        expect(marked.byteLength).toBeGreaterThan(jpeg.byteLength);
+        expect(dec.decode(marked)).toContain("trainedAlgorithmicMedia");
+    });
+
     it("skips fill bytes before a marker in a JPEG header", () => {
         const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xff, 0xdb, 0x00, 0x03, 0x00, 0xff, 0xda, 0x00, 0x02, 0x01, 0xff, 0xd9]);
         const marked = markAiGeneratedImage(jpeg);

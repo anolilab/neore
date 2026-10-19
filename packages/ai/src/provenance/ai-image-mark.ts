@@ -165,14 +165,61 @@ const markPng = (bytes: Uint8Array): Uint8Array => {
 };
 
 /**
+ * The first byte after a scan's entropy-coded data: a marker, not a stuffed 0xFF00,
+ * a fill byte or a restart marker. Scan data can hold any bytes, so this is the only
+ * safe way to find where the next segment starts.
+ */
+const endOfScan = (bytes: Uint8Array, start: number): number => {
+    for (let i = start; i + 1 < bytes.byteLength; i += 1) {
+        if (bytes[i] !== 0xff) {
+            continue;
+        }
+
+        const next = bytes[i + 1]!;
+
+        if (next !== 0x00 && next !== 0xff && (next < 0xd0 || next > 0xd7)) {
+            return i;
+        }
+    }
+
+    return bytes.byteLength;
+};
+
+/**
  * A C2PA manifest is an APP11 segment whose payload starts with "JP" (JUMBF). It can
- * sit between scans of a progressive JPEG, so the whole file is searched, not just
- * the header. A false match on entropy-coded data only skips marking, which is safe.
+ * sit between scans of a progressive JPEG, so every segment is walked, not just the
+ * header. Matching bytes inside another segment's payload do not count.
  */
 const hasJumbfSegment = (bytes: Uint8Array): boolean => {
-    for (let i = 0; i + 5 < bytes.byteLength; i += 1) {
-        if (bytes[i] === 0xff && bytes[i + 1] === 0xeb && bytes[i + 4] === 0x4a && bytes[i + 5] === 0x50) {
-            return true;
+    let offset = 2;
+
+    while (offset + 2 <= bytes.byteLength) {
+        if (bytes[offset] !== 0xff) {
+            return false;
+        }
+
+        const marker = bytes[offset + 1]!;
+
+        if (marker === 0xff) {
+            offset += 1;
+        } else if (marker === 0xd9) {
+            return false;
+        } else if (marker === 0x01 || marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7)) {
+            offset += 2;
+        } else {
+            if (offset + 6 > bytes.byteLength) {
+                return false;
+            }
+
+            if (marker === 0xeb && bytes[offset + 4] === 0x4a && bytes[offset + 5] === 0x50) {
+                return true;
+            }
+
+            offset += 2 + ((bytes[offset + 2]! << 8) | bytes[offset + 3]!);
+
+            if (marker === 0xda) {
+                offset = endOfScan(bytes, offset);
+            }
         }
     }
 
