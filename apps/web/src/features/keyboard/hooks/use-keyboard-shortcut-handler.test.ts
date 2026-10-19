@@ -165,4 +165,18 @@ describe("useKeyboardShortcutHandler", () => {
 
         consoleSpy.mockRestore();
     });
+
+    it("announces the model picker shortcut to the composer", () => {
+        const listener = vi.fn();
+
+        globalThis.addEventListener("openModelPicker", listener);
+
+        const { result } = renderHook(() => useKeyboardShortcutHandler());
+
+        result.current("openModelPicker", new KeyboardEvent("keydown", { key: "m" }));
+
+        globalThis.removeEventListener("openModelPicker", listener);
+
+        expect(listener).toHaveBeenCalledTimes(1);
+    });
 });

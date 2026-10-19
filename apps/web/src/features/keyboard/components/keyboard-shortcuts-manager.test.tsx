@@ -132,4 +132,33 @@ describe("KeyboardShortcutsManager", () => {
         expect(onShortcut).toHaveBeenCalledWith("copyLastCodeBlock", expect.anything());
         expect(notPrevented).toBe(false);
     });
+
+    it("opens the model picker from the composer on a modifier chord", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ openModelPicker: "ctrl+shift+m" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const notPrevented = fireEvent.keyDown(screen.getByLabelText("composer"), { code: "KeyM", ctrlKey: true, key: "M", shiftKey: true });
+
+        expect(onShortcut).toHaveBeenCalledWith("openModelPicker", expect.anything());
+        expect(notPrevented).toBe(false);
+    });
+
+    it("leaves a bare-key model picker binding to the field it is typed into", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ openModelPicker: "m" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        fireEvent.keyDown(screen.getByLabelText("composer"), { code: "KeyM", key: "m" });
+
+        expect(onShortcut).not.toHaveBeenCalled();
+    });
 });

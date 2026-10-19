@@ -28,6 +28,7 @@ import roleGuard from "./lib/role-guard";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
+import { normalizeModelNicknames } from "./lib/model-nicknames";
 
 /** Any context an auth helper may be called from. */
 type AnyAuthContext = QueryContext | MutationContext | ActionContext;
@@ -209,6 +210,10 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             }
 
             toStore.searchDomainBlocklist = domains;
+        }
+
+        if (toStore.modelNicknames && typeof toStore.modelNicknames === "object") {
+            toStore.modelNicknames = normalizeModelNicknames(toStore.modelNicknames as Record<string, string>);
         }
 
         const shortcuts = toStore.keyboardShortcuts;

@@ -1616,6 +1616,7 @@ export const userSettings = sqliteTable("userSettings", {
     mainFont: text("mainFont"),
     memoryEnabled: integer("memoryEnabled", { mode: "boolean" }),
     mermaidTheme: text("mermaidTheme"),
+    modelNicknames: text("modelNicknames", { mode: "json" }).$type<Record<string, string>>(),
     newChatsTemporary: integer("newChatsTemporary", { mode: "boolean" }),
     nickname: text("nickname"),
     onboardingCompleted: integer("onboardingCompleted", { mode: "boolean" }),

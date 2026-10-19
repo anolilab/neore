@@ -6544,6 +6544,9 @@
                           "nextItem": {
                             "type": "string"
                           },
+                          "openModelPicker": {
+                            "type": "string"
+                          },
                           "pinThread": {
                             "type": "string"
                           },
@@ -6626,6 +6629,15 @@
                             "type": "string"
                           }
                         ]
+                      },
+                      "modelNicknames": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
                       },
                       "newChatsTemporary": {
                         "type": "boolean"

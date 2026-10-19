@@ -1878,6 +1878,7 @@ export interface Doc_userSettings {
     mainFont?: string;
     memoryEnabled?: boolean;
     mermaidTheme?: string;
+    modelNicknames?: Record<string, string>;
     newChatsTemporary?: boolean;
     nickname?: string;
     onboardingCompleted?: boolean;
@@ -4600,6 +4601,7 @@ export interface Insert_userSettings {
     mainFont?: string;
     memoryEnabled?: boolean;
     mermaidTheme?: string;
+    modelNicknames?: Record<string, string>;
     newChatsTemporary?: boolean;
     nickname?: string;
     onboardingCompleted?: boolean;

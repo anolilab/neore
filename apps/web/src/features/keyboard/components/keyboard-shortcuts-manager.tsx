@@ -59,6 +59,7 @@ const KeyboardShortcutsHandler: React.FC<{
             newChat: convertShortcutToHotkeysHook(shortcuts.newChat),
             newTemporaryChat: convertShortcutToHotkeysHook(shortcuts.newTemporaryChat),
             nextItem: convertShortcutToHotkeysHook(shortcuts.nextItem),
+            openModelPicker: convertShortcutToHotkeysHook(shortcuts.openModelPicker),
             prevItem: convertShortcutToHotkeysHook(shortcuts.prevItem),
             search: convertShortcutToHotkeysHook(shortcuts.search),
             sidebarLeft: convertShortcutToHotkeysHook(shortcuts.sidebarLeft),
@@ -75,6 +76,7 @@ const KeyboardShortcutsHandler: React.FC<{
         shortcuts.newChat,
         shortcuts.newTemporaryChat,
         shortcuts.nextItem,
+        shortcuts.openModelPicker,
         shortcuts.prevItem,
         shortcuts.search,
         shortcuts.sidebarLeft,
@@ -162,6 +164,18 @@ const KeyboardShortcutsHandler: React.FC<{
         (event: KeyboardEvent) => {
             event.preventDefault();
             onShortcut?.("nextItem", event);
+        },
+        [onShortcut],
+    );
+
+    const handleOpenModelPicker = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("openModelPicker", event);
         },
         [onShortcut],
     );
@@ -343,6 +357,20 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: true,
         },
         [convertedShortcuts.nextItem, handleNextItem],
+    );
+
+    useHotkeys(
+        convertedShortcuts.openModelPicker,
+        handleOpenModelPicker,
+        {
+            description: "Open the model picker",
+            enabled: !!shortcuts.openModelPicker && typeof shortcuts.openModelPicker === "string",
+            // Like the copy shortcut: a modifier chord must work from the composer, a bare key must not be taken from a field.
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.openModelPicker, handleOpenModelPicker],
     );
 
     useHotkeys(

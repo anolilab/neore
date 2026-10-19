@@ -51,6 +51,10 @@ const useFavoriteModels = () => {
         updateUserSettings({ favoriteModels: newFavorites });
     };
 
+    const reorderFavorites = (modelIds: string[]) => {
+        updateUserSettings({ favoriteModels: modelIds });
+    };
+
     const addFavorite = (modelId: string) => {
         toggleFavorite(modelId, true);
     };
@@ -66,6 +70,7 @@ const useFavoriteModels = () => {
         favoriteModelIds,
         isFavorite,
         removeFavorite,
+        reorderFavorites,
         toggleFavorite,
     };
 };

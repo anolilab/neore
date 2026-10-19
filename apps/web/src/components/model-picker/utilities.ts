@@ -210,10 +210,11 @@ export const groupModelsByRegion = (models: GatewayModel[]): { eu: GatewayModel[
  * creator, the English description and the localized one — so a German user
  * typing German words and anyone typing the registry's English both find the
  * model. Fields are joined by a newline so a query never matches across two of
- * them. Build it once per model per locale, not per keystroke.
+ * them. A nickname the user gave the model matches too. Build it once per
+ * model per locale, not per keystroke.
  */
-export const getModelSearchText = (model: GatewayModel, localizedDescription?: string): string =>
-    [model.name, model.id, model.displayProvider, model.desc, localizedDescription].filter(Boolean).join("\n").toLowerCase();
+export const getModelSearchText = (model: GatewayModel, localizedDescription?: string, nickname?: string): string =>
+    [nickname, model.name, model.id, model.displayProvider, model.desc, localizedDescription].filter(Boolean).join("\n").toLowerCase();
 
 /**
  * Filter models by search query against their precomputed search text
@@ -363,4 +364,79 @@ export const formatDate = (dateString: string | undefined): string => {
         // If parsing fails, return as-is
         return dateString;
     }
+};
+
+/**
+ * What the picker, composer and message badges call a model: the user's own
+ * nickname if they set one, else the catalog name without its provider prefix.
+ */
+export const getModelLabel = (model: GatewayModel, nicknames?: Readonly<Record<string, string>>): string =>
+    nicknames?.[model.id] || stripProviderPrefix(model.name ?? model.id);
+
+export type ModelSort = "default" | "name" | "new" | "price-asc" | "price-desc";
+
+/**
+ * Orders a list for the picker's sort control. `default` keeps the catalog order
+ * (which the picker then groups by creator); the others are flat orders.
+ *
+ * Price is the input price per million tokens, the figure the cost marker is
+ * drawn from; a model with no price goes last in both directions rather than
+ * passing for free. `new` is `isNew` first: the catalog carries no release date.
+ */
+export const sortModels = (models: GatewayModel[], sort: ModelSort, nicknames?: Readonly<Record<string, string>>): GatewayModel[] => {
+    switch (sort) {
+        case "default": {
+            return models;
+        }
+        case "name": {
+            return models.toSorted((a, b) => getModelLabel(a, nicknames).localeCompare(getModelLabel(b, nicknames)));
+        }
+        case "new": {
+            return models.toSorted((a, b) => Number(Boolean(b.isNew)) - Number(Boolean(a.isNew)));
+        }
+        case "price-asc":
+        case "price-desc": {
+            const direction = sort === "price-asc" ? 1 : -1;
+
+            return models.toSorted((a, b) => {
+                const priceA = a.pricing?.input_per_million;
+                const priceB = b.pricing?.input_per_million;
+
+                if (priceA === undefined || priceB === undefined) {
+                    return Number(priceA === undefined) - Number(priceB === undefined);
+                }
+
+                return (priceA - priceB) * direction;
+            });
+        }
+        default: {
+            return models;
+        }
+    }
+};
+
+/** `$3.00` / `$0.075`: a price per million tokens, to the precision cheap models need. */
+export const formatPricePerMillion = (value: number): string =>
+    new Intl.NumberFormat("en-US", { currency: "USD", maximumFractionDigits: 4, minimumFractionDigits: 2, style: "currency" }).format(value);
+
+/**
+ * Moves `movedId` to where `targetId` sits in the user's FULL favourites list.
+ * The list on screen may show only part of it (a favourite that is filtered out
+ * or no longer in the catalog stays where it is), so the move is by id on the
+ * stored array, never by index on the visible one. Unknown ids change nothing.
+ */
+export const moveFavorite = (favorites: ReadonlyArray<string>, movedId: string, targetId: string): string[] => {
+    const from = favorites.indexOf(movedId);
+    const to = favorites.indexOf(targetId);
+
+    if (from === -1 || to === -1 || from === to) {
+        return [...favorites];
+    }
+
+    const next = [...favorites];
+    const [moved] = next.splice(from, 1);
+
+    next.splice(to, 0, moved!);
+
+    return next;
 };

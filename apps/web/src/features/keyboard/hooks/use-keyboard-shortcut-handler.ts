@@ -114,6 +114,11 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     break;
                 }
 
+                case "openModelPicker": {
+                    // The composer's model picker listens (`model-picker-button.tsx`) and owns the model change.
+                    globalThis.dispatchEvent(new CustomEvent("openModelPicker"));
+                    break;
+                }
                 case "prevItem": {
                     // Navigate to previous item
                     const focusedElement = document.activeElement;

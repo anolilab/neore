@@ -2,6 +2,7 @@ import { v } from "lunorash/server";
 
 import { MAX_SEARCH_DOMAIN_BLOCKLIST } from "../chat/tools/search-domains";
 import { MAX_LENGTH } from "../lib/validators";
+import { MAX_MODEL_NICKNAME_LENGTH, MAX_MODEL_NICKNAMES } from "./lib/model-nicknames";
 
 /**
  * Every user-writable setting. `userId` is NOT here: `updateUserSettings` takes
@@ -74,6 +75,7 @@ export const userSettingsFieldsWithoutUserId = {
             newChat: v.optional(v.string().max(MAX_LENGTH.short)),
             newTemporaryChat: v.optional(v.string().max(MAX_LENGTH.short)),
             nextItem: v.optional(v.string().max(MAX_LENGTH.short)),
+            openModelPicker: v.optional(v.string().max(MAX_LENGTH.short)),
             pinThread: v.optional(v.string().max(MAX_LENGTH.short)),
             prevItem: v.optional(v.string().max(MAX_LENGTH.short)),
             search: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -91,6 +93,11 @@ export const userSettingsFieldsWithoutUserId = {
     memoryEnabled: v.optional(v.boolean()), // Automatic memory extraction and retrieval. OPT-IN: absent means off.
     // Appearance: Mermaid diagram theme.
     mermaidTheme: v.optional(v.union(v.literal("default"), v.literal("neutral"), v.literal("dark"), v.literal("forest"), v.literal("base"))),
+    modelNicknames: v.optional(
+        v
+            .record(v.string().max(MAX_LENGTH.short), v.string().max(MAX_MODEL_NICKNAME_LENGTH))
+            .check((value) => Object.keys(value).length <= MAX_MODEL_NICKNAMES, { message: "Too many model nicknames" }),
+    ), // The user's own names for models, model id → nickname. Normalised server-side in `settingsUpsert`. Absent means none.
     newChatsTemporary: v.optional(v.boolean()), // New composer chats start temporary. OPT-IN: absent means off.
     nickname: v.optional(v.string().max(MAX_LENGTH.short)), // User's preferred name for the AI to call them (max 50 chars)
     onboardingCompleted: v.optional(v.boolean()),

@@ -16512,25 +16512,25 @@
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 151,
+      "line": 152,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "write",
-      "line": 228,
+      "line": 233,
       "reason": "the written table is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "read",
-      "line": 248,
+      "line": 253,
       "reason": "the table name is not a string literal"
     },
     {
       "file": "auth/functions",
       "kind": "call",
-      "line": 744,
+      "line": 749,
       "reason": "\"createAuthAction\" is not a registered function"
     },
     {

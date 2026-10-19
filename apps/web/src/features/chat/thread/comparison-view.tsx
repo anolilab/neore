@@ -26,6 +26,7 @@ import { ArrowUpRight, Sparkles } from "lucide-react";
 import type { FC } from "react";
 import { useMemo } from "react";
 
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import type { UIMessage } from "@/lib/agent";
 import { useUIMessages } from "@/lib/agent";
@@ -77,7 +78,8 @@ const ModelColumn: FC<{
 
     const models = useFeatureFlaggedModels();
     const modelDefinition = useMemo(() => models.find((m) => m.id === branch.model), [models, branch.model]);
-    const modelName = modelDefinition?.name || branch.model;
+    const { data: userSettings } = useUserSettings();
+    const modelName = userSettings?.modelNicknames?.[branch.model] || modelDefinition?.name || branch.model;
     const providerId = modelDefinition?.displayProvider;
 
     // Real-time paginated messages for this child thread.
