@@ -30,7 +30,7 @@ msgid ", unread"
 msgstr ", non letta"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:339
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:340
 msgid "...and {0} more"
 msgstr "...e altri {0}"
 
@@ -81,7 +81,7 @@ msgstr "\"v1\" per l'API Azure OpenAI attuale. Una versione con data come 2024-1
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "({0} di {MAX_PARTICIPANTS}, almeno {MIN_PARTICIPANTS})"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} non riusciti)"
 
@@ -206,7 +206,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, one {# membro} other {# membri}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:336
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, one {# messaggio} other {# messaggi}}"
 
@@ -371,18 +371,18 @@ msgid "{0} chunks"
 msgstr "{0} blocchi"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
 msgid "{0} conversations failed to import"
 msgstr "Importazione non riuscita per {0} conversazioni"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
 msgid "{0} conversations found"
 msgstr "{0} conversazioni trovate"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
 msgid "{0} conversations imported from {1}"
 msgstr "{0} conversazioni importate da {1}"
 
@@ -483,7 +483,7 @@ msgstr "{0} di {1} casi completati"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:370
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
 msgid "{0} of {1} conversations imported"
 msgstr "{0} di {1} conversazioni importate"
 
@@ -4487,7 +4487,7 @@ msgstr "Canada"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:347
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:348
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4511,7 +4511,7 @@ msgstr "Annulla il lavoro approfondito"
 msgid "Cancel Export"
 msgstr "Annulla esportazione"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:375
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:376
 msgid "Cancel Import"
 msgstr "Annulla importazione"
 
@@ -6333,6 +6333,10 @@ msgstr "Controlla la profondità di campo con l'apertura"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "Controlla come vengono mostrate le tue informazioni personali nell'interfaccia."
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:22
+msgid "Control panel"
+msgstr ""
+
 #: src/features/workflow/components/nodes/controlnet-node.tsx:182
 msgid "Control Strength"
 msgstr "Intensità del controllo"
@@ -6666,7 +6670,7 @@ msgstr "Impossibile eliminare il commento"
 msgid "Could not delete the page"
 msgstr "Impossibile eliminare la pagina"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:111
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:118
 msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
 msgstr "Impossibile rilevare il provider della chat. Assicurati di aver caricato un file di esportazione valido da ChatGPT, Gemini o Claude."
 
@@ -8271,7 +8275,7 @@ msgid "Details for case {0}"
 msgstr "Dettagli del caso {0}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:324
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
 msgid "Detected: {0}"
 msgstr "Rilevato: {0}"
 
@@ -8616,6 +8620,10 @@ msgstr "Fai doppio clic per modificare"
 #: src/features/workflow/components/nodes/group-node.tsx:314
 msgid "Double-click to rename"
 msgstr "Fai doppio clic per rinominare"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:15
+msgid "down"
+msgstr ""
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:180
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
@@ -10932,7 +10940,7 @@ msgstr "Impossibile spostare la conversazione"
 msgid "Failed to optimize prompt"
 msgstr "Impossibile ottimizzare il prompt"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:238
 msgid "Failed to parse file"
 msgstr "Impossibile analizzare il file"
 
@@ -11116,7 +11124,7 @@ msgstr "Impossibile inviare l'email di verifica"
 msgid "Failed to start impersonation"
 msgstr "Impossibile avviare l'impersonificazione"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:272
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:273
 msgid "Failed to start import"
 msgstr "Impossibile avviare l'importazione"
 
@@ -11940,6 +11948,7 @@ msgid "Fisheye, extreme distortion"
 msgstr "Fisheye, distorsione estrema"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:54
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:23
 msgid "Fit view"
 msgstr "Adatta alla vista"
 
@@ -13328,6 +13337,10 @@ msgstr "A"
 msgid "Hand (pan)"
 msgstr "Mano (sposta)"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:28
+msgid "Handle"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:298
 msgid "Handles demanding creative concepts"
 msgstr "Gestisce concept creativi impegnativi"
@@ -14021,11 +14034,11 @@ msgstr "Impersonificazione terminata"
 msgid "Import"
 msgstr "Importa"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
 msgid "Import All"
 msgstr "Importa tutto"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:283
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
 msgid "Import cancelled"
 msgstr "Importazione annullata"
 
@@ -14033,15 +14046,15 @@ msgstr "Importazione annullata"
 msgid "Import cases"
 msgstr "Importa casi"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:384
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
 msgid "Import complete!"
 msgstr "Importazione completata!"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:300
 msgid "Import Conversations"
 msgstr "Importa conversazioni"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:298
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
 msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
 
@@ -14049,12 +14062,12 @@ msgstr ""
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "Importa conversazioni da ChatGPT, Google Gemini o Claude. Carica il file JSON o ZIP esportato."
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:132
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:398
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:133
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:399
 msgid "Import failed"
 msgstr "Importazione non riuscita"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:390
 msgid "Import More"
 msgstr "Importa altro"
 
@@ -14062,7 +14075,7 @@ msgstr "Importa altro"
 msgid "Import Notion export (.zip)"
 msgstr "Importa esportazione Notion (.zip)"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:211
 msgid "Import one kind of export at a time."
 msgstr ""
 
@@ -14113,7 +14126,7 @@ msgid "Imported skill \"{0}\""
 msgstr "Skill \"{0}\" importata"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:363
 msgid "Importing from {0}..."
 msgstr "Importazione da {0}..."
 
@@ -15086,7 +15099,7 @@ msgstr "Ultimo fotogramma"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:410
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:411
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "Ultima importazione: {0} conversazioni da {1} il {2}"
 
@@ -15336,6 +15349,10 @@ msgstr "Lascia l'organizzazione"
 msgid "Leave Team"
 msgstr "Lascia il team"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:16
+msgid "left"
+msgstr ""
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:397
 #: src/features/workflow/components/nodes/outpaint-node.tsx:25
 msgid "Left"
@@ -15435,7 +15452,7 @@ msgstr "Riga {0}: {1}"
 msgid "Line {line}, column {column}"
 msgstr "Riga {line}, colonna {column}"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:168
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:179
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
 msgstr ""
 
@@ -16626,6 +16643,10 @@ msgstr "Microsoft App ID del tuo Azure Bot"
 msgid "Min"
 msgstr "Min"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:29
+msgid "Mini map"
+msgstr ""
+
 #: src/features/canvas/components/design-preset-selector.tsx:179
 msgid "Minimal Card"
 msgstr "Scheda minimal"
@@ -17199,6 +17220,11 @@ msgstr "Sposta su"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:108
 msgid "Move up one page"
 msgstr "Sali di una pagina"
+
+#. placeholder {0}: directions[direction] ?? direction
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:33
+msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
+msgstr ""
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:113
 msgid "MP4/MOV video"
@@ -17960,7 +17986,7 @@ msgstr "Nessun contenuto"
 msgid "No content to display"
 msgstr "Nessun contenuto da mostrare"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:219
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:220
 msgid "No conversations found in the file."
 msgstr "Nessuna conversazione trovata nel file."
 
@@ -19837,7 +19863,7 @@ msgstr "Confronto parallelo"
 msgid "Paris"
 msgstr "Parigi"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:318
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:319
 msgid "Parsing file..."
 msgstr "Analisi del file..."
 
@@ -19873,9 +19899,15 @@ msgid "Pass rate"
 msgstr "Tasso di superamento"
 
 #. placeholder {0}: citation.chunkIndex + 1
-#: src/features/knowledge/components/knowledge-source-group.tsx:66
+#: src/features/knowledge/components/knowledge-source-group.tsx:68
 msgid "Passage {0}, cited as [{position}]"
 msgstr "Passaggio {0}, citato come [{position}]"
+
+#. placeholder {0}: citation.chunkIndex + 1
+#. placeholder {1}: citation.pageNumber
+#: src/features/knowledge/components/knowledge-source-group.tsx:69
+msgid "Passage {0}, page {1}, cited as [{position}]"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:83
 msgid "passed"
@@ -20683,6 +20715,18 @@ msgstr "Preset"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1101
 msgid "Press ? for keyboard shortcuts"
 msgstr "Premi ? per le scorciatoie da tastiera"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:30
+msgid "Press enter or space to select a node. Press delete to remove it and escape to cancel."
+msgstr ""
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:31
+msgid "Press enter or space to select a node. You can then use the arrow keys to move the node around. Press delete to remove it and escape to cancel."
+msgstr ""
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:27
+msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:263
 msgid "Press Enter to send"
@@ -22790,6 +22834,10 @@ msgstr "Ampia conoscenza del mondo integrata nella generazione"
 msgid "RIFF (WAV/AVI/WebP)"
 msgstr "RIFF (WAV/AVI/WebP)"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:17
+msgid "right"
+msgstr ""
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:399
 #: src/features/workflow/components/nodes/outpaint-node.tsx:26
 msgid "Right"
@@ -23666,7 +23714,7 @@ msgstr "Seleziona la lingua di dettatura"
 msgid "Select duration"
 msgstr "Seleziona la durata"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:312
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:313
 msgid "Select File"
 msgstr "Seleziona file"
 
@@ -24535,7 +24583,7 @@ msgid "Skipped"
 msgstr "Saltato"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:328
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
 msgid "Skipped files that are not chat exports: {0}"
 msgstr ""
 
@@ -25219,7 +25267,7 @@ msgstr "Avvio"
 msgid "Starting {0}…"
 msgstr "Avvio di {0}…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
 msgid "Starting import..."
 msgstr "Avvio dell'importazione..."
 
@@ -25773,7 +25821,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "I criteri di successo devono avere al massimo {CRITERIA_MAX} caratteri"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:128
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:129
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "{imported} conversazioni importate da {0}"
 
@@ -25854,7 +25902,7 @@ msgstr "Generazione e refactoring di codice su più file di livello superiore"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Comprensione superiore di concetti visivi complessi"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:309
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
 msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
 msgstr "Formati supportati: esportazione di ChatGPT (conversations.json), Google Gemini (ZIP di Takeout), esportazione di Claude.ai."
 
@@ -27229,7 +27277,7 @@ msgstr "Questa operazione rimuove i file del modello dal tuo computer. Puoi scar
 msgid "This run is no longer available."
 msgstr "Questa esecuzione non è più disponibile."
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:225
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:226
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr ""
 
@@ -27540,6 +27588,10 @@ msgstr "Mostra/nascondi colonne"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:575
 msgid "Toggle element palette"
 msgstr "Mostra/nascondi palette degli elementi"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:24
+msgid "Toggle interactivity"
+msgstr ""
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("sidebarLeft"))
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:79
@@ -27948,7 +28000,7 @@ msgstr "Riprova"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
 msgid "Try Again"
 msgstr "Riprova"
 
@@ -28378,7 +28430,7 @@ msgstr "Modifiche non salvate"
 #~ msgid "Unsupported file format. Please upload a .json or .zip file."
 #~ msgstr "Formato di file non supportato. Carica un file .json o .zip."
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:243
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:254
 msgid "Unsupported file format. Please upload a .json, .jsonl or .zip file."
 msgstr ""
 
@@ -28416,6 +28468,10 @@ msgstr "Conversazione senza titolo"
 #: src/routes/(chat)/workflow/index.tsx:21
 msgid "Untitled Workflow"
 msgstr "Workflow senza titolo"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:18
+msgid "up"
+msgstr ""
 
 #: src/features/workflow/components/version-history.tsx:150
 msgid "Up to {MAX_HISTORY_ENTRIES} versions saved"
@@ -28668,7 +28724,7 @@ msgid "Uploading {attachmentName}"
 msgstr "Caricamento di {attachmentName}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:355
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
 msgid "Uploading data for import from {0}..."
 msgstr "Caricamento dei dati da importare da {0}..."
 
@@ -30101,6 +30157,10 @@ msgstr "Workers, KV, R2 e strumenti della piattaforma Cloudflare"
 msgid "Workflow automation across thousands of apps"
 msgstr "Automazione dei workflow su migliaia di app"
 
+#: src/features/workflow/components/canvas/workflow-canvas.tsx:306
+msgid "Workflow canvas"
+msgstr ""
+
 #: src/routes/(chat)/workflow/$workflowId.tsx:57
 #: src/routes/(chat)/workflow/shared/$token.tsx:45
 msgid "Workflow not found"
@@ -30718,6 +30778,7 @@ msgstr "Archivio ZIP"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:283
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:289
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
 msgid "Zoom in"
 msgstr "Aumenta zoom"
 
@@ -30733,6 +30794,7 @@ msgstr "Obiettivo zoom"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:249
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:255
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
 msgid "Zoom out"
 msgstr "Riduci zoom"
 
