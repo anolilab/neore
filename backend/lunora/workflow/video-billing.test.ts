@@ -664,7 +664,12 @@ describe("the reservation's lease against the real ledger", () => {
                 return calls;
             });
 
-            expect(swept).toStrictEqual([{ args: { claimKey: "r-2", requestId: "r-2" }, target: internal.auth.billing.releaseGatewayCredits.__lunoraRef }]);
+            expect(swept).toStrictEqual([
+                {
+                    args: { claimKey: "r-2", requestId: "r-2", rowId: expect.any(String) },
+                    target: internal.auth.billing.releaseGatewayCredits.__lunoraRef,
+                },
+            ]);
 
             const after = await harness.run(async (ctx: any) => {
                 await ctx.runMutation(releaseGatewayCredits, swept[0]!.args);
@@ -682,6 +687,43 @@ describe("the reservation's lease against the real ledger", () => {
         } finally {
             harness.close();
             vi.useRealTimers();
+        }
+    });
+
+    it("does not refund a newer reservation of the same request when an older lapse runs late", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const staleArgs = await harness.run(async (ctx: any) => {
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                await ctx.db.insert("memberCredits", { creditOverride: 1000, memberId: "member-1", organizationId: orgId, usedCredits: 0, userId: "u1" });
+                await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-4", userId: "u1" });
+
+                // The run gives its reservation back itself, and a retry takes the same request id again.
+                const older = await ctx.db
+                    .query("gatewayUsageDeductions")
+                    .withIndex("by_requestId", (q: any) => q.eq("requestId", "r-4"))
+                    .first();
+
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-4" });
+                await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-4", userId: "u1" });
+
+                // The lapse queued for the first reservation runs now, after the second one exists.
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-4", rowId: String(older._id) });
+
+                const record = await ctx.db.memberCredits.findFirst({ where: { userId: "u1" } });
+                const row = await ctx.db
+                    .query("gatewayUsageDeductions")
+                    .withIndex("by_requestId", (q: any) => q.eq("requestId", "r-4"))
+                    .first();
+
+                return { row: row !== null, usedCredits: (record as { usedCredits?: number }).usedCredits ?? 0 };
+            });
+
+            expect(staleArgs).toStrictEqual({ row: true, usedCredits: 500 });
+        } finally {
+            harness.close();
         }
     });
 });

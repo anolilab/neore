@@ -455,11 +455,25 @@ export const reserveGatewayCredits = internalMutation
         }
 
         await applyGatewayDeduction(context, { ...args, billingMode: "platform" });
-        // The lease is taken in the same mutation as the deduction, so a run evicted in between leaves neither half.
+
+        const reservation = await context.db
+            .query("gatewayUsageDeductions")
+            .withIndex("by_requestId", (q) => q.eq("requestId", args.requestId))
+            .first();
+
+        if (!reservation) {
+            throw new Error("Reservation row missing after deduction");
+        }
+
+        // The lease is taken in the same mutation as the deduction, so a run evicted in between leaves neither half. Its lapse names
+        // this row, so a lapse that runs after the row was released and taken again cannot refund the newer reservation.
         await releaseClaim(context, VIDEO_RESERVATION_SCOPE, args.requestId);
         await claimLease(context, VIDEO_RESERVATION_SCOPE, args.requestId, {
             leaseMs: VIDEO_RESERVATION_LEASE_MS,
-            onLapse: { args: JSON.stringify({ requestId: args.requestId }), target: internal.auth.billing.releaseGatewayCredits.__lunoraRef },
+            onLapse: {
+                args: JSON.stringify({ requestId: args.requestId, rowId: String(reservation._id) }),
+                target: internal.auth.billing.releaseGatewayCredits.__lunoraRef,
+            },
             ttlMs: VIDEO_RESERVATION_TTL_MS,
             userId: args.userId,
         });
@@ -473,15 +487,20 @@ export const reserveGatewayCredits = internalMutation
  * The lease is cleared even then, so a lapse the sweep schedules for a released reservation does nothing.
  */
 export const releaseGatewayCredits = internalMutation
-    .input({ requestId: v.string().max(MAX_LENGTH.long) })
+    .input({ requestId: v.string().max(MAX_LENGTH.long), rowId: v.optional(v.string().max(MAX_LENGTH.id)) })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
-        await releaseClaim(context, VIDEO_RESERVATION_SCOPE, args.requestId);
-
         const row = await context.db
             .query("gatewayUsageDeductions")
             .withIndex("by_requestId", (q) => q.eq("requestId", args.requestId))
             .first();
+
+        // A lapse names the row it was taken for. When that row is gone, or is a newer reservation, the lapse is stale: leave it alone.
+        if (args.rowId !== undefined && String(row?._id) !== args.rowId) {
+            return null;
+        }
+
+        await releaseClaim(context, VIDEO_RESERVATION_SCOPE, args.requestId);
 
         if (!row) {
             return null;

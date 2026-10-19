@@ -202,7 +202,7 @@ export interface InternalApiTypes {
             creditsLeftQuery: FunctionReference<"query", { orgId: string; userId: string }, { creditsLeft: number | null }>;
             deductCreditsFromGateway: FunctionReference<"mutation", { billingMode?: "custom" | "platform" | "byok"; byokFeeRate?: number; costMicrodollars: number; modelId: string; orgId?: string; requestId: string; userId: string }, void>;
             getRunPlanForOrganizationQuery: FunctionReference<"query", { organizationId: string | null; userId: string }, { isAdmin: boolean; plan: "premium" | null }>;
-            releaseGatewayCredits: FunctionReference<"mutation", { requestId: string }, null>;
+            releaseGatewayCredits: FunctionReference<"mutation", { requestId: string; rowId?: string }, null>;
             reserveGatewayCredits: FunctionReference<"mutation", { costMicrodollars: number; modelId: string; orgId: string; requestId: string; userId: string }, "taken" | "already" | "refused" | "busy">;
         };
         functions: {
