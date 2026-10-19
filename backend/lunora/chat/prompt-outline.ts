@@ -79,7 +79,7 @@ export const getThreadPromptOutline = liteAuthQuery
 
         while (scanned < MAX_OUTLINE_ROWS) {
             // A branched thread lists its active path; `null` keeps every other thread on the direct index scan.
-            const pathPage = await listActivePathPage(context, access.thread, { cursor, numItems: PAGE_ROWS }, unlockProof);
+            const pathPage = await listActivePathPage(context, access.thread, { cursor, numItems: PAGE_ROWS }, unlockProof, false);
             const page: OutlinePage = pathPage
                 ? { continueCursor: pathPage.continueCursor, isDone: pathPage.isDone, rows: pathPage.page }
                 : await listMessagesByThreadIdHandler(context, {

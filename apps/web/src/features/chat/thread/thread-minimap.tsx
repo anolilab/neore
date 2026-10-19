@@ -19,7 +19,7 @@ import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { scrollToMessage } from "./message-list";
-import { buildMinimapItems, mergeOutline, promptsDropped, shouldShowMinimap } from "./minimap-items";
+import { buildMinimapItems, isProvisionalId, mergeOutline, promptsDropped, shouldShowMinimap } from "./minimap-items";
 
 /** The outline is cheap to keep: it changes only when the active path does, which the effect below watches. */
 const OUTLINE_STALE_MS = 5 * 60_000;
@@ -50,19 +50,21 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
 
     // The outline is read once, so a branch switch, an edit or a delete (a loaded prompt that is no longer there)
     // leaves it listing prompts that are off the active path. Read it again then.
+    // The key is built from the thread, not from `outlineOptions`: that one is the skipped key while the outline is not read.
     const queryClient = useQueryClient();
     const previousPrompts = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined }>({ ids: new Set(), threadId: undefined });
 
     useEffect(() => {
-        const ids = new Set(loadedItems.map((item) => item.id));
+        // A sent prompt's optimistic id is replaced by its stored id; that is not a prompt that went away.
+        const ids = new Set(loadedItems.filter((item) => !isProvisionalId(item.id)).map((item) => item.id));
         const previous = previousPrompts.current;
 
         previousPrompts.current = { ids, threadId };
 
         if (previous.threadId === threadId && promptsDropped(previous.ids, ids)) {
-            queryClient.invalidateQueries({ queryKey: outlineOptions.queryKey });
+            queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId: threadId as Id<"threads"> }) });
         }
-    }, [loadedItems, threadId, queryClient, outlineOptions.queryKey]);
+    }, [loadedItems, threadId, queryClient, crpc]);
 
     if (!shouldShowMinimap(items)) {
         return null;

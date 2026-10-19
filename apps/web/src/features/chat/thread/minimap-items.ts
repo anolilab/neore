@@ -32,10 +32,17 @@ export const buildMinimapItems = (messages: ReadonlyArray<{ id: string; role: st
         });
 
 /**
- * The loaded prompts, preceded by the older ones the server outline knows about.
- * A loaded prompt the outline lacks (just sent, the outline is fetched once) goes at
- * the end, where a new prompt always is. The outline is `undefined` until it loads,
- * and while the whole chat is loaded it is not asked for at all.
+ * Ids a prompt carries before the server names it. Sending replaces them, so they are
+ * not a prompt that went missing.
+ */
+export const isProvisionalId = (id: string): boolean => id.startsWith("optimistic-") || id.startsWith("transitioning-");
+
+/**
+ * The loaded prompts, merged with the server outline. The outline is the newest run of
+ * prompts, and the loaded window is a contiguous run too, so: loaded prompts before the
+ * first one the outline shares are older than it and go ahead; loaded prompts after the
+ * outline's own are prompts sent since it was read and go at the end. The outline is
+ * `undefined` until it loads, and while the whole chat is loaded it is not asked for at all.
  */
 export const mergeOutline = (outline: ReadonlyArray<{ id: string; text: string }> | undefined, loaded: ReadonlyArray<MinimapItem>): MinimapItem[] => {
     if (!outline || outline.length === 0) {
@@ -46,8 +53,13 @@ export const mergeOutline = (outline: ReadonlyArray<{ id: string; text: string }
     const older = outline.map((entry) => {
         return { id: entry.id, preview: toMinimapPreview(entry.text) };
     });
+    const cut = loaded.findIndex((item) => known.has(item.id));
 
-    return [...older, ...loaded.filter((item) => !known.has(item.id))];
+    if (cut === -1) {
+        return [...older, ...loaded];
+    }
+
+    return [...loaded.slice(0, cut), ...older, ...loaded.slice(cut).filter((item) => !known.has(item.id))];
 };
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMinimapItems, mergeOutline, MINIMAP_PREVIEW_CHARS, promptsDropped, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
+import { buildMinimapItems, isProvisionalId, mergeOutline, MINIMAP_PREVIEW_CHARS, promptsDropped, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
 
 describe("toMinimapPreview", () => {
     it("collapses whitespace and newlines to one line", () => {
@@ -85,6 +85,22 @@ describe("mergeOutline", () => {
         ]);
     });
 
+    it("puts loaded prompts older than the outline's cut before it, not at the end", () => {
+        const outline = [
+            { id: "p3", text: "third" },
+            { id: "p4", text: "fourth" },
+        ];
+        const window = [
+            { id: "p1", preview: "first" },
+            { id: "p2", preview: "second" },
+            { id: "p3", preview: "third" },
+            { id: "p4", preview: "fourth" },
+            { id: "p5", preview: "fifth" },
+        ];
+
+        expect(mergeOutline(outline, window).map((item) => item.id)).toStrictEqual(["p1", "p2", "p3", "p4", "p5"]);
+    });
+
     it("falls back to the loaded prompts until the outline arrives, or when it is empty", () => {
         expect(mergeOutline(undefined, loaded)).toStrictEqual(loaded);
         expect(mergeOutline([], loaded)).toStrictEqual(loaded);
@@ -97,6 +113,15 @@ describe("mergeOutline", () => {
 
         expect(shouldShowMinimap([{ id: "x", preview: "only one loaded" }])).toBe(false);
         expect(shouldShowMinimap(mergeOutline(outline, [{ id: "x", preview: "only one loaded" }]))).toBe(true);
+    });
+});
+
+describe("isProvisionalId", () => {
+    it("marks the ids a sending prompt carries before its stored id", () => {
+        expect(isProvisionalId("optimistic-1700000000")).toBe(true);
+        expect(isProvisionalId("optimistic-edit-1700000000")).toBe(true);
+        expect(isProvisionalId("transitioning-1700000000")).toBe(true);
+        expect(isProvisionalId("m_abc123")).toBe(false);
     });
 });
 
