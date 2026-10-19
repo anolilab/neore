@@ -332,8 +332,10 @@ const splitAtHeadings = (text: string): Section[] => {
     for (const [index, line] of lines.entries()) {
         const previous = lines[index - 1];
         // A fence line is never a heading (it opens with ` or ~), so the tests can read the state before the line.
-        const heading = fence === null ? parseHeading(line) : null;
-        const setext = fence === null && index > frontMatter ? setextHeading(previous, line) : null;
+        // Front matter is metadata: a `# comment` in it is not a heading, and nothing in it is underlined.
+        const isBody = fence === null && index > frontMatter;
+        const heading = isBody ? parseHeading(line) : null;
+        const setext = isBody ? setextHeading(previous, line) : null;
 
         fence = nextFence(fence, line);
 

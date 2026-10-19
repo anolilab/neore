@@ -349,6 +349,20 @@ describe("setext headings", () => {
         expect(chunks[0]?.content).toContain("author: Ada");
     });
 
+    it("does not read a '# comment' inside front matter as a heading", () => {
+        const chunks = chunkText("---\ntitle: Guide\n# draft note\n---\n\nBody text", { headings: true });
+
+        expect(chunks).toHaveLength(1);
+        expect(chunks[0]?.sectionHeading).toBeUndefined();
+        expect(chunks[0]?.content).toContain("# draft note");
+    });
+
+    it("still reads a heading right after the front matter", () => {
+        const chunks = chunkText("---\ntitle: Guide\n---\n\n# Real heading\n\nBody", { headings: true });
+
+        expect(chunks.at(-1)?.sectionHeading).toBe("Real heading");
+    });
+
     it("keeps a table row out of the headings", () => {
         expect(headings("| Name | Score |\n---")).toStrictEqual([undefined]);
     });
