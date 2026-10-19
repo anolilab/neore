@@ -218,8 +218,10 @@ const leaf = (client: LunoraClient, path: string[]): any => {
                 queryFn: async ({ queryKey }: { queryKey: QueryKey }) => {
                     const manager = getLiveQueryManager(client);
 
+                    // The proof-scoped args, not the caller's: the fallback RPC must carry the
+                    // same proof the subscription does, or a locked chat's read is refused.
                     return manager
-                        ? await manager.fetch(queryKey, hashKey(queryKey), reference as never, (args ?? {}) as Record<string, unknown>)
+                        ? await manager.fetch(queryKey, hashKey(queryKey), reference as never, (scoped ?? {}) as Record<string, unknown>)
                         : await base.queryFn();
                 },
             };

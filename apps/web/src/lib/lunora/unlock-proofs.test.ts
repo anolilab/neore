@@ -33,7 +33,7 @@ describe("unlock proofs in memory", () => {
 
         vi.advanceTimersByTime(60_000);
 
-        expect(expired).toHaveBeenCalledWith("t1");
+        expect(expired).toHaveBeenCalledWith("t1", "proof");
         expect(currentUnlockProof("t1")).toBeUndefined();
     });
 
@@ -54,7 +54,7 @@ describe("unlock proofs in memory", () => {
 
         vi.advanceTimersByTime(UNLOCK_IDLE_MS);
 
-        expect(expired).toHaveBeenCalledWith("t1");
+        expect(expired).toHaveBeenCalledWith("t1", "proof");
         expect(currentUnlockProof("t1")).toBeUndefined();
     });
 
@@ -72,7 +72,7 @@ describe("unlock proofs in memory", () => {
         expect(expired).not.toHaveBeenCalled();
 
         vi.advanceTimersByTime(UNLOCK_IDLE_MS);
-        expect(expired).toHaveBeenCalledWith("t1");
+        expect(expired).toHaveBeenCalledWith("t1", "proof");
     });
 
     it("adds the proof to args for the chat they name, and nothing else", () => {

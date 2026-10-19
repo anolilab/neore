@@ -24,6 +24,10 @@ const result = (id: string, value = BIG) =>
         role: "tool",
     }) as ModelMessage;
 
+const ELIDED = "[Tool output removed to fit the context window]";
+/** The text of a tool message's first result. */
+const valueOf = (message: ModelMessage) => (message.content as { output: { value: string } }[])[0]!.output.value;
+
 /** `turns` user turns, each running `steps` tool calls before its answer. */
 const thread = (turns: number, steps: number, bigText = BIG): ModelMessage[] => {
     const messages: ModelMessage[] = [system("You are helpful.")];
@@ -185,6 +189,36 @@ describe("compressContextMessages", () => {
         assertWellFormed(messages, output);
     });
 
+    it("elides short tool outputs too, oldest first, and stops once the prompt fits", () => {
+        // Each 150-character output is longer than the note, so eliding it saves characters.
+        const steps = Array.from({ length: 12 }, (_, i) => [call(`c${i}`), result(`c${i}`, "z".repeat(150))]).flat();
+        const messages = [system("sys"), user("latest"), ...steps];
+        const output = compressContextMessages(messages, LIMIT);
+
+        expect(estimateTokens(output)).toBeLessThan(LIMIT * 0.8);
+        expect(valueOf(output[3]!)).toBe(ELIDED);
+        expect(valueOf(output[9]!)).toBe(ELIDED);
+        // Four elisions were enough, so the newer older results stay whole.
+        expect(output[11]).toBe(messages[11]);
+        expect(output.at(-1)).toBe(messages.at(-1));
+        assertWellFormed(messages, output);
+    });
+
+    it("keeps tool outputs no longer than the note, since eliding them would save nothing", () => {
+        const steps = Array.from({ length: 12 }, (_, i) => [call(`c${i}`), result(`c${i}`, i < 6 ? "s".repeat(40) : "z".repeat(150))]).flat();
+        const messages = [system("sys"), user(BIG), ...steps];
+        const output = compressContextMessages(messages, LIMIT);
+
+        expect(output).not.toBe(messages);
+
+        for (const index of [3, 5, 7, 9, 11, 13]) {
+            expect(output[index]).toBe(messages[index]);
+        }
+
+        expect(valueOf(output[15]!)).toBe(ELIDED);
+        assertWellFormed(messages, output);
+    });
+
     it("keeps the invariants across generated threads", () => {
         let compressedCount = 0;
 
@@ -202,6 +236,27 @@ describe("compressContextMessages", () => {
         }
 
         expect(compressedCount).toBeGreaterThan(10);
+    });
+
+    it("elides a long run of tool outputs oldest first, stopping as soon as the prompt fits", () => {
+        // 300 steps of 1000-character results: elision runs through hundreds of messages before the prompt fits.
+        const wide = 100_000;
+        const steps = Array.from({ length: 300 }, (_, i) => [call(`c${i}`), result(`c${i}`, "z".repeat(1000))]).flat();
+        const messages = [system("sys"), user("latest"), ...steps];
+        const output = compressContextMessages(messages, wide);
+        const threshold = wide * 0.8;
+        const elided = output.flatMap((m, i) => (m.role === "tool" && valueOf(m) === ELIDED ? [i] : []));
+        const toolIndexes = output.flatMap((m, i) => (m.role === "tool" ? [i] : []));
+        const lastElided = elided.at(-1)!;
+        // The original message back in place of the last elision: the prompt must be over the threshold without it.
+        const withoutLastElision = output.map((m, i) => (i === lastElided ? messages[i]! : m));
+
+        expect(elided.length).toBeGreaterThan(0);
+        expect(elided).toEqual(toolIndexes.slice(0, elided.length));
+        expect(estimateTokens(output)).toBeLessThan(threshold);
+        expect(estimateTokens(withoutLastElision)).toBeGreaterThanOrEqual(threshold);
+        expect(output.at(-1)).toBe(messages.at(-1));
+        assertWellFormed(messages, output);
     });
 });
 

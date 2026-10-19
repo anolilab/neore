@@ -1,13 +1,35 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelFilterRules } from "./use-model-filter-rules";
 
-// What the backend holds for the user's rules; the fake saves whatever the mutation sends.
+// What the backend holds for the user's rules. A save whose rules `refuse` accepts is refused, as the backend would.
+// `sent` records each save the backend received, with the account whose session carried it. `hold` keeps a save in flight.
 const server = vi.hoisted(() => {
-    return { rules: undefined as ModelFilterRules | undefined };
+    return {
+        hold: undefined as Promise<void> | undefined,
+        noRow: false,
+        refuse: (_rules: ModelFilterRules): boolean => false,
+        rules: undefined as ModelFilterRules | undefined,
+        sent: [] as { rules: ModelFilterRules; userId: string | undefined }[],
+        userId: "account-a" as string | undefined,
+    };
+});
+
+vi.mock("@/features/auth/lib/auth-ui-provider", () => {
+    return {
+        useAuth: () => {
+            return {
+                hooks: {
+                    useSession: () => {
+                        return { data: server.userId === undefined ? null : { user: { id: server.userId } } };
+                    },
+                },
+            };
+        },
+    };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -19,9 +41,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                         getAIUserPreferences: {
                             queryOptions: () => {
                                 return {
-                                    queryFn: async () => {
-                                        return { modelFilterRules: server.rules };
-                                    },
+                                    queryFn: async () => (server.noRow ? null : { modelFilterRules: server.rules }),
                                     queryKey: ["aiUserPreferences"],
                                 };
                             },
@@ -30,7 +50,15 @@ vi.mock("@/lib/lunora/crpc", () => {
                             mutationOptions: () => {
                                 return {
                                     mutationFn: async (input: { modelFilterRules: ModelFilterRules }) => {
+                                        server.sent.push({ rules: input.modelFilterRules, userId: server.userId });
+                                        await server.hold;
+
+                                        if (server.refuse(input.modelFilterRules)) {
+                                            throw new Error("save refused");
+                                        }
+
                                         server.rules = input.modelFilterRules;
+                                        server.noRow = false;
 
                                         return {};
                                     },
@@ -44,14 +72,25 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
-const { useBlockedCreators, withCreatorHidden, withoutCreator } = await import("./use-model-filter-rules");
+const { useBlockedCreators, useUpdateModelFilterRules, withCreatorHidden, withoutCreator } = await import("./use-model-filter-rules");
 
-const mount = () => {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: React.ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
+const PREFERENCES_KEY = ["aiUserPreferences"];
 
-    return renderHook(() => useBlockedCreators(), { wrapper });
-};
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+const wrapperFor =
+    (queryClient: QueryClient) =>
+    ({ children }: { children: React.ReactNode }) =>
+        createElement(QueryClientProvider, { client: queryClient }, children);
+
+const mount = () => renderHook(() => useBlockedCreators(), { wrapper: wrapperFor(newClient()) });
+
+afterEach(() => {
+    server.hold = undefined;
+    server.refuse = () => false;
+    server.sent = [];
+    server.userId = "account-a";
+});
 
 describe(useBlockedCreators, () => {
     it("undoing the first hide removes only its lab and keeps a later hide", async () => {
@@ -106,5 +145,308 @@ describe(useBlockedCreators, () => {
     it("hiding a lab that is already hidden does not repeat it", () => {
         expect(withCreatorHidden(["meta"], "meta")).toEqual(["meta"]);
         expect(withCreatorHidden(["meta"], "openai")).toEqual(["meta", "openai"]);
+    });
+});
+
+describe(useUpdateModelFilterRules, () => {
+    // The picker and the filters page are separate hook instances on one query cache.
+    const mountBoth = async (queryClient: QueryClient) => {
+        const { result: picker } = renderHook(() => useBlockedCreators(), { wrapper: wrapperFor(queryClient) });
+        const { result: page } = renderHook(() => useUpdateModelFilterRules(), { wrapper: wrapperFor(queryClient) });
+
+        await waitFor(() => {
+            expect(page.current.isLoaded).toBe(true);
+        });
+
+        return { page, picker };
+    };
+
+    /** How an edit settled, read as soon as it is started so a rejection is never unobserved. */
+    const settle = async (edit: Promise<unknown>): Promise<string> => {
+        try {
+            await edit;
+
+            return "saved";
+        } catch (error) {
+            return (error as Error).message;
+        }
+    };
+
+    const blockRegions = (current: ModelFilterRules, regions: string[]): ModelFilterRules => {
+        return { ...current, blockedRegions: regions };
+    };
+
+    it("a filter edit made from an outdated snapshot keeps a lab hidden a moment earlier", async () => {
+        server.rules = { requireZDR: true };
+
+        const { page, picker } = await mountBoth(newClient());
+        // Both edits hold the functions from before the other one ran: their renders are stale.
+        const stalePicker = picker.current.setBlockedCreators;
+        const stalePage = page.current.updateRules;
+
+        await act(async () => {
+            await stalePicker((current) => withCreatorHidden(current, "meta"));
+        });
+        await act(async () => {
+            await stalePage((current) => blockRegions(current, ["EU"]));
+        });
+
+        expect(server.rules).toEqual({ blockedCreators: ["meta"], blockedRegions: ["EU"], requireZDR: true });
+    });
+
+    it("a hide made from an outdated snapshot keeps a filter saved a moment earlier", async () => {
+        server.rules = { requireZDR: true };
+
+        const { page, picker } = await mountBoth(newClient());
+        const stalePicker = picker.current.setBlockedCreators;
+        const stalePage = page.current.updateRules;
+
+        await act(async () => {
+            await stalePage((current) => blockRegions(current, ["EU"]));
+        });
+        await act(async () => {
+            await stalePicker((current) => withCreatorHidden(current, "meta"));
+        });
+
+        expect(server.rules).toEqual({ blockedCreators: ["meta"], blockedRegions: ["EU"], requireZDR: true });
+    });
+
+    it("a refused save puts the cache back to the rules it replaced", async () => {
+        server.rules = { requireZDR: true };
+        server.refuse = () => true;
+
+        const queryClient = newClient();
+        const { page } = await mountBoth(queryClient);
+
+        await act(async () => {
+            await expect(page.current.updateRules((current) => blockRegions(current, ["EU"]))).rejects.toThrow("save refused");
+        });
+
+        expect(queryClient.getQueryData(PREFERENCES_KEY)).toEqual({ modelFilterRules: { requireZDR: true } });
+        await waitFor(() => {
+            expect(page.current.rules).toEqual({ requireZDR: true });
+        });
+        expect(server.rules).toEqual({ requireZDR: true });
+    });
+
+    it("with two edits pending, a refused first one leaves only the second's effect", async () => {
+        server.rules = { requireZDR: true };
+        server.refuse = (rules) => rules.blockedRegions?.join(",") === "EU";
+
+        const queryClient = newClient();
+        const { page } = await mountBoth(queryClient);
+        let first!: Promise<unknown>;
+        let second!: Promise<unknown>;
+
+        act(() => {
+            first = page.current.updateRules((current) => blockRegions(current, ["EU"]));
+            second = page.current.updateRules((current) => {
+                return { ...current, blockedProviders: ["groq"] };
+            });
+        });
+        const outcomes = Promise.all([settle(first), settle(second)]);
+
+        await act(async () => {
+            expect(await outcomes).toStrictEqual(["save refused", "saved"]);
+        });
+
+        const expected = { blockedProviders: ["groq"], requireZDR: true };
+
+        expect(queryClient.getQueryData(PREFERENCES_KEY)).toEqual({ modelFilterRules: expected });
+        expect(server.rules).toEqual(expected);
+    });
+
+    it("with two edits pending and both refused, the cache is back to the original rules", async () => {
+        server.rules = { requireZDR: true };
+        server.refuse = () => true;
+
+        const queryClient = newClient();
+        const { page } = await mountBoth(queryClient);
+        let first!: Promise<unknown>;
+        let second!: Promise<unknown>;
+
+        act(() => {
+            first = page.current.updateRules((current) => blockRegions(current, ["EU"]));
+            second = page.current.updateRules((current) => {
+                return { ...current, blockedProviders: ["groq"] };
+            });
+        });
+        const outcomes = Promise.all([settle(first), settle(second)]);
+
+        await act(async () => {
+            expect(await outcomes).toStrictEqual(["save refused", "save refused"]);
+        });
+
+        expect(queryClient.getQueryData(PREFERENCES_KEY)).toEqual({ modelFilterRules: { requireZDR: true } });
+        expect(server.rules).toEqual({ requireZDR: true });
+    });
+
+    it("with two edits pending, a saved first one and a refused second leave only the first", async () => {
+        server.rules = { requireZDR: true };
+        server.refuse = (rules) => rules.blockedProviders?.includes("groq") === true;
+
+        const queryClient = newClient();
+        const { page } = await mountBoth(queryClient);
+        let first!: Promise<unknown>;
+        let second!: Promise<unknown>;
+
+        act(() => {
+            first = page.current.updateRules((current) => blockRegions(current, ["EU"]));
+            second = page.current.updateRules((current) => {
+                return { ...current, blockedProviders: ["groq"] };
+            });
+        });
+        const outcomes = Promise.all([settle(first), settle(second)]);
+
+        await act(async () => {
+            expect(await outcomes).toStrictEqual(["saved", "save refused"]);
+        });
+
+        const expected = { blockedRegions: ["EU"], requireZDR: true };
+
+        expect(queryClient.getQueryData(PREFERENCES_KEY)).toEqual({ modelFilterRules: expected });
+        expect(server.rules).toEqual(expected);
+    });
+
+    it("a refused earlier edit does not undo a later one that saves", async () => {
+        server.rules = { requireZDR: true };
+        server.refuse = (rules) => rules.blockedRegions?.join(",") === "EU";
+
+        const queryClient = newClient();
+        const { page } = await mountBoth(queryClient);
+
+        await act(async () => {
+            await expect(page.current.updateRules((current) => blockRegions(current, ["EU"]))).rejects.toThrow("save refused");
+            await page.current.updateRules((current) => blockRegions(current, ["EU", "US"]));
+        });
+
+        const newer = { blockedRegions: ["EU", "US"], requireZDR: true };
+
+        expect(queryClient.getQueryData(PREFERENCES_KEY)).toEqual({ modelFilterRules: newer });
+        expect(server.rules).toEqual(newer);
+    });
+
+    it("the first edit from a user with no preferences row is saved and shown", async () => {
+        server.noRow = true;
+        server.rules = undefined;
+
+        const queryClient = newClient();
+        const { page } = await mountBoth(queryClient);
+
+        await act(async () => {
+            await page.current.updateRules((current) => blockRegions(current, ["EU"]));
+        });
+
+        expect(server.rules).toEqual({ blockedRegions: ["EU"] });
+        expect(queryClient.getQueryData(PREFERENCES_KEY)).toEqual({ modelFilterRules: { blockedRegions: ["EU"] } });
+    });
+
+    it("two edits from a user with no preferences row both survive", async () => {
+        server.noRow = true;
+        server.rules = undefined;
+
+        const { page } = await mountBoth(newClient());
+
+        await act(async () => {
+            await page.current.updateRules((current) => blockRegions(current, ["EU"]));
+        });
+        await act(async () => {
+            await page.current.updateRules((current) => {
+                return { ...current, requireZDR: true };
+            });
+        });
+
+        expect(server.rules).toEqual({ blockedRegions: ["EU"], requireZDR: true });
+    });
+
+    it("clearing the last rule saves an empty object, which the server stores", async () => {
+        server.rules = { blockedRegions: ["EU"] };
+
+        const { page } = await mountBoth(newClient());
+
+        await act(async () => {
+            await page.current.updateRules(() => {
+                return {};
+            });
+        });
+
+        expect(server.rules).toEqual({});
+    });
+
+    it("an account switch drops the first account's queued edit, and no save reaches the second account", async () => {
+        server.rules = { requireZDR: true };
+        let release!: () => void;
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node >= 22.11; the configured range starts at 22.0
+        server.hold = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        const queryClient = newClient();
+        const { rerender, result: page } = renderHook(() => useUpdateModelFilterRules(), { wrapper: wrapperFor(queryClient) });
+
+        await waitFor(() => {
+            expect(page.current.isLoaded).toBe(true);
+        });
+
+        const staleUpdate = page.current.updateRules;
+        let first!: Promise<unknown>;
+        let second!: Promise<unknown>;
+
+        act(() => {
+            first = page.current.updateRules((current) => blockRegions(current, ["EU"]));
+            second = page.current.updateRules((current) => {
+                return { ...current, blockedProviders: ["groq"] };
+            });
+        });
+        const outcomes = Promise.all([settle(first), settle(second)]);
+
+        // The first save is in flight under account A; the second is queued behind it.
+        await waitFor(() => {
+            expect(server.sent).toHaveLength(1);
+        });
+
+        server.userId = "account-b";
+        rerender();
+
+        // An edit from a render before the switch is refused outright.
+        await expect(staleUpdate((current) => blockRegions(current, ["US"]))).rejects.toThrow("signed-in account changed");
+
+        await act(async () => {
+            release();
+        });
+
+        expect(await outcomes).toStrictEqual(["saved", "The signed-in account changed; the edit was not saved"]);
+        expect(server.sent).toEqual([{ rules: { blockedRegions: ["EU"], requireZDR: true }, userId: "account-a" }]);
+        expect(JSON.stringify(queryClient.getQueryData(PREFERENCES_KEY))).not.toContain("groq");
+    });
+
+    it("after an account switch an edit waits for the new account's rules and never builds on the old ones", async () => {
+        server.rules = { requireZDR: true };
+
+        const queryClient = newClient();
+        const { rerender, result: page } = renderHook(() => useUpdateModelFilterRules(), { wrapper: wrapperFor(queryClient) });
+
+        await waitFor(() => {
+            expect(page.current.isLoaded).toBe(true);
+        });
+
+        server.userId = "account-b";
+        server.rules = { blockedProviders: ["groq"] };
+        rerender();
+
+        // The old account's cached rules are gone, so an edit before the new account's rules load is refused.
+        const early = page.current.updateRules((current) => blockRegions(current, ["US"]));
+
+        await expect(early).rejects.toThrow("have not loaded");
+
+        await waitFor(() => {
+            expect(page.current.rules).toEqual({ blockedProviders: ["groq"] });
+        });
+        await act(async () => {
+            await page.current.updateRules((current) => blockRegions(current, ["EU"]));
+        });
+
+        expect(server.sent).toEqual([{ rules: { blockedProviders: ["groq"], blockedRegions: ["EU"] }, userId: "account-b" }]);
     });
 });

@@ -4,8 +4,8 @@
  * period. The backend checks each proof on every gated call (`agent/thread-lock.ts`).
  *
  * `withUnlockProof` puts the live proof into a call's args, the one place every
- * procedure call passes through (`crpc.tsx`, `useAction`, `use-uimessages`), so
- * no call site has to remember it.
+ * procedure call passes through (`crpc.tsx`, `useAction`, `use-uimessages`,
+ * `use-delta-streams`), so no call site has to remember it.
  */
 
 import { useSyncExternalStore } from "react";
@@ -24,7 +24,7 @@ interface ProofEntry {
 
 const proofs = new Map<string, ProofEntry>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
-const relockListeners = new Set<(threadId: string) => void>();
+const relockListeners = new Set<(threadId: string, proof: string) => void>();
 const changeListeners = new Set<() => void>();
 const activity = { listening: false };
 
@@ -38,11 +38,11 @@ export const subscribeUnlockProofs = (listener: () => void): (() => void) => {
 };
 
 /**
- * Called with a chat's id each time it is relocked: by expiry or idle timeout,
- * by an explicit forget, or by an account switch. What the chat read with its
- * proof is dropped then (`live-queries.ts`). Returns the unsubscribe.
+ * Called with a chat's id and the proof it just lost, each time it is relocked: by
+ * expiry or idle timeout, by an explicit forget, or by an account switch. What the
+ * chat read with that proof is dropped then (`live-queries.ts`). Returns the unsubscribe.
  */
-export const onUnlockExpired = (listener: (threadId: string) => void): (() => void) => {
+export const onUnlockExpired = (listener: (threadId: string, proof: string) => void): (() => void) => {
     relockListeners.add(listener);
 
     return () => {
@@ -61,7 +61,14 @@ const clearTimer = (threadId: string): void => {
 
 /** Forgets a chat's proof and tells the listeners, so they drop what the proof read. */
 const relock = (threadId: string): void => {
+    const entry = proofs.get(threadId);
+
     clearTimer(threadId);
+
+    if (entry === undefined) {
+        return;
+    }
+
     proofs.delete(threadId);
 
     for (const listener of changeListeners) {
@@ -69,7 +76,7 @@ const relock = (threadId: string): void => {
     }
 
     for (const listener of relockListeners) {
-        listener(threadId);
+        listener(threadId, entry.proof);
     }
 };
 

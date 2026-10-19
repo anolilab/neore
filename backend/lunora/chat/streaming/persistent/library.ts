@@ -6,12 +6,19 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import type { Id } from "../../../_generated/dataModel";
-import { internalMutation, internalQuery } from "../../../_generated/server";
+import { addMessagesHandler, deleteMessage } from "../../../agent/messages";
+import { parentOf } from "../../../agent/branch-rows";
+import { patchThread } from "../../../agent/table-writes";
+import { internal } from "../../../_generated/internal";
+import type { Doc, Id } from "../../../_generated/dataModel";
+import { internalMutation, internalQuery, type MutationCtx } from "../../../_generated/server";
+import { patchRow } from "../../../lib/patch";
+import { MAX_LENGTH } from "../../../lib/validators";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
 
 const STREAM_TTL_MS = 20 * 60 * 1000; // 20 minutes
+const LIVE_STREAM_PAGE = 50;
 
 export const createStream = internalMutation
     .input({
@@ -150,6 +157,141 @@ export const setStreamStatus = internalMutation
         await ctx.db.patch(args.streamId, {
             status: args.status,
         });
+    });
+
+/**
+ * The sidebar's stop for a persistent reply. Each live stream of the thread ends
+ * `done` with the chunks it already has, so the run's next chunk write is refused
+ * (`CONFLICT`); the run then saves what it has (`finishStoppedReply`). The thread
+ * leaves `running` the way a legacy abort does: `abort`, then back to `active` a
+ * second later. Returns whether anything was stopped.
+ *
+ * ponytail: the stop lands at the run's next chunk write, so a long tool step keeps running (and billing) until then. Abort the in-flight call if that bites.
+ */
+export const stopActiveForThread = internalMutation
+    .input({ messageId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        // Read the live streams in pages (a thread has one or two; the bound is for a runaway one), then stop them.
+        const live: Doc<"persistentStreams">[] = [];
+        let cursor: string | undefined;
+
+        do {
+            const page = await ctx.db.persistentStreams.findMany({
+                cursor,
+                limit: LIVE_STREAM_PAGE,
+                where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
+            });
+
+            live.push(...page.page);
+            cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+        } while (cursor);
+
+        // A stop that names a prompt ends that prompt's reply only. When no live stream carries the id (a
+        // placeholder key, or a reply started from another row), it falls back to the whole thread.
+        const named = args.messageId === undefined ? [] : live.filter((stream) => stream.messageId === args.messageId);
+        const streams = named.length > 0 ? named : live;
+
+        for (const stream of streams) {
+            await ctx.db.patch(stream._id, { status: "done" });
+        }
+
+        // The thread leaves `running` only when no live reply is left to keep running.
+        if (streams.length > 0 && streams.length === live.length) {
+            const threadId = args.threadId as Id<"threads">;
+
+            await patchThread(ctx.db, threadId, { status: "abort", updatedAt: ctx.now });
+            await ctx.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
+        }
+
+        return streams.length > 0;
+    });
+
+/**
+ * Deletes an empty pending row and moves the thread's leaf off it onto the row before it, so no branch is left on a
+ * deleted row. The parent is read first: an implicit parent cannot be found once its child is gone.
+ */
+const removeEmptyPending = async (ctx: MutationCtx, threadId: Id<"threads">, pending: Doc<"messages">) => {
+    const parent = await parentOf(ctx, threadId, pending);
+    const thread = await ctx.db.get(threadId);
+
+    await deleteMessage(ctx, pending);
+
+    if (thread?.activeLeafMessageId === pending._id) {
+        await patchRow(ctx.db, thread, { activeLeafMessageId: parent?._id });
+    }
+};
+
+/**
+ * The run a sidebar stop refused saves the text it still owes its reply: what it wrote since its last
+ * finished step (`text`, `reasoning`). Each finished step is already a saved message, so no chunk is read here.
+ *
+ * The reply's row is the pending one for `order` (the step in flight). A continuation has none until a step
+ * saves (start.ts: `forceNewOrder` skips the pending row), so then the text becomes a new row at `order`, after
+ * `promptMessageId`, the way the agent saves a continuation's rows. No text, no row.
+ *
+ * Only a stream a stop ended counts: a timeout or a failure is left to the run's own error path. The thread
+ * leaves `running` in every case it returns true. Returns whether the stream was stopped, and the id of the row it saved.
+ * Called once per run: a redelivery never gets here (`claimStreamRun`), and a second Stop finds no live stream.
+ */
+export const finishStoppedReply = internalMutation
+    .input({
+        agentName: v.optional(v.string().max(MAX_LENGTH.short)),
+        /** A continuation's rows take their own order and branch from the tool result (`promptMessageId`). */
+        continuation: v.boolean(),
+        order: v.number(),
+        pendingReasoning: v.string().max(MAX_LENGTH.document),
+        pendingText: v.string().max(MAX_LENGTH.document),
+        promptMessageId: v.string().max(MAX_LENGTH.id),
+        streamId: v.id("persistentStreams"),
+    })
+    .output(v.object({ messageId: v.optional(v.id("messages")), stopped: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
+
+        if (!stream || stream.status !== "done") {
+            return { stopped: false };
+        }
+
+        const threadId = stream.threadId as Id<"threads">;
+        let messageId: Id<"messages"> | undefined;
+
+        const pending = await ctx.db.messages.findFirst({
+            orderBy: [{ stepOrder: "desc" }],
+            where: { order: args.order, status: "pending", threadId, tool: false },
+        });
+
+        if (args.pendingText.length === 0 && args.pendingReasoning.length === 0) {
+            // Nothing owed: the step in flight wrote no text, so its empty placeholder goes. Left pending, the abort
+            // that ends the run would mark it failed, and the reply would reload as an error.
+            if (pending) {
+                await removeEmptyPending(ctx, threadId, pending);
+            }
+        } else {
+            const content = [
+                ...(args.pendingReasoning ? [{ text: args.pendingReasoning, type: "reasoning" as const }] : []),
+                ...(args.pendingText ? [{ text: args.pendingText, type: "text" as const }] : []),
+            ];
+            const placement = args.continuation
+                ? { overrideOrder: args.order, parentMessageId: args.promptMessageId, promptMessageId: undefined }
+                : { overrideOrder: undefined, parentMessageId: undefined, promptMessageId: args.promptMessageId as Id<"messages"> };
+
+            const saved = await addMessagesHandler(ctx, {
+                agentName: args.agentName,
+                failPendingSteps: false,
+                messages: [{ message: { content, role: "assistant" }, status: "success" }],
+                pendingMessageId: pending?._id,
+                threadId,
+                userId: stream.userId,
+                ...placement,
+            });
+
+            messageId = saved.messages[0]?._id as Id<"messages"> | undefined;
+        }
+
+        await patchThread(ctx.db, threadId, { status: "active", updatedAt: ctx.now });
+
+        return { stopped: true, ...(messageId !== undefined && { messageId }) };
     });
 
 export const getStreamStatus = internalQuery

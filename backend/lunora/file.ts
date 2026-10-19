@@ -24,6 +24,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "./_generated/internal";
 import { internalAction, internalMutation } from "./_generated/server";
+import { fileGatedByLockedChat } from "./agent/files";
 import { finalizeStagedUpload, purgeStagedUploads } from "./lib/chat-upload";
 import { finalizeStagedReferenceMedia } from "./lib/reference-media-upload";
 import { authAction, authQuery, rateLimit } from "./lib/crpc";
@@ -83,7 +84,11 @@ export const finalizeReferenceMedia = authAction
  * text itself is never returned.
  */
 export const getChatFileExtraction = authQuery
-    .input({ fileId: v.id("chatFiles") })
+    .input({
+        fileId: v.id("chatFiles"),
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
     .output(
         v.union(
             v.null(),
@@ -95,7 +100,7 @@ export const getChatFileExtraction = authQuery
     .query(async ({ args, ctx }) => {
         const grant = await ctx.db.chatFileAccess.findFirst({ where: { fileId: args.fileId, userId: ctx.user.userId } });
 
-        if (!grant) {
+        if (!grant || (await fileGatedByLockedChat(ctx, { ...args, userId: ctx.user.userId }))) {
             return null;
         }
 
@@ -111,12 +116,16 @@ export const getChatFileExtraction = authQuery
  * does not exist.
  */
 export const getChatFileImageUrl = authQuery
-    .input({ fileId: v.id("chatFiles") })
+    .input({
+        fileId: v.id("chatFiles"),
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
     .output(v.union(v.null(), v.string()))
     .query(async ({ args, ctx }) => {
         const grant = await ctx.db.chatFileAccess.findFirst({ where: { fileId: args.fileId, userId: ctx.user.userId } });
 
-        if (!grant) {
+        if (!grant || (await fileGatedByLockedChat(ctx, { ...args, userId: ctx.user.userId }))) {
             return null;
         }
 

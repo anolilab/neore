@@ -1,113 +1,110 @@
-import { describe, expect, it, vi } from "vitest";
+/**
+ * A chunk write refused with CONFLICT (the stream was ended by a sidebar stop) stops
+ * the pipe with the text the reply still owes: what was written since the last
+ * finished step, and what was buffered but not written.
+ */
+import { LunoraError } from "lunorash/server";
+import { describe, expect, it } from "vitest";
 
-import { MAX_FLUSH_INTERVAL_MS, pipeToPersistentChunks, StreamFailedError } from "./persist-stream";
+import { isStreamWriteRefused, originalWriteError, pipeToPersistentChunks } from "./persist-stream";
 
-const streamOf = async function* (parts: { error?: unknown; text?: string; type: string }[]) {
-    yield* parts;
+/** A fake action context: the first `accepted` chunk writes succeed, the next one is refused as a stop. */
+const ctxAccepting = (accepted: number) => {
+    const written: string[] = [];
+    const ctx = {
+        runMutation: async (_ref: unknown, args: { text: string }) => {
+            if (written.length >= accepted) {
+                throw new LunoraError("CONFLICT", "Stream is not streaming; did it timeout?");
+            }
+
+            written.push(args.text);
+        },
+    };
+
+    return { ctx, written };
 };
 
-const makeCtx = () => {
-    const chunks: { final: boolean; reasoning?: string; text: string }[] = [];
-    const runMutation = vi.fn(async (_reference: unknown, args: { final: boolean; reasoning?: string; text: string }) => {
-        chunks.push({ final: args.final, reasoning: args.reasoning, text: args.text });
-
-        return null;
-    });
-
-    return { chunks, ctx: { runMutation } as unknown as Parameters<typeof pipeToPersistentChunks>[0] };
-};
+/** Parts of a model stream: a string is a text delta, `"finish-step"` ends a step. */
+async function* parts(items: (string | "finish-step")[]) {
+    for (const item of items) {
+        yield item === "finish-step" ? { type: "finish-step" } : { text: item, type: "text-delta" };
+    }
+}
 
 describe(pipeToPersistentChunks, () => {
-    it("flushes reasoning at its end and text at sentence delimiters", async () => {
-        const { chunks, ctx } = makeCtx();
+    it("stops at a refused write and owes the whole text, since no step has finished", async () => {
+        const { ctx, written } = ctxAccepting(1);
 
-        const result = await pipeToPersistentChunks(
-            ctx,
-            "s1",
-            streamOf([
-                { text: "Think", type: "reasoning-delta" },
-                { type: "reasoning-end" },
-                { text: "Hi.", type: "text-delta" },
-                { text: " tail", type: "text-delta" },
-            ]),
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. ", "Two. ", "Three. "])).catch((error_: unknown) => error_);
+
+        expect(isStreamWriteRefused(error)).toBe(true);
+        expect(written).toStrictEqual(["One. "]);
+        expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "One. Two. " });
+    });
+
+    it("after a finished step, owes only the text since that step, not the step's own text", async () => {
+        // The first step's text is written and then saved as its own message by the agent.
+        const { ctx } = ctxAccepting(1);
+
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", parts(["Let me search. ", "finish-step", "Answer."])).catch(
+            (error_: unknown) => error_,
         );
 
-        expect(chunks).toStrictEqual([
-            { final: false, reasoning: "Think", text: "" },
-            { final: false, reasoning: undefined, text: "Hi." },
-        ]);
-        expect(result.pending).toStrictEqual({ reasoning: "", text: " tail" });
+        expect(isStreamWriteRefused(error)).toBe(true);
+        expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "Answer." });
     });
 
-    it("drains the stream, flushes partial text and throws on an error part", async () => {
-        const { chunks, ctx } = makeCtx();
-        let isDrained = false;
+    it("keeps the original write error as the cause of a refusal", async () => {
+        const { ctx } = ctxAccepting(0);
 
-        const stream = (async function* erroringStream() {
-            yield { text: "Partial", type: "text-delta" };
-            yield { error: new Error("Rate limit exceeded"), type: "error" };
-            yield { type: "finish" };
-            isDrained = true;
-        })();
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", parts(["Hi. "])).catch((error_: unknown) => error_);
 
-        const promise = pipeToPersistentChunks(ctx, "s1", stream);
-
-        await expect(promise).rejects.toBeInstanceOf(StreamFailedError);
-        await expect(promise).rejects.toThrow("Rate limit exceeded");
-        expect(isDrained).toBe(true);
-        expect(chunks).toStrictEqual([{ final: false, reasoning: undefined, text: "Partial" }]);
+        expect(originalWriteError(error)).toBeInstanceOf(LunoraError);
+        expect((originalWriteError(error) as LunoraError).code).toBe("CONFLICT");
     });
 
-    it("carries a non-Error cause", async () => {
-        const { ctx } = makeCtx();
+    it("on a normal end, reports the text since the last finished step as unsaved", async () => {
+        const { ctx } = ctxAccepting(10);
 
-        await expect(pipeToPersistentChunks(ctx, "s1", streamOf([{ error: { code: 500 }, type: "error" }]))).rejects.toThrow("Model stream failed");
+        const piped = await pipeToPersistentChunks(ctx as never, "stream-1", parts(["Let me search. ", "finish-step", "Answer."]));
+
+        expect(piped.unsaved).toStrictEqual({ reasoning: "", text: "Answer." });
+        expect(piped.pending).toStrictEqual({ reasoning: "", text: "" });
     });
 
-    it("writes the first delta at once, without waiting for a sentence to end", async () => {
-        const { chunks, ctx } = makeCtx();
+    it("a refusal at a finished step's flush owes nothing, since the agent saves that step itself", async () => {
+        const { ctx } = ctxAccepting(1);
 
-        const result = await pipeToPersistentChunks(
-            ctx,
-            "s1",
-            streamOf([
-                { text: "", type: "text-delta" },
-                { text: "Once", type: "text-delta" },
-                { text: " upon", type: "text-delta" },
-                { text: " a time", type: "text-delta" },
-            ]),
-        );
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. ", "Two", "finish-step"])).catch((error_: unknown) => error_);
 
-        expect(chunks).toStrictEqual([{ final: false, reasoning: undefined, text: "Once" }]);
-        expect(result.pending).toStrictEqual({ reasoning: "", text: " upon a time" });
+        expect(isStreamWriteRefused(error)).toBe(true);
+        expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "" });
     });
 
-    it("writes a buffer older than the flush interval even with no delimiter in it", async () => {
-        const { chunks, ctx } = makeCtx();
-        let now = 1000;
-        const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    it("rethrows a non-refusal failure at a finished step's flush as it was", async () => {
+        const boom = new Error("database down");
+        let calls = 0;
+        const ctx = {
+            runMutation: async () => {
+                calls += 1;
 
-        const stream = (async function* codeStream() {
-            yield { text: "const", type: "text-delta" };
-            now += 10;
-            yield { text: " a", type: "text-delta" };
-            now += MAX_FLUSH_INTERVAL_MS;
-            yield { text: " = 1", type: "text-delta" };
-            now += 10;
-            yield { text: "\n", type: "text-delta" };
-        })();
+                if (calls > 1) {
+                    throw boom;
+                }
+            },
+        };
 
-        try {
-            const result = await pipeToPersistentChunks(ctx, "s1", stream);
+        await expect(pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. ", "Two", "finish-step"]))).rejects.toBe(boom);
+    });
 
-            expect(chunks).toStrictEqual([
-                { final: false, reasoning: undefined, text: "const" },
-                { final: false, reasoning: undefined, text: " a = 1" },
-            ]);
-            expect(result.pending).toStrictEqual({ reasoning: "", text: "\n" });
-            expect(result.firstTokenTime).toBe(1000);
-        } finally {
-            clock.mockRestore();
-        }
+    it("rethrows any other write failure as it was", async () => {
+        const boom = new Error("database down");
+        const ctx = {
+            runMutation: async () => {
+                throw boom;
+            },
+        };
+
+        await expect(pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. "]))).rejects.toBe(boom);
     });
 });

@@ -72,6 +72,18 @@ export const eraseChatFileAccessForUser = async (ctx: MutationCtx, userId: strin
     return { hasMore: full(rows) };
 };
 
+/** The file-to-chat links of the user's own chats (`chatFileThreads`, keyed by owner). */
+export const eraseChatFileThreadsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    const rows = await ctx.db
+        .query("chatFileThreads")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .take(BATCH);
+
+    await Promise.all(rows.map((row) => ctx.db.delete(row._id)));
+
+    return { hasMore: full(rows) };
+};
+
 /** The user's relationship rows, temporary threads and thread grants (held by them, or given on their threads). */
 export const eraseThreadMetadataForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
     const [relationships, temporaryThreads, threadAccess] = await Promise.all([

@@ -107,6 +107,27 @@ describe(loadRunContext, () => {
         expect(result.retrievedMemories).toStrictEqual([{ memoryId: "m1", score: 0.9 }]);
     });
 
+    it("tells the knowledge search a run was admitted only when the caller says so", async () => {
+        const admitted = makeCtx(Promise.resolve({ memoryEnabled: false }), Promise.resolve(null));
+
+        await loadRunContext(admitted.ctx, { ...args, admittedRun: true });
+
+        expect(admitted.runAction).toHaveBeenCalledWith(internal.knowledge.retrieve.search, {
+            admittedRun: true,
+            query: args.promptText,
+            threadId: "t1",
+            userId: "u1",
+        });
+
+        // A headless run (task, trigger, messenger) has no admission: the flag must not appear.
+        const headless = makeCtx(Promise.resolve({ memoryEnabled: false }), Promise.resolve(null));
+
+        await loadRunContext(headless.ctx, args);
+
+        expect(headless.runAction).toHaveBeenCalledWith(internal.knowledge.retrieve.search, { query: args.promptText, threadId: "t1", userId: "u1" });
+        expect(headless.runAction).not.toHaveBeenCalledWith(internal.knowledge.retrieve.search, expect.objectContaining({ admittedRun: true }));
+    });
+
     it("retrieves no memories for a user who has not opted in, and reads no project without one", async () => {
         const { ctx, runAction, runQuery } = makeCtx(Promise.resolve({ memoryEnabled: false }), Promise.resolve(null));
 

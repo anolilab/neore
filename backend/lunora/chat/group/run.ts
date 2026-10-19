@@ -44,6 +44,7 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    endStoppedRun,
     finishRun,
     loadRunContext,
     resolveRunModel,
@@ -56,7 +57,7 @@ import { buildAgentTools } from "../lib/agent-tools";
 import { getMaxSteps } from "../lib/auto-continue";
 import getAgent from "../lib/get-agent";
 import { closeMCPClients } from "../lib/mcp-tools";
-import { pipeToPersistentChunks } from "../lib/persist-stream";
+import { pipeToPersistentChunks, type PipedStream } from "../lib/persist-stream";
 import type { SearchMode } from "../lib/tool-builder";
 import type { ToolRunConfig } from "../lib/tool-run-config";
 import type { GroupHistoryRow, GroupParticipantInfo } from "./logic";
@@ -210,15 +211,16 @@ const lastSpeakerOf = (history: ReadonlyArray<GroupHistoryRow>): string | undefi
 
 /**
  * Run ONE participant into the turn's stream. Returns whether it paused on a
- * tool approval (which ends the turn) and the id of its last saved row — where
- * the next speaker continues from.
+ * tool approval or was stopped (either ends the turn) and the id of its last
+ * saved row — where the next speaker continues from. A stop saves the reply
+ * the speaker still owed before the model call is aborted (`endStoppedRun`).
  */
 const runSpeaker = async (
     ctx: ActionCtx,
     turn: TurnContext,
     speaker: GroupParticipantRun,
     position: QueuePosition,
-): Promise<{ lastMessageId: string | undefined; paused: boolean }> => {
+): Promise<{ lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     let mcpClients: MCPClient[] = [];
 
     try {
@@ -228,6 +230,8 @@ const runSpeaker = async (
 
         const toolResult = allowTools
             ? await buildAgentTools(ctx, {
+                  // The group turn runs inside the admitted stream (`runGroupTurn`, after `streamRunThread`).
+                  admittedRun: true,
                   autoMediaEnrichment: turn.agentPrefs.autoMediaEnrichment,
                   mcpServerNames: turn.mcpServerNames,
                   model,
@@ -304,27 +308,79 @@ const runSpeaker = async (
             text: "",
         });
 
+        // Aborted only after a stop's reply is saved (`stoppedAt` below).
+        const stopping = new AbortController();
+
+        streamTextArgs.abortSignal = stopping.signal;
+
         // Admitted by the stream this turn runs on (`streamRunThread`): the context is read without a proof.
         const result = await agent.streamText(ctx, { threadId: turn.threadId, userId: turn.userId }, streamTextArgs as never, {
             admittedRun: true,
             saveStreamDeltas: false,
         });
         const timingStart = Date.now();
-        const { firstTokenTime, pending } = await pipeToPersistentChunks(ctx, turn.streamId, result.fullStream);
+        const markSpeaker = async (messageIds: string[]) => {
+            if (messageIds.length > 0) {
+                await ctx.runMutation(internal.chat.group.functions.markSpeakerMessages, {
+                    agentName: speaker.name,
+                    messageIds,
+                    skillId: speaker.skillId,
+                    threadId: turn.threadId,
+                    userId: turn.userId,
+                });
+            }
+        };
+        // Timing only: memory is not extracted from group turns — the exchange
+        // is several participants' voices, not the user talking to one assistant.
+        const recordRun = (firstTokenTime: number | undefined) => {
+            afterRun(ctx, {
+                extractMemory: false,
+                firstTokenTime,
+                prompt: "",
+                savedMessages: result.savedMessages,
+                skill: { id: speaker.skillId, name: speaker.name },
+                threadId: turn.threadId,
+                ...(turn.prefs.timezone && { timeZone: turn.prefs.timezone }),
+                timingStart,
+                userId: turn.userId,
+            });
+        };
+
+        // A stop ends the turn here, with the reply this speaker still owed saved and stamped as its own.
+        const stoppedAt = async (error: unknown) => {
+            const stoppedIds = await endStoppedRun(ctx, error, {
+                agentName: speaker.name,
+                // A later speaker runs under `forceNewOrder`: its reply takes its own order, as a continuation does.
+                continuation: !isFirstSpeaker,
+                order: result.order,
+                promptMessageId: result.promptMessageId,
+                result,
+                stop: stopping,
+                streamId: turn.streamId,
+            });
+
+            await markSpeaker([...stoppedIds, ...(result.savedMessages ?? []).map((m) => m._id as string)]);
+
+            // What the speaker finished before the stop is a reply like any other on the usage page.
+            recordRun(undefined);
+
+            return { lastMessageId: undefined, paused: false, stopped: true };
+        };
+        let piped: PipedStream;
+
+        try {
+            piped = await pipeToPersistentChunks(ctx, turn.streamId, result.fullStream);
+        } catch (error) {
+            return await stoppedAt(error);
+        }
+
+        const { firstTokenTime, pending, unsaved } = piped;
 
         await result.consumeStream();
 
         const savedIds = (result.savedMessages ?? []).map((m) => m._id as string);
 
-        if (savedIds.length > 0) {
-            await ctx.runMutation(internal.chat.group.functions.markSpeakerMessages, {
-                agentName: speaker.name,
-                messageIds: savedIds,
-                skillId: speaker.skillId,
-                threadId: turn.threadId,
-                userId: turn.userId,
-            });
-        }
+        await markSpeaker(savedIds);
 
         const snapshot: ToolRunConfig = {
             autoMediaEnrichment: turn.agentPrefs.autoMediaEnrichment ?? false,
@@ -340,32 +396,27 @@ const runSpeaker = async (
             toolPermissionKeys: toolResult.permissionKeys,
         };
 
-        const { paused } = await finishRun(ctx, {
-            keepOpenUnlessPaused: true,
-            mcpLabels: toolResult.mcpLabels,
-            pending,
-            savedMessages: result.savedMessages,
-            snapshot,
-            streamId: turn.streamId,
-            threadId: turn.threadId,
-            userId: turn.userId,
-        });
+        let paused: boolean;
 
-        // Timing only: memory is not extracted from group turns — the exchange
-        // is several participants' voices, not the user talking to one assistant.
-        afterRun(ctx, {
-            extractMemory: false,
-            firstTokenTime,
-            prompt: "",
-            savedMessages: result.savedMessages,
-            skill: { id: speaker.skillId, name: speaker.name },
-            threadId: turn.threadId,
-            ...(turn.prefs.timezone && { timeZone: turn.prefs.timezone }),
-            timingStart,
-            userId: turn.userId,
-        });
+        try {
+            ({ paused } = await finishRun(ctx, {
+                keepOpenUnlessPaused: true,
+                mcpLabels: toolResult.mcpLabels,
+                pending,
+                savedMessages: result.savedMessages,
+                snapshot,
+                streamId: turn.streamId,
+                threadId: turn.threadId,
+                unsaved,
+                userId: turn.userId,
+            }));
+        } catch (error) {
+            return await stoppedAt(error);
+        }
 
-        return { lastMessageId: savedIds.at(-1), paused };
+        recordRun(firstTokenTime);
+
+        return { lastMessageId: savedIds.at(-1), paused, stopped: false };
     } finally {
         await closeMCPClients(mcpClients);
     }
@@ -464,7 +515,7 @@ const runQueue = async (
 
         spoken.push(speaker.skillId);
 
-        const { lastMessageId, paused } = await runSpeaker(ctx, turn, speaker, {
+        const { lastMessageId, paused, stopped } = await runSpeaker(ctx, turn, speaker, {
             continueFromMessageId: continueFrom,
             remaining: queue,
             spokenSkillIds: spoken,
@@ -474,6 +525,11 @@ const runQueue = async (
         if (paused) {
             // `finishRun` closed the stream; the approval's continuation picks up
             // this speaker and the rest of `queue` from the snapshot.
+            return;
+        }
+
+        if (stopped) {
+            // The stop ended the stream and the thread's run; no further speaker.
             return;
         }
 
@@ -520,6 +576,7 @@ const loadTurnContext = async (
         ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }),
     ]);
     const runContext = await loadRunContext(ctx, {
+        admittedRun: true,
         customSystemPrompt: args.customSystemPrompt,
         promptText: args.promptText,
         researchDepth: args.researchDepth,
@@ -667,6 +724,8 @@ export const continueGroupAfterToolApproval = async (
         ctx,
         { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
         {
+            // Reached only through `continueAfterToolApproval`, after its stream gate.
+            admittedRun: true,
             afterSaved: async ({ messageIds, toolResultId }) => {
                 await ctx.runMutation(internal.chat.group.functions.markSpeakerMessages, {
                     agentName: speaker.name,
@@ -702,7 +761,8 @@ export const continueGroupAfterToolApproval = async (
         },
     );
 
-    if (resumed.paused) {
+    // Paused again, or stopped by the user: either way this turn goes no further.
+    if (resumed.paused || resumed.stopped) {
         return;
     }
 

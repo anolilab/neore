@@ -479,6 +479,39 @@ describe(LiveQueryManager, () => {
         unobserveOther();
     });
 
+    it("drops a read that names only the proof, a deck's, when its chat relocks", () => {
+        const deck = key("chat_slides:getPresentation", { presentationId: "deck-1", unlockProof: "deck-proof" });
+        const unobserve = observe(deck);
+
+        queryClient.setQueryData(deck, { slides: ["secret"] });
+        rememberUnlockProof("deck-chat", "deck-proof", Date.now() + 1000);
+
+        vi.advanceTimersByTime(1000);
+
+        expect(queryClient.getQueryData(deck)).toBeUndefined();
+        expect(manager.isSubscribed(hashKey(deck))).toBe(false);
+
+        unobserve();
+    });
+
+    it("keeps a non-Lunora query that only mentions the chat's id in its key", () => {
+        const mentions = ["unrelated-cache", "locked-chat", { note: "locked-chat" }] as const;
+        // Not a Lunora key, but its third element has the args shape a Lunora read has.
+        const lookalike = ["other-cache", "chat:getThreadWithData", { threadId: "locked-chat" }] as const;
+        const lunora = key("chat:getThreadWithData", { threadId: "locked-chat" });
+
+        queryClient.setQueryData(mentions, { keep: true });
+        queryClient.setQueryData(lookalike, { keep: true });
+        queryClient.setQueryData(lunora, { messages: ["secret"] });
+        rememberUnlockProof("locked-chat", "proof", Date.now() + 1000);
+
+        vi.advanceTimersByTime(1000);
+
+        expect(queryClient.getQueryData(mentions)).toEqual({ keep: true });
+        expect(queryClient.getQueryData(lookalike)).toEqual({ keep: true });
+        expect(queryClient.getQueryData(lunora)).toBeUndefined();
+    });
+
     it("relocks a proof a render found lapsed before its timer fired, and drops the cache", async () => {
         const locked = key("chat:getThreadWithData", { threadId: "render-chat" });
         const unobserve = observe(locked);

@@ -50,11 +50,48 @@ export class StreamFailedError extends Error {
     }
 }
 
+/** Brands a refused chunk write, so a caller can tell it from any other failure. */
+const WRITE_REFUSED = Symbol.for("neore.stream-write-refused");
+
+/** Text a run still owes its reply, as a refused write leaves it. */
+export interface StreamText {
+    reasoning: string;
+    text: string;
+}
+
+/** A refused chunk write: the run's stream was ended while it was writing (a stop). */
+export interface StreamWriteRefused extends Error {
+    /** What the reply still needs: the text since the run's last finished step, and what was not yet written. */
+    pending: StreamText;
+}
+
+/**
+ * Wraps a `CONFLICT` from `addChunk`, which is how a stop shows up on a write. The original
+ * error is the `cause`, so a refusal that is not a stop can be rethrown as it was.
+ */
+export const streamWriteRefused = (pending: StreamText, cause: unknown): StreamWriteRefused =>
+    Object.assign(new Error("Stream write refused: the stream was ended", { cause }), { pending, [WRITE_REFUSED]: true });
+
+export const isStreamWriteRefused = (error: unknown): error is StreamWriteRefused => typeof error === "object" && error !== null && WRITE_REFUSED in error;
+
+/** The error a caller should see: the original of a refused write, anything else as it was. */
+export const originalWriteError = (error: unknown): unknown => (isStreamWriteRefused(error) ? error.cause : error);
+
+/** Turns a `CONFLICT` from `addChunk` into a refused write that keeps `pending`; any other error passes through. */
+export const asRefusedWrite = (error: unknown, pending: StreamText): unknown => {
+    // A thrown `LunoraError` carries `code`; a wire-decoded one carries it in `data`.
+    const { code, data } = (error ?? {}) as { code?: unknown; data?: { code?: unknown } };
+
+    return code === "CONFLICT" || data?.code === "CONFLICT" ? streamWriteRefused(pending, error) : error;
+};
+
 export interface PipedStream {
     /** Wall-clock ms of the first non-empty delta, if any. */
     firstTokenTime: number | undefined;
     /** Buffered text/reasoning not yet flushed — pass to the final chunk. */
-    pending: { reasoning: string; text: string };
+    pending: StreamText;
+    /** Text written since the last finished step. Those steps' messages are saved by the agent; this is the rest. */
+    unsaved: StreamText;
 }
 
 export const pipeToPersistentChunks = async (
@@ -62,19 +99,29 @@ export const pipeToPersistentChunks = async (
     streamId: string,
     fullStream: AsyncIterable<{ error?: unknown; text?: string; type: string }>,
 ): Promise<PipedStream> => {
-    let pending = { reasoning: "", text: "" };
+    let pending: StreamText = { reasoning: "", text: "" };
+    let unsaved: StreamText = { reasoning: "", text: "" };
     let firstTokenTime: number | undefined;
     let streamError: { error: unknown } | undefined;
     /** When the last chunk was written; `undefined` until the first one is. */
     let lastFlushAt: number | undefined;
 
     const flush = async (): Promise<void> => {
-        await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-            final: false,
-            reasoning: pending.reasoning || undefined,
-            streamId: streamId as Id<"persistentStreams">,
-            text: pending.text,
-        });
+        const chunk = pending;
+        const owed = { reasoning: unsaved.reasoning + chunk.reasoning, text: unsaved.text + chunk.text };
+
+        try {
+            await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+                final: false,
+                reasoning: chunk.reasoning || undefined,
+                streamId: streamId as Id<"persistentStreams">,
+                text: chunk.text,
+            });
+        } catch (error) {
+            throw asRefusedWrite(error, owed);
+        }
+
+        unsaved = owed;
         pending = { reasoning: "", text: "" };
         lastFlushAt = Date.now();
     };
@@ -108,6 +155,20 @@ export const pipeToPersistentChunks = async (
                     await flush();
                 }
 
+                // A finished step is saved as its own message by the agent, so from here on its text is not the reply's to keep.
+                if (part.type === "finish-step") {
+                    if (pending.text || pending.reasoning) {
+                        try {
+                            await flush();
+                        } catch (error) {
+                            // The agent saves this step itself, so a refusal here owes nothing.
+                            throw isStreamWriteRefused(error) ? streamWriteRefused({ reasoning: "", text: "" }, error.cause) : error;
+                        }
+                    }
+
+                    unsaved = { reasoning: "", text: "" };
+                }
+
                 continue;
             }
         }
@@ -132,5 +193,5 @@ export const pipeToPersistentChunks = async (
         throw new StreamFailedError(streamError.error);
     }
 
-    return { firstTokenTime, pending };
+    return { firstTokenTime, pending, unsaved };
 };

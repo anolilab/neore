@@ -51,6 +51,8 @@ const SYSTEM_DB_IMPORTERS = [
     "agent/admitted-thread-db.ts",
     // `count()` of the caller's own rows, which cannot run behind a read policy.
     "agent/threads.ts",
+    // The owner of a thread a message write links files under (`chatFileThreads`); the link is written, never returned.
+    "agent/files.ts",
     "gdpr/functions.ts",
     "skills/functions.ts",
     "skills/marketplace.ts",

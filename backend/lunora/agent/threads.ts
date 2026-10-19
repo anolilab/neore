@@ -17,6 +17,7 @@ import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, partial, MAX_LENGTH } from "../lib/validators";
 import { deleteMessage } from "./messages";
+import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
 import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
@@ -445,6 +446,12 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
     if (messages.isDone) {
         // Approval snapshots hold the run's system prompt; they go with the thread.
         await deleteToolApprovalRunsForThread(context, args.threadId);
+
+        // One batch of links per call. While links remain this page reports "not done" and the
+        // chain re-runs it, so the thread row (deleted last) and its links never outlive a partial delete.
+        if (await deleteChatFileLinksForThread(context, args.threadId)) {
+            return { cursor: messages.continueCursor, isDone: false };
+        }
 
         const thread = await context.db.get(args.threadId);
 

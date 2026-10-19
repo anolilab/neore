@@ -168,8 +168,8 @@ export class LiveQueryManager {
 
         let subject = tokenSubject(this.client.getAuthToken());
 
-        this.disconnectUnlock = onUnlockExpired((threadId) => {
-            this.dropThreadCache(threadId);
+        this.disconnectUnlock = onUnlockExpired((threadId, proof) => {
+            this.dropThreadCache(threadId, proof);
         });
 
         this.disconnectToken = this.client.onAuthTokenChange((token) => {
@@ -264,12 +264,24 @@ export class LiveQueryManager {
     }
 
     /**
-     * Drops the cached answers of one chat, which were read with its proof. The
-     * query key carries the args, so the chat's id is in it. Removing a query
-     * fires `removed`, which releases its live subscription (`onCacheEvent`).
+     * Drops the cached answers of one chat, which were read with its proof: the
+     * Lunora reads that name the chat (`threadId` / `chatId`) and the ones that carry
+     * the proof itself (a deck's `unlockProof` arg, which names no chat). Matched on the
+     * decoded call args, never on the key text, and only for Lunora keys. Removing a
+     * query fires `removed`, which releases its live subscription (`onCacheEvent`).
      */
-    private dropThreadCache(threadId: string): void {
-        this.queryClient.removeQueries({ predicate: (query) => JSON.stringify(query.queryKey).includes(threadId) });
+    private dropThreadCache(threadId: string, proof: string): void {
+        this.queryClient.removeQueries({
+            predicate: (query) => {
+                if (!isLunoraKey(query.queryKey)) {
+                    return false;
+                }
+
+                const args = argsOf(query);
+
+                return args.threadId === threadId || args.chatId === threadId || args.unlockProof === proof;
+            },
+        });
     }
 
     private onCacheEvent(event: QueryCacheNotifyEvent): void {

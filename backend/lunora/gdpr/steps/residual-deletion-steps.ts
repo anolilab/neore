@@ -46,6 +46,7 @@ import { internalAction, internalMutation, internalQuery } from "../../_generate
 import {
     eraseEmbeddingsForUser,
     eraseChatFileAccessForUser,
+    eraseChatFileThreadsForUser,
     eraseStreamingMessagesForUser,
     eraseWorkflowExecutionsForProject,
     eraseWorkflowExecutionsForUser,
@@ -279,6 +280,7 @@ export const deleteUserIntegrations = internalMutation
 
         const connections = await eraseMessengerConnectionsForUser(context, userId);
         const fileGrants = await eraseChatFileAccessForUser(context, userId);
+        const fileLinks = await eraseChatFileThreadsForUser(context, userId);
         const triggers = await eraseTriggersForUser(context, userId);
         const bots = await eraseBotsForUser(context, userId);
         const sessions = await eraseSandboxSessionsForUser(context, userId);
@@ -290,6 +292,7 @@ export const deleteUserIntegrations = internalMutation
                 notifications.hasMore ||
                 connections.hasMore ||
                 fileGrants.hasMore ||
+                fileLinks.hasMore ||
                 triggers.hasMore ||
                 bots.hasMore ||
                 sessions.hasMore,

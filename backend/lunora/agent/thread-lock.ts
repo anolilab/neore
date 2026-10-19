@@ -19,6 +19,7 @@ import { hashPasscode, isAcceptablePasscode, isThreadLocked, mintUnlockProof, ne
 
 import { scheduleGranteeRedaction } from "../notifications/locked-redact";
 
+import { scheduleFileLinkBackfill } from "./file-link-backfill";
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
 import { requireOwnedThreadIgnoringLock } from "./thread-read-access";
 
@@ -119,6 +120,8 @@ export const enableThreadLock = authMutation
             userId,
         });
         await patchRow(context.db, thread, { lockedAt: now, updatedAt: now });
+        // Index the chat's attachments; until the walk stamps the row, the file gate scans its messages.
+        await scheduleFileLinkBackfill(context, threadId, userId);
         // Former collaborators' notifications for this chat stop showing its title (`notifications/locked-redact.ts`).
         await scheduleGranteeRedaction(context, threadId, userId);
 
@@ -174,6 +177,10 @@ export const lockThread = authMutation
         // `lockedAt` moves too: a stream or background run started under the earlier proof is "created before the lock" and stops (`lockedAfterCreation`).
         await patchRow(context.db, row, { epoch: newPasscodeEpoch(), updatedAt: now });
         await patchRow(context.db, thread, { lockedAt: now, updatedAt: now });
+
+        if (row.filesIndexedAt === undefined) {
+            await scheduleFileLinkBackfill(context, threadId, userId);
+        }
 
         return { ok: true };
     });
@@ -265,6 +272,8 @@ export const inheritPasscodeHandler = async (ctx: MutationCtx, args: { sourceThr
 
     const now = Date.now();
 
+    const ownerId = target.userId ?? source.userId;
+
     await ctx.db.insert("threadPasscodes", {
         createdAt: now,
         epoch: newPasscodeEpoch(),
@@ -274,9 +283,10 @@ export const inheritPasscodeHandler = async (ctx: MutationCtx, args: { sourceThr
         salt: source.salt,
         threadId: args.targetThreadId,
         updatedAt: now,
-        userId: target.userId ?? source.userId,
+        userId: ownerId,
     });
     await patchRow(ctx.db, target, { lockedAt: now, updatedAt: now });
+    await scheduleFileLinkBackfill(ctx, args.targetThreadId, ownerId);
 
     return null;
 };

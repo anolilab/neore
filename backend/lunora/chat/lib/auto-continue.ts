@@ -30,8 +30,6 @@ const RECENT_MESSAGES_TO_KEEP = 6;
 const SUMMARY_TRUNCATION_LENGTH = 200;
 /** Replaces the output of a tool result that compression elides. The call keeps its id. */
 const ELIDED_TOOL_OUTPUT = "[Tool output removed to fit the context window]";
-/** Tool outputs at or under this length are kept: eliding them would save nothing. */
-const ELIDE_MIN_CHARS = 200;
 /** Stands in for the summary when the summary alone would not fit. */
 const DROPPED_SUMMARY_NOTE = "[Earlier conversation was removed to fit the context window]";
 
@@ -64,13 +62,11 @@ const toolResultText = (part: { content?: unknown; output?: unknown; result?: un
     }
 };
 
-/**
- * Fast approximate token count. Avoids tiktoken dependency.
- * Rough estimate: 1 token ≈ 4 characters for English text.
- * Applies a 15% safety margin to guard against estimation error.
- * Images and files get fixed estimates.
- */
-export const estimateTokens = (messages: ModelMessage[]): number => {
+/** Tokens for a character count, with the safety margin. */
+const charsToTokens = (chars: number): number => Math.ceil((chars / CHARS_PER_TOKEN) * ESTIMATION_SAFETY_MARGIN);
+
+/** The characters `estimateTokens` counts for a prompt. */
+const estimateChars = (messages: ModelMessage[]): number => {
     let totalChars = 0;
 
     for (const message of messages) {
@@ -137,9 +133,16 @@ export const estimateTokens = (messages: ModelMessage[]): number => {
         }
     }
 
-    // Apply safety margin to avoid context overflow from estimation error
-    return Math.ceil((totalChars / CHARS_PER_TOKEN) * ESTIMATION_SAFETY_MARGIN);
+    return totalChars;
 };
+
+/**
+ * Fast approximate token count. Avoids tiktoken dependency.
+ * Rough estimate: 1 token ≈ 4 characters for English text.
+ * Applies a 15% safety margin to guard against estimation error.
+ * Images and files get fixed estimates.
+ */
+export const estimateTokens = (messages: ModelMessage[]): number => charsToTokens(estimateChars(messages));
 
 // ─── Context Window Sizes ───────────────────────────────────────────────────
 
@@ -265,13 +268,14 @@ const findRecentStart = (conversation: ModelMessage[], keep: number): number => 
 };
 
 /**
- * Replaces the output of tool results with a short note, except those in the
- * final tool message, which the model is reacting to now. Each call keeps its
- * id and name, so every result still answers its call. Returns the input array
- * when nothing was replaced.
+ * Replaces tool outputs with a short note, oldest first, until the prompt is
+ * under `threshold` tokens. The final tool message is kept, since the model is
+ * reacting to it now. An output no longer than the note is kept too: eliding it
+ * would save nothing. Each call keeps its id and name, so every result still
+ * answers its call. Returns the input array when nothing was replaced.
  */
 // ponytail: only the final tool message is protected. If that one message alone exceeds the window, nothing more can be elided.
-const elideToolOutputs = (messages: ModelMessage[]): ModelMessage[] => {
+const elideToolOutputs = (messages: ModelMessage[], threshold: number): ModelMessage[] => {
     let lastTool = -1;
 
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -281,27 +285,47 @@ const elideToolOutputs = (messages: ModelMessage[]): ModelMessage[] => {
         }
     }
 
-    let changed = false;
+    // Counted once. Each replacement lowers the count by the characters it saves, which is what a re-count would give.
+    let chars = estimateChars(messages);
+    const elided = new Map<number, ModelMessage>();
 
-    const next = messages.map((message, index) => {
-        if (message.role !== "tool" || index === lastTool || !Array.isArray(message.content)) {
-            return message;
+    for (let index = 0; index < lastTool && charsToTokens(chars) >= threshold; index += 1) {
+        const message = messages[index];
+
+        if (message?.role !== "tool" || !Array.isArray(message.content)) {
+            continue;
         }
 
+        let saved = 0;
+
         const content = message.content.map((part) => {
-            if (part.type !== "tool-result" || toolResultText(part).length <= ELIDE_MIN_CHARS) {
+            if (part.type !== "tool-result") {
                 return part;
             }
 
-            changed = true;
+            const { length } = toolResultText(part);
+
+            if (length <= ELIDED_TOOL_OUTPUT.length) {
+                return part;
+            }
+
+            saved += length - ELIDED_TOOL_OUTPUT.length;
 
             return { ...part, output: { type: "text" as const, value: ELIDED_TOOL_OUTPUT } };
         });
 
-        return changed ? ({ ...message, content } as ModelMessage) : message;
-    });
+        if (saved > 0) {
+            chars -= saved;
+            elided.set(index, { ...message, content } as ModelMessage);
+        }
+    }
 
-    return changed ? next : messages;
+    if (elided.size === 0) {
+        return messages;
+    }
+
+    // One copy of the array, with only the changed messages swapped in.
+    return messages.map((m, i) => elided.get(i) ?? m);
 };
 
 /** Summary of the messages being dropped, capped at ~20% of the context window. */
@@ -405,11 +429,7 @@ export const compressContextMessages = (messages: ModelMessage[], contextLimit: 
         }
     }
 
-    if (estimateTokens(compressed) >= threshold) {
-        compressed = elideToolOutputs(compressed);
-    }
-
-    return compressed;
+    return elideToolOutputs(compressed, threshold);
 };
 
 // ─── Auto-Continue Configuration ────────────────────────────────────────────

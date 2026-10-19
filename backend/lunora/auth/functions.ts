@@ -911,7 +911,7 @@ export const updateUserSettings = authMutation
  * it has no fallback: a failed read throws, so the tool fails closed rather than searching unfiltered.
  */
 export const getSearchDomainBlocklistQuery = internalQuery
-    .input({ userId: v.string() })
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(v.array(v.string()))
     .query(async ({ args: { userId }, ctx: context }) => {
         const userSettings = await context.db

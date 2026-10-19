@@ -200,12 +200,17 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         });
     };
 
+    // The step save an abort waits for: it may still move the pending row.
+    let inFlightSave: Promise<void> | undefined;
+
     if (args.abortSignal) {
         const { abortSignal } = args;
 
         abortSignal.addEventListener(
             "abort",
             async () => {
+                // A step save already under way may still move the pending row: let it land before failing what is left.
+                await inFlightSave?.catch(() => undefined);
                 await fail(abortSignal.reason?.toString() ?? "abortSignal");
             },
             { once: true },
@@ -249,92 +254,101 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         };
     }
 
+    const saveStep = async <TOOLS extends ToolSet>(
+        toSave: { step: StepResult<TOOLS> } | { object: GenerateObjectResult<unknown> },
+        shouldCreatePendingMessage?: boolean,
+    ) => {
+        if (threadId && saveMessages !== "none") {
+            const serialized =
+                "object" in toSave
+                    ? await serializeObjectResult(context_, toSave.object, activeModel)
+                    : await serializeNewMessagesInStep(context_, toSave.step, activeModel);
+            const embeddings = await embedMessages(
+                context_,
+                { threadId, ...options, userId },
+                serialized.messages.map((m) => m.message),
+            );
+
+            if (shouldCreatePendingMessage) {
+                serialized.messages.push({
+                    message: { content: [], role: "assistant" },
+                    status: "pending",
+                });
+                embeddings?.vectors.push(null);
+            }
+
+            const saved = await context_.runMutation(internal.agent.messages.addMessages, {
+                agentName: options.agentName,
+                embeddings,
+                failPendingSteps: false,
+                messages: serialized.messages as any, // Messages with string IDs cast to proper schema
+                // Pass the computed order when forceNewOrder is true
+                overrideOrder: useForceNewOrder ? order : undefined,
+                // The continuation's fresh order has no row before it on its
+                // branch, so its first row names the tool result it continues.
+                parentMessageId: useForceNewOrder ? promptMessageId : undefined,
+                pendingMessageId: pendingMessageId as Id<"messages"> | undefined,
+                // When forceNewOrder is true, don't pass promptMessageId and use overrideOrder
+                // to ensure the continuation message gets a fresh order (N+1)
+                promptMessageId: (useForceNewOrder ? undefined : promptMessageId) as Id<"messages"> | undefined,
+                threadId: threadId as Id<"threads">,
+                userId,
+            });
+            const lastMessage = saved.messages.at(-1)!;
+
+            if (shouldCreatePendingMessage) {
+                if (lastMessage.status === "failed") {
+                    pendingMessageId = undefined;
+                    savedMessages.push(...saved.messages);
+                    await fail(lastMessage.error ?? "Aborting - the pending message was marked as failed");
+                } else {
+                    pendingMessageId = lastMessage._id;
+                    savedMessages.push(...saved.messages.slice(0, -1));
+                }
+            } else {
+                pendingMessageId = undefined;
+                savedMessages.push(...saved.messages);
+            }
+        }
+
+        const output = "object" in toSave ? toSave.object : toSave.step;
+
+        if (options.rawRequestResponseHandler) {
+            await options.rawRequestResponseHandler(context_, {
+                agentName: options.agentName,
+                request: output.request,
+                response: output.response,
+                threadId,
+                userId,
+            });
+        }
+
+        if (options.usageHandler && output.usage) {
+            await options.usageHandler(context_, {
+                agentName: options.agentName,
+                model: getModelName(activeModel),
+                provider: getProviderName(activeModel),
+                providerMetadata: output.providerMetadata,
+                threadId,
+                usage: output.usage,
+                userId,
+            });
+        }
+    };
+
     return {
         args: aiArgs,
         fail,
         getSavedMessages: () => savedMessages,
         order: order ?? 0,
         promptMessageId,
-        save: async <TOOLS extends ToolSet>(
+        save: <TOOLS extends ToolSet>(
             toSave: { step: StepResult<TOOLS> } | { object: GenerateObjectResult<unknown> },
             shouldCreatePendingMessage?: boolean,
         ) => {
-            if (threadId && saveMessages !== "none") {
-                const serialized =
-                    "object" in toSave
-                        ? await serializeObjectResult(context_, toSave.object, activeModel)
-                        : await serializeNewMessagesInStep(context_, toSave.step, activeModel);
-                const embeddings = await embedMessages(
-                    context_,
-                    { threadId, ...options, userId },
-                    serialized.messages.map((m) => m.message),
-                );
+            inFlightSave = saveStep(toSave, shouldCreatePendingMessage);
 
-                if (shouldCreatePendingMessage) {
-                    serialized.messages.push({
-                        message: { content: [], role: "assistant" },
-                        status: "pending",
-                    });
-                    embeddings?.vectors.push(null);
-                }
-
-                const saved = await context_.runMutation(internal.agent.messages.addMessages, {
-                    agentName: options.agentName,
-                    embeddings,
-                    failPendingSteps: false,
-                    messages: serialized.messages as any, // Messages with string IDs cast to proper schema
-                    // Pass the computed order when forceNewOrder is true
-                    overrideOrder: useForceNewOrder ? order : undefined,
-                    // The continuation's fresh order has no row before it on its
-                    // branch, so its first row names the tool result it continues.
-                    parentMessageId: useForceNewOrder ? promptMessageId : undefined,
-                    pendingMessageId: pendingMessageId as Id<"messages"> | undefined,
-                    // When forceNewOrder is true, don't pass promptMessageId and use overrideOrder
-                    // to ensure the continuation message gets a fresh order (N+1)
-                    promptMessageId: (useForceNewOrder ? undefined : promptMessageId) as Id<"messages"> | undefined,
-                    threadId: threadId as Id<"threads">,
-                    userId,
-                });
-                const lastMessage = saved.messages.at(-1)!;
-
-                if (shouldCreatePendingMessage) {
-                    if (lastMessage.status === "failed") {
-                        pendingMessageId = undefined;
-                        savedMessages.push(...saved.messages);
-                        await fail(lastMessage.error ?? "Aborting - the pending message was marked as failed");
-                    } else {
-                        pendingMessageId = lastMessage._id;
-                        savedMessages.push(...saved.messages.slice(0, -1));
-                    }
-                } else {
-                    pendingMessageId = undefined;
-                    savedMessages.push(...saved.messages);
-                }
-            }
-
-            const output = "object" in toSave ? toSave.object : toSave.step;
-
-            if (options.rawRequestResponseHandler) {
-                await options.rawRequestResponseHandler(context_, {
-                    agentName: options.agentName,
-                    request: output.request,
-                    response: output.response,
-                    threadId,
-                    userId,
-                });
-            }
-
-            if (options.usageHandler && output.usage) {
-                await options.usageHandler(context_, {
-                    agentName: options.agentName,
-                    model: getModelName(activeModel),
-                    provider: getProviderName(activeModel),
-                    providerMetadata: output.providerMetadata,
-                    threadId,
-                    usage: output.usage,
-                    userId,
-                });
-            }
+            return inFlightSave;
         },
         stepOrder: stepOrder ?? 0,
         updateModel: (modelValue: ModelOrMetadata | undefined) => {

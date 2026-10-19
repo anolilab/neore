@@ -216,8 +216,20 @@ export const collectConversations = internalAction.input({ userId: v.string() })
         });
 
         // Process current batch of threads
-        for (const thread of threads.page) {
+        for (const listed of threads.page) {
             try {
+                // A locked chat is listed as its stub (no title, no model, no tags). The export
+                // is the owner's own data-access right, not a view into the chat, so it reads the
+                // full row and every message, without the proof. The list and every client read stay
+                // guarded. Decided in the GDPR open questions (plan note, export section).
+                const thread = listed.lockedAt
+                    ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: listed._id as Id<"threads"> })
+                    : listed;
+
+                if (!thread) {
+                    continue;
+                }
+
                 // Every message, page by page: an Art. 15/20 export has no business
                 // truncating a long thread.
                 const messages: (typeof conversations)[number]["messages"] = [];
@@ -226,9 +238,10 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
                 while (hasMoreMessages) {
                     // Annotated: the loop feeds `messageCursor` back into the call, which
-                    // otherwise makes the inferred type circular.
+                    // otherwise makes the inferred type circular. The ADMITTED reader: no lock check,
+                    // because the export is the owner's own data (see the comment above).
                     const result: { continueCursor: string | null; isDone: boolean; page: Parameters<typeof projectMessage>[0][] } = await context.runQuery(
-                        internal.agent.messages.listMessagesByThreadIdInternal,
+                        internal.agent.messages.listMessagesByThreadIdAdmitted,
                         {
                             order: "asc",
                             paginationOpts: { cursor: messageCursor, numItems: MESSAGE_PAGE_SIZE },
@@ -246,7 +259,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
                 conversations.push({ messages, thread: projectThread(thread, tagNames) });
             } catch (error) {
-                gdprLogger.error(`Failed to collect messages for thread ${thread._id}:`, error);
+                gdprLogger.error(`Failed to collect messages for thread ${listed._id}:`, error);
             }
         }
 

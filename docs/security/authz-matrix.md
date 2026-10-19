@@ -101,6 +101,7 @@ for a schema table that is neither policed nor listed:
 | `auditLog` | admin-only audit trail (`admin*` procedures) |
 | `browserActions` | no owner column; read only after the parent browser session's owner check |
 | `changelogCache` | public changelog cache |
+| `chatFileThreads` | derived index of which of the owner's chats hold a chat file; read only as a yes/no by the lock gate, never returned, written by `changeMessageFiles` and the chat-file backfill (`agent/file-link-backfill.ts`), and deleted directly by `deleteChatFileLinksForThread` (permanent thread delete) and `eraseChatFileThreadsForUser` (account erasure) |
 | `chatFiles` | content-addressed and SHARED (same bytes, one row) — no owner; access is the `chatFileAccess` grant |
 | `cleanupConfigs` | admin-only configuration |
 | `cleanupLogs` | admin-only logs |

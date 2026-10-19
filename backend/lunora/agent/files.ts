@@ -8,12 +8,14 @@ import type { InferArgs } from "lunorash/server";
 import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery, type MutationCtx as MutationContext } from "../_generated/server";
+import { internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx } from "../_generated/server";
+import { isThreadLocked } from "../lib/thread-lock";
 import { checkThreadAccessBatchHandler } from "./threads";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { paginatedDocsOf } from "../lib/output-validators";
 import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
 import { patchRow, withoutUndefined } from "../lib/patch";
+import { systemDb } from "../lib/rls/scope";
 import { ownedStorageKeys } from "../lib/storage-ownership";
 
 /**
@@ -131,6 +133,98 @@ export async function addFileHandler(context: MutationContext, args: InferArgs<t
  */
 const THREAD_FILE_SCAN_LIMIT = 1000;
 
+/** True when `threadId` holds `fileId` by a message write (`chatFileThreads`): one point lookup. */
+const chatHoldsFile = async (context: Pick<QueryCtx, "db">, threadId: Id<"threads">, fileId: Id<"chatFiles">): Promise<boolean> =>
+    (await context.db
+        .query("chatFileThreads")
+        .withIndex("by_fileId_threadId", (q) => q.eq("fileId", fileId).eq("threadId", threadId))
+        .first()) !== null;
+
+/** Messages read per page by the unindexed-chat scan. */
+const SCAN_PAGE = 100;
+
+/**
+ * True when `threadId` has a message carrying `fileId`. The fallback for a chat whose links are not indexed
+ * yet (`filesIndexedAt` unset): exact, it reads pages until the file is found or the chat ends. Past RLS on
+ * purpose: a decision that is never returned, and the caller's own locked chat.
+ */
+const threadHoldsFileByScan = async (context: Pick<QueryCtx, "db">, threadId: Id<"threads">, fileId: Id<"chatFiles">): Promise<boolean> => {
+    const db = systemDb(context);
+    let cursor: string | null = null;
+
+    for (;;) {
+        const page = await db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .paginate({ cursor, numItems: SCAN_PAGE });
+
+        if (page.page.some((message) => message.fileIds?.includes(fileId))) {
+            return true;
+        }
+
+        if (page.isDone) {
+            return false;
+        }
+
+        cursor = page.continueCursor;
+    }
+};
+
+/**
+ * True when `fileId` is GATED for this request: it sits on a locked chat of
+ * `userId` that the request does not open. A file in a locked chat is that
+ * chat's content, so a grant alone must not carry it into any other chat (a new
+ * one, an unlocked one) nor out through a reader that returns its bytes, text or
+ * URL. The request opens a locked chat only by naming it (`threadId`) WITH that
+ * chat's valid proof. The caller's own passcode rows name their locked chats
+ * (shard-local, owner-scoped); the chats a file sits in are the `chatFileThreads`
+ * links the message writers record (`changeMessageFiles`).
+ *
+ * A chat whose links are not indexed yet (`filesIndexedAt` unset, `agent/file-link-backfill.ts`)
+ * is checked by its messages, so an attachment written before the links existed stays gated.
+ *
+ * Cost: one indexed read when the user has no locked chat; otherwise one
+ * passcode-indexed read plus one point lookup per locked chat. An indexed chat
+ * reads no message; an unindexed one reads its messages until the file is found.
+ */
+export const fileGatedByLockedChat = async (
+    context: Pick<QueryCtx, "db">,
+    { fileId, threadId, unlockProof, userId }: { fileId: Id<"chatFiles">; threadId?: Id<"threads">; unlockProof?: string; userId: string },
+): Promise<boolean> => {
+    const passcodes = await context.db
+        .query("threadPasscodes")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .collect();
+
+    // The common case: no locked chat, so the reactive read set is this one index range.
+    if (passcodes.length === 0) {
+        return false;
+    }
+
+    for (const { filesIndexedAt, threadId: lockedId } of passcodes) {
+        // The chat the request names is opened by its own valid proof; any other locked chat is not.
+        if (lockedId === threadId && !(await isLockedWithoutProof(context, lockedId, unlockProof))) {
+            continue;
+        }
+
+        const thread = await context.db.get(lockedId);
+
+        if (!thread || !isThreadLocked(thread)) {
+            continue;
+        }
+
+        if (await chatHoldsFile(context, lockedId, fileId)) {
+            return true;
+        }
+
+        if (filesIndexedAt === undefined && (await threadHoldsFileByScan(context, lockedId, fileId))) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 /**
  * The file, if `userId` may attach it: they stored the bytes themselves
  * (a `chatFileAccess` grant), or it is already attached to a message in
@@ -193,6 +287,12 @@ export const getFileForUser = internalQuery
         const grant = await ctx.db.chatFileAccess.findFirst({ where: { fileId: args.fileId, userId: args.userId } });
 
         if (grant) {
+            // The grant proves the caller stored the bytes, not that they may read them here: a file
+            // in another locked chat of theirs is that chat's content, whatever chat it is attached to.
+            if (await fileGatedByLockedChat(ctx, { fileId: args.fileId, threadId: args.threadId, unlockProof: args.unlockProof, userId: args.userId })) {
+                return null;
+            }
+
             return file;
         }
 
@@ -322,6 +422,76 @@ export const changeRefcount = async (context: MutationContext, previous: Id<"cha
             throw new Error(`File ${fileId} not found when incrementing refcount`);
         }
     }
+};
+
+/** Link rows one `deleteChatFileLinksForThread` call deletes. */
+export const LINK_BATCH = 100;
+
+/**
+ * Records that the thread's owner holds these files in `threadId` (`chatFileThreads`).
+ * Idempotent. A thread with no owner cannot be locked, so it needs no link.
+ */
+export const linkChatFiles = async (context: MutationContext, threadId: Id<"threads">, fileIds: Id<"chatFiles">[]): Promise<void> => {
+    if (fileIds.length === 0) {
+        return;
+    }
+
+    // The owner, read past RLS: a collaborator's write must link under the owner, whatever the caller may read.
+    const thread = await systemDb(context).get(threadId);
+
+    if (!thread?.userId) {
+        return;
+    }
+
+    const unique = new Set(fileIds);
+
+    for (const fileId of unique) {
+        const existing = await context.db
+            .query("chatFileThreads")
+            .withIndex("by_fileId_threadId", (q) => q.eq("fileId", fileId).eq("threadId", threadId))
+            .first();
+
+        if (!existing) {
+            await context.db.insert("chatFileThreads", { createdAt: Date.now(), fileId, threadId, userId: thread.userId });
+        }
+    }
+};
+
+/**
+ * `changeRefcount` for a message's files, plus the links for the files it adds to
+ * `threadId`. A link is never removed when a message drops a file: the thread may
+ * still hold it through another message, and a stale link only over-gates.
+ */
+export const changeMessageFiles = async (
+    context: MutationContext,
+    threadId: Id<"threads">,
+    previous: Id<"chatFiles">[],
+    next: Id<"chatFiles">[],
+): Promise<void> => {
+    await changeRefcount(context, previous, next);
+
+    const previousSet = new Set(previous);
+
+    await linkChatFiles(
+        context,
+        threadId,
+        next.filter((fileId) => !previousSet.has(fileId)),
+    );
+};
+
+/**
+ * Drops one batch of a thread's `chatFileThreads` links when the thread is permanently deleted.
+ * Returns true while links remain: the paged delete (`agent/threads.ts`) re-runs its final page until it is false.
+ */
+export const deleteChatFileLinksForThread = async (context: MutationContext, threadId: Id<"threads">): Promise<boolean> => {
+    const rows = await context.db
+        .query("chatFileThreads")
+        .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
+        .take(LINK_BATCH);
+
+    await Promise.all(rows.map((row) => context.db.delete(row._id)));
+
+    return rows.length === LINK_BATCH;
 };
 
 export const copyFile = internalMutation
