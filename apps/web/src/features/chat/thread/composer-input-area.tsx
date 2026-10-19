@@ -62,6 +62,8 @@ interface ComposerInputAreaProps {
     customVariables?: PromptVariable[];
     /** Whether input is disabled */
     disabled?: boolean;
+    /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
+    isHistoryRecalled?: () => boolean;
     /** Whether streaming is active (shows stop button) */
     isStreaming?: boolean;
     /** Whether file uploads are in progress (disables send with upload tooltip) */
@@ -124,6 +126,7 @@ const ComposerInputArea = ({
     onChange,
     onDraw,
     onHistoryNavigate,
+    isHistoryRecalled,
     onPaste,
     onSelectChat,
     onSelectFileUpload,
@@ -240,6 +243,7 @@ const ComposerInputArea = ({
                         currentThreadId={currentThreadId}
                         customVariables={customVariables}
                         disabled={disabled}
+                        isHistoryRecalled={isHistoryRecalled}
                         isStreaming={isStreaming}
                         maxRows={maxRows}
                         onCancel={onCancel}

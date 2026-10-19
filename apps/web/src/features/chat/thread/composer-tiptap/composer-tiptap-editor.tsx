@@ -68,10 +68,13 @@ export interface ComposerTiptapEditorProps {
     customVariables?: PromptVariable[];
     /** Whether input is disabled */
     disabled?: boolean;
+    /** Whether a recalled prompt is showing; insert-mode Escape then restores the draft instead of leaving insert mode. */
+    isHistoryRecalled?: () => boolean;
     /** Whether streaming is active */
     isStreaming?: boolean;
     /** Max height in rows (approximate) */
     maxRows?: number;
+
     /** Called when cancel/stop is clicked */
     onCancel?: () => void;
 
@@ -148,6 +151,7 @@ const ComposerTiptapEditor = ({
     onCancel,
     onChange,
     onHistoryNavigate,
+    isHistoryRecalled,
     onPaste,
     onSelectChat,
     onSelectFileUpload,
@@ -226,11 +230,13 @@ const ComposerTiptapEditor = ({
     const { data: userSettings } = useUserSettings();
     const isVimEnabled = userSettings?.composerVimMode === true;
     const vimEnabledRef = useRef(isVimEnabled);
+    const historyRecalledRef = useRef(isHistoryRecalled);
     const [vimMode, setVimMode] = useState<VimModeName>("insert");
 
     useEffect(() => {
         vimEnabledRef.current = isVimEnabled;
-    }, [isVimEnabled]);
+        historyRecalledRef.current = isHistoryRecalled;
+    }, [isVimEnabled, isHistoryRecalled]);
 
     // Create editor
     const editor = useEditor({
@@ -298,6 +304,7 @@ const ComposerTiptapEditor = ({
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             VimMode.configure({
                 isEnabled: () => vimEnabledRef.current,
+                isHistoryRecalled: () => historyRecalledRef.current?.() ?? false,
                 onModeChange: setVimMode,
             }),
         ],

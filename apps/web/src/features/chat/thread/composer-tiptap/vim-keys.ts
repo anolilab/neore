@@ -206,8 +206,8 @@ const normalKey = (state: EditorState, vim: VimState, key: string): VimResult =>
     const { line, offset } = cursor;
 
     if (vim.pending === "d") {
-        // `dd` deletes the line; anything else cancels the operator.
-        return key === "d" ? deleteLine(state, vim, line) : handledAt(vim, undefined);
+        // `dd` deletes the line; anything else cancels the operator and is handled as usual.
+        return key === "d" ? deleteLine(state, vim, line) : { handled: key.length === 1, state: { ...vim, pending: "" } };
     }
 
     switch (key) {
@@ -288,14 +288,18 @@ const normalKey = (state: EditorState, vim: VimState, key: string): VimResult =>
     }
 };
 
-/** Runs one key press. `handled: false` leaves the key to the rest of the editor. */
-export const runVimKey = (state: EditorState, vim: VimState, event: VimKey): VimResult => {
+/**
+ * Runs one key press. `handled: false` leaves the key to the rest of the editor.
+ * `historyRecalled`: a recalled prompt is showing, so insert-mode Escape belongs to
+ * prompt history (it restores the draft) and is not consumed here.
+ */
+export const runVimKey = (state: EditorState, vim: VimState, event: VimKey, historyRecalled = false): VimResult => {
     if (event.ctrlKey || event.metaKey || event.altKey) {
         return { handled: false, state: vim };
     }
 
     if (vim.mode === "insert") {
-        if (event.key !== "Escape") {
+        if (event.key !== "Escape" || historyRecalled) {
             return { handled: false, state: vim };
         }
 

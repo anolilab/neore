@@ -14,6 +14,8 @@ import { INITIAL_VIM_STATE, runVimKey } from "../vim-keys";
 
 export interface VimModeOptions {
     isEnabled: () => boolean;
+    /** A recalled prompt is showing: its Escape restores the draft, so insert-mode Escape must pass through. */
+    isHistoryRecalled: () => boolean;
     onModeChange: (mode: VimModeName) => void;
 }
 
@@ -23,6 +25,7 @@ const VimMode = Extension.create<VimModeOptions>({
     addOptions() {
         return {
             isEnabled: () => false,
+            isHistoryRecalled: () => false,
             onModeChange: () => {},
         };
     },
@@ -56,7 +59,7 @@ const VimMode = Extension.create<VimModeOptions>({
                         }
 
                         const vim = vimPluginKey.getState(view.state) ?? INITIAL_VIM_STATE;
-                        const result = runVimKey(view.state, vim, event);
+                        const result = runVimKey(view.state, vim, event, options.isHistoryRecalled());
 
                         if (result.state !== vim || result.tr) {
                             view.dispatch((result.tr ?? view.state.tr).setMeta(vimPluginKey, result.state));

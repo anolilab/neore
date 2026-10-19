@@ -81,6 +81,13 @@ describe("modes", () => {
         expect(offsetOf(state)).toBe(4);
     });
 
+    it("leaves Escape to prompt history while a recalled prompt is showing", () => {
+        const result = runVimKey(hello(5), INITIAL_VIM_STATE, key("Escape"), true);
+
+        expect(result.handled).toBe(false);
+        expect(result.state.mode).toBe("insert");
+    });
+
     it("leaves every key alone in insert mode", () => {
         const result = runVimKey(hello(0), INITIAL_VIM_STATE, key("h"));
 
@@ -160,6 +167,15 @@ describe("editing", () => {
 
         expect(lines(state)).toStrictEqual(["hello world"]);
         expect(vim.pending).toBe("");
+    });
+
+    it("cancels a pending d on a key that is not a motion, and keeps that key's own meaning", () => {
+        const enter = press(hello(0), ["d", "Enter"]);
+
+        expect(enter.handled).toBe(false);
+        expect(enter.vim.pending).toBe("");
+        expect(lines(enter.state)).toStrictEqual(["hello world"]);
+        expect(press(hello(0), ["d", "Tab"]).handled).toBe(false);
     });
 
     it("opens a line below with o and above with O, in insert mode", () => {

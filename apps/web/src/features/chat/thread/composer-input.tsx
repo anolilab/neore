@@ -948,7 +948,8 @@ const ComposerInput = ({
     const uploadGeneratedFile = useCallback(
         async (attachmentId: string, file: File, failureLabel: string): Promise<boolean> => {
             try {
-                updateAttachment(attachmentId, { status: "uploading" });
+                // Store the bytes with the status so the chip and the context-size estimate see the content, not a placeholder.
+                updateAttachment(attachmentId, { file, status: "uploading" });
 
                 const result = await attachmentAdapter.upload({
                     file,
@@ -1168,6 +1169,7 @@ const ComposerInput = ({
                 canQueueWhileStreaming={isThreadComposer && !isComparisonValid}
                 currentThreadId={threadId}
                 disabled={disabled || isComparisonLoading}
+                isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}
                 maxRows={maxRows}
