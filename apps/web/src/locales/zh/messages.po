@@ -1090,15 +1090,15 @@ msgstr "<0>Enter</0> 创建"
 msgid "<0>Esc</0> Close"
 msgstr "<0>Esc</0> 关闭"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:872
+#: src/features/settings/components/chat/trigger-settings.tsx:934
 msgid "<0>Event</0> — React to external events via MCP or Composio (coming in Phase 2)."
 msgstr "<0>事件</0>——通过 MCP 或 Composio 响应外部事件（将在第二阶段推出）。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:854
+#: src/features/settings/components/chat/trigger-settings.tsx:916
 msgid "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard 5-field cron expressions."
 msgstr "<0>定时</0>——按 cron 计划运行（例如每天早上 8 点）。使用标准的 5 字段 cron 表达式。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:863
+#: src/features/settings/components/chat/trigger-settings.tsx:925
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0>——接收来自外部服务（Stripe、GitHub、Zapier）的 HTTP POST 请求。请求使用带时间戳的 HMAC 签名，重放请求会被拒绝。"
 
@@ -1404,6 +1404,10 @@ msgstr "参考视频最长 {0} 秒。"
 msgid "A regular expression the answer must match"
 msgstr "答案必须匹配的正则表达式"
 
+#: src/features/settings/components/chat/bots-settings.tsx:141
+msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
+msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:227
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "每天早上简要汇总已完成、正在运行和需要你处理的事项。计入每日用量。"
@@ -1424,7 +1428,7 @@ msgstr "有工具调用需要你批准"
 msgid "A tool cannot be both added and disabled"
 msgstr "工具不能同时被添加和禁用"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:250
+#: src/features/settings/components/chat/trigger-settings.tsx:301
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "创建此触发器时将生成唯一的 webhook URL 和密钥。将该 URL 用作外部服务（Zapier、n8n、你自己的代码等）的目标地址。"
 
@@ -1591,7 +1595,7 @@ msgstr "活跃"
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
 #: src/features/settings/components/chat/model-filter-settings.tsx:194
 #: src/features/settings/components/chat/model-filter-settings.tsx:255
-#: src/features/settings/components/chat/trigger-settings.tsx:662
+#: src/features/settings/components/chat/trigger-settings.tsx:724
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
 msgid "Active"
@@ -2251,7 +2255,7 @@ msgid "AI"
 msgstr "AI"
 
 #: src/routes/admin/route.tsx:67
-#: src/routes/dashboard/route.tsx:52
+#: src/routes/dashboard/route.tsx:53
 msgid "AI Chat"
 msgstr "AI 聊天"
 
@@ -3349,7 +3353,7 @@ msgid "audio-video"
 msgstr "音视频"
 
 #: src/features/admin/components/audit-log-card.tsx:130
-#: src/features/layout/lib/dashboard-page-names.ts:17
+#: src/features/layout/lib/dashboard-page-names.ts:18
 #: src/routes/admin/route.tsx:34
 #: src/routes/admin/route.tsx:52
 msgid "Audit Log"
@@ -3363,7 +3367,7 @@ msgstr "澳大利亚"
 msgid "Austria"
 msgstr "奥地利"
 
-#: src/features/layout/lib/dashboard-page-names.ts:18
+#: src/features/layout/lib/dashboard-page-names.ts:19
 msgid "Auth"
 msgstr "身份验证"
 
@@ -3451,7 +3455,7 @@ msgstr "自动补全已启用"
 msgid "Autocomplete while typing"
 msgstr "输入时自动补全"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:574
+#: src/features/settings/components/chat/trigger-settings.tsx:632
 msgid "Automate agent execution on schedules, webhooks, or events"
 msgstr "通过定时、webhook 或事件自动执行智能体"
 
@@ -3989,6 +3993,14 @@ msgstr "波斯尼亚语"
 msgid "Bosnian (Bosnia)"
 msgstr "波斯尼亚语（波斯尼亚）"
 
+#: src/features/settings/components/chat/bots-settings.tsx:76
+msgid "Bot created"
+msgstr ""
+
+#: src/features/settings/components/chat/bots-settings.tsx:100
+msgid "Bot deleted"
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:113
 msgid "Bot OAuth token from your Slack App's OAuth & Permissions page"
 msgstr "Slack 应用“OAuth & Permissions”页面中的 Bot OAuth token"
@@ -4000,6 +4012,10 @@ msgstr "来自 @BotFather 的 Telegram 机器人 token"
 #: src/features/settings/components/chat/api-keys-settings.tsx:127
 msgid "Bot token from the Discord Developer Portal"
 msgstr "来自 Discord Developer Portal 的机器人 token"
+
+#: src/features/layout/lib/dashboard-page-names.ts:17
+msgid "Bots"
+msgstr ""
 
 #: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
@@ -4481,7 +4497,7 @@ msgstr "加拿大"
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:708
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:239
-#: src/features/settings/components/chat/trigger-settings.tsx:303
+#: src/features/settings/components/chat/trigger-settings.tsx:354
 #: src/features/settings/components/chat/usage-settings.tsx:569
 #: src/features/settings/components/chat/usage-settings.tsx:577
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
@@ -4791,8 +4807,9 @@ msgstr "聊天"
 #: src/components/settings/settings-modal.tsx:268
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:28
 #: src/features/chat/thread/composer-search-mode.tsx:48
-#: src/features/layout/lib/dashboard-page-names.ts:19
+#: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:378
+#: src/features/settings/components/chat/bots-settings.tsx:172
 msgid "Chat"
 msgstr "聊天"
 
@@ -5721,7 +5738,7 @@ msgid "completed"
 msgstr "已完成"
 
 #: src/features/evals/components/run-status.tsx:13
-#: src/features/settings/components/chat/trigger-settings.tsx:131
+#: src/features/settings/components/chat/trigger-settings.tsx:141
 #: src/features/tasks/components/goal-form-dialog.tsx:48
 #: src/features/tasks/components/goal-list.tsx:27
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:63
@@ -5834,6 +5851,10 @@ msgstr "压缩的透视"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:50
 msgid "Compressing context..."
 msgstr "正在压缩上下文..."
+
+#: src/features/settings/components/chat/bots-settings.tsx:140
+msgid "Computer"
+msgstr ""
 
 #: src/features/workflow/components/nodes/branch-node.tsx:36
 msgid "Condition (JavaScript expression)"
@@ -6140,7 +6161,7 @@ msgstr "连接器已断开。如果提供商的设置中仍列有它，请在那
 msgid "Connector: {0}"
 msgstr "连接器：{0}"
 
-#: src/features/layout/lib/dashboard-page-names.ts:20
+#: src/features/layout/lib/dashboard-page-names.ts:21
 #: src/features/settings/connectors/connectors-page.tsx:39
 msgid "Connectors"
 msgstr "连接器"
@@ -6455,7 +6476,7 @@ msgstr "已复制！"
 #: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/message-item.tsx:301
 #: src/features/chat/thread/text-selection-menu.tsx:384
-#: src/features/settings/components/chat/trigger-settings.tsx:622
+#: src/features/settings/components/chat/trigger-settings.tsx:680
 msgid "Copy"
 msgstr "复制"
 
@@ -6524,7 +6545,7 @@ msgstr "复制 Channel secret（基本设置），并签发长期有效的 Chann
 msgid "Copy the Phone number ID, a permanent (System User) access token, and the App Secret (App settings > Basic). Choose any Verify token."
 msgstr "复制电话号码 ID、永久（系统用户）访问令牌以及 App Secret（应用设置 > 基本）。验证令牌可任意设定。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:605
+#: src/features/settings/components/chat/trigger-settings.tsx:663
 msgid "Copy this secret now and store it with your webhook sender. It will not be shown again."
 msgstr ""
 
@@ -6545,7 +6566,7 @@ msgstr "复制到剪贴板"
 msgid "Copy value"
 msgstr "复制值"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:694
+#: src/features/settings/components/chat/trigger-settings.tsx:756
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:219
 msgid "Copy webhook URL"
 msgstr "复制 webhook URL"
@@ -6641,7 +6662,7 @@ msgstr ""
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:514
+#: src/features/settings/components/chat/trigger-settings.tsx:570
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr ""
 
@@ -6653,6 +6674,10 @@ msgstr "无法复制，请手动选择文本"
 msgid "Could not create a collection for this import. Try again."
 msgstr "无法为此次导入创建集合。请重试。"
 
+#: src/features/settings/components/chat/bots-settings.tsx:78
+msgid "Could not create the bot."
+msgstr ""
+
 #: src/features/chat/group/create-group-chat-button.tsx:83
 #: src/features/chat/group/create-group-chat-button.tsx:105
 msgid "Could not create the group chat"
@@ -6661,6 +6686,10 @@ msgstr "无法创建群聊"
 #: src/features/pages/components/pages-sidebar.tsx:101
 msgid "Could not create the page"
 msgstr "无法创建页面"
+
+#: src/features/settings/components/chat/bots-settings.tsx:102
+msgid "Could not delete the bot."
+msgstr ""
 
 #: src/features/pages/components/page-comments-panel.tsx:124
 msgid "Could not delete the comment"
@@ -6794,6 +6823,10 @@ msgstr "无法发送你的消息：{0}"
 #: src/features/settings/components/chat/mcp-settings.tsx:134
 msgid "Could not sign out"
 msgstr "无法退出登录"
+
+#: src/features/settings/components/chat/bots-settings.tsx:88
+msgid "Could not start a chat with this bot."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp-settings.tsx:94
 msgid "Could not start sign-in"
@@ -6932,6 +6965,10 @@ msgstr "创建和管理 API 密钥，以编程方式访问你的账号。"
 msgid "Create API Key"
 msgstr "创建 API 密钥"
 
+#: src/features/settings/components/chat/bots-settings.tsx:150
+msgid "Create bot"
+msgstr ""
+
 #: src/components/command-palette.tsx:313
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:92
 #: src/features/chat/thread-list/thread-node.tsx:569
@@ -7043,8 +7080,8 @@ msgstr "创建团队"
 msgid "Create teams to organize members into groups"
 msgstr "创建团队，将成员分组管理"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:594
-#: src/features/settings/components/chat/trigger-settings.tsx:838
+#: src/features/settings/components/chat/trigger-settings.tsx:652
+#: src/features/settings/components/chat/trigger-settings.tsx:900
 msgid "Create Trigger"
 msgstr "创建触发器"
 
@@ -7064,7 +7101,7 @@ msgstr "创建你的第一个提示词，用作对话的系统提示词。你也
 msgid "Create your first skill to automate workflows. Import from GitHub, upload SKILL.md files, or install from the official catalog."
 msgstr "创建你的第一个技能来自动化工作流。可以从 GitHub 导入、上传 SKILL.md 文件，或从官方目录安装。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:834
+#: src/features/settings/components/chat/trigger-settings.tsx:896
 msgid "Create your first trigger to automate agent execution on a schedule, via webhooks, or from external events."
 msgstr "创建你的第一个触发器，按计划、通过 webhook 或由外部事件自动执行智能体。"
 
@@ -7190,7 +7227,7 @@ msgstr "克罗地亚语"
 msgid "Croatian (Croatia)"
 msgstr "克罗地亚语（克罗地亚）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:214
+#: src/features/settings/components/chat/trigger-settings.tsx:265
 msgid "Cron Expression"
 msgstr "Cron 表达式"
 
@@ -7198,7 +7235,7 @@ msgstr "Cron 表达式"
 msgid "Cron expression (UTC)"
 msgstr "Cron 表达式（UTC）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:221
+#: src/features/settings/components/chat/trigger-settings.tsx:272
 msgid "Cron presets"
 msgstr "Cron 预设"
 
@@ -7342,7 +7379,7 @@ msgid "Customer messaging and support platform"
 msgstr "客户消息与支持平台"
 
 #: src/components/settings/settings-modal.tsx:251
-#: src/features/layout/lib/dashboard-page-names.ts:21
+#: src/features/layout/lib/dashboard-page-names.ts:22
 msgid "Customization"
 msgstr "个性化"
 
@@ -7424,7 +7461,7 @@ msgstr "每日费用（微美元）"
 msgid "Daily Cost Trend"
 msgstr "每日费用趋势"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:167
+#: src/features/settings/components/chat/trigger-settings.tsx:182
 msgid "Daily inbox summary"
 msgstr "每日收件箱摘要"
 
@@ -7462,7 +7499,7 @@ msgstr "变暗"
 
 #: src/features/layout/lib/dashboard-page-names.ts:13
 #: src/routes/admin/route.tsx:24
-#: src/routes/dashboard/route.tsx:55
+#: src/routes/dashboard/route.tsx:56
 msgid "Dashboard"
 msgstr "仪表盘"
 
@@ -7775,8 +7812,10 @@ msgstr "将任务委派给 AI 软件工程师 Devin"
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:696
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:829
+#: src/features/settings/components/chat/bots-settings.tsx:181
+#: src/features/settings/components/chat/bots-settings.tsx:190
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
-#: src/features/settings/components/chat/trigger-settings.tsx:889
+#: src/features/settings/components/chat/trigger-settings.tsx:951
 #: src/features/skills/components/skill-list.tsx:290
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
@@ -7788,7 +7827,7 @@ msgstr "删除"
 #. placeholder {0}: deletingTrigger.name
 #. placeholder {0}: selected.name
 #: src/features/knowledge/components/collection-picker.tsx:106
-#: src/features/settings/components/chat/trigger-settings.tsx:895
+#: src/features/settings/components/chat/trigger-settings.tsx:957
 #: src/features/skills/components/skill-list.tsx:296
 msgid "Delete \"{0}\"?"
 msgstr "删除“{0}”？"
@@ -7797,10 +7836,11 @@ msgstr "删除“{0}”？"
 msgid "Delete “{pendingDeleteTitle}”?"
 msgstr "删除“{pendingDeleteTitle}”？"
 
+#. placeholder {0}: bot.name
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
-#. placeholder {0}: skill.name
 #: src/features/local-models/components/ollama-model-manager.tsx:264
+#: src/features/settings/components/chat/bots-settings.tsx:175
 #: src/features/settings/components/chat/mcp/server-list.tsx:170
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
@@ -7812,7 +7852,9 @@ msgid "Delete {0} users"
 msgstr "删除 {0} 个用户"
 
 #. placeholder {0}: deleting.name
+#. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:341
+#: src/features/settings/components/chat/bots-settings.tsx:200
 msgid "Delete {0}?"
 msgstr "删除 {0}？"
 
@@ -8012,11 +8054,11 @@ msgstr "删除对话"
 msgid "Delete Threads"
 msgstr "删除对话"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:746
+#: src/features/settings/components/chat/trigger-settings.tsx:808
 msgid "Delete trigger"
 msgstr "删除触发器"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:895
+#: src/features/settings/components/chat/trigger-settings.tsx:957
 msgid "Delete trigger?"
 msgstr ""
 
@@ -8210,6 +8252,7 @@ msgstr "描述你的工作流……例如“根据文本生成图片，放大后
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:117
+#: src/features/settings/components/chat/bots-settings.tsx:117
 #: src/features/skills/components/skill-builder-diff.tsx:28
 #: src/features/skills/components/skill-builder-review.tsx:157
 #: src/features/skills/components/skill-form-dialog.tsx:255
@@ -8219,7 +8262,7 @@ msgid "Description"
 msgstr "描述"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:170
-#: src/features/settings/components/chat/trigger-settings.tsx:174
+#: src/features/settings/components/chat/trigger-settings.tsx:225
 msgid "Description (optional)"
 msgstr "描述（可选）"
 
@@ -8345,7 +8388,7 @@ msgid "Device removed"
 msgstr "设备已移除"
 
 #: src/features/devices/components/devices-settings.tsx:226
-#: src/features/layout/lib/dashboard-page-names.ts:22
+#: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "设备"
 
@@ -8410,7 +8453,7 @@ msgstr "关闭外部链接警告"
 msgid "Disable tool <0>{0}</0>"
 msgstr "停用工具 <0>{0}</0>"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:737
+#: src/features/settings/components/chat/trigger-settings.tsx:799
 msgid "Disable trigger"
 msgstr "禁用触发器"
 
@@ -8419,7 +8462,7 @@ msgid "Disable Two-Factor"
 msgstr "停用双重验证"
 
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:50
-#: src/features/settings/components/chat/trigger-settings.tsx:664
+#: src/features/settings/components/chat/trigger-settings.tsx:726
 msgid "Disabled"
 msgstr "已停用"
 
@@ -8489,7 +8532,7 @@ msgstr "关闭错误提示"
 msgid "Dismiss setup suggestions"
 msgstr "关闭设置建议"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:608
+#: src/features/settings/components/chat/trigger-settings.tsx:666
 msgid "Dismiss webhook secret"
 msgstr ""
 
@@ -8947,7 +8990,7 @@ msgstr "每个代码只能使用一次。请妥善保管，像对待密码一样
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "每个 Discord 频道会在 Neore Chat 中创建一个单独的对话。AI 会在频道中自动回复。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:879
+#: src/features/settings/components/chat/trigger-settings.tsx:941
 msgid "Each trigger creates a new thread and runs your agent with up to 25 iterations (Deep Work mode). Results are visible in your thread list."
 msgstr "每个触发器都会创建一个新对话，并以最多 25 次迭代运行你的智能体（深度工作模式）。结果会显示在你的对话列表中。"
 
@@ -9129,11 +9172,11 @@ msgstr "用 AI 编辑图像的特定区域"
 msgid "Edit task"
 msgstr "编辑任务"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:731
+#: src/features/settings/components/chat/trigger-settings.tsx:793
 msgid "Edit trigger"
 msgstr "编辑触发器"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:644
+#: src/features/settings/components/chat/trigger-settings.tsx:706
 msgid "Edit Trigger"
 msgstr "编辑触发器"
 
@@ -9462,7 +9505,7 @@ msgstr "启用专用模块以增强 AI 能力"
 msgid "Enable tool <0>{0}</0>"
 msgstr "启用工具 <0>{0}</0>"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:737
+#: src/features/settings/components/chat/trigger-settings.tsx:799
 msgid "Enable trigger"
 msgstr "启用触发器"
 
@@ -9994,16 +10037,16 @@ msgstr "评测"
 msgid "Evaluate JS"
 msgstr "执行 JS"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:125
-#: src/features/settings/components/chat/trigger-settings.tsx:342
+#: src/features/settings/components/chat/trigger-settings.tsx:135
+#: src/features/settings/components/chat/trigger-settings.tsx:393
 msgid "Event"
 msgstr "事件"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:270
+#: src/features/settings/components/chat/trigger-settings.tsx:321
 msgid "Event triggers via MCP/Composio are coming in Phase 2. For now, use webhook triggers to connect external services."
 msgstr "通过 MCP/Composio 的事件触发器将在第二阶段推出。目前请使用 webhook 触发器连接外部服务。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:119
+#: src/features/settings/components/chat/trigger-settings.tsx:129
 msgid "Every 6 hours"
 msgstr "每 6 小时"
 
@@ -10011,7 +10054,7 @@ msgstr "每 6 小时"
 msgid "Every day at 09:00 UTC"
 msgstr "每天 09:00 UTC"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:117
+#: src/features/settings/components/chat/trigger-settings.tsx:127
 msgid "Every day at 8 AM"
 msgstr "每天早上 8 点"
 
@@ -10043,11 +10086,11 @@ msgstr "每位参与者独立回答，互不可见；汇总者可以合并这些
 msgid "Every provider. <0>One SDK.</0>"
 msgstr "所有提供商。<0>一个 SDK。</0>"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:256
+#: src/features/settings/components/chat/trigger-settings.tsx:307
 msgid "Every request must be signed. Send <0>X-Neore-Timestamp</0> (the current Unix time in seconds) and <1>X-Signature-256: sha256=<hex></1>, the HMAC-SHA256 of <2><timestamp>.<raw body></2> keyed with the secret. Requests more than 5 minutes old, unsigned, or replayed are rejected."
 msgstr "每个请求都必须签名。发送 <0>X-Neore-Timestamp</0>（当前 Unix 时间，单位为秒）和 <1>X-Signature-256: sha256=<hex></1>，即以密钥对 <2><timestamp>.<raw body></2> 计算的 HMAC-SHA256。超过 5 分钟、未签名或被重放的请求都会被拒绝。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:120
+#: src/features/settings/components/chat/trigger-settings.tsx:130
 msgid "Every Sunday at midnight"
 msgstr "每周日午夜"
 
@@ -10190,7 +10233,7 @@ msgstr "执行失败"
 msgid "Execution history"
 msgstr "执行历史"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:768
+#: src/features/settings/components/chat/trigger-settings.tsx:830
 msgid "Execution History"
 msgstr "执行历史"
 
@@ -10569,7 +10612,7 @@ msgstr "失败"
 #: src/features/devices/components/devices-settings.tsx:135
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
-#: src/features/settings/components/chat/trigger-settings.tsx:132
+#: src/features/settings/components/chat/trigger-settings.tsx:142
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:41
 #: src/features/tasks/components/task-status.tsx:17
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:64
@@ -10693,7 +10736,7 @@ msgstr "创建预设失败"
 msgid "Failed to create tag"
 msgstr "创建标签失败"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:430
+#: src/features/settings/components/chat/trigger-settings.tsx:483
 msgid "Failed to create trigger"
 msgstr "创建触发器失败"
 
@@ -10771,7 +10814,7 @@ msgstr "删除数据集失败"
 msgid "Failed to delete threads"
 msgstr "删除对话失败"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:492
+#: src/features/settings/components/chat/trigger-settings.tsx:548
 msgid "Failed to delete trigger"
 msgstr "删除触发器失败"
 
@@ -11128,7 +11171,7 @@ msgstr "开始模拟登录失败"
 msgid "Failed to start import"
 msgstr "开始导入失败"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:527
+#: src/features/settings/components/chat/trigger-settings.tsx:583
 msgid "Failed to start test run"
 msgstr "启动测试运行失败"
 
@@ -11263,8 +11306,8 @@ msgstr "更新对话可见性失败"
 msgid "Failed to update tool permission"
 msgstr "更新工具权限失败"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:458
-#: src/features/settings/components/chat/trigger-settings.tsx:473
+#: src/features/settings/components/chat/trigger-settings.tsx:514
+#: src/features/settings/components/chat/trigger-settings.tsx:529
 msgid "Failed to update trigger"
 msgstr "更新触发器失败"
 
@@ -11926,7 +11969,7 @@ msgstr "Firefox 也可以使用，并且可能会询问同样的问题。"
 #~ msgid "First frame / last frame"
 #~ msgstr "首帧 / 尾帧"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:121
+#: src/features/settings/components/chat/trigger-settings.tsx:131
 msgid "First of each month at 9 AM"
 msgstr "每月 1 日上午 9 点"
 
@@ -13366,6 +13409,10 @@ msgstr "免提语音模式 — 直接说话，回复会被朗读出来"
 msgid "Hands-free voice updated"
 msgstr "免提模式语音已更新"
 
+#: src/features/settings/components/chat/bots-settings.tsx:168
+msgid "Has a computer"
+msgstr ""
+
 #: src/features/chat/thread/composer-image-settings.tsx:173
 msgid "HD — sharp & detailed"
 msgstr "高清——清晰细腻"
@@ -13662,7 +13709,7 @@ msgstr "此浏览器不支持 HLS 播放。"
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
 #: src/features/home/components/home-page.tsx:120
-#: src/features/layout/lib/dashboard-page-names.ts:23
+#: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
 msgstr "首页"
 
@@ -13724,7 +13771,7 @@ msgstr "临时聊天在自动删除前保留的时长。默认：24 小时。"
 msgid "How often the agent retries with the verifier's feedback before asking you to review."
 msgstr "在请你审核之前，智能体根据验证器反馈重试的次数。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:848
+#: src/features/settings/components/chat/trigger-settings.tsx:910
 msgid "How Triggers Work"
 msgstr "触发器的工作原理"
 
@@ -14353,7 +14400,7 @@ msgstr "输入或生成图像"
 msgid "Input or transform text"
 msgstr "输入或转换文本"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:290
+#: src/features/settings/components/chat/trigger-settings.tsx:341
 msgid "Input Template"
 msgstr "输入模板"
 
@@ -14412,6 +14459,7 @@ msgstr "已安装的模型"
 msgid "instruct"
 msgstr "指令型"
 
+#: src/features/settings/components/chat/bots-settings.tsx:126
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
 #: src/features/skills/components/skill-builder-diff.tsx:31
 #: src/features/skills/components/skill-builder-review.tsx:166
@@ -14855,7 +14903,7 @@ msgstr "键盘快捷键"
 
 #: src/components/settings/settings-modal.tsx:252
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:69
-#: src/features/layout/lib/dashboard-page-names.ts:24
+#: src/features/layout/lib/dashboard-page-names.ts:25
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:181
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:76
 msgid "Keyboard Shortcuts"
@@ -14899,7 +14947,7 @@ msgstr "知识库"
 
 #: src/components/settings/settings-modal.tsx:260
 #: src/features/chat/header/kb-attachment-button.tsx:186
-#: src/features/layout/lib/dashboard-page-names.ts:25
+#: src/features/layout/lib/dashboard-page-names.ts:26
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:287
 msgid "Knowledge Base"
 msgstr "知识库"
@@ -15136,7 +15184,7 @@ msgstr "最后更新于 <0>{0}</0>"
 msgid "Last used {date}"
 msgstr "上次使用于 {date}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:682
+#: src/features/settings/components/chat/trigger-settings.tsx:744
 msgid "Last: {lastRunAt}"
 msgstr "上次：{lastRunAt}"
 
@@ -15390,6 +15438,10 @@ msgstr "允许回复使用工具"
 #: src/features/devices/components/devices-settings.tsx:225
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "通过 Neore 桌面应用，让智能体使用你自己电脑上的文件、终端和本地 MCP 服务器。每个操作都会先在那台电脑上征求你的同意，共享聊天或后台任务不会运行任何操作。"
+
+#: src/features/settings/components/chat/trigger-settings.tsx:211
+msgid "Let the bot use its computer"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:224
 msgid "Level"
@@ -15749,7 +15801,7 @@ msgstr "正在加载对话"
 msgid "Loading threads..."
 msgstr "正在加载对话..."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:563
+#: src/features/settings/components/chat/trigger-settings.tsx:621
 msgid "Loading triggers..."
 msgstr "正在加载触发器..."
 
@@ -15774,7 +15826,7 @@ msgstr "正在加载概览…"
 #: src/features/settings/components/chat/default-models-settings.tsx:132
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:165
-#: src/features/settings/components/chat/trigger-settings.tsx:776
+#: src/features/settings/components/chat/trigger-settings.tsx:838
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
 #: src/routes/_shortcut.tsx:40
@@ -15784,11 +15836,12 @@ msgstr "正在加载..."
 #: ../../packages/chat-ui/src/chat/message-content.tsx:316
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/pages/components/public-page-view.tsx:66
+#: src/features/settings/components/chat/bots-settings.tsx:158
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "正在加载…"
 
-#: src/features/chat/core/context/chat-context.tsx:844
+#: src/features/chat/core/context/chat-context.tsx:846
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "本地模型仅支持文本。请移除附件后再发送。"
 
@@ -16372,7 +16425,7 @@ msgstr "MCP 服务器：{0}"
 
 #: src/components/settings/settings-modal.tsx:264
 #: src/features/chat/thread/composer-mcp-selector.tsx:140
-#: src/features/layout/lib/dashboard-page-names.ts:26
+#: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:406
 msgid "MCP Servers"
 msgstr "MCP 服务器"
@@ -16478,7 +16531,7 @@ msgstr "成员角色已更新"
 #: src/components/settings/settings-modal.tsx:281
 #: src/features/auth/components/organization/organization-members-card.tsx:58
 #: src/features/auth/components/organization/organization-members-card.tsx:109
-#: src/features/layout/lib/dashboard-page-names.ts:27
+#: src/features/layout/lib/dashboard-page-names.ts:28
 msgid "Members"
 msgstr "成员"
 
@@ -16583,7 +16636,7 @@ msgstr "发送给你的机器人的消息会创建带有“telegram”标签的�
 msgid "messenger"
 msgstr "即时通讯"
 
-#: src/features/layout/lib/dashboard-page-names.ts:28
+#: src/features/layout/lib/dashboard-page-names.ts:29
 msgid "Messenger"
 msgstr "消息平台"
 
@@ -16831,6 +16884,7 @@ msgstr "模式："
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
+#: src/features/settings/components/chat/bots-settings.tsx:135
 #: src/features/settings/components/chat/usage-settings.tsx:316
 #: src/features/tasks/components/task-form-dialog.tsx:352
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -16891,7 +16945,7 @@ msgstr "模型信息"
 msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost calculation in microdollars."
 msgstr "模型价格来自 models.dev，KV 缓存 24 小时。以微美元自动计算成本。"
 
-#: src/features/layout/lib/dashboard-page-names.ts:29
+#: src/features/layout/lib/dashboard-page-names.ts:30
 #: src/features/settings/components/chat/model-filter-settings.tsx:150
 msgid "Model Restrictions"
 msgstr "模型限制"
@@ -16919,7 +16973,7 @@ msgstr "模型：OpenAI Whisper"
 #: src/components/settings/settings-modal.tsx:262
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
 #: src/features/evals/components/dataset-panel.tsx:132
-#: src/features/layout/lib/dashboard-page-names.ts:30
+#: src/features/layout/lib/dashboard-page-names.ts:31
 #: src/features/marketing/components/landing-footer.tsx:111
 #: src/features/marketing/components/landing-footer.tsx:157
 #: src/features/marketing/components/landing-page.tsx:597
@@ -17344,11 +17398,12 @@ msgstr "缅甸语（缅甸）"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
+#: src/features/settings/components/chat/bots-settings.tsx:113
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:154
-#: src/features/settings/components/chat/trigger-settings.tsx:162
+#: src/features/settings/components/chat/trigger-settings.tsx:177
 #: src/features/settings/components/chat/usage-settings.tsx:429
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
@@ -17647,6 +17702,10 @@ msgstr "新"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "新的 Azure Bot 为单租户：请设置 Teams 租户 ID 密钥，否则回复无法通过身份验证。"
 
+#: src/features/settings/components/chat/bots-settings.tsx:111
+msgid "New bot"
+msgstr ""
+
 #: src/features/chat/thread/fork-branch-dialog.tsx:43
 msgid "New Branch"
 msgstr "新建分支"
@@ -17766,7 +17825,7 @@ msgstr "新建对话"
 msgid "New Thread"
 msgstr "新建对话"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:578
+#: src/features/settings/components/chat/trigger-settings.tsx:636
 msgid "New Trigger"
 msgstr "新建触发器"
 
@@ -17930,6 +17989,14 @@ msgstr "无附件"
 msgid "No audit logs found"
 msgstr "没有审计日志"
 
+#: src/features/settings/components/chat/trigger-settings.tsx:199
+msgid "No bot"
+msgstr ""
+
+#: src/features/settings/components/chat/bots-settings.tsx:161
+msgid "No bots yet."
+msgstr ""
+
 #: src/features/settings/components/chat/usage-settings.tsx:666
 msgid "No budget alerts configured."
 msgstr "尚未配置预算提醒。"
@@ -18041,7 +18108,7 @@ msgstr "此版本没有可用的差异数据"
 msgid "No enabled MCP servers."
 msgstr "没有已启用的 MCP 服务器。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:818
+#: src/features/settings/components/chat/trigger-settings.tsx:880
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:236
 msgid "No executions yet"
 msgstr "尚无执行记录"
@@ -18412,7 +18479,7 @@ msgstr "尚未共享任何工具"
 msgid "No tools."
 msgstr "没有工具。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:832
+#: src/features/settings/components/chat/trigger-settings.tsx:894
 msgid "No triggers yet"
 msgstr "还没有触发器"
 
@@ -19563,7 +19630,7 @@ msgstr "橙色"
 #: src/components/settings/settings-modal.tsx:280
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
-#: src/features/layout/lib/dashboard-page-names.ts:31
+#: src/features/layout/lib/dashboard-page-names.ts:32
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:129
 msgid "Organization"
@@ -19623,7 +19690,7 @@ msgstr "组织 slug 已更新"
 
 #: src/components/settings/settings-modal.tsx:275
 #: src/features/auth/components/organization/organizations-card.tsx:42
-#: src/features/layout/lib/dashboard-page-names.ts:32
+#: src/features/layout/lib/dashboard-page-names.ts:33
 msgid "Organizations"
 msgstr "组织"
 
@@ -20099,7 +20166,7 @@ msgstr "PE 可执行文件"
 msgid "Pen"
 msgstr "画笔"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:133
+#: src/features/settings/components/chat/trigger-settings.tsx:143
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:59
 #: src/features/workflow/components/canvas/workflow-controls.tsx:53
 msgid "Pending"
@@ -20188,7 +20255,7 @@ msgid "Personal information is now visible"
 msgstr "个人信息已显示"
 
 #: src/components/settings/settings-modal.tsx:258
-#: src/features/layout/lib/dashboard-page-names.ts:33
+#: src/features/layout/lib/dashboard-page-names.ts:34
 msgid "Personalization"
 msgstr "个性化"
 
@@ -20893,7 +20960,7 @@ msgid "Priority support"
 msgstr "优先支持"
 
 #: src/components/settings/settings-modal.tsx:289
-#: src/features/layout/lib/dashboard-page-names.ts:34
+#: src/features/layout/lib/dashboard-page-names.ts:35
 #: src/features/marketing/components/gateway-footer.tsx:18
 #: src/features/marketing/components/gateway-footer.tsx:139
 #: src/features/marketing/components/landing-footer.tsx:102
@@ -20904,7 +20971,7 @@ msgid "Privacy"
 msgstr "隐私"
 
 #: src/components/settings/settings-modal.tsx:288
-#: src/features/layout/lib/dashboard-page-names.ts:35
+#: src/features/layout/lib/dashboard-page-names.ts:36
 #: src/routes/dashboard/settings/privacy.tsx:16
 msgid "Privacy & Data"
 msgstr "隐私与数据"
@@ -22436,7 +22503,7 @@ msgstr "所选期间内每个技能或智能体的回复、token 和支出"
 msgid "Reply"
 msgstr "回复"
 
-#: src/features/chat/core/context/chat-context.tsx:763
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "Reply ready"
 msgstr "回复已就绪"
 
@@ -22973,6 +23040,10 @@ msgstr "在每个用例上运行一个技能，或一个带系统提示词的模
 msgid "Run again"
 msgstr "再次运行"
 
+#: src/features/settings/components/chat/trigger-settings.tsx:190
+msgid "Run as bot (optional)"
+msgstr ""
+
 #: src/features/marketing/components/tutorials-page.tsx:103
 msgid "Run code in a sandboxed environment with shell access, file operations, and persistent sessions."
 msgstr "在沙盒环境中运行代码，支持 shell 访问、文件操作和持久会话。"
@@ -23041,7 +23112,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 #: src/features/home/components/home-page.tsx:176
 #: src/features/home/components/home-page.tsx:184
 #: src/features/home/components/home-page.tsx:192
-#: src/features/settings/components/chat/trigger-settings.tsx:134
+#: src/features/settings/components/chat/trigger-settings.tsx:144
 #: src/features/tasks/components/task-detail-dialog.tsx:136
 #: src/features/tasks/components/task-status.tsx:20
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:66
@@ -23082,7 +23153,7 @@ msgstr "{0} 的运行"
 msgid "Runs on Cloudflare Workers — sub-50ms cold starts, 300+ edge locations worldwide."
 msgstr "运行在 Cloudflare Workers 上——冷启动低于 50ms，全球 300+ 个边缘节点。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:678
+#: src/features/settings/components/chat/trigger-settings.tsx:740
 msgid "Runs: {runCount}"
 msgstr "运行次数：{runCount}"
 
@@ -23321,8 +23392,8 @@ msgstr "正在扫描..."
 msgid "Scene Description"
 msgstr "场景描述"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:126
-#: src/features/settings/components/chat/trigger-settings.tsx:350
+#: src/features/settings/components/chat/trigger-settings.tsx:136
+#: src/features/settings/components/chat/trigger-settings.tsx:401
 msgid "Schedule"
 msgstr "计划"
 
@@ -23337,6 +23408,10 @@ msgstr "定时清理"
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:342
 msgid "Scheduled job"
 msgstr "定时任务"
+
+#: src/features/settings/components/chat/trigger-settings.tsx:213
+msgid "Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings."
+msgstr ""
 
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:143
 msgid "Scheduler"
@@ -23618,7 +23693,7 @@ msgid "Secret access key"
 msgstr "秘密访问密钥"
 
 #: src/components/settings/settings-modal.tsx:273
-#: src/features/layout/lib/dashboard-page-names.ts:36
+#: src/features/layout/lib/dashboard-page-names.ts:37
 msgid "Security"
 msgstr "安全"
 
@@ -24028,7 +24103,7 @@ msgstr "设置应用的文字方向。RTL 用于阿拉伯语、希伯来语和�
 msgid "Set up a local model server"
 msgstr "设置本地模型服务器"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:157
+#: src/features/settings/components/chat/trigger-settings.tsx:172
 msgid "Set up a new automated agent execution"
 msgstr "设置新的自动化智能体执行"
 
@@ -24039,7 +24114,7 @@ msgstr "设置触发器，按计划、通过 Webhook 或响应事件来自动执
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:255
 #: src/components/settings/settings-modal.tsx:394
 #: src/components/settings/settings-modal.tsx:492
-#: src/features/layout/lib/dashboard-page-names.ts:37
+#: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
 msgstr "设置"
 
@@ -25862,11 +25937,11 @@ msgstr "总结一篇文档或一个 URL..."
 msgid "Summarize any webpage in seconds"
 msgstr "几秒钟总结任意网页"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:179
+#: src/features/settings/components/chat/trigger-settings.tsx:230
 msgid "Summarize my email inbox every morning"
 msgstr "每天早上总结我的收件箱"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:294
+#: src/features/settings/components/chat/trigger-settings.tsx:345
 msgid "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 msgstr "总结我的收件箱并突出紧急事项。使用 {PAYLOAD_TOKEN} 获取 Webhook 数据。"
 
@@ -26049,7 +26124,7 @@ msgstr "系统提示词"
 #~ msgid "System Prompt"
 #~ msgstr "系统提示词"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:279
+#: src/features/settings/components/chat/trigger-settings.tsx:330
 #: src/features/workflow/components/nodes/ai-node.tsx:44
 msgid "System Prompt (optional)"
 msgstr "系统提示词（可选）"
@@ -26259,7 +26334,7 @@ msgstr "团队设置已更新"
 #: src/components/organization-switcher.tsx:64
 #: src/features/auth/components/team/teams-card.tsx:42
 #: src/features/auth/components/team/teams-card.tsx:60
-#: src/features/layout/lib/dashboard-page-names.ts:38
+#: src/features/layout/lib/dashboard-page-names.ts:39
 msgid "Teams"
 msgstr "团队"
 
@@ -26409,11 +26484,11 @@ msgstr "试运行已在临时聊天中就绪，它会被自动删除。"
 msgid "Test drive: {0}"
 msgstr "试运行：{0}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:524
+#: src/features/settings/components/chat/trigger-settings.tsx:580
 msgid "Test run scheduled — check your threads for the result"
 msgstr "测试运行已安排——请在对话中查看结果"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:715
+#: src/features/settings/components/chat/trigger-settings.tsx:777
 msgid "Test run trigger"
 msgstr "测试运行触发器"
 
@@ -26619,6 +26694,14 @@ msgstr "压缩包中的文件过多。"
 #: src/features/chat/thread/ask-user-prompt.tsx:141
 msgid "The assistant has a question"
 msgstr "助手有一个问题"
+
+#: src/features/settings/components/chat/bots-settings.tsx:191
+msgid "The bot and its computer are removed. Its chats stay, as plain chats."
+msgstr ""
+
+#: src/features/chat/thread/composer-model-selector.tsx:85
+msgid "The bot sets the model for this chat."
+msgstr ""
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
@@ -26909,7 +26992,7 @@ msgstr "token 预算必须是整数。"
 msgid "The Token you entered in the server configuration"
 msgstr "你在服务器配置中输入的 Token"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:890
+#: src/features/settings/components/chat/trigger-settings.tsx:952
 msgid "The trigger stops running and its execution history is removed. This cannot be undone."
 msgstr ""
 
@@ -27410,7 +27493,7 @@ msgid "Thought for a few seconds"
 msgstr "思考了几秒钟"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:298
-#: src/features/settings/components/chat/trigger-settings.tsx:811
+#: src/features/settings/components/chat/trigger-settings.tsx:873
 msgid "Thread"
 msgstr "对话"
 
@@ -27525,7 +27608,7 @@ msgid "Timestamps enabled"
 msgstr "已开启时间戳"
 
 #: src/features/settings/components/account/account-settings.tsx:354
-#: src/features/settings/components/chat/trigger-settings.tsx:235
+#: src/features/settings/components/chat/trigger-settings.tsx:286
 msgid "Timezone"
 msgstr "时区"
 
@@ -27903,23 +27986,23 @@ msgstr "三角形"
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "当用量指标超过阈值时触发通知或阻止"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:432
+#: src/features/settings/components/chat/trigger-settings.tsx:485
 msgid "Trigger created"
 msgstr "触发器已创建"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:494
+#: src/features/settings/components/chat/trigger-settings.tsx:550
 msgid "Trigger deleted"
 msgstr "触发器已删除"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:475
+#: src/features/settings/components/chat/trigger-settings.tsx:531
 msgid "Trigger disabled"
 msgstr "触发器已停用"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:475
+#: src/features/settings/components/chat/trigger-settings.tsx:531
 msgid "Trigger enabled"
 msgstr "触发器已启用"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:413
+#: src/features/settings/components/chat/trigger-settings.tsx:464
 msgid "Trigger name is required"
 msgstr "触发器名称为必填项"
 
@@ -27931,20 +28014,20 @@ msgstr "触发器运行失败"
 msgid "Trigger run finished"
 msgstr "触发器运行完成"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:189
+#: src/features/settings/components/chat/trigger-settings.tsx:240
 msgid "Trigger type"
 msgstr "触发器类型"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:188
+#: src/features/settings/components/chat/trigger-settings.tsx:239
 msgid "Trigger Type"
 msgstr "触发器类型"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:460
+#: src/features/settings/components/chat/trigger-settings.tsx:516
 msgid "Trigger updated"
 msgstr "触发器已更新"
 
-#: src/features/layout/lib/dashboard-page-names.ts:39
-#: src/features/settings/components/chat/trigger-settings.tsx:573
+#: src/features/layout/lib/dashboard-page-names.ts:40
+#: src/features/settings/components/chat/trigger-settings.tsx:631
 msgid "Triggers"
 msgstr "触发器"
 
@@ -28782,7 +28865,7 @@ msgid "US"
 msgstr "美国"
 
 #: src/features/chat/sidebar/usage-card.tsx:117
-#: src/features/layout/lib/dashboard-page-names.ts:40
+#: src/features/layout/lib/dashboard-page-names.ts:41
 msgid "Usage"
 msgstr "用量"
 
@@ -29027,7 +29110,7 @@ msgstr "请输入用户名或邮箱"
 msgid "Username: @{platformUsername}"
 msgstr "用户名：@{platformUsername}"
 
-#: src/features/layout/lib/dashboard-page-names.ts:41
+#: src/features/layout/lib/dashboard-page-names.ts:42
 #: src/routes/admin/route.tsx:29
 #: src/routes/admin/route.tsx:57
 msgid "Users"
@@ -29786,7 +29869,7 @@ msgstr "等待：{0}"
 msgid "Want to continue from here?"
 msgstr "想从这里继续吗？"
 
-#: src/features/chat/core/context/chat-context.tsx:804
+#: src/features/chat/core/context/chat-context.tsx:806
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "我们未能及时确认你的会话。你的消息仍在输入框中，请重新发送。"
 
@@ -29839,8 +29922,8 @@ msgstr "集成网络搜索，了解时事"
 msgid "Web search via Parallel's search API"
 msgstr "通过 Parallel 搜索 API 进行网络搜索"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:127
-#: src/features/settings/components/chat/trigger-settings.tsx:358
+#: src/features/settings/components/chat/trigger-settings.tsx:137
+#: src/features/settings/components/chat/trigger-settings.tsx:409
 msgid "Webhook"
 msgstr "Webhook"
 
@@ -29848,11 +29931,11 @@ msgstr "Webhook"
 msgid "Webhook notifications"
 msgstr "Webhook 通知"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:603
+#: src/features/settings/components/chat/trigger-settings.tsx:661
 msgid "Webhook secret"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:512
+#: src/features/settings/components/chat/trigger-settings.tsx:568
 msgid "Webhook secret copied to clipboard"
 msgstr "Webhook 密钥已复制到剪贴板"
 
@@ -29864,7 +29947,7 @@ msgstr "用于验证 Telegram 传入更新的 Webhook 密钥"
 msgid "Webhook URL"
 msgstr "Webhook URL"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:554
+#: src/features/settings/components/chat/trigger-settings.tsx:612
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:132
 msgid "Webhook URL copied to clipboard"
 msgstr "Webhook URL 已复制到剪贴板"
@@ -29905,7 +29988,7 @@ msgstr "WeChat Token"
 msgid "Weekdays at 09:00 UTC"
 msgstr "工作日 09:00 UTC"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:118
+#: src/features/settings/components/chat/trigger-settings.tsx:128
 msgid "Weekdays at 8 AM"
 msgstr "工作日上午 8 点"
 
@@ -30362,7 +30445,7 @@ msgstr "你"
 msgid "You (another tab)"
 msgstr "你（另一个标签页）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:283
+#: src/features/settings/components/chat/trigger-settings.tsx:334
 msgid "You are a helpful assistant that summarizes emails..."
 msgstr "你是一个帮助总结电子邮件的助手..."
 
@@ -30528,7 +30611,7 @@ msgstr "你的 AI 工作区<0>从这里开始。</0>"
 msgid "Your answer"
 msgstr "你的回答"
 
-#: src/features/chat/core/context/chat-context.tsx:763
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "Your answer in Neore has finished."
 msgstr "你在 Neore 中的回复已生成完毕。"
 
@@ -30547,6 +30630,10 @@ msgstr "你的 Azure OpenAI 资源：端点、API 版本和部署名称。"
 #: src/features/settings/components/personalization/personalization-settings.tsx:190
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "你的背景、偏好或所在地，帮助 AI 更好地了解你"
+
+#: src/features/settings/components/chat/bots-settings.tsx:155
+msgid "Your bots"
+msgstr ""
 
 #: src/features/local-models/lib/local-errors.ts:178
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
@@ -30623,7 +30710,7 @@ msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请�
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 
-#: src/features/chat/core/context/chat-context.tsx:993
+#: src/features/chat/core/context/chat-context.tsx:995
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "你的消息包含不当内容，无法发送。"
 

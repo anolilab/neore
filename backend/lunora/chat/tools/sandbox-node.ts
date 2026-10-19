@@ -11,6 +11,7 @@ import type { Sandbox } from "e2b";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
+import { runAfterOnShard } from "../../lib/shard-scheduler";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { internalAction } from "../../_generated/server";
@@ -41,17 +42,162 @@ const truncate = (text: string, maxLength = MAX_OUTPUT_LENGTH): string => {
     return `${text.slice(0, maxLength)}\n... (truncated, ${text.length - maxLength} chars omitted)`;
 };
 
+/** A bot's computer idles this long before it is paused (state kept, no compute billed). */
+const BOT_COMPUTER_IDLE_MS = 10 * 60_000;
+/** E2B's own lifetime cap for a running computer: a safety net if the idle pause never runs. */
+const BOT_COMPUTER_LIFETIME_MS = 60 * 60_000;
+/** How long a call waits for another caller's computer to finish starting, polled this often. */
+const BOT_COMPUTER_START_WAIT_MS = 90_000;
+const STARTING_POLL_MS = 1000;
+/** A kill that stalls must not hang the tool call that is cleaning up. */
+const BOT_KILL_TIMEOUT_MS = 15_000;
+/** Bounds a resume or a connection to a bot computer, so a stalled E2B call cannot hang the tool call. */
+const BOT_REQUEST_TIMEOUT_MS = 20_000;
+
+const killBotSandbox = async (sandboxId: string): Promise<void> => {
+    const { Sandbox } = await import("e2b");
+
+    await Sandbox.kill(sandboxId, { apiKey: E2B_API_KEY, requestTimeoutMs: BOT_KILL_TIMEOUT_MS }).catch(() => undefined);
+};
+
+/**
+ * The bot's one long-lived computer. A paused one is resumed with `connect`, which
+ * keeps its filesystem and memory. Every path arms the idle check again, so a
+ * resumed computer is paused when it goes quiet.
+ */
+export const getOrCreateBotComputer = async (
+    context: any,
+    userId: string,
+    botId: Id<"bots">,
+): Promise<{ isNew: boolean; sandbox: Sandbox; sessionId: Id<"sandboxSessions"> }> => {
+    const claimComputer = async () =>
+        await context.runMutation(internal.sandbox.functions.claimBotComputer, {
+            botId,
+            timeoutMs: BOT_COMPUTER_IDLE_MS,
+            userId,
+        });
+
+    let claim = await claimComputer();
+
+    // Another caller is creating the computer: wait for it, so a parallel tool call is not refused.
+    for (let waited = 0; !claim.created && !claim.sandboxId && waited < BOT_COMPUTER_START_WAIT_MS; waited += STARTING_POLL_MS) {
+        await new Promise((resolve) => {
+            setTimeout(resolve, STARTING_POLL_MS);
+        });
+        claim = await claimComputer();
+    }
+
+    const { Sandbox, SandboxNotFoundError } = await import("e2b");
+
+    if (!claim.created) {
+        if (!claim.sandboxId) {
+            throw new Error("Your computer is still starting. Try again in a moment.");
+        }
+
+        let sandbox: Sandbox;
+
+        try {
+            // `connect` resumes a paused computer; without its own timeout E2B would keep it only for the 300 s default.
+            sandbox = await Sandbox.connect(claim.sandboxId, {
+                apiKey: E2B_API_KEY,
+                requestTimeoutMs: BOT_REQUEST_TIMEOUT_MS,
+                timeoutMs: BOT_COMPUTER_LIFETIME_MS,
+            });
+        } catch (error) {
+            // Only a computer E2B says is gone is retired. Any other failure keeps its files and asks for a retry.
+            if (error instanceof SandboxNotFoundError) {
+                await context.runMutation(internal.sandbox.functions.closeSession, {
+                    errorMessage: "Computer no longer available",
+                    sessionId: claim.sessionId,
+                    status: "terminated",
+                });
+
+                throw new Error("Your computer was lost. Try again to start a new one.", { cause: error });
+            }
+
+            throw new Error("Could not reach your computer. Try again in a moment.", { cause: error });
+        }
+
+        if (!(await context.runMutation(internal.sandbox.functions.activateBotComputer, { sandboxId: claim.sandboxId, sessionId: claim.sessionId }))) {
+            await killBotSandbox(claim.sandboxId);
+
+            throw new Error("Your computer was retired while it was resuming.");
+        }
+
+        await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000, userId);
+
+        return { isNew: false, sandbox, sessionId: claim.sessionId };
+    }
+
+    let sandbox: Sandbox | undefined;
+
+    try {
+        // At its lifetime cap E2B pauses the computer rather than killing it, so its files survive for the next call.
+        sandbox = await Sandbox.create({
+            apiKey: E2B_API_KEY,
+            lifecycle: { autoResume: false, onTimeout: "pause" },
+            timeoutMs: BOT_COMPUTER_LIFETIME_MS,
+        });
+
+        // Refused when the bot's computer was retired, or this claim went stale and was replaced, while
+        // the sandbox was starting: then this sandbox is the extra one, and the catch below kills it.
+        if (!(await context.runMutation(internal.sandbox.functions.activateBotComputer, { sandboxId: sandbox.sandboxId, sessionId: claim.sessionId }))) {
+            throw new Error("Your computer was retired while it was starting.");
+        }
+
+        await armIdleCheck(context, claim.sessionId, BOT_COMPUTER_IDLE_MS + 10_000, userId);
+
+        return { isNew: true, sandbox, sessionId: claim.sessionId };
+    } catch (error) {
+        // A sandbox made but not adopted by its session must not run on outside the session. Its kill
+        // is best effort: a failed kill still leaves the sandbox to E2B's own lifetime cap.
+        if (sandbox) {
+            await killBotSandbox(sandbox.sandboxId);
+        }
+
+        await context.runMutation(internal.sandbox.functions.closeSession, {
+            errorMessage: error instanceof Error ? error.message : String(error),
+            sessionId: claim.sessionId,
+            status: "failed",
+        });
+
+        throw error;
+    }
+};
+
+/** Schedule the idle check that pauses or kills a session, and remember it on the session. */
+const armIdleCheck = async (context: any, sessionId: Id<"sandboxSessions">, afterMs: number, userId: string): Promise<void> => {
+    // Routed to the owner's shard: the session row lives there, so the cleanup must run there to find it.
+    const cleanupFunctionId = await runAfterOnShard(context.scheduler, afterMs, internal.sandbox.cleanup.checkAndTerminateSandbox, { sessionId }, userId);
+
+    await context.runMutation(internal.sandbox.functions.updateSession, {
+        cleanupFnId: String(cleanupFunctionId),
+        sessionId,
+    });
+};
+
 /**
  * Get or create a sandbox session for the given thread.
  * Returns the E2B sandbox instance and the session ID.
  */
-const getOrCreateSandbox = async (
+export const getOrCreateSandbox = async (
     context: any,
     userId: string,
     threadId: Id<"threads">,
 ): Promise<{ isNew: boolean; sandbox: Sandbox; sessionId: Id<"sandboxSessions"> }> => {
     if (!E2B_API_KEY) {
         throw new Error("E2B_API_KEY is not configured. Please set it to use sandbox features.");
+    }
+
+    // A chat that belongs to a bot with a computer shares that bot's computer, across threads.
+    const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId });
+
+    if (thread?.botId) {
+        const bot = await context.runQuery(internal.bots.functions.getBotForRun, { botId: thread.botId, userId });
+
+        if (bot?.computerEnabled) {
+            return await getOrCreateBotComputer(context, userId, thread.botId as Id<"bots">);
+        }
     }
 
     // Check for existing active session
@@ -103,7 +249,13 @@ const getOrCreateSandbox = async (
     });
 
     // Schedule idle cleanup
-    const cleanupFunctionId = await context.scheduler.runAfter(DEFAULT_TIMEOUT_MS + 10_000, internal.sandbox.cleanup.checkAndTerminateSandbox, { sessionId });
+    const cleanupFunctionId = await runAfterOnShard(
+        context.scheduler,
+        DEFAULT_TIMEOUT_MS + 10_000,
+        internal.sandbox.cleanup.checkAndTerminateSandbox,
+        { sessionId },
+        userId,
+    );
 
     await context.runMutation(internal.sandbox.functions.updateSession, {
         cleanupFnId: String(cleanupFunctionId),

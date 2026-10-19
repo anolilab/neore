@@ -8923,6 +8923,331 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#bots_functions:createBot": {
+      "post": {
+        "description": "Invoke the `mutation` `bots_functions:createBot` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "bots_functions:createBot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "computerEnabled": {
+                        "type": "boolean"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "instructions": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "computerEnabled",
+                      "instructions",
+                      "model",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "bots_functions:createBot",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: bots_functions:createBot",
+        "tags": [
+          "bots"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#bots_functions:deleteBot": {
+      "post": {
+        "description": "Invoke the `mutation` `bots_functions:deleteBot` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "bots_functions:deleteBot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "botId": {
+                        "description": "Id<\"bots\">",
+                        "type": "string",
+                        "x-lunora-table": "bots"
+                      }
+                    },
+                    "required": [
+                      "botId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "bots_functions:deleteBot",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: bots_functions:deleteBot",
+        "tags": [
+          "bots"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#bots_functions:listBots": {
+      "post": {
+        "description": "Invoke the `query` `bots_functions:listBots` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "bots_functions:listBots",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "bots_functions:listBots",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "_creationTime": {
+                        "type": "number"
+                      },
+                      "_id": {
+                        "type": "string"
+                      },
+                      "computerEnabled": {
+                        "type": "boolean"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "instructions": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      },
+                      "userId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "_creationTime",
+                      "_id",
+                      "computerEnabled",
+                      "createdAt",
+                      "instructions",
+                      "model",
+                      "name",
+                      "updatedAt",
+                      "userId"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: bots_functions:listBots",
+        "tags": [
+          "bots"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#bots_functions:updateBot": {
+      "post": {
+        "description": "Invoke the `mutation` `bots_functions:updateBot` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "bots_functions:updateBot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "botId": {
+                        "description": "Id<\"bots\">",
+                        "type": "string",
+                        "x-lunora-table": "bots"
+                      },
+                      "patch": {
+                        "properties": {
+                          "computerEnabled": {
+                            "type": "boolean"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "instructions": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "botId",
+                      "patch"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "bots_functions:updateBot",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: bots_functions:updateBot",
+        "tags": [
+          "bots"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#changelog_functions:getChangelogs": {
       "post": {
         "description": "Invoke the `action` `changelog_functions:getChangelogs` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -10468,6 +10793,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "botId": {
+                        "type": "string"
+                      },
                       "branchName": {
                         "type": "string"
                       },
@@ -11617,6 +11945,9 @@
                       "activeLeafMessageId": {
                         "type": "string"
                       },
+                      "botId": {
+                        "type": "string"
+                      },
                       "createdAt": {
                         "type": "number"
                       },
@@ -12106,6 +12437,9 @@
                       "_id": {
                         "type": "string"
                       },
+                      "botId": {
+                        "type": "string"
+                      },
                       "createdAt": {
                         "type": "number"
                       },
@@ -12556,6 +12890,9 @@
                         "type": "number"
                       },
                       "_id": {
+                        "type": "string"
+                      },
+                      "botId": {
                         "type": "string"
                       },
                       "createdAt": {
@@ -37976,6 +38313,12 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "botComputer": {
+                        "type": "boolean"
+                      },
+                      "botId": {
+                        "type": "string"
+                      },
                       "cronExpression": {
                         "type": "string"
                       },
@@ -38385,6 +38728,19 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "botComputer": {
+                        "type": "boolean"
+                      },
+                      "botId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "cronExpression": {
                         "type": "string"
                       },
@@ -42376,6 +42732,10 @@
     {
       "description": "Creem subscriptions: per-user Pro and per-organization Team checkout, customer portal, Team seat sync and the webhook that sets the tier. Owns the `@lunora/payment` store tables.",
       "name": "billing"
+    },
+    {
+      "description": "Persistent bots: a named persona with its own routines, memory and computer, owned by one user.",
+      "name": "bots"
     },
     {
       "description": "Product changelog, fetched from Featurebase and cached.",

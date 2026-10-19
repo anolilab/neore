@@ -17,6 +17,7 @@ backend/lunora-bindings.json
 # regenerates on any source change, so the reformat is both pointless and a
 # source of phantom diffs.
 **/_generated/
+**/routeTree.gen.ts
 **/.lunora-schema.json
 **/lunora.advisor.map.json
 **/.wrangler/

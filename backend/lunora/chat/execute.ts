@@ -182,7 +182,12 @@ export const runStreamingAgent = internalAction
 
             const invokedSkill = skillRun.invocation;
 
-            model = resolveSkillModel(requestedModel, invokedSkill?.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), isAnonymous === true);
+            // A live bot keeps its pinned model (`/chat/start`); a skill's preferred model does not replace it.
+            const liveBot = thread?.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: thread.botId, userId }) : null;
+
+            model = liveBot
+                ? requestedModel
+                : resolveSkillModel(requestedModel, invokedSkill?.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), isAnonymous === true);
 
             // Auto-detect task complexity
             let taskAnalysis: TaskAnalysis | undefined;
@@ -360,6 +365,7 @@ export const runStreamingAgent = internalAction
 
             // Post-stream work: timing and memory extraction, then follow-ups.
             afterRun(ctx, {
+                botId: runContext.botId,
                 extractMemory: runContext.memoryEnabled,
                 firstTokenTime,
                 knowledgeSources: runContext.knowledgeSources,

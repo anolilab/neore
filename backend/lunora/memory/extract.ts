@@ -230,6 +230,9 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
 export const extractMemories = internalAction
     .input({
         assistantResponse: v.string(),
+        // The bot whose chat produced the turn. Its memories are written and deduped in
+        // that scope only (`getActiveMemoriesForUser`), never against the user's own.
+        botId: v.optional(v.string()),
         threadId: v.optional(v.id("threads")),
         toolResults: v.optional(
             v.array(
@@ -261,6 +264,7 @@ export const extractMemories = internalAction
 
         // 2. Load existing memories for dedup context
         const existingMemories = await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
+            botId: args.botId,
             limit: 50,
             userId: args.userId,
         });
@@ -356,6 +360,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         // so an object without the key is rejected. Writing the local type the
         // same way keeps the mismatch in one place.
         const memoriesToSave: {
+            botId?: string;
             confidence: number;
             importance: number;
             memory: string;
@@ -404,6 +409,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             if (!similarMemory) {
                 // No similar memory found — save as new
                 memoriesToSave.push({
+                    botId: args.botId,
                     confidence: fact.confidence,
                     importance: fact.importance,
                     memory: fact.memory,
@@ -430,6 +436,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 switch (revision.action) {
                     case "ADD": {
                         memoriesToSave.push({
+                            botId: args.botId,
                             confidence: fact.confidence,
                             importance: fact.importance,
                             memory: fact.memory,
@@ -448,6 +455,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     }
                     case "SUPERSEDE": {
                         memoriesToSave.push({
+                            botId: args.botId,
                             confidence: fact.confidence,
                             importance: fact.importance,
                             memory: fact.memory,
@@ -478,6 +486,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             } catch (error) {
                 console.error("[memory/extract] Belief revision failed, saving as new:", error);
                 memoriesToSave.push({
+                    botId: args.botId,
                     confidence: fact.confidence,
                     importance: fact.importance,
                     memory: fact.memory,
@@ -565,9 +574,11 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             await ctx.runMutation(internal.memory.functions.confirmMemories, { memoryIds: memoriesToConfirm, userId: args.userId });
         }
 
-        // 8. Trigger session compression if thread memory count is growing large
+        // 8. Trigger session compression if thread memory count is growing large.
+        // Compression stays inside one scope: a bot's rows compress into that bot's rows.
         if (args.threadId && memoriesToSave.length > 0) {
             void ctx.runAction(internal.memory.compress.maybeCompressThreadMemories, {
+                botId: args.botId,
                 threadId: args.threadId,
                 userId: args.userId,
             });

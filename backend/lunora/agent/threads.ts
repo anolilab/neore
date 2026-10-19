@@ -192,6 +192,7 @@ export const createThread = internalMutation
     });
 
 export const threadFieldsSupportingPatch = [
+    "botId" as const,
     "title" as const,
     "summary" as const,
     "status" as const,

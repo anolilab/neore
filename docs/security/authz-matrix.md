@@ -83,7 +83,7 @@ past RLS through `systemDb(ctx)`; every file that does is listed in the guard.
 
 | rule | tables |
 | --- | --- |
-| owner (`userId` = caller) | `account`, `aiUserPreferences`, `browserExtensions`, `browserSessions`, `chatImportJobs`, `codingAgentRuns`, `documentVersions`, `embeddings_1024`, `embeddings_128`, `embeddings_1408`, `embeddings_1536`, `embeddings_256`, `embeddings_512`, `embeddings_768`, `evalCases`, `evalDatasets`, `evalResults`, `evalRuns`, `folders`, `gatewayNotifications`, `gatewayUsageDeductions`, `gdprAuditLog`, `gdprConsent`, `gdprRequests`, `goals`, `knowledgeChunks`, `knowledgeCollectionLinks`, `mcpServerGrants`, `memories`, `memoryDigests`, `memoryReflectionState`, `messengerConnections`, `oauthStates`, `presentations`, `sandboxSessions`, `session`, `skillInvocations`, `systemPromptPresets`, `taskRuns`, `tasks`, `temporaryThreads`, `threadPins`, `threadRelationships`, `threadTags`, `threadVariables`, `toolApprovalRuns`, `triggers`, `twoFactor`, `usageBackfill`, `usageDaily`, `usageReplies`, `userConnectors`, `userSettings`, `userSkills`, `workflowExecutions`, `workflowPresence`, `workflowVersions` |
+| owner (`userId` = caller) | `account`, `aiUserPreferences`, `bots`, `browserExtensions`, `browserSessions`, `chatImportJobs`, `codingAgentRuns`, `documentVersions`, `embeddings_1024`, `embeddings_128`, `embeddings_1408`, `embeddings_1536`, `embeddings_256`, `embeddings_512`, `embeddings_768`, `evalCases`, `evalDatasets`, `evalResults`, `evalRuns`, `folders`, `gatewayNotifications`, `gatewayUsageDeductions`, `gdprAuditLog`, `gdprConsent`, `gdprRequests`, `goals`, `knowledgeChunks`, `knowledgeCollectionLinks`, `mcpServerGrants`, `memories`, `memoryDigests`, `memoryReflectionState`, `messengerConnections`, `oauthStates`, `presentations`, `sandboxSessions`, `session`, `skillInvocations`, `systemPromptPresets`, `taskRuns`, `tasks`, `temporaryThreads`, `threadPins`, `threadRelationships`, `threadTags`, `threadVariables`, `toolApprovalRuns`, `triggers`, `twoFactor`, `usageBackfill`, `usageDaily`, `usageReplies`, `userConnectors`, `userSettings`, `userSkills`, `workflowExecutions`, `workflowPresence`, `workflowVersions` |
 | thread-scoped: own rows, or any row of an admitted thread; writes need a write grant | `threads` (by `_id`; `update` write grant, `delete` admin), `messages`, `streamingMessages`, `persistentStreams`, `documents`, `followupSuggestions` |
 | thread grants | `threadAccess` (own grant, or any member of an admitted thread reads; admins write), `threadInvites` (owner/admin grantees only) |
 | page-scoped | `pages` (own or admitted; `update` needs comment+), `pageComments`, `pageVersions`, `pagePresence`, `pageFavorites` (own rows or any row of a page the caller is a member of), `pageAccess` (own grant, page admins manage), `pageInvites` (page admins, or the bearer of the token) |
@@ -255,6 +255,10 @@ for a schema table that is neither policed nor listed:
 | `billing_checkout.getMyPlan` | query | authQuery | user | caller-scoped (ctx.user) — own row only | ok — new |
 | `billing_checkout.getTeamPlansIPay` | query | authQuery | organization, member (count) | caller-scoped: organizations whose `creemPurchaserId` is the caller (indexed); returns name + member count only, for the delete-account warning | ok — new |
 | `billing_checkout.openCustomerPortal` | action | authAction + RL | user, organization (customer id) | `user`: caller's own row; `organization`: active org owner AND the recorded purchaser (`creemPurchaserId`) — the org's Creem customer is the purchaser's own | ok — new; portal for the caller's own Pro or their org's Team only |
+| `bots_functions.createBot` | mutation | authMutation + RL | bots | caller-scoped (ctx.user); model checked against the catalog | ok |
+| `bots_functions.deleteBot` | mutation | authMutation + RL | bots | row.userId == caller | ok |
+| `bots_functions.listBots` | query | authQuery | bots | caller-scoped (ctx.user) | ok |
+| `bots_functions.updateBot` | mutation | authMutation + RL | bots | row.userId == caller; model checked against the catalog | ok |
 | `changelog_functions.getChangelogs` | action | publicAction | — | none (public) | accepted — public by design; cached with a module cooldown |
 | `chat_ask_user.answerAskUser` | mutation | authMutation + RL | toolApprovalRuns, threads | thread owner only (as `respondToToolApproval`); the request must be an `askUser` call on the latest turn | ok |
 | `chat_autocomplete.suggestCompletion` | action | authAction + RL | userSettings | caller-scoped (ctx.user); refuses unless the caller's own opt-in setting is on; the draft comes from the caller and is sent to the utility model as JSON data; reads no thread | ok |
@@ -273,7 +277,7 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.continueThread` | action | authAction + RL | threads | thread access (owner/grant) | accepted — rate-limited; advisor: no maxOutputTokens bound |
 | `chat_functions.convertTemporaryToPermanent` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.createExtensionPairing` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
-| `chat_functions.createThread` | mutation | authMutation + RL | projects, teamMember | org membership/role; row.userId == caller | **fixed** (low) — organizationId must be the active org |
+| `chat_functions.createThread` | mutation | authMutation + RL | projects, teamMember | org membership/role; row.userId == caller; botId must be a bot the caller owns | **fixed** (low) — organizationId must be the active org |
 | `chat_functions.createThreadRelationshipPublic` | mutation | authMutation + RL | threads | row.userId == caller (both ends) | **fixed** (critical) — both threads must be the caller's; a link to a stranger's thread was a read grant on it |
 | `chat_functions.deleteThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.deleteThreads` | mutation | authMutation + RL | — | row.userId == caller | ok |
@@ -578,13 +582,13 @@ for a schema table that is neither policed nor listed:
 | `tasks_functions.runTask` | mutation | authMutation + RL | tasks | owner helper | ok |
 | `tasks_functions.updateGoal` | mutation | authMutation + RL | goals | owner helper | ok |
 | `tasks_functions.updateTask` | mutation | authMutation + RL | goals, skills, tasks | owner helper | ok |
-| `triggers_functions.createTrigger` | mutation | authMutation + RL | triggers | caller-scoped (ctx.user) | ok |
+| `triggers_functions.createTrigger` | mutation | authMutation + RL | triggers | caller-scoped (ctx.user); botId must be a bot the caller owns | ok |
 | `triggers_functions.deleteTrigger` | mutation | authMutation + RL | triggers | row.userId == caller | ok |
 | `triggers_functions.getTriggerExecutions` | query | authQuery | triggers | row.userId == caller | ok |
 | `triggers_functions.getTriggers` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `triggers_functions.setTriggerEnabled` | mutation | authMutation + RL | triggers | row.userId == caller | ok |
 | `triggers_functions.testRunTrigger` | action | authAction + RL | triggers | row.userId == caller | ok |
-| `triggers_functions.updateTrigger` | mutation | authMutation + RL | triggers | row.userId == caller | ok |
+| `triggers_functions.updateTrigger` | mutation | authMutation + RL | triggers | row.userId == caller; a new botId must be a bot the caller owns | ok |
 | `usage_activity.getActivityHeatmap` | query | authQuery | usageDaily | caller-scoped (ctx.user) | ok — new; at most 378 rows via `(userId, skillKey, date)` |
 | `usage_activity.getSkillBreakdown` | query | authQuery | usageDaily | caller-scoped (ctx.user) | ok — new; at most 4000 rows via `(userId, date)` |
 | `usage_backfill.getUsageBackfillStatus` | query | authQuery | usageBackfill | caller-scoped (ctx.user) | ok — new; one row via `by_userId` |

@@ -79,6 +79,7 @@ import { Route as DashboardSettingsAuthOrganizationsRouteImport } from "./routes
 import { Route as DashboardSettingsAuthSecurityRouteImport } from "./routes/dashboard/settings/auth/security";
 import { Route as DashboardSettingsAuthTeamsRouteImport } from "./routes/dashboard/settings/auth/teams";
 import { Route as DashboardSettingsChatAgentRouteImport } from "./routes/dashboard/settings/chat/agent";
+import { Route as DashboardSettingsChatBotsRouteImport } from "./routes/dashboard/settings/chat/bots";
 import { Route as DashboardSettingsChatDevicesRouteImport } from "./routes/dashboard/settings/chat/devices";
 import { Route as DashboardSettingsChatKnowledgeRouteImport } from "./routes/dashboard/settings/chat/knowledge";
 import { Route as DashboardSettingsChatMcpRouteImport } from "./routes/dashboard/settings/chat/mcp";
@@ -438,6 +439,11 @@ const DashboardSettingsChatAgentRoute = DashboardSettingsChatAgentRouteImport.up
     path: "/settings/chat/agent",
     getParentRoute: () => DashboardRouteRoute,
 } as any);
+const DashboardSettingsChatBotsRoute = DashboardSettingsChatBotsRouteImport.update({
+    id: "/settings/chat/bots",
+    path: "/settings/chat/bots",
+    getParentRoute: () => DashboardRouteRoute,
+} as any);
 const DashboardSettingsChatDevicesRoute = DashboardSettingsChatDevicesRouteImport.update({
     id: "/settings/chat/devices",
     path: "/settings/chat/devices",
@@ -557,6 +563,7 @@ export interface FileRoutesByFullPath {
     "/dashboard/settings/auth/security": typeof DashboardSettingsAuthSecurityRoute;
     "/dashboard/settings/auth/teams": typeof DashboardSettingsAuthTeamsRoute;
     "/dashboard/settings/chat/agent": typeof DashboardSettingsChatAgentRoute;
+    "/dashboard/settings/chat/bots": typeof DashboardSettingsChatBotsRoute;
     "/dashboard/settings/chat/devices": typeof DashboardSettingsChatDevicesRoute;
     "/dashboard/settings/chat/knowledge": typeof DashboardSettingsChatKnowledgeRoute;
     "/dashboard/settings/chat/mcp": typeof DashboardSettingsChatMcpRoute;
@@ -631,6 +638,7 @@ export interface FileRoutesByTo {
     "/dashboard/settings/auth/security": typeof DashboardSettingsAuthSecurityRoute;
     "/dashboard/settings/auth/teams": typeof DashboardSettingsAuthTeamsRoute;
     "/dashboard/settings/chat/agent": typeof DashboardSettingsChatAgentRoute;
+    "/dashboard/settings/chat/bots": typeof DashboardSettingsChatBotsRoute;
     "/dashboard/settings/chat/devices": typeof DashboardSettingsChatDevicesRoute;
     "/dashboard/settings/chat/knowledge": typeof DashboardSettingsChatKnowledgeRoute;
     "/dashboard/settings/chat/mcp": typeof DashboardSettingsChatMcpRoute;
@@ -714,6 +722,7 @@ export interface FileRoutesById {
     "/dashboard/settings/auth/security": typeof DashboardSettingsAuthSecurityRoute;
     "/dashboard/settings/auth/teams": typeof DashboardSettingsAuthTeamsRoute;
     "/dashboard/settings/chat/agent": typeof DashboardSettingsChatAgentRoute;
+    "/dashboard/settings/chat/bots": typeof DashboardSettingsChatBotsRoute;
     "/dashboard/settings/chat/devices": typeof DashboardSettingsChatDevicesRoute;
     "/dashboard/settings/chat/knowledge": typeof DashboardSettingsChatKnowledgeRoute;
     "/dashboard/settings/chat/mcp": typeof DashboardSettingsChatMcpRoute;
@@ -796,6 +805,7 @@ export interface FileRouteTypes {
         | "/dashboard/settings/auth/security"
         | "/dashboard/settings/auth/teams"
         | "/dashboard/settings/chat/agent"
+        | "/dashboard/settings/chat/bots"
         | "/dashboard/settings/chat/devices"
         | "/dashboard/settings/chat/knowledge"
         | "/dashboard/settings/chat/mcp"
@@ -870,6 +880,7 @@ export interface FileRouteTypes {
         | "/dashboard/settings/auth/security"
         | "/dashboard/settings/auth/teams"
         | "/dashboard/settings/chat/agent"
+        | "/dashboard/settings/chat/bots"
         | "/dashboard/settings/chat/devices"
         | "/dashboard/settings/chat/knowledge"
         | "/dashboard/settings/chat/mcp"
@@ -952,6 +963,7 @@ export interface FileRouteTypes {
         | "/dashboard/settings/auth/security"
         | "/dashboard/settings/auth/teams"
         | "/dashboard/settings/chat/agent"
+        | "/dashboard/settings/chat/bots"
         | "/dashboard/settings/chat/devices"
         | "/dashboard/settings/chat/knowledge"
         | "/dashboard/settings/chat/mcp"
@@ -1480,6 +1492,13 @@ declare module "@tanstack/react-router" {
             preLoaderRoute: typeof DashboardSettingsChatAgentRouteImport;
             parentRoute: typeof DashboardRouteRoute;
         };
+        "/dashboard/settings/chat/bots": {
+            id: "/dashboard/settings/chat/bots";
+            path: "/settings/chat/bots";
+            fullPath: "/dashboard/settings/chat/bots";
+            preLoaderRoute: typeof DashboardSettingsChatBotsRouteImport;
+            parentRoute: typeof DashboardRouteRoute;
+        };
         "/dashboard/settings/chat/devices": {
             id: "/dashboard/settings/chat/devices";
             path: "/settings/chat/devices";
@@ -1659,6 +1678,7 @@ interface DashboardRouteRouteChildren {
     DashboardSettingsAuthSecurityRoute: typeof DashboardSettingsAuthSecurityRoute;
     DashboardSettingsAuthTeamsRoute: typeof DashboardSettingsAuthTeamsRoute;
     DashboardSettingsChatAgentRoute: typeof DashboardSettingsChatAgentRoute;
+    DashboardSettingsChatBotsRoute: typeof DashboardSettingsChatBotsRoute;
     DashboardSettingsChatDevicesRoute: typeof DashboardSettingsChatDevicesRoute;
     DashboardSettingsChatKnowledgeRoute: typeof DashboardSettingsChatKnowledgeRoute;
     DashboardSettingsChatMcpRoute: typeof DashboardSettingsChatMcpRoute;
@@ -1685,6 +1705,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
     DashboardSettingsAuthSecurityRoute: DashboardSettingsAuthSecurityRoute,
     DashboardSettingsAuthTeamsRoute: DashboardSettingsAuthTeamsRoute,
     DashboardSettingsChatAgentRoute: DashboardSettingsChatAgentRoute,
+    DashboardSettingsChatBotsRoute: DashboardSettingsChatBotsRoute,
     DashboardSettingsChatDevicesRoute: DashboardSettingsChatDevicesRoute,
     DashboardSettingsChatKnowledgeRoute: DashboardSettingsChatKnowledgeRoute,
     DashboardSettingsChatMcpRoute: DashboardSettingsChatMcpRoute,
@@ -1768,13 +1789,3 @@ const rootRouteChildren: RootRouteChildren = {
     publicTutorialsIndexRoute: publicTutorialsIndexRoute,
 };
 export const routeTree = rootRouteImport._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>();
-
-import type { getRouter } from "./router.tsx";
-import type { startInstance } from "./start.ts";
-declare module "@tanstack/react-start" {
-    interface Register {
-        ssr: true;
-        router: Awaited<ReturnType<typeof getRouter>>;
-        config: Awaited<ReturnType<typeof startInstance.getOptions>>;
-    }
-}

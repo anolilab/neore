@@ -1090,15 +1090,15 @@ msgstr "<0>Enter</0> Criar"
 msgid "<0>Esc</0> Close"
 msgstr "<0>Esc</0> Fechar"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:872
+#: src/features/settings/components/chat/trigger-settings.tsx:934
 msgid "<0>Event</0> — React to external events via MCP or Composio (coming in Phase 2)."
 msgstr "<0>Evento</0> — Reaja a eventos externos via MCP ou Composio (em breve, na Fase 2)."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:854
+#: src/features/settings/components/chat/trigger-settings.tsx:916
 msgid "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard 5-field cron expressions."
 msgstr "<0>Agendamento</0> — Executa em um agendamento cron (ex.: diariamente às 8h). Usa expressões cron padrão de 5 campos."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:863
+#: src/features/settings/components/chat/trigger-settings.tsx:925
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — Recebe requisições HTTP POST de serviços externos (Stripe, GitHub, Zapier). As requisições são assinadas com um HMAC com carimbo de data/hora e repetições são rejeitadas."
 
@@ -1404,6 +1404,10 @@ msgstr "Um vídeo de referência pode ter no máximo {0} segundos."
 msgid "A regular expression the answer must match"
 msgstr "Uma expressão regular à qual a resposta deve corresponder"
 
+#: src/features/settings/components/chat/bots-settings.tsx:141
+msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
+msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:227
 msgid "A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage."
 msgstr "Um breve resumo toda manhã do que terminou, do que está em execução e do que precisa de você. Conta para o seu uso diário."
@@ -1424,7 +1428,7 @@ msgstr "Uma chamada de ferramenta precisa da sua aprovação"
 msgid "A tool cannot be both added and disabled"
 msgstr "Uma ferramenta não pode ser adicionada e desativada ao mesmo tempo"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:250
+#: src/features/settings/components/chat/trigger-settings.tsx:301
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "Uma URL de webhook e um segredo exclusivos serão gerados quando você criar este gatilho. Use a URL como destino para serviços externos (Zapier, n8n, seu próprio código etc.)."
 
@@ -1591,7 +1595,7 @@ msgstr "ativo"
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
 #: src/features/settings/components/chat/model-filter-settings.tsx:194
 #: src/features/settings/components/chat/model-filter-settings.tsx:255
-#: src/features/settings/components/chat/trigger-settings.tsx:662
+#: src/features/settings/components/chat/trigger-settings.tsx:724
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
 msgid "Active"
@@ -2251,7 +2255,7 @@ msgid "AI"
 msgstr "IA"
 
 #: src/routes/admin/route.tsx:67
-#: src/routes/dashboard/route.tsx:52
+#: src/routes/dashboard/route.tsx:53
 msgid "AI Chat"
 msgstr "Chat de IA"
 
@@ -3349,7 +3353,7 @@ msgid "audio-video"
 msgstr "áudio e vídeo"
 
 #: src/features/admin/components/audit-log-card.tsx:130
-#: src/features/layout/lib/dashboard-page-names.ts:17
+#: src/features/layout/lib/dashboard-page-names.ts:18
 #: src/routes/admin/route.tsx:34
 #: src/routes/admin/route.tsx:52
 msgid "Audit Log"
@@ -3363,7 +3367,7 @@ msgstr "Austrália"
 msgid "Austria"
 msgstr "Áustria"
 
-#: src/features/layout/lib/dashboard-page-names.ts:18
+#: src/features/layout/lib/dashboard-page-names.ts:19
 msgid "Auth"
 msgstr "Autenticação"
 
@@ -3451,7 +3455,7 @@ msgstr "Preenchimento automático ativado"
 msgid "Autocomplete while typing"
 msgstr "Preenchimento automático ao digitar"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:574
+#: src/features/settings/components/chat/trigger-settings.tsx:632
 msgid "Automate agent execution on schedules, webhooks, or events"
 msgstr "Automatize a execução de agentes com agendamentos, webhooks ou eventos"
 
@@ -3989,6 +3993,14 @@ msgstr "Bósnio"
 msgid "Bosnian (Bosnia)"
 msgstr "Bósnio (Bósnia)"
 
+#: src/features/settings/components/chat/bots-settings.tsx:76
+msgid "Bot created"
+msgstr ""
+
+#: src/features/settings/components/chat/bots-settings.tsx:100
+msgid "Bot deleted"
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:113
 msgid "Bot OAuth token from your Slack App's OAuth & Permissions page"
 msgstr "Token OAuth do bot da página OAuth & Permissions do seu app do Slack"
@@ -4000,6 +4012,10 @@ msgstr "Token do bot do @BotFather para o seu bot do Telegram"
 #: src/features/settings/components/chat/api-keys-settings.tsx:127
 msgid "Bot token from the Discord Developer Portal"
 msgstr "Token do bot do Discord Developer Portal"
+
+#: src/features/layout/lib/dashboard-page-names.ts:17
+msgid "Bots"
+msgstr ""
 
 #: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
@@ -4481,7 +4497,7 @@ msgstr "Canadá"
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:708
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:239
-#: src/features/settings/components/chat/trigger-settings.tsx:303
+#: src/features/settings/components/chat/trigger-settings.tsx:354
 #: src/features/settings/components/chat/usage-settings.tsx:569
 #: src/features/settings/components/chat/usage-settings.tsx:577
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
@@ -4791,8 +4807,9 @@ msgstr "chat"
 #: src/components/settings/settings-modal.tsx:268
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:28
 #: src/features/chat/thread/composer-search-mode.tsx:48
-#: src/features/layout/lib/dashboard-page-names.ts:19
+#: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:378
+#: src/features/settings/components/chat/bots-settings.tsx:172
 msgid "Chat"
 msgstr "Chat"
 
@@ -5721,7 +5738,7 @@ msgid "completed"
 msgstr "concluído"
 
 #: src/features/evals/components/run-status.tsx:13
-#: src/features/settings/components/chat/trigger-settings.tsx:131
+#: src/features/settings/components/chat/trigger-settings.tsx:141
 #: src/features/tasks/components/goal-form-dialog.tsx:48
 #: src/features/tasks/components/goal-list.tsx:27
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:63
@@ -5834,6 +5851,10 @@ msgstr "Perspectiva comprimida"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:50
 msgid "Compressing context..."
 msgstr "Comprimindo o contexto..."
+
+#: src/features/settings/components/chat/bots-settings.tsx:140
+msgid "Computer"
+msgstr ""
 
 #: src/features/workflow/components/nodes/branch-node.tsx:36
 msgid "Condition (JavaScript expression)"
@@ -6140,7 +6161,7 @@ msgstr "Conector desconectado. Revogue o acesso nas configurações do provedor 
 msgid "Connector: {0}"
 msgstr "Conector: {0}"
 
-#: src/features/layout/lib/dashboard-page-names.ts:20
+#: src/features/layout/lib/dashboard-page-names.ts:21
 #: src/features/settings/connectors/connectors-page.tsx:39
 msgid "Connectors"
 msgstr "Conectores"
@@ -6455,7 +6476,7 @@ msgstr "Copiado!"
 #: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/message-item.tsx:301
 #: src/features/chat/thread/text-selection-menu.tsx:384
-#: src/features/settings/components/chat/trigger-settings.tsx:622
+#: src/features/settings/components/chat/trigger-settings.tsx:680
 msgid "Copy"
 msgstr "Copiar"
 
@@ -6524,7 +6545,7 @@ msgstr "Copie o Channel secret (Basic settings) e emita um Channel access token 
 msgid "Copy the Phone number ID, a permanent (System User) access token, and the App Secret (App settings > Basic). Choose any Verify token."
 msgstr "Copie o Phone number ID, um access token permanente (System User) e o App Secret (App settings > Basic). Escolha qualquer Verify token."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:605
+#: src/features/settings/components/chat/trigger-settings.tsx:663
 msgid "Copy this secret now and store it with your webhook sender. It will not be shown again."
 msgstr ""
 
@@ -6545,7 +6566,7 @@ msgstr "Copiar para a área de transferência"
 msgid "Copy value"
 msgstr "Copiar valor"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:694
+#: src/features/settings/components/chat/trigger-settings.tsx:756
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:219
 msgid "Copy webhook URL"
 msgstr "Copiar URL do webhook"
@@ -6641,7 +6662,7 @@ msgstr ""
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:514
+#: src/features/settings/components/chat/trigger-settings.tsx:570
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr ""
 
@@ -6653,6 +6674,10 @@ msgstr "Não foi possível copiar; selecione o texto"
 msgid "Could not create a collection for this import. Try again."
 msgstr "Não foi possível criar uma coleção para esta importação. Tente novamente."
 
+#: src/features/settings/components/chat/bots-settings.tsx:78
+msgid "Could not create the bot."
+msgstr ""
+
 #: src/features/chat/group/create-group-chat-button.tsx:83
 #: src/features/chat/group/create-group-chat-button.tsx:105
 msgid "Could not create the group chat"
@@ -6661,6 +6686,10 @@ msgstr "Não foi possível criar o chat em grupo"
 #: src/features/pages/components/pages-sidebar.tsx:101
 msgid "Could not create the page"
 msgstr "Não foi possível criar a página"
+
+#: src/features/settings/components/chat/bots-settings.tsx:102
+msgid "Could not delete the bot."
+msgstr ""
 
 #: src/features/pages/components/page-comments-panel.tsx:124
 msgid "Could not delete the comment"
@@ -6794,6 +6823,10 @@ msgstr "Não foi possível enviar sua mensagem: {0}"
 #: src/features/settings/components/chat/mcp-settings.tsx:134
 msgid "Could not sign out"
 msgstr "Não foi possível sair"
+
+#: src/features/settings/components/chat/bots-settings.tsx:88
+msgid "Could not start a chat with this bot."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp-settings.tsx:94
 msgid "Could not start sign-in"
@@ -6932,6 +6965,10 @@ msgstr "Crie e gerencie chaves de API para acesso programático à sua conta."
 msgid "Create API Key"
 msgstr "Criar chave de API"
 
+#: src/features/settings/components/chat/bots-settings.tsx:150
+msgid "Create bot"
+msgstr ""
+
 #: src/components/command-palette.tsx:313
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:92
 #: src/features/chat/thread-list/thread-node.tsx:569
@@ -7043,8 +7080,8 @@ msgstr "Criar equipe"
 msgid "Create teams to organize members into groups"
 msgstr "Crie equipes para organizar os membros em grupos"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:594
-#: src/features/settings/components/chat/trigger-settings.tsx:838
+#: src/features/settings/components/chat/trigger-settings.tsx:652
+#: src/features/settings/components/chat/trigger-settings.tsx:900
 msgid "Create Trigger"
 msgstr "Criar gatilho"
 
@@ -7064,7 +7101,7 @@ msgstr "Crie seu primeiro prompt para usar como prompt de sistema nas suas conve
 msgid "Create your first skill to automate workflows. Import from GitHub, upload SKILL.md files, or install from the official catalog."
 msgstr "Crie sua primeira habilidade para automatizar fluxos de trabalho. Importe do GitHub, envie arquivos SKILL.md ou instale do catálogo oficial."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:834
+#: src/features/settings/components/chat/trigger-settings.tsx:896
 msgid "Create your first trigger to automate agent execution on a schedule, via webhooks, or from external events."
 msgstr "Crie seu primeiro gatilho para automatizar a execução de agentes em um agendamento, via webhooks ou a partir de eventos externos."
 
@@ -7190,7 +7227,7 @@ msgstr "Croata"
 msgid "Croatian (Croatia)"
 msgstr "Croata (Croácia)"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:214
+#: src/features/settings/components/chat/trigger-settings.tsx:265
 msgid "Cron Expression"
 msgstr "Expressão cron"
 
@@ -7198,7 +7235,7 @@ msgstr "Expressão cron"
 msgid "Cron expression (UTC)"
 msgstr "Expressão cron (UTC)"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:221
+#: src/features/settings/components/chat/trigger-settings.tsx:272
 msgid "Cron presets"
 msgstr "Predefinições de cron"
 
@@ -7342,7 +7379,7 @@ msgid "Customer messaging and support platform"
 msgstr "Plataforma de mensagens e suporte ao cliente"
 
 #: src/components/settings/settings-modal.tsx:251
-#: src/features/layout/lib/dashboard-page-names.ts:21
+#: src/features/layout/lib/dashboard-page-names.ts:22
 msgid "Customization"
 msgstr "Personalização"
 
@@ -7424,7 +7461,7 @@ msgstr "Custo diário (microdólares)"
 msgid "Daily Cost Trend"
 msgstr "Tendência de custo diário"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:167
+#: src/features/settings/components/chat/trigger-settings.tsx:182
 msgid "Daily inbox summary"
 msgstr "Resumo diário da caixa de entrada"
 
@@ -7462,7 +7499,7 @@ msgstr "Escurecer"
 
 #: src/features/layout/lib/dashboard-page-names.ts:13
 #: src/routes/admin/route.tsx:24
-#: src/routes/dashboard/route.tsx:55
+#: src/routes/dashboard/route.tsx:56
 msgid "Dashboard"
 msgstr "Painel"
 
@@ -7775,8 +7812,10 @@ msgstr "Delegue tarefas ao Devin, o engenheiro de software de IA"
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:696
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:829
+#: src/features/settings/components/chat/bots-settings.tsx:181
+#: src/features/settings/components/chat/bots-settings.tsx:190
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
-#: src/features/settings/components/chat/trigger-settings.tsx:889
+#: src/features/settings/components/chat/trigger-settings.tsx:951
 #: src/features/skills/components/skill-list.tsx:290
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
@@ -7788,7 +7827,7 @@ msgstr "Excluir"
 #. placeholder {0}: deletingTrigger.name
 #. placeholder {0}: selected.name
 #: src/features/knowledge/components/collection-picker.tsx:106
-#: src/features/settings/components/chat/trigger-settings.tsx:895
+#: src/features/settings/components/chat/trigger-settings.tsx:957
 #: src/features/skills/components/skill-list.tsx:296
 msgid "Delete \"{0}\"?"
 msgstr "Excluir \"{0}\"?"
@@ -7797,10 +7836,11 @@ msgstr "Excluir \"{0}\"?"
 msgid "Delete “{pendingDeleteTitle}”?"
 msgstr "Excluir “{pendingDeleteTitle}”?"
 
+#. placeholder {0}: bot.name
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
-#. placeholder {0}: skill.name
 #: src/features/local-models/components/ollama-model-manager.tsx:264
+#: src/features/settings/components/chat/bots-settings.tsx:175
 #: src/features/settings/components/chat/mcp/server-list.tsx:170
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
@@ -7812,7 +7852,9 @@ msgid "Delete {0} users"
 msgstr "Excluir {0} usuários"
 
 #. placeholder {0}: deleting.name
+#. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:341
+#: src/features/settings/components/chat/bots-settings.tsx:200
 msgid "Delete {0}?"
 msgstr "Excluir {0}?"
 
@@ -8012,11 +8054,11 @@ msgstr "Excluir conversa"
 msgid "Delete Threads"
 msgstr "Excluir conversas"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:746
+#: src/features/settings/components/chat/trigger-settings.tsx:808
 msgid "Delete trigger"
 msgstr "Excluir gatilho"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:895
+#: src/features/settings/components/chat/trigger-settings.tsx:957
 msgid "Delete trigger?"
 msgstr ""
 
@@ -8210,6 +8252,7 @@ msgstr "Descreva seu fluxo de trabalho... ex.: “Gerar uma imagem a partir de t
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:117
+#: src/features/settings/components/chat/bots-settings.tsx:117
 #: src/features/skills/components/skill-builder-diff.tsx:28
 #: src/features/skills/components/skill-builder-review.tsx:157
 #: src/features/skills/components/skill-form-dialog.tsx:255
@@ -8219,7 +8262,7 @@ msgid "Description"
 msgstr "Descrição"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:170
-#: src/features/settings/components/chat/trigger-settings.tsx:174
+#: src/features/settings/components/chat/trigger-settings.tsx:225
 msgid "Description (optional)"
 msgstr "Descrição (opcional)"
 
@@ -8345,7 +8388,7 @@ msgid "Device removed"
 msgstr "Dispositivo removido"
 
 #: src/features/devices/components/devices-settings.tsx:226
-#: src/features/layout/lib/dashboard-page-names.ts:22
+#: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "Dispositivos"
 
@@ -8410,7 +8453,7 @@ msgstr "Desativar aviso de links externos"
 msgid "Disable tool <0>{0}</0>"
 msgstr "Desativar ferramenta <0>{0}</0>"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:737
+#: src/features/settings/components/chat/trigger-settings.tsx:799
 msgid "Disable trigger"
 msgstr "Desativar gatilho"
 
@@ -8419,7 +8462,7 @@ msgid "Disable Two-Factor"
 msgstr "Desativar dois fatores"
 
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:50
-#: src/features/settings/components/chat/trigger-settings.tsx:664
+#: src/features/settings/components/chat/trigger-settings.tsx:726
 msgid "Disabled"
 msgstr "Desativado"
 
@@ -8489,7 +8532,7 @@ msgstr "Dispensar erros"
 msgid "Dismiss setup suggestions"
 msgstr "Dispensar sugestões de configuração"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:608
+#: src/features/settings/components/chat/trigger-settings.tsx:666
 msgid "Dismiss webhook secret"
 msgstr ""
 
@@ -8947,7 +8990,7 @@ msgstr "Cada código só pode ser usado uma vez. Guarde-os com segurança e trat
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Cada canal do Discord cria uma conversa separada no Neore Chat. A IA vai responder automaticamente no canal."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:879
+#: src/features/settings/components/chat/trigger-settings.tsx:941
 msgid "Each trigger creates a new thread and runs your agent with up to 25 iterations (Deep Work mode). Results are visible in your thread list."
 msgstr "Cada gatilho cria uma nova conversa e executa seu agente com até 25 iterações (modo Deep Work). Os resultados aparecem na sua lista de conversas."
 
@@ -9129,11 +9172,11 @@ msgstr "Edite regiões específicas de uma imagem com IA"
 msgid "Edit task"
 msgstr "Editar tarefa"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:731
+#: src/features/settings/components/chat/trigger-settings.tsx:793
 msgid "Edit trigger"
 msgstr "Editar gatilho"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:644
+#: src/features/settings/components/chat/trigger-settings.tsx:706
 msgid "Edit Trigger"
 msgstr "Editar gatilho"
 
@@ -9462,7 +9505,7 @@ msgstr "Ative módulos especializados para ampliar as capacidades da IA"
 msgid "Enable tool <0>{0}</0>"
 msgstr "Ativar ferramenta <0>{0}</0>"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:737
+#: src/features/settings/components/chat/trigger-settings.tsx:799
 msgid "Enable trigger"
 msgstr "Ativar gatilho"
 
@@ -9994,16 +10037,16 @@ msgstr "Avaliar"
 msgid "Evaluate JS"
 msgstr "Avaliar JS"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:125
-#: src/features/settings/components/chat/trigger-settings.tsx:342
+#: src/features/settings/components/chat/trigger-settings.tsx:135
+#: src/features/settings/components/chat/trigger-settings.tsx:393
 msgid "Event"
 msgstr "Evento"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:270
+#: src/features/settings/components/chat/trigger-settings.tsx:321
 msgid "Event triggers via MCP/Composio are coming in Phase 2. For now, use webhook triggers to connect external services."
 msgstr "Gatilhos de eventos via MCP/Composio chegam na Fase 2. Por enquanto, use gatilhos de webhook para conectar serviços externos."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:119
+#: src/features/settings/components/chat/trigger-settings.tsx:129
 msgid "Every 6 hours"
 msgstr "A cada 6 horas"
 
@@ -10011,7 +10054,7 @@ msgstr "A cada 6 horas"
 msgid "Every day at 09:00 UTC"
 msgstr "Todos os dias às 09:00 UTC"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:117
+#: src/features/settings/components/chat/trigger-settings.tsx:127
 msgid "Every day at 8 AM"
 msgstr "Todos os dias às 8h"
 
@@ -10043,11 +10086,11 @@ msgstr "Cada participante responde sozinho, sem ver os outros; um sintetizador p
 msgid "Every provider. <0>One SDK.</0>"
 msgstr "Todos os provedores. <0>Um SDK.</0>"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:256
+#: src/features/settings/components/chat/trigger-settings.tsx:307
 msgid "Every request must be signed. Send <0>X-Neore-Timestamp</0> (the current Unix time in seconds) and <1>X-Signature-256: sha256=<hex></1>, the HMAC-SHA256 of <2><timestamp>.<raw body></2> keyed with the secret. Requests more than 5 minutes old, unsigned, or replayed are rejected."
 msgstr "Toda requisição precisa ser assinada. Envie <0>X-Neore-Timestamp</0> (o horário Unix atual em segundos) e <1>X-Signature-256: sha256=<hex></1>, o HMAC-SHA256 de <2><timestamp>.<raw body></2> com o segredo como chave. Requisições com mais de 5 minutos, sem assinatura ou repetidas são rejeitadas."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:120
+#: src/features/settings/components/chat/trigger-settings.tsx:130
 msgid "Every Sunday at midnight"
 msgstr "Todo domingo à meia-noite"
 
@@ -10190,7 +10233,7 @@ msgstr "Falha na execução"
 msgid "Execution history"
 msgstr "Histórico de execuções"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:768
+#: src/features/settings/components/chat/trigger-settings.tsx:830
 msgid "Execution History"
 msgstr "Histórico de execuções"
 
@@ -10569,7 +10612,7 @@ msgstr "falhou"
 #: src/features/devices/components/devices-settings.tsx:135
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
-#: src/features/settings/components/chat/trigger-settings.tsx:132
+#: src/features/settings/components/chat/trigger-settings.tsx:142
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:41
 #: src/features/tasks/components/task-status.tsx:17
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:64
@@ -10693,7 +10736,7 @@ msgstr "Falha ao criar a predefinição"
 msgid "Failed to create tag"
 msgstr "Falha ao criar a tag"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:430
+#: src/features/settings/components/chat/trigger-settings.tsx:483
 msgid "Failed to create trigger"
 msgstr "Falha ao criar o gatilho"
 
@@ -10771,7 +10814,7 @@ msgstr "Falha ao excluir o dataset"
 msgid "Failed to delete threads"
 msgstr "Falha ao excluir as conversas"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:492
+#: src/features/settings/components/chat/trigger-settings.tsx:548
 msgid "Failed to delete trigger"
 msgstr "Falha ao excluir o gatilho"
 
@@ -11128,7 +11171,7 @@ msgstr "Falha ao iniciar a representação"
 msgid "Failed to start import"
 msgstr "Falha ao iniciar a importação"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:527
+#: src/features/settings/components/chat/trigger-settings.tsx:583
 msgid "Failed to start test run"
 msgstr "Falha ao iniciar a execução de teste"
 
@@ -11263,8 +11306,8 @@ msgstr "Falha ao atualizar a visibilidade da conversa"
 msgid "Failed to update tool permission"
 msgstr "Falha ao atualizar a permissão da ferramenta"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:458
-#: src/features/settings/components/chat/trigger-settings.tsx:473
+#: src/features/settings/components/chat/trigger-settings.tsx:514
+#: src/features/settings/components/chat/trigger-settings.tsx:529
 msgid "Failed to update trigger"
 msgstr "Falha ao atualizar o gatilho"
 
@@ -11926,7 +11969,7 @@ msgstr "O Firefox também funciona e pode fazer a mesma pergunta."
 #~ msgid "First frame / last frame"
 #~ msgstr "Primeiro quadro / último quadro"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:121
+#: src/features/settings/components/chat/trigger-settings.tsx:131
 msgid "First of each month at 9 AM"
 msgstr "Todo dia 1º do mês às 9h"
 
@@ -13366,6 +13409,10 @@ msgstr "Modo de voz mãos-livres — fale, e as respostas são lidas em voz alta
 msgid "Hands-free voice updated"
 msgstr "Voz do modo mãos-livres atualizada"
 
+#: src/features/settings/components/chat/bots-settings.tsx:168
+msgid "Has a computer"
+msgstr ""
+
 #: src/features/chat/thread/composer-image-settings.tsx:173
 msgid "HD — sharp & detailed"
 msgstr "HD — nítido e detalhado"
@@ -13662,7 +13709,7 @@ msgstr "A reprodução HLS não é compatível com este navegador."
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
 #: src/features/home/components/home-page.tsx:120
-#: src/features/layout/lib/dashboard-page-names.ts:23
+#: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
 msgstr "Início"
 
@@ -13724,7 +13771,7 @@ msgstr "Por quanto tempo os chats temporários são mantidos antes de serem excl
 msgid "How often the agent retries with the verifier's feedback before asking you to review."
 msgstr "Quantas vezes o agente tenta novamente com o feedback do verificador antes de pedir sua revisão."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:848
+#: src/features/settings/components/chat/trigger-settings.tsx:910
 msgid "How Triggers Work"
 msgstr "Como os gatilhos funcionam"
 
@@ -14353,7 +14400,7 @@ msgstr "Insira ou gere imagens"
 msgid "Input or transform text"
 msgstr "Insira ou transforme texto"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:290
+#: src/features/settings/components/chat/trigger-settings.tsx:341
 msgid "Input Template"
 msgstr "Modelo de entrada"
 
@@ -14412,6 +14459,7 @@ msgstr "Modelos instalados"
 msgid "instruct"
 msgstr "instruct"
 
+#: src/features/settings/components/chat/bots-settings.tsx:126
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
 #: src/features/skills/components/skill-builder-diff.tsx:31
 #: src/features/skills/components/skill-builder-review.tsx:166
@@ -14855,7 +14903,7 @@ msgstr "Atalhos de teclado"
 
 #: src/components/settings/settings-modal.tsx:252
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:69
-#: src/features/layout/lib/dashboard-page-names.ts:24
+#: src/features/layout/lib/dashboard-page-names.ts:25
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:181
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:76
 msgid "Keyboard Shortcuts"
@@ -14899,7 +14947,7 @@ msgstr "Base de conhecimento"
 
 #: src/components/settings/settings-modal.tsx:260
 #: src/features/chat/header/kb-attachment-button.tsx:186
-#: src/features/layout/lib/dashboard-page-names.ts:25
+#: src/features/layout/lib/dashboard-page-names.ts:26
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:287
 msgid "Knowledge Base"
 msgstr "Base de conhecimento"
@@ -15136,7 +15184,7 @@ msgstr "Atualizado pela última vez em <0>{0}</0>"
 msgid "Last used {date}"
 msgstr "Usada pela última vez em {date}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:682
+#: src/features/settings/components/chat/trigger-settings.tsx:744
 msgid "Last: {lastRunAt}"
 msgstr "Última: {lastRunAt}"
 
@@ -15390,6 +15438,10 @@ msgstr "Permitir ferramentas nas respostas"
 #: src/features/devices/components/devices-settings.tsx:225
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Permita que o agente use arquivos, um terminal e servidores MCP locais no seu próprio computador pelo aplicativo de desktop do Neore. Cada ação pede sua aprovação primeiro nesse computador, e nada é executado a partir de chats compartilhados ou tarefas em segundo plano."
+
+#: src/features/settings/components/chat/trigger-settings.tsx:211
+msgid "Let the bot use its computer"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:224
 msgid "Level"
@@ -15749,7 +15801,7 @@ msgstr "Carregando conversas"
 msgid "Loading threads..."
 msgstr "Carregando conversas..."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:563
+#: src/features/settings/components/chat/trigger-settings.tsx:621
 msgid "Loading triggers..."
 msgstr "Carregando gatilhos..."
 
@@ -15774,7 +15826,7 @@ msgstr "Carregando sua visão geral…"
 #: src/features/settings/components/chat/default-models-settings.tsx:132
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:165
-#: src/features/settings/components/chat/trigger-settings.tsx:776
+#: src/features/settings/components/chat/trigger-settings.tsx:838
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
 #: src/routes/_shortcut.tsx:40
@@ -15784,11 +15836,12 @@ msgstr "Carregando..."
 #: ../../packages/chat-ui/src/chat/message-content.tsx:316
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/pages/components/public-page-view.tsx:66
+#: src/features/settings/components/chat/bots-settings.tsx:158
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "Carregando…"
 
-#: src/features/chat/core/context/chat-context.tsx:844
+#: src/features/chat/core/context/chat-context.tsx:846
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Modelos locais aceitam apenas texto. Remova os anexos para enviar."
 
@@ -16372,7 +16425,7 @@ msgstr "Servidor MCP: {0}"
 
 #: src/components/settings/settings-modal.tsx:264
 #: src/features/chat/thread/composer-mcp-selector.tsx:140
-#: src/features/layout/lib/dashboard-page-names.ts:26
+#: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:406
 msgid "MCP Servers"
 msgstr "Servidores MCP"
@@ -16478,7 +16531,7 @@ msgstr "Função do membro atualizada com sucesso"
 #: src/components/settings/settings-modal.tsx:281
 #: src/features/auth/components/organization/organization-members-card.tsx:58
 #: src/features/auth/components/organization/organization-members-card.tsx:109
-#: src/features/layout/lib/dashboard-page-names.ts:27
+#: src/features/layout/lib/dashboard-page-names.ts:28
 msgid "Members"
 msgstr "Membros"
 
@@ -16583,7 +16636,7 @@ msgstr "As mensagens enviadas ao seu bot vão criar novas conversas com a tag \"
 msgid "messenger"
 msgstr "mensageiro"
 
-#: src/features/layout/lib/dashboard-page-names.ts:28
+#: src/features/layout/lib/dashboard-page-names.ts:29
 msgid "Messenger"
 msgstr "Mensageiros"
 
@@ -16831,6 +16884,7 @@ msgstr "Modo:"
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
+#: src/features/settings/components/chat/bots-settings.tsx:135
 #: src/features/settings/components/chat/usage-settings.tsx:316
 #: src/features/tasks/components/task-form-dialog.tsx:352
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -16891,7 +16945,7 @@ msgstr "Informações do modelo"
 msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost calculation in microdollars."
 msgstr "Preços dos modelos do models.dev, em cache no KV por 24 horas. Cálculo automático de custo em microdólares."
 
-#: src/features/layout/lib/dashboard-page-names.ts:29
+#: src/features/layout/lib/dashboard-page-names.ts:30
 #: src/features/settings/components/chat/model-filter-settings.tsx:150
 msgid "Model Restrictions"
 msgstr "Restrições de modelos"
@@ -16919,7 +16973,7 @@ msgstr "Modelo: OpenAI Whisper"
 #: src/components/settings/settings-modal.tsx:262
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
 #: src/features/evals/components/dataset-panel.tsx:132
-#: src/features/layout/lib/dashboard-page-names.ts:30
+#: src/features/layout/lib/dashboard-page-names.ts:31
 #: src/features/marketing/components/landing-footer.tsx:111
 #: src/features/marketing/components/landing-footer.tsx:157
 #: src/features/marketing/components/landing-page.tsx:597
@@ -17344,11 +17398,12 @@ msgstr "Birmanês (Mianmar)"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
+#: src/features/settings/components/chat/bots-settings.tsx:113
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:154
-#: src/features/settings/components/chat/trigger-settings.tsx:162
+#: src/features/settings/components/chat/trigger-settings.tsx:177
 #: src/features/settings/components/chat/usage-settings.tsx:429
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
@@ -17647,6 +17702,10 @@ msgstr "Novo"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "Novos Azure Bots são single-tenant: defina a chave Tenant ID do Teams, senão as respostas não conseguem se autenticar."
 
+#: src/features/settings/components/chat/bots-settings.tsx:111
+msgid "New bot"
+msgstr ""
+
 #: src/features/chat/thread/fork-branch-dialog.tsx:43
 msgid "New Branch"
 msgstr "Nova ramificação"
@@ -17766,7 +17825,7 @@ msgstr "Nova conversa"
 msgid "New Thread"
 msgstr "Nova conversa"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:578
+#: src/features/settings/components/chat/trigger-settings.tsx:636
 msgid "New Trigger"
 msgstr "Novo gatilho"
 
@@ -17930,6 +17989,14 @@ msgstr "Nenhum anexo"
 msgid "No audit logs found"
 msgstr "Nenhum log de auditoria encontrado"
 
+#: src/features/settings/components/chat/trigger-settings.tsx:199
+msgid "No bot"
+msgstr ""
+
+#: src/features/settings/components/chat/bots-settings.tsx:161
+msgid "No bots yet."
+msgstr ""
+
 #: src/features/settings/components/chat/usage-settings.tsx:666
 msgid "No budget alerts configured."
 msgstr "Nenhum alerta de orçamento configurado."
@@ -18041,7 +18108,7 @@ msgstr "Não há diferenças disponíveis para esta versão"
 msgid "No enabled MCP servers."
 msgstr "Nenhum servidor MCP ativado."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:818
+#: src/features/settings/components/chat/trigger-settings.tsx:880
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:236
 msgid "No executions yet"
 msgstr "Nenhuma execução ainda"
@@ -18412,7 +18479,7 @@ msgstr "Nenhuma ferramenta compartilhada ainda"
 msgid "No tools."
 msgstr "Nenhuma ferramenta."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:832
+#: src/features/settings/components/chat/trigger-settings.tsx:894
 msgid "No triggers yet"
 msgstr "Nenhum gatilho ainda"
 
@@ -19563,7 +19630,7 @@ msgstr "Laranja"
 #: src/components/settings/settings-modal.tsx:280
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
-#: src/features/layout/lib/dashboard-page-names.ts:31
+#: src/features/layout/lib/dashboard-page-names.ts:32
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:129
 msgid "Organization"
@@ -19623,7 +19690,7 @@ msgstr "Slug da organização atualizado com sucesso"
 
 #: src/components/settings/settings-modal.tsx:275
 #: src/features/auth/components/organization/organizations-card.tsx:42
-#: src/features/layout/lib/dashboard-page-names.ts:32
+#: src/features/layout/lib/dashboard-page-names.ts:33
 msgid "Organizations"
 msgstr "Organizações"
 
@@ -20099,7 +20166,7 @@ msgstr "Executável PE"
 msgid "Pen"
 msgstr "Caneta"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:133
+#: src/features/settings/components/chat/trigger-settings.tsx:143
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:59
 #: src/features/workflow/components/canvas/workflow-controls.tsx:53
 msgid "Pending"
@@ -20188,7 +20255,7 @@ msgid "Personal information is now visible"
 msgstr "Suas informações pessoais agora estão visíveis"
 
 #: src/components/settings/settings-modal.tsx:258
-#: src/features/layout/lib/dashboard-page-names.ts:33
+#: src/features/layout/lib/dashboard-page-names.ts:34
 msgid "Personalization"
 msgstr "Personalização"
 
@@ -20893,7 +20960,7 @@ msgid "Priority support"
 msgstr "Suporte prioritário"
 
 #: src/components/settings/settings-modal.tsx:289
-#: src/features/layout/lib/dashboard-page-names.ts:34
+#: src/features/layout/lib/dashboard-page-names.ts:35
 #: src/features/marketing/components/gateway-footer.tsx:18
 #: src/features/marketing/components/gateway-footer.tsx:139
 #: src/features/marketing/components/landing-footer.tsx:102
@@ -20904,7 +20971,7 @@ msgid "Privacy"
 msgstr "Privacidade"
 
 #: src/components/settings/settings-modal.tsx:288
-#: src/features/layout/lib/dashboard-page-names.ts:35
+#: src/features/layout/lib/dashboard-page-names.ts:36
 #: src/routes/dashboard/settings/privacy.tsx:16
 msgid "Privacy & Data"
 msgstr "Privacidade e dados"
@@ -22436,7 +22503,7 @@ msgstr "Respostas, tokens e gastos por habilidade ou agente no período selecion
 msgid "Reply"
 msgstr "Responder"
 
-#: src/features/chat/core/context/chat-context.tsx:763
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "Reply ready"
 msgstr "Resposta pronta"
 
@@ -22973,6 +23040,10 @@ msgstr "Execute uma habilidade, ou um modelo com um prompt de sistema, em cada c
 msgid "Run again"
 msgstr "Executar novamente"
 
+#: src/features/settings/components/chat/trigger-settings.tsx:190
+msgid "Run as bot (optional)"
+msgstr ""
+
 #: src/features/marketing/components/tutorials-page.tsx:103
 msgid "Run code in a sandboxed environment with shell access, file operations, and persistent sessions."
 msgstr "Execute código em um ambiente isolado com acesso ao shell, operações de arquivos e sessões persistentes."
@@ -23041,7 +23112,7 @@ msgstr "Execute seu fluxo de trabalho para ver o histórico de execuções aqui.
 #: src/features/home/components/home-page.tsx:176
 #: src/features/home/components/home-page.tsx:184
 #: src/features/home/components/home-page.tsx:192
-#: src/features/settings/components/chat/trigger-settings.tsx:134
+#: src/features/settings/components/chat/trigger-settings.tsx:144
 #: src/features/tasks/components/task-detail-dialog.tsx:136
 #: src/features/tasks/components/task-status.tsx:20
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:66
@@ -23082,7 +23153,7 @@ msgstr "Execuções de {0}"
 msgid "Runs on Cloudflare Workers — sub-50ms cold starts, 300+ edge locations worldwide."
 msgstr "Roda no Cloudflare Workers — inicialização a frio abaixo de 50ms, mais de 300 locais de borda no mundo todo."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:678
+#: src/features/settings/components/chat/trigger-settings.tsx:740
 msgid "Runs: {runCount}"
 msgstr "Execuções: {runCount}"
 
@@ -23321,8 +23392,8 @@ msgstr "Verificando..."
 msgid "Scene Description"
 msgstr "Descrição da cena"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:126
-#: src/features/settings/components/chat/trigger-settings.tsx:350
+#: src/features/settings/components/chat/trigger-settings.tsx:136
+#: src/features/settings/components/chat/trigger-settings.tsx:401
 msgid "Schedule"
 msgstr "Agendamento"
 
@@ -23337,6 +23408,10 @@ msgstr "Limpeza agendada"
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:342
 msgid "Scheduled job"
 msgstr "Tarefa agendada"
+
+#: src/features/settings/components/chat/trigger-settings.tsx:213
+msgid "Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings."
+msgstr ""
 
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:143
 msgid "Scheduler"
@@ -23618,7 +23693,7 @@ msgid "Secret access key"
 msgstr "Chave de acesso secreta"
 
 #: src/components/settings/settings-modal.tsx:273
-#: src/features/layout/lib/dashboard-page-names.ts:36
+#: src/features/layout/lib/dashboard-page-names.ts:37
 msgid "Security"
 msgstr "Segurança"
 
@@ -24028,7 +24103,7 @@ msgstr "Defina a direção do texto no aplicativo. RTL é usado em idiomas como 
 msgid "Set up a local model server"
 msgstr "Configurar um servidor de modelos local"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:157
+#: src/features/settings/components/chat/trigger-settings.tsx:172
 msgid "Set up a new automated agent execution"
 msgstr "Configure uma nova execução automática de agente"
 
@@ -24039,7 +24114,7 @@ msgstr "Configure gatilhos para automatizar tarefas por agendamento, via webhook
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:255
 #: src/components/settings/settings-modal.tsx:394
 #: src/components/settings/settings-modal.tsx:492
-#: src/features/layout/lib/dashboard-page-names.ts:37
+#: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
 msgstr "Configurações"
 
@@ -25862,11 +25937,11 @@ msgstr "Resuma um documento ou URL..."
 msgid "Summarize any webpage in seconds"
 msgstr "Resuma qualquer página da web em segundos"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:179
+#: src/features/settings/components/chat/trigger-settings.tsx:230
 msgid "Summarize my email inbox every morning"
 msgstr "Resumir minha caixa de entrada de e-mail todas as manhãs"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:294
+#: src/features/settings/components/chat/trigger-settings.tsx:345
 msgid "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 msgstr "Resuma minha caixa de entrada e destaque os itens urgentes. Use {PAYLOAD_TOKEN} para os dados do webhook."
 
@@ -26049,7 +26124,7 @@ msgstr "Prompt de sistema"
 #~ msgid "System Prompt"
 #~ msgstr "Prompt do sistema"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:279
+#: src/features/settings/components/chat/trigger-settings.tsx:330
 #: src/features/workflow/components/nodes/ai-node.tsx:44
 msgid "System Prompt (optional)"
 msgstr "Prompt de sistema (opcional)"
@@ -26259,7 +26334,7 @@ msgstr "Configurações da equipe atualizadas com sucesso"
 #: src/components/organization-switcher.tsx:64
 #: src/features/auth/components/team/teams-card.tsx:42
 #: src/features/auth/components/team/teams-card.tsx:60
-#: src/features/layout/lib/dashboard-page-names.ts:38
+#: src/features/layout/lib/dashboard-page-names.ts:39
 msgid "Teams"
 msgstr "Equipes"
 
@@ -26409,11 +26484,11 @@ msgstr "Teste pronto em um chat temporário. Ele será excluído automaticamente
 msgid "Test drive: {0}"
 msgstr "Teste: {0}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:524
+#: src/features/settings/components/chat/trigger-settings.tsx:580
 msgid "Test run scheduled — check your threads for the result"
 msgstr "Execução de teste agendada — confira suas conversas para ver o resultado"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:715
+#: src/features/settings/components/chat/trigger-settings.tsx:777
 msgid "Test run trigger"
 msgstr "Executar gatilho de teste"
 
@@ -26619,6 +26694,14 @@ msgstr "O arquivo compactado contém arquivos demais."
 #: src/features/chat/thread/ask-user-prompt.tsx:141
 msgid "The assistant has a question"
 msgstr "O assistente tem uma pergunta"
+
+#: src/features/settings/components/chat/bots-settings.tsx:191
+msgid "The bot and its computer are removed. Its chats stay, as plain chats."
+msgstr ""
+
+#: src/features/chat/thread/composer-model-selector.tsx:85
+msgid "The bot sets the model for this chat."
+msgstr ""
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
@@ -26909,7 +26992,7 @@ msgstr "O orçamento de tokens deve ser um número inteiro de tokens."
 msgid "The Token you entered in the server configuration"
 msgstr "O Token que você informou na configuração do servidor"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:890
+#: src/features/settings/components/chat/trigger-settings.tsx:952
 msgid "The trigger stops running and its execution history is removed. This cannot be undone."
 msgstr ""
 
@@ -27410,7 +27493,7 @@ msgid "Thought for a few seconds"
 msgstr "Pensou por alguns segundos"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:298
-#: src/features/settings/components/chat/trigger-settings.tsx:811
+#: src/features/settings/components/chat/trigger-settings.tsx:873
 msgid "Thread"
 msgstr "Conversa"
 
@@ -27525,7 +27608,7 @@ msgid "Timestamps enabled"
 msgstr "Data e hora ativadas"
 
 #: src/features/settings/components/account/account-settings.tsx:354
-#: src/features/settings/components/chat/trigger-settings.tsx:235
+#: src/features/settings/components/chat/trigger-settings.tsx:286
 msgid "Timezone"
 msgstr "Fuso horário"
 
@@ -27903,23 +27986,23 @@ msgstr "Triângulo"
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "Dispara uma notificação ou um bloqueio quando uma métrica de uso excede um limite"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:432
+#: src/features/settings/components/chat/trigger-settings.tsx:485
 msgid "Trigger created"
 msgstr "Gatilho criado"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:494
+#: src/features/settings/components/chat/trigger-settings.tsx:550
 msgid "Trigger deleted"
 msgstr "Gatilho excluído"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:475
+#: src/features/settings/components/chat/trigger-settings.tsx:531
 msgid "Trigger disabled"
 msgstr "Gatilho desativado"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:475
+#: src/features/settings/components/chat/trigger-settings.tsx:531
 msgid "Trigger enabled"
 msgstr "Gatilho ativado"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:413
+#: src/features/settings/components/chat/trigger-settings.tsx:464
 msgid "Trigger name is required"
 msgstr "O nome do gatilho é obrigatório"
 
@@ -27931,20 +28014,20 @@ msgstr "A execução do gatilho falhou"
 msgid "Trigger run finished"
 msgstr "Execução do gatilho concluída"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:189
+#: src/features/settings/components/chat/trigger-settings.tsx:240
 msgid "Trigger type"
 msgstr "Tipo de gatilho"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:188
+#: src/features/settings/components/chat/trigger-settings.tsx:239
 msgid "Trigger Type"
 msgstr "Tipo de gatilho"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:460
+#: src/features/settings/components/chat/trigger-settings.tsx:516
 msgid "Trigger updated"
 msgstr "Gatilho atualizado"
 
-#: src/features/layout/lib/dashboard-page-names.ts:39
-#: src/features/settings/components/chat/trigger-settings.tsx:573
+#: src/features/layout/lib/dashboard-page-names.ts:40
+#: src/features/settings/components/chat/trigger-settings.tsx:631
 msgid "Triggers"
 msgstr "Gatilhos"
 
@@ -28782,7 +28865,7 @@ msgid "US"
 msgstr "EUA"
 
 #: src/features/chat/sidebar/usage-card.tsx:117
-#: src/features/layout/lib/dashboard-page-names.ts:40
+#: src/features/layout/lib/dashboard-page-names.ts:41
 msgid "Usage"
 msgstr "Uso"
 
@@ -29027,7 +29110,7 @@ msgstr "O nome de usuário ou e-mail é obrigatório"
 msgid "Username: @{platformUsername}"
 msgstr "Nome de usuário: @{platformUsername}"
 
-#: src/features/layout/lib/dashboard-page-names.ts:41
+#: src/features/layout/lib/dashboard-page-names.ts:42
 #: src/routes/admin/route.tsx:29
 #: src/routes/admin/route.tsx:57
 msgid "Users"
@@ -29786,7 +29869,7 @@ msgstr "Aguarda: {0}"
 msgid "Want to continue from here?"
 msgstr "Quer continuar daqui?"
 
-#: src/features/chat/core/context/chat-context.tsx:804
+#: src/features/chat/core/context/chat-context.tsx:806
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Não conseguimos confirmar sua sessão a tempo. Sua mensagem continua no campo de texto. Tente enviá-la novamente."
 
@@ -29839,8 +29922,8 @@ msgstr "Integração com pesquisa na web para temas atuais"
 msgid "Web search via Parallel's search API"
 msgstr "Pesquisa na web pela API de pesquisa da Parallel"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:127
-#: src/features/settings/components/chat/trigger-settings.tsx:358
+#: src/features/settings/components/chat/trigger-settings.tsx:137
+#: src/features/settings/components/chat/trigger-settings.tsx:409
 msgid "Webhook"
 msgstr "Webhook"
 
@@ -29848,11 +29931,11 @@ msgstr "Webhook"
 msgid "Webhook notifications"
 msgstr "Notificações por webhook"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:603
+#: src/features/settings/components/chat/trigger-settings.tsx:661
 msgid "Webhook secret"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:512
+#: src/features/settings/components/chat/trigger-settings.tsx:568
 msgid "Webhook secret copied to clipboard"
 msgstr "Segredo do webhook copiado para a área de transferência"
 
@@ -29864,7 +29947,7 @@ msgstr "Webhook secret para verificar as atualizações recebidas do Telegram"
 msgid "Webhook URL"
 msgstr "URL do webhook"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:554
+#: src/features/settings/components/chat/trigger-settings.tsx:612
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:132
 msgid "Webhook URL copied to clipboard"
 msgstr "URL do webhook copiada para a área de transferência"
@@ -29905,7 +29988,7 @@ msgstr "Token do WeChat"
 msgid "Weekdays at 09:00 UTC"
 msgstr "Dias úteis às 09:00 UTC"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:118
+#: src/features/settings/components/chat/trigger-settings.tsx:128
 msgid "Weekdays at 8 AM"
 msgstr "Dias úteis às 8h"
 
@@ -30362,7 +30445,7 @@ msgstr "Você"
 msgid "You (another tab)"
 msgstr "Você (outra aba)"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:283
+#: src/features/settings/components/chat/trigger-settings.tsx:334
 msgid "You are a helpful assistant that summarizes emails..."
 msgstr "Você é um assistente prestativo que resume e-mails..."
 
@@ -30528,7 +30611,7 @@ msgstr "Seu espaço de trabalho de IA <0>começa aqui.</0>"
 msgid "Your answer"
 msgstr "Sua resposta"
 
-#: src/features/chat/core/context/chat-context.tsx:763
+#: src/features/chat/core/context/chat-context.tsx:765
 msgid "Your answer in Neore has finished."
 msgstr "Sua resposta no Neore foi concluída."
 
@@ -30547,6 +30630,10 @@ msgstr "Seu recurso do Azure OpenAI: ponto de extremidade, versão da API e nome
 #: src/features/settings/components/personalization/personalization-settings.tsx:190
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "Sua formação, preferências ou localização, para ajudar a IA a entender você melhor"
+
+#: src/features/settings/components/chat/bots-settings.tsx:155
+msgid "Your bots"
+msgstr ""
 
 #: src/features/local-models/lib/local-errors.ts:178
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
@@ -30623,7 +30710,7 @@ msgstr "Seu servidor local respondeu, mas recusou este site (CORS). Permita a or
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Sua localização (ex.: \"São Paulo, Brasil\", \"Berlim, Alemanha\")."
 
-#: src/features/chat/core/context/chat-context.tsx:993
+#: src/features/chat/core/context/chat-context.tsx:995
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Sua mensagem contém conteúdo impróprio e não pode ser enviada."
 

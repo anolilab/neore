@@ -55,6 +55,7 @@ import { eraseSystemPromptPresetsForUser } from "../../system-prompts/gdpr";
 import { eraseWorkflowVersionsAndPresenceForProject, eraseWorkflowVersionsAndPresenceForUser } from "../../workflow/gdpr";
 import { eraseSkillRatingRows } from "../../skills/gdpr";
 import { eraseKnowledgeForUser, eraseProjectKnowledgeForProject } from "../../knowledge/gdpr";
+import { eraseBotsForUser } from "../../bots/gdpr";
 import { eraseTriggersForUser } from "../../triggers/gdpr";
 import { eraseSandboxSessionsForUser } from "../../sandbox/gdpr";
 import { eraseMessengerConnectionsForUser } from "../../messenger/gdpr";
@@ -279,6 +280,7 @@ export const deleteUserIntegrations = internalMutation
         const connections = await eraseMessengerConnectionsForUser(context, userId);
         const fileGrants = await eraseChatFileAccessForUser(context, userId);
         const triggers = await eraseTriggersForUser(context, userId);
+        const bots = await eraseBotsForUser(context, userId);
         const sessions = await eraseSandboxSessionsForUser(context, userId);
 
         return {
@@ -289,6 +291,7 @@ export const deleteUserIntegrations = internalMutation
                 connections.hasMore ||
                 fileGrants.hasMore ||
                 triggers.hasMore ||
+                bots.hasMore ||
                 sessions.hasMore,
         };
     });

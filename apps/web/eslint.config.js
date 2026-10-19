@@ -20,6 +20,9 @@ export default createConfig(
             // every finding in them is `unicorn/no-abusive-eslint-disable` on a
             // blanket disable the generator writes.
             "./src/locales/**",
+            // Written by the TanStack Router generator. Its blanket
+            // `eslint-disable` header and its formatting are not ours to fix.
+            "./src/routeTree.gen.ts",
             // ...globs
         ],
         typescript: {
@@ -640,13 +643,12 @@ export default createConfig(
     },
     {
         /**
-         * Regenerated files that ship a blanket `/* eslint-disable *\/` header:
-         * `routeTree.gen.ts` from TanStack Router, `worker-configuration.d.ts`
-         * from wrangler. Editing either is undone by the next codegen. Under
-         * that header wrangler's own inline `// eslint-disable-line` comments
-         * report as unused, which is theirs to emit, not ours to fix.
+         * `worker-configuration.d.ts` from wrangler ships a blanket
+         * `/* eslint-disable *\/` header. Editing it is undone by the next
+         * codegen. Under that header wrangler's own inline `// eslint-disable-line`
+         * comments report as unused, which is theirs to emit, not ours to fix.
          */
-        files: ["**/routeTree.gen.ts", "**/worker-configuration.d.ts"],
+        files: ["**/worker-configuration.d.ts"],
         linterOptions: {
             reportUnusedDisableDirectives: "off",
         },
