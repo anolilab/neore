@@ -635,6 +635,7 @@ export interface ApiTypes {
         };
         io: {
             exportSkill: FunctionReference<"action", { skillId: Id<"skills"> }, { files: Array<{ content: string; encoding: "utf8" | "base64"; path: string }>; markdown: string; slug: string }>;
+            fetchSkillFromUrl: FunctionReference<"action", { url: string }, { filename: string; markdown: string; sourceUrl: string }>;
             importSkill: FunctionReference<"action", { filename?: string; files?: Array<{ content: string; encoding: "utf8" | "base64"; path: string }>; markdown: string; visibility?: "private" | "organization" }, { skillId: Id<"skills">; slug: string; warnings: Array<string> }>;
         };
         marketplace: {
@@ -1392,6 +1393,7 @@ export const api: ApiTypes = {
         },
         io: {
             exportSkill: { __lunoraRef: "skills_io:exportSkill" },
+            fetchSkillFromUrl: { __lunoraRef: "skills_io:fetchSkillFromUrl" },
             importSkill: { __lunoraRef: "skills_io:importSkill" },
         },
         marketplace: {

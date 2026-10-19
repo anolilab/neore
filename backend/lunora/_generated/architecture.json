@@ -13676,6 +13676,13 @@
       "module": "skills"
     },
     {
+      "detail": "action",
+      "id": "function:skills_io:fetchSkillFromUrl",
+      "kind": "function",
+      "name": "skills.io.fetchSkillFromUrl",
+      "module": "skills"
+    },
+    {
       "detail": "query",
       "id": "function:skills_io:findFreeSkillSlug",
       "kind": "function",
@@ -17868,13 +17875,13 @@
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 249,
+      "line": 278,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 280,
+      "line": 309,
       "reason": "the default export is not a registered function"
     },
     {

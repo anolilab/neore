@@ -27,9 +27,12 @@ import {
     SKILL_IMPORT_LIMITS,
     type SkillFileData,
     skillFileBytes,
+    SKILL_MARKDOWN_FILE,
     skillToMarkdown,
     validateSkillFiles,
 } from "./markdown";
+import { fetchSkillMarkdown, SkillSourceError } from "./registry-fetch";
+import { resolveSkillSourceUrls } from "./source-url";
 import { MAX_LENGTH } from "../lib/validators";
 import { withDependency } from "../lib/dependency";
 
@@ -142,6 +145,49 @@ export const listSkillFilesInternal = internalQuery
         return files.map((file) => {
             return { name: file.name, sizeBytes: file.sizeBytes, storageId: file.storageId };
         });
+    });
+
+/**
+ * Reads a SKILL.md from a pasted GitHub or skills.sh link, for the import dialog to
+ * preview and then pass to `importSkill`, which parses it again. Fetch only: nothing
+ * is created here, and only the SKILL.md is read, never a script or other file.
+ *
+ * The pasted link is never requested. `source-url.ts` reduces it to an owner, a
+ * repository and a path and builds the request on `raw.githubusercontent.com`;
+ * `registry-fetch.ts` bounds the answer (deadline, no redirects, size cap).
+ */
+export const fetchSkillFromUrl = authAction
+    .use(rateLimit("skills/create"))
+    .input({ url: v.string().max(MAX_LENGTH.url) })
+    .output(v.object({ filename: v.string(), markdown: v.string(), sourceUrl: v.string() }))
+    .action(async ({ args, ctx }) => {
+        const resolved = resolveSkillSourceUrls(args.url);
+
+        if (!resolved.ok) {
+            throw new LunoraError("BAD_REQUEST", resolved.error);
+        }
+
+        let found: Awaited<ReturnType<typeof fetchSkillMarkdown>>;
+
+        try {
+            found = await fetchSkillMarkdown(resolved.urls);
+        } catch (error) {
+            throw error instanceof SkillSourceError ? new LunoraError("BAD_REQUEST", error.message) : error;
+        }
+
+        if (!found) {
+            throw new LunoraError("NOT_FOUND", "No SKILL.md was found at that link.");
+        }
+
+        const parsed = parseSkillMarkdown(found.markdown);
+
+        if (!parsed.ok) {
+            throw new LunoraError("BAD_REQUEST", parsed.errors.join("; "));
+        }
+
+        ctx.log.event("skills.fetch_from_url", { bytes: found.markdown.length });
+
+        return { filename: SKILL_MARKDOWN_FILE, markdown: found.markdown, sourceUrl: found.url };
     });
 
 /**

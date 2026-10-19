@@ -86,6 +86,15 @@ Disabled skills remain saved but have no effect on conversations.
 - **Sort**: Recent, alphabetical, most used, or by creation date
 - **Categories**: Filter by category (research, coding, writing, etc.)
 
+### Import a Skill
+
+**Import skill** accepts a `SKILL.md`, a skill `.zip` (with `references/`, `scripts/` and `assets/`), pasted markdown, or a link:
+
+- **From a link**: paste a GitHub link to a skill folder or its `SKILL.md` (`github.com/owner/repo/tree/main/skills/my-skill`, a `blob` link or a `raw.githubusercontent.com` link), or a skills.sh link (`skills.sh/owner/repo/skill`). The server reads the `SKILL.md` and puts it in the box for the usual preview; nothing is created until you press **Import**.
+- Only the `SKILL.md` comes from a link. Scripts, references and assets in the skill are not fetched; import the `.zip` if you need them.
+- A skills.sh link is turned into a GitHub path by trying the usual repository layouts (`skills/<name>/`, `<name>/`, `.claude/skills/<name>/`) on the default branch. If the skill lives elsewhere, paste its GitHub link instead.
+- Only public GitHub repositories are read, only over `https`, redirects are not followed, and a `SKILL.md` over 64 KB is refused. The text is untrusted: it is parsed and checked again on import, and tools the app does not have are dropped with a warning.
+
 ## Skill Limits
 
 | Plan | Skills |

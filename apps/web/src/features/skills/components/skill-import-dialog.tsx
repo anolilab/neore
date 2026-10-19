@@ -4,12 +4,13 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import { parseSkillMarkdown, validateSkillFiles } from "@neore/backend/skills/markdown";
 import { Button } from "@neore/ui/components/button";
+import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
 import { FileUpIcon, Loader2Icon } from "lucide-react";
-import type { ChangeEvent, FC } from "react";
+import type { ChangeEvent, FC, KeyboardEvent } from "react";
 import { useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -46,7 +47,10 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
     const [readError, setReadError] = useState<string | null>(null);
     const fileInput = useRef<HTMLInputElement>(null);
     const markdownId = useId();
+    const linkId = useId();
+    const [link, setLink] = useState("");
     const { isPending, mutateAsync: importSkill } = useMutation(useLunoraActionOptions(api.skills.io.importSkill));
+    const { isPending: isFetching, mutateAsync: fetchSkill } = useMutation(useLunoraActionOptions(api.skills.io.fetchSkillFromUrl));
 
     const preview = useMemo(() => {
         if (!upload.markdown.trim()) {
@@ -77,6 +81,27 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
         }
     };
 
+    // The server reads the SKILL.md (GitHub links only); it lands in the box below for the same preview and checks as pasted text.
+    const handleFetchLink = async () => {
+        try {
+            const fetched = await fetchSkill({ url: link });
+
+            setUpload({ filename: fetched.filename, files: [], markdown: fetched.markdown });
+            setReadError(null);
+        } catch (error) {
+            setReadError(error instanceof Error && error.message ? error.message : t`That link could not be read.`);
+        }
+    };
+
+    const handleLinkKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key !== "Enter" || !link.trim() || isFetching) {
+            return;
+        }
+
+        event.preventDefault();
+        handleFetchLink();
+    };
+
     const handleImport = async () => {
         try {
             const result = await importSkill({ filename: upload.filename, files: upload.files, markdown: upload.markdown });
@@ -97,7 +122,7 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
         <>
             <DialogHeader>
                 <DialogTitle>{t`Import skill`}</DialogTitle>
-                <DialogDescription>{t`Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown.`}</DialogDescription>
+                <DialogDescription>{t`Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), paste the markdown, or fetch it from a link.`}</DialogDescription>
             </DialogHeader>
             <DialogPanel className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -115,6 +140,27 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                         tabIndex={-1}
                         type="file"
                     />
+                </div>
+                <div className="space-y-1.5">
+                    <Label htmlFor={linkId}>{t`Or fetch from a link`}</Label>
+                    <div className="flex gap-2">
+                        <Input
+                            id={linkId}
+                            inputMode="url"
+                            onChange={(event) => setLink(event.target.value)}
+                            onKeyDown={handleLinkKeyDown}
+                            placeholder="https://github.com/owner/repo/tree/main/skills/my-skill"
+                            type="url"
+                            value={link}
+                        />
+                        <Button disabled={!link.trim() || isFetching} onClick={handleFetchLink} type="button" variant="outline">
+                            {isFetching && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
+                            {t`Fetch`}
+                        </Button>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                        {t`A GitHub link to a skill folder or its SKILL.md, or a skills.sh link. Only the SKILL.md is imported; scripts and other files in the skill are not.`}
+                    </p>
                 </div>
                 <div className="space-y-1.5">
                     <Label htmlFor={markdownId}>{t`SKILL.md`}</Label>

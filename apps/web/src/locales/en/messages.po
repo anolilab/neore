@@ -335,7 +335,7 @@ msgid "{0} (shared)"
 msgstr "{0} (shared)"
 
 #. placeholder {0}: upload.files.length
-#: src/features/skills/components/skill-import-dialog.tsx:145
+#: src/features/skills/components/skill-import-dialog.tsx:191
 msgid "{0} additional file(s)"
 msgstr "{0} additional file(s)"
 
@@ -1369,6 +1369,10 @@ msgstr "A document editor that thinks with you."
 #: src/features/skills/components/skill-builder-dialog.tsx:228
 msgid "A few questions first"
 msgstr "A few questions first"
+
+#: src/features/skills/components/skill-import-dialog.tsx:162
+msgid "A GitHub link to a skill folder or its SKILL.md, or a skills.sh link. Only the SKILL.md is imported; scripts and other files in the skill are not."
+msgstr "A GitHub link to a skill folder or its SKILL.md, or a skills.sh link. Only the SKILL.md is imported; scripts and other files in the skill are not."
 
 #: src/features/tasks/components/goal-form-dialog.tsx:74
 msgid "A goal groups tasks. Its progress follows from how many of them are done."
@@ -4563,7 +4567,7 @@ msgstr "Canada"
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
-#: src/features/skills/components/skill-import-dialog.tsx:157
+#: src/features/skills/components/skill-import-dialog.tsx:203
 #: src/features/slides/components/slide-editor-dialog.tsx:113
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
@@ -5027,7 +5031,7 @@ msgstr "Chinese (Simplified)"
 msgid "Chinese (Traditional)"
 msgstr "Chinese (Traditional)"
 
-#: src/features/skills/components/skill-import-dialog.tsx:106
+#: src/features/skills/components/skill-import-dialog.tsx:131
 msgid "Choose .md or .zip"
 msgstr "Choose .md or .zip"
 
@@ -11896,6 +11900,10 @@ msgstr "Feishu Encrypt Key"
 msgid "Feishu Verification Token"
 msgstr "Feishu Verification Token"
 
+#: src/features/skills/components/skill-import-dialog.tsx:158
+msgid "Fetch"
+msgstr "Fetch"
+
 #: src/features/settings/components/chat/custom-providers-settings.tsx:572
 #: src/features/settings/components/chat/native-providers-settings.tsx:646
 msgid "Fetch models"
@@ -14260,7 +14268,7 @@ msgstr "Impersonation Stopped"
 
 #: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
-#: src/features/skills/components/skill-import-dialog.tsx:161
+#: src/features/skills/components/skill-import-dialog.tsx:207
 #: src/features/skills/components/skill-list.tsx:331
 msgid "Import"
 msgstr "Import"
@@ -14314,7 +14322,7 @@ msgstr "Import Notion export (.zip)"
 msgid "Import one kind of export at a time."
 msgstr "Import one kind of export at a time."
 
-#: src/features/skills/components/skill-import-dialog.tsx:99
+#: src/features/skills/components/skill-import-dialog.tsx:124
 msgid "Import skill"
 msgstr "Import skill"
 
@@ -14356,7 +14364,7 @@ msgid "Imported {added} Notion page(s)."
 msgstr "Imported {added} Notion page(s)."
 
 #. placeholder {0}: result.slug
-#: src/features/skills/components/skill-import-dialog.tsx:88
+#: src/features/skills/components/skill-import-dialog.tsx:113
 msgid "Imported skill \"{0}\""
 msgstr "Imported skill \"{0}\""
 
@@ -19939,6 +19947,10 @@ msgstr "Or connect a Text node to provide the prompt"
 msgid "or continue with"
 msgstr "or continue with"
 
+#: src/features/skills/components/skill-import-dialog.tsx:145
+msgid "Or fetch from a link"
+msgstr "Or fetch from a link"
+
 #: src/features/local-models/components/local-setup-guide.tsx:138
 msgid "Or from a terminal:"
 msgstr "Or from a terminal:"
@@ -25013,7 +25025,7 @@ msgstr "Skill updated"
 msgid "Skill: {skillName}"
 msgstr "Skill: {skillName}"
 
-#: src/features/skills/components/skill-import-dialog.tsx:120
+#: src/features/skills/components/skill-import-dialog.tsx:166
 msgid "SKILL.md"
 msgstr "SKILL.md"
 
@@ -27098,6 +27110,10 @@ msgstr "Thailand"
 msgid "Thanks for rating"
 msgstr "Thanks for rating"
 
+#: src/features/skills/components/skill-import-dialog.tsx:92
+msgid "That link could not be read."
+msgstr "That link could not be read."
+
 #: src/features/chat/thread/message-list.tsx:366
 msgid "That message could not be found in this conversation."
 msgstr "That message could not be found in this conversation."
@@ -27229,7 +27245,7 @@ msgstr "The extension could not be connected."
 msgid "The extension will be able to read and send chats as {0}. You can disconnect it at any time by signing out in the extension or ending its session in your account settings."
 msgstr "The extension will be able to read and send chats as {0}. You can disconnect it at any time by signing out in the extension or ending its session in your account settings."
 
-#: src/features/skills/components/skill-import-dialog.tsx:76
+#: src/features/skills/components/skill-import-dialog.tsx:80
 msgid "The file is larger than {megabytes} MB."
 msgstr "The file is larger than {megabytes} MB."
 
@@ -27416,7 +27432,7 @@ msgstr "The right model, every time."
 msgid "The server lists no models yet — pull or load one first"
 msgstr "The server lists no models yet — pull or load one first"
 
-#: src/features/skills/components/skill-import-dialog.tsx:92
+#: src/features/skills/components/skill-import-dialog.tsx:117
 msgid "The skill could not be imported."
 msgstr "The skill could not be imported."
 
@@ -27681,7 +27697,7 @@ msgstr "This CSV file appears to be empty or invalid."
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 
-#: src/features/skills/components/skill-import-dialog.tsx:76
+#: src/features/skills/components/skill-import-dialog.tsx:80
 msgid "This file could not be read."
 msgstr "This file could not be read."
 
@@ -29216,8 +29232,12 @@ msgid "Upload a profile picture for your account"
 msgstr "Upload a profile picture for your account"
 
 #: src/features/skills/components/skill-import-dialog.tsx:100
-msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown."
-msgstr "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown."
+#~ msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown."
+#~ msgstr "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown."
+
+#: src/features/skills/components/skill-import-dialog.tsx:125
+msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), paste the markdown, or fetch it from a link."
+msgstr "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), paste the markdown, or fetch it from a link."
 
 #: src/features/workflow/templates/index.ts:164
 msgid "Upload an image and upscale it with AI enhancement"

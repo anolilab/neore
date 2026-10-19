@@ -36954,6 +36954,83 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#skills_io:fetchSkillFromUrl": {
+      "post": {
+        "description": "Invoke the `action` `skills_io:fetchSkillFromUrl` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "skills_io:fetchSkillFromUrl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "skills_io:fetchSkillFromUrl",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "filename": {
+                      "type": "string"
+                    },
+                    "markdown": {
+                      "type": "string"
+                    },
+                    "sourceUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "filename",
+                    "markdown",
+                    "sourceUrl"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: skills_io:fetchSkillFromUrl",
+        "tags": [
+          "skills"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#skills_io:importSkill": {
       "post": {
         "description": "Invoke the `action` `skills_io:importSkill` over the Lunora RPC envelope (POST /_lunora/rpc).",
