@@ -30,7 +30,7 @@ interface ThreadMinimapProps {
 
 const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
     const { t } = useLingui();
-    const { messages, messagesStatus } = useChatMessages();
+    const { isStreaming, messages, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
     const crpc = useCRPC();
 
@@ -52,6 +52,7 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
     // leaves it listing prompts that are off the active path. Read it again then.
     // The key is built from the thread, not from `outlineOptions`: that one is the skipped key while the outline is not read.
     const queryClient = useQueryClient();
+    const reReadWhenIdle = useRef(false);
     const previousPrompts = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined }>({ ids: new Set(), threadId: undefined });
 
     useEffect(() => {
@@ -62,9 +63,20 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
         previousPrompts.current = { ids, threadId };
 
         if (previous.threadId === threadId && promptsDropped(previous.ids, ids)) {
+            // A regenerate hides prompts before the server moves the path, so this read can be stale: read again once streaming settles.
+            reReadWhenIdle.current = true;
             queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId: threadId as Id<"threads"> }) });
         }
     }, [loadedItems, threadId, queryClient, crpc]);
+
+    useEffect(() => {
+        if (isStreaming || !reReadWhenIdle.current) {
+            return;
+        }
+
+        reReadWhenIdle.current = false;
+        queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId: threadId as Id<"threads"> }) });
+    }, [isStreaming, threadId, queryClient, crpc]);
 
     if (!shouldShowMinimap(items)) {
         return null;
