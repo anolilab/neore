@@ -50,8 +50,8 @@ const NON_CONVERSATION_EXPORT_FILES = new Set([
  */
 const detectProvider = (data: unknown): ImportProvider => {
     // Neore export root (`exportVersion` + `conversations`). Checked first: it is the only format whose
-    // root object carries both, and a `.json` file arrives wrapped once in an array.
-    if (isNeoreExport(data) || (Array.isArray(data) && data.length > 0 && isNeoreExport(data[0]))) {
+    // root object carries both, and a `.json` file arrives wrapped once in an array. Any entry will do: the parser skips the ones that are not exports.
+    if (isNeoreExport(data) || (Array.isArray(data) && data.some((entry) => isNeoreExport(entry)))) {
         return "neore";
     }
 

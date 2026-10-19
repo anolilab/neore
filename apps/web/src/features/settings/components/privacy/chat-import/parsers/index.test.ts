@@ -141,6 +141,19 @@ describe("parseExportFile", () => {
             expect(parseExportFile([root]).conversations).toHaveLength(1);
         });
 
+        it("detects a Neore export that is not the first entry of the array", () => {
+            const root = {
+                conversations: [
+                    { messages: [{ createdAt: 1, order: 0, stepOrder: 0, status: "success", text: "Hi", tool: false }], thread: { createdAt: 1, title: "N" } },
+                ],
+                exportVersion: "1.0",
+            };
+            const result = parseExportFile([{ unrelated: true }, root]);
+
+            expect(result.provider).toBe("neore");
+            expect(result.conversations).toHaveLength(1);
+        });
+
         it("detects an empty Neore export as neore with nothing to import", () => {
             const result = parseExportFile([{ conversations: [], exportVersion: "1.0" }]);
 
