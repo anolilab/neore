@@ -1051,7 +1051,7 @@ const LandingPage: FC = () => {
                                         </Button>
                                     )}
                                     {(!(tier.id === "pro" || tier.id === "team") || (!isSignedIn && !isSessionUnknown)) && (
-                                        <SignUpOpenOnly>
+                                        <SignUpOpenOnly enabled={tier.href !== "/chat"}>
                                             <LinkButton
                                                 className="w-full"
                                                 size="marketing"

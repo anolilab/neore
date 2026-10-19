@@ -14,4 +14,9 @@ describe(isSignUpOpen, () => {
         expect(isSignUpOpen("false")).toBe(true);
         expect(isSignUpOpen("0")).toBe(true);
     });
+
+    it("compares the raw value, as the backend does", () => {
+        expect(isSignUpOpen(" false")).toBe(false);
+        expect(isSignUpOpen("0 ")).toBe(false);
+    });
 });
