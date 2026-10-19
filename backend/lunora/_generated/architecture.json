@@ -1056,11 +1056,6 @@
       "to": "table:user"
     },
     {
-      "from": "function:auth_billing:gatewayDeductionTakenQuery",
-      "kind": "read",
-      "to": "table:gatewayUsageDeductions"
-    },
-    {
       "from": "function:auth_billing:releaseGatewayCredits",
       "kind": "read",
       "to": "table:gatewayUsageDeductions"
@@ -1079,6 +1074,11 @@
       "from": "function:auth_billing:reserveGatewayCredits",
       "kind": "read",
       "to": "table:gatewayUsageDeductions"
+    },
+    {
+      "from": "function:auth_billing:reserveGatewayCredits",
+      "kind": "read",
+      "to": "table:idempotencyClaims"
     },
     {
       "from": "function:auth_billing:setMemberCreditOverride",
@@ -8099,13 +8099,6 @@
       "id": "function:auth_billing:deductCreditsFromGateway",
       "kind": "function",
       "name": "auth.billing.deductCreditsFromGateway",
-      "module": "auth"
-    },
-    {
-      "detail": "query",
-      "id": "function:auth_billing:gatewayDeductionTakenQuery",
-      "kind": "function",
-      "name": "auth.billing.gatewayDeductionTakenQuery",
       "module": "auth"
     },
     {
@@ -18520,67 +18513,67 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 93,
+      "line": 94,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 93,
+      "line": 94,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 93,
+      "line": 94,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 93,
+      "line": 94,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 93,
+      "line": 94,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 107,
+      "line": 108,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 107,
+      "line": 108,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 110,
+      "line": 111,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 110,
+      "line": 111,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 157,
+      "line": 158,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 218,
+      "line": 219,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -19798,44 +19791,44 @@
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 76,
+      "line": 92,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 80,
+      "line": 112,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 95,
+      "line": 142,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 113,
+      "line": 183,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 168,
-      "reason": "\"runBilledVideo\" is not a registered function"
-    },
-    {
-      "file": "workflow/video-billing",
-      "kind": "call",
-      "line": 200,
+      "line": 215,
       "reason": "\"chargePaidCall\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 252,
+      "line": 267,
       "reason": "\"chargePaidCall\" is not a registered function"
+    },
+    {
+      "file": "workflow/video-billing",
+      "kind": "call",
+      "line": 329,
+      "reason": "\"runBilledVideo\" is not a registered function"
     }
   ],
   "version": 1
