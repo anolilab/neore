@@ -100,6 +100,7 @@ const optionalEnvSchema = z.object({
     CREEM_PRODUCT_TEAM_YEARLY: z.string().trim().optional(),
     CREEM_TEST_MODE: z.string().trim().optional(),
     CREEM_WEBHOOK_SECRET: z.string().trim().optional(),
+    CREEM_YEARLY_CHECKOUT: z.string().trim().optional(),
     DPO_EMAIL: z.string().trim().optional(),
     FEATUREBASE_API_KEY: z.string().trim().optional(),
     // Pre-registered OAuth clients for connectors whose MCP server has no dynamic

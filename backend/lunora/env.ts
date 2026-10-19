@@ -29,6 +29,8 @@ export const CREEM_PRODUCT_TEAM = read("CREEM_PRODUCT_TEAM");
 /** The yearly products of the same plans. Empty = no yearly option; a yearly subscription grants the same tier. */
 export const CREEM_PRODUCT_PRO_YEARLY = read("CREEM_PRODUCT_PRO_YEARLY");
 export const CREEM_PRODUCT_TEAM_YEARLY = read("CREEM_PRODUCT_TEAM_YEARLY");
+/** `true` offers yearly checkout. Off stops new yearly purchases; the yearly ids stay recognised so existing subscriptions can still be cancelled. */
+export const CREEM_YEARLY_CHECKOUT = read("CREEM_YEARLY_CHECKOUT");
 export const CREEM_WEBHOOK_SECRET = read("CREEM_WEBHOOK_SECRET");
 /** `true` targets test-api.creem.io (test-mode keys and products). */
 export const CREEM_TEST_MODE = read("CREEM_TEST_MODE");

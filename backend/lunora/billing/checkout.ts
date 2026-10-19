@@ -22,7 +22,7 @@ import { getOrganization, getUser } from "../auth/lib/better-auth-queries";
 import { CREEM_API_KEY, SITE_URL } from "../env";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { billingOrganizationOf, portalCustomerFor, productFor } from "./plans";
-import { planProducts } from "./products";
+import { checkoutProducts } from "./products";
 
 const TRAILING_SLASH = /\/$/u;
 
@@ -116,7 +116,7 @@ export const getTeamPlansIPay = authQuery
  * show a "yearly" button only for those. The prices themselves live in Creem.
  */
 export const getBillingOptions = authQuery.output(v.object({ yearly: v.object({ pro: v.boolean(), team: v.boolean() }) })).query(() => {
-    const { yearly } = planProducts();
+    const { yearly } = checkoutProducts();
 
     return { yearly: { pro: Boolean(yearly?.pro), team: Boolean(yearly?.team) } };
 });
@@ -133,7 +133,7 @@ export const createCheckout = authAction
     .input({ interval: v.optional(v.union(v.literal("month"), v.literal("year"))), plan: v.union(v.literal("pro"), v.literal("team")) })
     .output(v.object({ url: v.string() }))
     .action(async ({ args: { interval = "month", plan }, ctx }) => {
-        const productId = productFor(plan, interval, planProducts());
+        const productId = productFor(plan, interval, checkoutProducts());
 
         if (interval === "year" && productId === "") {
             throw new LunoraError("SERVICE_UNAVAILABLE", "Yearly billing is not available");
