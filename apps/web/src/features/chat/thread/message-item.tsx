@@ -331,7 +331,8 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                     {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
                 </MessageAction>
 
-                {hasCopyableContent && (
+                {/* A page-only message has parts to copy but no visible text, so its download and copy would be empty. */}
+                {hasCopyableContent && messageText.length > 0 && (
                     <DropdownMenu>
                         <DropdownMenuTrigger
                             render={

@@ -23,8 +23,6 @@ export const autoDirection = <Tag extends BlockTag>(tag: Tag): FC<BlockProps<Tag
     return AutoDirection;
 };
 
-
-
 /** Pass as `components` to a chat `Streamdown`. A stable module-level object, so memoised renderers are not disturbed. */
 export const chatMarkdownComponents: Components = {
     blockquote: autoDirection("blockquote"),

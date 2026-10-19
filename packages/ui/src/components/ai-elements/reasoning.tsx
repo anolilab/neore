@@ -132,8 +132,8 @@ export const ReasoningTrigger = memo(({ children, className, getThinkingMessage 
         <CollapsibleTrigger
             aria-label={i18n._(getTriggerLabel(isStreaming, isOpen))}
             className={cn("text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors", className)}
-            id={triggerId}
             {...props}
+            id={triggerId}
         >
             {children ?? (
                 <>

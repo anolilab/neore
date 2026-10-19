@@ -6561,7 +6561,7 @@ msgstr "Copied to clipboard"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:327
+#: src/features/chat/thread/message-item.tsx:330
 #: src/features/prompts/components/prompt-item.tsx:255
 msgid "Copied!"
 msgstr "Copied!"
@@ -6570,7 +6570,7 @@ msgstr "Copied!"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:327
+#: src/features/chat/thread/message-item.tsx:330
 #: src/features/chat/thread/text-selection-menu.tsx:384
 #: src/features/settings/components/chat/trigger-settings.tsx:680
 msgid "Copy"
@@ -6588,7 +6588,7 @@ msgstr "Copy"
 msgid "Copy as Markdown"
 msgstr "Copy as Markdown"
 
-#: src/features/chat/thread/message-item.tsx:343
+#: src/features/chat/thread/message-item.tsx:347
 msgid "Copy as plain text"
 msgstr "Copy as plain text"
 
@@ -8850,7 +8850,7 @@ msgstr "Download a model"
 msgid "Download as CSV"
 msgstr "Download as CSV"
 
-#: src/features/chat/thread/message-item.tsx:347
+#: src/features/chat/thread/message-item.tsx:351
 msgid "Download as Markdown"
 msgstr "Download as Markdown"
 
@@ -9198,7 +9198,7 @@ msgstr "Edge-guided generation"
 #: src/features/canvas/canvas-panel.tsx:748
 #: src/features/chat/thread-list/group-header.tsx:144
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:366
+#: src/features/chat/thread/message-item.tsx:370
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:206
 #: src/features/prompts/components/prompt-list-view.tsx:218
@@ -9825,6 +9825,7 @@ msgid "enhancement"
 msgstr "enhancement"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:129
+#: ../../packages/ui/src/components/chat-markdown.tsx:110
 msgid "Enlarge table"
 msgstr "Enlarge table"
 
@@ -12341,7 +12342,7 @@ msgstr "Fork"
 msgid "Fork {0} to edit a copy"
 msgstr "Fork {0} to edit a copy"
 
-#: src/features/chat/thread/message-item.tsx:376
+#: src/features/chat/thread/message-item.tsx:380
 msgid "Fork conversation"
 msgstr "Fork conversation"
 
@@ -12852,7 +12853,7 @@ msgstr "Generate from a description"
 msgid "Generate ideas for a creative writing story"
 msgstr "Generate ideas for a creative writing story"
 
-#: src/features/chat/thread/message-item.tsx:395
+#: src/features/chat/thread/message-item.tsx:399
 msgid "Generate image"
 msgstr "Generate image"
 
@@ -12878,7 +12879,7 @@ msgstr "Generate random seed"
 msgid "Generate unique business ideas for 2025"
 msgstr "Generate unique business ideas for 2025"
 
-#: src/features/chat/thread/message-item.tsx:405
+#: src/features/chat/thread/message-item.tsx:409
 msgid "Generate video"
 msgstr "Generate video"
 
@@ -12891,7 +12892,7 @@ msgstr "Generate Video"
 msgid "Generate videos from text or images"
 msgstr "Generate videos from text or images"
 
-#: src/features/chat/thread/message-item.tsx:415
+#: src/features/chat/thread/message-item.tsx:419
 msgid "Generate voice"
 msgstr "Generate voice"
 
@@ -17406,7 +17407,7 @@ msgstr "More"
 msgid "More About You"
 msgstr "More About You"
 
-#: src/features/chat/thread/message-item.tsx:335
+#: src/features/chat/thread/message-item.tsx:339
 msgid "More copy options"
 msgstr "More copy options"
 
@@ -20729,7 +20730,7 @@ msgstr "Pin memory"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:142
 #: ../../packages/chat-ui/src/chat/message-item.tsx:191
-#: src/features/chat/thread/message-item.tsx:354
+#: src/features/chat/thread/message-item.tsx:358
 msgid "Pin message"
 msgstr "Pin message"
 
@@ -22466,7 +22467,7 @@ msgid "Refresh installed models"
 msgstr "Refresh installed models"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:196
-#: src/features/chat/thread/message-item.tsx:360
+#: src/features/chat/thread/message-item.tsx:364
 msgid "Regenerate"
 msgstr "Regenerate"
 
@@ -24687,6 +24688,7 @@ msgid "Show {remainingCount} more"
 msgstr "Show {remainingCount} more"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:102
+#: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"
 msgstr "Show all {lines} lines"
 
@@ -24726,6 +24728,7 @@ msgid "Show Labels"
 msgstr "Show Labels"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:102
+#: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:196
 msgid "Show less"
 msgstr "Show less"
@@ -26616,6 +26619,8 @@ msgstr "System UI"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:134
 #: ../../packages/ui/src/components/chat-markdown.tsx:135
+#: ../../packages/ui/src/components/chat-markdown.tsx:115
+#: ../../packages/ui/src/components/chat-markdown.tsx:116
 msgid "Table"
 msgstr "Table"
 
