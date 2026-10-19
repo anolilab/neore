@@ -20,6 +20,9 @@ const TIER_LIMITS: Record<string, number> = {
 
 const DEFAULT_RPM = 60;
 
+/** The per-minute request limit for a tier. The one table: the limiter enforces it and `GET /v1/rate-limits` reports it. */
+export const rpmFor = (tier: string): number => TIER_LIMITS[tier] ?? DEFAULT_RPM;
+
 const misconfigured = (c: Context<HonoEnv>, message: string) => c.json({ error: { code: "MISCONFIGURED", message } }, 503);
 
 export const rateLimitMiddleware = createMiddleware<HonoEnv>(async (c, next) => {
@@ -37,7 +40,7 @@ export const rateLimitMiddleware = createMiddleware<HonoEnv>(async (c, next) => 
     }
 
     const tier = c.get("userTier") ?? "free";
-    const limit = TIER_LIMITS[tier] ?? DEFAULT_RPM;
+    const limit = rpmFor(tier);
     const allowed = await consumeRateLimit(c.env, limit, `chat:${userId}`);
 
     if (allowed === null) {

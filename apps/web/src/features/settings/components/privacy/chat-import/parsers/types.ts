@@ -14,7 +14,7 @@ export interface NormalizedConversation {
     title: string;
 }
 
-export type ImportProvider = "chatgpt" | "gemini" | "claude" | "claude-code" | "codex";
+export type ImportProvider = "chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore";
 
 export interface ParseResult {
     conversations: NormalizedConversation[];

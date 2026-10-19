@@ -8,7 +8,8 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { getChunksByEmbeddingIds, keywordSearchChunks } from "./functions";
+import { getChunksByEmbeddingIds, keywordSearchChunks, recordKnowledgeSources, saveChunks } from "./functions";
+import { readKnowledgeCitation, toKnowledgeSource } from "./citations";
 import { fuseSearchLegs } from "./retrieve";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -73,5 +74,74 @@ describe("knowledge search file ids", () => {
             { chunkId: "c1", chunkIndex: 0, content: "Refunds…", fileId: "f1", fileName: "refunds.txt" },
             { chunkId: "c2", chunkIndex: 3, content: "Shipping…", fileId: "f2", fileName: "shipping.txt" },
         ]);
+    });
+});
+
+describe("knowledge search pages", () => {
+    it("writes the page a chunk starts on into its metadata, and nothing for a chunk without one", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(saveChunks, {
+                chunks: [
+                    { chunkIndex: 1, content: "Ibex grazing rules.", pageNumber: 4, sectionHeading: "Grazing" },
+                    { chunkIndex: 2, content: "No page here.", pageNumber: undefined },
+                ],
+                fileId,
+                userId: USER,
+            });
+        });
+
+        const rows = await harness.run(
+            async (ctx: any) =>
+                await ctx.db
+                    .query("knowledgeChunks")
+                    .withIndex("by_fileId_chunkIndex", (q: any) => q.eq("fileId", fileId))
+                    .collect(),
+        );
+        const byIndex = new Map<number, { metadata?: object }>(rows.map((row: any) => [row.chunkIndex, row]));
+
+        expect(byIndex.get(1)?.metadata).toStrictEqual({ pageNumber: 4, sectionHeading: "Grazing" });
+        expect(byIndex.get(2)?.metadata).toBeUndefined();
+    });
+
+    it("returns the page from both legs, and leaves it out for a chunk that has none", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(saveChunks, {
+                chunks: [{ chunkIndex: 1, content: "Ibex grazing rules.", pageNumber: 4 }],
+                fileId,
+                userId: USER,
+            });
+        });
+
+        const vector = await harness.run(
+            async (ctx: any) => await ctx.runQuery(getChunksByEmbeddingIds, { embeddingIds: ["emb-1"], knowledgeFileIds: [fileId], userId: USER }),
+        );
+        const keyword = await harness.run(
+            async (ctx: any) => await ctx.runQuery(keywordSearchChunks, { knowledgeFileIds: [fileId], limit: 5, query: "ibex", userId: USER }),
+        );
+
+        expect(vector[0]).not.toHaveProperty("pageNumber");
+        expect(keyword).toMatchObject([{ content: "Ibex grazing rules.", pageNumber: 4 }]);
+    });
+
+    it("keeps the page on a recorded citation through the message row", async () => {
+        const messageId = await harness.run(
+            async (ctx: any) => await ctx.db.insert("messages", { order: 0, status: "complete", stepOrder: 0, threadId: "thread-1", tool: false }),
+        );
+
+        await harness.run(async (ctx: any) => {
+            await ctx.runMutation(recordKnowledgeSources, {
+                messageId,
+                sources: [
+                    toKnowledgeSource(
+                        { chunkId: "c9", chunkIndex: 3, content: "Ibex grazing rules.", fileId, fileName: "herd.pdf", pageNumber: 7, score: 1 },
+                        1,
+                    ),
+                ],
+            });
+        });
+
+        const row = await harness.run(async (ctx: any) => await ctx.db.get(messageId));
+
+        expect(readKnowledgeCitation(row.sources[0].providerMetadata)).toMatchObject({ chunkId: "c9", pageNumber: 7 });
     });
 });

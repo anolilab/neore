@@ -131,18 +131,37 @@ export const applyMiddleOut = (messages: EstimatorMessage[], contextWindow: numb
 
     // Indices of messages that must be preserved (tail pairs)
     const preservedTailCount = Math.min(keepPairs * 2, nonSystemIndices.length);
-    // Middle candidates: non-system, non-tail messages — remove oldest first
-    const middleIndices: number[] = nonSystemIndices.slice(0, nonSystemIndices.length - preservedTailCount);
+    const tailFrom = nonSystemIndices[nonSystemIndices.length - preservedTailCount] ?? messages.length;
+
+    // A tool result is only valid after the assistant message that issued its call, so
+    // a `tool` message travels with the message before it. Removing one alone leaves a
+    // call with no result, or a result with no call, which providers reject.
+    const groups: number[][] = [];
+
+    for (const index of nonSystemIndices) {
+        const last = groups.at(-1);
+
+        if (last && messages[index]!.role === "tool") {
+            last.push(index);
+        } else {
+            groups.push([index]);
+        }
+    }
 
     const removed = new Set<number>();
 
-    for (const index of middleIndices) {
+    // Middle candidates: groups wholly before the tail, oldest first
+    for (const group of groups) {
+        if (group.at(-1)! >= tailFrom) break;
+
         const current = messages.filter((_, i) => !removed.has(i));
         const estimate = estimateMessageTokens(current, system);
 
         if (estimate <= target) break;
 
-        removed.add(index);
+        for (const index of group) {
+            removed.add(index);
+        }
     }
 
     const isCompressed = removed.size > 0;

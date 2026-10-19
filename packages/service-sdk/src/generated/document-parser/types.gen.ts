@@ -6,9 +6,19 @@ export type ClientOptions = {
 
 export type ExtractResponse = {
     /**
-     * Extracted text content
+     * Extracted text content. Empty when `pages` is present, so the text is never sent twice.
      */
     content: string;
+    /**
+     * Only for a PDF or a PPTX requested with format=markdown: one entry per page, in order. Absent otherwise.
+     */
+    pages?: Array<{
+        /**
+         * The page, 1-based
+         */
+        pageNumber: number;
+        content: string;
+    }>;
     /**
      * Detected MIME type
      */
@@ -54,13 +64,18 @@ export type ExtractDocumentData = {
         'content-type': string;
     };
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * plain (the default): xberg's plain-text rendering. markdown: headings, lists and tables kept as Markdown. A PDF is split into pages and a PPTX into slides (plain text, not Markdown); those come back in `pages`, and `content` is empty. Knowledge ingestion asks for markdown; the other callers keep plain.
+         */
+        format?: 'plain' | 'markdown';
+    };
     url: '/extract';
 };
 
 export type ExtractDocumentErrors = {
     /**
-     * Bad request (empty body)
+     * Bad request (empty body, or an unknown format option)
      */
     400: ErrorResponse;
     /**

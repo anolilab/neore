@@ -23,6 +23,7 @@ import { canaryRouter } from "./routes/internal/canary.js";
 import { generateRouter } from "./routes/internal/generate.js";
 import { modelProxyRouter } from "./routes/internal/model-proxy.js";
 import { notificationRulesRouter } from "./routes/internal/notification-rules.js";
+import { rerankRouter } from "./routes/internal/rerank.js";
 import { routeRouter } from "./routes/internal/route.js";
 import { speechRouter } from "./routes/internal/speech.js";
 import { streamRouter } from "./routes/internal/stream.js";
@@ -38,6 +39,7 @@ import { musicRouter } from "./routes/v1/music.js";
 import type { MusicRenderMessage } from "./routes/v1/music-types.js";
 import { rateLimitsRouter } from "./routes/v1/rate-limits.js";
 import { realtimeRouter } from "./routes/v1/realtime.js";
+import { createResponsesRouter } from "./routes/v1/responses.js";
 import { usageRouter } from "./routes/v1/usage.js";
 import { videoRouter } from "./routes/v1/video.js";
 import type { VideoRenderMessage } from "./routes/v1/video-types.js";
@@ -102,6 +104,7 @@ app.route("/", generateRouter);
 app.route("/", streamRouter);
 app.route("/", routeRouter);
 app.route("/", modelProxyRouter);
+app.route("/", rerankRouter);
 app.route("/", speechRouter);
 app.route("/", webhooksRouter);
 app.route("/", canaryRouter);
@@ -116,6 +119,10 @@ app.route("/", realtimeRouter);
 // Routes — SaaS API + Dashboard (Bearer auth; a few backend-only routes are binding-only)
 app.route("/", cacheRouter);
 app.route("/", completionsRouter);
+app.route(
+    "/",
+    createResponsesRouter((request, env, ctx) => app.fetch(request, env, ctx)),
+);
 app.route("/", embeddingsRouter);
 app.route("/", modelsRouter);
 app.route("/", rateLimitsRouter);

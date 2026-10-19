@@ -24,6 +24,15 @@ export const MAX_EXTRACTION_DOCUMENT_BYTES = 25 * 1024 * 1024;
 /** {@link MAX_EXTRACTION_DOCUMENT_BYTES} in whole megabytes, for messages. */
 export const MAX_EXTRACTION_DOCUMENT_MEGABYTES = MAX_EXTRACTION_DOCUMENT_BYTES / (1024 * 1024);
 
+/**
+ * Above this size a document is extracted as plain text. Markdown output costs
+ * roughly twice the memory of plain on a text-dense PDF (87 MiB against 45 MiB at
+ * 6 MB), so past about 9 MB it no longer fits the Worker's 128 MiB, while plain
+ * text goes on to about 17 MB. A large file keeps what it could always do and
+ * loses only its headings and pages.
+ */
+export const MARKDOWN_EXTRACTION_MAX_BYTES = 5 * 1024 * 1024;
+
 const MEDIA_MIME_TYPE = /^(?:image|audio|video)\//u;
 
 /**

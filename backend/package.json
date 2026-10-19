@@ -14,6 +14,7 @@
     },
     "exports": {
         "./agent": "./lunora/agent/client/index.ts",
+        "./agent/branch-tree": "./lunora/agent/branch-tree.ts",
         "./agent/deltas": "./lunora/agent/deltas.ts",
         "./agent/shared": "./lunora/agent/shared.ts",
         "./agent/types": "./lunora/agent/client/types.ts",

@@ -48,6 +48,30 @@ export const isPlainTextMimeType = (mimeType: string): boolean => {
     return !isHtmlMimeType(base) && (TEXT_MIME_TYPES.has(base) || base.startsWith("text/"));
 };
 
+/** Text read as it is, with no parser in between. Markdown is the exception: read the same way, but its headings are structure. */
+export const isRawText = (mimeType: string): boolean => isPlainTextMimeType(mimeType) && baseMimeType(mimeType) !== "text/markdown";
+
+const MARKDOWN_FILE_NAME_RE = /\.md$/iu;
+
+const PPTX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+/** Formats the parser answers with pages (`pages` in its Markdown response): PDFs, and slide decks (one page per slide). */
+export const isPagedMimeType = (mimeType: string): boolean => {
+    const base = baseMimeType(mimeType);
+
+    return base === "application/pdf" || base === PPTX_MIME_TYPE;
+};
+
+/**
+ * Whether text from this file has Markdown structure, so its `#` lines are
+ * headings. Parser output and HTML do (the parser and `htmlToText` write them);
+ * raw text does not, except a `.md` file. A slide deck is the parser's exception:
+ * its text is plain, so a slide that starts with `# ` is not a heading.
+ * `name` is a file name or URL path.
+ */
+export const hasMarkdownStructure = (name: string, mimeType: string): boolean =>
+    baseMimeType(mimeType) !== PPTX_MIME_TYPE && (!isRawText(mimeType) || MARKDOWN_FILE_NAME_RE.test(name));
+
 // ─── HTML ────────────────────────────────────────────────────────────────────
 
 const DROP_ELEMENTS_RE = /<(script|style|noscript|svg|head|template|iframe)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
@@ -332,7 +356,8 @@ export const fetchUrlDocument = async (url: string, dependencies: UrlFetchDepend
             const rendered = await dependencies.render(url);
 
             if (rendered.content.trim()) {
-                return { mimeType: "text/html", text: rendered.content.trim(), title: rendered.title, url };
+                // The renderer returns the page's text content, not its markup or Markdown.
+                return { mimeType: "text/plain", text: rendered.content.trim(), title: rendered.title, url };
             }
         } catch {
             // Fall back to fetching the HTML directly.

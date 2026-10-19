@@ -20,6 +20,13 @@ describe(buildKnowledgeCitations, () => {
         expect(sources[0]).toMatchObject({ filename: "a.pdf", id: "knowledge:a", sourceType: "document", type: "source" });
     });
 
+    it("carries the page into the excerpt and the stored source", () => {
+        const { context, sources } = buildKnowledgeCitations([hit("a", { pageNumber: 7 })]);
+
+        expect(context).toContain("[1] a.pdf (passage 3, page 7):\ncontent of a");
+        expect(readKnowledgeCitation(sources[0]!.providerMetadata)).toMatchObject({ pageNumber: 7 });
+    });
+
     it("cites a chunk once, and says nothing when nothing was found", () => {
         expect(buildKnowledgeCitations([hit("a"), hit("a")]).sources).toHaveLength(1);
         expect(buildKnowledgeCitations([])).toEqual({ context: undefined, sources: [] });

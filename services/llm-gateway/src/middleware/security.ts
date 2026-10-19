@@ -1,6 +1,7 @@
 import { createMiddleware } from "hono/factory";
 
 import type { HonoEnv } from "../env.js";
+import { dispatchedFrom } from "../lib/dispatched-request.js";
 
 const MAX_AGE_RE = /\bmax-age=\d+/u;
 const NO_STORE_RE = /\bno-store\b/u;
@@ -9,7 +10,8 @@ const NO_STORE_RE = /\bno-store\b/u;
 export const isCacheableByHandler = (value: string | null): boolean => !!value && MAX_AGE_RE.test(value) && !NO_STORE_RE.test(value);
 
 export const securityMiddleware = createMiddleware<HonoEnv>(async (c, next) => {
-    const requestId = crypto.randomUUID();
+    // A request dispatched in-process keeps its outer request's id: one client call, one id.
+    const requestId = dispatchedFrom(c.env)?.requestId ?? crypto.randomUUID();
 
     c.set("requestId", requestId);
 

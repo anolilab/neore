@@ -28,6 +28,8 @@ export interface KnowledgeHit {
     content: string;
     fileId: string;
     fileName: string;
+    /** The page the passage starts on, when the file has pages. */
+    pageNumber?: number;
     score: number;
 }
 
@@ -38,6 +40,7 @@ export interface KnowledgeCitation {
     citation: number;
     fileId: string;
     fileName: string;
+    pageNumber?: number;
     passage: string;
 }
 
@@ -69,6 +72,7 @@ export const toKnowledgeSource = (hit: KnowledgeHit, citation: number): Knowledg
                 citation,
                 fileId: hit.fileId,
                 fileName: hit.fileName,
+                ...(hit.pageNumber !== undefined && { pageNumber: hit.pageNumber }),
                 passage: clipPassage(hit.content),
             },
         },
@@ -89,7 +93,11 @@ export const buildKnowledgeCitations = (hits: ReadonlyArray<KnowledgeHit>): { co
         return { context: undefined, sources: [] };
     }
 
-    const excerpts = unique.map((hit, index) => `[${String(index + 1)}] ${hit.fileName} (passage ${String(hit.chunkIndex + 1)}):\n${hit.content}`);
+    const excerpts = unique.map((hit, index) => {
+        const page = hit.pageNumber === undefined ? "" : `, page ${String(hit.pageNumber)}`;
+
+        return `[${String(index + 1)}] ${hit.fileName} (passage ${String(hit.chunkIndex + 1)}${page}):\n${hit.content}`;
+    });
 
     return {
         context: [
@@ -127,7 +135,7 @@ export const readKnowledgeCitation = (providerMetadata: unknown): KnowledgeCitat
         return undefined;
     }
 
-    const { chunkId, chunkIndex, citation, fileId, fileName, passage } = entry;
+    const { chunkId, chunkIndex, citation, fileId, fileName, pageNumber, passage } = entry;
 
     if (
         typeof chunkId !== "string" ||
@@ -140,5 +148,5 @@ export const readKnowledgeCitation = (providerMetadata: unknown): KnowledgeCitat
         return undefined;
     }
 
-    return { chunkId, chunkIndex, citation, fileId, fileName, passage };
+    return { chunkId, chunkIndex, citation, fileId, fileName, passage, ...(typeof pageNumber === "number" && { pageNumber }) };
 };

@@ -53,6 +53,13 @@ export class RequestTelemetry {
 
     private readonly rootTraceId: string;
 
+    /**
+     * The first span this request started: the root of the trace. Kept apart from
+     * `spans`, because a flush drains that buffer and the root must stay the default
+     * parent for spans recorded after it.
+     */
+    private rootSpan: Span | undefined;
+
     constructor(config: OtelConfig | null, traceId?: string) {
         this.config = config;
         this.rootTraceId = traceId ?? randomHex(16);
@@ -88,6 +95,7 @@ export class RequestTelemetry {
 
         if (this.enabled) {
             this.spans.push(span);
+            this.rootSpan ??= span;
         }
 
         return span;
@@ -126,6 +134,25 @@ export class RequestTelemetry {
         }
     }
 
+    /**
+     * Records a span for work that has already finished: it ended now and took
+     * `durationMs`. For call sites that only learn the outcome at the end (a
+     * model call's tokens and latency), where {@link startSpan} would have to be
+     * held open across the whole call. The parent defaults to the request's root
+     * span (the `SERVER` span of an HTTP request, or the CONSUMER span of a queue message).
+     */
+    recordSpan(name: string, options: { attributes?: Attributes; durationMs: number; error?: unknown; kind?: SpanKindValue; parent?: Span }): Span {
+        const span = this.startSpan(name, { attributes: options.attributes, kind: options.kind, parent: options.parent ?? this.rootSpan });
+
+        this.endSpan(span, { error: options.error });
+
+        if (span.endTimeNs !== undefined) {
+            span.startTimeNs = span.endTimeNs - BigInt(Math.max(0, Math.round(options.durationMs))) * 1_000_000n;
+        }
+
+        return span;
+    }
+
     /** Add an event to a span (e.g., retry attempts, fallback transitions). */
     addEvent(span: Span, name: string, attributes?: Attributes): void {
         if (!this.enabled) return;
@@ -148,18 +175,39 @@ export class RequestTelemetry {
     }
 
     /**
-     * Flush all collected spans/metrics. Returns a promise; callers
-     * typically pass it to `executionCtx.waitUntil()` so the worker stays
+     * Export what has accumulated since the last flush, then forget it. Returns a
+     * promise; callers pass it to `executionCtx.waitUntil()` so the worker stays
      * alive long enough to complete the export.
+     *
+     * The buffers are taken synchronously, before the first await, so a second flush
+     * sends only what was recorded after the first. That matters because a request
+     * can flush twice: the middleware flushes when the handler returns, and a streamed
+     * reply records its usage only once the body ends. Spans still open stay buffered
+     * until they end, so no export carries a span without its end time.
      */
     async flush(): Promise<void> {
         if (!this.enabled || !this.config) return;
 
-        if (this.spans.length === 0 && this.counters.length === 0 && this.histograms.length === 0) {
+        const drained = [...this.spans];
+
+        this.spans.length = 0;
+
+        const ended = drained.filter((span) => span.endTimeNs !== undefined);
+
+        // Open spans go back in: they belong to a later flush, once they end.
+        this.spans.push(...drained.filter((span) => span.endTimeNs === undefined));
+
+        const counters = [...this.counters];
+        const histograms = [...this.histograms];
+
+        this.counters.length = 0;
+        this.histograms.length = 0;
+
+        if (ended.length === 0 && counters.length === 0 && histograms.length === 0) {
             return;
         }
 
-        await exportTelemetry({ counters: this.counters, histograms: this.histograms, spans: this.spans }, this.config, nowNs());
+        await exportTelemetry({ counters, histograms, spans: ended }, this.config, nowNs());
     }
 }
 

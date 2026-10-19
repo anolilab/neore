@@ -31,8 +31,17 @@ export interface AppEnv {
 
     /** Cloudflare account ID — used for Workers AI REST API fallback when AI binding is unavailable */
     CLOUDFLARE_ACCOUNT_ID?: string;
+
     /** Cloudflare API token — used for Workers AI REST API fallback when AI binding is unavailable */
     CLOUDFLARE_API_KEY?: string;
+
+    /**
+     * Optional per-tier daily caps on the public chat route, `"free=200,pro=5000"`
+     * (`middleware/daily-limit.ts`), counted from `usage_log`. Unset = no cap.
+     */
+    DAILY_REQUEST_LIMITS?: string;
+    /** As `DAILY_REQUEST_LIMITS`, in tokens per UTC day. */
+    DAILY_TOKEN_LIMITS?: string;
     /** Deployment stage when set (`production`, `preview`, ...); only read as a second production signal beside `NODE_ENV`. */
     ENVIRONMENT?: string;
     FAL_API_KEY?: string;
@@ -150,6 +159,8 @@ export interface AppEnv {
     // ── Secrets (set via `wrangler secret put`) ─────────────────────────
     /** HMAC shared secret for Backend &lt;-> Gateway auth */
     SIGNING_SECRET: string;
+    /** As `DAILY_REQUEST_LIMITS`, in tokens per rolling minute. Unset = no cap. */
+    TOKENS_PER_MINUTE_LIMITS?: string;
     // ── Cloudflare bindings ──────────────────────────────────────────────
     USAGE_DB: D1Database;
 

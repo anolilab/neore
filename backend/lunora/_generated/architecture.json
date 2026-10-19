@@ -5198,6 +5198,11 @@
     {
       "from": "function:sandbox_cleanup:checkAndTerminateSandbox",
       "kind": "call",
+      "to": "function:sandbox_functions:closeSession"
+    },
+    {
+      "from": "function:sandbox_cleanup:checkAndTerminateSandbox",
+      "kind": "call",
       "to": "function:sandbox_functions:markBotComputerPaused"
     },
     {
@@ -17846,25 +17851,25 @@
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 94,
+      "line": 103,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 178,
+      "line": 196,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 237,
+      "line": 319,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 249,
+      "line": 331,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {

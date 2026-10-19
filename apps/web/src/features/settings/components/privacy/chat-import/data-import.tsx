@@ -36,6 +36,7 @@ const PROVIDER_LABELS: Record<ImportProvider, string> = {
     "claude-code": "Claude Code",
     codex: "Codex CLI",
     gemini: "Google Gemini",
+    neore: "Neore",
 };
 
 /** The normalised conversations as the one JSON file the import uploads. */
@@ -295,7 +296,7 @@ const DataImport: FC = () => {
 
     return (
         <SettingsCard
-            description={t`Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files.`}
+            description={t`Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files.`}
             title={t`Import Conversations`}
         >
             <CardContent className="space-y-4">
@@ -306,7 +307,7 @@ const DataImport: FC = () => {
                 {state.step === "idle" && (
                     <div className="space-y-3">
                         <p className="text-muted-foreground text-sm">
-                            {t`Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export.`}
+                            {t`Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl).`}
                         </p>
                         <Button onClick={() => fileInputRef.current?.click()} variant="default">
                             {t`Select File`}

@@ -14,12 +14,21 @@ import type { Doc } from "../_generated/dataModel";
 import { type ActionCtx, internalAction } from "../_generated/server";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { fetchWithTimeout, isSafeUrl } from "../chat/tools/utilities";
-import { MAX_EXTRACTION_DOCUMENT_BYTES, MAX_EXTRACTION_DOCUMENT_MEGABYTES } from "../lib/document-limits";
+import { MARKDOWN_EXTRACTION_MAX_BYTES, MAX_EXTRACTION_DOCUMENT_BYTES, MAX_EXTRACTION_DOCUMENT_MEGABYTES } from "../lib/document-limits";
 import { FETCH_TIMEOUT_LONG_MS } from "../lib/fetch-timeout";
 import { gatewayFetch, isServiceBound, serviceFetch, type ServicesContext } from "../lib/services";
 import { readStoredObject } from "../lib/storage-read";
-import { chunkText, estimateTokens } from "./chunking";
-import { documentToText, fetchUrlDocument, type ParseDocument } from "./sources";
+import {
+    type ChunkOptions,
+    chunkText,
+    EMBEDDING_INPUT_BUDGET,
+    embeddingInput,
+    estimateTokens,
+    markPage,
+    stripPageSentinel,
+    withoutPageLines,
+} from "./chunking";
+import { documentToText, fetchUrlDocument, hasMarkdownStructure, isPagedMimeType, type ParseDocument } from "./sources";
 
 ("use node");
 
@@ -35,7 +44,7 @@ const MAX_FILE_SIZE = MAX_EXTRACTION_DOCUMENT_BYTES;
 // ============================================================================
 
 /** The document-parser Worker as a {@link ParseDocument}, or `undefined` when its binding is absent. */
-const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
+export const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
     if (!isServiceBound(ctx, "documentParser")) {
         return undefined;
     }
@@ -43,12 +52,23 @@ const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
     return async (bytes, mimeType) => {
         const { createDocumentParserClient, extractDocument } = await import("@neore/service-sdk/document-parser");
         const parserClient = createDocumentParserClient({ fetch: serviceFetch(ctx, "documentParser") });
-        const { data, error, response } = await extractDocument({
-            body: new Blob([bytes], { type: mimeType }),
-            client: parserClient,
-            headers: { "content-type": mimeType },
-            signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
-        });
+        // Markdown keeps the headings the chunker's section paths come from, and
+        // splits PDF and PPTX content into pages. Only knowledge asks for it.
+        const extract = async (asMarkdown: boolean) =>
+            await extractDocument({
+                body: new Blob([bytes], { type: mimeType }),
+                client: parserClient,
+                headers: { "content-type": mimeType },
+                ...(asMarkdown && { query: { format: "markdown" as const } }),
+                signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
+            });
+        const wantsMarkdown = bytes.byteLength <= MARKDOWN_EXTRACTION_MAX_BYTES;
+        // The Worker running out of memory or time on a Markdown render is a 5xx, or a rejected call, not a verdict on the file.
+        // A failed Markdown render falls back to plain text; a rejected plain attempt propagates.
+        const rendered = wantsMarkdown ? await extract(true).catch(() => undefined) : undefined;
+        const result = rendered && (rendered.response?.status ?? 500) < 500 ? rendered : await extract(false);
+
+        const { data, error, response } = result;
 
         if (response?.status === 413) {
             throw new LunoraError(
@@ -61,18 +81,36 @@ const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
             throw new LunoraError("INTERNAL", `Parser returned ${response?.status ?? "no response"}: ${JSON.stringify(error)}`);
         }
 
-        let text = data.content || "";
+        // A paged document comes back page by page: joined here, each page under its page line.
+        // Plain text is stripped too: a PDF whose Markdown render failed reaches here with its page-less text.
+        let text = data.pages ? data.pages.map((page) => markPage(page.pageNumber, page.content)).join("\n\n") : stripPageSentinel(data.content || "");
 
-        // Append table markdown if present
-        if (data.tables.length > 0) {
-            const tableMarkdown = data.tables
-                .map((table, index) => (table.markdown ? `\n\n### Table ${String(index + 1)}\n${table.markdown}` : ""))
-                .filter(Boolean)
+        // Markdown already carries the tables in place. Append only the ones it
+        // lacks, so a table is never indexed twice. On a paged document the table is looked for on its own
+        // page: the same Markdown quoted on another page does not stand in for it.
+        // Each keeps the number it has in the document, so "Table 2" is still the second table when the first is in place.
+        const missingTables = data.tables
+            .map((table, index) => {
+                return { number: index + 1, table };
+            })
+            .filter(({ table }) => {
+                const haystack = data.pages?.find((page) => page.pageNumber === table.pageNumber)?.content ?? text;
+
+                return table.markdown && !haystack.includes(table.markdown.trim());
+            });
+
+        if (missingTables.length > 0) {
+            const isPaged = isPagedMimeType(mimeType);
+            const tableMarkdown = missingTables
+                .map(({ number, table }) => {
+                    const section = `### Table ${String(number)}\n${stripPageSentinel(table.markdown)}`;
+
+                    // A table appended after the last page would inherit that page: mark each with its own.
+                    return `\n\n${isPaged ? markPage(table.pageNumber, section) : section}`;
+                })
                 .join("");
 
-            if (tableMarkdown) {
-                text += `\n\n---\n## Extracted Tables${tableMarkdown}`;
-            }
+            text += `\n\n---\n## Extracted Tables${tableMarkdown}`;
         }
 
         return text;
@@ -111,13 +149,18 @@ const pageRenderer = (ctx: ServicesContext): ((url: string) => Promise<{ content
     };
 };
 
+/** What the chunker may read in this source's text: headings where it is Markdown, page markers where the parser wrote them. */
+const chunkingFor = (name: string, mimeType: string): ChunkOptions => {
+    return { headings: hasMarkdownStructure(name, mimeType), pages: isPagedMimeType(mimeType) };
+};
+
 /**
  * The file's text, from wherever it came: a web page (`sourceUrl`), an object
  * stored for a pasted, folder or archive document (`storageKey`), or an upload
  * in the vault (`vaultFileId`). Read through `ctx.storage`, never over HTTP —
  * see `lib/storage-read.ts`. A URL also reports the page title.
  */
-const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Promise<{ text: string; title?: string }> => {
+const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Promise<{ chunking: ChunkOptions; text: string; title?: string }> => {
     const parse = documentParser(ctx);
 
     if (file.sourceUrl) {
@@ -128,7 +171,11 @@ const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Prom
             render: pageRenderer(ctx),
         });
 
-        return { text: fetched.text, title: fetched.title };
+        return {
+            chunking: chunkingFor(new URL(fetched.url).pathname, fetched.mimeType),
+            text: fetched.text,
+            title: fetched.title,
+        };
     }
 
     let key = file.storageKey;
@@ -145,7 +192,7 @@ const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Prom
 
     const { bytes } = await readStoredObject(ctx.storage, key, { maxBytes: MAX_FILE_SIZE });
 
-    return { text: await documentToText(bytes, file.mimeType, parse) };
+    return { chunking: chunkingFor(file.name, file.mimeType), text: await documentToText(bytes, file.mimeType, parse) };
 };
 
 // ============================================================================
@@ -184,14 +231,14 @@ export const ingestFile = internalAction
             }
 
             // 3. The text, from an upload, a stored document or a URL.
-            const { text: extractedText, title } = await loadSourceText(ctx, file);
+            const { chunking, text: extractedText, title } = await loadSourceText(ctx, file);
 
             if (!extractedText.trim()) {
                 throw new LunoraError("UNPROCESSABLE", "No text content could be extracted from the file");
             }
 
             // 4. Chunk the extracted text
-            const chunks = chunkText(extractedText);
+            const chunks = chunkText(extractedText, chunking);
 
             if (chunks.length === 0) {
                 throw new LunoraError("UNPROCESSABLE", "No text content could be extracted from the file");
@@ -202,7 +249,7 @@ export const ingestFile = internalAction
             const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), { userId: args.userId });
 
             const { embedMany } = await import("../agent/client/search");
-            const chunkTexts = chunks.map((c) => c.content.slice(0, 2000));
+            const chunkTexts = chunks.map((c) => embeddingInput(c, EMBEDDING_INPUT_BUDGET));
             const { embeddings } = await embedMany(ctx, {
                 embeddingModel,
                 threadId: undefined,
@@ -248,6 +295,8 @@ export const ingestFile = internalAction
                         chunkIndex: chunk.index,
                         content: chunk.content,
                         embeddingId: (embeddingIds[i] as string) ?? undefined,
+                        pageNumber: chunk.pageNumber,
+                        sectionHeading: chunk.sectionHeading,
                         tokenCount: estimateTokens(chunk.content),
                     };
                 }),
@@ -279,7 +328,7 @@ export const ingestFile = internalAction
                     prompt: `Summarize the following document in 2-3 sentences. Focus on the key topics and content type.
 
 Document title: ${file.name}
-Content (first 3000 chars): ${extractedText.slice(0, 3000)}`,
+Content (first 3000 chars): ${withoutPageLines(extractedText).slice(0, 3000)}`,
                 });
 
                 summary = summaryResult.output?.summary;

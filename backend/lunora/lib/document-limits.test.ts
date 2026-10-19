@@ -7,6 +7,7 @@ import {
     chatAttachmentLimit,
     exceedsDocumentLimit,
     isDocumentMimeType,
+    MARKDOWN_EXTRACTION_MAX_BYTES,
     MAX_EXTRACTION_DOCUMENT_BYTES,
     MAX_EXTRACTION_DOCUMENT_MEGABYTES,
 } from "./document-limits";
@@ -17,6 +18,11 @@ describe("document limits", () => {
         expect(MAX_EXTRACTION_DOCUMENT_MEGABYTES).toBe(25);
         expect(exceedsDocumentLimit(MAX_EXTRACTION_DOCUMENT_BYTES)).toBe(false);
         expect(exceedsDocumentLimit(MAX_EXTRACTION_DOCUMENT_BYTES + 1)).toBe(true);
+    });
+
+    it("extracts a document as Markdown only up to 5 MiB", () => {
+        expect(MARKDOWN_EXTRACTION_MAX_BYTES).toBe(5 * 1024 * 1024);
+        expect(MARKDOWN_EXTRACTION_MAX_BYTES).toBeLessThan(MAX_EXTRACTION_DOCUMENT_BYTES);
     });
 
     it("matches the parser's own cap", () => {

@@ -2,7 +2,7 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Document Parser API",
-        "description": "Cloudflare Worker (Rust, xberg) that extracts text, tables, and metadata from documents. Private: reached only through the backend's service binding. Maintained by hand \u2014 the Rust Worker serves no /openapi.json.",
+        "description": "Cloudflare Worker (Rust, xberg) that extracts text, tables, and metadata from documents. Private: reached only through the backend's service binding. Maintained by hand — the Rust Worker serves no /openapi.json.",
         "version": "1.0.0"
     },
     "paths": {
@@ -21,6 +21,17 @@
                             "type": "string"
                         },
                         "description": "MIME type of the document"
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": ["plain", "markdown"],
+                            "default": "plain"
+                        },
+                        "description": "plain (the default): xberg's plain-text rendering. markdown: headings, lists and tables kept as Markdown. A PDF is split into pages and a PPTX into slides (plain text, not Markdown); those come back in `pages`, and `content` is empty. Knowledge ingestion asks for markdown; the other callers keep plain."
                     }
                 ],
                 "requestBody": {
@@ -46,7 +57,7 @@
                         }
                     },
                     "400": {
-                        "description": "Bad request (empty body)",
+                        "description": "Bad request (empty body, or an unknown format option)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -155,7 +166,24 @@
                 "properties": {
                     "content": {
                         "type": "string",
-                        "description": "Extracted text content"
+                        "description": "Extracted text content. Empty when `pages` is present, so the text is never sent twice."
+                    },
+                    "pages": {
+                        "type": "array",
+                        "description": "Only for a PDF or a PPTX requested with format=markdown: one entry per page, in order. Absent otherwise.",
+                        "items": {
+                            "type": "object",
+                            "required": ["pageNumber", "content"],
+                            "properties": {
+                                "pageNumber": {
+                                    "type": "number",
+                                    "description": "The page, 1-based"
+                                },
+                                "content": {
+                                    "type": "string"
+                                }
+                            }
+                        }
                     },
                     "mimeType": {
                         "type": "string",

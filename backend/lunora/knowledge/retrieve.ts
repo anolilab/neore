@@ -14,12 +14,19 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { callOnShard } from "../lib/cross-shard";
-import { gatewayFetch } from "../lib/services";
+import { assertOk, fetchWithDeadline, HttpError } from "../lib/fetch-timeout";
+import { gatewayFetch, SERVICE_ORIGIN } from "../lib/services";
 import { reciprocalRankFusion } from "./hybrid";
 import { MAX_LENGTH } from "../lib/validators";
 
 const EMBEDDING_MODEL_NAME = "text-embedding-004";
 const MAX_RESULTS = 5;
+
+/**
+ * What fusion hands the reranker: three times what a caller gets back, so the
+ * cross-encoder can promote a passage the rank-only fusion left at 8th.
+ */
+export const RERANK_CANDIDATES = MAX_RESULTS * 3;
 
 interface RankedChunk {
     chunkId: string;
@@ -28,6 +35,8 @@ interface RankedChunk {
     /** The knowledge file the chunk came from — eval runs match expected sources by it. */
     fileId: string;
     fileName: string;
+    /** The page the chunk starts on, for PDF and PPTX; absent for other formats and older chunks. */
+    pageNumber?: number;
 }
 
 /**
@@ -108,21 +117,30 @@ const vHit = v.object({
     content: v.string(),
     fileId: v.string(),
     fileName: v.string(),
+    pageNumber: v.optional(v.number()),
     score: v.number(),
 });
 
-type Hit = { chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number };
+type Hit = { chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number };
 
 /**
  * Fuses the two legs by rank (deduplicated by chunk id) into the rows callers
  * read. `score` is the RRF score: comparable within one response, not across.
  * `chunkId` and `chunkIndex` are what a citation points at (`citations.ts`).
  */
-export const fuseSearchLegs = (vectorHits: ReadonlyArray<RankedChunk>, keywordHits: ReadonlyArray<RankedChunk>): Hit[] =>
+export const fuseSearchLegs = (vectorHits: ReadonlyArray<RankedChunk>, keywordHits: ReadonlyArray<RankedChunk>, limit: number = MAX_RESULTS): Hit[] =>
     reciprocalRankFusion<RankedChunk>([vectorHits, keywordHits], (chunk) => chunk.chunkId)
-        .slice(0, MAX_RESULTS)
+        .slice(0, limit)
         .map(({ item, score }) => {
-            return { chunkId: item.chunkId, chunkIndex: item.chunkIndex, content: item.content, fileId: item.fileId, fileName: item.fileName, score };
+            return {
+                chunkId: item.chunkId,
+                chunkIndex: item.chunkIndex,
+                content: item.content,
+                fileId: item.fileId,
+                fileName: item.fileName,
+                ...(item.pageNumber !== undefined && { pageNumber: item.pageNumber }),
+                score,
+            };
         });
 
 /**
@@ -130,15 +148,15 @@ export const fuseSearchLegs = (vectorHits: ReadonlyArray<RankedChunk>, keywordHi
  * collection owner's — by rank again. Scores from different shards are not
  * comparable; ranks are.
  */
-export const mergeResultLists = (lists: ReadonlyArray<ReadonlyArray<Hit>>): Hit[] => {
+export const mergeResultLists = (lists: ReadonlyArray<ReadonlyArray<Hit>>, limit: number = MAX_RESULTS): Hit[] => {
     const nonEmpty = lists.filter((list) => list.length > 0);
 
     if (nonEmpty.length <= 1) {
-        return [...(nonEmpty[0] ?? [])].slice(0, MAX_RESULTS);
+        return [...(nonEmpty[0] ?? [])].slice(0, limit);
     }
 
     return reciprocalRankFusion<Hit>(nonEmpty, (hit) => hit.chunkId)
-        .slice(0, MAX_RESULTS)
+        .slice(0, limit)
         .map(({ item, score }) => {
             return { ...item, score };
         });
@@ -189,7 +207,72 @@ const searchFiles = async (
             }),
     ]);
 
-    return fuseSearchLegs(vectorHits, keywordHits);
+    return fuseSearchLegs(vectorHits, keywordHits, RERANK_CANDIDATES);
+};
+
+/** How long retrieval waits for the reranker before keeping the fused order: it sits on the path to every knowledge-grounded reply. */
+const RERANK_TIMEOUT_MS = 2000;
+
+/** A reranker score for the candidate at `index` of the list that was sent. */
+export interface RerankScore {
+    index: number;
+    score: number;
+}
+
+/**
+ * Cuts the fused candidates to what callers get. With reranker scores the final
+ * order is the fused order and the reranker's order fused AGAIN by rank, not the
+ * reranker's order alone: the model is strongest on English and Chinese, and a
+ * blend keeps a wrong-language ordering from burying what both legs agreed on.
+ * Without scores — nothing to rerank, no reranker bound, any failure — it is the
+ * fused order, i.e. what retrieval returned before reranking existed.
+ */
+export const applyRerank = (candidates: ReadonlyArray<Hit>, scores: ReadonlyArray<RerankScore> | null): Hit[] => {
+    // A partial answer would hand its first scored hit the top reranker rank over candidates it never saw.
+    if (!scores || new Set(scores.map(({ index }) => index)).size !== candidates.length || candidates.length <= MAX_RESULTS) {
+        return candidates.slice(0, MAX_RESULTS);
+    }
+
+    const byReranker = scores.toSorted((a, b) => b.score - a.score).flatMap(({ index }) => (candidates[index] ? [candidates[index]] : []));
+
+    return reciprocalRankFusion<Hit>([candidates, byReranker], (hit) => hit.chunkId)
+        .slice(0, MAX_RESULTS)
+        .map(({ item, score }) => {
+            return { ...item, score };
+        });
+};
+
+/**
+ * Asks the gateway's reranker to score the candidates against the query.
+ * `null` on every failure: an unbound reranker (503, the normal case in local
+ * dev) is silent, anything else logs once and moves on.
+ */
+const rerankCandidates = async (ctx: ActionCtx, query: string, candidates: ReadonlyArray<Hit>): Promise<RerankScore[] | null> => {
+    if (candidates.length <= MAX_RESULTS) {
+        return null;
+    }
+
+    try {
+        const response = await fetchWithDeadline(`${SERVICE_ORIGIN.llmGateway}/internal/rerank`, {
+            body: JSON.stringify({ documents: candidates.map((hit) => hit.content), query: query.slice(0, 2000), topN: candidates.length }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+            timeoutMs: RERANK_TIMEOUT_MS,
+            via: gatewayFetch(ctx),
+        });
+
+        await assertOk(response, "Rerank gateway error");
+
+        const { results } = (await response.json()) as { results?: RerankScore[] };
+
+        return Array.isArray(results) ? results : null;
+    } catch (error) {
+        if (!(error instanceof HttpError && error.status === 503)) {
+            console.warn("[knowledge_retrieve] Rerank failed, keeping the fused order:", error);
+        }
+
+        return null;
+    }
 };
 
 /**
@@ -280,8 +363,11 @@ export const searchKnowledgeBase = async (ctx: ActionCtx, args: { fileIds?: stri
         ),
     ]);
 
-    // 4. Fuse by rank. `score` is the RRF score: comparable within one response, not across.
-    return mergeResultLists(lists);
+    // 4. Fuse by rank, then let the reranker reorder the candidates. `score` is an
+    // RRF score either way: comparable within one response, not across.
+    const candidates = mergeResultLists(lists, RERANK_CANDIDATES);
+
+    return applyRerank(candidates, await rerankCandidates(ctx, args.query, candidates));
 };
 
 export const search = internalAction
@@ -305,7 +391,7 @@ const MAX_QUERY_LENGTH = 2000;
 export const searchKnowledge = authAction
     .use(rateLimit("knowledge/search"))
     .input({ query: v.string().max(MAX_LENGTH.long) })
-    .output(v.array(v.object({ chunkIndex: v.number(), content: v.string(), fileName: v.string(), score: v.number() })))
+    .output(v.array(v.object({ chunkIndex: v.number(), content: v.string(), fileName: v.string(), pageNumber: v.optional(v.number()), score: v.number() })))
     .action(async ({ args, ctx }) => {
         const query = args.query.trim();
 
@@ -313,11 +399,20 @@ export const searchKnowledge = authAction
             throw new LunoraError("BAD_REQUEST", `Query must be 1-${String(MAX_QUERY_LENGTH)} characters`);
         }
 
-        const results = await ctx.runAction(internal.knowledge.retrieve.search, { query, userId: ctx.user.userId });
+        const hits = await ctx.runAction(internal.knowledge.retrieve.search, { query, userId: ctx.user.userId });
 
-        ctx.log.event("knowledge.search_knowledge", { queryLength: query.length, resultCount: results.length });
+        ctx.log.event("knowledge.search_knowledge", { queryLength: query.length, resultCount: hits.length });
 
-        return results;
+        // `.output()` rejects keys it does not declare, so only the public fields go out.
+        return hits.map((hit) => {
+            return {
+                chunkIndex: hit.chunkIndex,
+                content: hit.content,
+                fileName: hit.fileName,
+                ...(hit.pageNumber !== undefined && { pageNumber: hit.pageNumber }),
+                score: hit.score,
+            };
+        });
     });
 
 export default search;

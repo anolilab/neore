@@ -4,6 +4,7 @@
  */
 import type { AppEnv } from "../env.js";
 import type { RequestTelemetry } from "../lib/otel/index.js";
+import { SpanKind } from "../lib/otel/index.js";
 import { buildEvent, deliverEvent } from "../lib/webhook-delivery.js";
 import type { NotificationEvent } from "./notifications.js";
 import { evaluateRules } from "./notifications.js";
@@ -25,6 +26,8 @@ export interface UsageLogEntry {
     latencyMs: number;
     modelApiId: string;
     modelId: string;
+    /** What the call was, as OpenTelemetry's GenAI conventions name it. Set it and the call also exports as a GenAI span. */
+    operation?: "chat" | "embeddings";
     orgId?: string;
     promptTokens: number;
     provider: string;
@@ -62,6 +65,10 @@ export class UsageTracker {
             streaming: entry.isStreaming,
         };
 
+        if (entry.operation) {
+            this.recordGenAiSpan(telemetry, entry, entry.operation);
+        }
+
         telemetry.recordCounter("gateway.tokens_total", entry.promptTokens, { ...labels, kind: "prompt" }, "1");
         telemetry.recordCounter("gateway.tokens_total", entry.completionTokens, { ...labels, kind: "completion" }, "1");
 
@@ -89,6 +96,33 @@ export class UsageTracker {
         }
     }
 
+    /**
+     * One span per model call in OpenTelemetry's GenAI conventions
+     * (`gen_ai.*`), which LLM-aware backends read to show a call as a
+     * generation, with its model, token counts and latency. The caller's user
+     * id and the prompt are NOT attached: spans go to an operator-chosen
+     * collector, and neither is needed to read a trace.
+     */
+    private static recordGenAiSpan(telemetry: RequestTelemetry, entry: UsageLogEntry, operation: "chat" | "embeddings"): void {
+        telemetry.recordSpan(`${operation} ${entry.modelApiId}`, {
+            attributes: {
+                "gateway.cost_microdollars": entry.costMicrodollars,
+                "gateway.finish_reason": entry.finishReason,
+                "gateway.request_id": entry.requestId,
+                "gen_ai.operation.name": operation,
+                "gen_ai.provider.name": entry.provider,
+                "gen_ai.request.model": entry.modelApiId,
+                "gen_ai.response.model": entry.routedModelId ?? entry.modelApiId,
+                "gen_ai.system": entry.provider,
+                "gen_ai.usage.input_tokens": entry.promptTokens,
+                ...(operation === "chat" && { "gen_ai.usage.output_tokens": entry.completionTokens }),
+            },
+            durationMs: entry.latencyMs,
+            error: entry.errorCode ? new Error(entry.errorCode) : undefined,
+            kind: SpanKind.CLIENT,
+        });
+    }
+
     private db: D1Database;
 
     private env: AppEnv;
@@ -99,11 +133,13 @@ export class UsageTracker {
     }
 
     /**
-     * Record a usage log entry to D1. Optionally emit OTel metrics in
-     * parallel — pass `c.var.telemetry` to get token/cost/latency
-     * histograms and counters exported alongside the D1 row.
+     * Record a usage log entry to D1. Optionally emit OTel metrics — pass
+     * `c.var.telemetry` to get token/cost/latency histograms and counters
+     * exported alongside the D1 row.
      */
     async record(entry: UsageLogEntry, telemetry?: RequestTelemetry): Promise<void> {
+        // Before the first await: a handler that calls this synchronously has its metrics
+        // buffered before the middleware's flush.
         if (telemetry) UsageTracker.recordMetrics(telemetry, entry);
 
         const id = crypto.randomUUID();
@@ -152,60 +188,28 @@ export class UsageTracker {
             // Usage tracking is non-blocking — log and continue
             console.error("[UsageTracker] Failed to record usage:", error);
         }
+
+        await flushQuietly(telemetry);
     }
 
     /**
      * Record usage and evaluate notification rules.
      * Returns whether the user should be blocked and any triggered notifications.
      *
-     * When `telemetry` is provided, OTel metrics are emitted in parallel with
-     * the D1 write. Pass `c.var.telemetry` from any route handler.
+     * When `telemetry` is provided, OTel metrics are emitted with the D1 write, and
+     * the request's telemetry is flushed once more at the end. A streamed reply
+     * records here after the middleware has already flushed, so this is what exports it.
      */
     async recordAndEvaluate(entry: UsageLogEntry, telemetry?: RequestTelemetry): Promise<RecordResult> {
-        await this.record(entry);
-
         if (telemetry) UsageTracker.recordMetrics(telemetry, entry);
 
-        const result = await evaluateRules(this.env, entry.userId, entry.orgId, entry);
+        try {
+            await this.record(entry);
 
-        // If blocked, store in KV for pre-request checks (1-hour TTL) and fire budget_exceeded webhook
-        if (result.blocked) {
-            const kv = this.env.RATE_LIMIT_KV;
-
-            try {
-                await kv.put(`blocked:${entry.userId}`, new Date(Date.now() + 3_600_000).toISOString(), { expirationTtl: 3600 });
-            } catch {
-                // Non-critical
-            }
-
-            // Fire budget_exceeded webhook (non-blocking, best-effort)
-            deliverEvent(
-                this.db,
-                buildEvent(
-                    "budget_exceeded",
-                    entry.userId,
-                    {
-                        costMicrodollars: entry.costMicrodollars,
-                        modelId: entry.modelId,
-                        requestId: entry.requestId,
-                    },
-                    entry.orgId,
-                ),
-            ).catch(() => {
-                // Non-critical
-            });
+            return await evaluateAndNotify(this.env, this.db, entry);
+        } finally {
+            await flushQuietly(telemetry);
         }
-
-        // Forward notifications to the backend if any were triggered
-        if (result.notifications.length > 0) {
-            try {
-                await sendNotifications(this.env, entry.userId, result.notifications);
-            } catch {
-                // Non-critical — notifications are best-effort
-            }
-        }
-
-        return result;
     }
 
     /**
@@ -223,6 +227,58 @@ export class UsageTracker {
         }
     }
 }
+
+const evaluateAndNotify = async (env: AppEnv, db: D1Database, entry: UsageLogEntry): Promise<RecordResult> => {
+    const result = await evaluateRules(env, entry.userId, entry.orgId, entry);
+
+    // If blocked, store in KV for pre-request checks (1-hour TTL) and fire budget_exceeded webhook
+    if (result.blocked) {
+        const kv = env.RATE_LIMIT_KV;
+
+        try {
+            await kv.put(`blocked:${entry.userId}`, new Date(Date.now() + 3_600_000).toISOString(), { expirationTtl: 3600 });
+        } catch {
+            // Non-critical
+        }
+
+        // Fire budget_exceeded webhook (non-blocking, best-effort)
+        deliverEvent(
+            db,
+            buildEvent(
+                "budget_exceeded",
+                entry.userId,
+                {
+                    costMicrodollars: entry.costMicrodollars,
+                    modelId: entry.modelId,
+                    requestId: entry.requestId,
+                },
+                entry.orgId,
+            ),
+        ).catch(() => {
+            // Non-critical
+        });
+    }
+
+    // Forward notifications to the backend if any were triggered
+    if (result.notifications.length > 0) {
+        try {
+            await sendNotifications(env, entry.userId, result.notifications);
+        } catch {
+            // Non-critical — notifications are best-effort
+        }
+    }
+
+    return result;
+};
+
+/** Telemetry must never fail the caller, so an export error is dropped here. */
+const flushQuietly = async (telemetry: RequestTelemetry | undefined): Promise<void> => {
+    try {
+        await telemetry?.flush();
+    } catch {
+        // Non-critical
+    }
+};
 
 const sendNotifications = async (env: AppEnv, userId: string, notifications: NotificationEvent[]): Promise<void> => {
     const lunoraUrl = env.LUNORA_URL;

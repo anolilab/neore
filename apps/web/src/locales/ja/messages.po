@@ -30,7 +30,7 @@ msgid ", unread"
 msgstr "、未読"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:339
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:340
 msgid "...and {0} more"
 msgstr "…他 {0} 件"
 
@@ -81,7 +81,7 @@ msgstr "現在の Azure OpenAI API には \"v1\" を指定します。2024-10-21
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "（{0} / {MAX_PARTICIPANTS}、最低 {MIN_PARTICIPANTS}）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 件失敗）"
 
@@ -206,7 +206,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 人のメンバー}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:336
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, other {# 件のメッセージ}}"
 
@@ -371,18 +371,18 @@ msgid "{0} chunks"
 msgstr "{0} チャンク"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
 msgid "{0} conversations failed to import"
 msgstr "{0} 件の会話をインポートできませんでした"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
 msgid "{0} conversations found"
 msgstr "{0} 件の会話が見つかりました"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
 msgid "{0} conversations imported from {1}"
 msgstr "{1} から {0} 件の会話をインポートしました"
 
@@ -483,7 +483,7 @@ msgstr "{1} 件中 {0} 件のケースが完了"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:370
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
 msgid "{0} of {1} conversations imported"
 msgstr "{1} 件中 {0} 件の会話をインポートしました"
 
@@ -1090,15 +1090,15 @@ msgstr "<0>Enter</0> 作成"
 msgid "<0>Esc</0> Close"
 msgstr "<0>Esc</0> 閉じる"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:928
+#: src/features/settings/components/chat/trigger-settings.tsx:934
 msgid "<0>Event</0> — React to external events via MCP or Composio (coming in Phase 2)."
 msgstr "<0>イベント</0> — MCP または Composio 経由で外部イベントに反応します（フェーズ 2 で提供予定）。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:910
+#: src/features/settings/components/chat/trigger-settings.tsx:916
 msgid "<0>Schedule</0> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard 5-field cron expressions."
 msgstr "<0>スケジュール</0> — cron スケジュールで実行します（例：毎日午前 8 時）。標準的な 5 フィールドの cron 式を使用します。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:919
+#: src/features/settings/components/chat/trigger-settings.tsx:925
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — 外部サービス（Stripe、GitHub、Zapier）から HTTP POST リクエストを受信します。リクエストはタイムスタンプ付きの HMAC で署名され、リプレイは拒否されます。"
 
@@ -1428,7 +1428,7 @@ msgstr "ツールの呼び出しに承認が必要です"
 msgid "A tool cannot be both added and disabled"
 msgstr "同じツールを追加と無効化の両方に指定することはできません"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:295
+#: src/features/settings/components/chat/trigger-settings.tsx:301
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "このトリガーを作成すると、固有の Webhook URL とシークレットが生成されます。この URL を外部サービス（Zapier、n8n、独自のコードなど）の送信先として使用してください。"
 
@@ -1595,7 +1595,7 @@ msgstr "アクティブ"
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
 #: src/features/settings/components/chat/model-filter-settings.tsx:194
 #: src/features/settings/components/chat/model-filter-settings.tsx:255
-#: src/features/settings/components/chat/trigger-settings.tsx:718
+#: src/features/settings/components/chat/trigger-settings.tsx:724
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
 msgid "Active"
@@ -3455,7 +3455,7 @@ msgstr "オートコンプリートを有効にしました"
 msgid "Autocomplete while typing"
 msgstr "入力中のオートコンプリート"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:626
+#: src/features/settings/components/chat/trigger-settings.tsx:632
 msgid "Automate agent execution on schedules, webhooks, or events"
 msgstr "スケジュール、Webhook、イベントでエージェントの実行を自動化"
 
@@ -4497,13 +4497,13 @@ msgstr "カナダ"
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:708
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:239
-#: src/features/settings/components/chat/trigger-settings.tsx:348
+#: src/features/settings/components/chat/trigger-settings.tsx:354
 #: src/features/settings/components/chat/usage-settings.tsx:569
 #: src/features/settings/components/chat/usage-settings.tsx:577
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:347
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:348
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4527,7 +4527,7 @@ msgstr "ディープワークをキャンセル"
 msgid "Cancel Export"
 msgstr "エクスポートをキャンセル"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:375
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:376
 msgid "Cancel Import"
 msgstr "インポートをキャンセル"
 
@@ -6354,6 +6354,10 @@ msgstr "絞り設定で被写界深度を調整します"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "UI での個人情報の表示方法を管理します。"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:22
+msgid "Control panel"
+msgstr ""
+
 #: src/features/workflow/components/nodes/controlnet-node.tsx:182
 msgid "Control Strength"
 msgstr "制御の強さ"
@@ -6472,7 +6476,7 @@ msgstr "コピーしました！"
 #: src/features/chat/sharing/thread-share-button.tsx:366
 #: src/features/chat/thread/message-item.tsx:301
 #: src/features/chat/thread/text-selection-menu.tsx:384
-#: src/features/settings/components/chat/trigger-settings.tsx:674
+#: src/features/settings/components/chat/trigger-settings.tsx:680
 msgid "Copy"
 msgstr "コピー"
 
@@ -6541,7 +6545,7 @@ msgstr "Channel secret（Basic settings）をコピーし、長期の Channel ac
 msgid "Copy the Phone number ID, a permanent (System User) access token, and the App Secret (App settings > Basic). Choose any Verify token."
 msgstr "Phone number ID、永続的な（System User）アクセストークン、App Secret（App settings > Basic）をコピーしてください。Verify token は任意の値を指定できます。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:657
+#: src/features/settings/components/chat/trigger-settings.tsx:663
 msgid "Copy this secret now and store it with your webhook sender. It will not be shown again."
 msgstr ""
 
@@ -6562,7 +6566,7 @@ msgstr "クリップボードにコピー"
 msgid "Copy value"
 msgstr "値をコピー"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:750
+#: src/features/settings/components/chat/trigger-settings.tsx:756
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:219
 msgid "Copy webhook URL"
 msgstr "Webhook URL をコピー"
@@ -6658,7 +6662,7 @@ msgstr ""
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:564
+#: src/features/settings/components/chat/trigger-settings.tsx:570
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr ""
 
@@ -6695,9 +6699,13 @@ msgstr "コメントを削除できませんでした"
 msgid "Could not delete the page"
 msgstr "ページを削除できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:111
-msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
-msgstr "チャットのプロバイダーを検出できませんでした。ChatGPT、Gemini、Claude の有効なエクスポートファイルをアップロードしたか確認してください。"
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:119
+msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:118
+#~ msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
+#~ msgstr "チャットのプロバイダーを検出できませんでした。ChatGPT、Gemini、Claude の有効なエクスポートファイルをアップロードしたか確認してください。"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:58
 msgid "Could not export the workflow"
@@ -7076,8 +7084,8 @@ msgstr "チームを作成"
 msgid "Create teams to organize members into groups"
 msgstr "チームを作成して、メンバーをグループに整理します"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:646
-#: src/features/settings/components/chat/trigger-settings.tsx:894
+#: src/features/settings/components/chat/trigger-settings.tsx:652
+#: src/features/settings/components/chat/trigger-settings.tsx:900
 msgid "Create Trigger"
 msgstr "トリガーを作成"
 
@@ -7097,7 +7105,7 @@ msgstr "最初のプロンプトを作成して、スレッドのシステムプ
 msgid "Create your first skill to automate workflows. Import from GitHub, upload SKILL.md files, or install from the official catalog."
 msgstr "最初のスキルを作成してワークフローを自動化しましょう。GitHub からインポートしたり、SKILL.md ファイルをアップロードしたり、公式カタログからインストールしたりできます。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:890
+#: src/features/settings/components/chat/trigger-settings.tsx:896
 msgid "Create your first trigger to automate agent execution on a schedule, via webhooks, or from external events."
 msgstr "最初のトリガーを作成して、スケジュール、Webhook、外部イベントによるエージェントの実行を自動化しましょう。"
 
@@ -7223,7 +7231,7 @@ msgstr "クロアチア語"
 msgid "Croatian (Croatia)"
 msgstr "クロアチア語（クロアチア）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:259
+#: src/features/settings/components/chat/trigger-settings.tsx:265
 msgid "Cron Expression"
 msgstr "Cron 式"
 
@@ -7231,7 +7239,7 @@ msgstr "Cron 式"
 msgid "Cron expression (UTC)"
 msgstr "Cron 式（UTC）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:266
+#: src/features/settings/components/chat/trigger-settings.tsx:272
 msgid "Cron presets"
 msgstr "cron のプリセット"
 
@@ -7457,7 +7465,7 @@ msgstr "1 日あたりのコスト（マイクロドル）"
 msgid "Daily Cost Trend"
 msgstr "日別コストの推移"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:179
+#: src/features/settings/components/chat/trigger-settings.tsx:182
 msgid "Daily inbox summary"
 msgstr "毎日の受信トレイの要約"
 
@@ -7811,7 +7819,7 @@ msgstr "AI ソフトウェアエンジニアの Devin にタスクを委任"
 #: src/features/settings/components/chat/bots-settings.tsx:181
 #: src/features/settings/components/chat/bots-settings.tsx:190
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
-#: src/features/settings/components/chat/trigger-settings.tsx:945
+#: src/features/settings/components/chat/trigger-settings.tsx:951
 #: src/features/skills/components/skill-list.tsx:290
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
@@ -7823,7 +7831,7 @@ msgstr "削除"
 #. placeholder {0}: deletingTrigger.name
 #. placeholder {0}: selected.name
 #: src/features/knowledge/components/collection-picker.tsx:106
-#: src/features/settings/components/chat/trigger-settings.tsx:951
+#: src/features/settings/components/chat/trigger-settings.tsx:957
 #: src/features/skills/components/skill-list.tsx:296
 msgid "Delete \"{0}\"?"
 msgstr "「{0}」を削除しますか？"
@@ -8050,11 +8058,11 @@ msgstr "スレッドを削除"
 msgid "Delete Threads"
 msgstr "スレッドを削除"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:802
+#: src/features/settings/components/chat/trigger-settings.tsx:808
 msgid "Delete trigger"
 msgstr "トリガーを削除"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:951
+#: src/features/settings/components/chat/trigger-settings.tsx:957
 msgid "Delete trigger?"
 msgstr ""
 
@@ -8258,7 +8266,7 @@ msgid "Description"
 msgstr "説明"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:170
-#: src/features/settings/components/chat/trigger-settings.tsx:219
+#: src/features/settings/components/chat/trigger-settings.tsx:225
 msgid "Description (optional)"
 msgstr "説明（任意）"
 
@@ -8314,7 +8322,7 @@ msgid "Details for case {0}"
 msgstr "ケース {0} の詳細"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:324
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
 msgid "Detected: {0}"
 msgstr "検出：{0}"
 
@@ -8449,7 +8457,7 @@ msgstr "外部リンクの警告を無効化"
 msgid "Disable tool <0>{0}</0>"
 msgstr "ツール <0>{0}</0> を無効化"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:793
+#: src/features/settings/components/chat/trigger-settings.tsx:799
 msgid "Disable trigger"
 msgstr "トリガーを無効にする"
 
@@ -8458,7 +8466,7 @@ msgid "Disable Two-Factor"
 msgstr "二要素認証を無効化"
 
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:50
-#: src/features/settings/components/chat/trigger-settings.tsx:720
+#: src/features/settings/components/chat/trigger-settings.tsx:726
 msgid "Disabled"
 msgstr "無効"
 
@@ -8528,7 +8536,7 @@ msgstr "エラーを閉じる"
 msgid "Dismiss setup suggestions"
 msgstr "セットアップの提案を閉じる"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:660
+#: src/features/settings/components/chat/trigger-settings.tsx:666
 msgid "Dismiss webhook secret"
 msgstr ""
 
@@ -8659,6 +8667,10 @@ msgstr "ダブルクリックして編集"
 #: src/features/workflow/components/nodes/group-node.tsx:314
 msgid "Double-click to rename"
 msgstr "ダブルクリックして名前を変更"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:15
+msgid "down"
+msgstr ""
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:180
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
@@ -8982,7 +8994,7 @@ msgstr "各コードは 1 回しか使えません。パスワードと同様に
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Discord の各チャンネルごとに、Neore Chat に別々のスレッドが作成されます。AI はチャンネル内で自動的に応答します。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:935
+#: src/features/settings/components/chat/trigger-settings.tsx:941
 msgid "Each trigger creates a new thread and runs your agent with up to 25 iterations (Deep Work mode). Results are visible in your thread list."
 msgstr "各トリガーは新しいスレッドを作成し、最大 25 回の反復（ディープワークモード）でエージェントを実行します。結果はスレッド一覧で確認できます。"
 
@@ -9164,11 +9176,11 @@ msgstr "AI で画像の特定の領域を編集"
 msgid "Edit task"
 msgstr "タスクを編集"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:787
+#: src/features/settings/components/chat/trigger-settings.tsx:793
 msgid "Edit trigger"
 msgstr "トリガーを編集"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:700
+#: src/features/settings/components/chat/trigger-settings.tsx:706
 msgid "Edit Trigger"
 msgstr "トリガーを編集"
 
@@ -9497,7 +9509,7 @@ msgstr "専用モジュールを有効にして AI の機能を強化"
 msgid "Enable tool <0>{0}</0>"
 msgstr "ツール <0>{0}</0> を有効化"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:793
+#: src/features/settings/components/chat/trigger-settings.tsx:799
 msgid "Enable trigger"
 msgstr "トリガーを有効にする"
 
@@ -10030,11 +10042,11 @@ msgid "Evaluate JS"
 msgstr "JS を評価"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:135
-#: src/features/settings/components/chat/trigger-settings.tsx:387
+#: src/features/settings/components/chat/trigger-settings.tsx:393
 msgid "Event"
 msgstr "イベント"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:315
+#: src/features/settings/components/chat/trigger-settings.tsx:321
 msgid "Event triggers via MCP/Composio are coming in Phase 2. For now, use webhook triggers to connect external services."
 msgstr "MCP/Composio 経由のイベントトリガーはフェーズ 2 で提供予定です。現時点では、Webhook トリガーを使って外部サービスと接続してください。"
 
@@ -10078,7 +10090,7 @@ msgstr "各参加者は他の回答を見ずに個別に回答し、統合役が
 msgid "Every provider. <0>One SDK.</0>"
 msgstr "すべてのプロバイダーを。<0>1 つの SDK で。</0>"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:301
+#: src/features/settings/components/chat/trigger-settings.tsx:307
 msgid "Every request must be signed. Send <0>X-Neore-Timestamp</0> (the current Unix time in seconds) and <1>X-Signature-256: sha256=<hex></1>, the HMAC-SHA256 of <2><timestamp>.<raw body></2> keyed with the secret. Requests more than 5 minutes old, unsigned, or replayed are rejected."
 msgstr "すべてのリクエストに署名が必要です。<0>X-Neore-Timestamp</0>（現在の Unix 時刻、秒単位）と <1>X-Signature-256: sha256=<hex></1> を送信してください。後者は、シークレットをキーとした <2><timestamp>.<raw body></2> の HMAC-SHA256 です。5 分以上前のリクエスト、署名のないリクエスト、リプレイされたリクエストは拒否されます。"
 
@@ -10225,7 +10237,7 @@ msgstr "実行に失敗しました"
 msgid "Execution history"
 msgstr "実行履歴"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:824
+#: src/features/settings/components/chat/trigger-settings.tsx:830
 msgid "Execution History"
 msgstr "実行履歴"
 
@@ -10728,7 +10740,7 @@ msgstr "プリセットを作成できませんでした"
 msgid "Failed to create tag"
 msgstr "タグを作成できませんでした"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:477
+#: src/features/settings/components/chat/trigger-settings.tsx:483
 msgid "Failed to create trigger"
 msgstr "トリガーを作成できませんでした"
 
@@ -10806,7 +10818,7 @@ msgstr "データセットを削除できませんでした"
 msgid "Failed to delete threads"
 msgstr "スレッドを削除できませんでした"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:542
+#: src/features/settings/components/chat/trigger-settings.tsx:548
 msgid "Failed to delete trigger"
 msgstr "トリガーを削除できませんでした"
 
@@ -10975,7 +10987,7 @@ msgstr "スレッドを移動できませんでした"
 msgid "Failed to optimize prompt"
 msgstr "プロンプトを最適化できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:238
 msgid "Failed to parse file"
 msgstr "ファイルを解析できませんでした"
 
@@ -11159,11 +11171,11 @@ msgstr "確認メールを送信できませんでした"
 msgid "Failed to start impersonation"
 msgstr "なりすましを開始できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:272
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:273
 msgid "Failed to start import"
 msgstr "インポートを開始できませんでした"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:577
+#: src/features/settings/components/chat/trigger-settings.tsx:583
 msgid "Failed to start test run"
 msgstr "テスト実行を開始できませんでした"
 
@@ -11298,8 +11310,8 @@ msgstr "スレッドの公開範囲を更新できませんでした"
 msgid "Failed to update tool permission"
 msgstr "ツールの権限を更新できませんでした"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:508
-#: src/features/settings/components/chat/trigger-settings.tsx:523
+#: src/features/settings/components/chat/trigger-settings.tsx:514
+#: src/features/settings/components/chat/trigger-settings.tsx:529
 msgid "Failed to update trigger"
 msgstr "トリガーを更新できませんでした"
 
@@ -11983,6 +11995,7 @@ msgid "Fisheye, extreme distortion"
 msgstr "魚眼、極端な歪み"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:54
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:23
 msgid "Fit view"
 msgstr "全体を表示"
 
@@ -13371,6 +13384,10 @@ msgstr "H"
 msgid "Hand (pan)"
 msgstr "ハンド（パン）"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:28
+msgid "Handle"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:298
 msgid "Handles demanding creative concepts"
 msgstr "高度なクリエイティブコンセプトにも対応"
@@ -13758,7 +13775,7 @@ msgstr "一時チャットが自動削除されるまでの保持期間です。
 msgid "How often the agent retries with the verifier's feedback before asking you to review."
 msgstr "レビューを依頼する前に、エージェントが検証役のフィードバックをもとに再試行する回数です。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:904
+#: src/features/settings/components/chat/trigger-settings.tsx:910
 msgid "How Triggers Work"
 msgstr "トリガーの仕組み"
 
@@ -14068,11 +14085,11 @@ msgstr "なりすましを終了"
 msgid "Import"
 msgstr "インポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
 msgid "Import All"
 msgstr "すべてインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:283
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
 msgid "Import cancelled"
 msgstr "インポートをキャンセルしました"
 
@@ -14080,28 +14097,32 @@ msgstr "インポートをキャンセルしました"
 msgid "Import cases"
 msgstr "ケースをインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:384
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
 msgid "Import complete!"
 msgstr "インポートが完了しました！"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:300
 msgid "Import Conversations"
 msgstr "会話をインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:298
-msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+#~ msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#~ msgstr ""
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:210
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "ChatGPT、Google Gemini、Claude から会話をインポートします。エクスポートした JSON または ZIP ファイルをアップロードしてください。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:132
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:398
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:133
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:399
 msgid "Import failed"
 msgstr "インポートに失敗しました"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:390
 msgid "Import More"
 msgstr "さらにインポート"
 
@@ -14109,7 +14130,7 @@ msgstr "さらにインポート"
 msgid "Import Notion export (.zip)"
 msgstr "Notion のエクスポートをインポート（.zip）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:211
 msgid "Import one kind of export at a time."
 msgstr ""
 
@@ -14160,7 +14181,7 @@ msgid "Imported skill \"{0}\""
 msgstr "スキル「{0}」をインポートしました"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:363
 msgid "Importing from {0}..."
 msgstr "{0} からインポートしています..."
 
@@ -14387,7 +14408,7 @@ msgstr "画像を入力または生成"
 msgid "Input or transform text"
 msgstr "テキストを入力または変換"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:335
+#: src/features/settings/components/chat/trigger-settings.tsx:341
 msgid "Input Template"
 msgstr "入力テンプレート"
 
@@ -15134,7 +15155,7 @@ msgstr "最後のフレーム"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:410
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:411
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "前回のインポート：{2} に {1} から {0} 件の会話"
 
@@ -15171,7 +15192,7 @@ msgstr "最終更新 <0>{0}</0>"
 msgid "Last used {date}"
 msgstr "最終使用 {date}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:738
+#: src/features/settings/components/chat/trigger-settings.tsx:744
 msgid "Last: {lastRunAt}"
 msgstr "前回: {lastRunAt}"
 
@@ -15384,6 +15405,10 @@ msgstr "組織から退出"
 msgid "Leave Team"
 msgstr "チームから退出"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:16
+msgid "left"
+msgstr ""
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:397
 #: src/features/workflow/components/nodes/outpaint-node.tsx:25
 msgid "Left"
@@ -15422,7 +15447,7 @@ msgstr "返信でツールを使う"
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Neore デスクトップアプリを通じて、エージェントがあなたのコンピューター上のファイル、ターミナル、ローカル MCP サーバーを使えるようにします。すべての操作はまずそのコンピューターで確認を求め、共有チャットやバックグラウンドタスクからは何も実行されません。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:205
+#: src/features/settings/components/chat/trigger-settings.tsx:211
 msgid "Let the bot use its computer"
 msgstr ""
 
@@ -15487,7 +15512,7 @@ msgstr "{0} 行目：{1}"
 msgid "Line {line}, column {column}"
 msgstr "{line} 行目、{column} 列目"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:168
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:181
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
 msgstr ""
 
@@ -15784,7 +15809,7 @@ msgstr "スレッドを読み込んでいます"
 msgid "Loading threads..."
 msgstr "スレッドを読み込んでいます..."
 
-#: src/features/settings/components/chat/trigger-settings.tsx:615
+#: src/features/settings/components/chat/trigger-settings.tsx:621
 msgid "Loading triggers..."
 msgstr "トリガーを読み込んでいます..."
 
@@ -15809,7 +15834,7 @@ msgstr "概要を読み込み中…"
 #: src/features/settings/components/chat/default-models-settings.tsx:132
 #: src/features/settings/components/chat/native-providers-settings.tsx:396
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:165
-#: src/features/settings/components/chat/trigger-settings.tsx:832
+#: src/features/settings/components/chat/trigger-settings.tsx:838
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
 #: src/routes/_shortcut.tsx:40
@@ -16679,6 +16704,10 @@ msgstr "Azure Bot の Microsoft App ID"
 msgid "Min"
 msgstr "Min"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:29
+msgid "Mini map"
+msgstr ""
+
 #: src/features/canvas/components/design-preset-selector.tsx:179
 msgid "Minimal Card"
 msgstr "ミニマルカード"
@@ -17254,6 +17283,11 @@ msgstr "上へ移動"
 msgid "Move up one page"
 msgstr "1 ページ上へ移動"
 
+#. placeholder {0}: directions[direction] ?? direction
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:33
+msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
+msgstr ""
+
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:113
 msgid "MP4/MOV video"
 msgstr "MP4/MOV 動画"
@@ -17377,7 +17411,7 @@ msgstr "ミャンマー語（ミャンマー）"
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:154
-#: src/features/settings/components/chat/trigger-settings.tsx:174
+#: src/features/settings/components/chat/trigger-settings.tsx:177
 #: src/features/settings/components/chat/usage-settings.tsx:429
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
@@ -17799,7 +17833,7 @@ msgstr "新しいスレッド"
 msgid "New Thread"
 msgstr "新しいスレッド"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:630
+#: src/features/settings/components/chat/trigger-settings.tsx:636
 msgid "New Trigger"
 msgstr "新しいトリガー"
 
@@ -17963,7 +17997,7 @@ msgstr "添付ファイルなし"
 msgid "No audit logs found"
 msgstr "監査ログが見つかりません"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:193
+#: src/features/settings/components/chat/trigger-settings.tsx:199
 msgid "No bot"
 msgstr ""
 
@@ -18027,7 +18061,7 @@ msgstr "コンテンツなし"
 msgid "No content to display"
 msgstr "表示するコンテンツがありません"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:219
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:220
 msgid "No conversations found in the file."
 msgstr "ファイル内に会話が見つかりませんでした。"
 
@@ -18082,7 +18116,7 @@ msgstr "このバージョンの差分データはありません"
 msgid "No enabled MCP servers."
 msgstr "有効な MCP サーバーはありません。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:874
+#: src/features/settings/components/chat/trigger-settings.tsx:880
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:236
 msgid "No executions yet"
 msgstr "まだ実行されていません"
@@ -18453,7 +18487,7 @@ msgstr "共有されているツールはまだありません"
 msgid "No tools."
 msgstr "ツールはありません。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:888
+#: src/features/settings/components/chat/trigger-settings.tsx:894
 msgid "No triggers yet"
 msgstr "トリガーはまだありません"
 
@@ -19904,7 +19938,7 @@ msgstr "並列比較"
 msgid "Paris"
 msgstr "パリ"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:318
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:319
 msgid "Parsing file..."
 msgstr "ファイルを解析しています..."
 
@@ -19940,9 +19974,15 @@ msgid "Pass rate"
 msgstr "合格率"
 
 #. placeholder {0}: citation.chunkIndex + 1
-#: src/features/knowledge/components/knowledge-source-group.tsx:66
+#: src/features/knowledge/components/knowledge-source-group.tsx:68
 msgid "Passage {0}, cited as [{position}]"
 msgstr "パッセージ {0}（[{position}] として引用）"
+
+#. placeholder {0}: citation.chunkIndex + 1
+#. placeholder {1}: citation.pageNumber
+#: src/features/knowledge/components/knowledge-source-group.tsx:69
+msgid "Passage {0}, page {1}, cited as [{position}]"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:83
 msgid "passed"
@@ -20750,6 +20790,18 @@ msgstr "プリセット"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1101
 msgid "Press ? for keyboard shortcuts"
 msgstr "? キーでキーボードショートカットを表示"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:30
+msgid "Press enter or space to select a node. Press delete to remove it and escape to cancel."
+msgstr ""
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:31
+msgid "Press enter or space to select a node. You can then use the arrow keys to move the node around. Press delete to remove it and escape to cancel."
+msgstr ""
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:27
+msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:263
 msgid "Press Enter to send"
@@ -22857,6 +22909,10 @@ msgstr "豊富な世界知識を生成に活用"
 msgid "RIFF (WAV/AVI/WebP)"
 msgstr "RIFF (WAV/AVI/WebP)"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:17
+msgid "right"
+msgstr ""
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:399
 #: src/features/workflow/components/nodes/outpaint-node.tsx:26
 msgid "Right"
@@ -22992,7 +23048,7 @@ msgstr "各ケースに対して、スキル、またはシステムプロンプ
 msgid "Run again"
 msgstr "もう一度実行"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:187
+#: src/features/settings/components/chat/trigger-settings.tsx:190
 msgid "Run as bot (optional)"
 msgstr ""
 
@@ -23105,7 +23161,7 @@ msgstr "{0} の実行"
 msgid "Runs on Cloudflare Workers — sub-50ms cold starts, 300+ edge locations worldwide."
 msgstr "Cloudflare Workers で動作 — コールドスタート 50ms 未満、世界 300 以上のエッジロケーション。"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:734
+#: src/features/settings/components/chat/trigger-settings.tsx:740
 msgid "Runs: {runCount}"
 msgstr "実行回数: {runCount}"
 
@@ -23345,7 +23401,7 @@ msgid "Scene Description"
 msgstr "シーンの説明"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:136
-#: src/features/settings/components/chat/trigger-settings.tsx:395
+#: src/features/settings/components/chat/trigger-settings.tsx:401
 msgid "Schedule"
 msgstr "スケジュール"
 
@@ -23361,7 +23417,7 @@ msgstr "定期クリーンアップ"
 msgid "Scheduled job"
 msgstr "スケジュールされたジョブ"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:207
+#: src/features/settings/components/chat/trigger-settings.tsx:213
 msgid "Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings."
 msgstr ""
 
@@ -23741,7 +23797,7 @@ msgstr "音声入力の言語を選択"
 msgid "Select duration"
 msgstr "期間を選択"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:312
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:313
 msgid "Select File"
 msgstr "ファイルを選択"
 
@@ -24055,7 +24111,7 @@ msgstr "アプリケーションのテキストの方向を設定します。RTL
 msgid "Set up a local model server"
 msgstr "ローカルモデルサーバーをセットアップ"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:169
+#: src/features/settings/components/chat/trigger-settings.tsx:172
 msgid "Set up a new automated agent execution"
 msgstr "新しい自動エージェント実行を設定します"
 
@@ -24610,7 +24666,7 @@ msgid "Skipped"
 msgstr "スキップ済み"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:328
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
 msgid "Skipped files that are not chat exports: {0}"
 msgstr ""
 
@@ -25294,7 +25350,7 @@ msgstr "開始中"
 msgid "Starting {0}…"
 msgstr "{0} を開始しています…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
 msgid "Starting import..."
 msgstr "インポートを開始しています..."
 
@@ -25848,7 +25904,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "成功基準は {CRITERIA_MAX} 文字以内で入力してください"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:128
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:129
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "{0} から {imported} 件の会話をインポートしました"
 
@@ -25889,11 +25945,11 @@ msgstr "ドキュメントや URL を要約..."
 msgid "Summarize any webpage in seconds"
 msgstr "あらゆる Web ページを数秒で要約"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:224
+#: src/features/settings/components/chat/trigger-settings.tsx:230
 msgid "Summarize my email inbox every morning"
 msgstr "毎朝メールの受信トレイを要約して"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:339
+#: src/features/settings/components/chat/trigger-settings.tsx:345
 msgid "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 msgstr "受信トレイを要約して、緊急の項目を強調してください。Webhook データには {PAYLOAD_TOKEN} を使用します。"
 
@@ -25929,9 +25985,17 @@ msgstr "複数ファイルにまたがる優れたコード生成とリファク
 msgid "Superior understanding of complex visual concepts"
 msgstr "複雑な視覚的コンセプトへの優れた理解"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:309
-msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
-msgstr "対応形式：ChatGPT のエクスポート（conversations.json）、Google Gemini（Takeout ZIP）、Claude.ai のエクスポート。"
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
+msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+#~ msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json)."
+#~ msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+#~ msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
+#~ msgstr "対応形式：ChatGPT のエクスポート（conversations.json）、Google Gemini（Takeout ZIP）、Claude.ai のエクスポート。"
 
 #: src/features/marketing/data/models-data.ts:249
 msgid "Supports 10-second video durations"
@@ -26076,7 +26140,7 @@ msgstr "システムプロンプト"
 #~ msgid "System Prompt"
 #~ msgstr "システムプロンプト"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:324
+#: src/features/settings/components/chat/trigger-settings.tsx:330
 #: src/features/workflow/components/nodes/ai-node.tsx:44
 msgid "System Prompt (optional)"
 msgstr "システムプロンプト（任意）"
@@ -26436,11 +26500,11 @@ msgstr "一時チャットで試用の準備ができました。自動的に削
 msgid "Test drive: {0}"
 msgstr "試用：{0}"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:574
+#: src/features/settings/components/chat/trigger-settings.tsx:580
 msgid "Test run scheduled — check your threads for the result"
 msgstr "テスト実行をスケジュールしました — 結果はスレッドで確認してください"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:771
+#: src/features/settings/components/chat/trigger-settings.tsx:777
 msgid "Test run trigger"
 msgstr "トリガーをテスト実行"
 
@@ -26651,7 +26715,7 @@ msgstr "アシスタントから質問があります"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:83
+#: src/features/chat/thread/composer-model-selector.tsx:85
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -26944,7 +27008,7 @@ msgstr "トークン予算はトークン数の整数で指定してください
 msgid "The Token you entered in the server configuration"
 msgstr "サーバー設定で入力した Token"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:946
+#: src/features/settings/components/chat/trigger-settings.tsx:952
 msgid "The trigger stops running and its execution history is removed. This cannot be undone."
 msgstr ""
 
@@ -27312,7 +27376,7 @@ msgstr "コンピューターからモデルファイルを削除します。後
 msgid "This run is no longer available."
 msgstr "この実行は利用できなくなりました。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:225
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:226
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr ""
 
@@ -27445,7 +27509,7 @@ msgid "Thought for a few seconds"
 msgstr "数秒間思考しました"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:298
-#: src/features/settings/components/chat/trigger-settings.tsx:867
+#: src/features/settings/components/chat/trigger-settings.tsx:873
 msgid "Thread"
 msgstr "スレッド"
 
@@ -27560,7 +27624,7 @@ msgid "Timestamps enabled"
 msgstr "タイムスタンプを表示しました"
 
 #: src/features/settings/components/account/account-settings.tsx:354
-#: src/features/settings/components/chat/trigger-settings.tsx:280
+#: src/features/settings/components/chat/trigger-settings.tsx:286
 msgid "Timezone"
 msgstr "タイムゾーン"
 
@@ -27623,6 +27687,10 @@ msgstr "列の表示を切り替え"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:575
 msgid "Toggle element palette"
 msgstr "要素パレットの表示を切り替え"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:24
+msgid "Toggle interactivity"
+msgstr ""
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("sidebarLeft"))
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:79
@@ -27934,23 +28002,23 @@ msgstr "三角形"
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "使用量の指標がしきい値を超えたときに通知またはブロックします"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:479
+#: src/features/settings/components/chat/trigger-settings.tsx:485
 msgid "Trigger created"
 msgstr "トリガーを作成しました"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:544
+#: src/features/settings/components/chat/trigger-settings.tsx:550
 msgid "Trigger deleted"
 msgstr "トリガーを削除しました"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:525
+#: src/features/settings/components/chat/trigger-settings.tsx:531
 msgid "Trigger disabled"
 msgstr "トリガーを無効にしました"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:525
+#: src/features/settings/components/chat/trigger-settings.tsx:531
 msgid "Trigger enabled"
 msgstr "トリガーを有効にしました"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:458
+#: src/features/settings/components/chat/trigger-settings.tsx:464
 msgid "Trigger name is required"
 msgstr "トリガー名は必須です"
 
@@ -27962,20 +28030,20 @@ msgstr "トリガーの実行に失敗しました"
 msgid "Trigger run finished"
 msgstr "トリガーの実行が完了しました"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:234
+#: src/features/settings/components/chat/trigger-settings.tsx:240
 msgid "Trigger type"
 msgstr "トリガーの種類"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:233
+#: src/features/settings/components/chat/trigger-settings.tsx:239
 msgid "Trigger Type"
 msgstr "トリガーの種類"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:510
+#: src/features/settings/components/chat/trigger-settings.tsx:516
 msgid "Trigger updated"
 msgstr "トリガーを更新しました"
 
 #: src/features/layout/lib/dashboard-page-names.ts:40
-#: src/features/settings/components/chat/trigger-settings.tsx:625
+#: src/features/settings/components/chat/trigger-settings.tsx:631
 msgid "Triggers"
 msgstr "トリガー"
 
@@ -28031,7 +28099,7 @@ msgstr "再試行"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
 msgid "Try Again"
 msgstr "もう一度試す"
 
@@ -28461,7 +28529,7 @@ msgstr "未保存の変更"
 #~ msgid "Unsupported file format. Please upload a .json or .zip file."
 #~ msgstr "サポートされていないファイル形式です。.json または .zip ファイルをアップロードしてください。"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:243
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:256
 msgid "Unsupported file format. Please upload a .json, .jsonl or .zip file."
 msgstr ""
 
@@ -28499,6 +28567,10 @@ msgstr "無題のスレッド"
 #: src/routes/(chat)/workflow/index.tsx:21
 msgid "Untitled Workflow"
 msgstr "無題のワークフロー"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:18
+msgid "up"
+msgstr ""
 
 #: src/features/workflow/components/version-history.tsx:150
 msgid "Up to {MAX_HISTORY_ENTRIES} versions saved"
@@ -28751,7 +28823,7 @@ msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} をアップロードしています"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:355
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
 msgid "Uploading data for import from {0}..."
 msgstr "{0} からのインポート用データをアップロードしています..."
 
@@ -29867,7 +29939,7 @@ msgid "Web search via Parallel's search API"
 msgstr "Parallel の検索 API による Web 検索"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:137
-#: src/features/settings/components/chat/trigger-settings.tsx:403
+#: src/features/settings/components/chat/trigger-settings.tsx:409
 msgid "Webhook"
 msgstr "Webhook"
 
@@ -29875,11 +29947,11 @@ msgstr "Webhook"
 msgid "Webhook notifications"
 msgstr "Webhook 通知"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:655
+#: src/features/settings/components/chat/trigger-settings.tsx:661
 msgid "Webhook secret"
 msgstr ""
 
-#: src/features/settings/components/chat/trigger-settings.tsx:562
+#: src/features/settings/components/chat/trigger-settings.tsx:568
 msgid "Webhook secret copied to clipboard"
 msgstr "Webhook シークレットをクリップボードにコピーしました"
 
@@ -29891,7 +29963,7 @@ msgstr "Telegram からの更新を検証するための Webhook シークレッ
 msgid "Webhook URL"
 msgstr "Webhook URL"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:606
+#: src/features/settings/components/chat/trigger-settings.tsx:612
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:132
 msgid "Webhook URL copied to clipboard"
 msgstr "Webhook URL をクリップボードにコピーしました"
@@ -30184,6 +30256,10 @@ msgstr "Workers、KV、R2 などの Cloudflare プラットフォームツール
 msgid "Workflow automation across thousands of apps"
 msgstr "数千のアプリをまたぐワークフロー自動化"
 
+#: src/features/workflow/components/canvas/workflow-canvas.tsx:306
+msgid "Workflow canvas"
+msgstr ""
+
 #: src/routes/(chat)/workflow/$workflowId.tsx:57
 #: src/routes/(chat)/workflow/shared/$token.tsx:45
 msgid "Workflow not found"
@@ -30385,7 +30461,7 @@ msgstr "あなた"
 msgid "You (another tab)"
 msgstr "あなた（別のタブ）"
 
-#: src/features/settings/components/chat/trigger-settings.tsx:328
+#: src/features/settings/components/chat/trigger-settings.tsx:334
 msgid "You are a helpful assistant that summarizes emails..."
 msgstr "あなたはメールを要約する有能なアシスタントです..."
 
@@ -30805,6 +30881,7 @@ msgstr "ZIP アーカイブ"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:283
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:289
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
 msgid "Zoom in"
 msgstr "拡大"
 
@@ -30820,6 +30897,7 @@ msgstr "ズームレンズ"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:249
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:255
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
 msgid "Zoom out"
 msgstr "縮小"
 
