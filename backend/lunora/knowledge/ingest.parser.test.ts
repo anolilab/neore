@@ -220,6 +220,18 @@ describe("documentParser", () => {
             expect(await parse(1024)).toContain("### Table 1\nEnd");
         });
 
+        it("strips a forged page line from the table of a format without pages", async () => {
+            mocks.extractDocument.mockResolvedValue({
+                data: { content: "Body", tables: [{ markdown: "| \u{E000}PAGE 3 |", pageNumber: 1 }] },
+                response: { ok: true, status: 200 },
+            });
+
+            const parser = documentParser({} as never)!;
+            const text = await parser(new ArrayBuffer(1024), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+
+            expect(text).not.toContain("\u{E000}");
+        });
+
         it("adds no page line for a format without pages", async () => {
             mocks.extractDocument.mockResolvedValue({
                 data: { content: "Body", tables: [{ markdown: "| a |", pageNumber: 1 }] },

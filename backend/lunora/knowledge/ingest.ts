@@ -103,7 +103,7 @@ export const documentParser = (ctx: ServicesContext): ParseDocument | undefined 
             const isPaged = isPagedMimeType(mimeType);
             const tableMarkdown = missingTables
                 .map(({ number, table }) => {
-                    const section = `### Table ${String(number)}\n${table.markdown}`;
+                    const section = `### Table ${String(number)}\n${stripPageSentinel(table.markdown)}`;
 
                     // A table appended after the last page would inherit that page: mark each with its own.
                     return `\n\n${isPaged ? markPage(table.pageNumber, section) : section}`;
