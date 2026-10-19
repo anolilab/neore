@@ -524,6 +524,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "auth_team:updateTeamMemberRole": lunora_auth_team_32.updateTeamMemberRole as unknown as RegisteredLunoraFunction,
     "auth_team:updateTeamSettings": lunora_auth_team_32.updateTeamSettings as unknown as RegisteredLunoraFunction,
     "billing_checkout:createCheckout": lunora_billing_checkout_33.createCheckout as unknown as RegisteredLunoraFunction,
+    "billing_checkout:getBillingOptions": lunora_billing_checkout_33.getBillingOptions as unknown as RegisteredLunoraFunction,
     "billing_checkout:getBillingSubject": lunora_billing_checkout_33.getBillingSubject as unknown as RegisteredLunoraFunction,
     "billing_checkout:getMyPlan": lunora_billing_checkout_33.getMyPlan as unknown as RegisteredLunoraFunction,
     "billing_checkout:getTeamPlansIPay": lunora_billing_checkout_33.getTeamPlansIPay as unknown as RegisteredLunoraFunction,
@@ -8172,7 +8173,8 @@ export interface Caller {
     };
     billing: {
         checkout: {
-            createCheckout: (args: { plan: "pro" | "team" }) => Promise<{ url: string }>;
+            createCheckout: (args: { interval?: "month" | "year"; plan: "pro" | "team" }) => Promise<{ url: string }>;
+            getBillingOptions: (args?: {}) => Promise<{ yearly: { pro: boolean; team: boolean } }>;
             getBillingSubject: (args: { id: string; kind: "organization" | "user" }) => Promise<{ baseTier: "free" | "pro" | "enterprise"; creemCustomerId: string | null; creemPurchaserId: string | null; creemSubscriptionId: string | null; exists: boolean; isAnonymous: boolean; seats: number }>;
             getMyPlan: (args?: {}) => Promise<({} & { baseTier: "free" | "pro" | "enterprise"; creemCustomerId: string | null; }) | null>;
             getTeamPlansIPay: (args?: {}) => Promise<Array<{ memberCount: number; name: string; organizationId: string }>>;
@@ -9124,10 +9126,10 @@ export interface Caller {
             saveNotifications: (args: { notifications: Array<{ action: "notify" | "block" | "notify_and_block"; currentValue: number; metric: string; ruleId: string; ruleName: string; threshold: number }>; userId: string }) => Promise<void>;
         };
         usage_functions: {
-            createMyNotificationRule: (args: { action?: "notify" | "block" | "notify_and_block"; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter?: string; name: string; period?: "hour" | "day" | "month"; threshold: number }) => Promise<{} & { action: "notify" | "block" | "notify_and_block"; createdAt: string; id: string; isActive: boolean; lastTriggeredAt: string | null; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter: string | null; name: string; orgId: string | null; period: "hour" | "day" | "month"; threshold: number; userId: string; }>;
+            createMyNotificationRule: (args: { action?: "notify" | "block" | "notify_and_block"; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter?: string; name: string; period?: "hour" | "day" | "month"; threshold: number }) => Promise<{} & { action: "notify" | "block" | "notify_and_block"; createdAt: string; id: string; isActive: boolean; lastTriggeredAt: string | null; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter: string | null; name: string; orgId: string | null; period: "month" | "hour" | "day"; threshold: number; userId: string; }>;
             deleteMyNotificationRule: (args: { ruleId: string }) => Promise<null>;
             getMyUsage: (args: { days?: number }) => Promise<{} & { byModel: Record<string, {} & { cost: number; requests: number; tokens: number; }>; dailyBreakdown: ({} & { completionTokens: number; costMicrodollars: number; date: string; promptTokens: number; requestCount: number; })[]; period: string; totalCompletionTokens: number; totalCostMicrodollars: number; totalPromptTokens: number; totalRequests: number; }>;
-            listMyNotificationRules: (args?: {}) => Promise<({} & { action: "notify" | "block" | "notify_and_block"; createdAt: string; id: string; isActive: boolean; lastTriggeredAt: string | null; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter: string | null; name: string; orgId: string | null; period: "hour" | "day" | "month"; threshold: number; userId: string; })[]>;
+            listMyNotificationRules: (args?: {}) => Promise<({} & { action: "notify" | "block" | "notify_and_block"; createdAt: string; id: string; isActive: boolean; lastTriggeredAt: string | null; metric: "daily_cost" | "monthly_cost" | "request_count" | "token_count"; modelFilter: string | null; name: string; orgId: string | null; period: "month" | "hour" | "day"; threshold: number; userId: string; })[]>;
         };
     };
     sandbox: {
@@ -9799,6 +9801,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
     billing: {
         checkout: {
             createCheckout: (args) => callRegistered(context, "billing_checkout:createCheckout", args),
+            getBillingOptions: (args) => callRegistered(context, "billing_checkout:getBillingOptions", args),
             getBillingSubject: (args) => callRegistered(context, "billing_checkout:getBillingSubject", args),
             getMyPlan: (args) => callRegistered(context, "billing_checkout:getMyPlan", args),
             getTeamPlansIPay: (args) => callRegistered(context, "billing_checkout:getTeamPlansIPay", args),
