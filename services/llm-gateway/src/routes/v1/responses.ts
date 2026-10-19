@@ -37,7 +37,7 @@ import {
 /** Sends a request through the top-level app. Wired in `src/index.ts`. */
 export type Dispatch = (request: Request, env: AppEnv, ctx: Context["executionCtx"]) => Response | Promise<Response>;
 
-/** Request headers the completions route reads: its bearer auth, its idempotency cache and the stream's CORS origin. */
+/** Request headers passed on as they are: the completions route's bearer auth and the stream's CORS origin. The idempotency key is forwarded separately, namespaced. */
 const FORWARDED_HEADERS = ["authorization", "origin"] as const;
 
 const GATEWAY_KEY_AUTHORIZATION_PREFIX = "Bearer gk_";
