@@ -457,9 +457,13 @@ describe("runVideoNode", () => {
         const actionContext = {
             runAction: vi.fn(),
             runMutation: vi.fn(),
-            runQuery: vi.fn(async (reference: unknown) =>
-                reference === internal.auth.billing.creditsLeftQuery ? { creditsLeft: 500 } : { isAdmin: false, plan: "premium" },
-            ),
+            runQuery: vi.fn(async (reference: unknown) => {
+                if (reference === internal.auth.billing.gatewayDeductionTakenQuery) {
+                    return false;
+                }
+
+                return reference === internal.auth.billing.creditsLeftQuery ? { creditsLeft: 500 } : { isAdmin: false, plan: "premium" };
+            }),
         };
         const frame: WorkflowEdge[] = [{ id: "e", source: "src", sourceHandle: "frame-start", target: "gen" }];
         const ctx = executionContextOf({

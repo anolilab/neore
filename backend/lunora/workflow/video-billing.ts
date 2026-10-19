@@ -129,6 +129,21 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
     return reserved;
 };
 
+/** The stored file a clip was saved as, or else its URL: unique to one generation, so it keys that clip's charge. */
+const clipIdOf = (result: unknown): string | undefined => {
+    if (typeof result !== "object" || result === null || !("assets" in result) || !Array.isArray(result.assets)) {
+        return undefined;
+    }
+
+    const [first] = result.assets as { fileId?: unknown; videoUrl?: unknown }[];
+
+    if (typeof first?.fileId === "string") {
+        return first.fileId;
+    }
+
+    return typeof first?.videoUrl === "string" ? first.videoUrl : undefined;
+};
+
 /** The model the clip is charged to, as the ledger records it. */
 const clipModelIdOf = (node: WorkflowNode): string => {
     const kind = videoKindOf(node);
@@ -282,14 +297,18 @@ export const runBilledVideo = async <T>(
     }
 
     if (costs.clipMicrodollars !== undefined) {
-        // The reservation in `beginVideoRun` already posted this request id, so the ledger makes this a no-op.
+        // A clip made under this attempt's own reservation is charged by that reservation, so the ledger makes this a no-op. A clip
+        // made when an earlier attempt already held the reservation is a clip of its own: it is charged under its own key, so the
+        // earlier attempt's release cannot remove the only record of it.
+        const clipId = reserved ? undefined : clipIdOf(result);
+
         await chargePaidCall(
             context,
             {
                 costMicrodollars: costs.clipMicrodollars,
                 modelId: clipModelIdOf(node),
                 orgId: run.orgId,
-                requestId: videoRequestId(run.runId, node.id),
+                requestId: clipId === undefined ? videoRequestId(run.runId, node.id) : `${videoRequestId(run.runId, node.id)}:clip:${clipId}`,
             },
             userId,
         );

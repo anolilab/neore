@@ -502,6 +502,23 @@ describe("the clip's credit reservation", () => {
         expect(ctx.left()).toBe(0);
     });
 
+    it("charges a clip made while an earlier attempt holds the reservation under that clip's own key", async () => {
+        const ctx = balanceCtx({ balance: 2000 });
+        const run = executionContextOf({ orgId: "org-1", runId: "run-a" });
+
+        await runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => {
+            return { assets: [{ fileId: "file-1" }] };
+        });
+        await runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => {
+            return { assets: [{ fileId: "file-2" }] };
+        });
+
+        expect(ctx.runMutation).toHaveBeenCalledWith(
+            internal.auth.billing.deductCreditsFromGateway,
+            expect.objectContaining({ costMicrodollars: CLIP, requestId: 'workflow-video:["run-a","gen"]:clip:file-2' }),
+        );
+    });
+
     it("gives the reservation back when the daily quota refuses the run", async () => {
         const ctx = balanceCtx({ balance: 1000, quotaOk: false });
 
