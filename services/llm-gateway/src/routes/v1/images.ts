@@ -146,6 +146,18 @@ imagesRouter.post("/v1/images/generations", expensiveEndpointRateLimit({ bucket:
             ),
         });
 
+        // Build OpenAI-compatible response
+        // Art. 50(2): every generated image leaves the gateway marked as AI-generated.
+        const data = result.images.map((img) => {
+            const base64 = markBase64Image(img.base64);
+
+            return {
+                b64_json: body.response_format === "b64_json" ? base64 : undefined,
+                revised_prompt: undefined as string | undefined,
+                url: body.response_format === "url" ? `data:${img.mediaType};base64,${base64}` : undefined,
+            };
+        });
+
         const latencyMs = Date.now() - startTime;
         const imageCount = result.images.length;
         const costMicrodollars = imageCount * modelInfo.costPerImageMicrodollars;
@@ -193,18 +205,6 @@ imagesRouter.post("/v1/images/generations", expensiveEndpointRateLimit({ bucket:
                     : []),
             ]),
         );
-
-        // Build OpenAI-compatible response
-        // Art. 50(2): every generated image leaves the gateway marked as AI-generated.
-        const data = result.images.map((img) => {
-            const base64 = markBase64Image(img.base64);
-
-            return {
-                b64_json: body.response_format === "b64_json" ? base64 : undefined,
-                revised_prompt: undefined as string | undefined,
-                url: body.response_format === "url" ? `data:${img.mediaType};base64,${base64}` : undefined,
-            };
-        });
 
         return c.json(
             {
