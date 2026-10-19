@@ -13,7 +13,7 @@ let cache: Promise<GatewayModel[]> | undefined;
  * Fetched once per panel lifetime; a failure is retried on next mount.
  */
 const loadModels = (): Promise<GatewayModel[]> => {
-    cache ??= fetch(`${LLM_GATEWAY_URL}/v1/models`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(5000) })
+    cache ??= fetch(`${LLM_GATEWAY_URL}/v1/models?prices=per-million`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(5000) })
         .then(async (response) => {
             if (!response.ok) {
                 await response.body?.cancel();

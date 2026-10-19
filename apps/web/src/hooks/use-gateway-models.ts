@@ -19,7 +19,8 @@ interface GatewayModelsResponse {
  * Fetch model catalog from the LLM Gateway.
  */
 async function fetchGatewayModels(): Promise<GatewayModelsResponse> {
-    const url = `${env.VITE_LLM_GATEWAY_URL}/v1/models`;
+    // The query string is a new cache key for browsers and CDNs: `/v1/models` alone was cached for up to an hour under the old, scaled per-million prices.
+    const url = `${env.VITE_LLM_GATEWAY_URL}/v1/models?prices=per-million`;
     const response = await fetch(url, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(5000),
