@@ -37,7 +37,7 @@ type ModelsListResponse = {
     version: typeof MODELS_VERSION;
 };
 
-const MODELS_LIST_CACHE_KEY = "models_list_v4";
+const MODELS_LIST_CACHE_KEY = "models_list_v5";
 const MODELS_LIST_CACHE_TTL = 3600; // 1 hour
 
 /**
@@ -264,9 +264,9 @@ const enrichModel = async (model: GatewayModelDefinition, pricingService: Pricin
         ...(pricing && {
             context_window: pricing.contextWindow,
             pricing: {
-                input_per_million: pricing.inputPerMillion / 1_000_000,
-                output_per_million: pricing.outputPerMillion / 1_000_000,
-                ...(pricing.cachedInputPerMillion && { cached_input_per_million: pricing.cachedInputPerMillion / 1_000_000 }),
+                input_per_million: pricing.inputPerMillion,
+                output_per_million: pricing.outputPerMillion,
+                ...(pricing.cachedInputPerMillion && { cached_input_per_million: pricing.cachedInputPerMillion }),
             },
         }),
     };
