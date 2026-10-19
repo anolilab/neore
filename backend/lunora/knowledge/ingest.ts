@@ -14,12 +14,12 @@ import type { Doc } from "../_generated/dataModel";
 import { type ActionCtx, internalAction } from "../_generated/server";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { fetchWithTimeout, isSafeUrl } from "../chat/tools/utilities";
-import { MAX_EXTRACTION_DOCUMENT_BYTES, MAX_EXTRACTION_DOCUMENT_MEGABYTES } from "../lib/document-limits";
+import { MARKDOWN_EXTRACTION_MAX_BYTES, MAX_EXTRACTION_DOCUMENT_BYTES, MAX_EXTRACTION_DOCUMENT_MEGABYTES } from "../lib/document-limits";
 import { FETCH_TIMEOUT_LONG_MS } from "../lib/fetch-timeout";
 import { gatewayFetch, isServiceBound, serviceFetch, type ServicesContext } from "../lib/services";
 import { readStoredObject } from "../lib/storage-read";
 import { chunkText, embeddingInput, estimateTokens } from "./chunking";
-import { documentToText, fetchUrlDocument, type ParseDocument } from "./sources";
+import { documentToText, fetchUrlDocument, hasMarkdownStructure, type ParseDocument } from "./sources";
 
 ("use node");
 
@@ -33,15 +33,6 @@ const MAX_FILE_SIZE = MAX_EXTRACTION_DOCUMENT_BYTES;
 // ============================================================================
 // Services
 // ============================================================================
-
-/**
- * Above this size a document is extracted as plain text. Markdown output costs
- * roughly twice the memory of plain on a text-dense PDF (87 MiB against 45 MiB at
- * 6 MB), so past about 9 MB it no longer fits the Worker's 128 MiB, while plain
- * text goes on to about 17 MB. A large file keeps what it could always do and
- * loses only its headings and pages.
- */
-export const MARKDOWN_EXTRACTION_MAX_BYTES = 5 * 1024 * 1024;
 
 /** The document-parser Worker as a {@link ParseDocument}, or `undefined` when its binding is absent. */
 export const documentParser = (ctx: ServicesContext): ParseDocument | undefined => {
@@ -137,7 +128,7 @@ const pageRenderer = (ctx: ServicesContext): ((url: string) => Promise<{ content
  * in the vault (`vaultFileId`). Read through `ctx.storage`, never over HTTP —
  * see `lib/storage-read.ts`. A URL also reports the page title.
  */
-const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Promise<{ text: string; title?: string }> => {
+const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Promise<{ markdown: boolean; text: string; title?: string }> => {
     const parse = documentParser(ctx);
 
     if (file.sourceUrl) {
@@ -148,7 +139,11 @@ const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Prom
             render: pageRenderer(ctx),
         });
 
-        return { text: fetched.text, title: fetched.title };
+        return {
+            markdown: hasMarkdownStructure(new URL(fetched.url).pathname, fetched.mimeType),
+            text: fetched.text,
+            title: fetched.title,
+        };
     }
 
     let key = file.storageKey;
@@ -165,7 +160,7 @@ const loadSourceText = async (ctx: ActionCtx, file: Doc<"knowledgeFiles">): Prom
 
     const { bytes } = await readStoredObject(ctx.storage, key, { maxBytes: MAX_FILE_SIZE });
 
-    return { text: await documentToText(bytes, file.mimeType, parse) };
+    return { markdown: hasMarkdownStructure(file.name, file.mimeType), text: await documentToText(bytes, file.mimeType, parse) };
 };
 
 // ============================================================================
@@ -204,14 +199,14 @@ export const ingestFile = internalAction
             }
 
             // 3. The text, from an upload, a stored document or a URL.
-            const { text: extractedText, title } = await loadSourceText(ctx, file);
+            const { markdown, text: extractedText, title } = await loadSourceText(ctx, file);
 
             if (!extractedText.trim()) {
                 throw new LunoraError("UNPROCESSABLE", "No text content could be extracted from the file");
             }
 
             // 4. Chunk the extracted text
-            const chunks = chunkText(extractedText);
+            const chunks = chunkText(extractedText, { markdown });
 
             if (chunks.length === 0) {
                 throw new LunoraError("UNPROCESSABLE", "No text content could be extracted from the file");

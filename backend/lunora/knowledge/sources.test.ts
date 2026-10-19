@@ -6,7 +6,16 @@
 import { describe, expect, it, type Mock, vi } from "vitest";
 
 import { isSafeUrl } from "../chat/tools/utilities";
-import { documentToText, fetchUrlDocument, htmlToText, MAX_URL_BYTES, normalizeIngestUrl, type UrlFetchDependencies } from "./sources";
+import {
+    documentToText,
+    fetchUrlDocument,
+    hasMarkdownStructure,
+    htmlToText,
+    isRawText,
+    MAX_URL_BYTES,
+    normalizeIngestUrl,
+    type UrlFetchDependencies,
+} from "./sources";
 
 const TOO_SLOW = /longer than/u;
 
@@ -173,5 +182,24 @@ describe(documentToText, () => {
     it("needs the parser for binary documents", async () => {
         await expect(documentToText(new ArrayBuffer(4), "application/pdf", undefined)).rejects.toThrow("parser");
         await expect(documentToText(new ArrayBuffer(4), "application/pdf", async () => "ok")).resolves.toBe("ok");
+    });
+});
+
+describe("markdown structure", () => {
+    it.each([
+        ["notes.txt", "text/plain", false],
+        ["main.py", "text/x-python", false],
+        ["config.yaml", "application/yaml", false],
+        ["README.md", "text/plain", true],
+        ["notes", "text/markdown", true],
+        ["report.pdf", "application/pdf", true],
+        ["page", "text/html", true],
+    ])("%s (%s) has Markdown structure: %s", (name, mimeType, expected) => {
+        expect(hasMarkdownStructure(name, mimeType)).toBe(expected);
+    });
+
+    it("reads text/markdown as Markdown, not as raw text", () => {
+        expect(isRawText("text/markdown")).toBe(false);
+        expect(isRawText("text/x-python")).toBe(true);
     });
 });

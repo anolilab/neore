@@ -4,7 +4,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { documentParser, MARKDOWN_EXTRACTION_MAX_BYTES } from "./ingest";
+import { MARKDOWN_EXTRACTION_MAX_BYTES } from "../lib/document-limits";
+import { documentParser } from "./ingest";
 
 const mocks = vi.hoisted(() => {
     return { extractDocument: vi.fn() };

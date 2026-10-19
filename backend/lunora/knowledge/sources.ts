@@ -48,6 +48,18 @@ export const isPlainTextMimeType = (mimeType: string): boolean => {
     return !isHtmlMimeType(base) && (TEXT_MIME_TYPES.has(base) || base.startsWith("text/"));
 };
 
+/** Text read as it is, with no parser in between. Markdown is the exception: read the same way, but its headings are structure. */
+export const isRawText = (mimeType: string): boolean => isPlainTextMimeType(mimeType) && baseMimeType(mimeType) !== "text/markdown";
+
+const MARKDOWN_FILE_NAME_RE = /\.md$/iu;
+
+/**
+ * Whether text from this file has Markdown structure, so its `#` lines are
+ * headings. Parser output and HTML do (the parser and `htmlToText` write them);
+ * raw text does not, except a `.md` file. `name` is a file name or URL path.
+ */
+export const hasMarkdownStructure = (name: string, mimeType: string): boolean => !isRawText(mimeType) || MARKDOWN_FILE_NAME_RE.test(name);
+
 // ─── HTML ────────────────────────────────────────────────────────────────────
 
 const DROP_ELEMENTS_RE = /<(script|style|noscript|svg|head|template|iframe)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
@@ -332,7 +344,8 @@ export const fetchUrlDocument = async (url: string, dependencies: UrlFetchDepend
             const rendered = await dependencies.render(url);
 
             if (rendered.content.trim()) {
-                return { mimeType: "text/html", text: rendered.content.trim(), title: rendered.title, url };
+                // The renderer returns the page's text content, not its markup or Markdown.
+                return { mimeType: "text/plain", text: rendered.content.trim(), title: rendered.title, url };
             }
         } catch {
             // Fall back to fetching the HTML directly.

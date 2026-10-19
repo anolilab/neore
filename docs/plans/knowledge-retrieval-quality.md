@@ -35,6 +35,12 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
   ingested into the knowledge base. Chat attachments still get plain text, so
   they chunk as before.
 
+- **Opt-in per source.** `chunkText(text, { markdown: true })` is what reads
+  headings and `<!-- PAGE n -->` markers; the default is the plain paragraph
+  packer. Ingestion passes the flag for parser output and Markdown files and
+  not for raw text types (code, config, plain text), where a `# comment` line is
+  not a heading and would otherwise split a file into one chunk per comment.
+
 ## Part B — rerank
 
 - New gateway route `POST /internal/rerank` (reachable only through the backend's service binding, like `/internal/speech`):
@@ -104,4 +110,4 @@ Retrieval is vector + BM25 fused by RRF (`hybrid.ts`) over chunks cut by
 
 ## Out of scope
 
-Knowledge graphs, CAG, and per-collection tuning (see `peer-gap-backlog.md`).
+Knowledge graphs, CAG, and per-collection tuning (see `gap-backlog.md`).

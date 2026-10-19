@@ -58,6 +58,9 @@ interface PackedChunk {
     pageNumber?: number;
 }
 
+/** A paragraph's text and page marker. Outside Markdown a page-marker-looking line is just text. */
+const bodyOf = (paragraph: string, markdown: boolean): { body: string; marker?: number } => (markdown ? stripPageMarkers(paragraph) : { body: paragraph });
+
 /**
  * Packs paragraphs into strings of ~CHUNK_TARGET_TOKENS with overlap.
  *
@@ -67,7 +70,7 @@ interface PackedChunk {
  * so it starts on the page that chunk ended on. `page` is the page in effect
  * at the end of `text`, which the next section continues from.
  */
-const packParagraphs = (text: string, startPage: number | undefined): { chunks: PackedChunk[]; page: number | undefined } => {
+const packParagraphs = (text: string, startPage: number | undefined, markdown: boolean): { chunks: PackedChunk[]; page: number | undefined } => {
     const paragraphs = text.split(BLANK_LINE_RE);
     const chunks: PackedChunk[] = [];
 
@@ -77,7 +80,7 @@ const packParagraphs = (text: string, startPage: number | undefined): { chunks: 
     let currentChunk = "";
 
     for (const paragraph of paragraphs) {
-        const stripped = stripPageMarkers(paragraph);
+        const stripped = bodyOf(paragraph, markdown);
 
         page = stripped.marker ?? page;
 
@@ -240,20 +243,29 @@ const foldHeadingOnly = (sections: Section[]): Section[] => {
     return folded;
 };
 
+export interface ChunkOptions {
+    /**
+     * The text is Markdown: `#` lines are headings and `<!-- PAGE n -->` lines
+     * are the parser's page markers. Off by default, because code and config
+     * are full of `#` comments, and read as headings each one splits the file.
+     */
+    markdown?: boolean;
+}
+
 /**
  * Split text into paragraph-aware chunks of ~CHUNK_TARGET_TOKENS with overlap.
- * Markdown headings start a new chunk and are reported as `sectionHeading`;
- * overlap never crosses a heading, so a chunk's text belongs to one section.
- * `<!-- PAGE n -->` lines (the parser's, for PDFs) are reported as `pageNumber`
- * and never appear in the text.
+ * With `markdown`, headings start a new chunk and are reported as
+ * `sectionHeading` (overlap never crosses one, so a chunk's text belongs to one
+ * section), and `<!-- PAGE n -->` lines are reported as `pageNumber` and never
+ * appear in the text. Without it the text is packed as paragraphs and nothing else.
  */
-export const chunkText = (text: string): TextChunk[] => {
+export const chunkText = (text: string, { markdown = false }: ChunkOptions = {}): TextChunk[] => {
     const chunks: TextChunk[] = [];
-    const sections = foldHeadingOnly(splitAtHeadings(text));
+    const sections: Section[] = markdown ? foldHeadingOnly(splitAtHeadings(text)) : [{ text }];
     let page: number | undefined;
 
     for (const section of sections) {
-        const packed = packParagraphs(section.text, page);
+        const packed = packParagraphs(section.text, page, markdown);
 
         page = packed.page;
 
