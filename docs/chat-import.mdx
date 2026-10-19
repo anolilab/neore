@@ -83,7 +83,7 @@ The import tool handles the entire process:
 - An export keeps every reply you regenerated or edited, and does not record which one you kept. The alternatives are combined into one message rather than imported separately.
 - Exports made before Neore recorded each message's role do not say who wrote it. Replies that did not follow one of your prompts are then imported as your messages: results of sub-agent and coding-agent runs, the text after a tool approval or an answered question, and the replies of later speakers in a group chat. Request a new export to avoid this.
 - A failed or interrupted reply keeps the text it had.
-- Timestamps are the creation times Neore recorded for each conversation and message.
+- A message keeps the time it was imported with (its original time when it came from another platform), and the time Neore created it otherwise. A conversation's time is the creation time Neore recorded.
 - Importing the same export twice creates the conversations twice. Delete the duplicates from the thread list if you import it again.
 - The export is capped at 32 MB. An import whose conversations come to more than 25 MB is refused with a "too large" message; nothing is cut short.
 

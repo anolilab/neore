@@ -93,11 +93,12 @@ const roleOf = (message: unknown): string | undefined => {
 };
 
 const projectMessage = (
-    message: Pick<Doc<"messages">, "_creationTime" | "message" | "model" | "order" | "status" | "stepOrder" | "text" | "tool"> & { _id: string },
+    message: Pick<Doc<"messages">, "_creationTime" | "createdAt" | "message" | "model" | "order" | "status" | "stepOrder" | "text" | "tool"> & { _id: string },
 ) => {
     return {
         _id: message._id,
-        createdAt: message._creationTime,
+        // The display time: an imported message keeps its source time there, and a re-import should keep it too.
+        createdAt: message.createdAt ?? message._creationTime,
         model: message.model,
         order: message.order,
         role: roleOf(message.message),

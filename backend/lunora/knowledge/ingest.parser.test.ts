@@ -104,4 +104,38 @@ describe("documentParser", () => {
 
         await expect(parse(1024)).rejects.toThrow("at most");
     });
+
+    describe("tables the Markdown lacks", () => {
+        const withTables = (tables: { markdown: string; pageNumber: number }[]) => {
+            mocks.extractDocument.mockResolvedValue({
+                data: { content: "<!-- PAGE 1 -->\n\nBody\n\n<!-- PAGE 3 -->\n\nEnd", tables },
+                response: { ok: true, status: 200 },
+            });
+        };
+
+        it("marks each appended table with its own page, so it is not cited under the last one", async () => {
+            withTables([{ markdown: "| a |\n| - |\n| 1 |", pageNumber: 2 }]);
+
+            const text = await parse(1024);
+
+            expect(text).toContain("<!-- PAGE 2 -->\n\n### Table 1\n| a |");
+            expect(text.indexOf("<!-- PAGE 2 -->")).toBeGreaterThan(text.indexOf("<!-- PAGE 3 -->"));
+        });
+
+        it("leaves a table the Markdown already carries where it is", async () => {
+            withTables([{ markdown: "Body", pageNumber: 1 }]);
+
+            expect(await parse(1024)).not.toContain("Extracted Tables");
+        });
+
+        it("adds no page marker for a format without pages", async () => {
+            withTables([{ markdown: "| a |", pageNumber: 1 }]);
+
+            const parser = documentParser({} as never)!;
+            const text = await parser(new ArrayBuffer(1024), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+
+            expect(text).toContain("### Table 1");
+            expect(text.split("<!-- PAGE")).toHaveLength(3);
+        });
+    });
 });

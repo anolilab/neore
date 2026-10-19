@@ -47,6 +47,8 @@ describe("collectConversations", () => {
 
                     for (let m = 0; m < MESSAGES_PER_THREAD; m += 1) {
                         await context.db.insert("messages", {
+                            // The first message of the first thread carries an imported display time.
+                            ...(t === 0 && m === 0 && { createdAt: 1_600_000_000_000 }),
                             message: { content: `t${String(t)}-m${String(m)}`, role: m % 2 === 0 ? "user" : "assistant" },
                             order: m,
                             status: "success",
@@ -82,9 +84,14 @@ describe("collectConversations", () => {
             expect(exported.map((conversation) => conversation.thread.title)).not.toContain("Not mine");
 
             // The row has no role column; the export reads it from the stored UI message so a re-import can tell a reply that opens its own order from a prompt.
-            const roles = exported[0]?.messages.map((message) => (message as { role?: string }).role);
+            const first = exported.find((conversation) => conversation.messages[0]?.text === "t0-m0");
+            const roles = first?.messages.map((message) => (message as { role?: string }).role);
+            const times = first?.messages.map((message) => (message as { createdAt?: number }).createdAt);
 
             expect(roles?.slice(0, 2)).toEqual(["user", "assistant"]);
+            // A re-import keeps an imported message's source time; a row without one falls back to its creation time.
+            expect(times?.[0]).toBe(1_600_000_000_000);
+            expect(times?.[1]).toBeGreaterThan(1_600_000_000_000);
 
             for (const conversation of exported) {
                 // Ascending, complete, in order.
