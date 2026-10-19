@@ -1,7 +1,8 @@
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
-import { deductCreditsFromGateway } from "../auth/billing";
+import { deductCreditsFromGateway, releaseGatewayCredits, reserveGatewayCredits, VIDEO_RESERVATION_SCOPE } from "../auth/billing";
+import { completeKey, reapLapsedClaims } from "../lib/claim-once";
 import schema from "../schema";
 import { internal } from "../_generated/internal";
 import type { WorkflowNode } from "./core";
@@ -35,6 +36,10 @@ const makeCtx = ({ creditsLeft = null, limitOk = true }: Answers = {}) => {
         throw new Error("unexpected query");
     });
     const runMutation = vi.fn(async (reference: unknown, _args?: unknown) => {
+        if (reference === internal.auth.billing.reserveGatewayCredits) {
+            return { outcome: "taken" };
+        }
+
         if (reference === internal.chat.daily_charge.chargeDailyUnit) {
             return limitOk;
         }
@@ -50,13 +55,15 @@ const REQUEST_ID = 'workflow-video:["run","gen"]';
 
 /**
  * A deduction ledger keyed on the request id, as `applyGatewayDeduction` is: a repeat of a request id posts nothing.
- * `deductFailures` makes the first deductions throw; `recordFails` makes the claim write throw.
+ * `deductFailures` makes the first deductions throw; `recordFails` makes the charge-record claim write throw.
+ * `claims` holds the charge records; `leases` holds the reservation leases.
  */
 const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures?: number; recordFails?: boolean } = {}) => {
     const ledger = new Map<string, number>();
     const posted: string[] = [];
     const deductions: Record<string, unknown>[] = [];
     const claims: unknown[] = [];
+    const leases: unknown[] = [];
     let failures = deductFailures;
     const runMutation = vi.fn(async (reference: unknown, args?: any) => {
         if (reference === internal.auth.billing.deductCreditsFromGateway) {
@@ -77,6 +84,12 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
         }
 
         if (reference === internal.lib.claim_once.claimKey) {
+            if (args.scope === "video-reservation") {
+                leases.push(args);
+
+                return true;
+            }
+
             if (recordFails) {
                 throw new Error("claims unavailable");
             }
@@ -84,6 +97,10 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
             claims.push(args);
 
             return true;
+        }
+
+        if (reference === internal.auth.billing.reserveGatewayCredits) {
+            return { outcome: "taken" };
         }
 
         if (reference === internal.chat.daily_charge.chargeDailyUnit) {
@@ -96,7 +113,7 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
         return { creditsLeft: null };
     });
 
-    return { claims, deductions, ledger, posted, runMutation, runQuery };
+    return { claims, deductions, leases, ledger, posted, runMutation, runQuery };
 };
 
 const videoNode = node("gen", "video", { label: "Hero", mode: "text-to-video", model: PAID });
@@ -324,6 +341,415 @@ describe("the recorded charge's lapse target", () => {
                         await ctx.runMutation(deductCreditsFromGateway, { claimKey: "k", costMicrodollars: 1, modelId: "m", requestId: "r", userId: "u" }),
                 ),
             ).resolves.toBeUndefined();
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+/**
+ * One member's balance, taken the way `reserveGatewayCredits` takes it: the check and the take in one step. Every
+ * `creditsLeft` read answers the full balance, as two runs that start together both read it before either reserves.
+ */
+const balanceCtx = ({
+    balance,
+    liveSnapshot = false,
+    quotaFails = false,
+    quotaOk = true,
+    releaseFailures = 0,
+}: {
+    balance: number;
+    liveSnapshot?: boolean;
+    quotaFails?: boolean;
+    quotaOk?: boolean;
+    releaseFailures?: number;
+}) => {
+    let left = balance;
+    let failuresLeft = releaseFailures;
+    const reserved = new Map<string, number>();
+    const runMutation = vi.fn(async (reference: unknown, args?: any) => {
+        if (reference === internal.auth.billing.reserveGatewayCredits) {
+            if (reserved.has(args.requestId)) {
+                return { outcome: "already" };
+            }
+
+            // 1 credit is 1,000 microdollars.
+            const credits = args.costMicrodollars / 1000;
+
+            if (credits > left) {
+                return { outcome: "refused" };
+            }
+
+            left -= credits;
+            reserved.set(args.requestId, credits);
+
+            return { outcome: "taken" };
+        }
+
+        if (reference === internal.auth.billing.releaseGatewayCredits) {
+            if (failuresLeft > 0) {
+                failuresLeft -= 1;
+
+                throw new Error("ledger unavailable");
+            }
+
+            left += reserved.get(args.requestId) ?? 0;
+            reserved.delete(args.requestId);
+
+            return undefined;
+        }
+
+        if (reference === internal.chat.daily_charge.chargeDailyUnit) {
+            if (quotaFails) {
+                throw new Error("quota unavailable");
+            }
+
+            return quotaOk;
+        }
+
+        return undefined;
+    });
+    // Answers the balance as it stands when `liveSnapshot` is set, and as it stood when the run started otherwise.
+    const runQuery = vi.fn(async () => {
+        return { creditsLeft: liveSnapshot ? left : balance };
+    });
+
+    return { left: () => left, runMutation, runQuery };
+};
+
+describe("the clip's credit reservation", () => {
+    it("refuses the second of two runs racing for a balance that covers one clip, before its paid call", async () => {
+        const ctx = balanceCtx({ balance: 600 });
+        const dispatchA = vi.fn(async () => "clip-a");
+        const dispatchB = vi.fn(async () => "clip-b");
+
+        const results = await Promise.allSettled([
+            runBilledVideo(ctx, executionContextOf({ orgId: "org-1", runId: "run-a" }), videoNode, "u1", costs(), dispatchA),
+            runBilledVideo(ctx, executionContextOf({ orgId: "org-1", runId: "run-b" }), videoNode, "u1", costs(), dispatchB),
+        ]);
+
+        expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+        expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+        expect(dispatchA.mock.calls.length + dispatchB.mock.calls.length).toBe(1);
+        const refusal = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+
+        expect(refusal?.reason).toBeInstanceOf(Error);
+        expect((refusal?.reason as Error).message).toContain("Not enough credits");
+        expect(ctx.left()).toBe(100);
+    });
+
+    it("gives the reservation back when the paid work makes no clip", async () => {
+        const ctx = balanceCtx({ balance: 1000 });
+
+        await expect(
+            runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => {
+                throw new Error("fal is down");
+            }),
+        ).rejects.toThrow("fal is down");
+        expect(ctx.left()).toBe(1000);
+    });
+
+    it("gives the reservation back when the daily quota call throws, not only when it refuses", async () => {
+        const ctx = balanceCtx({ balance: 1000, quotaFails: true });
+
+        await expect(runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip")).rejects.toThrow(
+            "quota unavailable",
+        );
+        expect(ctx.left()).toBe(1000);
+    });
+
+    it("retries a release that fails once, so the reservation is still given back", async () => {
+        const ctx = balanceCtx({ balance: 1000, releaseFailures: 1 });
+
+        await expect(
+            runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => {
+                throw new Error("fal is down");
+            }),
+        ).rejects.toThrow("fal is down");
+        expect(ctx.left()).toBe(1000);
+    });
+
+    it("does not give back an earlier attempt's reservation when a retry of the node fails", async () => {
+        const ctx = balanceCtx({ balance: 1000 });
+        const run = executionContextOf({ orgId: "org-1", runId: "run-a" });
+
+        await expect(runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => "clip")).resolves.toBe("clip");
+        expect(ctx.left()).toBe(500);
+
+        await expect(
+            runBilledVideo(ctx, run, videoNode, "u1", costs(), async () => {
+                throw new Error("fal is down");
+            }),
+        ).rejects.toThrow("fal is down");
+        expect(ctx.left()).toBe(500);
+    });
+
+    it("refuses a retry of a settled node whose clip the balance cannot pay for again, before its paid call", async () => {
+        const ctx = balanceCtx({ balance: 500, liveSnapshot: true });
+        const run = executionContextOf({ orgId: "org-1", runId: "run-a" });
+        const dispatch = vi.fn(async () => "clip");
+
+        await expect(runBilledVideo(ctx, run, videoNode, "u1", costs(), dispatch)).resolves.toBe("clip");
+        expect(ctx.left()).toBe(0);
+
+        await expect(runBilledVideo(ctx, run, videoNode, "u1", costs(), dispatch)).rejects.toThrow("Not enough credits");
+        expect(dispatch).toHaveBeenCalledTimes(1);
+        expect(ctx.left()).toBe(0);
+    });
+
+    it("settles the lease once the clip is charged, so a later lapse no longer gives the reservation back", async () => {
+        const ctx = ledgerCtx();
+
+        await runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip");
+
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.lib.claim_once.completeKey, { key: REQUEST_ID, scope: "video-reservation" });
+    });
+
+    it("returns the finished clip even when its reservation cannot be settled", async () => {
+        const base = ledgerCtx();
+        const runMutation = vi.fn(async (reference: unknown, args?: any) => {
+            if (reference === internal.lib.claim_once.completeKey) {
+                throw new Error("claims down");
+            }
+
+            return await base.runMutation(reference, args);
+        });
+
+        await expect(
+            runBilledVideo({ ...base, runMutation }, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip"),
+        ).resolves.toBe("clip");
+        expect(base.posted).toStrictEqual([REQUEST_ID]);
+    });
+
+    it("gives the reservation back when the daily quota refuses the run", async () => {
+        const ctx = balanceCtx({ balance: 1000, quotaOk: false });
+
+        await expect(runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip")).rejects.toThrow(
+            "daily video generation limit",
+        );
+        expect(ctx.left()).toBe(1000);
+    });
+});
+
+describe("the clip's reservation against the real ledger", () => {
+    it("takes a clip within the balance, refuses one past it, gives a release back once, and posts nothing after", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const observed = await harness.run(async (ctx: any) => {
+                // 1,000 credits: one credit is 1,000 microdollars.
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                await ctx.db.insert("memberCredits", { creditOverride: 1000, memberId: "member-1", organizationId: orgId, usedCredits: 0, userId: "u1" });
+
+                const usedCredits = async (): Promise<number> => {
+                    const record = await ctx.db.memberCredits.findFirst({ where: { organizationId: orgId, userId: "u1" } });
+
+                    return (record as { usedCredits?: number }).usedCredits ?? 0;
+                };
+                const reserve = async (costMicrodollars: number, requestId: string): Promise<string> => {
+                    const result = await ctx.runMutation(reserveGatewayCredits, { costMicrodollars, modelId: PAID, orgId, requestId, userId: "u1" });
+
+                    return result.outcome;
+                };
+                const ledgerRowOf = async (requestId: string): Promise<unknown> =>
+                    await ctx.db
+                        .query("gatewayUsageDeductions")
+                        .withIndex("by_requestId", (q: any) => q.eq("requestId", requestId))
+                        .first();
+
+                const first = await reserve(500_000, "r-1");
+                const afterFirst = await usedCredits();
+                const second = await reserve(500_000, "r-2");
+                const afterSecond = await usedCredits();
+                const third = await reserve(1000, "r-3");
+                const afterRefusal = await usedCredits();
+
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-1" });
+                const afterRelease = await usedCredits();
+                const rowAfterRelease = await ledgerRowOf("r-1");
+
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-1" });
+                const afterSecondRelease = await usedCredits();
+
+                return { afterFirst, afterRefusal, afterRelease, afterSecond, afterSecondRelease, first, rowAfterRelease, second, third };
+            });
+
+            expect(observed).toMatchObject({
+                afterFirst: 500,
+                afterRefusal: 1000,
+                afterRelease: 500,
+                afterSecond: 1000,
+                first: "taken",
+                second: "taken",
+                third: "refused",
+            });
+            expect(observed.rowAfterRelease).toBeFalsy();
+            expect(observed.afterSecondRelease).toBe(500);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a negative cost, so a reservation can never take nothing and pass", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await expect(
+                harness.run(
+                    async (ctx: any) =>
+                        await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: -1, modelId: PAID, orgId: "org-1", requestId: "r-neg", userId: "u1" }),
+                ),
+            ).rejects.toThrow();
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("the reservation's lease against the real ledger", () => {
+    const NOW = 1_800_000_000_000;
+
+    it("refuses a leased reservation as busy, a settled one as already, and takes a released one again", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const outcomes = await harness.run(async (ctx: any) => {
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                await ctx.db.insert("memberCredits", { creditOverride: 1000, memberId: "member-1", organizationId: orgId, usedCredits: 0, userId: "u1" });
+
+                const reserve = async (): Promise<string> => {
+                    const result = await ctx.runMutation(reserveGatewayCredits, {
+                        costMicrodollars: 500_000,
+                        modelId: PAID,
+                        orgId,
+                        requestId: "r-1",
+                        userId: "u1",
+                    });
+
+                    return result.outcome;
+                };
+
+                const first = await reserve();
+                const second = await reserve();
+
+                await ctx.runMutation(completeKey, { key: "r-1", scope: VIDEO_RESERVATION_SCOPE });
+                const settled = await reserve();
+
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-1" });
+                const released = await reserve();
+
+                return { first, released, second, settled };
+            });
+
+            expect(outcomes).toStrictEqual({ first: "taken", released: "taken", second: "busy", settled: "already" });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("gives a lapsed reservation back through the sweep, and the scheduled release accepts the sweep's claim key", async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (ctx: any) => {
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                await ctx.db.insert("memberCredits", { creditOverride: 1000, memberId: "member-1", organizationId: orgId, usedCredits: 0, userId: "u1" });
+                await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-2", userId: "u1" });
+            });
+
+            // Past the reservation's lease: the run that took it is gone.
+            vi.setSystemTime(NOW + 61 * 60 * 1000);
+
+            const swept = await harness.run(async (ctx: any) => {
+                const calls: { args: Record<string, unknown>; target: string }[] = [];
+
+                ctx.scheduler.runAfter = async (_delay: number, target: string, args: Record<string, unknown>) => {
+                    calls.push({ args, target });
+                };
+
+                await ctx.runMutation(reapLapsedClaims, {});
+
+                return calls;
+            });
+
+            expect(swept).toStrictEqual([
+                {
+                    args: { claimKey: "r-2", requestId: "r-2", rowId: expect.any(String) },
+                    target: internal.auth.billing.releaseGatewayCredits.__lunoraRef,
+                },
+            ]);
+
+            const after = await harness.run(async (ctx: any) => {
+                await ctx.runMutation(releaseGatewayCredits, swept[0]!.args);
+
+                const record = await ctx.db.memberCredits.findFirst({ where: { userId: "u1" } });
+                const row = await ctx.db
+                    .query("gatewayUsageDeductions")
+                    .withIndex("by_requestId", (q: any) => q.eq("requestId", "r-2"))
+                    .first();
+
+                return { row, usedCredits: (record as { usedCredits?: number }).usedCredits ?? 0 };
+            });
+
+            expect(after).toStrictEqual({ row: null, usedCredits: 0 });
+        } finally {
+            harness.close();
+            vi.useRealTimers();
+        }
+    });
+
+    it("does not refund a newer reservation of the same request when an older lapse runs late", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const staleArgs = await harness.run(async (ctx: any) => {
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                await ctx.db.insert("memberCredits", { creditOverride: 1000, memberId: "member-1", organizationId: orgId, usedCredits: 0, userId: "u1" });
+                await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-4", userId: "u1" });
+
+                // The run gives its reservation back itself, and a retry takes the same request id again.
+                const older = await ctx.db
+                    .query("gatewayUsageDeductions")
+                    .withIndex("by_requestId", (q: any) => q.eq("requestId", "r-4"))
+                    .first();
+
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-4" });
+                await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-4", userId: "u1" });
+
+                // The lapse queued for the first reservation runs now, after the second one exists.
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-4", rowId: String(older._id) });
+
+                const record = await ctx.db.memberCredits.findFirst({ where: { userId: "u1" } });
+                const row = await ctx.db
+                    .query("gatewayUsageDeductions")
+                    .withIndex("by_requestId", (q: any) => q.eq("requestId", "r-4"))
+                    .first();
+
+                return { row: row !== null, usedCredits: (record as { usedCredits?: number }).usedCredits ?? 0 };
+            });
+
+            expect(staleArgs).toStrictEqual({ row: true, usedCredits: 500 });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("takes nothing and refuses nothing for a member with no credit record, so the video node still runs", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const outcome = await harness.run(async (ctx: any) => {
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                return await ctx.runMutation(reserveGatewayCredits, { costMicrodollars: 500_000, modelId: PAID, orgId, requestId: "r-5", userId: "u1" });
+            });
+
+            expect(outcome).toStrictEqual({ outcome: "taken" });
         } finally {
             harness.close();
         }

@@ -452,6 +452,8 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "auth_billing:getMemberCredits": lunora_auth_billing_24.getMemberCredits as unknown as RegisteredLunoraFunction,
     "auth_billing:getRunPlanForOrganizationQuery": lunora_auth_billing_24.getRunPlanForOrganizationQuery as unknown as RegisteredLunoraFunction,
     "auth_billing:listMemberCredits": lunora_auth_billing_24.listMemberCredits as unknown as RegisteredLunoraFunction,
+    "auth_billing:releaseGatewayCredits": lunora_auth_billing_24.releaseGatewayCredits as unknown as RegisteredLunoraFunction,
+    "auth_billing:reserveGatewayCredits": lunora_auth_billing_24.reserveGatewayCredits as unknown as RegisteredLunoraFunction,
     "auth_billing:setMemberCreditOverride": lunora_auth_billing_24.setMemberCreditOverride as unknown as RegisteredLunoraFunction,
     "auth_billing:setOrganizationBillingTier": lunora_auth_billing_24.setOrganizationBillingTier as unknown as RegisteredLunoraFunction,
     "auth_billing:updateBillingSettings": lunora_auth_billing_24.updateBillingSettings as unknown as RegisteredLunoraFunction,
@@ -8099,6 +8101,8 @@ export interface Caller {
             getMemberCredits: (args: { userId?: string }) => Promise<({} & { creditOverride: number | null; effectiveCredits: number; orgDefault: number; resetAt: number | null; usedCredits: number; userId: string; }) | null>;
             getRunPlanForOrganizationQuery: (args: { organizationId: string | null; userId: string }) => Promise<{ isAdmin: boolean; plan: "premium" | null }>;
             listMemberCredits: (args?: {}) => Promise<({} & { creditOverride: number | null; effectiveCredits: number; role: string; usedCredits: number; userEmail: string | null; userId: string; userName: string | null; })[]>;
+            releaseGatewayCredits: (args: { requestId: string; rowId?: string }) => Promise<null>;
+            reserveGatewayCredits: (args: { costMicrodollars: number; modelId: string; orgId: string; requestId: string; userId: string }) => Promise<{ outcome: "taken" | "already" | "refused" | "busy"; rowId?: string }>;
             setMemberCreditOverride: (args: { creditOverride: number | null; organizationId: string; userId: string }) => Promise<void>;
             setOrganizationBillingTier: (args: { baseTier?: "free" | "pro" | "enterprise"; creditsPerUser?: number; organizationId: string }) => Promise<null>;
             updateBillingSettings: (args: { allowedModels?: Array<string>; billingEmail?: string }) => Promise<void>;
@@ -9706,6 +9710,8 @@ export const createCaller = (context: CallerCtx): Caller => ({
             getMemberCredits: (args) => callRegistered(context, "auth_billing:getMemberCredits", args),
             getRunPlanForOrganizationQuery: (args) => callRegistered(context, "auth_billing:getRunPlanForOrganizationQuery", args),
             listMemberCredits: (args) => callRegistered(context, "auth_billing:listMemberCredits", args),
+            releaseGatewayCredits: (args) => callRegistered(context, "auth_billing:releaseGatewayCredits", args),
+            reserveGatewayCredits: (args) => callRegistered(context, "auth_billing:reserveGatewayCredits", args),
             setMemberCreditOverride: (args) => callRegistered(context, "auth_billing:setMemberCreditOverride", args),
             setOrganizationBillingTier: (args) => callRegistered(context, "auth_billing:setOrganizationBillingTier", args),
             updateBillingSettings: (args) => callRegistered(context, "auth_billing:updateBillingSettings", args),

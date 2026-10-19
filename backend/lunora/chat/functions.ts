@@ -90,6 +90,7 @@ import {
 import { getAgentForUser } from "./lib/thread-helpers";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
+import { retryClipStore } from "../workflow/clip-store-retry";
 
 const DATA_URL_BASE64_RE = /^data:[^;]+;base64,/;
 const DATA_URL_IMAGE_RE = /^data:image\/(\w+);base64,(.+)$/;
@@ -4589,7 +4590,17 @@ export const generateVideo = internalAction
 
             const mimeType = videoData.mimeType || "video/mp4";
             const blob = bytesToBlob(videoData.uint8Array, mimeType);
-            const { file, filePart } = await storeFile(context, blob, { threadId, userId });
+            // The clip is paid for once it is generated. A store that keeps failing is reported, so it can be followed up.
+            const { file, filePart } = await retryClipStore(() => storeFile(context, blob, { threadId, userId }), {
+                attempts: 3,
+                onGiveUp: (error) => {
+                    context.log.event("workflow.video_clip_not_stored", {
+                        error: error instanceof Error ? error.message : String(error),
+                        modelId: model,
+                        provider: modelDefinition.provider,
+                    });
+                },
+            });
 
             // Serialize warnings
             const serializedWarnings = warnings?.map((warning: any) => {
@@ -5868,7 +5879,18 @@ export const generateImageToVideo = internalAction
 
         const videoResponse = await fetchOk(resolvedVideo.url, { errorPrefix: "Failed to download generated video", timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const mimeType = resolvedVideo.contentType;
-        const { file } = await storeFile(context, bytesToBlob(new Uint8Array(await videoResponse.arrayBuffer()), mimeType), { threadId, userId });
+        const videoBlob = bytesToBlob(new Uint8Array(await videoResponse.arrayBuffer()), mimeType);
+        // The clip is paid for once it is generated. A store that keeps failing is reported, so it can be followed up.
+        const { file } = await retryClipStore(() => storeFile(context, videoBlob, { threadId, userId }), {
+            attempts: 3,
+            onGiveUp: (error) => {
+                context.log.event("workflow.video_clip_not_stored", {
+                    error: error instanceof Error ? error.message : String(error),
+                    modelId: endpoint,
+                    provider: "fal",
+                });
+            },
+        });
 
         return {
             fileId: file.fileId,
