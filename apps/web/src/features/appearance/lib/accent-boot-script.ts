@@ -1,14 +1,5 @@
 import { ACCENT_IDS, DEFAULT_ACCENT } from "./accent-presets";
-import {
-    CONTRAST_ATTRIBUTE,
-    DEFAULT_DENSITY,
-    DEFAULT_MAIN_FONT,
-    DENSITY_ATTRIBUTE,
-    DENSITY_IDS,
-    FONT_ATTRIBUTE,
-    MAIN_FONT_IDS,
-    PREFERS_MORE_CONTRAST_QUERY,
-} from "./display-preferences";
+import { CONTRAST_ATTRIBUTE, DEFAULT_DENSITY, DEFAULT_MAIN_FONT, DENSITY_ATTRIBUTE, DENSITY_IDS, FONT_ATTRIBUTE, MAIN_FONT_IDS } from "./display-preferences";
 
 /** The `persist` key of `useUIStateStore` (`features/layout/stores/ui-state-store.ts`). */
 export const UI_STATE_STORAGE_KEY = "neore-ui-state";
@@ -32,7 +23,7 @@ const BOOT_ATTRIBUTES = [
  * Only a known id from the allow-list is ever written into the DOM; anything
  * else in storage (or no storage at all) leaves the default tokens in place.
  */
-export const ACCENT_BOOT_SCRIPT = `(function(){try{var s=JSON.parse(localStorage.getItem(${JSON.stringify(UI_STATE_STORAGE_KEY)})||"null");var a=s&&s.state&&s.state.appearance||{};var c=${JSON.stringify(BOOT_ATTRIBUTES)};for(var i=0;i<c.length;i++){var m=c[i];var v=a[m.key];if(v!==m.fallback&&m.ids.indexOf(v)!==-1){document.documentElement.setAttribute(m.attribute,v)}}var k=a.contrast;if(k==="high"||(k!=="standard"&&window.matchMedia&&window.matchMedia(${JSON.stringify(PREFERS_MORE_CONTRAST_QUERY)}).matches)){document.documentElement.setAttribute(${JSON.stringify(CONTRAST_ATTRIBUTE)},"high")}}catch(e){}})();`;
+export const ACCENT_BOOT_SCRIPT = `(function(){try{var s=JSON.parse(localStorage.getItem(${JSON.stringify(UI_STATE_STORAGE_KEY)})||"null");var a=s&&s.state&&s.state.appearance||{};var c=${JSON.stringify(BOOT_ATTRIBUTES)};for(var i=0;i<c.length;i++){var m=c[i];var v=a[m.key];if(v!==m.fallback&&m.ids.indexOf(v)!==-1){document.documentElement.setAttribute(m.attribute,v)}}var k=a.contrast;if(k==="high"||(k!=="standard"&&window.matchMedia&&window.matchMedia("(prefers-contrast: more)").matches)){document.documentElement.setAttribute("data-contrast","high")}}catch(e){}})();`;
 
 /** The runtime twin of the contrast part of the boot script. */
 export const applyContrastAttribute = (value: "high" | undefined, root: HTMLElement = document.documentElement): void => {

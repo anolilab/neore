@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ACCENT_ATTRIBUTE, ACCENT_BOOT_SCRIPT, applyAccentAttribute, UI_STATE_STORAGE_KEY } from "./accent-boot-script";
-import { CONTRAST_ATTRIBUTE, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE } from "./display-preferences";
+import { CONTRAST_ATTRIBUTE, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, PREFERS_MORE_CONTRAST_QUERY } from "./display-preferences";
 
 const runBootScript = (): void => {
     // eslint-disable-next-line sonarjs/code-eval -- runs the inline script exactly as the browser would
@@ -28,6 +28,11 @@ describe("accent boot script", () => {
                 return { matches: matches && query.includes("prefers-contrast: more") };
             });
         };
+
+        it("hard-codes the contrast literals the script writes, so they cannot drift from the constants", () => {
+            expect(ACCENT_BOOT_SCRIPT).toContain(`matchMedia("${PREFERS_MORE_CONTRAST_QUERY}")`);
+            expect(ACCENT_BOOT_SCRIPT).toContain(`setAttribute("${CONTRAST_ATTRIBUTE}","high")`);
+        });
 
         it("applies a stored high choice whatever the system says", () => {
             systemPrefersMore(false);
