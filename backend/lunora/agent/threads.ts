@@ -282,6 +282,14 @@ export const searchThreadTitles = query
         return threads.filter((t) => !isThreadLocked(t)).map((item) => publicThread(item));
     });
 
+/** The archive write itself, shared by manual archive and the auto-archive sweep (`auto-archive.ts`). */
+export const markThreadArchived = async (context: MutationContext, threadId: Id<"threads">): Promise<void> => {
+    await context.db.patch(threadId, {
+        status: "archived",
+        updatedAt: context.now,
+    });
+};
+
 export const archiveThread = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.from(vThreadDocument))
@@ -289,10 +297,7 @@ export const archiveThread = internalMutation
         const oldThread = await ctx.db.get(args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await ctx.db.patch(args.threadId, {
-            status: "archived",
-            updatedAt: ctx.now,
-        });
+        await markThreadArchived(ctx, args.threadId);
         const newThread = (await ctx.db.get(args.threadId))!;
 
         // Update aggregate - status changed

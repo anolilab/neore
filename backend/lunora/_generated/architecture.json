@@ -61,14 +61,34 @@
       "to": "table:playgroundApiKeys"
     },
     {
-      "from": "function:agent_auto_archive:autoArchiveInactiveThreads",
+      "from": "function:agent_auto_archive:archiveIfStillIdle",
+      "kind": "read",
+      "to": "table:persistentStreams"
+    },
+    {
+      "from": "function:agent_auto_archive:autoArchiveContinue",
       "kind": "call",
-      "to": "function:agent_threads:archiveThread"
+      "to": "function:agent_auto_archive:archiveIfStillIdle"
+    },
+    {
+      "from": "function:agent_auto_archive:autoArchiveContinue",
+      "kind": "read",
+      "to": "table:threads"
+    },
+    {
+      "from": "function:agent_auto_archive:autoArchiveContinue",
+      "kind": "read",
+      "to": "table:userSettings"
+    },
+    {
+      "from": "function:agent_auto_archive:autoArchiveContinue",
+      "kind": "schedule",
+      "to": "function:agent_auto_archive:autoArchiveContinue"
     },
     {
       "from": "function:agent_auto_archive:autoArchiveInactiveThreads",
-      "kind": "read",
-      "to": "table:persistentStreams"
+      "kind": "call",
+      "to": "function:agent_auto_archive:archiveIfStillIdle"
     },
     {
       "from": "function:agent_auto_archive:autoArchiveInactiveThreads",
@@ -79,6 +99,11 @@
       "from": "function:agent_auto_archive:autoArchiveInactiveThreads",
       "kind": "read",
       "to": "table:userSettings"
+    },
+    {
+      "from": "function:agent_auto_archive:autoArchiveInactiveThreads",
+      "kind": "schedule",
+      "to": "function:agent_auto_archive:autoArchiveContinue"
     },
     {
       "from": "function:agent_branches:setActiveLeaf",
@@ -612,11 +637,6 @@
     },
     {
       "from": "function:agent_threads:_deletePageForThreadId",
-      "kind": "write",
-      "to": "table:threads"
-    },
-    {
-      "from": "function:agent_threads:archiveThread",
       "kind": "write",
       "to": "table:threads"
     },
@@ -6578,6 +6598,20 @@
       "id": "function:agent_api_keys:validate",
       "kind": "function",
       "name": "agent.api_keys.validate",
+      "module": "agent"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:agent_auto_archive:archiveIfStillIdle",
+      "kind": "function",
+      "name": "agent.auto_archive.archiveIfStillIdle",
+      "module": "agent"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:agent_auto_archive:autoArchiveContinue",
+      "kind": "function",
+      "name": "agent.auto_archive.autoArchiveContinue",
       "module": "agent"
     },
     {
@@ -16070,8 +16104,14 @@
     },
     {
       "file": "agent/threads",
+      "kind": "write",
+      "line": 287,
+      "reason": "\"markThreadArchived\" is not a registered function"
+    },
+    {
+      "file": "agent/threads",
       "kind": "read",
-      "line": 1413,
+      "line": 1418,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {

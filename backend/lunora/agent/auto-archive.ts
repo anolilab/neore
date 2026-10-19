@@ -3,96 +3,153 @@
  * Runs once per housekeeping pass on the user's own shard (`shardSweeps()` in
  * `lib/shard-housekeeping.ts`), not on a cron of its own. The eligibility rules
  * are in `auto-archive-logic.ts`.
+ *
+ * A pass reads the idle range newest-first in pages and archives up to
+ * ARCHIVE_BATCH threads. Every write goes through `archiveIfStillIdle`, which
+ * re-reads the thread in the same mutation and archives it only if it is still
+ * due, so a message, a run, or a pin that lands after the scan wins.
  */
 import { v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, type MutationCtx } from "../_generated/server";
 import { currentUserShard } from "../lib/shard-context";
-import { type AutoArchiveCandidate, autoArchiveCutoff, isAutoArchiveDays, selectAutoArchiveDue } from "./auto-archive-logic";
+import type { ScanPage } from "../lib/scan-pages";
+import { type AutoArchiveCandidate, autoArchiveCutoff, isAutoArchiveDays, runArchivePass, selectAutoArchiveDue } from "./auto-archive-logic";
+import { markThreadArchived } from "./threads";
 
 /** Threads archived per pass. The rest wait for the next pass, which is idempotent. */
 const ARCHIVE_BATCH = 100;
-// Scanned newest-idle first (`desc`), so the scan starts at the cutoff, where the threads that just
-// went idle are. Archiving bumps `updatedAt`, so archived rows leave the window; pinned, deleted and
-// running rows can stay in it, so only more than SCAN_LIMIT of them near the cutoff would hide the rest.
-// ponytail: raise SCAN_LIMIT, or add a cursor, if that shows up.
-const SCAN_LIMIT = 500;
-const STREAM_SCAN_LIMIT = 200;
+/** Index rows read per page, and per pass before the pass hands its cursor to a follow-up run. */
+const PAGE_SIZE = 200;
+const READ_BUDGET = 1000;
+/** A follow-up run for a pass that ran out of budget. */
+const RESUME_DELAY_MS = 10_000;
 
+const NO_EXCLUSIONS = { liveThreadIds: new Set<string>(), pinnedProjectIds: new Set<string>() };
+
+const candidateOf = (thread: Doc<"threads">): AutoArchiveCandidate => {
+    return {
+        _id: thread._id,
+        deleted: thread.deleted,
+        isTemporary: thread.isTemporary,
+        pinnedAt: thread.pinnedAt,
+        projectId: thread.projectId,
+        status: thread.status,
+        updatedAt: thread.updatedAt,
+    };
+};
+
+/**
+ * Archives one thread if, as read now, it is still due. The eligibility check runs
+ * on the fresh row, its project's pin state and its live streams, in the same
+ * transaction as the write, so nothing that happened after the scan is overwritten.
+ */
+export const archiveIfStillIdle = internalMutation
+    .input({ cutoff: v.number(), threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const thread = await ctx.db.get(args.threadId);
+
+        if (!thread) {
+            return false;
+        }
+
+        const streams = await ctx.db
+            .query("persistentStreams")
+            .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
+            .take(50);
+        const hasLiveStream = streams.some((stream) => stream.status === "pending" || stream.status === "streaming");
+
+        // The project pin is read per thread, not from a capped list of pinned projects.
+        const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;
+        const pinnedProjectIds = new Set<string>(project && project.pinnedAt !== undefined && thread.projectId ? [thread.projectId] : []);
+
+        const due = selectAutoArchiveDue(
+            [candidateOf(thread)],
+            args.cutoff,
+            {
+                liveThreadIds: new Set(hasLiveStream ? [args.threadId] : []),
+                pinnedProjectIds,
+            },
+            1,
+        );
+
+        if (due.length === 0) {
+            return false;
+        }
+
+        await markThreadArchived(ctx, args.threadId);
+
+        return true;
+    });
+
+const runAutoArchivePass = async (ctx: MutationCtx, cursor: string | null): Promise<void> => {
+    const userId = currentUserShard();
+
+    if (!userId) {
+        return;
+    }
+
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+    const days = settings?.autoArchiveAfterDays;
+
+    if (!isAutoArchiveDays(days) || days === 0) {
+        return;
+    }
+
+    const cutoff = autoArchiveCutoff(ctx.now, days);
+    const result = await runArchivePass({
+        archiveBatch: ARCHIVE_BATCH,
+        archiveIfStillDue: async (threadId) =>
+            await ctx.runMutation(internal.agent.auto_archive.archiveIfStillIdle, { cutoff, threadId: threadId as Id<"threads"> }),
+        cursor,
+        fetchPage: async (pageCursor): Promise<ScanPage<AutoArchiveCandidate>> => {
+            const page = await ctx.db
+                .query("threads")
+                .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", userId).lt("updatedAt", cutoff))
+                .order("desc")
+                .paginate({ cursor: pageCursor, numItems: PAGE_SIZE });
+
+            return {
+                continueCursor: page.continueCursor,
+                isDone: page.isDone,
+                page: (page.page as unknown as Doc<"threads">[]).map((thread) => candidateOf(thread)),
+            };
+        },
+        isDue: (candidate) => selectAutoArchiveDue([candidate], cutoff, NO_EXCLUSIONS, 1).length === 1,
+        readBudget: READ_BUDGET,
+    });
+
+    if (result.continueCursor) {
+        await ctx.scheduler.runAfter(RESUME_DELAY_MS, internal.agent.auto_archive.autoArchiveContinue, { cursor: result.continueCursor });
+    }
+
+    if (result.archived > 0) {
+        ctx.log.event("chat.auto_archive", { archived: result.archived });
+    }
+};
+
+/** The housekeeping sweep entry: a fresh pass from the newest idle thread. */
 export const autoArchiveInactiveThreads = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx }) => {
-        const userId = currentUserShard();
+        await runAutoArchivePass(ctx, null);
 
-        if (!userId) {
-            return null;
-        }
+        return null;
+    });
 
-        const settings = await ctx.db
-            .query("userSettings")
-            .withIndex("by_userId", (q) => q.eq("userId", userId))
-            .unique();
-        const days = settings?.autoArchiveAfterDays;
-
-        if (!isAutoArchiveDays(days) || days === 0) {
-            return null;
-        }
-
-        const cutoff = autoArchiveCutoff(ctx.now, days);
-        const candidates = await ctx.db
-            .query("threads")
-            .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", userId).lt("updatedAt", cutoff))
-            .order("desc")
-            .take(SCAN_LIMIT);
-
-        const { page: pinnedProjects } = await ctx.db.projects.findMany({
-            limit: 200,
-            where: { pinnedAt: { gte: 0 }, userId },
-        });
-        const liveThreadIds = new Set<string>();
-
-        for (const status of ["pending", "streaming"]) {
-            const streams = await ctx.db
-                .query("persistentStreams")
-                .withIndex("by_userId_status", (q) => q.eq("userId", userId).eq("status", status))
-                .take(STREAM_SCAN_LIMIT);
-
-            for (const stream of streams) {
-                liveThreadIds.add(stream.threadId);
-            }
-        }
-
-        const due = selectAutoArchiveDue(
-            candidates.map((thread): AutoArchiveCandidate => {
-                return {
-                    _id: thread._id,
-                    deleted: thread.deleted,
-                    isTemporary: thread.isTemporary,
-                    pinnedAt: thread.pinnedAt,
-                    projectId: thread.projectId,
-                    status: thread.status,
-                    updatedAt: thread.updatedAt,
-                };
-            }),
-            cutoff,
-            {
-                liveThreadIds,
-                pinnedProjectIds: new Set(pinnedProjects.map((project) => project._id)),
-            },
-            ARCHIVE_BATCH,
-        );
-
-        // One at a time: each archive writes audited rows, and a batched fan-out nests the audit triggers.
-        for (const threadId of due) {
-            await ctx.runMutation(internal.agent.threads.archiveThread, { threadId: threadId as Id<"threads"> });
-        }
-
-        if (due.length > 0) {
-            ctx.log.event("chat.auto_archive", { archived: due.length });
-        }
+/** Resumes a pass that ran out of read budget, from the cursor it stopped at. */
+export const autoArchiveContinue = internalMutation
+    .input({ cursor: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await runAutoArchivePass(ctx, args.cursor);
 
         return null;
     });

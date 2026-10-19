@@ -254,6 +254,8 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "agent_api_keys:destroy": lunora_agent_api_keys_3.destroy as unknown as RegisteredLunoraFunction,
     "agent_api_keys:issue": lunora_agent_api_keys_3.issue as unknown as RegisteredLunoraFunction,
     "agent_api_keys:validate": lunora_agent_api_keys_3.validate as unknown as RegisteredLunoraFunction,
+    "agent_auto_archive:archiveIfStillIdle": lunora_agent_auto_archive_4.archiveIfStillIdle as unknown as RegisteredLunoraFunction,
+    "agent_auto_archive:autoArchiveContinue": lunora_agent_auto_archive_4.autoArchiveContinue as unknown as RegisteredLunoraFunction,
     "agent_auto_archive:autoArchiveInactiveThreads": lunora_agent_auto_archive_4.autoArchiveInactiveThreads as unknown as RegisteredLunoraFunction,
     "agent_branches:editAssistantReply": lunora_agent_branches_5.editAssistantReply as unknown as RegisteredLunoraFunction,
     "agent_branches:getContextPathIds": lunora_agent_branches_5.getContextPathIds as unknown as RegisteredLunoraFunction,
@@ -1465,6 +1467,19 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["apiKey"] !== "string") return DEFER;
 return { "apiKey": source["apiKey"] };
+});
+installCompiledValidatorMap(lunora_agent_auto_archive_4.archiveIfStillIdle.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["cutoff"] !== "number" || !Number.isFinite(source["cutoff"])) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "cutoff": source["cutoff"], "threadId": source["threadId"] };
+});
+installCompiledValidatorMap(lunora_agent_auto_archive_4.autoArchiveContinue.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["cursor"] !== "string") return DEFER;
+return { "cursor": source["cursor"] };
 });
 installCompiledValidatorMap(lunora_agent_branches_5.getContextPathIds.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -7803,6 +7818,8 @@ export interface Caller {
             validate: (args: { apiKey: Id<"playgroundApiKeys"> }) => Promise<boolean>;
         };
         auto_archive: {
+            archiveIfStillIdle: (args: { cutoff: number; threadId: Id<"threads"> }) => Promise<boolean>;
+            autoArchiveContinue: (args: { cursor: string }) => Promise<null>;
             autoArchiveInactiveThreads: (args?: {}) => Promise<null>;
         };
         branches: {
@@ -9400,6 +9417,8 @@ export const createCaller = (context: CallerCtx): Caller => ({
             validate: (args) => callRegistered(context, "agent_api_keys:validate", args),
         },
         auto_archive: {
+            archiveIfStillIdle: (args) => callRegistered(context, "agent_auto_archive:archiveIfStillIdle", args),
+            autoArchiveContinue: (args) => callRegistered(context, "agent_auto_archive:autoArchiveContinue", args),
             autoArchiveInactiveThreads: (args) => callRegistered(context, "agent_auto_archive:autoArchiveInactiveThreads", args),
         },
         branches: {

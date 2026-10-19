@@ -22,6 +22,8 @@ export interface InternalApiTypes {
             validate: FunctionReference<"query", { apiKey: Id<"playgroundApiKeys"> }, boolean>;
         };
         auto_archive: {
+            archiveIfStillIdle: FunctionReference<"mutation", { cutoff: number; threadId: Id<"threads"> }, boolean>;
+            autoArchiveContinue: FunctionReference<"mutation", { cursor: string }, null>;
             autoArchiveInactiveThreads: FunctionReference<"mutation", {}, null>;
         };
         branches: {
@@ -998,6 +1000,8 @@ export const internal: InternalApiTypes = {
             validate: { __lunoraRef: "agent_api_keys:validate" },
         },
         auto_archive: {
+            archiveIfStillIdle: { __lunoraRef: "agent_auto_archive:archiveIfStillIdle" },
+            autoArchiveContinue: { __lunoraRef: "agent_auto_archive:autoArchiveContinue" },
             autoArchiveInactiveThreads: { __lunoraRef: "agent_auto_archive:autoArchiveInactiveThreads" },
         },
         branches: {
