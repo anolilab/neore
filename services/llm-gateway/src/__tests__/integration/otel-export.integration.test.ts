@@ -79,7 +79,7 @@ describe.each([
         for (const [url, init] of fetchMock.mock.calls) {
             const target = String(url);
 
-            if (target.startsWith(COLLECTOR)) {
+            if (URL.canParse(target) && new URL(target).origin === COLLECTOR) {
                 exported.push({
                     body: JSON.parse(String((init as RequestInit).body)),
                     path: new URL(target).pathname as CollectorExport["path"],

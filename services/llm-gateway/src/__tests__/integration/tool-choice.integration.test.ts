@@ -102,6 +102,23 @@ describe("tool_choice on /v1/chat/completions", () => {
     });
 });
 
+describe("tool_choice without tools on /v1/chat/completions", () => {
+    it.each([["required"], [{ function: { name: "get_weather" }, type: "function" }]])("refuses %j, which has nothing to require", async (toolChoice) => {
+        const res = await fetchApp(post("/v1/chat/completions", { messages: [{ content: "Hi", role: "user" }], tool_choice: toolChoice }), await env());
+        const body = (await res.json()) as { error: { param: string } };
+
+        expect(res.status).toBe(400);
+        expect(body.error.param).toBe("tool_choice");
+        expect(state.toolChoices).toEqual([]);
+    });
+
+    it.each([["auto"], ["none"]])("lets %s through without tools", async (toolChoice) => {
+        const res = await fetchApp(post("/v1/chat/completions", { messages: [{ content: "Hi", role: "user" }], tool_choice: toolChoice }), await env());
+
+        expect(res.status).toBe(200);
+    });
+});
+
 describe("top_p on /v1/chat/completions", () => {
     it("passes top_p to the model on a non-streamed call", async () => {
         const res = await fetchApp(post("/v1/chat/completions", { messages: [{ content: "Hi", role: "user" }], top_p: 0.5 }), await env());

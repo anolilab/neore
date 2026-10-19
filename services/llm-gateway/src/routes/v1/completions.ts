@@ -252,6 +252,12 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
     }
 
     const body = parsed.data;
+
+    // Without tools there is nothing to require or name, and a silent drop would hand back a plain reply the caller asked us not to give.
+    if (body.tools === undefined && body.tool_choice !== undefined && body.tool_choice !== "auto" && body.tool_choice !== "none") {
+        return c.json({ error: { message: "tool_choice requires a tools array", param: "tool_choice", type: "invalid_request_error" } }, 400);
+    }
+
     const userId = c.get("userId");
     const orgId = c.get("orgId");
     const apiKeyId = c.get("apiKeyId");
