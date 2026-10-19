@@ -342,8 +342,19 @@ describe("the recorded charge's lapse target", () => {
  * One member's balance, taken the way `reserveGatewayCredits` takes it: the check and the take in one step. Every
  * `creditsLeft` read answers the full balance, as two runs that start together both read it before either reserves.
  */
-const balanceCtx = ({ balance, quotaFails = false, quotaOk = true }: { balance: number; quotaFails?: boolean; quotaOk?: boolean }) => {
+const balanceCtx = ({
+    balance,
+    quotaFails = false,
+    quotaOk = true,
+    releaseFailures = 0,
+}: {
+    balance: number;
+    quotaFails?: boolean;
+    quotaOk?: boolean;
+    releaseFailures?: number;
+}) => {
     let left = balance;
+    let failuresLeft = releaseFailures;
     const reserved = new Map<string, number>();
     const runMutation = vi.fn(async (reference: unknown, args?: any) => {
         if (reference === internal.auth.billing.reserveGatewayCredits) {
@@ -361,6 +372,12 @@ const balanceCtx = ({ balance, quotaFails = false, quotaOk = true }: { balance: 
         }
 
         if (reference === internal.auth.billing.releaseGatewayCredits) {
+            if (failuresLeft > 0) {
+                failuresLeft -= 1;
+
+                throw new Error("ledger unavailable");
+            }
+
             left += reserved.get(args.requestId) ?? 0;
             reserved.delete(args.requestId);
 
@@ -422,6 +439,17 @@ describe("the clip's credit reservation", () => {
         await expect(runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip")).rejects.toThrow(
             "quota unavailable",
         );
+        expect(ctx.left()).toBe(1000);
+    });
+
+    it("retries a release that fails once, so the reservation is still given back", async () => {
+        const ctx = balanceCtx({ balance: 1000, releaseFailures: 1 });
+
+        await expect(
+            runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => {
+                throw new Error("fal is down");
+            }),
+        ).rejects.toThrow("fal is down");
         expect(ctx.left()).toBe(1000);
     });
 

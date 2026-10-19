@@ -126,17 +126,24 @@ const clipModelIdOf = (node: WorkflowNode): string => {
 
 /**
  * Gives back the clip's reservation when no clip was made. A failed release leaves the reservation taken, so the
- * member is charged for a clip they did not get. That is logged, and not retried here (a residual ceiling).
+ * member is charged for a clip they did not get. It is tried twice, like a deduction; a release that fails both
+ * times is logged, and is a residual ceiling.
  */
 const releaseClip = async (context: Pick<ActionCtx, "runMutation">, run: ExecutionContext, node: WorkflowNode, costs: VideoRunCosts): Promise<void> => {
     if (costs.clipMicrodollars === undefined || !run.orgId) {
         return;
     }
 
-    try {
-        await context.runMutation(internal.auth.billing.releaseGatewayCredits, { requestId: videoRequestId(run.runId, node.id) });
-    } catch (error) {
-        chatLogger.error("[workflow] video credit reservation could not be released", { error, requestId: videoRequestId(run.runId, node.id) });
+    const requestId = videoRequestId(run.runId, node.id);
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+            await context.runMutation(internal.auth.billing.releaseGatewayCredits, { requestId });
+
+            return;
+        } catch (error) {
+            chatLogger.error("[workflow] video credit reservation could not be released", { attempt, error, requestId });
+        }
     }
 };
 

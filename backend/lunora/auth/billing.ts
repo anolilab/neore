@@ -404,10 +404,10 @@ export const deductCreditsFromGateway = internalMutation
 export const reserveGatewayCredits = internalMutation
     .input({
         costMicrodollars: v.number(),
-        modelId: v.string(),
+        modelId: v.string().max(MAX_LENGTH.short),
         orgId: v.string().max(MAX_LENGTH.id),
-        requestId: v.string(),
-        userId: v.string(),
+        requestId: v.string().max(MAX_LENGTH.long),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.boolean())
     .mutation(async ({ args, ctx: context }) => {
@@ -441,7 +441,7 @@ export const reserveGatewayCredits = internalMutation
  * Gives back a reservation from `reserveGatewayCredits` whose paid work produced no clip: removes its ledger
  * row and the credits it took. With no row (never taken, or already released) it does nothing.
  */
-export const releaseGatewayCredits = internalMutation.input({ requestId: v.string() }).mutation(async ({ args, ctx: context }) => {
+export const releaseGatewayCredits = internalMutation.input({ requestId: v.string().max(MAX_LENGTH.long) }).mutation(async ({ args, ctx: context }) => {
     const row = await context.db
         .query("gatewayUsageDeductions")
         .withIndex("by_requestId", (q) => q.eq("requestId", args.requestId))
