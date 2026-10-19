@@ -158,6 +158,9 @@ const markPng = (bytes: Uint8Array): Uint8Array => {
         return bytes;
     }
 
+    // Keep anything after IEND byte for byte: the marker only adds a chunk.
+    chunks.push(bytes.subarray(offset));
+
     return concat(chunks);
 };
 

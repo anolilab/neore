@@ -140,6 +140,15 @@ describe("markAiGeneratedImage", () => {
         expect(dec.decode(readPngChunks(marked)[2]!.data)).toContain("DigitalSourceType");
     });
 
+    it("keeps bytes appended after IEND", () => {
+        const trailer = enc.encode("trailing data");
+        const png = new Uint8Array([...makePng(), ...trailer]);
+        const marked = markAiGeneratedImage(png);
+
+        expect(marked.subarray(marked.byteLength - trailer.byteLength)).toEqual(trailer);
+        expect(readPngChunks(marked.subarray(0, marked.byteLength - trailer.byteLength)).map((c) => c.type)).toEqual(["IHDR", "iTXt", "IDAT", "IEND"]);
+    });
+
     it("skips a PNG whose XMP already declares our source type", () => {
         const once = markAiGeneratedImage(makePng());
 
