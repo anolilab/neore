@@ -204,10 +204,16 @@ export const storeFile = async (
  * signs it each time the message is read. `file.url` is a signed URL for
  * immediate use only.
  */
-export const getFile = async (ctx: (ActionContext | QueryContext) & { storage: Signer }, fileId: string, access: { threadId?: string; userId: string }) => {
+export const getFile = async (
+    ctx: (ActionContext | QueryContext) & { storage: Signer },
+    fileId: string,
+    access: { threadId?: string; unlockProof?: string; userId: string },
+) => {
     const file = await ctx.runQuery(internal.agent.files.getFileForUser, {
         fileId: fileId as Id<"chatFiles">,
         ...(access.threadId && { threadId: access.threadId as Id<"threads"> }),
+        // A locked thread refuses the file without the proof the caller holds (`getFileForUser`).
+        ...(access.unlockProof && { unlockProof: access.unlockProof }),
         userId: access.userId,
     });
 

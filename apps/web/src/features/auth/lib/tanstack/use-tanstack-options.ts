@@ -2,6 +2,7 @@ import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { use, useCallback, useMemo } from "react";
 
 import type { AuthClient } from "@/lib/auth/client";
+import { forgetAllUnlockProofs } from "@/lib/lunora/unlock-proofs";
 
 import type { AnyAuthClient } from "../../types/auth-core-types";
 import type { AuthHooks, AuthMutators } from "../../types/hook-integration-types";
@@ -63,6 +64,9 @@ const useTanstackOptions = ({ authClient }: { authClient: AnyAuthClient }) => {
                     }
                 },
                 setActiveSession: async (parameters) => {
+                    // The switch keeps the page loaded, so unlocked chats of the account being left would stay open.
+                    forgetAllUnlockProofs();
+
                     const { error } = (await setActiveSessionAsync({
                         ...parameters,
                         fetchOptions: { throw: false },

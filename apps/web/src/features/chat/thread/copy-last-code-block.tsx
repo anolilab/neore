@@ -35,16 +35,26 @@ const CopyLastCodeBlockListener: FC = () => {
                 return;
             }
 
-            navigator.clipboard
+            // The Clipboard API is absent outside a secure context, and its write can reject.
+            const { clipboard }: { clipboard?: Clipboard } = navigator;
+            const failed = () => {
+                toast.error(t`Could not copy to the clipboard`);
+            };
+
+            if (!clipboard) {
+                failed();
+
+                return;
+            }
+
+            clipboard
                 .writeText(code)
                 .then(() => {
                     toast.success(t`Copied the last code block`);
 
                     return undefined;
                 })
-                .catch(() => {
-                    toast.error(t`Could not copy to the clipboard`);
-                });
+                .catch(failed);
         };
 
         globalThis.addEventListener("copyLastCodeBlock", handle);

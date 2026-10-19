@@ -1,19 +1,18 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
-import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@neore/ui/components/dialog";
 import { formatNumber } from "@neore/ui/utils/locale-format";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
 import { useMemo } from "react";
 
 import { toUIMessages } from "@/lib/agent";
-import { useLunora } from "@/lib/lunora/crpc";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import { formatCostUsd } from "../thread/format-cost";
-import { countReplies, summarizeThreadStats } from "./thread-stats";
+import { countReplies, distinctModels, summarizeThreadStats } from "./thread-stats";
 
 interface ThreadStatsDialogProps {
     model: string;
@@ -29,13 +28,11 @@ interface ThreadStatsDialogProps {
  */
 const ThreadStatsDialog: FC<ThreadStatsDialogProps> = ({ model, onOpenChange, open, threadId }) => {
     const { i18n, t } = useLingui();
-    const lunora = useLunora();
+    const crpc = useCRPC();
 
-    const { data, isError, isPending } = useQuery({
-        enabled: open,
-        queryFn: () => lunora.query(api.chat.functions.getFullThreadForExport, { model, threadId: threadId as Id<"threads"> }),
-        queryKey: ["chat", "thread-stats", threadId, model],
-    });
+    const { data, isError, isPending } = useQuery(
+        crpc.chat.functions.getFullThreadForExport.queryOptions(open ? { model, threadId: threadId as Id<"threads"> } : skipToken, { live: false }),
+    );
 
     const stats = useMemo(() => {
         if (!data) {
@@ -46,7 +43,7 @@ const ThreadStatsDialog: FC<ThreadStatsDialogProps> = ({ model, onOpenChange, op
         const rows = data.messages as unknown as Parameters<typeof toUIMessages>[0];
         const own = rows.filter((row) => String(row.threadId) === threadId);
 
-        return { ...summarizeThreadStats(toUIMessages(own)), replies: countReplies(own) };
+        return { ...summarizeThreadStats(toUIMessages(own)), models: distinctModels(own), replies: countReplies(own) };
     }, [data, threadId]);
 
     const { locale } = i18n;

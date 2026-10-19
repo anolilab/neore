@@ -522,6 +522,7 @@ const runChatStartOnShard = async (
                 body.fileIds.map(async (fileId) => {
                     const { extractedText, file, filePart, imagePart } = await getFile(context as HttpActionCtx & { storage: Signer }, fileId, {
                         ...(attachThreadId && { threadId: attachThreadId }),
+                        unlockProof: body.unlockProof,
                         userId,
                     });
 
@@ -930,6 +931,7 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                         // already on a message in this thread.
                         const { extractedText, file, filePart, imagePart } = await getFile(context as HttpActionCtx & { storage: Signer }, fileId, {
                             threadId: threadId as string,
+                            unlockProof,
                             userId,
                         });
 

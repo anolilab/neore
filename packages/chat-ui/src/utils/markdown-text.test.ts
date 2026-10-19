@@ -57,6 +57,15 @@ describe("markdownToPlainText", () => {
         expect(markdownToPlainText("| Name | Qty |\n|:-----|----:|\n| **apple** | 2 |")).toBe("Name\tQty\napple\t2");
     });
 
+    it("keeps pipes in prose and in shell pipelines, which are not tables", () => {
+        expect(markdownToPlainText("a | b | c")).toBe("a | b | c");
+        expect(markdownToPlainText("Run this:\n\n$ cat log.txt | grep error | wc -l")).toBe("Run this:\n\n$ cat log.txt | grep error | wc -l");
+    });
+
+    it("keeps a four-space-indented fence line as literal code", () => {
+        expect(markdownToPlainText("Example:\n\n    ```\n    const x = 1;\n    ```")).toBe("Example:\n\n    ```\n    const x = 1;\n    ```");
+    });
+
     it("drops horizontal rules and strips blockquote markers", () => {
         expect(markdownToPlainText("above\n\n---\n\n> quoted **text**")).toBe("above\n\nquoted text");
     });

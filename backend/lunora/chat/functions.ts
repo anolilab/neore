@@ -2766,9 +2766,11 @@ export const branchThread = authAction
             try {
                 await context.runAction(internal.agent.messages.cloneThread, {
                     copyUserIdForVectorSearch: true,
+                    // The copy re-checks a locked source (`cloneMessageBatch`), so it needs the same proof as the gate above.
                     sourceThreadId: threadId as Id<"threads">,
                     statuses: ["success"], // Only copy successful messages
                     targetThreadId: newThreadId as Id<"threads">,
+                    unlockProof,
                     upToAndIncludingMessageId: forkEnd.endId,
                 });
             } catch (error) {

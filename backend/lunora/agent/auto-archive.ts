@@ -42,6 +42,31 @@ const candidateOf = (thread: Doc<"threads">): AutoArchiveCandidate => {
 };
 
 /**
+ * True when the thread has a pending or streaming stream. Pages the thread's own
+ * stream rows until the first live one, so finished streams never hide it.
+ */
+const threadHasLiveStream = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
+    let cursor: string | null = null;
+    let isDone = false;
+
+    while (!isDone) {
+        const page = await ctx.db
+            .query("persistentStreams")
+            .withIndex("by_threadId", (q) => q.eq("threadId", threadId))
+            .paginate({ cursor, numItems: 50 });
+
+        if (page.page.some((stream) => stream.status === "pending" || stream.status === "streaming")) {
+            return true;
+        }
+
+        cursor = page.continueCursor;
+        isDone = page.isDone;
+    }
+
+    return false;
+};
+
+/**
  * Archives one thread if, as read now, it is still due. The eligibility check runs
  * on the fresh row, its project's pin state and its live streams, in the same
  * transaction as the write, so nothing that happened after the scan is overwritten.
@@ -56,11 +81,7 @@ export const archiveIfStillIdle = internalMutation
             return false;
         }
 
-        const streams = await ctx.db
-            .query("persistentStreams")
-            .withIndex("by_threadId", (q) => q.eq("threadId", args.threadId))
-            .take(50);
-        const hasLiveStream = streams.some((stream) => stream.status === "pending" || stream.status === "streaming");
+        const hasLiveStream = await threadHasLiveStream(ctx, args.threadId);
 
         // The project pin is read per thread, not from a capped list of pinned projects.
         const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;

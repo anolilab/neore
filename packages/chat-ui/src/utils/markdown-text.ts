@@ -7,7 +7,9 @@
  * through unchanged, which is the right failure for copied text.
  */
 
-const FENCE_OPEN_RE = /^ *(`{3,}|~{3,})/;
+// CommonMark: a fence may be indented 0-3 spaces; 4+ is indented code, literal text.
+const FENCE_OPEN_RE = /^ {0,3}(`{3,}|~{3,})/;
+const FOUR_SPACE_INDENT_RE = /^ {4,}/;
 const FENCE_CLOSE_RE = /^(?:`+|~+)$/;
 const HEADING_OPEN_RE = /^ {0,3}#{1,6} (.*)$/;
 const BLOCKQUOTE_RE = /^ {0,3}> ?/;
@@ -170,16 +172,10 @@ const stripInline = (text: string): string => {
         .replaceAll(CODE_RESTORE_RE, (_match, index: string) => codes[Number(index)] ?? "");
 };
 
-/** `null` for a line with no text of its own (a rule, a table separator). */
+/** `null` for a line with no text of its own (a rule). Pipes stay: only a table turns them into cells. */
 const convertLine = (line: string): string | null => {
-    if (isRule(line) || (pipeCount(line) >= 2 && isTableSeparator(line))) {
+    if (isRule(line)) {
         return null;
-    }
-
-    if (pipeCount(line) >= 2) {
-        return tableCells(line)
-            .map((cell) => stripInline(cell))
-            .join("\t");
     }
 
     const heading = headingText(line);
@@ -189,10 +185,24 @@ const convertLine = (line: string): string | null => {
 };
 
 const isFenceClose = (line: string, fence: string): boolean => {
+    if (FOUR_SPACE_INDENT_RE.test(line)) {
+        return false;
+    }
+
     const closing = line.trim();
 
     return closing.length >= fence.length && closing[0] === fence[0] && FENCE_CLOSE_RE.test(closing);
 };
+
+/** A GFM table starts at a row with pipes that is followed by a separator row with as many cells. */
+const isTableStart = (line: string, next: string | undefined): boolean =>
+    next !== undefined && pipeCount(line) >= 1 && pipeCount(next) >= 1 && isTableSeparator(next) && tableCells(line).length === tableCells(next).length;
+
+/** A table row as tab-separated plain cells. */
+const tableRowText = (line: string): string =>
+    tableCells(line)
+        .map((cell) => stripInline(cell))
+        .join("\t");
 
 /**
  * Plain text of a markdown string. Lists keep their bullets and numbers, link
@@ -201,9 +211,12 @@ const isFenceClose = (line: string, fence: string): boolean => {
  */
 export const markdownToPlainText = (markdown: string): string => {
     const output: string[] = [];
+    const lines = markdown.replaceAll(CRLF_RE, "\n").split("\n");
     let fence: string | undefined;
 
-    for (const line of markdown.replaceAll(CRLF_RE, "\n").split("\n")) {
+    for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index] ?? "";
+
         if (fence !== undefined) {
             if (isFenceClose(line, fence)) {
                 fence = undefined;
@@ -218,6 +231,19 @@ export const markdownToPlainText = (markdown: string): string => {
 
         if (marker) {
             fence = marker;
+            continue;
+        }
+
+        if (isTableStart(line, lines[index + 1])) {
+            output.push(tableRowText(line));
+            // The separator row is markup; the body rows run until a row without pipes.
+            index += 1;
+
+            while (index + 1 < lines.length && pipeCount(lines[index + 1] ?? "") >= 1) {
+                index += 1;
+                output.push(tableRowText(lines[index] ?? ""));
+            }
+
             continue;
         }
 

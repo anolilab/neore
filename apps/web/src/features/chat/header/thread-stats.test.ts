@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countReplies, summarizeThreadStats } from "./thread-stats";
+import { countReplies, distinctModels, summarizeThreadStats } from "./thread-stats";
 
 const reply = (overrides: Partial<Parameters<typeof summarizeThreadStats>[0][number]> = {}) => {
     return {
@@ -25,7 +25,6 @@ describe("summarizeThreadStats", () => {
             averageTokensPerSecond: undefined,
             cost: undefined,
             inputTokens: 0,
-            models: [],
             outputTokens: 0,
         });
     });
@@ -78,11 +77,30 @@ describe("summarizeThreadStats", () => {
         expect(stats.cost?.pricingAvailable).toBe(false);
         expect(stats.cost?.microdollars).toBe(1000);
     });
+});
 
-    it("lists each model once, in first-use order, and skips replies without one", () => {
-        const stats = summarizeThreadStats([reply({ model: "b" }), reply({ model: "a" }), reply({ model: "b" }), reply()]);
+describe("distinctModels", () => {
+    it("lists each model once, in first-use order, and skips rows without one", () => {
+        const rows = [
+            { ...row("a", 1, 0), model: "b" },
+            { ...row("u", 2, 0, { role: "user" }), model: "x" },
+            { ...row("c", 2, 0), model: "a" },
+            { ...row("d", 3, 0), model: "b" },
+            row("e", 4, 0),
+        ];
 
-        expect(stats.models).toEqual(["b", "a"]);
+        expect(distinctModels(rows)).toEqual(["b", "a"]);
+    });
+
+    it("keeps the model of every regenerated alternative that shares a prompt's order", () => {
+        // Same `order`, different models: `toUIMessages` would merge these into one turn and keep only "model-b".
+        const rows = [
+            { ...row("a1", 1, 0), model: "model-a" },
+            { ...row("b1", 1, 0, { parentMessageId: "prompt" }), model: "model-b" },
+        ];
+
+        expect(countReplies(rows)).toBe(2);
+        expect(distinctModels(rows)).toEqual(["model-a", "model-b"]);
     });
 });
 

@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useEffect, useId, useState } from "react";
 
@@ -20,16 +20,19 @@ export const LockedChatGate = ({ children, threadId }: { children: ReactNode; th
     const { t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
-    const queryClient = useQueryClient();
     const [unlocking, setUnlocking] = useState(false);
+    const [, setRelocks] = useState(0);
 
-    // When the proof lapses (expiry or idle), refetch: the server refuses the read and the prompt appears.
+    // A relock drops this chat's cached reads (`live-queries.ts`). Re-rendering makes this
+    // gate's query build a fresh one, which reads without the expired proof and gets refused.
     useEffect(
         () =>
-            onUnlockExpired(() => {
-                void queryClient.invalidateQueries();
+            onUnlockExpired((relocked) => {
+                if (relocked === threadId) {
+                    setRelocks((count) => count + 1);
+                }
             }),
-        [queryClient],
+        [threadId],
     );
     // The same args as the chat's own read, so the two share one subscription (`DEFAULT_MESSAGE_OPTS`).
     const { error } = useQuery(crpc.chat.composite.getThreadWithData.queryOptions({ messageOpts: DEFAULT_MESSAGE_OPTS, threadId: threadId as Id<"threads"> }));

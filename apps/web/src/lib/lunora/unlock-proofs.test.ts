@@ -37,6 +37,15 @@ describe("unlock proofs in memory", () => {
         expect(currentUnlockProof("t1")).toBeUndefined();
     });
 
+    it("does not revive a proof that lapsed before the user's next input", () => {
+        rememberUnlockProof("t1", "proof", NOW + 10 * UNLOCK_IDLE_MS, NOW);
+
+        vi.setSystemTime(NOW + UNLOCK_IDLE_MS + 1);
+        noteUnlockActivity();
+
+        expect(currentUnlockProof("t1")).toBeUndefined();
+    });
+
     it("forgets a proof after the idle timeout", () => {
         const expired = vi.fn();
 

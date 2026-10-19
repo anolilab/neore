@@ -25,7 +25,11 @@ const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const relockListeners = new Set<(threadId: string) => void>();
 const activity = { listening: false };
 
-/** Called with a chat's id when its proof is forgotten by timer (expiry or idle). Returns the unsubscribe. */
+/**
+ * Called with a chat's id each time it is relocked: by expiry or idle timeout,
+ * by an explicit forget, or by an account switch. What the chat read with its
+ * proof is dropped then (`live-queries.ts`). Returns the unsubscribe.
+ */
 export const onUnlockExpired = (listener: (threadId: string) => void): (() => void) => {
     relockListeners.add(listener);
 
@@ -43,7 +47,8 @@ const clearTimer = (threadId: string): void => {
     }
 };
 
-const expire = (threadId: string): void => {
+/** Forgets a chat's proof and tells the listeners, so they drop what the proof read. */
+const relock = (threadId: string): void => {
     clearTimer(threadId);
     proofs.delete(threadId);
 
@@ -62,18 +67,28 @@ const arm = (threadId: string, entry: ProofEntry, now: number): void => {
         threadId,
         setTimeout(
             () => {
-                expire(threadId);
+                relock(threadId);
             },
             Math.max(0, due - now),
         ),
     );
 };
 
-/** Any user input counts as use. Reads of the proof do not: a render must not keep a chat open. */
+/** True once a proof is past its expiry or has sat idle too long. */
+const lapsed = (entry: ProofEntry, now: number): boolean => entry.expiresAt <= now || now - entry.lastUsedAt > UNLOCK_IDLE_MS;
+
+/**
+ * Any user input counts as use. Reads of the proof do not: a render must not keep a chat open.
+ * A proof that already lapsed is relocked, not revived: a throttled timer may not have fired yet.
+ */
 export const noteUnlockActivity = (now: number = Date.now()): void => {
     for (const [threadId, entry] of proofs) {
-        entry.lastUsedAt = now;
-        arm(threadId, entry, now);
+        if (lapsed(entry, now)) {
+            relock(threadId);
+        } else {
+            entry.lastUsedAt = now;
+            arm(threadId, entry, now);
+        }
     }
 };
 
@@ -108,10 +123,14 @@ export const currentUnlockProof = (threadId: string, now: number = Date.now()): 
         return undefined;
     }
 
-    // Silent: this runs during render. The timer tells the listeners.
-    if (entry.expiresAt <= now || now - entry.lastUsedAt > UNLOCK_IDLE_MS) {
-        clearTimer(threadId);
-        proofs.delete(threadId);
+    // This runs during render, so the relock (which tells the listeners) is deferred. The
+    // guard keeps a proof re-remembered in the meantime.
+    if (lapsed(entry, now)) {
+        queueMicrotask(() => {
+            if (proofs.get(threadId) === entry) {
+                relock(threadId);
+            }
+        });
 
         return undefined;
     }
@@ -121,17 +140,15 @@ export const currentUnlockProof = (threadId: string, now: number = Date.now()): 
 
 /** Re-locks one chat now. */
 export const forgetUnlockProof = (threadId: string): void => {
-    clearTimer(threadId);
-    proofs.delete(threadId);
+    relock(threadId);
 };
 
-/** Re-locks everything (sign-out). */
+/** Re-locks everything (account switch, token subject change). */
 export const forgetAllUnlockProofs = (): void => {
-    for (const threadId of timers.keys()) {
-        clearTimer(threadId);
+    // A Map iterator tolerates the deletes `relock` makes.
+    for (const threadId of proofs.keys()) {
+        relock(threadId);
     }
-
-    proofs.clear();
 };
 
 /**

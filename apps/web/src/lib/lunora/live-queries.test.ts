@@ -1,3 +1,4 @@
+import { lunoraQueryOptions } from "@lunora/react";
 import { dehydrate, hashKey, hydrate, QueryClient, QueryObserver, skipToken } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +12,7 @@ import {
     SEED_SLOT_TIMEOUT_MS,
     tokenSubject,
 } from "./live-queries";
+import { currentUnlockProof, rememberUnlockProof } from "./unlock-proofs";
 
 type OnData = (value: unknown) => void;
 type OnError = (error: { code?: string; message: string }) => void;
@@ -455,6 +457,57 @@ describe(LiveQueryManager, () => {
         expect(queryClient.getQueryData(key("x:y"))).toBe("value");
 
         unobserve();
+    });
+
+    it("drops a chat's cached reads when its proof expires, and keeps other chats", () => {
+        const locked = key("chat:getThreadWithData", { threadId: "locked-chat" });
+        const other = key("chat:getThreadWithData", { threadId: "other-chat" });
+        const unobserve = observe(locked);
+        const unobserveOther = observe(other);
+
+        queryClient.setQueryData(locked, { messages: ["secret"] });
+        queryClient.setQueryData(other, { messages: ["public"] });
+        rememberUnlockProof("locked-chat", "proof", Date.now() + 1000);
+
+        vi.advanceTimersByTime(1000);
+
+        expect(queryClient.getQueryData(locked)).toBeUndefined();
+        expect(manager.isSubscribed(hashKey(locked))).toBe(false);
+        expect(queryClient.getQueryData(other)).toEqual({ messages: ["public"] });
+
+        unobserve();
+        unobserveOther();
+    });
+
+    it("relocks a proof a render found lapsed before its timer fired, and drops the cache", async () => {
+        const locked = key("chat:getThreadWithData", { threadId: "render-chat" });
+        const unobserve = observe(locked);
+
+        queryClient.setQueryData(locked, { messages: ["secret"] });
+        rememberUnlockProof("render-chat", "proof", Date.now() + 1000);
+
+        // The clock passes the expiry but the timer has not run (a throttled background tab).
+        vi.setSystemTime(Date.now() + 5000);
+
+        expect(currentUnlockProof("render-chat")).toBeUndefined();
+
+        await Promise.resolve();
+
+        expect(queryClient.getQueryData(locked)).toBeUndefined();
+
+        unobserve();
+    });
+
+    it("keys a real chat query by the chat id it names, so the relock finds it", () => {
+        const real = lunoraQueryOptions(
+            {} as never,
+            { __lunoraRef: "chat_functions:getThreadWithData" } as never,
+            {
+                threadId: "locked-chat",
+            } as never,
+        ).queryKey;
+
+        expect(JSON.stringify(real)).toContain("locked-chat");
     });
 });
 

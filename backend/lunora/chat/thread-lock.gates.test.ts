@@ -5,12 +5,16 @@
  * in `agent/thread-lock.test.ts`; this file drives the chat procedures.
  */
 import { lunoraTest } from "@lunora/testing";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { registeredApi, registerModule } from "../../test/registered-api";
+
+import { getFile } from "../agent/client/files";
+import { addFile, getFileForUser } from "../agent/files";
 import { readMessagesByIds } from "../agent/messages";
 import { lockThread } from "../agent/thread-lock";
 import { createPin, getThreadPins } from "./pins/functions";
-import { abortThreadStream, getCachedFollowupSuggestions, getThread, getThreadUIMessages, gateThreadActionHandler } from "./functions";
+import { abortThreadStream, branchThread, getCachedFollowupSuggestions, getThread, getThreadUIMessages, gateThreadActionHandler } from "./functions";
 import { getGroupChat } from "./group/functions";
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { claimToolApproval } from "./lib/tool-approval-claim";
@@ -25,6 +29,20 @@ const STRANGER = "user-stranger";
 const SECRET = "s".repeat(40);
 const PASSCODE = "passcode-1";
 const NOT_FOUND_PATTERN = /NOT_FOUND/;
+
+// `branchThread` reaches its own steps and the fork's copy through `internal.*`: resolve those to registered procedures.
+const registry = vi.hoisted(() => new Map<string, unknown>());
+
+vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
+vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+beforeAll(async () => {
+    registerModule(registry, "chat_functions", await import("./functions"));
+    registerModule(registry, "agent_messages", await import("../agent/messages"));
+    registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "agent_branches", await import("../agent/branches"));
+    registerModule(registry, "lib_document_history", await import("../lib/document-history"));
+}, 30_000);
 
 // Same identity seam as `thread-read-paths.test.ts`: the session reads come off the harness identity.
 const { sessionFrom } = vi.hoisted(() => {
@@ -348,6 +366,49 @@ describe("writes into a locked chat", () => {
                     await claimToolApproval(context, { approvalId: "a-1", callerId: OWNER, decision: "approve", threadId: threadId as never }),
             ),
         ).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
+    });
+});
+
+describe("branching a locked chat", () => {
+    it("forks it with a valid proof, copying the messages, and refuses without one", async () => {
+        const branch = (unlockProof?: string) => as(OWNER).action(branchThread as never, { threadId, unlockProof } as never);
+
+        await expect(branch()).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
+
+        // The copy re-checks the locked source; without the proof forwarded to it, this fork fails after it is created.
+        const forkId = await branch(proof);
+
+        expect(forkId).toEqual(expect.any(String));
+        expect(forkId).not.toBe(threadId);
+    });
+});
+
+describe("attaching a file to a locked chat", () => {
+    it("refuses the owner's own file without a proof, and attaches it with one", async () => {
+        const { fileId } = (await harness.run(
+            async (context: any) =>
+                await context.runMutation(addFile, {
+                    filename: "a.png",
+                    hash: "h-lock",
+                    mediaType: "image/png",
+                    storageId: "agent-files/h-lock",
+                    userId: OWNER,
+                }),
+        )) as { fileId: string };
+        // The chat's gate runs before the grant shortcut, so the grant alone must not open the file.
+        // `getFile` names the query through `internal.*`, which this harness does not register: route it to the real function.
+        const attach = (unlockProof?: string) =>
+            harness.run(async (context: any) => {
+                const ctx = {
+                    runQuery: async (_reference: unknown, args: unknown) => await context.runQuery(getFileForUser, args),
+                    storage: { getSignedUrl: async (key: string) => `https://files.test/${key}` },
+                };
+
+                return await getFile(ctx as never, fileId, { threadId, unlockProof, userId: OWNER });
+            });
+
+        await expect(attach()).rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(await attach(proof)).toMatchObject({ file: { fileId, storageId: "agent-files/h-lock" } });
     });
 });
 
