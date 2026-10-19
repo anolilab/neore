@@ -61,13 +61,28 @@
 /*
  * Much of the UI dims the theme colours with an opacity modifier (`text-muted-foreground/50`,
  * `border-border/40`), which mixes them with transparency and undoes the tokens above.
- * In high contrast the full token wins. Hard-coded palette colours (some badges) are not adjusted.
+ * In high contrast the full token wins. Each opacity class is named in full: a substring
+ * selector also matched variants such as `placeholder:text-muted-foreground/50`, and so
+ * recoloured typed text. An element that also carries a variant (`hover:…`, `placeholder:…`)
+ * keeps its own dimming, because that variant may be the only cue it has. Hard-coded palette
+ * colours (some badges) are not adjusted.
  */
-:root[data-contrast="high"] [class*="text-muted-foreground/"] {
+:root[data-contrast="high"]
+    :is(
+        .text-muted-foreground\/20,
+        .text-muted-foreground\/25,
+        .text-muted-foreground\/30,
+        .text-muted-foreground\/40,
+        .text-muted-foreground\/50,
+        .text-muted-foreground\/60,
+        .text-muted-foreground\/70,
+        .text-muted-foreground\/72,
+        .text-muted-foreground\/80
+    ):not([class*=":"]) {
     color: var(--muted-foreground);
 }
 
-:root[data-contrast="high"] [class*="border-border/"] {
+:root[data-contrast="high"] :is(.border-border\/30, .border-border\/40, .border-border\/50, .border-border\/60, .border-border\/70):not([class*=":"]) {
     border-color: var(--border);
 }
 

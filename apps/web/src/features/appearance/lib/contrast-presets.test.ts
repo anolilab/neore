@@ -81,8 +81,9 @@ describe("contrast setting", () => {
 
 describe("dimmed theme colours", () => {
     it("are restored to the full token", () => {
-        expect(CSS).toContain('[class*="text-muted-foreground/"]');
-        expect(CSS).toContain('[class*="border-border/"]');
+        expect(CSS).toContain(String.raw`.text-muted-foreground\/50`);
+        expect(CSS).toContain(String.raw`.border-border\/40`);
+        expect(CSS).toContain(':not([class*=":"])');
     });
 });
 

@@ -399,7 +399,8 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                                                 e.preventDefault();
                                                 handleSelectChat(chat);
                                             }}
-                                            value={`chat:${chat.id}`}
+                                            // The title is in the value so the popup's own search matches it; the id keeps it unique.
+                                            value={`${chat.title} chat:${chat.id}`}
                                         >
                                             <div className="flex min-w-0 flex-1 items-center gap-2">
                                                 <MessageSquareIcon aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />

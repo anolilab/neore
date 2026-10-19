@@ -944,10 +944,9 @@ const ComposerInput = ({
     }, []);
 
     // Attach a file the composer generated (converted text, a referenced chat) and upload it like any other.
-    const attachGeneratedFile = useCallback(
-        async (file: File, failureLabel: string): Promise<boolean> => {
-            const attachmentId = addAttachment(file);
-
+    // Uploads `file` into an attachment that already exists, so it is pending (and blocks sending) from the moment it is added.
+    const uploadGeneratedFile = useCallback(
+        async (attachmentId: string, file: File, failureLabel: string): Promise<boolean> => {
             try {
                 updateAttachment(attachmentId, { status: "uploading" });
 
@@ -977,7 +976,12 @@ const ComposerInput = ({
                 return false;
             }
         },
-        [addAttachment, attachmentAdapter, updateAttachment, describeUploadError],
+        [attachmentAdapter, updateAttachment, describeUploadError],
+    );
+
+    const attachGeneratedFile = useCallback(
+        async (file: File, failureLabel: string): Promise<boolean> => await uploadGeneratedFile(addAttachment(file), file, failureLabel),
+        [addAttachment, uploadGeneratedFile],
     );
 
     // Convert long text to attachment
@@ -998,19 +1002,26 @@ const ComposerInput = ({
     }, [text, attachGeneratedFile, setText, t]);
 
     // "@" a chat: read it through the thread view's own query (so the usual access and lock checks apply), then attach its text.
+    // The attachment is added and pending before the read, so a message sent meanwhile waits for it instead of leaving the chat out.
     const handleSelectChat = useCallback(
         async (chat: ChatReference) => {
+            const fileName = chatReferenceFileName(chat.title);
+            const attachmentId = addAttachment(new File([], fileName, { type: "text/plain" }));
+
+            updateAttachment(attachmentId, { status: "uploading" });
+
             try {
                 const messages = await readChatMessages(lunora, chat.id);
                 const transcript = buildChatTranscript(chat.title, messages);
 
-                await attachGeneratedFile(new File([transcript], chatReferenceFileName(chat.title), { type: "text/plain" }), t`Could not attach the chat`);
+                await uploadGeneratedFile(attachmentId, new File([transcript], fileName, { type: "text/plain" }), t`Could not attach the chat`);
             } catch (error) {
                 console.error("Failed to read the referenced chat:", error);
+                updateAttachment(attachmentId, { error: t`Could not read that chat`, status: "error" });
                 showError(t`Could not read that chat. If it is locked, unlock it first.`);
             }
         },
-        [lunora, attachGeneratedFile, t],
+        [lunora, addAttachment, updateAttachment, uploadGeneratedFile, t],
     );
 
     // Handle attachment file update (for editing)
