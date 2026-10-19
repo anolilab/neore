@@ -1751,6 +1751,36 @@
       "to": "function:lib_document_history:recordHistory"
     },
     {
+      "from": "function:chat_functions:generateBackgroundRemoval",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateBackgroundRemoval",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
+    },
+    {
+      "from": "function:chat_functions:generateCharacterRef",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateCharacterRef",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
+    },
+    {
+      "from": "function:chat_functions:generateControlNet",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateControlNet",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
+    },
+    {
       "from": "function:chat_functions:generateFollowupSuggestionsForThread",
       "kind": "call",
       "to": "function:agent_followup_suggestions:cacheFollowupSuggestions"
@@ -1772,6 +1802,71 @@
     },
     {
       "from": "function:chat_functions:generateImage",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateImage",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
+    },
+    {
+      "from": "function:chat_functions:generateImg2Img",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateImg2Img",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
+    },
+    {
+      "from": "function:chat_functions:generateInpaint",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateInpaint",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
+    },
+    {
+      "from": "function:chat_functions:generateObjectEdit",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateObjectEdit",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
+    },
+    {
+      "from": "function:chat_functions:generateOutpaint",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateOutpaint",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
+    },
+    {
+      "from": "function:chat_functions:generateParallelCompare",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateParallelCompare",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
+    },
+    {
+      "from": "function:chat_functions:generateStyleRef",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateStyleRef",
       "kind": "schedule",
       "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
     },
@@ -1789,6 +1884,16 @@
       "from": "function:chat_functions:generateSummary",
       "kind": "schedule",
       "to": "function:chat_functions:createSummarizeChat"
+    },
+    {
+      "from": "function:chat_functions:generateUpscale",
+      "kind": "call",
+      "to": "function:agent_files:markNsfwFailed"
+    },
+    {
+      "from": "function:chat_functions:generateUpscale",
+      "kind": "schedule",
+      "to": "function:agent_nsfw_check:checkImageNsfwForChatFile"
     },
     {
       "from": "function:chat_functions:getAllThreadRelationships",
@@ -12104,6 +12209,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:messenger_functions:claimAiDisclosure",
+      "kind": "function",
+      "name": "messenger.functions.claimAiDisclosure",
+      "module": "messenger"
+    },
+    {
+      "detail": "mutation",
       "id": "function:messenger_functions:claimThreadReply",
       "kind": "function",
       "name": "messenger.functions.claimThreadReply",
@@ -18355,61 +18467,61 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 85,
+      "line": 93,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 85,
+      "line": 93,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 85,
+      "line": 93,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 85,
+      "line": 93,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 99,
+      "line": 107,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 99,
+      "line": 107,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 102,
+      "line": 110,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 102,
+      "line": 110,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 142,
+      "line": 150,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 203,
+      "line": 211,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
@@ -18613,61 +18725,67 @@
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 102,
+      "line": 103,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 111,
+      "line": 112,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 152,
+      "line": 153,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 158,
+      "line": 159,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 185,
+      "line": 186,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 236,
+      "line": 214,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 251,
+      "line": 248,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 259,
+      "line": 263,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 286,
+      "line": 271,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {
       "file": "messenger/respond",
       "kind": "call",
-      "line": 295,
+      "line": 298,
+      "reason": "\"respondToInbound\" is not a registered function"
+    },
+    {
+      "file": "messenger/respond",
+      "kind": "call",
+      "line": 307,
       "reason": "\"respondToInbound\" is not a registered function"
     },
     {

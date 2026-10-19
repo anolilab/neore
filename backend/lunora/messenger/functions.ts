@@ -11,7 +11,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { changeRefcount } from "../agent/files";
 import { insertMessageRow, insertThread, patchMessage, patchThread } from "../agent/table-writes";
-import { claimOnce, MESSENGER_CLAIM_TTL_MS } from "../lib/claim-once";
+import { AI_DISCLOSURE_CLAIM_TTL_MS, claimOnce, MESSENGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { timingSafeEqual } from "../lib/crypto";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { getUserTier } from "../lib/rate-limiter";
@@ -616,6 +616,18 @@ export const claimThreadReply = internalMutation
 
         return claimed ? { claimed: true as const, newestUserMessageId: plan.newestUserMessageId } : { claimed: false as const };
     });
+
+const AI_DISCLOSURE_SCOPE = "messenger-ai-disclosure";
+
+/**
+ * `true` the first time a chat (thread) gets a reply that carries the AI
+ * disclosure, `false` after. Called right before the reply is sent, so a
+ * reply that never went out does not use it up.
+ */
+export const claimAiDisclosure = internalMutation
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.boolean())
+    .mutation(async ({ args: { threadId, userId }, ctx }) => await claimOnce(ctx, AI_DISCLOSURE_SCOPE, threadId, AI_DISCLOSURE_CLAIM_TTL_MS, userId));
 
 /**
  * Append an assistant-side note to a messenger thread — used when a reply could

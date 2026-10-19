@@ -29,6 +29,7 @@ import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import type { Delivery } from "./lib/platform-media";
 import { requireKey } from "./lib/platform-media";
+import { AI_DISCLOSURE } from "./lib/pairing";
 import type { ReplyToolPlan } from "./lib/reply-tools";
 import { chooseReplyModel, MESSENGER_TEXT_REPLY_MAX_STEPS, MESSENGER_TOOL_REPLY_MAX_STEPS, MESSENGER_TOOL_SYSTEM, planReplyTools } from "./lib/reply-tools";
 import { ingestAttachments, sendReplyMedia } from "./media";
@@ -205,6 +206,17 @@ const generateReply = async (ctx: ActionCtx, threadId: Id<"threads">, userId: st
 };
 
 /**
+ * Art. 50(1): the chat's first reply says it comes from an AI. Claimed only
+ * here, right before the send and after the reply exists, so a burst, a closed
+ * window or a failed run never uses it up.
+ */
+const withAiDisclosure = async (ctx: ActionCtx, options: { text: string; threadId: Id<"threads">; userId: string }): Promise<string> => {
+    const first = await ctx.runMutation(internal.messenger.functions.claimAiDisclosure, { threadId: options.threadId, userId: options.userId });
+
+    return first ? `${AI_DISCLOSURE}\n\n${options.text}` : options.text;
+};
+
+/**
  * Upload the files a tool reply produced. A tool run can outlast the window it
  * started in, so the window is checked again before any upload; the platform
  * adapters still apply their own size limits.
@@ -275,7 +287,7 @@ export const respondToInbound = async (ctx: ActionCtx, args: RespondArgs): Promi
         }
 
         // Send response back to the platform using per-user BYOK tokens
-        let outcome = await sendPlatformMessage(delivery, responseText, messengerKeys);
+        let outcome = await sendPlatformMessage(delivery, await withAiDisclosure(ctx, { text: responseText, threadId, userId }), messengerKeys);
 
         // Only a reply with tools can have produced files.
         if (outcome === "sent" && replyTools) {

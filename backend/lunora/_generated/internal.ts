@@ -746,6 +746,7 @@ export interface InternalApiTypes {
     messenger: {
         functions: {
             chargeReplyToolRound: FunctionReference<"mutation", { userId: string }, "charged" | "limit" | "unavailable">;
+            claimAiDisclosure: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, boolean>;
             claimThreadReply: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, { claimed: true; newestUserMessageId: string } | { claimed: false }>;
             completeMessengerMessage: FunctionReference<"mutation", { fileIds?: Array<Id<"chatFiles">>; messageId: Id<"messages">; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; text: string }, boolean>;
             findOrCreateMessengerThread: FunctionReference<"mutation", { externalThreadId: string; messengerConnectionId: Id<"messengerConnections">; source: string; title?: string; userId: string }, { isNew: boolean; threadId: Id<"threads">; }>;
@@ -1732,6 +1733,7 @@ export const internal: InternalApiTypes = {
     messenger: {
         functions: {
             chargeReplyToolRound: { __lunoraRef: "messenger_functions:chargeReplyToolRound" },
+            claimAiDisclosure: { __lunoraRef: "messenger_functions:claimAiDisclosure" },
             claimThreadReply: { __lunoraRef: "messenger_functions:claimThreadReply" },
             completeMessengerMessage: { __lunoraRef: "messenger_functions:completeMessengerMessage" },
             findOrCreateMessengerThread: { __lunoraRef: "messenger_functions:findOrCreateMessengerThread" },

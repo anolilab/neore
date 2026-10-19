@@ -1045,6 +1045,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "memory_retrieve:default": lunora_memory_retrieve_124.default as unknown as RegisteredLunoraFunction,
     "memory_retrieve:retrieveRelevantMemories": lunora_memory_retrieve_124.retrieveRelevantMemories as unknown as RegisteredLunoraFunction,
     "messenger_functions:chargeReplyToolRound": lunora_messenger_functions_125.chargeReplyToolRound as unknown as RegisteredLunoraFunction,
+    "messenger_functions:claimAiDisclosure": lunora_messenger_functions_125.claimAiDisclosure as unknown as RegisteredLunoraFunction,
     "messenger_functions:claimThreadReply": lunora_messenger_functions_125.claimThreadReply as unknown as RegisteredLunoraFunction,
     "messenger_functions:completeMessengerMessage": lunora_messenger_functions_125.completeMessengerMessage as unknown as RegisteredLunoraFunction,
     "messenger_functions:createConnection": lunora_messenger_functions_125.createConnection as unknown as RegisteredLunoraFunction,
@@ -6240,6 +6241,13 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_messenger_functions_125.claimAiDisclosure.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "threadId": source["threadId"], "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_messenger_functions_125.claimThreadReply.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8927,6 +8935,7 @@ export interface Caller {
     messenger: {
         functions: {
             chargeReplyToolRound: (args: { userId: string }) => Promise<"charged" | "limit" | "unavailable">;
+            claimAiDisclosure: (args: { threadId: Id<"threads">; userId: string }) => Promise<boolean>;
             claimThreadReply: (args: { threadId: Id<"threads">; userId: string }) => Promise<{ claimed: true; newestUserMessageId: string } | { claimed: false }>;
             completeMessengerMessage: (args: { fileIds?: Array<Id<"chatFiles">>; messageId: Id<"messages">; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; text: string }) => Promise<boolean>;
             createConnection: (args: { displayName?: string; platform: "telegram" | "slack" | "discord" | "whatsapp" | "line" | "feishu" | "teams" | "wechat" }) => Promise<{ connectionId: string; pairingCode: string | null; pairingCodeExpiresAt: number | null }>;
@@ -10532,6 +10541,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
     messenger: {
         functions: {
             chargeReplyToolRound: (args) => callRegistered(context, "messenger_functions:chargeReplyToolRound", args),
+            claimAiDisclosure: (args) => callRegistered(context, "messenger_functions:claimAiDisclosure", args),
             claimThreadReply: (args) => callRegistered(context, "messenger_functions:claimThreadReply", args),
             completeMessengerMessage: (args) => callRegistered(context, "messenger_functions:completeMessengerMessage", args),
             createConnection: (args) => callRegistered(context, "messenger_functions:createConnection", args),

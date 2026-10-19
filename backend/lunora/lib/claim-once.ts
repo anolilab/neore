@@ -13,6 +13,7 @@
  * | `trigger-webhook`  | `<triggerId>:<sig hex>`  | {@link TRIGGER_CLAIM_TTL_MS}   | `triggers/http.ts`           |
  * | `job`              | `<jobId>`                | {@link JOB_CLAIM_TTL_MS}       | `lib/job-queue.ts` (`once`)  |
  * | `messenger-reply`  | `<threadId>:<messageId>` | {@link MESSENGER_CLAIM_TTL_MS} | `messenger/functions.ts`     |
+ * | `messenger-ai-disclosure` | `<threadId>`      | {@link AI_DISCLOSURE_CLAIM_TTL_MS} | `messenger/functions.ts` |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  *
@@ -53,6 +54,13 @@ import { patchRow } from "./patch";
  * accepts (WhatsApp's 24h service window, Telegram's 24h retention).
  */
 export const MESSENGER_CLAIM_TTL_MS = 25 * 60 * 60 * 1000;
+
+/**
+ * A chat's AI disclosure, sent once with its first reply. Effectively forever:
+ * a re-disclosure is harmless but noisy, and the row is tagged with the owner,
+ * so account deletion clears it.
+ */
+export const AI_DISCLOSURE_CLAIM_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 
 /** Trigger webhooks: must outlast the signed-timestamp window on either side (`lib/crypto.ts`). */
 export const TRIGGER_CLAIM_TTL_MS = 15 * 60 * 1000;

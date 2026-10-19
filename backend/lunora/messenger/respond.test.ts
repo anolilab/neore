@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../test/registered-api";
 
+import { AI_DISCLOSURE } from "./lib/pairing";
 import { MESSENGER_MEDIA_MODEL, MESSENGER_TOOL_REPLY_MAX_STEPS, MESSENGER_TOOL_SYSTEM } from "./lib/reply-tools";
 
 // A reference is read as its dispatch key, which the fake ctx below switches on.
@@ -17,6 +18,8 @@ const state = vi.hoisted(() => {
     return {
         afterRun: undefined as (() => void) | undefined,
         charge: "charged" as "charged" | "limit" | "unavailable",
+        /** Whether this chat's AI disclosure is still unsent (the claim succeeds). */
+        disclose: false,
         mutations: [] as { args: unknown; path: string }[],
         replyFiles: [] as { filename?: string; key: string; mediaType: string }[],
         runs: [] as Record<string, unknown>[],
@@ -111,6 +114,9 @@ const ctx = () =>
                 case "messenger_functions:chargeReplyToolRound": {
                     return state.charge;
                 }
+                case "messenger_functions:claimAiDisclosure": {
+                    return state.disclose;
+                }
                 case "messenger_functions:claimThreadReply": {
                     return { claimed: true };
                 }
@@ -158,6 +164,7 @@ beforeEach(() => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     state.afterRun = undefined;
     state.charge = "charged";
+    state.disclose = false;
     state.mutations = [];
     state.replyFiles = [{ filename: "cat.png", key: "agent-files/cat", mediaType: "image/png" }];
     state.runs = [];
@@ -244,6 +251,42 @@ describe("messenger replies with tools", () => {
         expect(state.runs[0]).toMatchObject({ tools: "none" });
         expect(state.sentText).toHaveLength(1);
         expect(state.sentMedia).toStrictEqual([]);
+    });
+});
+
+describe("AI disclosure", () => {
+    it("prepends the disclosure to a chat's first reply, in the same message", async () => {
+        state.disclose = true;
+
+        await respond();
+
+        expect(state.sentText).toStrictEqual([{ chatId: "chat-1", platform: "telegram", text: `${AI_DISCLOSURE}\n\nHere is your picture.` }]);
+    });
+
+    it("leaves later replies unchanged once the chat has been told", async () => {
+        state.disclose = false;
+
+        await respond();
+
+        expect(state.sentText.map((sent) => sent.text)).toStrictEqual(["Here is your picture."]);
+    });
+
+    it("claims the disclosure per thread, for the thread's owner", async () => {
+        state.disclose = true;
+
+        await respond();
+
+        expect(state.mutations.filter((entry) => entry.path === "messenger_functions:claimAiDisclosure")).toStrictEqual([
+            { args: { threadId: "thread-1", userId: "owner" }, path: "messenger_functions:claimAiDisclosure" },
+        ]);
+    });
+
+    it("does not claim it when the reply window has closed, so the next reply still discloses", async () => {
+        state.disclose = true;
+
+        await respond({ inboundAt: NOW - 25 * HOUR, platform: "whatsapp" });
+
+        expect(mutationPaths()).not.toContain("messenger_functions:claimAiDisclosure");
     });
 });
 

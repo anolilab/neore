@@ -44,6 +44,11 @@ export const parsePairCommand = (text: string | undefined): string | null => {
 
 export const PRIVATE_BOT_NOTICE = "This bot is private. If it is yours, send /pair followed by the code shown in your Neore messenger settings.";
 // Art. 50(1): the first message a contact gets says replies come from an AI.
-// ponytail: connections paired before this notice shipped never see it; no backfill.
 export const PAIRED_NOTICE =
     "Paired. Replies in this chat come from an AI assistant, not a person. This chat is now connected to your Neore account — send a message to start.";
+/**
+ * Prepended once to the first reply a chat receives (`messenger/respond.ts`),
+ * for chats paired before PAIRED_NOTICE shipped and for group members who never
+ * saw the pairing message. Not added to later replies.
+ */
+export const AI_DISCLOSURE = "Replies in this chat come from an AI assistant, not a person.";
