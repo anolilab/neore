@@ -20,6 +20,7 @@ import {
     CheckIcon,
     ChevronDownIcon,
     CopyIcon,
+    DownloadIcon,
     FileTextIcon,
     Gauge,
     GitBranch,
@@ -45,13 +46,16 @@ import { MessageSpeakerLabel } from "@/features/chat/group/speaker-label";
 import MessageTranslation from "@/features/chat/translation/message-translation";
 import TranslateAction from "@/features/chat/translation/translate-action";
 import SaveEvalCaseAction from "@/features/evals/components/save-eval-case-action";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
+import { saveBlob } from "@/lib/download";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 import ForkBranchDialog from "./fork-branch-dialog";
+import formatMessageTime from "./format-message-time";
 import GenerationModelMenu from "./generation-model-menu";
 import MemoryUsageAction from "./memory-usage-action";
 import MessageBranchSwitcher from "./message-branch-switcher";
@@ -239,7 +243,8 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
     const { createBranch } = useThreadManager(true);
     const [isForkDialogOpen, setIsForkDialogOpen] = useState(false);
     const { mutate: createPin } = useMutation(crpc.chat.pins.functions.createPin.mutationOptions());
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
+    const showTimestamps = useUIStateStore((state) => state.preferences.showTimestamps);
 
     // Hide action bar while streaming
     if (isStreaming) {
@@ -337,6 +342,10 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                                 <FileTextIcon aria-hidden="true" className="size-4" />
                                 {t`Copy as plain text`}
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => saveBlob(new Blob([messageText], { type: "text/markdown" }), "message.md")}>
+                                <DownloadIcon aria-hidden="true" className="size-4" />
+                                {t`Download as Markdown`}
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 )}
@@ -414,6 +423,16 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                         <div className="grow" />
                         <MessageModelBadge model={message.model} />
                     </>
+                )}
+
+                {showTimestamps && (
+                    <time
+                        className="text-muted-foreground ml-1 text-xs tabular-nums"
+                        dateTime={new Date(message._creationTime).toISOString()}
+                        title={new Date(message._creationTime).toLocaleString(i18n.locale)}
+                    >
+                        {formatMessageTime(message._creationTime, i18n.locale)}
+                    </time>
                 )}
             </MessageActions>
 

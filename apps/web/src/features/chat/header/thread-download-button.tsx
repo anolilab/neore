@@ -119,6 +119,10 @@ const ThreadDownloadButton: FC<Props> = ({ model, threadId }) => {
                         <FileTypeIcon className="size-4" />
                         {t`Download PDF`}
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadFormat("docx")}>
+                        <FileTypeIcon className="size-4" />
+                        {t`Download Word document`}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleDownloadFormat("txt")}>
                         <FileTextIcon className="size-4" />
                         {t`Download Text`}

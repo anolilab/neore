@@ -94,3 +94,21 @@ describe("chat tables", () => {
         expect(screen.getByRole("dialog").textContent).toContain("apple");
     });
 });
+
+describe("chat text direction", () => {
+    it("lets each block pick its direction from its own text", async () => {
+        await renderChat("# عنوان\n\nHello there\n\nשלום עולם\n\n- one\n- two\n\n> quoted");
+
+        expect(screen.getByRole("heading").getAttribute("dir")).toBe("auto");
+        expect(screen.getByText("Hello there").getAttribute("dir")).toBe("auto");
+        expect(screen.getByText("שלום עולם").getAttribute("dir")).toBe("auto");
+        expect(screen.getByRole("list").getAttribute("dir")).toBe("auto");
+        expect(screen.getByText("quoted").closest("blockquote")?.getAttribute("dir")).toBe("auto");
+    });
+
+    it("leaves code blocks alone", async () => {
+        await renderChat(fence(2));
+
+        expect(screen.getByText("const line0 = 0;").closest("pre")?.getAttribute("dir")).toBeNull();
+    });
+});

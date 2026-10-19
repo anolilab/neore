@@ -1,9 +1,11 @@
 import type { Doc } from "@neore/backend/dataModel";
 
+import { buildDocx, DOCX_MIME_TYPE } from "./docx";
+
 type Message = Doc<"messages">;
 type Chat = Doc<"threads">;
 
-export type DownloadFormat = "json" | "md" | "txt" | "pdf";
+export type DownloadFormat = "docx" | "json" | "md" | "txt" | "pdf";
 
 /**
  * `Doc<"messages">.message` is an untyped JSON blob (a persisted AI SDK core message).
@@ -16,19 +18,26 @@ interface StoredMessagePayload {
 
 const getStoredMessage = (message: Message): StoredMessagePayload | undefined => message.message as StoredMessagePayload | undefined;
 
-const formatMessage = (message: Message): string => {
+/** A message as the exporters print it: who said it, and what. */
+const toEntry = (message: Message): { role: string; text: string } => {
     const stored = getStoredMessage(message);
 
     if (message.tool) {
-        const toolResult = stored?.content?.[0]?.content ?? message.text ?? "No result";
-
-        return `Tool Output: ${toolResult}`;
+        return { role: "Tool Output", text: stored?.content?.[0]?.content ?? message.text ?? "No result" };
     }
 
-    const role: string = stored?.role ?? (message.tool ? "tool" : "assistant");
-    const textContent: string = message.text ?? stored?.content?.map((c) => c.text).join(String.raw`\n`) ?? "";
+    const role: string = stored?.role ?? "assistant";
 
-    return `${role.charAt(0).toUpperCase() + role.slice(1)}: ${textContent}`;
+    return {
+        role: role.charAt(0).toUpperCase() + role.slice(1),
+        text: message.text ?? stored?.content?.map((c) => c.text).join("\n") ?? "",
+    };
+};
+
+const formatMessage = (message: Message): string => {
+    const { role, text } = toEntry(message);
+
+    return `${role}: ${text}`;
 };
 
 /** Format thread + messages as a markdown string. Exported for clipboard copy. */
@@ -93,11 +102,23 @@ const downloadTxt = (chat: Chat, messages: Message[], filename: string) => {
     const header = [`Title: ${chat.title || "Untitled Chat"}`, `Date: ${new Date(chat._creationTime).toLocaleString()}`, "---", ""];
 
     const messageLines = messages.map((message) => formatMessage(message));
-    const content = [...header, ...messageLines].join(String.raw`\n`);
+    const content = [...header, ...messageLines].join("\n");
 
     const blob = new Blob([content], { type: "text/plain" });
 
     saveBlob(blob, filename);
+};
+
+const downloadDocx = async (chat: Chat, messages: Message[], filename: string) => {
+    // JSZip is only needed once someone exports a Word document, so it stays off the chat route.
+    const { default: JsZip } = await import("jszip");
+    const bytes = await buildDocx(JsZip, {
+        date: new Date(chat._creationTime).toLocaleString(),
+        entries: messages.map((message) => toEntry(message)),
+        title: chat.title || "Untitled Chat",
+    });
+
+    saveBlob(new Blob([bytes], { type: DOCX_MIME_TYPE }), filename);
 };
 
 const downloadPdf = async (chat: Chat, messages: Message[], filename: string) => {
@@ -162,6 +183,10 @@ export const handleDownload = async (thread: Chat, messages: Message[], format: 
     const filename = `${title}.${format}`;
 
     switch (format) {
+        case "docx": {
+            await downloadDocx(thread, sortedMessages, filename);
+            break;
+        }
         case "json": {
             downloadJson(thread, sortedMessages, filename);
             break;

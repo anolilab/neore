@@ -573,7 +573,7 @@ const AccountSettings: FC = () => {
                             <Label className="text-base font-medium" htmlFor="sound-effects">
                                 {t`Sound Effects`}
                             </Label>
-                            <p className="text-muted-foreground text-sm">{t`Play sound effects for UI interactions.`}</p>
+                            <p className="text-muted-foreground text-sm">{t`Play a short sound when a reply finishes. Applies to this browser only.`}</p>
                         </div>
                         <Switch
                             checked={soundEffects}
