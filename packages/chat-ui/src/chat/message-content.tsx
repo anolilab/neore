@@ -333,10 +333,6 @@ const FileLoadingFallback: FC<{ name?: string }> = memo(({ name }) => {
 
 FileLoadingFallback.displayName = "FileLoadingFallback";
 
-/**
- * Placeholder shown when an image is blocked by the NSFW classifier
- * or is still being checked.
- */
 const isGeneratedMediaType = (mediaType: string | undefined): boolean =>
     mediaType?.startsWith("image/") === true || mediaType?.startsWith("video/") === true || mediaType?.startsWith("audio/") === true;
 
@@ -346,6 +342,10 @@ const AiGeneratedLabel: FC = memo(() => {
     return <span className="text-muted-foreground block text-xs">{t`AI-generated`}</span>;
 });
 
+/**
+ * Placeholder shown when an image is blocked by the NSFW classifier
+ * or is still being checked.
+ */
 const NsfwBlockedPlaceholder: FC<{ nsfwStatus: string }> = memo(({ nsfwStatus }) => {
     const { t } = useLingui();
 
