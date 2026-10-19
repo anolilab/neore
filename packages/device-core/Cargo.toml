@@ -22,6 +22,14 @@ libc = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 landlock = "0.4.7"
+# The pairing secret (`store.rs`) in the Secret Service keyring.
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+
+# The pairing secret (`store.rs`) in the macOS keychain.
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
 
 [target.'cfg(windows)'.dependencies]
+# The pairing secret (`store.rs`) in the Windows credential store.
+keyring = { version = "3", features = ["windows-native"] }
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }

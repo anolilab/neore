@@ -1,22 +1,39 @@
 # Packages the Electron desktop shell (`apps/desktop`) for macOS (arm64 and x64),
-# Windows and Linux when a `desktop-v*` tag is pushed, and attaches the installers
-# to a DRAFT prerelease. Replaces `native.yml` (the Tauri shell, now deleted).
+# Windows (x64 and arm64) and Linux (x64 and arm64) when a `desktop-v*` tag is pushed,
+# and attaches the installers to a DRAFT prerelease. Replaces `native.yml` (the Tauri
+# shell, now deleted).
 #
-# UNSIGNED. Unsigned macOS builds are blocked by Gatekeeper and unsigned Windows
-# installers trip SmartScreen, so treat the output as internal test builds until
-# the signing accounts exist (docs/plans/desktop-and-mobile-apps.md §3: an Apple
-# Developer ID with notarization, and Windows code signing, Authenticode or Azure
-# Trusted Signing). Once the owner has them, add the secrets to the build job's
-# `env` here (names come from the owner's accounts, not from this file), add a
-# notarization step, and drop the "unsigned" wording from the release notes.
+# One job per platform. Linux x64 and arm64 are separate jobs, each on a native runner, and
+# each builds the device-execution addon for its own architecture. macOS and Windows build
+# both of their arches in one electron-builder run: macOS from `mac.target`, Windows from
+# `win.target`. Both jobs cross-compile the second addon (macOS x64, Windows arm64), so every
+# installer carries the addon for its arch.
+#
+# The update feed (`latest*.yml`). A single electron-builder run writes one feed per platform,
+# so macOS (`latest-mac.yml`) and Windows (`latest.yml`) each list both arches. Linux arm64
+# writes `latest-linux-arm64.yml`, separate from x64. Splitting macOS or Windows across jobs
+# would make two jobs write the same feed file.
+#
+# Runner labels: `windows-latest`, `ubuntu-22.04`, `ubuntu-22.04-arm` and `macos-latest`.
+# `ubuntu-22.04-arm` is a GitHub-hosted arm64 label; check it is available to this repository.
+#
+# Unverified: the Windows arm64 addon is cross-compiled on the x64 `windows-latest` runner. That
+# needs the `aarch64-pc-windows-msvc` Rust target and an MSVC ARM64 linker/libraries on the image.
+# Neither was checked against the runner image or the repo's Rust CI (there is none for it).
+# If the link fails, the Windows leg fails before packaging.
+#
+# SIGNING. Windows uses Authenticode. electron-builder reads `WIN_CSC_LINK` and
+# `WIN_CSC_KEY_PASSWORD` from the environment. With neither set the installer is unsigned.
+# Those two secrets are passed to the packaging step only, and that step drops them when
+# they are empty: electron-builder treats an empty string as a set value and fails, instead
+# of skipping signing. macOS is still unsigned: it needs an Apple Developer ID and
+# notarization (docs/plans/desktop-and-mobile-apps.md §3). Unsigned macOS builds are blocked
+# by Gatekeeper, and unsigned Windows installers trip SmartScreen, so the release is still
+# internal until both are in place. Drop the "unsigned" wording from the release notes then.
 #
 # Known blocker: the macOS packaging depends on the `@xmldom/xmldom` override in
 # `pnpm-workspace.yaml`. If the packager fails there, the macOS leg fails until the
 # owner decides how to resolve it. The other legs are not affected by it.
-#
-# The update feed (`latest*.yml`) is produced by electron-builder in one run per
-# platform. Only the macOS leg builds both architectures in one run, so its
-# `latest-mac.yml` is not duplicated across jobs.
 
 name: "Desktop build"
 
@@ -34,21 +51,33 @@ permissions:
 
 jobs:
     build:
-        name: "Package (${{ matrix.name }})"
+        name: "Package (${{ matrix.name }}-${{ matrix.arch }})"
         strategy:
             fail-fast: false
             matrix:
                 include:
                     - name: "macos"
+                      arch: "universal"
                       runner: "macos-latest"
                       # arm64 and x64 both come from `mac.target` in electron-builder.yml.
                       args: "--mac"
+                      artifact: "desktop-macos"
                     - name: "windows"
+                      arch: "x64+arm64"
                       runner: "windows-latest"
-                      args: "--win"
+                      # Both arches in one run, so electron-builder writes one `latest.yml` listing both.
+                      args: "--win --x64 --arm64"
+                      artifact: "desktop-windows"
                     - name: "linux"
+                      arch: "x64"
                       runner: "ubuntu-22.04"
-                      args: "--linux"
+                      args: "--linux --x64"
+                      artifact: "desktop-linux-x64"
+                    - name: "linux"
+                      arch: "arm64"
+                      runner: "ubuntu-22.04-arm"
+                      args: "--linux --arm64"
+                      artifact: "desktop-linux-arm64"
         runs-on: "${{ matrix.runner }}"
         timeout-minutes: 60
         env:
@@ -77,16 +106,72 @@ jobs:
                   node-version: "22"
                   skip-playwright: "true"
 
+            # The device-execution addon (`packages/device-core-node`, Rust via napi) is
+            # loaded by the shell at runtime. Without it the installer ships with the
+            # addon missing, and the failure is silent until a device call runs.
+            - name: "Install Rust (stable)"
+              uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # master
+              with:
+                  toolchain: "stable"
+
+            - name: "Cache Rust build"
+              uses: "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6" # v2.9.2
+              with:
+                  workspaces: "packages/device-core-node -> target"
+
+            # The Linux keyring backend (`keyring`'s Secret Service) links libdbus at build time.
+            - name: "Install libdbus for the Linux keyring"
+              if: "matrix.name == 'linux'"
+              run: "sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config"
+
+            - name: "Add the x64 macOS Rust target"
+              if: "matrix.name == 'macos'"
+              run: "rustup target add x86_64-apple-darwin"
+
+            - name: "Add the arm64 Windows Rust target"
+              if: "matrix.name == 'windows'"
+              run: "rustup target add aarch64-pc-windows-msvc"
+
+            # Builds for the runner's own architecture: x64 on Windows, the matrix arch on Linux.
+            - name: "Build the device-execution addon for the runner's architecture"
+              run: "pnpm --filter @neore/device-core-node run build"
+
+            # `mac.target` ships x64 as well as arm64, and an Electron x64 app needs an x64 addon.
+            - name: "Build the device-execution addon for x64 (macOS)"
+              if: "matrix.name == 'macos'"
+              run: "pnpm --filter @neore/device-core-node run build -- --target x86_64-apple-darwin"
+
+            # `win.target` ships arm64 as well as x64. Cross-compiled here, unverified: see the header.
+            - name: "Build the device-execution addon for arm64 (Windows)"
+              if: "matrix.name == 'windows'"
+              run: "pnpm --filter @neore/device-core-node run build -- --target aarch64-pc-windows-msvc"
+
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"
 
+            - name: "Smoke-test the bundles and the addon"
+              run: "pnpm --filter @neore/desktop run smoke"
+
+            # Authenticode: the cert variables are dropped when empty (see the header).
+            # Bash on every runner, including Windows (Git Bash), so one script covers all legs.
             - name: "Package with electron-builder"
-              run: "pnpm --filter @neore/desktop exec electron-builder --config electron-builder.yml --publish never ${{ matrix.args }}"
+              shell: "bash"
+              env:
+                  WIN_CSC_LINK: "${{ secrets.WIN_CSC_LINK }}"
+                  WIN_CSC_KEY_PASSWORD: "${{ secrets.WIN_CSC_KEY_PASSWORD }}"
+              run: |
+                  if [ -z "$WIN_CSC_LINK" ]; then
+                      unset WIN_CSC_LINK WIN_CSC_KEY_PASSWORD
+                  fi
+                  pnpm --filter @neore/desktop exec electron-builder --config electron-builder.yml --publish never ${{ matrix.args }}
+
+            - name: "Check the release artifacts"
+              run: "pnpm --filter @neore/desktop run smoke:artifacts"
 
             - name: "Upload installers"
               uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
               with:
-                  name: "desktop-${{ matrix.name }}"
+                  name: "${{ matrix.artifact }}"
                   if-no-files-found: "error"
                   retention-days: 7
                   path: |

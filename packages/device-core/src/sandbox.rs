@@ -12,9 +12,10 @@
 //! - **Windows:** no sandbox. Commands run in a kill-on-close Job Object
 //!   (`shell.rs`) and are reported as unsandboxed.
 //!
-//! Network access is NOT restricted on any platform. The user's "Require sandbox
-//! for shell commands" setting (default on) refuses `shell_run` where
-//! [`support`] says unavailable.
+//! Network access is blocked on macOS unless the user allows it
+//! ([`Policy::network`]); Linux and Windows do not restrict it. The user's
+//! "Require sandbox for shell commands" setting (default on) refuses `shell_run`
+//! where [`support`] says unavailable.
 
 use std::path::{Path, PathBuf};
 
@@ -38,6 +39,9 @@ pub struct Policy {
     /// Hidden except for `writable`/`readable` entries under it (macOS; on
     /// Linux everything not listed is hidden anyway).
     pub home: Option<PathBuf>,
+    /// Whether the command may reach the network. macOS denies it when false;
+    /// Linux does not enforce either value yet.
+    pub network: bool,
 }
 
 /// Read-only system folders on Linux. `/run` is NOT listed whole: the user's
@@ -65,15 +69,17 @@ const LINUX_SYSTEM_READ: &[&str] = &[
 ];
 
 /// Device files and shared memory a normal command writes to (`> /dev/null`).
+/// Terminals (`/dev/tty*`, `/dev/pts/*`) are deliberately absent: a command that
+/// can write to one can inject keys into the user's other sessions (TIOCSTI).
+/// Landlock cannot restrict the ioctl itself, so withholding write is the control.
+/// They stay readable through `/dev` in [`LINUX_SYSTEM_READ`].
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
 const LINUX_DEVICE_WRITE: &[&str] = &[
     "/dev/full",
     "/dev/null",
     "/dev/ptmx",
-    "/dev/pts",
     "/dev/random",
     "/dev/shm",
-    "/dev/tty",
     "/dev/urandom",
     "/dev/zero",
 ];
@@ -129,6 +135,7 @@ impl Policy {
             writable: roots.to_vec(),
             readable,
             home: home.map(Path::to_path_buf),
+            network: false,
         }
     }
 }
@@ -182,17 +189,24 @@ pub fn seatbelt_profile(policy: &Policy) -> (String, Vec<(String, String)>) {
         .iter()
         .map(|path| param("READ", path))
         .collect();
+    // A denylist over `allow default`, not full confinement: the escape routes
+    // to other apps (`open`, `osascript`, `launchctl`), Apple events and the
+    // launch-services lookup are closed; other binaries still run.
     let mut profile = String::from(
-        // A denylist over `allow default`, not full confinement: the escape routes
-        // to other apps (`open`, `osascript`, `launchctl`), Apple events and the
-        // launch-services lookup are closed; other binaries still run.
         "(version 1)\n(allow default)\n(deny file-write*)\n\
          (deny process-exec (literal \"/usr/bin/open\") (literal \"/usr/bin/osascript\") (literal \"/bin/launchctl\"))\n\
          (deny appleevent-send)\n\
-         (deny mach-lookup (global-name \"com.apple.coreservices.launchservicesd\"))\n\
-         (allow file-write*\n    \
+         (deny mach-lookup (global-name \"com.apple.coreservices.launchservicesd\"))\n",
+    );
+
+    if !policy.network {
+        profile.push_str("(deny network*)\n");
+    }
+
+    profile.push_str(
+        "(allow file-write*\n    \
          (literal \"/dev/null\") (literal \"/dev/zero\") (literal \"/dev/dtracehelper\")\n    \
-         (regex #\"^/dev/tty\") (regex #\"^/dev/fd/\")",
+         (regex #\"^/dev/fd/\")",
     );
 
     for rule in &writable {
@@ -360,11 +374,15 @@ pub const SANDBOX_EXEC: &str = "/usr/bin/sandbox-exec";
 pub fn policy_for_call(
     support: &Support,
     allow_unsandboxed: bool,
+    allow_network: bool,
     roots: &[PathBuf],
     home: Option<&Path>,
 ) -> Result<Option<Policy>, String> {
     match support {
-        Support::Available(_) => Ok(Some(Policy::for_roots(roots, home))),
+        Support::Available(_) => Ok(Some(Policy {
+            network: allow_network,
+            ..Policy::for_roots(roots, home)
+        })),
         Support::Unavailable(_) if allow_unsandboxed => Ok(None),
         Support::Unavailable(reason) => Err(format!(
             "shell commands must run sandboxed, and {reason}. To run them without a sandbox, \
@@ -378,18 +396,36 @@ pub fn policy_for_call(
 #[cfg(target_os = "macos")]
 const SANDBOX_LIMITS: &str = "it can change files only in the shared folders, cannot see the rest of \
      your home folder, cannot run open, osascript or launchctl, and cannot send Apple events. Other \
-     programs can still run, it can READ files outside the shared folders, and network access and \
-     local services are not restricted.";
+     programs can still run, it can READ files outside the shared folders, and local services \
+     (Mach IPC) are not restricted.";
 
 #[cfg(not(target_os = "macos"))]
 const SANDBOX_LIMITS: &str = "it can change files only in the shared folders and reads only system \
      and toolchain folders besides them. Local IPC (D-Bus, SSH and GPG agents, other sockets) and \
      network access are NOT isolated.";
 
+/// The network clause of the sandbox line. Empty where the mechanism does not
+/// enforce it: [`SANDBOX_LIMITS`] already says so.
+#[cfg(target_os = "macos")]
+fn network_sentence(policy: &Policy) -> &'static str {
+    if policy.network {
+        " Network access is allowed by this computer's device settings."
+    } else {
+        " Network access is blocked. Turn on \"Allow network for shell commands\" in this computer's device settings to allow it."
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn network_sentence(_policy: &Policy) -> &'static str {
+    ""
+}
+
 /// The line the approval prompt shows about the sandbox.
 pub fn describe(support: &Support, policy: Option<&Policy>) -> String {
     match (support, policy) {
-        (Support::Available(mechanism), Some(_)) => format!("Sandboxed ({mechanism}): {SANDBOX_LIMITS}"),
+        (Support::Available(mechanism), Some(policy)) => {
+            format!("Sandboxed ({mechanism}): {SANDBOX_LIMITS}{}", network_sentence(policy))
+        }
         (Support::Unavailable(reason), _) => {
             format!("NOT sandboxed ({reason}): it runs with your full access to this computer.")
         }
@@ -408,6 +444,7 @@ mod tests {
             writable: vec![PathBuf::from("/home/me/project")],
             readable: vec![PathBuf::from("/usr"), PathBuf::from("/home/me/.rustup")],
             home: Some(PathBuf::from("/home/me")),
+            network: false,
         }
     }
 
@@ -449,6 +486,21 @@ mod tests {
     }
 
     #[test]
+    fn no_policy_grants_writes_to_terminals() {
+        let rules = landlock_rules(&policy());
+        let terminal = |path: &Path| {
+            let text = path.to_string_lossy();
+            text.starts_with("/dev/tty") || text.starts_with("/dev/pts")
+        };
+
+        assert!(!rules.iter().any(|rule| rule.writable && terminal(&rule.path)));
+
+        let (profile, _) = seatbelt_profile(&policy());
+        assert!(!profile.contains("/dev/tty"));
+        assert!(!profile.contains("/dev/pts"));
+    }
+
+    #[test]
     fn the_seatbelt_profile_passes_every_path_as_a_parameter() {
         let tricky = Policy {
             writable: vec![PathBuf::from("/tmp/a\") (allow default")],
@@ -487,17 +539,38 @@ mod tests {
         let roots = vec![PathBuf::from("/srv/p")];
         let missing = Support::Unavailable("no Landlock".into());
 
-        assert!(policy_for_call(&missing, false, &roots, None)
+        assert!(policy_for_call(&missing, false, false, &roots, None)
             .unwrap_err()
             .contains("no Landlock"));
-        assert_eq!(policy_for_call(&missing, true, &roots, None), Ok(None));
+        assert_eq!(policy_for_call(&missing, true, false, &roots, None), Ok(None));
         assert_eq!(
-            policy_for_call(&Support::Available("x".into()), false, &roots, None)
+            policy_for_call(&Support::Available("x".into()), false, false, &roots, None)
                 .unwrap()
                 .unwrap()
                 .writable,
             roots
         );
+    }
+
+    #[test]
+    fn network_is_blocked_unless_the_user_allows_it() {
+        let roots = vec![PathBuf::from("/srv/p")];
+        let available = Support::Available("x".into());
+        let blocked = policy_for_call(&available, false, false, &roots, None).unwrap().unwrap();
+        let allowed = policy_for_call(&available, false, true, &roots, None).unwrap().unwrap();
+
+        assert!(!blocked.network);
+        assert!(allowed.network);
+    }
+
+    #[test]
+    fn the_seatbelt_profile_denies_the_network_unless_allowed() {
+        let (blocked, _) = seatbelt_profile(&policy());
+        let (allowed, _) = seatbelt_profile(&Policy { network: true, ..policy() });
+
+        assert!(blocked.contains("(deny network*)"));
+        assert!(!allowed.contains("network"));
+        assert_eq!(blocked.matches('(').count(), blocked.matches(')').count());
     }
 
     #[test]
@@ -510,6 +583,10 @@ mod tests {
         assert!(describe(&available, Some(&policy())).contains("NOT isolated"));
         #[cfg(target_os = "macos")]
         assert!(describe(&available, Some(&policy())).contains("cannot run open, osascript or launchctl"));
+        #[cfg(target_os = "macos")]
+        assert!(describe(&available, Some(&policy())).contains("Network access is blocked"));
+        #[cfg(target_os = "macos")]
+        assert!(describe(&available, Some(&Policy { network: true, ..policy() })).contains("Network access is allowed"));
         assert!(describe(&missing, None).starts_with("NOT sandboxed (no Landlock)"));
     }
 }

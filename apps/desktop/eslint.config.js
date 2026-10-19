@@ -1,7 +1,7 @@
 import { createConfig } from "@anolilab/eslint-config";
 
 const config = await createConfig({
-    ignores: ["./dist/**", "./release/**", "./test-results/**", "./playwright-report/**"],
+    ignores: ["./dist/**", "./release/**", "./test-results/**", "./playwright-report/**", "./.eslint.cache.json"],
     typescript: {
         ignoresTypeAware: ["*.json", "*.md"],
         isTypeAware: false,

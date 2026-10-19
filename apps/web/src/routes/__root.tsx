@@ -24,6 +24,7 @@ import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef } from "
 
 import type { SettingsTab } from "@/components/settings/settings-modal";
 import ImpersonationBanner from "@/features/admin/components/impersonation-banner";
+import OfflineScreen from "@/features/connection/components/offline-screen";
 import AppearanceSync from "@/features/appearance/components/appearance-sync";
 import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
@@ -37,6 +38,7 @@ import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
 import { seedHydratedAuthToken } from "@neore/client-runtime";
 import { TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@neore/client-runtime";
+import { isNativeShell } from "@/lib/native/bridge";
 import NativeBridge from "@/lib/native/native-bridge";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
@@ -442,6 +444,8 @@ const RootComponent = () => {
                                                     }
                                                 >
                                                     <ImpersonationBanner />
+                                                    {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
+                                                    {isNativeShell() && <OfflineScreen />}
                                                     <ScreenSizeDebug />
                                                     <Outlet />
                                                     <Suspense fallback={null}>

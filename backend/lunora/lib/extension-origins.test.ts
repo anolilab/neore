@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { OPTIONAL_ENV_KEYS } from "./env-validation";
 import {
+    MOBILE_REDIRECT_URI,
     NATIVE_REDIRECT_URI,
     parseTrustedExtensionOrigins,
     parseTrustedExtensionRedirectUris,
@@ -58,6 +59,24 @@ describe("parseTrustedExtensionOrigins", () => {
 describe("parseTrustedExtensionRedirectUris", () => {
     const FIREFOX_REDIRECT = `https://${"0a".repeat(20)}.extensions.allizom.org/`;
     const CHROME_REDIRECT = `https://${"b".repeat(32)}.chromiumapp.org/`;
+
+    it("admits the mobile callback only when listed, and only exactly", () => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        expect(parseTrustedExtensionRedirectUris(undefined)).not.toContain(MOBILE_REDIRECT_URI);
+        expect(parseTrustedExtensionRedirectUris(MOBILE_REDIRECT_URI)).toEqual([MOBILE_REDIRECT_URI]);
+        expect(parseTrustedExtensionRedirectUris(`${SHIPPED_FIREFOX_REDIRECT_URI},${NATIVE_REDIRECT_URI},${MOBILE_REDIRECT_URI}`)).toEqual([
+            SHIPPED_FIREFOX_REDIRECT_URI,
+            NATIVE_REDIRECT_URI,
+            MOBILE_REDIRECT_URI,
+        ]);
+        expect(
+            parseTrustedExtensionRedirectUris(
+                "neore-mobile://auth/callback/x,neore-mobile://other,NEORE-MOBILE://auth/callback,neore-mobile://auth/callback?x=1",
+            ),
+        ).toEqual([]);
+        expect(console.warn).toHaveBeenCalledTimes(4);
+    });
 
     it("defaults to the shipped Firefox add-on when unset, and `none` turns it off", () => {
         expect(parseTrustedExtensionRedirectUris(undefined)).toEqual([SHIPPED_FIREFOX_REDIRECT_URI]);

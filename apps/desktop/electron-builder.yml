@@ -13,7 +13,14 @@ directories:
 files:
     - dist/**/*
     - package.json
+    # The device-execution addon (`@neore/device-core-node`) is a production dependency, so
+    # electron-builder packs it from node_modules. Its Rust sources, build output and dev
+    # tooling are not needed at runtime (`target/` alone is hundreds of MB).
+    - "!node_modules/@neore/device-core-node/{src,target,node_modules,Cargo.toml,Cargo.lock,build.rs}{,/**/*}"
 asar: true
+# A `.node` binary is dlopen'd from disk and cannot be loaded from inside the asar archive.
+asarUnpack:
+    - "**/*.node"
 afterPack: scripts/after-pack.cjs
 # The custom scheme: installers register it (macOS from Info.plist, Windows in the installer, Linux via the .desktop file).
 protocols:
@@ -36,6 +43,8 @@ mac:
     extendInfo:
         # The web app's voice input asks for the microphone; without this key macOS denies it silently.
         NSMicrophoneUsageDescription: Neore uses the microphone for voice input when you start dictation.
+# Windows code signing is Authenticode (decided), not Azure Trusted Signing. electron-builder
+# reads WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD from the environment; unset, the installer is unsigned.
 win:
     icon: build/icon.ico
     target:

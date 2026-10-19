@@ -15,6 +15,7 @@ import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as DocsRouteRouteImport } from './routes/docs/route'
+import { Route as DownloadRouteImport } from './routes/download'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as chatWorkflowRouteRouteImport } from './routes/(chat)/workflow/route'
@@ -117,6 +118,11 @@ const DashboardRouteRoute = DashboardRouteRouteImport.update({
 const DocsRouteRoute = DocsRouteRouteImport.update({
   id: '/docs',
   path: '/docs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadRoute = DownloadRouteImport.update({
+  id: '/download',
+  path: '/download',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -526,6 +532,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
   '/': typeof publicIndexRoute
+  '/download': typeof DownloadRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/workflow': typeof chatWorkflowRouteRouteWithChildren
@@ -604,6 +611,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/auth': typeof AuthRouteRouteWithChildren
   '/': typeof publicIndexRoute
+  '/download': typeof DownloadRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/datenschutz': typeof publicDatenschutzRoute
@@ -684,6 +692,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
   '/_shortcut': typeof ShortcutRouteWithChildren
+  '/download': typeof DownloadRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/(chat)/workflow': typeof chatWorkflowRouteRouteWithChildren
@@ -768,6 +777,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/docs'
     | '/'
+    | '/download'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/workflow'
@@ -846,6 +856,7 @@ export interface FileRouteTypes {
   to:
     | '/auth'
     | '/'
+    | '/download'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/datenschutz'
@@ -925,6 +936,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/docs'
     | '/_shortcut'
+    | '/download'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/(chat)/workflow'
@@ -1009,6 +1021,7 @@ export interface RootRouteChildren {
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   DocsRouteRoute: typeof DocsRouteRouteWithChildren
   ShortcutRoute: typeof ShortcutRouteWithChildren
+  DownloadRoute: typeof DownloadRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   publicDatenschutzRoute: typeof publicDatenschutzRoute
@@ -1067,6 +1080,13 @@ declare module '@tanstack/react-router' {
       path: '/docs'
       fullPath: '/docs'
       preLoaderRoute: typeof DocsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download': {
+      id: '/download'
+      path: '/download'
+      fullPath: '/download'
+      preLoaderRoute: typeof DownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -1824,6 +1844,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   DocsRouteRoute: DocsRouteRouteWithChildren,
   ShortcutRoute: ShortcutRouteWithChildren,
+  DownloadRoute: DownloadRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   publicDatenschutzRoute: publicDatenschutzRoute,

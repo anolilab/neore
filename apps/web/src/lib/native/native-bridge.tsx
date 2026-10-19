@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
+import { trackEvent } from "@/lib/analytics";
 
 import { completeNativeSignIn, getNativeDeviceStatus, onNativeCompose, onNativeSignIn } from "./bridge";
 
@@ -24,7 +25,7 @@ const requestSend = async (text: string): Promise<void> => {
 };
 
 /**
- * Mounted once in the root; does nothing outside the Tauri shell. Inside it:
+ * Mounted once in the root; does nothing outside the desktop shell. Inside it:
  *
  * - text from the Quick Composer, a `neore://new?text=` link or a share is sent
  *   as a new chat;
@@ -68,6 +69,8 @@ const NativeBridge = (): JSX.Element | null => {
             onNativeSignIn((signIn) => {
                 void (async () => {
                     if (await completeNativeSignIn(signIn)) {
+                        // Sent before the reload; analytics may not flush on unload, so this one can be lost.
+                        trackEvent("desktop_signed_in", {});
                         // A full load: SSR, the RPC token and every cached query
                         // must all start from the new session.
                         globalThis.location.assign("/chat");

@@ -80,6 +80,14 @@ export const SHIPPED_FIREFOX_REDIRECT_URI = "https://c64d88ed4645bb5915bc267506f
 export const NATIVE_REDIRECT_URI = "neore://auth/callback";
 
 /**
+ * The mobile app's system-browser sign-in callback. Same trust model as
+ * {@link NATIVE_REDIRECT_URI}: any app can register the scheme, so it is opt-in
+ * only, matched exactly, and its codes go down the token path (not the cookie
+ * path in `auth/client-grant-cookie.ts`).
+ */
+export const MOBILE_REDIRECT_URI = "neore-mobile://auth/callback";
+
+/**
  * `TRUSTED_EXTENSION_REDIRECT_URIS` → the exact redirect URIs the extension
  * sign-in flow may deliver a code to.
  *
@@ -98,7 +106,7 @@ export const NATIVE_REDIRECT_URI = "neore://auth/callback";
  * not add to it. The list never widens: an arbitrary URL here would let any page
  * that starts the flow receive a code, so everything that is not a
  * browser-intercepted extension redirect URI (or, opted into, exactly
- * {@link NATIVE_REDIRECT_URI}) is dropped with a warning.
+ * {@link NATIVE_REDIRECT_URI} or {@link MOBILE_REDIRECT_URI}) is dropped with a warning.
  */
 export const parseTrustedExtensionRedirectUris = (raw: string | undefined): string[] => {
     const trimmed = raw?.trim() ?? "";
@@ -121,7 +129,7 @@ export const parseTrustedExtensionRedirectUris = (raw: string | undefined): stri
             continue;
         }
 
-        if (uri === NATIVE_REDIRECT_URI) {
+        if (uri === NATIVE_REDIRECT_URI || uri === MOBILE_REDIRECT_URI) {
             uris.push(uri);
             continue;
         }

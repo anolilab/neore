@@ -3,6 +3,10 @@ export const CHANNEL = {
     closeQuickComposer: "neore:close-quick-composer",
     compose: "neore:compose",
     notify: "neore:notify",
+    /** Opens one thread in its own window; the site passes the thread id, the shell builds the URL. */
+    openThreadWindow: "neore:open-thread-window",
+    /** The dock / launcher badge: the site reports its unread count. */
+    setBadge: "neore:set-badge",
     /** Quick Composer only: its own page sends these, nothing else. */
     quickCompose: "neore:quick-compose",
     signIn: "neore:sign-in",

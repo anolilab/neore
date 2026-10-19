@@ -21,7 +21,7 @@ const siteOrigin = argument(SITE_ORIGIN_ARG);
 const capabilities = (argument(CAPABILITIES_ARG) ?? "").split(",").filter((name) => name !== "");
 
 /** Subscribes to a main-process event; the returned function unsubscribes. */
-const listen = <Payload>(channel: string, handler: (payload: Payload) => void): () => void => {
+const listen = <Payload>(channel: string, handler: (payload: Payload) => void): (() => void) => {
     const listener = (_event: IpcRendererEvent, payload: Payload) => handler(payload);
 
     ipcRenderer.on(channel, listener);
@@ -37,8 +37,8 @@ const listen = <Payload>(channel: string, handler: (payload: Payload) => void): 
 const deviceRelay = {
     execute: (call: { envelope: string; signature: string }) => ipcRenderer.invoke(DEVICE_CHANNEL.execute, call),
     manifest: () => ipcRenderer.invoke(DEVICE_CHANNEL.manifest),
-    onChanged: (handler: () => void): () => void => listen(DEVICE_CHANNEL.changed, () => handler()),
-    onProgress: (handler: (report: { callId: string; payload: string; signature: string }) => void): () => void =>
+    onChanged: (handler: () => void): (() => void) => listen(DEVICE_CHANNEL.changed, () => handler()),
+    onProgress: (handler: (report: { callId: string; payload: string; signature: string }) => void): (() => void) =>
         listen(DEVICE_CHANNEL.progress, (report: { callId: string; payload: string; signature: string }) => handler(report)),
     openSettings: () => ipcRenderer.invoke(DEVICE_CHANNEL.openSettings),
     pair: (pairing: { accountLabel: string; deviceId: string; secret: string }) => ipcRenderer.invoke(DEVICE_CHANNEL.pair, pairing),
@@ -51,10 +51,15 @@ if (siteOrigin !== undefined && document.location.origin === siteOrigin) {
         capabilities,
         device: capabilities.includes("device") ? deviceRelay : undefined,
         notify: (title: string, body?: string) => ipcRenderer.invoke(CHANNEL.notify, { body, title }),
-        onCompose: (handler: () => void): () => void => listen(CHANNEL.compose, () => handler()),
-        onSignIn: (handler: () => void): () => void => listen(CHANNEL.signIn, () => handler()),
+        /** Opens a thread in its own window. Exposed only with the `thread-windows` capability. */
+        openThreadWindow: (threadId: string): Promise<void> => ipcRenderer.invoke(CHANNEL.openThreadWindow, threadId),
+        /** Unread count for the dock / launcher badge; the main process clamps it to 0..999. */
+        setBadge: (count: number): Promise<void> => ipcRenderer.invoke(CHANNEL.setBadge, count),
+        onCompose: (handler: () => void): (() => void) => listen(CHANNEL.compose, () => handler()),
+        onSignIn: (handler: () => void): (() => void) => listen(CHANNEL.signIn, () => handler()),
         startBrowserSignIn: (): Promise<void> => ipcRenderer.invoke(CHANNEL.startBrowserSignIn),
         takePendingCompose: (): Promise<string | undefined> => ipcRenderer.invoke(CHANNEL.takePendingCompose),
-        takePendingSignIn: (): Promise<{ code: string; codeVerifier: string; redirectUri: string } | undefined> => ipcRenderer.invoke(CHANNEL.takePendingSignIn),
+        takePendingSignIn: (): Promise<{ code: string; codeVerifier: string; redirectUri: string } | undefined> =>
+            ipcRenderer.invoke(CHANNEL.takePendingSignIn),
     });
 }
