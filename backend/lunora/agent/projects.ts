@@ -9,13 +9,12 @@ import { internalMutation, type MutationCtx } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
-import { omit, pick } from "../lib/collections";
+import { pick } from "../lib/collections";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { assert } from "../lib/error-helpers";
 import { paginationOptionsValidator, partial, MAX_LENGTH } from "../lib/validators";
 import {
     type ProjectDoc as ProjectDocument,
-    type ThreadDoc,
     vPaginationResult,
     vProjectCreateFields,
     vProjectDoc as vProjectDocument,
@@ -25,6 +24,7 @@ import {
 import { admitOrganization } from "../lib/rls/scope";
 import { countedWorkflowFileIds } from "../workflow/images";
 import { changeRefcount } from "./files";
+import { listThreadItem } from "./threads";
 
 /**
  * A workflow keeps its images and reference media as chat-file references
@@ -42,11 +42,6 @@ const recountWorkflowImages = async (ctx: MutationCtx, ownerId: string | undefin
 
     await changeRefcount(ctx, previous, next);
 };
-// Helper to convert thread to public format (omits parentThreadIds)
-const publicThread = (thread: Doc<"threads">): ThreadDoc =>
-    // Safe cast: optional fields are never null at runtime (only undefined).
-    // The column builders generate null|T types in TypeScript only.
-    omit(thread, ["parentThreadIds"]) as unknown as ThreadDoc;
 
 export const publicProject = (project: Doc<"projects">): ProjectDocument =>
     // Safe cast: optional fields are never null at runtime (only undefined).
@@ -390,7 +385,7 @@ export const listThreadsByProject = query
         return {
             continueCursor: threads.continueCursor,
             isDone: threads.isDone,
-            page: threads.page.map((item) => publicThread(item as unknown as Doc<"threads">)),
+            page: threads.page.map((item) => listThreadItem(item as unknown as Doc<"threads">)),
         };
     });
 

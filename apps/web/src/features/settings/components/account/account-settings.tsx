@@ -19,6 +19,7 @@ import { createLanguageList } from "@/features/chat/core/utils/language-utilitie
 import { DEFAULT_SPEECH_VOICE, SPEECH_VOICES, speechVoiceLabel } from "@/features/chat/voice-mode/tts-availability";
 import { useFontSettings, useLayoutState, useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import NotificationSettings from "@/features/notifications/components/notification-settings";
+import ChatLifecycleControls from "@/features/settings/components/chat/chat-lifecycle-settings";
 
 // BCP 47 defaults for each supported UI locale. Hoisted to avoid recreation on every render.
 const LOCALE_DEFAULTS: Record<string, string> = { de: "de-DE", en: "en-US" };
@@ -57,7 +58,7 @@ const AccountSettings: FC = () => {
     const userSettings = userSettingsQuery.data;
     const retentionHours = userSettings?.temporaryChatRetentionHours ?? 24;
     const [retentionInput, setRetentionInput] = useState(retentionHours.toString());
-    const { codeFont, mainFont, setCodeFont, setMainFont } = useFontSettings();
+    const { codeFont, setCodeFont } = useFontSettings();
     const { direction, setDirection } = useLayoutState();
     const updateUserSettings = useUpdateUserSettings();
     const { isAnonymous } = useIsAnonymous();
@@ -171,29 +172,7 @@ const AccountSettings: FC = () => {
 
             <SettingsCard description={t`Customize the appearance of the application.`} title={t`Appearance`}>
                 <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label className="text-base font-medium" htmlFor="main-font">
-                            {t`Main Font`}
-                        </Label>
-                        <Select
-                            onValueChange={(value) => {
-                                setMainFont(value as typeof mainFont);
-                                toast.success(t`Main font updated`);
-                            }}
-                            value={mainFont}
-                        >
-                            <SelectTrigger id="main-font">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="inter">{t`Inter`}</SelectItem>
-                                <SelectItem value="system">{t`System`}</SelectItem>
-                                <SelectItem value="serif">{t`Serif`}</SelectItem>
-                                <SelectItem value="mono">{t`Mono`}</SelectItem>
-                                <SelectItem value="roboto-slab">{t`Roboto Slab`}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <AppearanceControls />
                     <div className="space-y-2">
                         <Label className="text-base font-medium" htmlFor="code-font">
                             {t`Code Font`}
@@ -217,7 +196,6 @@ const AccountSettings: FC = () => {
                             </SelectContent>
                         </Select>
                     </div>
-                    <AppearanceControls />
                     <div className="space-y-2">
                         <Label className="text-base font-medium" htmlFor="direction">
                             {t`Text Direction`}
@@ -536,6 +514,7 @@ const AccountSettings: FC = () => {
                         </div>
                         <p className="text-muted-foreground text-xs">{t`Range: 1 hour to 7 days (168 hours)`}</p>
                     </div>
+                    <ChatLifecycleControls />
                 </CardContent>
             </SettingsCard>
 

@@ -166,6 +166,7 @@ export const schema = defineSchema({
                 allowedModels: v.optional(v.array(v.string())),
                 allowedProviders: v.optional(v.array(v.string())),
                 allowedRegions: v.optional(v.array(v.string())),
+                blockedCreators: v.optional(v.array(v.string())),
                 blockedModels: v.optional(v.array(v.string())),
                 blockedProviders: v.optional(v.array(v.string())),
                 blockedRegions: v.optional(v.array(v.string())),
@@ -1694,6 +1695,7 @@ export const schema = defineSchema({
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId_status", ["userId", "status"])
         .index("by_threadId", ["threadId"])
+        .index("by_threadId_status", ["threadId", "status"])
         .relations((r) => {
             return {
                 chunks: r.many("persistentChunks", { field: "streamId" }),
@@ -2450,6 +2452,31 @@ export const schema = defineSchema({
         .index("by_threadId", ["threadId"])
         .index("by_knowledgeFileId", ["knowledgeFileId"]),
 
+    // A locked thread's passcode. Kept OUT of `threads` (thread docs reach
+    // clients raw), on the owner's shard next to the thread. Hash, salt and the
+    // failure/backoff state never leave the backend. `epoch` is what proofs are
+    // bound to: rotated by lock, change and removal, so old proofs die.
+    threadPasscodes: defineTable({
+        createdAt: v.number(),
+        epoch: v.string(),
+        failedAttempts: v.number(),
+        hash: v.string(),
+        iterations: v.number(),
+        lockoutUntil: v.optional(v.number()),
+        salt: v.string(),
+        threadId: v.id("threads"),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_thread", ["threadId"])
+        .index("by_userId", ["userId"])
+        .relations((r) => {
+            return {
+                thread: r.one("threads", { field: "threadId" }),
+            };
+        }),
+
     threadPins: defineTable({
         createdAt: v.number(),
         messageId: v.string(),
@@ -2514,6 +2541,9 @@ export const schema = defineSchema({
         isTemporary: v.optional(v.boolean()),
         language: v.optional(v.string()),
         lastCompressionStartedAt: v.optional(v.number()),
+        // Set while the thread has a passcode (locked). Content is refused
+        // without a proof; `lib/thread-lock.ts`. The hash lives in `threadPasscodes`.
+        lockedAt: v.optional(v.number()),
         messengerConnectionId: v.optional(v.id("messengerConnections")),
         mode: v.optional(v.string()),
         model: v.optional(v.string()),
@@ -2821,15 +2851,22 @@ export const schema = defineSchema({
         aboutMe: v.optional(v.string()),
         // Appearance presets (accepted values: `auth/fields.ts`).
         accentColor: v.optional(v.string()),
+        // Auto-archive threads idle this many days (`agent/auto-archive.ts`). Absent or 0 = off; 7-365 otherwise.
+        autoArchiveAfterDays: v.optional(v.number()),
         // Opt-in: speak every finished reply aloud (`features/chat/voice-mode`). Absent = off.
         autoReadReplies: v.optional(v.boolean()),
+        // Appearance: cap long chat code blocks (absent = on). Accepted values: `auth/fields.ts`.
+        capLongCodeBlocks: v.optional(v.boolean()),
         codeFont: v.optional(v.string()),
         codeHighlightTheme: v.optional(v.string()),
+        codeLineNumbers: v.optional(v.boolean()),
         // Opt-in composer ghost-text completions (`chat/autocomplete.ts`). Absent = off.
         composerAutocompleteEnabled: v.optional(v.boolean()),
         customInstructions: v.optional(v.string()),
         // Opt-in morning summary (`notifications/daily-brief.ts`). Absent = off.
         dailyBriefEnabled: v.optional(v.boolean()),
+        // Appearance: UI spacing preset (accepted values: `auth/fields.ts`).
+        density: v.optional(v.string()),
         dictationLanguage: v.optional(v.string()),
         disableExternalLinkWarning: v.optional(v.boolean()),
         enableFollowupSuggestions: v.optional(v.boolean()),
@@ -2843,11 +2880,15 @@ export const schema = defineSchema({
         mainFont: v.optional(v.string()),
         memoryEnabled: v.optional(v.boolean()),
         mermaidTheme: v.optional(v.string()),
+        // New composer chats are temporary by default. Absent = off.
+        newChatsTemporary: v.optional(v.boolean()),
         nickname: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
         profession: v.optional(v.string()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.
         resumeLastChat: v.optional(v.boolean()),
+        // Hostnames the web search tool never returns (`chat/tools/search-domains.ts`). Absent = none.
+        searchDomainBlocklist: v.optional(v.array(v.string())),
         sendBehavior: v.optional(v.string()),
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),

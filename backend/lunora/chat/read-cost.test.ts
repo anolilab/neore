@@ -167,7 +167,8 @@ describe("thread list and thread page cost", () => {
             // (`readerForAdmittedThread`), which behind `rls()` read all 300.
             expect(cost.byTable.messages).toBe(2);
             // 11 (the page + lookahead) + 150 (usage) + 1 (suggestions) + 1 (the thread).
-            expect(cost.rowsRead).toBe(163);
+            // +1 over the pre-lock count: the page reads its thread once to see whether it is locked (agent/messages.ts withoutLockedThreads).
+            expect(cost.rowsRead).toBe(164);
         } finally {
             harness.close();
         }
@@ -258,8 +259,10 @@ describe("thread list and thread page cost", () => {
 
             // Was 829 rows at 400 messages (and 229 at 100): each `.first()` of
             // the walk read the rest of the thread. Now the same at any length.
-            expect(cost.rowsRead).toBe(29);
-            expect(cost.statements, JSON.stringify(cost.byTable)).toBeLessThanOrEqual(35);
+            // +1: the page reads its thread once to see whether it is locked (agent/messages.ts withoutLockedThreads).
+            expect(cost.rowsRead).toBe(30);
+            // 37 (was 35): the passcode lock check adds two statements to a branched page (follow-up: pass the lock state down instead of re-reading).
+            expect(cost.statements, JSON.stringify(cost.byTable)).toBeLessThanOrEqual(37);
         } finally {
             harness.close();
         }

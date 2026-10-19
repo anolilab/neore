@@ -35,6 +35,7 @@ import type { Query, QueryCacheNotifyEvent, QueryClient, QueryKey } from "@tanst
 
 import { Entry, NO_VALUE } from "./live-query-entry";
 import { resetShardRegistry } from "./shard-routing";
+import { forgetAllUnlockProofs, onUnlockExpired } from "./unlock-proofs";
 import type { WsTicketMinter } from "./ws-ticket";
 
 export { FIRST_VALUE_TIMEOUT_MS } from "./live-query-entry";
@@ -148,6 +149,8 @@ export class LiveQueryManager {
 
     private disconnectToken: (() => void) | undefined;
 
+    private disconnectUnlock: (() => void) | undefined;
+
     public constructor(
         private readonly client: LiveQueryClient,
         private readonly queryClient: QueryClient,
@@ -165,6 +168,10 @@ export class LiveQueryManager {
 
         let subject = tokenSubject(this.client.getAuthToken());
 
+        this.disconnectUnlock = onUnlockExpired((threadId) => {
+            this.dropThreadCache(threadId);
+        });
+
         this.disconnectToken = this.client.onAuthTokenChange((token) => {
             const next = tokenSubject(token);
 
@@ -177,6 +184,8 @@ export class LiveQueryManager {
             subject = next;
             // Another user's grants are not this one's: shared objects re-resolve.
             resetShardRegistry();
+            // Nor are another user's unlocked chats (`unlock-proofs.ts`).
+            forgetAllUnlockProofs();
             // A NEW function identity is what makes `setWsToken` close the open
             // sockets; the client resends every subscription on reconnect.
             this.client.setWsToken(this.wsTokenProvider());
@@ -190,8 +199,10 @@ export class LiveQueryManager {
     public disconnect(): void {
         this.disconnectCache?.();
         this.disconnectToken?.();
+        this.disconnectUnlock?.();
         this.disconnectCache = undefined;
         this.disconnectToken = undefined;
+        this.disconnectUnlock = undefined;
 
         // `release` deletes from `entries`, so iterate a snapshot of the keys.
         const hashes = [...this.entries.keys()];
@@ -250,6 +261,15 @@ export class LiveQueryManager {
 
             return bearer ? await this.mintWsTicket(bearer) : undefined;
         };
+    }
+
+    /**
+     * Drops the cached answers of one chat, which were read with its proof. The
+     * query key carries the args, so the chat's id is in it. Removing a query
+     * fires `removed`, which releases its live subscription (`onCacheEvent`).
+     */
+    private dropThreadCache(threadId: string): void {
+        this.queryClient.removeQueries({ predicate: (query) => JSON.stringify(query.queryKey).includes(threadId) });
     }
 
     private onCacheEvent(event: QueryCacheNotifyEvent): void {

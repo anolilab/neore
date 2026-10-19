@@ -13,6 +13,8 @@ import { getAuthUserIdentity } from "../auth";
 import { pick } from "../lib/collections";
 import { admittedThreadDb } from "./admitted-thread-db";
 import { resolveThreadReadAccess } from "./thread-read-access";
+import { isLockedWithoutProof } from "./thread-passcode";
+import { MAX_LENGTH } from "../lib/validators";
 import { mergedStream, stream } from "../lib/streams";
 import { streamDeltasFields, streamingMessagesFieldsWithoutState } from "../schema";
 import {
@@ -59,6 +61,7 @@ export const listDeltas = query
     .input({
         cursors: v.array(v.object({ cursor: v.number(), streamId: v.id("streamingMessages") })),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(v.array(vStreamDelta)))
     .query(async ({ args, ctx }) => {
@@ -70,7 +73,7 @@ export const listDeltas = query
 
         // Raw stream rows (user ids, provider options, tool payloads): owner or live
         // grantee only. `isPublic` grants nothing here — see `thread-read-access.ts`.
-        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId);
+        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
 
         if (access?.kind !== "full") {
             return [];
@@ -85,8 +88,13 @@ export const listDeltas = query
  */
 export const listDeltasHandler = async (
     context: QueryContext,
-    args: { cursors: { cursor: number; streamId: Id<"streamingMessages"> }[]; threadId: Id<"threads"> },
+    args: { cursors: { cursor: number; streamId: Id<"streamingMessages"> }[]; threadId: Id<"threads">; unlockProof?: string },
 ): Promise<StreamDelta[]> => {
+    // A locked thread's live output is not read without its proof, by any caller.
+    if (await isLockedWithoutProof(context, args.threadId, args.unlockProof)) {
+        return [];
+    }
+
     let totalDeltas = 0;
     const deltas: StreamDelta[] = [];
 
@@ -148,6 +156,7 @@ export const list = query
         startOrder: v.optional(v.number()),
         statuses: v.optional(v.array(v.union(v.literal("streaming"), v.literal("finished"), v.literal("aborted")))),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(v.array(vStreamMessage)))
     .query(async ({ args, ctx }) => {
@@ -159,7 +168,7 @@ export const list = query
 
         // Raw stream rows (user ids, provider options, tool payloads): owner or live
         // grantee only. `isPublic` grants nothing here — see `thread-read-access.ts`.
-        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId);
+        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
 
         if (access?.kind !== "full") {
             return [];
@@ -178,8 +187,13 @@ export const listHandler = async (
         startOrder?: number;
         statuses?: ("streaming" | "finished" | "aborted")[];
         threadId: Id<"threads">;
+        unlockProof?: string;
     },
 ): Promise<StreamMessage[]> => {
+    if (await isLockedWithoutProof(context, args.threadId, args.unlockProof)) {
+        return [];
+    }
+
     const statuses = args.statuses ?? ["streaming"];
     const database = admittedThreadDb(context, args.threadId);
     const messages = await mergedStream<Doc<"streamingMessages">>(
@@ -219,6 +233,23 @@ export const abortByOrder = internalMutation
 
         for (const innerStream of streams) {
             await abortById(ctx, { reason: args.reason, streamId: innerStream._id });
+        }
+
+        return streams.length > 0;
+    });
+
+/** Aborts every stream still streaming in a thread, whichever prompt started it. */
+export const abortActiveForThread = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const streams = await ctx.db
+            .query("streamingMessages")
+            .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", args.threadId).eq("stateKind", "streaming"))
+            .take(100);
+
+        for (const innerStream of streams) {
+            await abortById(ctx, { reason: "Aborted by user", streamId: innerStream._id });
         }
 
         return streams.length > 0;

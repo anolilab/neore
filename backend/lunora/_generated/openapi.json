@@ -745,6 +745,80 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#agent_branches:editAssistantReply": {
+      "post": {
+        "description": "Invoke the `mutation` `agent_branches:editAssistantReply` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "agent_branches:editAssistantReply",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "messageId": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "messageId",
+                      "text",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "agent_branches:editAssistantReply",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: agent_branches:editAssistantReply",
+        "tags": [
+          "agent"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#agent_branches:switchBranch": {
       "post": {
         "description": "Invoke the `mutation` `agent_branches:switchBranch` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -764,6 +838,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -1012,6 +1089,9 @@
                         "description": "Id<\"documents\">",
                         "type": "string",
                         "x-lunora-table": "documents"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -1070,6 +1150,9 @@
                   "args": {
                     "properties": {
                       "messageId": {
+                        "type": "string"
+                      },
+                      "unlockProof": {
                         "type": "string"
                       }
                     },
@@ -1132,6 +1215,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -1217,6 +1303,9 @@
                         "type": "string"
                       },
                       "title": {
+                        "type": "string"
+                      },
+                      "unlockProof": {
                         "type": "string"
                       }
                     },
@@ -1332,6 +1421,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       },
                       "upToAndIncludingMessageId": {
                         "description": "Id<\"messages\">",
@@ -1701,6 +1793,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -1782,6 +1877,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -1826,6 +1924,426 @@
           "agent"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#agent_thread_lock:changeThreadPasscode": {
+      "post": {
+        "description": "Invoke the `mutation` `agent_thread_lock:changeThreadPasscode` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "agent_thread_lock:changeThreadPasscode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "currentPasscode": {
+                        "type": "string"
+                      },
+                      "newPasscode": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "currentPasscode",
+                      "newPasscode",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "agent_thread_lock:changeThreadPasscode",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "proof": {
+                      "type": "string"
+                    },
+                    "retryAfterMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: agent_thread_lock:changeThreadPasscode",
+        "tags": [
+          "agent"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#agent_thread_lock:enableThreadLock": {
+      "post": {
+        "description": "Invoke the `mutation` `agent_thread_lock:enableThreadLock` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "agent_thread_lock:enableThreadLock",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "passcode": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "passcode",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "agent_thread_lock:enableThreadLock",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "proof": {
+                      "type": "string"
+                    },
+                    "retryAfterMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: agent_thread_lock:enableThreadLock",
+        "tags": [
+          "agent"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#agent_thread_lock:lockThread": {
+      "post": {
+        "description": "Invoke the `mutation` `agent_thread_lock:lockThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "agent_thread_lock:lockThread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "agent_thread_lock:lockThread",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "proof": {
+                      "type": "string"
+                    },
+                    "retryAfterMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: agent_thread_lock:lockThread",
+        "tags": [
+          "agent"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#agent_thread_lock:removeThreadPasscode": {
+      "post": {
+        "description": "Invoke the `mutation` `agent_thread_lock:removeThreadPasscode` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "agent_thread_lock:removeThreadPasscode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "passcode": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "passcode",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "agent_thread_lock:removeThreadPasscode",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "proof": {
+                      "type": "string"
+                    },
+                    "retryAfterMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: agent_thread_lock:removeThreadPasscode",
+        "tags": [
+          "agent"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#agent_thread_lock:unlockThread": {
+      "post": {
+        "description": "Invoke the `mutation` `agent_thread_lock:unlockThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "agent_thread_lock:unlockThread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "passcode": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "passcode",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "agent_thread_lock:unlockThread",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "proof": {
+                      "type": "string"
+                    },
+                    "retryAfterMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: agent_thread_lock:unlockThread",
+        "tags": [
+          "agent"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#agent_threads:getChildThreads": {
@@ -2218,6 +2736,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -2488,6 +3009,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -5654,6 +6178,12 @@
                             },
                             "type": "array"
                           },
+                          "blockedCreators": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
                           "blockedModels": {
                             "items": {
                               "type": "string"
@@ -5853,7 +6383,13 @@
                           }
                         ]
                       },
+                      "autoArchiveAfterDays": {
+                        "type": "number"
+                      },
                       "autoReadReplies": {
+                        "type": "boolean"
+                      },
+                      "capLongCodeBlocks": {
                         "type": "boolean"
                       },
                       "codeFont": {
@@ -5912,6 +6448,9 @@
                           }
                         ]
                       },
+                      "codeLineNumbers": {
+                        "type": "boolean"
+                      },
                       "composerAutocompleteEnabled": {
                         "type": "boolean"
                       },
@@ -5920,6 +6459,22 @@
                       },
                       "dailyBriefEnabled": {
                         "type": "boolean"
+                      },
+                      "density": {
+                        "anyOf": [
+                          {
+                            "const": "compact",
+                            "type": "string"
+                          },
+                          {
+                            "const": "comfortable",
+                            "type": "string"
+                          },
+                          {
+                            "const": "spacious",
+                            "type": "string"
+                          }
+                        ]
                       },
                       "dictationLanguage": {
                         "type": "string"
@@ -5954,6 +6509,9 @@
                             "type": "string"
                           },
                           "commandPalette": {
+                            "type": "string"
+                          },
+                          "copyLastCodeBlock": {
                             "type": "string"
                           },
                           "createBranch": {
@@ -6035,6 +6593,10 @@
                           {
                             "const": "roboto-slab",
                             "type": "string"
+                          },
+                          {
+                            "const": "dyslexic",
+                            "type": "string"
                           }
                         ]
                       },
@@ -6065,6 +6627,9 @@
                           }
                         ]
                       },
+                      "newChatsTemporary": {
+                        "type": "boolean"
+                      },
                       "nickname": {
                         "type": "string"
                       },
@@ -6076,6 +6641,12 @@
                       },
                       "resumeLastChat": {
                         "type": "boolean"
+                      },
+                      "searchDomainBlocklist": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
                       },
                       "sendBehavior": {
                         "anyOf": [
@@ -9638,6 +10209,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -9891,6 +10465,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -10466,6 +11043,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -10522,6 +11102,80 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#chat_functions:abortThreadStream": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_functions:abortThreadStream` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_functions:abortThreadStream",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_functions:abortThreadStream",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "aborted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "aborted"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_functions:abortThreadStream",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#chat_functions:branchThread": {
       "post": {
         "description": "Invoke the `action` `chat_functions:branchThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -10547,6 +11201,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -10616,6 +11273,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -11147,6 +11807,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -11715,6 +12378,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -11792,6 +12458,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -12011,6 +12680,9 @@
                         ],
                         "type": "object"
                       },
+                      "lockedAt": {
+                        "type": "number"
+                      },
                       "order": {
                         "type": "number"
                       },
@@ -12113,6 +12785,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -12190,6 +12865,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -12464,6 +13142,9 @@
                       "isPublic": {
                         "type": "boolean"
                       },
+                      "lockedAt": {
+                        "type": "number"
+                      },
                       "model": {
                         "type": "string"
                       },
@@ -12700,6 +13381,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -12799,6 +13483,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -13245,6 +13932,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -14344,6 +15034,9 @@
                       },
                       "title": {
                         "type": "string"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -15026,6 +15719,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -15250,6 +15946,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -15621,10 +16320,19 @@
                       "reply": {
                         "type": "string"
                       },
+                      "retentionHours": {
+                        "type": "number"
+                      },
+                      "temporary": {
+                        "type": "boolean"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -15948,6 +16656,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -16074,6 +16785,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -17144,6 +17858,9 @@
                       },
                       "totalSlides": {
                         "type": "number"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -17225,6 +17942,9 @@
                         "type": "number"
                       },
                       "title": {
+                        "type": "string"
+                      },
+                      "unlockProof": {
                         "type": "string"
                       }
                     },
@@ -17440,6 +18160,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -17501,6 +18224,9 @@
                         "description": "Id<\"presentations\">",
                         "type": "string",
                         "x-lunora-table": "presentations"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -17615,6 +18341,9 @@
                         "description": "Id<\"presentations\">",
                         "type": "string",
                         "x-lunora-table": "presentations"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -17717,6 +18446,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -17835,6 +18567,9 @@
                       },
                       "title": {
                         "type": "string"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -17906,6 +18641,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -17986,6 +18724,9 @@
                         "description": "Id<\"persistentStreams\">",
                         "type": "string",
                         "x-lunora-table": "persistentStreams"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -18735,6 +19476,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -24180,6 +24924,9 @@
                           "_id": {
                             "type": "string"
                           },
+                          "locked": {
+                            "type": "boolean"
+                          },
                           "title": {
                             "type": "string"
                           },
@@ -24622,6 +25369,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -24915,6 +25665,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -25067,6 +25820,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -25764,6 +26520,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -25833,6 +26592,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -25897,6 +26659,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -26451,6 +27216,9 @@
                   "args": {
                     "properties": {
                       "messageId": {
+                        "type": "string"
+                      },
+                      "unlockProof": {
                         "type": "string"
                       }
                     },
@@ -31245,6 +32013,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -31661,6 +32432,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -31931,6 +32705,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -32503,6 +33280,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -32927,6 +33707,9 @@
                         "type": "string",
                         "x-lunora-table": "threads"
                       },
+                      "unlockProof": {
+                        "type": "string"
+                      },
                       "variables": {
                         "items": {
                           "properties": {
@@ -33287,6 +34070,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       },
                       "value": {
                         "type": "string"

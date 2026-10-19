@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { DEFAULT_DENSITY, DEFAULT_MAIN_FONT, isDensityId, isMainFontId } from "@/features/appearance/lib/display-preferences";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
@@ -47,13 +48,16 @@ type FontSettingsHookReturn = FontSettings & {
     resetFonts: () => void;
     setCodeFont: (codeFont: FontSettings["codeFont"]) => void;
     setFonts: (fonts: Partial<FontSettings>) => void;
-    setMainFont: (mainFont: FontSettings["mainFont"]) => void;
 };
 
 type AppearanceSettingsHookReturn = AppearanceSettings & {
     resetAppearance: () => void;
     setAccentColor: (accentColor: AppearanceSettings["accentColor"]) => void;
+    setCapLongCodeBlocks: (capLongCodeBlocks: boolean) => void;
     setCodeHighlightTheme: (codeHighlightTheme: AppearanceSettings["codeHighlightTheme"]) => void;
+    setCodeLineNumbers: (codeLineNumbers: boolean) => void;
+    setDensity: (density: AppearanceSettings["density"]) => void;
+    setMainFont: (mainFont: AppearanceSettings["mainFont"]) => void;
     setMermaidTheme: (mermaidTheme: AppearanceSettings["mermaidTheme"]) => void;
 };
 
@@ -85,7 +89,6 @@ type ModalsHookReturn = {
 
 type LayoutStateHookReturn = LayoutState & {
     resetLayout: () => void;
-    setDensity: (density: LayoutState["density"]) => void;
     setDirection: (direction: LayoutState["direction"]) => void;
     setFontSize: (fontSize: LayoutState["fontSize"]) => void;
     setLayoutState: (layout: Partial<LayoutState>) => void;
@@ -280,7 +283,6 @@ export const useFontSettings = (): FontSettingsHookReturn => {
         resetFonts,
         setCodeFont: (codeFont: FontSettings["codeFont"]) => setFonts({ codeFont }),
         setFonts,
-        setMainFont: (mainFont: FontSettings["mainFont"]) => setFonts({ mainFont }),
     };
 };
 
@@ -310,9 +312,16 @@ export const useAppearanceSettings = (): AppearanceSettingsHookReturn => {
 
     return {
         ...appearance,
+        // Persisted state from before density and font existed has neither key (zustand merges shallowly), so read them through the guards.
+        density: isDensityId(appearance.density) ? appearance.density : DEFAULT_DENSITY,
+        mainFont: isMainFontId(appearance.mainFont) ? appearance.mainFont : DEFAULT_MAIN_FONT,
         resetAppearance,
         setAccentColor: (accentColor: AppearanceSettings["accentColor"]) => update({ accentColor }),
+        setCapLongCodeBlocks: (capLongCodeBlocks: boolean) => update({ capLongCodeBlocks }),
         setCodeHighlightTheme: (codeHighlightTheme: AppearanceSettings["codeHighlightTheme"]) => update({ codeHighlightTheme }),
+        setCodeLineNumbers: (codeLineNumbers: boolean) => update({ codeLineNumbers }),
+        setDensity: (density: AppearanceSettings["density"]) => update({ density }),
+        setMainFont: (mainFont: AppearanceSettings["mainFont"]) => update({ mainFont }),
         setMermaidTheme: (mermaidTheme: AppearanceSettings["mermaidTheme"]) => update({ mermaidTheme }),
     };
 };
@@ -381,7 +390,6 @@ export const useLayoutState = (): LayoutStateHookReturn => {
     return {
         ...layout,
         resetLayout,
-        setDensity: (density: LayoutState["density"]) => setLayoutState({ density }),
         setDirection: (direction: LayoutState["direction"]) => setLayoutState({ direction }),
         setFontSize: (fontSize: LayoutState["fontSize"]) => setLayoutState({ fontSize }),
         setLayoutState,

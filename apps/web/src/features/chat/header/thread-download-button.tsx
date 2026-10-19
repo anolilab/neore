@@ -6,7 +6,7 @@ import type { Doc, Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
-import { ClipboardCopyIcon, DownloadIcon, FileJsonIcon, FileTextIcon, FileTypeIcon } from "lucide-react";
+import { ClipboardCopyIcon, DownloadIcon, FileJsonIcon, FileTextIcon, FileTypeIcon, GaugeIcon } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import type { DownloadFormat } from "@/lib/download";
 import { formatAsMarkdown, handleDownload } from "@/lib/download";
 import { useLunora } from "@/lib/lunora/crpc";
+
+import ThreadStatsDialog from "./thread-stats-dialog";
 
 interface Props {
     model?: string;
@@ -23,6 +25,7 @@ interface Props {
 const ThreadDownloadButton: FC<Props> = ({ model, threadId }) => {
     const { t } = useLingui();
     const [loading, setLoading] = useState(false);
+    const [isStatsOpen, setIsStatsOpen] = useState(false);
     const lunora = useLunora();
 
     const fetchThread = useCallback(async () => {
@@ -124,9 +127,14 @@ const ThreadDownloadButton: FC<Props> = ({ model, threadId }) => {
                         <FileJsonIcon className="size-4" />
                         {t`Download JSON`}
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsStatsOpen(true)}>
+                        <GaugeIcon className="size-4" />
+                        {t`Thread statistics`}
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
             <TooltipContent side="bottom">{t`Export chat`}</TooltipContent>
+            {model && threadId && <ThreadStatsDialog model={model} onOpenChange={setIsStatsOpen} open={isStatsOpen} threadId={threadId} />}
         </Tooltip>
     );
 };

@@ -139,12 +139,12 @@ one unset falls back to the system default.
 ### Model Filters
 
 Restrict which models and providers may be used. Reached at
-`/dashboard/settings/chat/model-filters` — this page is not yet linked from the
-settings sidebar.
+**Settings → Chat → Model Restrictions** (`/dashboard/settings/chat/model-filters`).
 
 **Features:**
 - Region restrictions — limit which regions models may be hosted in, for GDPR and data-residency requirements
 - Block specific models or providers outright
+- Hide a whole lab from the model picker: use the hide button on a lab in the picker, and restore it under **Hidden in Model Picker** on this page. Hidden labs are removed from the picker only; a current or default model from a hidden lab still works.
 - Clear all rules at once
 
 ### Usage
@@ -192,6 +192,12 @@ See [Messenger Integration](/docs/messenger).
 - Default model selection
 - Auto-save preferences
 - Conversation defaults
+- Start new chats as temporary (off by default); this also covers new chats with a local model and new model comparisons
+- Auto-archive inactive chats (off, or after 30, 90, 180 or 365 days of no activity)
+
+**Auto-archive:** pinned chats, chats in a pinned project, chats with a reply still being generated and temporary chats are never archived. Archived chats stay searchable.
+
+**Blocked websites for web search:** enter one domain per line (for example `example.com`). The assistant's web search never returns results from those sites or their subdomains, even when it asks for them. This covers web search only; it does not stop the browser tool from visiting a site.
 
 ### Devices
 
@@ -361,8 +367,14 @@ See [Voice](/docs/voice).
 **Interface Options:**
 - Layout preferences
 - Sidebar visibility
-- Compact or spacious views
+- Density: compact, comfortable (default) or spacious spacing for chat messages and the thread list. Changes vertical space only.
+- Font: sans (default), serif, monospace, system UI or dyslexia-friendly. It applies to the whole interface; code blocks stay monospace. No font is downloaded; a face that is not installed on your device falls back to the next one.
 - Customize appearance
+
+**Code Blocks (Appearance):**
+- **Line numbers in code blocks**: off by default
+- **Limit height of long code blocks**: on by default. Blocks longer than 24 lines scroll inside a fixed height until you select **Show all lines**
+- Tables in replies have an enlarge button that opens them in a dialog
 
 ### Keyboard Shortcuts
 

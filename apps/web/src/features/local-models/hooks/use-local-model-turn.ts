@@ -7,6 +7,7 @@ import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
+import type { NewChatTemporaryFields } from "@/features/chat/core/utils/new-chat-temporary";
 import type { LocalModelTarget } from "@/features/settings/lib/custom-models";
 import { findLocalModelTarget } from "@/features/settings/lib/custom-models";
 import type { UIMessage } from "@/lib/agent";
@@ -31,6 +32,8 @@ export interface LocalTurnSendOptions {
     onSaved: (result: { isNewThread: boolean; message: string | undefined; threadId: string }) => void;
     prompt: string;
     systemPrompt?: string;
+    /** Set only for a turn that creates the thread: the new chat's temporary choice. */
+    temporary?: NewChatTemporaryFields;
     threadId: string | undefined;
 }
 
@@ -92,7 +95,7 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
     }, []);
 
     const send = useCallback(
-        async ({ branch, history, language, onNotSaved, onSaved, prompt, systemPrompt, threadId }: LocalTurnSendOptions) => {
+        async ({ branch, history, language, onNotSaved, onSaved, prompt, systemPrompt, temporary, threadId }: LocalTurnSendOptions) => {
             if (!target) {
                 return;
             }
@@ -117,6 +120,7 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
                             ...(branch && { branch: { kind: branch.kind, messageId: branch.messageId as Id<"messages"> } }),
                             ...(language && { language }),
                             model,
+                            ...(!threadId && temporary),
                             ...(threadId && { threadId: threadId as Id<"threads"> }),
                         });
 

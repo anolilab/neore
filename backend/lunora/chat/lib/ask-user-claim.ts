@@ -26,16 +26,22 @@ export const normalizeAskUserAnswer = (answer: string): string | undefined => {
 
 export const claimAskUserAnswer = async (
     ctx: Pick<MutationCtx, "db">,
-    args: { approvalId: string; callerId: string; reply: AskUserReply; threadId: Id<"threads"> },
+    args: { approvalId: string; callerId: string; reply: AskUserReply; threadId: Id<"threads">; unlockProof?: string | null },
 ): Promise<ClaimResult & { answer?: string }> => {
-    const { approvalId, callerId, reply, threadId } = args;
+    const { approvalId, callerId, reply, threadId, unlockProof } = args;
     const answer = reply.kind === "answer" ? normalizeAskUserAnswer(reply.answer) : undefined;
 
     if (reply.kind === "answer" && answer === undefined) {
         throw new LunoraError("BAD_REQUEST", `Answer with 1 to ${String(ASK_USER_ANSWER_MAX)} characters`);
     }
 
-    const claim = await claimToolApproval(ctx, { approvalId, callerId, decision: reply.kind === "answer" ? "approve" : "deny", threadId });
+    const claim = await claimToolApproval(ctx, {
+        approvalId,
+        callerId,
+        decision: reply.kind === "answer" ? "approve" : "deny",
+        threadId,
+        unlockProof,
+    });
 
     if (claim.kind === "claimed" && claim.toolName !== ASK_USER_TOOL_NAME) {
         throw new LunoraError("BAD_REQUEST", "This request is not a question");

@@ -47,6 +47,7 @@ import {
     hasBriefContent,
     nextBriefRunAt,
 } from "./daily-brief-logic";
+import { toRedactedNotificationViews } from "./functions";
 import { notify } from "./notify";
 import { sumMessageCosts } from "../agent/message-cost";
 import { DAILY_BRIEF_SKILL_KEY } from "../usage/activity-logic";
@@ -211,12 +212,16 @@ export const loadDailyBriefInputs = internalQuery
             ctx.db.notifications.findMany({ limit: BRIEF_EVENTS_READ, orderBy: [{ createdAt: "desc" }], where: { createdAt: { gt: since }, userId } }),
         ]);
 
+        // A row written before its chat was locked still has the title: the summarizer sees the redacted one.
+        const events = await toRedactedNotificationViews(
+            ctx.db,
+            recent.page.filter((row) => row.type !== "daily_brief"),
+        );
+
         return {
-            events: recent.page
-                .filter((row) => row.type !== "daily_brief")
-                .map((row) => {
-                    return { title: row.title, type: row.type, ...(row.outcome && { outcome: row.outcome }) };
-                }),
+            events: events.map((row) => {
+                return { title: row.title, type: row.type, ...(row.outcome && { outcome: row.outcome }) };
+            }),
             needsYou: [
                 ...overview.approvals.map((approval) => {
                     return { kind: "waiting_in_chat", title: approval.threadTitle ?? "A chat" };
@@ -238,7 +243,9 @@ export const loadDailyBriefInputs = internalQuery
             ],
             // `recentThreads` is most-recently-updated first, so "touched since
             // the last brief" is its leading run.
-            threads: overview.recentThreads.filter((thread) => thread.updatedAt > since && thread.title).map((thread) => thread.title!),
+            threads: overview.recentThreads
+                .filter((thread) => thread.updatedAt > since && thread.title && thread.locked !== true)
+                .map((thread) => thread.title!),
         };
     });
 

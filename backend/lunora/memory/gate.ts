@@ -475,6 +475,7 @@ export type GateReason =
     | "classifier_no"
     | "classifier_yes"
     | "classifier_failed"
+    | "locked_thread"
     | "no_signal"
     | "strong_signal"
     | "temporary_thread"

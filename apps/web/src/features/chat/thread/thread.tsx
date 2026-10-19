@@ -35,10 +35,12 @@ import ChatError from "./chat-error";
 import type { ComparisonBranch } from "./comparison-view";
 import ComparisonView from "./comparison-view";
 import Composer from "./composer";
+import CopyLastCodeBlockListener from "./copy-last-code-block";
 import EditComposer from "./edit-composer";
 import MediaGalleryView from "./media-gallery-view";
 import MessageList from "./message-list";
 import TextSelectionMenu from "./text-selection-menu";
+import ThreadMinimap from "./thread-minimap";
 import type { ThreadViewportRef } from "./thread-viewport";
 import ThreadViewport from "./thread-viewport";
 import ThreadWelcome from "./thread-welcome";
@@ -237,6 +239,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
     return (
         <>
             <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
+            <CopyLastCodeBlockListener />
             <div className={cn("h-[calc(100%-40px)]", className)} style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
                 <ThreadViewport className="flex h-full flex-col items-center bg-inherit px-4 pt-2" ref={viewportRef}>
                     <div
@@ -250,13 +253,17 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
                             </div>
                         )}
                         {composerMode === "text" && showMessageList && (
-                            <div className="flex w-full flex-1 flex-col">
-                                <MessageList
-                                    className={isEnableFollowupSuggestions && !activeStreamId ? "pb-[190px]" : "pb-6"}
-                                    editComposerComponent={EditComposer}
-                                    maxWidth={maxWidth}
-                                />
-                                <div className="flex-1" />
+                            <div className="flex w-full flex-1">
+                                <div className="flex min-w-0 flex-1 flex-col">
+                                    <MessageList
+                                        className={isEnableFollowupSuggestions && !activeStreamId ? "pb-[190px]" : "pb-6"}
+                                        editComposerComponent={EditComposer}
+                                        maxWidth={maxWidth}
+                                    />
+                                    <div className="flex-1" />
+                                </div>
+                                {/* Sticky within the scroll viewport, so it stays in view while the thread scrolls. */}
+                                <ThreadMinimap className="sticky top-4 hidden self-start md:block" />
                             </div>
                         )}
                         {composerMode === "text" && !showMessageList && (

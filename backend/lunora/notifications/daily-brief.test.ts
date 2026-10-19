@@ -8,7 +8,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { createRatelimit } from "../lib/rate-limiter";
 import schema from "../schema";
-import { chargeDailyBrief, runDailyBrief } from "./daily-brief";
+import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
+import { chargeDailyBrief, loadDailyBriefInputs, runDailyBrief } from "./daily-brief";
 
 const { generateText, registry, users } = vi.hoisted(() => {
     return { generateText: vi.fn(), registry: new Map<string, unknown>(), users: new Set<string>() };
@@ -112,5 +113,41 @@ describe("daily brief billing", () => {
 
         await expect(harness.run(async (ctx: any) => await ctx.runMutation(chargeDailyBrief, { checkOnly: true, userId: USER }))).resolves.toBe("charged");
         expect(await remainingRuns()).toBe(before);
+    });
+});
+
+describe("the summarizer's input", () => {
+    type Inputs = { events: { title: string; type: string }[] };
+
+    const inputsSince = async (since: number): Promise<Inputs> =>
+        await harness.run(
+            async (ctx: any) =>
+                await (loadDailyBriefInputs as unknown as { handler: (ctx: unknown, args: unknown) => Promise<Inputs> }).handler(ctx, { since, userId: USER }),
+        );
+
+    it("names a notification of a chat locked after it was written by the generic title only", async () => {
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { status: "regular", title: "Salary", updatedAt: NOW, userId: USER });
+
+            await ctx.db.insert("notifications", { createdAt: NOW - 1000, link: `/chat/${threadId}`, title: "Salary", type: "task", userId: USER });
+            await ctx.db.patch(threadId, { lockedAt: NOW });
+        });
+
+        const { events } = await inputsSince(NOW - 60_000);
+
+        expect(events).toEqual([{ title: LOCKED_THREAD_TITLE, type: "task" }]);
+        expect(JSON.stringify(events)).not.toContain("Salary");
+    });
+
+    it("keeps the title of a notification linked to a chat that is not locked", async () => {
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { status: "regular", title: "Plans", updatedAt: NOW, userId: USER });
+
+            await ctx.db.insert("notifications", { createdAt: NOW - 1000, link: `/chat/${threadId}`, title: "Plans", type: "task", userId: USER });
+        });
+
+        const { events } = await inputsSince(NOW - 60_000);
+
+        expect(events).toContainEqual({ title: "Plans", type: "task" });
     });
 });

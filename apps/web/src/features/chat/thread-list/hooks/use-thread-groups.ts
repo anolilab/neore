@@ -201,6 +201,7 @@ const useThreadGroups = (
                 branchPoint: 0,
                 branchType: "branch",
                 category: thread.category,
+                lockedAt: thread.lockedAt,
                 children,
                 createdAt: thread.createdAt ?? thread._creationTime,
                 depth,
@@ -217,6 +218,7 @@ const useThreadGroups = (
                 tags: resolveThreadTags(thread.tagIds, userTags),
                 threadId: thread._id,
                 title: thread.title || t`New Chat`,
+                updatedAt: thread.updatedAt,
             };
         };
 

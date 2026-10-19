@@ -16,6 +16,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx as MutationContext } from "../_generated/server";
 import { getThreadRow } from "../agent/branch-rows";
@@ -23,6 +24,8 @@ import { saveEditedSiblingHandler } from "../agent/branches";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread, patchThread } from "../agent/table-writes";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { storedRetentionHours } from "../lib/temporary-retention";
+import { MAX_LENGTH } from "../lib/validators";
 import type { StoredCustomProvider } from "./lib/custom-providers";
 import {
     buildLocalPromptMessage,
@@ -34,7 +37,7 @@ import {
     MAX_LOCAL_REPLY_CHARS,
     resolveLocalModel,
 } from "./lib/local-turn";
-import { admitOwnedThread } from "../agent/thread-read-access";
+import { requireOwnedThread } from "../agent/thread-read-access";
 
 /** Regenerate the reply to `messageId` (a prompt), or save an edit of it. Requires `threadId`. */
 export interface LocalTurnBranch {
@@ -51,7 +54,13 @@ export interface SaveLocalTurnArgs {
     prompt: string;
     reasoning?: string;
     reply: string;
+    /** Hours until expiry when a NEW thread is `temporary`; ignored for an existing thread. */
+    retentionHours?: number;
+    /** A new thread created as a temporary chat, the same record the hosted composer path writes. */
+    temporary?: boolean;
     threadId?: Id<"threads">;
+    /** The owner's passcode proof, when the chat they save into is locked. */
+    unlockProof?: string;
 }
 
 export interface SaveLocalTurnResult {
@@ -101,7 +110,8 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
             throw new LunoraError("FORBIDDEN", "Cannot write to another user's thread");
         }
 
-        admitOwnedThread(ctx, thread, userId);
+        // Owner, admitted for the rows below; a locked chat needs its proof.
+        await requireOwnedThread(ctx, args.threadId, userId, args.unlockProof);
 
         threadId = args.threadId;
         await patchThread(ctx.db, threadId, { model: args.model, updatedAt: now });
@@ -117,6 +127,16 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
             updatedAt: now,
             userId,
         })) as Id<"threads">;
+
+        if (args.temporary) {
+            const userSettings = await ctx.db
+                .query("userSettings")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+            const hours = args.retentionHours ?? storedRetentionHours(userSettings?.temporaryChatRetentionHours);
+
+            await ctx.runMutation(internal.agent.threads.createTemporaryThread, { expiresAt: now + hours * 60 * 60 * 1000, retentionHours: hours, threadId });
+        }
     }
 
     const userMessage = buildLocalPromptMessage(args.prompt);
@@ -182,8 +202,13 @@ export const saveLocalTurn = authMutation
         prompt: v.string().check((value) => value.length <= MAX_LOCAL_PROMPT_CHARS, { message: "Prompt too long" }),
         reasoning: v.optional(v.string().check((value) => value.length <= MAX_LOCAL_REPLY_CHARS, { message: "Reasoning too long" })),
         reply: v.string().check((value) => value.length <= MAX_LOCAL_REPLY_CHARS, { message: "Reply too long" }),
+        /** Hours until expiry when a new thread is `temporary`; the same 1-168 range as the hosted path. */
+        retentionHours: v.optional(v.number().check((value) => value >= 1 && value <= 168, { message: "Invalid retention" })),
+        /** Start a NEW thread as a temporary chat (ignored when `threadId` is set). */
+        temporary: v.optional(v.boolean()),
         /** Omit to start a new thread. */
         threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ assistantMessageId: v.string(), threadId: v.string(), userMessageId: v.string() }))
     .mutation(async ({ args, ctx }) => {

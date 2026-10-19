@@ -215,6 +215,7 @@ const OWNER_TABLES = [
     "taskRuns",
     "tasks",
     "temporaryThreads",
+    "threadPasscodes",
     "threadPins",
     "threadRelationships",
     "threadTags",

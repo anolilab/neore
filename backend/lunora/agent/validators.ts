@@ -677,6 +677,8 @@ export const vThreadDocFields = {
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.
     groupChat: v.optional(vGroupChat),
+    // Written only by `agent/thread-passcode.ts` (set on lock, cleared on removal).
+    lockedAt: v.optional(v.number()),
     order: v.optional(v.number()),
     status: vThreadStatus,
     // Written only by `chat/tags/functions.ts`, which checks the ids belong to

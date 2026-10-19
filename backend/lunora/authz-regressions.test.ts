@@ -1016,3 +1016,39 @@ describe("stored media survives the owner's legitimate copies", () => {
         expect(await countOf()).toBe(2);
     });
 });
+
+describe("assistant reply edits run through row-level security", () => {
+    it("edits the owner's reply in place, drops its stale vector, and refuses a stranger", async () => {
+        const threadId = await newThread(OWNER);
+        const replyId = await run(
+            async (context) =>
+                await context.db.insert("messages", {
+                    message: { content: [{ text: "old", type: "text" }], role: "assistant" },
+                    order: 1,
+                    status: "success",
+                    stepOrder: 0,
+                    text: "old",
+                    threadId,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+        const vectorId = await run(
+            async (context) => await context.db.insert("embeddings_1536", { model: "m", table: "messages", threadId, userId: OWNER, vector: [] }),
+        );
+
+        await run(async (context) => await context.db.patch(replyId, { embeddingId: vectorId }));
+
+        await expect(
+            as(STRANGER).mutation(procedureAt("agent_branches", "editAssistantReply"), { messageId: replyId, text: "hijack", threadId } as never),
+        ).rejects.toThrow();
+
+        await as(OWNER).mutation(procedureAt("agent_branches", "editAssistantReply"), { messageId: replyId, text: "new", threadId } as never);
+
+        const reply = await run(async (context) => await context.db.get(replyId));
+
+        expect(reply).toMatchObject({ message: { content: [{ text: "new", type: "text" }] }, text: "new" });
+        expect(reply.embeddingId).toBeUndefined();
+        expect(await run(async (context) => await context.db.get(vectorId))).toBeNull();
+    });
+});

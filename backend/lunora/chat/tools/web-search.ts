@@ -12,6 +12,15 @@ import { EXA_API_KEY, PARALLEL_API_KEY, TAVILY_API_KEY } from "../../env";
 import { assertOk } from "../../lib/fetch-timeout";
 import { toolsLogger } from "../../lib/logger";
 import toonEncodeOutput from "./toon-encode";
+import {
+    EXA_MAX_DOMAINS,
+    filterBlockedResults,
+    filterIncludeDomains,
+    mergeExcludeDomains,
+    TAVILY_MAX_EXCLUDE_DOMAINS,
+    TAVILY_MAX_INCLUDE_DOMAINS,
+    toSearchDomain,
+} from "./search-domains";
 import { deduplicateByDomainAndUrl, fetchWithTimeout, formatError, withRetry } from "./utilities";
 
 export interface WebSearchResult {
@@ -84,8 +93,8 @@ const searchWithTavily = async (
             query,
             search_depth: "advanced",
             topic,
-            ...(domainFilter?.includeDomains?.length && { include_domains: domainFilter.includeDomains }),
-            ...(domainFilter?.excludeDomains?.length && { exclude_domains: domainFilter.excludeDomains }),
+            ...(domainFilter?.includeDomains?.length && { include_domains: domainFilter.includeDomains.slice(0, TAVILY_MAX_INCLUDE_DOMAINS) }),
+            ...(domainFilter?.excludeDomains?.length && { exclude_domains: domainFilter.excludeDomains.slice(0, TAVILY_MAX_EXCLUDE_DOMAINS) }),
         }),
         headers: {
             "Content-Type": "application/json",
@@ -119,16 +128,21 @@ const searchWithExa = async (
         throw new Error("EXA_API_KEY is not configured");
     }
 
+    // Exa's REST API is camelCase (https://exa.ai/docs/reference/search). Its docs do not
+    // say whether includeDomains and excludeDomains combine, so excludes go only when there
+    // is no include list. The caller's post-filter enforces the excludes either way.
+    const excludeDomains = domainFilter?.includeDomains?.length ? undefined : domainFilter?.excludeDomains;
+
     const response = await fetchWithTimeout("https://api.exa.ai/search", {
         body: JSON.stringify({
             contents: {
-                text: { max_characters: 2000 },
+                text: { maxCharacters: 2000 },
             },
-            num_results: maxResults,
+            numResults: maxResults,
             query,
             use_autoprompt: true,
-            ...(domainFilter?.includeDomains?.length && { include_domains: domainFilter.includeDomains }),
-            ...(domainFilter?.excludeDomains?.length && { exclude_domains: domainFilter.excludeDomains }),
+            ...(domainFilter?.includeDomains?.length && { includeDomains: domainFilter.includeDomains.slice(0, EXA_MAX_DOMAINS) }),
+            ...(excludeDomains?.length && { excludeDomains: excludeDomains.slice(0, EXA_MAX_DOMAINS) }),
         }),
         headers: {
             "Content-Type": "application/json",
@@ -227,7 +241,36 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
 
         const { excludeDomains, includeDomains, maxResults = depth.defaultMaxResults, provider = "auto", queries: rawQueries, topic = "general" } = input;
         const queries = rawQueries.slice(0, depth.maxQueries);
-        const domainFilter = includeDomains?.length || excludeDomains?.length ? { excludeDomains, includeDomains } : undefined;
+
+        // The user's blocklist always wins over the model's domain arguments. It is
+        // read here, not carried on the ctx, so every run path (chat, resumed
+        // approvals, group, headless) gets it, and a failed read throws: no
+        // unfiltered search.
+        const blocklist = context.userId ? await context.runQuery(internal.auth.functions.getSearchDomainBlocklistQuery, { userId: context.userId }) : [];
+        const keptIncludes = includeDomains?.length ? filterIncludeDomains(includeDomains, blocklist) : undefined;
+
+        // Every include was blocked: searching with no include list would search the whole web.
+        if (includeDomains?.length && keptIncludes?.length === 0) {
+            return {
+                results: queries.map((query) => {
+                    return { query, results: [] };
+                }),
+                totalResults: 0,
+            };
+        }
+
+        const domainFilter =
+            keptIncludes?.length || excludeDomains?.length || blocklist.length > 0
+                ? { excludeDomains: mergeExcludeDomains(excludeDomains, blocklist), includeDomains: keptIncludes }
+                : undefined;
+
+        // What the post-filter drops: the model's excludes as hostnames (the filter matches
+        // hostnames, so `https://Spam.io/x` becomes `spam.io`) plus the user's blocklist. Applied
+        // to every provider, because a provider may ignore exclude_domains or drop it beside include_domains.
+        const enforcedExcludes = mergeExcludeDomains(
+            (excludeDomains ?? []).flatMap((entry) => toSearchDomain(entry) ?? []),
+            blocklist,
+        );
 
         // Lazy fetch user's Tavily key (BYOK), fall back to env key
         let userTavilyKey: string | undefined;
@@ -286,7 +329,8 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
                     shouldRetry: isPaidSearchRetryable,
                 });
 
-                return { query, results: deduplicateByDomainAndUrl(results) };
+                // Post-filter too: a provider may ignore `exclude_domains`, and `parallel` takes none.
+                return { query, results: deduplicateByDomainAndUrl(filterBlockedResults(results, enforcedExcludes)) };
             } catch (error) {
                 toolsLogger.error(`Search failed for query "${query}":`, formatError(error));
 

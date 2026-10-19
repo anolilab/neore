@@ -38,11 +38,14 @@ export const listMessages = async (
         paginationOpts,
         statuses,
         threadId,
+        unlockProof,
     }: {
         excludeToolMessages?: boolean;
         paginationOpts: PaginationOptions;
         statuses?: MessageStatus[];
         threadId: string;
+        // The caller validated this proof for a locked thread (`agent/thread-passcode.ts`); without it a locked thread lists empty.
+        unlockProof?: string;
     },
 ): Promise<PaginationResult<MessageDoc>> => {
     if (paginationOpts.numItems === 0) {
@@ -66,6 +69,7 @@ export const listMessages = async (
         paginationOpts: { ...paginationOpts, cursor: paginationOpts.cursor ?? null },
         statuses,
         threadId: threadId as Id<"threads">,
+        unlockProof,
     });
 };
 

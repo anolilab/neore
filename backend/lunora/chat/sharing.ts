@@ -19,6 +19,7 @@ import { rateLimitGuard, shareLinkBucket } from "../lib/rate-limiter";
 import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
 import { admitThread, systemDb } from "../lib/rls/scope";
 import { loadNsfwStatuses, MAX_PUBLIC_THREAD_ROWS, toPublicThreadMessages, vPublicThreadMessage } from "./lib/public-thread";
+import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 
 // Helper function to generate unique tokens
@@ -479,6 +480,11 @@ export const toggleThreadVisibility = authMutation
 
         if (!accessResult.hasAccess || !accessResult.thread) {
             throw new LunoraError("FORBIDDEN", "Admin access required to change thread visibility");
+        }
+
+        // A locked chat is never published: its passcode would not protect the public copy.
+        if (isPublic && isThreadLocked(accessResult.thread)) {
+            throw new LunoraError("BAD_REQUEST", "Unlock and stop locking this chat before you share it.");
         }
 
         const newToken = isPublic ? generateToken() : undefined;

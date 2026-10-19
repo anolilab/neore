@@ -18,9 +18,11 @@ import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, partial, MAX_LENGTH } from "../lib/validators";
 import { deleteMessage } from "./messages";
 import { deleteStreamsPageForThreadId } from "./streams";
-import { meetsThreadPermission, redactThreadForPublicViewer, resolveThreadReadAccess, type ThreadPermission, admitOwnedThread } from "./thread-read-access";
+import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
+import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadDocFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
+import { readPasscodeRow } from "./thread-passcode";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
     const result = omit(thread, ["parentThreadIds"]);
@@ -37,6 +39,13 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
 
     return result as unknown as ThreadDoc;
 };
+
+/**
+ * One row of a LIST. A locked thread is its stub (metadata only, no title,
+ * summary, tags or share token); lists take no proof, so they never open one.
+ */
+export const listThreadItem = (thread: Doc<"threads">): ThreadDoc =>
+    isThreadLocked(thread) ? (toLockedThreadStub(publicThread(thread)) as unknown as ThreadDoc) : publicThread(thread);
 
 /** The full row, unchecked — shared by both procedures below, which differ only in who may see it. */
 const getThreadRow = async (ctx: QueryContext, threadId: Id<"threads">) => await ctx.db.get(threadId);
@@ -59,16 +68,22 @@ export const getThreadInternal = internalQuery
     });
 
 export const getThread = query
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.from(v.union(vThreadDocument, v.null())))
     .query(async ({ args, ctx }) => {
         // Owner or live grantee: the full row. Anyone else: a public thread's
         // redacted shape (no owner id, system prompt, org/team ids), else nothing.
+        // The owner of a locked thread without a proof gets the stub: its title
+        // is not the redacted shape's to carry.
         const identity = await getAuthUserIdentity(ctx);
-        const access = await resolveThreadReadAccess(ctx, args.threadId, identity?.userId);
+        const access = await resolveThreadReadAccess(ctx, args.threadId, identity?.userId, args.unlockProof);
 
         if (!access) {
             return null;
+        }
+
+        if (access.kind === "locked") {
+            return toLockedThreadStub(publicThread(access.thread)) as unknown as ThreadDoc;
         }
 
         return access.kind === "full" ? publicThread(access.thread) : redactThreadForPublicViewer(publicThread(access.thread));
@@ -140,7 +155,7 @@ const listThreadsForUserHandler = async (ctx: QueryContext, args: InferArgs<type
 
             return true;
         })
-        .map((t) => publicThread(t as unknown as Doc<"threads">));
+        .map((t) => listThreadItem(t as unknown as Doc<"threads">));
 
     return { continueCursor: threads.continueCursor, isDone: threads.isDone, page: filteredPage };
 };
@@ -263,8 +278,17 @@ export const searchThreadTitles = query
             .withSearchIndex("title", (q) => q.search("title", args.query).eq("userId", scopedUserId))
             .take(args.limit);
 
-        return threads.map((item) => publicThread(item));
+        // A locked thread's title is its content: it is never a hit.
+        return threads.filter((t) => !isThreadLocked(t)).map((item) => publicThread(item));
     });
+
+/** The archive write itself, shared by manual archive and the auto-archive sweep (`auto-archive.ts`). */
+export const markThreadArchived = async (context: MutationContext, threadId: Id<"threads">): Promise<void> => {
+    await context.db.patch(threadId, {
+        status: "archived",
+        updatedAt: context.now,
+    });
+};
 
 export const archiveThread = internalMutation
     .input({ threadId: v.id("threads") })
@@ -273,10 +297,7 @@ export const archiveThread = internalMutation
         const oldThread = await ctx.db.get(args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
-        await ctx.db.patch(args.threadId, {
-            status: "archived",
-            updatedAt: ctx.now,
-        });
+        await markThreadArchived(ctx, args.threadId);
         const newThread = (await ctx.db.get(args.threadId))!;
 
         // Update aggregate - status changed
@@ -389,6 +410,13 @@ export const deleteAllForThreadIdAsync = internalMutation
                 .collect();
 
             await Promise.all(markers.map((marker) => ctx.db.delete(marker._id)));
+
+            // The passcode row of a deleted locked chat goes with it (the hash has no other use).
+            const passcode = await readPasscodeRow(ctx.db, args.threadId);
+
+            if (passcode) {
+                await ctx.db.delete(passcode._id);
+            }
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.threads.deleteAllForThreadIdAsync, {
                 cursor: messagesResult.cursor,
@@ -491,7 +519,7 @@ export const listPinnedThreads = query
             .withIndex("by_user_and_pinned_deleted", (q: any) => q.eq("userId", args.userId).eq("deleted", false).gte("pinnedAt", 0))
             .take(100);
 
-        return threads.filter((t) => t.pinnedAt !== undefined).map((item) => publicThread(item));
+        return threads.filter((t) => t.pinnedAt !== undefined).map((item) => listThreadItem(item));
     });
 
 // Thread order functions
@@ -554,7 +582,7 @@ export const listThreadOrders = query
             }
         }
 
-        return threads.map((item) => publicThread(item));
+        return threads.map((item) => listThreadItem(item));
     });
 
 // Thread visibility functions
@@ -569,6 +597,13 @@ export const updateThreadVisibility = internalMutation
         const thread = await ctx.db.get(args.threadId);
 
         assert(thread, `Thread ${args.threadId} not found`);
+
+        // A locked chat's content is not shared. Unsharing (`isPublic: false`,
+        // no token) stays allowed.
+        if (isThreadLocked(thread) && (args.isPublic === true || args.publicAccessToken !== undefined)) {
+            throw new LunoraError("BAD_REQUEST", "A locked chat cannot be shared. Unlock it first.");
+        }
+
         // An absent token REMOVES the stored one — making a thread private must
         // revoke its old link, not leave it valid.
         await patchRow(ctx.db, thread, {
@@ -593,7 +628,7 @@ export const getThreadByPublicToken = internalQuery
             .withIndex("by_publicAccessToken", (q) => q.eq("publicAccessToken", args.publicAccessToken))
             .first();
 
-        if (!thread || !thread.isPublic || thread.deleted) {
+        if (!thread || !thread.isPublic || thread.deleted || isThreadLocked(thread)) {
             return null;
         }
 
@@ -915,7 +950,7 @@ export const getThreadListDataBatchHandler = async (
 
             return true;
         })
-        .map((t) => publicThread(t as unknown as Doc<"threads">));
+        .map((t) => listThreadItem(t as unknown as Doc<"threads">));
 
     // One read for every temporary thread, not a `get` each — an un-hinted
     // `get` probes every table. Kept in the records' expiry order.
@@ -926,15 +961,15 @@ export const getThreadListDataBatchHandler = async (
     const temporaryThreads = temporaryThreadIds
         .map((threadId) => temporaryThreadsById.get(threadId))
         .filter((t): t is Doc<"threads"> => t !== undefined && !t.deleted)
-        .map((item) => publicThread(item));
+        .map((item) => listThreadItem(item));
 
-    const pinnedThreads = pinnedThreadsRaw.page.filter((t) => t.pinnedAt !== undefined).map((item) => publicThread(item as unknown as Doc<"threads">));
+    const pinnedThreads = pinnedThreadsRaw.page.filter((t) => t.pinnedAt !== undefined).map((item) => listThreadItem(item as unknown as Doc<"threads">));
 
     const threadOrders: ThreadDoc[] = [];
 
     for (const thread of ordered.page) {
         if (!thread.deleted && thread.order !== undefined) {
-            threadOrders.push(publicThread(thread as unknown as Doc<"threads">));
+            threadOrders.push(listThreadItem(thread as unknown as Doc<"threads">));
         }
     }
 
@@ -967,10 +1002,11 @@ export const getThreadListDataBatchHandler = async (
 export const getThreadWithAccess = internalQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         userId: v.optional(v.string()),
     })
     .query(async ({ args, ctx }) => {
-        const access = await resolveThreadReadAccess(ctx, args.threadId, args.userId);
+        const access = await resolveThreadReadAccess(ctx, args.threadId, args.userId, args.unlockProof);
 
         if (access?.kind !== "full" || access.thread.deleted) {
             return null;
@@ -1037,7 +1073,7 @@ export const searchThreadsByTitleAndSummary = query
         const combined: Doc<"threads">[] = [];
 
         for (const t of titleMatches) {
-            if (t.deleted || t.isTemporary) {
+            if (t.deleted || t.isTemporary || isThreadLocked(t)) {
                 continue;
             }
 
@@ -1046,7 +1082,7 @@ export const searchThreadsByTitleAndSummary = query
         }
 
         for (const t of summaryMatches) {
-            if (!seen.has(t._id) && !t.deleted && !t.isTemporary) {
+            if (!seen.has(t._id) && !t.deleted && !t.isTemporary && !isThreadLocked(t)) {
                 combined.push(t);
             }
         }
@@ -1118,7 +1154,7 @@ export const getTemporaryThreads = query
 
         return {
             ...allTemporaryThreadRecords,
-            page: validThreads.map((item) => publicThread(item)),
+            page: validThreads.map((item) => listThreadItem(item)),
         };
     });
 
@@ -1341,7 +1377,7 @@ export const deleteExpiredTemporaryThreads = internalMutation
     });
 
 export const getThreadUsage = query
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(
         v.object({
             cachedInputTokens: v.optional(v.number()),
@@ -1366,7 +1402,7 @@ export const getThreadUsage = query
             return { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
         }
 
-        admitOwnedThread(ctx, thread, identity.userId);
+        await requireOwnedThread(ctx, args.threadId, identity.userId, args.unlockProof);
 
         return getThreadUsageHandler(ctx, args);
     });

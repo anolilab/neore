@@ -5,6 +5,7 @@ import { persist } from "zustand/middleware";
 
 import type { AccentId } from "@/features/appearance/lib/accent-presets";
 import type { CodeHighlightThemeId, MermaidThemeId } from "@/features/appearance/lib/code-themes";
+import type { DensityId, MainFontId } from "@/features/appearance/lib/display-preferences";
 
 const platformModifier = "ctrl";
 
@@ -27,13 +28,18 @@ export type ModalState = {
 
 export type FontSettings = {
     codeFont: "fira-code" | "mono" | "consolas" | "jetbrains" | "source-code-pro";
-    mainFont: "inter" | "system" | "serif" | "mono" | "roboto-slab";
 };
 
-/** Accent colour, code-block and diagram themes — see `features/appearance`. */
+/** Accent colour, code-block and diagram themes, UI density and font family — see `features/appearance`. */
 export type AppearanceSettings = {
     accentColor: AccentId;
+    /** Absent means on: long code blocks scroll inside a 24-line cap until expanded. */
+    capLongCodeBlocks?: boolean;
     codeHighlightTheme: CodeHighlightThemeId;
+    /** Absent means off. */
+    codeLineNumbers?: boolean;
+    density: DensityId;
+    mainFont: MainFontId;
     mermaidTheme: MermaidThemeId;
 };
 
@@ -41,6 +47,7 @@ export type KeyboardShortcuts = {
     archiveThread: string;
     audioRecord: string;
     commandPalette: string;
+    copyLastCodeBlock: string;
     createBranch: string;
     deleteThread: string;
     escape: string;
@@ -61,7 +68,6 @@ export type KeyboardShortcuts = {
 export type Direction = "ltr" | "rtl";
 
 export type LayoutState = {
-    density: "compact" | "comfortable" | "spacious";
     direction: Direction;
     fontSize: "small" | "medium" | "large";
     showAvatars: boolean;
@@ -85,6 +91,7 @@ const defaultKeyboardShortcuts: KeyboardShortcuts = {
     archiveThread: `${platformModifier}+a`,
     audioRecord: `${platformModifier}+shift+r`,
     commandPalette: `${platformModifier}+k`,
+    copyLastCodeBlock: `${platformModifier}+shift+x`,
     createBranch: `${platformModifier}+shift+c`,
     deleteThread: `${platformModifier}+d`,
     escape: "escape",
@@ -108,10 +115,18 @@ export const RIGHT_SIDEBAR_MIN_WIDTH = 240;
 export const RIGHT_SIDEBAR_MAX_WIDTH = 600;
 
 const defaultUIState = {
-    appearance: { accentColor: "default", codeHighlightTheme: "default", mermaidTheme: "default" } as AppearanceSettings,
-    fonts: { codeFont: "fira-code" as const, mainFont: "inter" as const },
+    appearance: {
+        accentColor: "default",
+        capLongCodeBlocks: true,
+        codeHighlightTheme: "default",
+        codeLineNumbers: false,
+        density: "comfortable",
+        mainFont: "inter",
+        mermaidTheme: "default",
+    } as AppearanceSettings,
+    fonts: { codeFont: "fira-code" as const },
     keyboardShortcuts: defaultKeyboardShortcuts,
-    layout: { density: "comfortable" as const, direction: "ltr" as const, fontSize: "medium" as const, showAvatars: true, showTimestamps: true },
+    layout: { direction: "ltr" as const, fontSize: "medium" as const, showAvatars: true, showTimestamps: true },
     modals: {} as Record<string, ModalState>,
     preferences: {
         animations: true,
@@ -342,6 +357,18 @@ export const useUIStateStore = create<UIStateStore>()(
         },
         {
             name: "neore-ui-state",
+            // The persisted object replaces the defaults wholesale, so a key added after a
+            // user last saved (a new shortcut, a new appearance flag) would be missing.
+            merge: (persisted, current) => {
+                const saved = (persisted ?? {}) as Partial<typeof current>;
+
+                return {
+                    ...current,
+                    ...saved,
+                    appearance: { ...current.appearance, ...saved.appearance },
+                    keyboardShortcuts: { ...current.keyboardShortcuts, ...saved.keyboardShortcuts },
+                };
+            },
             partialize: (state) => {
                 return {
                     appearance: state.appearance,

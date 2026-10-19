@@ -1,14 +1,19 @@
 "use client";
 
 import type { GatewayModel } from "@neore/ai/models";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
-interface ModelFilterRules {
+const NO_BLOCKED_CREATORS: string[] = [];
+
+export interface ModelFilterRules {
     allowedModels?: string[];
     allowedProviders?: string[];
     allowedRegions?: string[];
+    /** Labs (creator slugs, e.g. "meta") hidden from the model picker only. Applied in `ModelPicker`, not here: other surfaces still resolve every model. */
+    blockedCreators?: string[];
     blockedModels?: string[];
     blockedProviders?: string[];
     blockedRegions?: string[];
@@ -104,4 +109,59 @@ export const useFilteredModels = (models: GatewayModel[]): GatewayModel[] => {
     if (!hasRules) return models;
 
     return models.filter((m) => isModelAllowed(m, rules));
+};
+
+/** The hidden list with one lab added. A lab already in it is not repeated. */
+export const withCreatorHidden = (blocked: ReadonlyArray<string>, slug: string): string[] => (blocked.includes(slug) ? [...blocked] : [...blocked, slug]);
+
+/** The hidden list with one lab removed; every other entry stays as it is. */
+export const withoutCreator = (blocked: ReadonlyArray<string>, slug: string): string[] => blocked.filter((s) => s !== slug);
+
+/**
+ * The labs hidden from the model picker, and an updater for them. The mutation
+ * replaces the whole `modelFilterRules` object, so the other rules are carried
+ * over. Shared by the picker's "Hide" action and the filters page.
+ *
+ * The updater is applied to the newest rules this hook knows, not to the
+ * render's snapshot, so two edits in flight both survive.
+ */
+export const useBlockedCreators = () => {
+    const crpc = useCRPC();
+    const { data: aiPreferences, isSuccess: isLoaded } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const rules = aiPreferences?.modelFilterRules as ModelFilterRules | undefined;
+    const updateMutation = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
+    const { mutateAsync } = updateMutation;
+    // ponytail: a refetch that lands mid-save resets this to the server copy, which can lack that save. Serialise saves if that bites.
+    const newest = useRef(rules);
+    const loaded = useRef(isLoaded);
+
+    useEffect(() => {
+        newest.current = rules;
+        loaded.current = isLoaded;
+    }, [isLoaded, rules]);
+
+    const setBlockedCreators = useCallback(
+        async (update: (current: ReadonlyArray<string>) => string[]) => {
+            // Before the preferences load there are no rules to carry over, and saving would replace the user's other filters.
+            if (!loaded.current) {
+                throw new Error("The model filter rules have not loaded yet");
+            }
+
+            const base = newest.current;
+            const next: ModelFilterRules = { ...base, blockedCreators: update(base?.blockedCreators ?? NO_BLOCKED_CREATORS) };
+
+            newest.current = next;
+
+            return mutateAsync({ modelFilterRules: next }).catch((error: unknown) => {
+                if (newest.current === next) {
+                    newest.current = base;
+                }
+
+                throw error;
+            });
+        },
+        [mutateAsync],
+    );
+
+    return { blockedCreators: rules?.blockedCreators ?? NO_BLOCKED_CREATORS, isLoaded, isPending: updateMutation.isPending, setBlockedCreators };
 };

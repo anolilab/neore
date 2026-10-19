@@ -11,6 +11,7 @@ import type { StreamArgs } from "@neore/backend/agent/validators";
 import { useLayoutEffect, useMemo, useRef } from "react";
 
 import { shardOptionsFor } from "@/lib/lunora/shard-routing";
+import { withUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 import { shareUnchangedMessages } from "./share-unchanged-messages";
 import type { BetterOmit, ErrorMessage, Expand } from "./type-utilities";
@@ -186,7 +187,8 @@ export const useUIMessages = <Query extends UIMessagesQuery<any, any>>(
     // real query, but TypeScript cannot see that through two unresolved generics —
     // so `.order` and `.status` came back missing on a value that has both.
     // A shared thread's messages live on its owner's shard (`lib/lunora/shard-routing.ts`).
-    const paginated = usePaginatedQuery(query, args as PaginatedArgs<Query> | "skip", {
+    // A locked chat's messages need its in-memory proof (`lib/lunora/unlock-proofs.ts`).
+    const paginated = usePaginatedQuery(query, withUnlockProof(args) as PaginatedArgs<Query> | "skip", {
         initialNumItems: options.initialNumItems,
         ...shardOptionsFor(args),
     }) as UsePaginatedQueryResult<UIMessagesQueryResult<Query>>;

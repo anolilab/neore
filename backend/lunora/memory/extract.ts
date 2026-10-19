@@ -188,6 +188,10 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
         return { reason: "temporary_thread", verdict: "skip" };
     }
 
+    if (args.threadId && (await ctx.runQuery(internal.memory.functions.isThreadLockedForMemory, { threadId: args.threadId }))) {
+        return { reason: "locked_thread", verdict: "skip" };
+    }
+
     // Keyed on the user's statement, not the whole exchange: a regenerate or a
     // trigger re-running the same prompt produces a new response to the same
     // words, and the facts come from the words. (Plus the assistant question a

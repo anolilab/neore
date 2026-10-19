@@ -2,10 +2,16 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
-import { internalMutation } from "../../_generated/server";
+import type { QueryCtx } from "../../_generated/server";
+import { internalMutation, internalQuery } from "../../_generated/server";
 import { patchThread } from "../../agent/table-writes";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
+import { publicThread } from "../../agent/threads";
+import { vThreadDoc } from "../../agent/validators";
 import { optionalAuthQuery } from "../../lib/crpc";
+import { MAX_LENGTH } from "../../lib/validators";
+import { throwThreadLocked } from "../../lib/thread-lock";
+import { lockedAfterCreation } from "../lib/thread-gate";
 
 /**
  * Persistent Text Streaming Helper
@@ -74,16 +80,21 @@ const vStreamBody = v.object({
 export const getStreamBody = optionalAuthQuery
     .input({
         streamId: v.id("persistentStreams"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(vStreamBody)
     .query(async ({ args: input, ctx }) => {
         // Decided on the stream's THREAD (which admits it), so the stream row is
         // found by its thread id first — row-level security hides it until then.
         const threadId = await parentKeyOf(ctx, input.streamId, "threadId");
-        const access = threadId ? await resolveThreadReadAccess(ctx, threadId as Id<"threads">, ctx.user?.userId) : null;
+        const access = threadId ? await resolveThreadReadAccess(ctx, threadId as Id<"threads">, ctx.user?.userId, input.unlockProof) : null;
 
         if (!access) {
             throw new LunoraError("NOT_FOUND", "Stream not found");
+        }
+
+        if (access.kind === "locked") {
+            return throwThreadLocked();
         }
 
         const body = await persistentTextStreaming.getStreamBody(ctx, input.streamId as StreamId);
@@ -137,14 +148,18 @@ export const createStreamWithMessage = internalMutation
 export const getActiveStreamForThread = optionalAuthQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.union(v.object({ streamId: v.id("persistentStreams") }), v.null()))
     .query(async ({ args: input, ctx }) => {
-        const { threadId } = input;
+        const { threadId, unlockProof } = input;
 
         // Same rule as `getStreamBody`, which this hands its stream id to. The bare
         // `isPublic` test it replaces also admitted deleted and temporary threads.
-        if (!(await resolveThreadReadAccess(ctx, threadId, ctx.user?.userId))) {
+        // A locked chat answers nothing here, rather than an error on a live query.
+        const access = await resolveThreadReadAccess(ctx, threadId, ctx.user?.userId, unlockProof);
+
+        if (!access || access.kind === "locked") {
             return null;
         }
 
@@ -158,3 +173,61 @@ export const getActiveStreamForThread = optionalAuthQuery
 
         return stream ? { streamId: stream._id } : null;
     });
+
+/**
+ * The thread a background run on this stream may write into, or null. Full
+ * access only (owner or live grantee), as before. A locked thread is admitted
+ * only when it was not locked after the stream row was created: that row is
+ * written only by a request that passed the lock gate, and a background run has
+ * no proof of its own.
+ */
+export const streamRunThreadHandler = async (ctx: QueryCtx, args: { streamId: Id<"persistentStreams">; userId: string }) => {
+    const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
+
+    if (!stream) {
+        return null;
+    }
+
+    const access = await resolveThreadReadAccess(ctx, stream.threadId as Id<"threads">, args.userId);
+
+    if (!access || access.thread.deleted) {
+        return null;
+    }
+
+    if (access.kind === "full") {
+        return publicThread(access.thread);
+    }
+
+    if (access.kind === "locked" && !lockedAfterCreation(access.thread, stream._creationTime)) {
+        return publicThread(access.thread);
+    }
+
+    return null;
+};
+
+export const streamRunThread = internalQuery
+    .input({ streamId: v.id("persistentStreams"), userId: v.string() })
+    .output(v.from(v.union(vThreadDoc, v.null())))
+    .query(async ({ args, ctx }) => await streamRunThreadHandler(ctx, args));
+
+/**
+ * True when the stream's thread was locked after the stream was created. The
+ * `/chat/chunks` poll carries no proof, so its refusal rests on this alone.
+ * A missing stream answers true: nothing is read from it.
+ */
+export const streamLockedSinceStartHandler = async (ctx: QueryCtx, args: { streamId: Id<"persistentStreams"> }): Promise<boolean> => {
+    const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
+
+    if (!stream) {
+        return true;
+    }
+
+    const thread = await ctx.db.get(stream.threadId as Id<"threads">);
+
+    return thread !== null && lockedAfterCreation(thread, stream._creationTime);
+};
+
+export const streamLockedSinceStart = internalQuery
+    .input({ streamId: v.id("persistentStreams") })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => await streamLockedSinceStartHandler(ctx, args));

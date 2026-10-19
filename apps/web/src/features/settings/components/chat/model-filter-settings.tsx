@@ -15,18 +15,10 @@ import type { FC } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { getCreatorDisplayName } from "@/components/model-picker/utilities";
+import type { ModelFilterRules } from "@/hooks/use-model-filter-rules";
+import { useBlockedCreators, withoutCreator } from "@/hooks/use-model-filter-rules";
 import { useCRPC } from "@/lib/lunora/crpc";
-
-interface ModelFilterRules {
-    allowedModels?: string[];
-    allowedProviders?: string[];
-    allowedRegions?: string[];
-    blockedModels?: string[];
-    blockedProviders?: string[];
-    blockedRegions?: string[];
-    denyDataCollection?: boolean;
-    requireZDR?: boolean;
-}
 
 const REGIONS = [
     { code: "US", description: msg`Models hosted in US data centers`, label: msg`United States` },
@@ -51,6 +43,16 @@ const ModelFilterSettings: FC = () => {
     const [modelInput, setModelInput] = useState("");
 
     const rules: ModelFilterRules = (aiPreferences?.modelFilterRules as ModelFilterRules) ?? {};
+    const { blockedCreators, isPending: blockedCreatorsPending, setBlockedCreators } = useBlockedCreators();
+
+    const restoreCreator = async (slug: string) => {
+        try {
+            await setBlockedCreators((current) => withoutCreator(current, slug));
+            toast.success(t`Filter rules updated`);
+        } catch {
+            toast.error(t`Failed to update filter rules`);
+        }
+    };
 
     const updateRules = async (newRules: ModelFilterRules) => {
         try {
@@ -64,6 +66,8 @@ const ModelFilterSettings: FC = () => {
             if (newRules.allowedModels && newRules.allowedModels.length > 0) cleaned.allowedModels = newRules.allowedModels;
 
             if (newRules.blockedModels && newRules.blockedModels.length > 0) cleaned.blockedModels = newRules.blockedModels;
+
+            if (newRules.blockedCreators && newRules.blockedCreators.length > 0) cleaned.blockedCreators = newRules.blockedCreators;
 
             if (newRules.allowedProviders && newRules.allowedProviders.length > 0) cleaned.allowedProviders = newRules.allowedProviders;
 
@@ -135,6 +139,7 @@ const ModelFilterSettings: FC = () => {
         (rules.allowedRegions && rules.allowedRegions.length > 0) ||
         (rules.blockedRegions && rules.blockedRegions.length > 0) ||
         (rules.blockedModels && rules.blockedModels.length > 0) ||
+        (rules.blockedCreators && rules.blockedCreators.length > 0) ||
         (rules.allowedProviders && rules.allowedProviders.length > 0) ||
         (rules.blockedProviders && rules.blockedProviders.length > 0) ||
         rules.requireZDR ||
@@ -283,6 +288,40 @@ const ModelFilterSettings: FC = () => {
                             })}
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Hidden labs: written by the model picker's "Hide" action, restored here */}
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">{t`Hidden in Model Picker`}</CardTitle>
+                    <CardDescription className="text-xs">{t`Labs hidden from the model picker only. Models already selected or set as defaults keep working.`}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {blockedCreators.length === 0 ? (
+                        <p className="text-muted-foreground text-xs">{t`No labs are hidden.`}</p>
+                    ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                            {blockedCreators.map((slug) => {
+                                const name = getCreatorDisplayName(slug);
+
+                                return (
+                                    <Badge className="gap-1 pr-1 text-xs" key={slug} variant="secondary">
+                                        {name}
+                                        <button
+                                            aria-label={t`Show ${name} in model picker`}
+                                            className="hover:bg-foreground/10 ml-0.5 rounded p-0.5"
+                                            disabled={blockedCreatorsPending}
+                                            onClick={() => restoreCreator(slug)}
+                                            type="button"
+                                        >
+                                            <X aria-hidden="true" className="h-3 w-3" />
+                                        </button>
+                                    </Badge>
+                                );
+                            })}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

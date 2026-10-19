@@ -7,11 +7,15 @@ import { authMutation, rateLimit } from "../lib/crpc";
 import { throwBadRequest, throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
 import { childrenOf, contextPathIds, descendFrom, getThreadRow, loadActivePath, parentOf, resolveLeafRow, walkPath } from "./branch-rows";
 import type { MessageBranch } from "./branch-tree";
-import { BRANCH_ROOT, forkEnd } from "./branch-tree";
+import { BRANCH_ROOT, forkEnd, messageRowsOf } from "./branch-tree";
 import { addMessagesHandler, getMaxMessage } from "./messages";
+import { requireOwnedThread } from "./thread-read-access";
+import { isLockedWithoutProof } from "./thread-passcode";
+import { type ReplyContent, rewriteReplyText } from "./reply-edit";
+import { extractText } from "./shared";
 import type { Message } from "./validators";
 import { vMessage } from "./validators";
-import { admitOwnedThread } from "./thread-read-access";
+import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 
 /**
@@ -43,8 +47,15 @@ export const listActivePathPage = async (
     context: QueryContext,
     thread: Pick<Doc<"threads">, "_id" | "activeLeafMessageId">,
     paginationOptions: { cursor: string | null; endCursor?: string; numItems: number },
+    unlockProof?: string | null,
 ): Promise<(PaginationResult<Doc<"messages">> & { branches: Map<string, MessageBranch> }) | null> => {
     if (!thread.activeLeafMessageId) {
+        return null;
+    }
+
+    // A locked thread's path is its content: without the proof it reads as unbranched
+    // (`null`), and the caller's linear read is refused the same way.
+    if (await isLockedWithoutProof(context, thread._id as Id<"threads">, unlockProof)) {
         return null;
     }
 
@@ -266,13 +277,116 @@ export const saveEditedSiblingHandler = async (
     return savedId;
 };
 
+/** The stored `message` of a row, typed for the reply helpers. */
+const messageOf = (row: Doc<"messages">): { content: ReplyContent; role: string } | undefined =>
+    row.message as { content: ReplyContent; role: string } | undefined;
+
+/**
+ * Replaces the visible text of an assistant reply, in place: no model call, no
+ * credit charge, and no row is inserted, so a repeated save writes nothing new.
+ * The reply is the displayed message containing `messageId` (`messageRowsOf`),
+ * which keeps sibling replies that share its `order` untouched. Tool calls,
+ * reasoning and media stay as they were (`reply-edit.ts`).
+ */
+export const editAssistantReply = authMutation
+    .use(rateLimit("chat/update"))
+    .input({
+        messageId: v.string().max(MAX_LENGTH.id),
+        text: v.string().max(MAX_LENGTH.document),
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => await editAssistantReplyHandler(ctx, { ...args, userId: ctx.user.userId }));
+
+/** `editAssistantReply`'s body, with the caller passed in so the harness can drive it. */
+export const editAssistantReplyHandler = async (
+    ctx: MutationContext,
+    args: { messageId: string; text: string; threadId: Id<"threads">; unlockProof?: string; userId: string },
+): Promise<null> => {
+    const thread = await ctx.db.get(args.threadId);
+
+    if (!thread) {
+        return throwThreadNotFound();
+    }
+
+    // The same owner-only rule as editing a prompt (`/chat/edit`).
+    if (thread.userId !== args.userId) {
+        throwForbidden("Cannot modify another user's thread");
+    }
+
+    // Lock-aware: a locked thread's reply text is not editable without its proof.
+    await requireOwnedThread(ctx, args.threadId, args.userId, args.unlockProof);
+
+    const text = args.text.trim();
+
+    if (!text) {
+        return throwBadRequest("The reply text is empty");
+    }
+
+    const path = await loadActivePath(ctx, args.threadId, thread.activeLeafMessageId);
+    const pathRows = path.map((row) => {
+        return { _id: row._id as string, doc: row, order: row.order, role: messageOf(row)?.role };
+    });
+    const reply = messageRowsOf(pathRows, args.messageId)?.map((entry) => entry.doc);
+
+    if (!reply) {
+        return throwBadRequest("Message is not on the displayed path");
+    }
+
+    if (reply.some((row) => row.status !== "success")) {
+        return throwBadRequest("The reply has not finished");
+    }
+
+    const changes = rewriteReplyText(
+        reply.map((row) => {
+            return { content: messageOf(row)?.content ?? "", role: messageOf(row)?.role ?? "" };
+        }),
+        text,
+    );
+
+    if (!changes) {
+        return throwBadRequest("This message has no text to edit");
+    }
+
+    for (const [index, row] of reply.entries()) {
+        const content = changes[index];
+
+        if (content === undefined) {
+            continue;
+        }
+
+        const message = { ...messageOf(row), content } as Message;
+        // `text` is the search copy of the message; a row hidden from search has none, and stays so.
+        const patch: { embeddingId?: undefined; message: Message; text?: string } = { message };
+
+        if (row.text !== undefined) {
+            patch.text = extractText(message);
+        }
+
+        // The stored vector embeds the old text, so it would surface the old reply in search.
+        if (row.embeddingId) {
+            await ctx.db.delete(row.embeddingId as Id<"embeddings_1536">);
+            patch.embeddingId = undefined;
+        }
+
+        await patchRow(ctx.db, row, patch);
+    }
+
+    return null;
+};
+
 /**
  * The sibling switcher. Stores the leaf reached from `messageId` by latest
  * child, so the stored leaf is a real leaf and later replies extend it.
  */
 export const switchBranch = authMutation
     .use(rateLimit("chat/update"))
-    .input({ messageId: v.string().max(MAX_LENGTH.id), threadId: v.id("threads") })
+    .input({
+        messageId: v.string().max(MAX_LENGTH.id),
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const thread = await ctx.db.get(args.threadId);
@@ -285,7 +399,7 @@ export const switchBranch = authMutation
             throwForbidden("Cannot modify another user's thread");
         }
 
-        admitOwnedThread(ctx, thread, ctx.user.userId);
+        await requireOwnedThread(ctx, args.threadId, ctx.user.userId, args.unlockProof);
 
         const target = await getThreadRow(ctx, args.threadId, args.messageId);
 

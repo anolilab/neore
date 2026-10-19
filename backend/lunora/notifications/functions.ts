@@ -10,6 +10,7 @@ import type { QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { notify } from "./notify";
+import { linksToLockedThread, redactForLockedThread } from "./locked-link";
 import { notificationInputFields, vNotificationView } from "./validators";
 
 /** Rows the bell lists: the newest, read or not. */
@@ -33,6 +34,20 @@ export const toNotificationView = (row: Doc<"notifications">) => {
         ...(row.outcome !== undefined && { outcome: row.outcome }),
     };
 };
+
+/**
+ * What any surface shows of notification rows (the inbox, the home page): a row
+ * linked to a locked chat is redacted, whichever writer or write date. Rows
+ * written before a lock still carry the title, so this runs at read time too.
+ */
+export const toRedactedNotificationViews = async (db: Parameters<typeof linksToLockedThread>[0], rows: Doc<"notifications">[]) =>
+    await Promise.all(
+        rows.map(async (row) => {
+            const view = toNotificationView(row);
+
+            return (await linksToLockedThread(db, row.link)) ? redactForLockedThread(view) : view;
+        }),
+    );
 
 /** Unread rows of `userId`, newest first, at most `limit`. */
 export const loadUnread = async (ctx: Pick<QueryCtx, "db">, userId: string, limit: number) => {
@@ -59,7 +74,7 @@ export const getNotificationInbox = authQuery
             loadUnread(ctx, userId, UNREAD_COUNT_CAP),
         ]);
 
-        return { items: recent.page.map((row) => toNotificationView(row)), unreadCount: unread.length };
+        return { items: await toRedactedNotificationViews(ctx.db, recent.page), unreadCount: unread.length };
     });
 
 export const markNotificationRead = authMutation

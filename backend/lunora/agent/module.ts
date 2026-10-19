@@ -26,6 +26,7 @@ export default defineModule({
         "threadAccess",
         "threadInvites",
         "threadRelationships",
+        "threadPasscodes",
         "threads",
         "workflowExecutions",
     ],

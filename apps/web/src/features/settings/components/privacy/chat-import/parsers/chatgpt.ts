@@ -7,11 +7,12 @@
 import type { NormalizedConversation, NormalizedMessage } from "./types";
 
 /**
- * A non-text content part (image asset, audio transcript, …). Only the
- * discriminator is ever read — these parts are dropped during normalisation.
+ * A non-text content part. Voice turns carry their spoken text as an
+ * `audio_transcription` part; every other kind (image asset, …) is dropped.
  */
 interface ChatGPTNonTextPart {
     content_type?: string;
+    text?: string;
 }
 
 type ChatGPTContentPart = ChatGPTNonTextPart | string;
@@ -41,7 +42,8 @@ interface ChatGPTConversation {
 }
 
 /**
- * Extract text content from a ChatGPT message's parts array.
+ * Extract text content from a ChatGPT message's parts array. Plain strings and voice
+ * transcripts (`audio_transcription`) are text; anything else is not.
  */
 const extractTextFromParts = (parts?: ChatGPTContentPart[]): string => {
     if (!parts) {
@@ -49,7 +51,18 @@ const extractTextFromParts = (parts?: ChatGPTContentPart[]): string => {
     }
 
     return parts
-        .filter((part): part is string => typeof part === "string")
+        .flatMap((part): string[] => {
+            if (typeof part === "string") {
+                return [part];
+            }
+
+            // `part` is untrusted JSON, so a null entry must not reach the property read.
+            if (part?.content_type === "audio_transcription" && typeof part.text === "string") {
+                return [part.text];
+            }
+
+            return [];
+        })
         .join("\n")
         .trim();
 };

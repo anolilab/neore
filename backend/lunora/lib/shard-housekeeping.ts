@@ -60,6 +60,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "reapLapsedClaims", ref: internal.lib.claim_once.reapLapsedClaims },
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims },
     { name: "deleteExpiredTemporaryChats", ref: internal.crons.deleteExpiredTemporaryChats },
+    // Per-user setting (`autoArchiveAfterDays`); does nothing for users who left it off.
+    { name: "autoArchiveInactiveThreads", ref: internal.agent.auto_archive.autoArchiveInactiveThreads },
     { name: "cleanupExpiredExports", ref: internal.gdpr.request_sweeps.cleanupExpiredExports },
     { name: "handleGdprRequestTimeouts", ref: internal.gdpr.request_sweeps.handleGdprRequestTimeouts },
     { name: "pruneOldNotifications", ref: internal.notifications.functions.pruneOldNotifications },

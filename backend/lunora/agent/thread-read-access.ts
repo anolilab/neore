@@ -3,6 +3,9 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext, QueryCtx as QueryContext } from "../_generated/server";
 import { throwThreadNotFound } from "../lib/error-helpers";
 import { admitThread, systemDb } from "../lib/rls/scope";
+import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
+
+import { isUnlockProofValid } from "./thread-passcode";
 
 /**
  * Who may read a thread's raw message rows through a CLIENT-reachable procedure.
@@ -47,9 +50,17 @@ export const meetsThreadPermission = (granted: ThreadPermission, required: Threa
  * - `redacted` — a live PUBLIC thread and anyone else, including no caller at
  *   all: only what `redactThreadForPublicViewer` / `toPublicThreadMessages`
  *   let through. Never an authorization for anything but that projection.
- * - `null` — nothing, including a missing thread.
+ * - `locked` — the owner, but the thread has a passcode and the caller's proof
+ *   is missing, stale or from an earlier epoch. Nothing but the lock state.
+ * - `null` — nothing, including a missing thread, and a locked thread for
+ *   anyone who is not the owner (a locked thread is owner-only: no grants, no
+ *   public view).
  */
-export type ThreadReadAccess = { kind: "full"; permission: ThreadPermission; thread: Doc<"threads"> } | { kind: "redacted"; thread: Doc<"threads"> } | null;
+export type ThreadReadAccess =
+    | { kind: "full"; permission: ThreadPermission; thread: Doc<"threads"> }
+    | { kind: "locked"; thread: Doc<"threads"> }
+    | { kind: "redacted"; thread: Doc<"threads"> }
+    | null;
 
 /**
  * THE decision of who may read a thread. Every client-reachable read goes
@@ -59,11 +70,16 @@ export type ThreadReadAccess = { kind: "full"; permission: ThreadPermission; thr
  * Deleted threads are left to the caller (the owner's trash still reads them),
  * except that a deleted or temporary thread is never shown `redacted` — the
  * share page (`getPublicThread`) refuses both.
+ *
+ * `unlockProof` is the caller's passcode proof for a locked thread. A caller
+ * that does not pass one (internal jobs, public surfaces) is refused a locked
+ * thread, which is the fail-closed default.
  */
 export const resolveThreadReadAccess = async (
     context: Pick<QueryContext, "db">,
     threadId: Id<"threads">,
     userId: string | null | undefined,
+    unlockProof?: string | null,
 ): Promise<ThreadReadAccess> => {
     // The decision reads past row-level security (a grantee cannot see the
     // owner's row until it is admitted); the admission below is what then lets
@@ -75,13 +91,22 @@ export const resolveThreadReadAccess = async (
         return null;
     }
 
-    if (userId) {
-        if (thread.userId === userId) {
-            admitThread(context, threadId, "admin", userId);
-
-            return { kind: "full", permission: "admin", thread };
+    if (userId && thread.userId === userId) {
+        if (isThreadLocked(thread) && !(await isUnlockProofValid(db, thread, userId, unlockProof, Date.now()))) {
+            return { kind: "locked", thread };
         }
 
+        admitThread(context, threadId, "admin", userId);
+
+        return { kind: "full", permission: "admin", thread };
+    }
+
+    // A locked thread is owner-only: no grant or public view reads past its passcode.
+    if (isThreadLocked(thread)) {
+        return null;
+    }
+
+    if (userId) {
         // `.global()` (D1): a grant is read from whichever shard the caller is on.
         const access = await context.db.threadAccess.findFirst({ where: { threadId, userId } });
 
@@ -113,7 +138,34 @@ export const resolveThreadReadAccess = async (
  * thread variables, relationships): a grantee writing one would plant it in
  * someone else's thread.
  */
-export const requireOwnedThread = async (context: Pick<QueryContext, "db">, threadId: Id<"threads">, userId: string): Promise<Doc<"threads">> => {
+export const requireOwnedThread = async (
+    context: Pick<QueryContext, "db">,
+    threadId: Id<"threads">,
+    userId: string,
+    unlockProof?: string | null,
+): Promise<Doc<"threads">> => {
+    const thread = await context.db.get(threadId);
+
+    if (!thread || thread.userId !== userId) {
+        return throwThreadNotFound();
+    }
+
+    if (isThreadLocked(thread) && !(await isUnlockProofValid(systemDb(context), thread, userId, unlockProof, Date.now()))) {
+        return throwThreadLocked();
+    }
+
+    admitThread(context, threadId, "admin", userId);
+
+    return thread;
+};
+
+/**
+ * The owner's thread row, with NO passcode check. For the operations that
+ * must work on a locked thread without its passcode: move to trash, restore,
+ * permanent delete, and the lock management itself. Do not use it to read or
+ * write content.
+ */
+export const requireOwnedThreadIgnoringLock = async (context: Pick<QueryContext, "db">, threadId: Id<"threads">, userId: string): Promise<Doc<"threads">> => {
     const thread = await context.db.get(threadId);
 
     if (!thread || thread.userId !== userId) {
@@ -134,8 +186,13 @@ export const requireThreadPermission = async (
     threadId: Id<"threads">,
     userId: string,
     level: ThreadPermission,
+    unlockProof?: string | null,
 ): Promise<{ permission: ThreadPermission; thread: Doc<"threads"> }> => {
-    const access = await resolveThreadReadAccess(context, threadId, userId);
+    const access = await resolveThreadReadAccess(context, threadId, userId, unlockProof);
+
+    if (access?.kind === "locked") {
+        return throwThreadLocked();
+    }
 
     if (access?.kind !== "full" || !meetsThreadPermission(access.permission, level)) {
         return throwThreadNotFound();

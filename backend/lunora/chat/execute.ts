@@ -21,6 +21,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
 import { streamLogger } from "../lib/logger";
+import { isThreadLocked } from "../lib/thread-lock";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
 import { continueGroupAfterToolApproval, runGroupTurn } from "./group/run";
 import {
@@ -81,11 +82,13 @@ export const runStreamingAgent = internalAction
         // and discards, and generates nothing.
         const isSkillCommand = userPrompt !== undefined && Boolean(parseSkillCommand(userPrompt));
         const reads = Promise.all([
-            ctx.runQuery(internal.agent.threads.getThreadWithAccess, { threadId: threadId as Id<"threads">, userId }),
+            // Full access, or a locked chat the stream was started under (`streamRunThread`).
+            ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }),
             // Group chat: its participants take the turn (`group/run.ts`) — unless
             // the user invoked one skill directly with `/<slug>`.
             isSkillCommand ? null : ctx.runQuery(internal.chat.group.functions.getGroupRunConfig, { organizationId, threadId, userId }),
-            ctx.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [messageId as Id<"messages">] }),
+            // Raw row: the stream above was admitted under the thread's lock state (`streamRunThread`).
+            ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] }),
             ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId }),
         ]);
 
@@ -325,7 +328,9 @@ export const runStreamingAgent = internalAction
             }
 
             // Stream text
+            // Admitted by `streamRunThread` above: the run reads its context without a proof.
             const result = await threadObject.streamText(streamTextArgs, {
+                admittedRun: true,
                 statelessMode: threadStatelessMode,
             });
 
@@ -366,7 +371,8 @@ export const runStreamingAgent = internalAction
             // Post-stream work: timing and memory extraction, then follow-ups.
             afterRun(ctx, {
                 botId: runContext.botId,
-                extractMemory: runContext.memoryEnabled,
+                // A locked chat's content is never mined into memory.
+                extractMemory: runContext.memoryEnabled && !isThreadLocked(thread),
                 firstTokenTime,
                 knowledgeSources: runContext.knowledgeSources,
                 prompt,
@@ -435,6 +441,13 @@ export const continueAfterToolApproval = internalAction
         // Enqueued on the jobs queue (at-least-once): only the claiming delivery resumes the run.
         if (!(await ctx.runMutation(internal.chat.streaming.persistent.library.claimStreamRun, { streamId: streamId as Id<"persistentStreams"> }))) {
             streamLogger.warn(`[ToolApproval] Stream ${streamId} already claimed — ignoring a redelivered continuation`);
+
+            return;
+        }
+
+        // A locked chat resumes only under a stream started after its lock (`streamRunThread`).
+        if (!(await ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }))) {
+            streamLogger.warn(`[ToolApproval] Stream ${streamId} belongs to a locked or unreachable chat — not resumed`);
 
             return;
         }

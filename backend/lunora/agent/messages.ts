@@ -16,7 +16,9 @@ import { omit } from "../lib/collections";
  */
 import { pick } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
-import { paginationOptionsValidator, partial } from "../lib/validators";
+import { MAX_LENGTH, paginationOptionsValidator, partial } from "../lib/validators";
+import { throwThreadLocked, isThreadLocked } from "../lib/thread-lock";
+import { systemDb } from "../lib/rls/scope";
 import { mergedStream, stream } from "../lib/streams";
 // Not through the `./client` barrel: it re-exports this module, so importing
 // it here is a cycle, and whichever side loads first sees the other's
@@ -37,6 +39,7 @@ import { loadBranchTree, parentOf, resolveLeafRow } from "./branch-rows";
 import { BRANCH_ROOT, resolveActivePath, resolveBranchParent } from "./branch-tree";
 import { changeRefcount } from "./files";
 import { resolveThreadReadAccess } from "./thread-read-access";
+import { isLockedWithoutProof, isUnlockProofValid } from "./thread-passcode";
 import { getStreamingMessagesWithMetadata } from "./streams";
 import { insertVector, searchVectors } from "./vector/index";
 import { validateVectorDimension, type VectorTableId, vVectorId } from "./vector/tables";
@@ -605,6 +608,7 @@ export const cloneMessageBatch = internalMutation
         sourceThreadId: v.id("threads"),
         statuses: v.optional(v.array(vMessageStatus)),
         targetThreadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         upToAndIncludingMessageId: v.optional(v.id("messages")),
     })
     // Without an `.output()` the generated reference returns `unknown`, so the
@@ -612,6 +616,12 @@ export const cloneMessageBatch = internalMutation
     // to assign it. Declared, so the caller gets the type from the api.
     .output(v.object({ continueCursor: v.union(v.string(), v.null()), isDone: v.boolean(), numCopied: v.number() }))
     .mutation(async ({ args, ctx }) => {
+        // A fork copies content, so a locked source needs its proof. The fork is a
+        // NEW thread and gets no lock of its own.
+        if (await isLockedWithoutProof(ctx, args.sourceThreadId, args.unlockProof)) {
+            throwThreadLocked();
+        }
+
         const orderOffset = args.insertAtOrder ?? 0;
         const result = await listMessagesByThreadIdHandler(ctx, {
             excludeToolMessages: args.excludeToolMessages,
@@ -619,6 +629,7 @@ export const cloneMessageBatch = internalMutation
             paginationOpts: args.paginationOpts,
             statuses: args.statuses,
             threadId: args.sourceThreadId,
+            unlockProof: args.unlockProof,
             upToAndIncludingMessageId: args.upToAndIncludingMessageId,
         });
 
@@ -720,6 +731,7 @@ export const cloneThread = internalAction
         sourceThreadId: v.id("threads"),
         statuses: v.optional(v.array(vMessageStatus)),
         targetThreadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         upToAndIncludingMessageId: v.optional(v.id("messages")),
     })
     .output(v.number())
@@ -759,7 +771,47 @@ export const listMessagesByThreadIdArgs = {
     paginationOpts: v.optional(paginationOptionsValidator),
     statuses: v.optional(v.array(vMessageStatus)),
     threadId: v.id("threads"),
+    unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     upToAndIncludingMessageId: v.optional(v.id("messages")),
+};
+
+/**
+ * Drops the rows that sit in a LOCKED thread from search and fetch results.
+ * Applied where rows become hits, so text and vector hits both pass through it.
+ * A cross-thread search (no `scope.threadId`) never keeps a locked row, even
+ * with a proof. A thread-scoped search keeps its rows only when the proof opens
+ * THAT thread.
+ */
+const withoutLockedThreads = async <M extends { threadId: string }>(
+    context: Pick<QueryContext, "db">,
+    rows: M[],
+    scope: { threadId?: Id<"threads">; unlockProof?: string | null },
+): Promise<M[]> => {
+    if (rows.length === 0) {
+        return rows;
+    }
+
+    const db = systemDb(context);
+    const { page: threads } = await db.threads.findMany({
+        where: { _id: { in: [...new Set(rows.map((row) => row.threadId))] as Id<"threads">[] } },
+    });
+    const locked = threads.filter((thread) => isThreadLocked(thread));
+
+    if (locked.length === 0) {
+        return rows;
+    }
+
+    const closed = new Set<string>();
+
+    for (const thread of locked) {
+        const opened = scope.threadId === thread._id && (await isUnlockProofValid(db, thread, thread.userId ?? "", scope.unlockProof, Date.now()));
+
+        if (!opened) {
+            closed.add(thread._id as string);
+        }
+    }
+
+    return rows.filter((row) => !closed.has(row.threadId));
 };
 
 export const listMessagesByThreadId = query
@@ -769,7 +821,11 @@ export const listMessagesByThreadId = query
         // Owner or unexpired invitee only — see `thread-read-access.ts` for why
         // `isPublic` is not a grant on these raw rows.
         const identity = await getAuthUserIdentity(ctx);
-        const access = await resolveThreadReadAccess(ctx, args.threadId, identity?.userId);
+        const access = await resolveThreadReadAccess(ctx, args.threadId, identity?.userId, args.unlockProof);
+
+        if (access?.kind === "locked") {
+            return throwThreadLocked();
+        }
 
         if (access?.kind !== "full") {
             return { continueCursor: "" as string, isDone: true, page: [] };
@@ -806,6 +862,18 @@ export const listMessagesByThreadIdHandler = async (
     context: QueryContext,
     args: InferArgs<typeof listMessagesByThreadIdArgs>,
 ): Promise<PaginationResult<Doc<"messages">>> => {
+    if (await isLockedWithoutProof(context, args.threadId, args.unlockProof)) {
+        return { continueCursor: "", isDone: true, page: [] };
+    }
+
+    return await listMessagesPage(context, args);
+};
+
+/**
+ * The page read itself, with NO lock check. Only for a caller that has already
+ * admitted the run under the thread's lock state (`listMessagesByThreadIdAdmitted`).
+ */
+const listMessagesPage = async (context: QueryContext, args: InferArgs<typeof listMessagesByThreadIdArgs>): Promise<PaginationResult<Doc<"messages">>> => {
     const allStatuses = messageStatuses;
     const statuses = args.statuses ?? allStatuses;
     const last = args.upToAndIncludingMessageId && (await context.db.get(args.upToAndIncludingMessageId));
@@ -874,6 +942,51 @@ export const listMessagesByThreadIdHandler = async (
 };
 
 export const getMessagesByIds = internalQuery
+    .input({
+        messageIds: v.array(v.id("messages")),
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
+    .output(v.from(v.array(v.union(v.null(), vMessageDocument))))
+    .query(async ({ args, ctx }) => await readMessagesByIds(ctx, args));
+
+/** `getMessagesByIds`'s read: a locked chat's rows come back null unless the proof for `threadId` is valid. */
+export const readMessagesByIds = async (
+    ctx: Pick<QueryContext, "db">,
+    args: { messageIds: Id<"messages">[]; threadId?: Id<"threads">; unlockProof?: string },
+): Promise<(ReturnType<typeof publicMessage> | null)[]> => {
+    const rows = await Promise.all(args.messageIds.map((id) => ctx.db.get(id)));
+    const found = rows.filter((m): m is Doc<"messages"> => m !== null);
+    const unlocked = await withoutLockedThreads(ctx, found, { threadId: args.threadId, unlockProof: args.unlockProof });
+    const visible = new Set(unlocked.map((m) => m._id));
+
+    return rows.map((m) => (m && visible.has(m._id) ? publicMessage(m) : null));
+};
+
+/**
+ * Recent messages for a RUN ALREADY ADMITTED under the thread's lock state: its
+ * stream was started with a valid proof, or after the lock (`streamRunThread`,
+ * `lockedAfterCreation`). Internal only. Callers are the background run and the
+ * group turn, which pass `admittedRun` to the agent (`agent/client/search.ts`).
+ * A client-reachable read never comes here.
+ */
+export const listMessagesByThreadIdAdmitted = internalQuery
+    .input(listMessagesByThreadIdArgs)
+    .output(v.from(vPaginationResult(vMessageDocument)))
+    .query(async ({ args, ctx }) => {
+        const messages = await listMessagesPage(ctx, args);
+
+        return { ...messages, page: (messages.page as unknown as Doc<"messages">[]).map((item) => publicMessage(item)) };
+    });
+
+/**
+ * Raw rows for SERVER code that decides the thread's access itself: a background
+ * run admitted by its stream (`streamRunThread`), or an edit, regenerate, media
+ * or abort path that runs the lock gate on the thread right after this read.
+ * Internal only, never a client surface. `getMessagesByIds` above is the
+ * filtered read: it hides a locked thread's rows unless a proof is passed.
+ */
+export const getMessagesByIdsUnfiltered = internalQuery
     .input({ messageIds: v.array(v.id("messages")) })
     .output(v.from(v.array(v.union(v.null(), vMessageDocument))))
     .query(async ({ args, ctx }) => {
@@ -893,6 +1006,7 @@ export const searchMessages = internalAction
         text: v.optional(v.string()),
         textSearch: v.optional(v.boolean()),
         threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         vectorScoreThreshold: v.optional(v.number()),
         vectorSearch: v.optional(v.boolean()),
     })
@@ -909,6 +1023,7 @@ export const searchMessages = internalAction
                 targetMessageId: args.targetMessageId,
                 text: args.text,
                 threadId: args.threadId,
+                unlockProof: args.unlockProof,
             });
         }
 
@@ -919,6 +1034,7 @@ export const searchMessages = internalAction
             if (!embedding && args.targetMessageId) {
                 const target = await ctx.runQuery(internal.agent.messages.getMessageSearchFields, {
                     messageId: args.targetMessageId,
+                    unlockProof: args.unlockProof,
                 });
 
                 assert(target, "Target message embedding not found.");
@@ -959,6 +1075,7 @@ export const searchMessages = internalAction
                 searchAllMessagesForUserId: args.searchAllMessagesForUserId,
                 textSearchMessages: textSearchMessages?.filter((m) => !embeddingIds.includes(m.embeddingId! as VectorTableId)),
                 threadId: args.threadId,
+                unlockProof: args.unlockProof,
             });
 
             return messages;
@@ -976,6 +1093,7 @@ export const _fetchSearchMessages = internalQuery
         searchAllMessagesForUserId: v.optional(v.string()),
         textSearchMessages: v.optional(v.array(vMessageDocument)),
         threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(v.array(vMessageDocument)))
     .query(async ({ args, ctx }) => {
@@ -1009,7 +1127,7 @@ export const _fetchSearchMessages = internalQuery
             .map((item) => publicMessage(item));
 
         messages.push(...(args.textSearchMessages ?? []));
-        messages = sorted(messages);
+        messages = await withoutLockedThreads(ctx, sorted(messages), { threadId, unlockProof: args.unlockProof });
         messages = messages.slice(0, args.limit);
 
         if (!threadId) {
@@ -1097,6 +1215,7 @@ export const textSearch = internalQuery
         targetMessageId: v.optional(v.id("messages")),
         text: v.optional(v.string()),
         threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(v.array(vMessageDocument)))
     .query(async ({ args, ctx }) => {
@@ -1121,7 +1240,9 @@ export const textSearch = internalQuery
             .filter((document) => document.tool === false && (order ? document.order <= order : true))
             .take(args.limit);
 
-        return messages
+        const visible = await withoutLockedThreads(ctx, messages, { threadId: args.threadId, unlockProof: args.unlockProof });
+
+        return visible
             .filter((m) => !targetMessage || m.order < targetMessage.order || (m.order === targetMessage.order && m.stepOrder < targetMessage.stepOrder))
             .map((item) => publicMessage(item));
     });
@@ -1129,6 +1250,7 @@ export const textSearch = internalQuery
 export const getMessageSearchFields = internalQuery
     .input({
         messageId: v.id("messages"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         v.object({
@@ -1139,6 +1261,11 @@ export const getMessageSearchFields = internalQuery
     )
     .query(async ({ args, ctx }) => {
         const message = await ctx.db.get(args.messageId);
+
+        if (message && (await isLockedWithoutProof(ctx, message.threadId, args.unlockProof))) {
+            return { embedding: undefined, embeddingModel: undefined, text: undefined };
+        }
+
         const text = message?.text;
         let embedding;
         let embeddingModel;

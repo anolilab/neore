@@ -11,6 +11,8 @@
 @import "@neore/ui/global.css";
 /* Accent colour presets (`data-accent` on <html>), generated from features/appearance/lib/accent-presets.ts */
 @import "./features/appearance/accent-presets.css";
+/* UI density tokens and font families (`data-density` / `data-font`) */
+@import "./features/appearance/display-presets.css";
 @import "@c15t/react/styles.css";
 /* Import KaTeX styles for math rendering */
 @import "katex/dist/katex.min.css";

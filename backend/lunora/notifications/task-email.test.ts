@@ -7,6 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
+import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import schema from "../schema";
 import { notify } from "./notify";
 import {
@@ -270,5 +271,42 @@ describe("sweep", () => {
         await harness.run(async (ctx: any) => await dispatchOutcomeEmails.handler(ctx, {}));
 
         expect(await outbox()).toHaveLength(0);
+    });
+});
+
+describe("the outbox title for a chat", () => {
+    const queuedTitle = async (lockedAt: number | undefined): Promise<string> => {
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { ...(lockedAt !== undefined && { lockedAt }), status: "regular", title: "Salary", userId: USER });
+            const notificationId = await ctx.db.insert("notifications", {
+                createdAt: 1,
+                link: `/chat/${threadId}`,
+                title: "Salary",
+                type: "task",
+                userId: USER,
+            });
+
+            await ctx.db.insert("outcomeEmails", {
+                attempts: 0,
+                createdAt: 1,
+                link: `/chat/${threadId}`,
+                notificationId,
+                status: "pending",
+                title: "Salary",
+                userId: USER,
+            });
+        });
+
+        const [row] = await run<{ title: string }[]>(listPendingOutcomeEmails);
+
+        return row?.title ?? "";
+    };
+
+    it("sends the generic title once the chat was locked after the row was queued", async () => {
+        expect(await queuedTitle(Date.now())).toBe(LOCKED_THREAD_TITLE);
+    });
+
+    it("keeps the title of a chat that is not locked", async () => {
+        expect(await queuedTitle(undefined)).toBe("Salary");
     });
 });

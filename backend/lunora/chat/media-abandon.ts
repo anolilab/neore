@@ -14,6 +14,7 @@ import { v } from "lunorash/server";
 
 import { internalMutation } from "../_generated/server";
 import { patchRow } from "../lib/patch";
+import { isThreadLocked } from "../lib/thread-lock";
 
 /** The `providerMetadata` namespace the job stamp lives under. */
 const JOB_STAMP_NAMESPACE = "neoreJob";
@@ -35,6 +36,13 @@ export const failAbandonedMediaJob = internalMutation
     })
     .output(v.boolean())
     .mutation(async ({ args: { claimKey, threadId }, ctx }) => {
+        // A locked chat takes no placeholder text.
+        const thread = await ctx.db.get(threadId);
+
+        if (thread && isThreadLocked(thread)) {
+            return false;
+        }
+
         const pending = await ctx.db
             .query("messages")
             .withIndex("threadId_status_tool_order_stepOrder", (q) => q.eq("threadId", threadId).eq("status", "pending").eq("tool", false))

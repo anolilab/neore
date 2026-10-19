@@ -18,6 +18,7 @@ import { chatLogger } from "../lib/logger";
 import { getUserTier } from "../lib/rate-limiter";
 import { SERVICE_REQUEST_WINDOW_MS } from "../lib/sign-request";
 import { threadShardFor } from "../lib/thread-shard";
+import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
@@ -368,13 +369,21 @@ export interface ChatStartBody {
     referenceImages?: string[];
     regenerate?: boolean;
     researchDepth?: "speed" | "balanced" | "thorough";
+    /** New thread only: the composer's temporary setting, decided by the client (`chat-context.tsx`). */
+    retentionHours?: number;
     searchMode?: string;
     seed?: number;
     shouldAutoContinue?: boolean;
     statelessMode?: boolean;
     style?: string;
+    temporary?: boolean;
     threadId?: string;
+    /** The passcode proof for a locked thread (`agent/thread-passcode.ts`). Forwarded by the gateway as is. */
+    unlockProof?: string;
 }
+
+/** The answer to a request that writes into a locked thread without a valid proof. */
+const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
 
 /**
  * Everything `/chat/start` does once the caller is trusted: resolve the user
@@ -490,9 +499,10 @@ const runChatStartOnShard = async (
     // Read while the attachments load; answered after them, as before.
     const accessPromise =
         validThreadId && !(body.regenerate && body.parentId)
-            ? context.runQuery(internal.agent.threads.checkThreadAccessBatch, {
-                  requiredPermission: "write",
+            ? context.runQuery(internal.chat.functions.gateThreadAction, {
+                  level: "write",
                   threadId: validThreadId as Id<"threads">,
+                  unlockProof: body.unlockProof,
                   userId,
               })
             : undefined;
@@ -512,6 +522,7 @@ const runChatStartOnShard = async (
                 body.fileIds.map(async (fileId) => {
                     const { extractedText, file, filePart, imagePart } = await getFile(context as HttpActionCtx & { storage: Signer }, fileId, {
                         ...(attachThreadId && { threadId: attachThreadId }),
+                        unlockProof: body.unlockProof,
                         userId,
                     });
 
@@ -543,7 +554,11 @@ const runChatStartOnShard = async (
 
     const access = await accessPromise;
 
-    if (access && !access.hasAccess) {
+    if (access?.outcome === "locked") {
+        return threadLockedResponse();
+    }
+
+    if (access && access.outcome !== "ok") {
         return Response.json({ error: "Thread not found" }, { status: 404 });
     }
 
@@ -551,7 +566,7 @@ const runChatStartOnShard = async (
     // set here, before any write, so the stream config and the agent both see it.
     // Bots chat in text only, so a media model is refused rather than swapped.
     // A regenerate skips the access check above, so it reads the thread itself.
-    let threadBotId = access?.thread?.botId;
+    let threadBotId: string | undefined = access?.botId;
 
     if (!threadBotId && validThreadId && body.regenerate && body.parentId) {
         const ownThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
@@ -643,8 +658,25 @@ const runChatStartOnShard = async (
         // Regenerate: a SIBLING reply to the same prompt row (see
         // `agent/branch-tree.ts`). This used to save a copy of the prompt, which
         // appended a duplicate turn at the end and left the old reply behind it.
+        // A regenerate writes a sibling reply, so a locked chat needs its proof here.
+        // The gate runs first: with a valid proof the prompt read below passes the lock filter.
+        const regenerateGate = await context.runQuery(internal.chat.functions.gateThreadAction, {
+            level: "write",
+            threadId: validThreadId as Id<"threads">,
+            unlockProof: body.unlockProof,
+            userId,
+        });
+
+        if (regenerateGate.outcome === "locked") {
+            return threadLockedResponse();
+        }
+
         const [[prompt], regenerateThread] = await Promise.all([
-            context.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [body.parentId as Id<"messages">] }),
+            context.runQuery(internal.agent.messages.getMessagesByIds, {
+                messageIds: [body.parentId as Id<"messages">],
+                threadId: validThreadId as Id<"threads">,
+                unlockProof: body.unlockProof,
+            }),
             context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> }),
         ]);
 
@@ -701,6 +733,8 @@ const runChatStartOnShard = async (
             model: effectiveModel,
             reasoningEffort: body.reasoningEffort,
             statelessMode: body.statelessMode,
+            // Temporary only when the client asked for it; the composer applies the user's default itself.
+            ...(body.temporary === true && { retentionHours: body.retentionHours, temporary: true }),
             // A media thread is titled from its prompt, with no model call.
             ...(contentType !== "text" && { title: mediaThreadTitle(body.prompt) }),
             userId,
@@ -775,10 +809,11 @@ const runChatStartOnShard = async (
 };
 
 export const editMessageHttpAction = async (context: HttpActionCtx, request: Request) => {
-    const { content, fileIds, messageId } = (await request.json()) as {
+    const { content, fileIds, messageId, unlockProof } = (await request.json()) as {
         content: ({ text: string; type: "text" } | { image: string; type: "image" } | { data: string; filename?: string; mimeType?: string; type: "file" })[];
         fileIds?: string[];
         messageId: string;
+        unlockProof?: string;
     };
 
     // Validate messageId format
@@ -829,8 +864,8 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
     }
 
     try {
-        // Get the message to find its thread
-        const messages = await context.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [messageId as Id<"messages">] });
+        // Get the message to find its thread. The thread is not known yet, so the raw row is read and the gate below decides.
+        const messages = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] });
 
         if (!messages || messages.length === 0) {
             return Response.json({ error: "Message not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
@@ -847,13 +882,22 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         // Get thread to determine model
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
-        if (!thread) {
-            return Response.json({ error: "Thread not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
+        // A message in a thread the caller does not own answers exactly like a message that does not exist,
+        // so a message id cannot be probed (a locked chat's included).
+        if (!thread || thread.userId !== userId) {
+            return Response.json({ error: "Message not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
         }
 
-        // Verify the authenticated user owns this thread
-        if (thread.userId !== userId) {
-            return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
+        // An edit writes a sibling prompt and a reply into the thread: a locked chat needs its proof.
+        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, {
+            level: "write",
+            threadId: threadId as Id<"threads">,
+            unlockProof,
+            userId,
+        });
+
+        if (gateResult.outcome === "locked") {
+            return threadLockedResponse();
         }
 
         // An edit regenerates the reply, so it spends the same daily message quota
@@ -884,6 +928,7 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                         // already on a message in this thread.
                         const { extractedText, file, filePart, imagePart } = await getFile(context as HttpActionCtx & { storage: Signer }, fileId, {
                             threadId: threadId as string,
+                            unlockProof,
                             userId,
                         });
 
@@ -1043,6 +1088,7 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
         messageId,
         streamingConfig,
         threadId: bodyThreadId,
+        unlockProof,
     } = (await request.json()) as {
         messageId: string;
         streamingConfig?: {
@@ -1060,6 +1106,7 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
         };
         /** Routes the request to the thread owner's shard (`onThreadShard`); must name the message's thread. */
         threadId?: string;
+        unlockProof?: string;
     };
 
     // Validate messageId
@@ -1102,8 +1149,8 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
         return Response.json({ error: "User ID not found" }, { headers: { "Content-Type": "application/json" }, status: 401 });
     }
 
-    // Get message to retrieve threadId and prompt content
-    const messages = await context.runQuery(internal.agent.messages.getMessagesByIds, { messageIds: [messageId as Id<"messages">] });
+    // Get message to retrieve threadId and prompt content. The gate below refuses a locked thread without its proof.
+    const messages = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] });
     const message = messages?.[0];
 
     if (!message) {
@@ -1129,13 +1176,18 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
     // ...and only while they may still WRITE to the thread: authorship outlives a
     // grant, so a collaborator downgraded to view (or revoked) must not start paid
     // generations that land as replies in the owner's thread. As `/chat/start`.
-    const access = await context.runQuery(internal.agent.threads.checkThreadAccessBatch, {
-        requiredPermission: "write",
+    const access = await context.runQuery(internal.chat.functions.gateThreadAction, {
+        level: "write",
         threadId: threadId as Id<"threads">,
+        unlockProof,
         userId: authenticatedUserId,
     });
 
-    if (!access.hasAccess) {
+    if (access.outcome === "locked") {
+        return threadLockedResponse();
+    }
+
+    if (access.outcome !== "ok") {
         return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
     }
 

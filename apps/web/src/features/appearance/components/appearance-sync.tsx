@@ -9,15 +9,17 @@ import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { authClient } from "@/lib/auth/client";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { applyAccentAttribute } from "../lib/accent-boot-script";
+import { applyAccentAttribute, applyRootAttribute } from "../lib/accent-boot-script";
 import { DEFAULT_ACCENT, isAccentId } from "../lib/accent-presets";
 import { CODE_HIGHLIGHT_THEMES, isCodeHighlightThemeId, isMermaidThemeId } from "../lib/code-themes";
+import { DEFAULT_DENSITY, DEFAULT_MAIN_FONT, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, isDensityId, isMainFontId } from "../lib/display-preferences";
 
 /**
  * Applies the Appearance settings app-wide; renders nothing.
  *
- * - The accent goes on `<html data-accent>` (the boot script already did so
- *   before first paint; this keeps it in step with later changes).
+ * - The accent, density and font go on `<html>` as `data-accent`,
+ *   `data-density` and `data-font` (the boot script already did so before first
+ *   paint; this keeps them in step with later changes).
  * - The code / Mermaid themes are pushed to the Streamdown renderers.
  * - The account's stored choice (`userSettings`) is adopted when it arrives or
  *   changes, so it follows the user across devices. Deferred past first paint
@@ -25,7 +27,9 @@ import { CODE_HIGHLIGHT_THEMES, isCodeHighlightThemeId, isMermaidThemeId } from 
  *   and first paint's query budget is not spent on it.
  */
 const AppearanceSync = () => {
-    const { accentColor, codeHighlightTheme, mermaidTheme } = useUIStateStore((state) => state.appearance);
+    const { accentColor, capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, density, mainFont, mermaidTheme } = useUIStateStore(
+        (state) => state.appearance,
+    );
     const setAppearance = useUIStateStore((state) => state.setAppearance);
 
     useEffect(() => {
@@ -33,11 +37,22 @@ const AppearanceSync = () => {
     }, [accentColor]);
 
     useEffect(() => {
+        applyRootAttribute(DENSITY_ATTRIBUTE, isDensityId(density) ? density : DEFAULT_DENSITY, DEFAULT_DENSITY);
+    }, [density]);
+
+    useEffect(() => {
+        applyRootAttribute(FONT_ATTRIBUTE, isMainFontId(mainFont) ? mainFont : DEFAULT_MAIN_FONT, DEFAULT_MAIN_FONT);
+    }, [mainFont]);
+
+    useEffect(() => {
         setStreamdownAppearance({
+            // Absent is the default for each: the cap is on, line numbers are off.
+            capLongCodeBlocks: capLongCodeBlocks !== false,
+            codeLineNumbers: codeLineNumbers === true,
             mermaidTheme: isMermaidThemeId(mermaidTheme) ? mermaidTheme : "default",
             shikiTheme: CODE_HIGHLIGHT_THEMES[isCodeHighlightThemeId(codeHighlightTheme) ? codeHighlightTheme : "default"],
         });
-    }, [codeHighlightTheme, mermaidTheme]);
+    }, [capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, mermaidTheme]);
 
     const crpc = useCRPC();
     const { data: sessionData } = authClient.useSession();
@@ -47,12 +62,24 @@ const AppearanceSync = () => {
     const storedAccent = userSettings?.accentColor;
     const storedCodeTheme = userSettings?.codeHighlightTheme;
     const storedMermaidTheme = userSettings?.mermaidTheme;
+    const storedDensity = userSettings?.density;
+    const storedMainFont = userSettings?.mainFont;
+    const storedCapLongCodeBlocks = userSettings?.capLongCodeBlocks;
+    const storedCodeLineNumbers = userSettings?.codeLineNumbers;
 
     useEffect(() => {
         const changes: Parameters<typeof setAppearance>[0] = {};
 
         if (isAccentId(storedAccent)) {
             changes.accentColor = storedAccent;
+        }
+
+        if (typeof storedCapLongCodeBlocks === "boolean") {
+            changes.capLongCodeBlocks = storedCapLongCodeBlocks;
+        }
+
+        if (typeof storedCodeLineNumbers === "boolean") {
+            changes.codeLineNumbers = storedCodeLineNumbers;
         }
 
         if (isCodeHighlightThemeId(storedCodeTheme)) {
@@ -63,10 +90,18 @@ const AppearanceSync = () => {
             changes.mermaidTheme = storedMermaidTheme;
         }
 
+        if (isDensityId(storedDensity)) {
+            changes.density = storedDensity;
+        }
+
+        if (isMainFontId(storedMainFont)) {
+            changes.mainFont = storedMainFont;
+        }
+
         if (Object.keys(changes).length > 0) {
             setAppearance(changes);
         }
-    }, [storedAccent, storedCodeTheme, storedMermaidTheme, setAppearance]);
+    }, [storedAccent, storedCapLongCodeBlocks, storedCodeLineNumbers, storedCodeTheme, storedDensity, storedMainFont, storedMermaidTheme, setAppearance]);
 
     return null;
 };

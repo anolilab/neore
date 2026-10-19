@@ -7,8 +7,36 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { listActivePathPage } from "../agent/branches";
+import { createTemporaryThread } from "../agent/threads";
 import schema from "../schema";
 import { saveLocalTurnHandler } from "./local-models";
+
+// The harness cannot run a generated `internal` reference (it has no `kind`), so the one the temporary
+// path uses reads the real function from `hooks`, set below. A static import inside the factory would
+// deadlock: `agent/threads` imports `_generated/internal`.
+const hooks = vi.hoisted(() => {
+    return { createTemporaryThread: undefined as unknown };
+});
+
+vi.mock("../_generated/internal", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../_generated/internal")>();
+
+    return {
+        ...original,
+        internal: {
+            ...original.internal,
+            agent: {
+                ...original.internal.agent,
+                threads: {
+                    ...original.internal.agent.threads,
+                    get createTemporaryThread() {
+                        return hooks.createTemporaryThread;
+                    },
+                },
+            },
+        },
+    };
+});
 
 // `aiUserPreferences` is audited, and its trigger writes the `.global()`
 // `documentHistory` table the harness cannot store. Auditing is not under test.
@@ -20,6 +48,8 @@ vi.mock("../lib/audit-triggers", async (importOriginal) => {
         },
     };
 });
+
+hooks.createTemporaryThread = createTemporaryThread;
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -193,5 +223,62 @@ describe("regenerate and edit on the local path", () => {
         await expect(save(OWNER, { branch: { kind: "regenerate", messageId: first.assistantMessageId }, threadId: first.threadId })).rejects.toThrow(
             NOT_A_PROMPT_RE,
         );
+    });
+});
+
+describe("temporary new chats on the local path", () => {
+    const temporaryRowsOf = async (threadId: string) =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db
+                    .query("temporaryThreads")
+                    .withIndex("by_thread", (q: any) => q.eq("threadId", threadId))
+                    .collect(),
+        );
+
+    const withStoredRetention = async (userId: string, temporaryChatRetentionHours: number) =>
+        await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { temporaryChatRetentionHours, userId }));
+
+    it("creates the thread as temporary with the stored retention", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+        await withStoredRetention(OWNER, 48);
+
+        const before = Date.now();
+        const { threadId } = await save(OWNER, { temporary: true });
+        const [record] = await temporaryRowsOf(threadId);
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get(threadId));
+
+        expect(record).toMatchObject({ retentionHours: 48, threadId, userId: OWNER });
+        expect(record.expiresAt).toBeGreaterThanOrEqual(before + 48 * 3_600_000);
+        expect(record.expiresAt).toBeLessThanOrEqual(Date.now() + 48 * 3_600_000);
+        expect(thread).toMatchObject({ isTemporary: true });
+    });
+
+    it("prefers an explicit retention over the stored one", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+        await withStoredRetention(OWNER, 48);
+
+        const { threadId } = await save(OWNER, { retentionHours: 72, temporary: true });
+
+        expect(await temporaryRowsOf(threadId)).toMatchObject([{ retentionHours: 72 }]);
+    });
+
+    it("falls back to a day when the stored retention is out of range", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+        await withStoredRetention(OWNER, 500);
+
+        const { threadId } = await save(OWNER, { temporary: true });
+
+        expect(await temporaryRowsOf(threadId)).toMatchObject([{ retentionHours: 24 }]);
+    });
+
+    it("writes no temporary record for a plain new chat or a turn into an existing thread", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const plain = await save(OWNER, {});
+        const existing = await save(OWNER, { prompt: "again", temporary: true, threadId: plain.threadId });
+
+        expect(await temporaryRowsOf(plain.threadId)).toStrictEqual([]);
+        expect(await temporaryRowsOf(existing.threadId)).toStrictEqual([]);
     });
 });

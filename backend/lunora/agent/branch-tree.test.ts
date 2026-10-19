@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BranchParentInput, BranchRow, ForkPathRow } from "./branch-tree";
-import { BRANCH_ROOT, buildBranchTree, forkEnd, resolveActivePath, resolveBranchParent } from "./branch-tree";
+import { BRANCH_ROOT, buildBranchTree, forkEnd, messageRowsOf, resolveActivePath, resolveBranchParent } from "./branch-tree";
 
 const row = (_id: string, order: number, stepOrder: number, parentMessageId?: string): BranchRow => {
     return { _id, order, parentMessageId, stepOrder };
@@ -129,5 +129,23 @@ describe(forkEnd, () => {
 
     it("refuses a message that is not on the path", () => {
         expect(forkEnd(path, { messageId: "off-path-sibling" })).toBeUndefined();
+    });
+});
+
+describe("messageRowsOf", () => {
+    // Two replies to u1 share order 1: only the one on the path is the message.
+    const onPath: ForkPathRow[] = [
+        { _id: "u1", order: 0, role: "user" },
+        { _id: "a1-step1", order: 1, role: "assistant" },
+        { _id: "a1-tool", order: 1, role: "tool" },
+        { _id: "a1-step2", order: 1, role: "assistant" },
+    ];
+
+    it("returns every row of the displayed message, not a sibling sharing its order", () => {
+        expect(messageRowsOf(onPath, "a1-tool")?.map((r) => r._id)).toStrictEqual(["a1-step1", "a1-tool", "a1-step2"]);
+    });
+
+    it("returns undefined for a message that is not on the path", () => {
+        expect(messageRowsOf(onPath, "a1-sibling")).toBeUndefined();
     });
 });

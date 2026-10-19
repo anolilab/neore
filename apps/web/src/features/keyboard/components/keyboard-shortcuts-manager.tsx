@@ -31,6 +31,10 @@ const isUserTypingInInput = (event: KeyboardEvent): boolean => {
     );
 };
 
+// A key with no ctrl/meta/alt (a bare letter, or shift alone) types a character into an
+// editable target. Such a keystroke belongs to the field, so the shortcut must not take it.
+const isTextEntryKeystroke = (event: KeyboardEvent): boolean => isUserTypingInInput(event) && !event.ctrlKey && !event.metaKey && !event.altKey;
+
 // Internal component that registers hotkeys
 const KeyboardShortcutsHandler: React.FC<{
     onShortcut?: (action: keyof KeyboardShortcutsConfig, event: KeyboardEvent) => void;
@@ -46,6 +50,7 @@ const KeyboardShortcutsHandler: React.FC<{
     const convertedShortcuts = useMemo(() => {
         return {
             audioRecord: convertShortcutToHotkeysHook(shortcuts.audioRecord),
+            copyLastCodeBlock: convertShortcutToHotkeysHook(shortcuts.copyLastCodeBlock),
             escape: convertShortcutToHotkeysHook(shortcuts.escape),
             firstItem: convertShortcutToHotkeysHook(shortcuts.firstItem),
             focusSearch: convertShortcutToHotkeysHook(shortcuts.focusSearch),
@@ -61,6 +66,7 @@ const KeyboardShortcutsHandler: React.FC<{
         };
     }, [
         shortcuts.audioRecord,
+        shortcuts.copyLastCodeBlock,
         shortcuts.escape,
         shortcuts.firstItem,
         shortcuts.focusSearch,
@@ -80,6 +86,18 @@ const KeyboardShortcutsHandler: React.FC<{
         (event: KeyboardEvent) => {
             event.preventDefault();
             onShortcut?.("audioRecord", event);
+        },
+        [onShortcut],
+    );
+
+    const handleCopyLastCodeBlock = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("copyLastCodeBlock", event);
         },
         [onShortcut],
     );
@@ -206,6 +224,21 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: true,
         },
         [convertedShortcuts.audioRecord, handleAudioRecord],
+    );
+
+    useHotkeys(
+        convertedShortcuts.copyLastCodeBlock,
+        handleCopyLastCodeBlock,
+        {
+            description: "Copy last code block",
+            enabled: !!shortcuts.copyLastCodeBlock && typeof shortcuts.copyLastCodeBlock === "string",
+            // Enabled in fields so a modifier chord works from the composer. The predicate keeps
+            // a bare key from being prevented there, since react-hotkeys-hook prevents by itself.
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.copyLastCodeBlock, handleCopyLastCodeBlock],
     );
 
     useHotkeys(

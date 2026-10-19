@@ -52,6 +52,7 @@ import { getToolRegistry } from "./jit-tool-loader";
 import { searchMarketplaceSkills } from "./marketplace";
 import { vSkillConfig } from "./validators";
 import { MAX_LENGTH } from "../lib/validators";
+import { isThreadLocked } from "../lib/thread-lock";
 
 const MCP_SERVERS_PER_SEARCH = 2;
 const MARKETPLACE_SKILLS_PER_QUERY = 3;
@@ -427,7 +428,8 @@ export const attachSkillTestDrive = authMutation
         const thread = await ctx.db.get(args.threadId as Id<"threads">);
 
         // NOT_FOUND for someone else's thread too, so a probe learns nothing.
-        if (!thread || thread.userId !== userId) {
+        // A locked chat takes no draft changes either: the lock answers as not found.
+        if (!thread || thread.userId !== userId || isThreadLocked(thread)) {
             throw new LunoraError("NOT_FOUND", "Thread not found");
         }
 

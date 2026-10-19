@@ -561,8 +561,8 @@ export const afterRun = (
  * and, for auto-continue, context compression between steps. Callers add their
  * own prompt / system fields on top.
  */
-export const buildRunStreamArgs = (options: { model: string; reasoningEffort: number | undefined; shouldAutoContinue: boolean }): Record<string, unknown> => {
-    const { model, reasoningEffort, shouldAutoContinue } = options;
+export const buildRunStreamArgs = (options: { model: string; reasoningEffort: number | undefined; shouldAutoContinue?: boolean }): Record<string, unknown> => {
+    const { model, reasoningEffort } = options;
     const modelDefinition = MODEL_LOOKUP.get(model);
     const supportsReasoningEffort =
         modelDefinition?.filterCapabilities?.includes("effort_control") || modelDefinition?.filterCapabilities?.includes("reasoning");
@@ -580,15 +580,17 @@ export const buildRunStreamArgs = (options: { model: string; reasoningEffort: nu
     // allowlists it, so nesting it under one would only get it stripped.
     const streamTextArgs: Record<string, unknown> = providerOptions && Object.keys(providerOptions).length > 0 ? { providerOptions } : {};
 
-    if (shouldAutoContinue) {
-        const contextLimit = getModelContextWindow(model);
+    // Every run compresses between steps, not only auto-continue ones: a 5-step
+    // run's tool results pile up after the one-shot check in `applyLateCompression`.
+    // `shouldAutoContinue` no longer changes this; it stays in the type so callers
+    // need no edit.
+    const contextLimit = getModelContextWindow(model);
 
-        streamTextArgs.prepareStep = ({ messages }: { messages: unknown[] }) => {
-            const compressed = compressContextMessages(messages as never, contextLimit);
+    streamTextArgs.prepareStep = ({ messages }: { messages: unknown[] }) => {
+        const compressed = compressContextMessages(messages as never, contextLimit);
 
-            return compressed === messages ? undefined : { messages: compressed };
-        };
-    }
+        return compressed === messages ? undefined : { messages: compressed };
+    };
 
     return streamTextArgs;
 };

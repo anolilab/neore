@@ -11,7 +11,9 @@ import { authMutation, query, rateLimit } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { assert } from "../lib/error-helpers";
 import { withoutUndefined } from "../lib/patch";
-import { admitOwnedThread } from "./thread-read-access";
+import { requireOwnedThread } from "./thread-read-access";
+import { isLockedWithoutProof } from "./thread-passcode";
+import { throwThreadLocked } from "../lib/thread-lock";
 import { assertJsonWithinLimit, MAX_LENGTH, vJsonValue } from "../lib/validators";
 
 const vDocumentKind = v.union(v.literal("text"), v.literal("code"), v.literal("sheet"), v.literal("image"), v.literal("design"));
@@ -51,7 +53,7 @@ const publicDocument = (documentRow: Doc<"documents">): DocumentDoc => {
 };
 
 export const getDocument = query
-    .input({ documentId: v.id("documents") })
+    .input({ documentId: v.id("documents"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.from(v.union(vDocumentDoc, v.null())))
     .query(async ({ args, ctx }) => {
         const identity = await getAuthUserIdentity(ctx);
@@ -66,16 +68,21 @@ export const getDocument = query
             return null;
         }
 
+        if (await isLockedWithoutProof(ctx, documentRow.threadId, args.unlockProof)) {
+            return throwThreadLocked();
+        }
+
         return publicDocument(documentRow);
     });
 
+/** Internal: a locked thread's document is skipped (null) without its proof. */
 export const getDocumentInternal = internalQuery
-    .input({ documentId: v.id("documents") })
+    .input({ documentId: v.id("documents"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.from(v.union(vDocumentDoc, v.null())))
     .query(async ({ args, ctx }) => {
         const documentRow = await ctx.db.get(args.documentId);
 
-        if (!documentRow) {
+        if (!documentRow || (await isLockedWithoutProof(ctx, documentRow.threadId, args.unlockProof))) {
             return null;
         }
 
@@ -83,7 +90,7 @@ export const getDocumentInternal = internalQuery
     });
 
 export const getDocumentsByThread = query
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.from(v.array(vDocumentDoc)))
     .query(async ({ args, ctx }) => {
         const identity = await getAuthUserIdentity(ctx);
@@ -98,7 +105,7 @@ export const getDocumentsByThread = query
             return [];
         }
 
-        admitOwnedThread(ctx, thread, identity.userId);
+        await requireOwnedThread(ctx, args.threadId, identity.userId, args.unlockProof);
 
         const docs = await ctx.db
             .query("documents")
@@ -109,7 +116,7 @@ export const getDocumentsByThread = query
     });
 
 export const getDocumentByMessage = query
-    .input({ messageId: v.string().max(MAX_LENGTH.id) })
+    .input({ messageId: v.string().max(MAX_LENGTH.id), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.from(v.union(vDocumentDoc, v.null())))
     .query(async ({ args, ctx }) => {
         const identity = await getAuthUserIdentity(ctx);
@@ -125,6 +132,10 @@ export const getDocumentByMessage = query
 
         if (!documentRow || documentRow.userId !== identity.userId) {
             return null;
+        }
+
+        if (await isLockedWithoutProof(ctx, documentRow.threadId, args.unlockProof)) {
+            return throwThreadLocked();
         }
 
         return publicDocument(documentRow);
@@ -166,6 +177,7 @@ export const updateDocument = authMutation
         documentId: v.id("documents"),
         language: v.optional(v.string().max(MAX_LENGTH.short)),
         title: v.optional(v.string().max(MAX_LENGTH.long)),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(vDocumentDoc))
     .mutation(async ({ args, ctx }) => {
@@ -183,6 +195,10 @@ export const updateDocument = authMutation
 
         if (documentRow.userId !== identity.userId) {
             throw new LunoraError("FORBIDDEN", "Forbidden");
+        }
+
+        if (await isLockedWithoutProof(ctx, documentRow.threadId, args.unlockProof)) {
+            throwThreadLocked();
         }
 
         const patch: Partial<Doc<"documents">> = {};

@@ -599,6 +599,15 @@ export interface StreamObjectResult<RESULT> {
 
 export type Options = {
     /**
+     * Set ONLY by code whose run was admitted under its chat's lock state: the
+     * background run and the group turn, after `streamRunThread` (see
+     * `chat/streaming/index.ts`). Their recent messages are read without a
+     * proof, because the stream already carries that decision. Never set it
+     * for a call a client can make.
+     */
+    admittedRun?: boolean;
+
+    /**
      * By default, messages are ordered with context in `fetchContextWithPrompt`,
      * but you can override this by providing a context handler. Here you can
      * filter, modify, or enrich the context messages. If provided, the default

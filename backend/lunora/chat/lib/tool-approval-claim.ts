@@ -15,6 +15,7 @@ import { loadActivePathTail } from "../../agent/branch-rows";
 import { isToolApprovalRunExpired } from "./tool-approval-cleanup";
 import type { ToolRunConfig } from "./tool-run-config";
 import { admitOwnedThread, resolveThreadReadAccess } from "../../agent/thread-read-access";
+import { throwThreadLocked } from "../../lib/thread-lock";
 
 export type ToolApprovalDecision = "always" | "approve" | "deny";
 
@@ -106,13 +107,19 @@ const canWriteThread = async (ctx: Pick<MutationCtx, "db">, thread: Doc<"threads
 
 export const claimToolApproval = async (
     ctx: Pick<MutationCtx, "db">,
-    args: { approvalId: string; callerId: string; decision: ToolApprovalDecision; threadId: Id<"threads"> },
+    args: { approvalId: string; callerId: string; decision: ToolApprovalDecision; threadId: Id<"threads">; unlockProof?: string | null },
 ): Promise<ClaimResult> => {
-    const { approvalId, callerId, decision, threadId } = args;
+    const { approvalId, callerId, decision, threadId, unlockProof } = args;
     // Through the access helper, so a write collaborator still gets the FORBIDDEN
     // below rather than a row-level-security NOT_FOUND, and the owner's thread is
     // admitted for the reads that follow.
-    const access = await resolveThreadReadAccess(ctx, threadId, callerId);
+    const access = await resolveThreadReadAccess(ctx, threadId, callerId, unlockProof);
+
+    // A locked chat's approval resumes its run, so the owner's proof is needed here too.
+    if (access?.kind === "locked") {
+        throwThreadLocked();
+    }
+
     const thread = access?.kind === "full" ? access.thread : null;
 
     // One message for "missing" and "not yours", so the answer does not reveal

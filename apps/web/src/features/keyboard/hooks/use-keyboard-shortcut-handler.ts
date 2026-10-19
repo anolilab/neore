@@ -34,6 +34,11 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                     // Handled by GlobalCommandPalette component, no action needed here
                     break;
                 }
+                case "copyLastCodeBlock": {
+                    // The thread's listener owns the messages and the clipboard (`copy-last-code-block.tsx`).
+                    globalThis.dispatchEvent(new CustomEvent("copyLastCodeBlock"));
+                    break;
+                }
                 case "escape": {
                     // Close modals, blur inputs, etc.
                     const activeElement = document.activeElement as HTMLElement;

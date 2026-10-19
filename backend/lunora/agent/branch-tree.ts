@@ -198,22 +198,14 @@ export interface ForkPathRow {
 }
 
 /**
- * Where a fork at `target` ends, given the active path top first: the last
- * row it copies, and that message's position in the displayed list — what
- * `threadRelationships.branchPoint` records.
- *
- * `target` names a message as the UI shows it: an assistant message groups
- * every non-user row of one `order` (`toUIMessages`), so a fork at it keeps all
- * of its steps, not just the first row. `index` is the legacy form — a
- * position in the displayed message list. No target forks the whole path.
- * `undefined` when the target is not on the path, or the path is empty.
+ * The displayed messages along a path, top first: each assistant message is the
+ * run of consecutive non-user rows sharing one `order` (`toUIMessages`), a user
+ * or system row stands alone. Sibling replies share an `order`, so the path has
+ * to be walked first; this never looks at rows off it.
  */
-export const forkEnd = (
-    pathRows: ReadonlyArray<ForkPathRow>,
-    target?: { index: number } | { messageId: string },
-): { endId: string; index: number } | undefined => {
-    const groups: ForkPathRow[][] = [];
-    let previous: ForkPathRow | undefined;
+export const groupPathRows = <T extends ForkPathRow>(pathRows: ReadonlyArray<T>): T[][] => {
+    const groups: T[][] = [];
+    let previous: T | undefined;
 
     for (const row of pathRows) {
         const standalone = row.role === "user" || row.role === "system";
@@ -228,6 +220,29 @@ export const forkEnd = (
         previous = row;
     }
 
+    return groups;
+};
+
+/** The displayed message containing `messageId` along the path, or `undefined` when it is not on the path. */
+export const messageRowsOf = <T extends ForkPathRow>(pathRows: ReadonlyArray<T>, messageId: string): T[] | undefined =>
+    groupPathRows(pathRows).find((rows) => rows.some((row) => row._id === messageId));
+
+/**
+ * Where a fork at `target` ends, given the active path top first: the last
+ * row it copies, and that message's position in the displayed list — what
+ * `threadRelationships.branchPoint` records.
+ *
+ * `target` names a message as the UI shows it: an assistant message groups
+ * every non-user row of one `order` (`toUIMessages`), so a fork at it keeps all
+ * of its steps, not just the first row. `index` is the legacy form — a
+ * position in the displayed message list. No target forks the whole path.
+ * `undefined` when the target is not on the path, or the path is empty.
+ */
+export const forkEnd = (
+    pathRows: ReadonlyArray<ForkPathRow>,
+    target?: { index: number } | { messageId: string },
+): { endId: string; index: number } | undefined => {
+    const groups = groupPathRows(pathRows);
     let index = groups.length - 1;
 
     if (target && "messageId" in target) {
