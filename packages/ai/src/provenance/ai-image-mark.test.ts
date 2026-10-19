@@ -30,6 +30,9 @@ const chunk = (type: string, data: Uint8Array) => {
     return new Uint8Array([...u32(data.byteLength), ...body, ...u32(crc32(body))]);
 };
 
+// An APP11 segment carrying a JUMBF box, the form a C2PA manifest takes.
+const C2PA_APP11 = [0xff, 0xeb, 0x00, 0x12, 0x4a, 0x50, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x6a, 0x75, 0x6d, 0x62];
+
 const SIGNATURE = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 const makePng = (extra: Uint8Array[] = []) => {
@@ -121,7 +124,7 @@ describe("markAiGeneratedImage", () => {
     });
 
     it("passes a JPEG with a C2PA (APP11) segment through unchanged", () => {
-        const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xeb, 0x00, 0x04, 0x4a, 0x50, 0xff, 0xd9]);
+        const jpeg = new Uint8Array([0xff, 0xd8, ...C2PA_APP11, 0xff, 0xd9]);
 
         expect(markAiGeneratedImage(jpeg)).toEqual(jpeg);
     });
@@ -166,8 +169,7 @@ describe("markAiGeneratedImage", () => {
     it("leaves a multi-scan JPEG with a C2PA segment after the first scan unchanged", () => {
         const dqt = [0xff, 0xdb, 0x00, 0x03, 0x00];
         const sosHeader = [0xff, 0xda, 0x00, 0x02];
-        const c2pa = [0xff, 0xeb, 0x00, 0x04, 0x4a, 0x50];
-        const jpeg = new Uint8Array([0xff, 0xd8, ...dqt, ...sosHeader, 0x01, 0x02, ...c2pa, ...sosHeader, 0x03, 0xff, 0xd9]);
+        const jpeg = new Uint8Array([0xff, 0xd8, ...dqt, ...sosHeader, 0x01, 0x02, ...C2PA_APP11, ...sosHeader, 0x03, 0xff, 0xd9]);
 
         expect(markAiGeneratedImage(jpeg)).toBe(jpeg);
     });
@@ -175,6 +177,14 @@ describe("markAiGeneratedImage", () => {
     it("marks a JPEG whose Exif payload contains the C2PA byte pattern", () => {
         const exif = [0xff, 0xe1, 0x00, 0x0e, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0xff, 0xeb, 0x00, 0x04, 0x4a, 0x50];
         const jpeg = new Uint8Array([0xff, 0xd8, ...exif, 0xff, 0xdb, 0x00, 0x03, 0x00, 0xff, 0xd9]);
+        const marked = markAiGeneratedImage(jpeg);
+
+        expect(marked.byteLength).toBeGreaterThan(jpeg.byteLength);
+        expect(dec.decode(marked)).toContain("trainedAlgorithmicMedia");
+    });
+
+    it("marks a JPEG whose APP11 segment starts with JP but is not a JUMBF box", () => {
+        const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xeb, 0x00, 0x04, 0x4a, 0x50, 0xff, 0xd9]);
         const marked = markAiGeneratedImage(jpeg);
 
         expect(marked.byteLength).toBeGreaterThan(jpeg.byteLength);

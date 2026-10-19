@@ -352,7 +352,7 @@ const storeGeneratedImage = async (
     bytes: Uint8Array,
     mimeType: string,
     scope: { threadId?: string; userId?: string },
-): ReturnType<typeof storeFile> => {
+): Promise<Awaited<ReturnType<typeof storeFile>> & { mediaType: string }> => {
     // The bytes say what they are; the declared type can be a CDN's generic octet-stream,
     // which the NSFW check would skip as "not an image".
     const mediaType = sniffImageMediaType(bytes) ?? (mimeType.startsWith("image/") ? mimeType : "image/png");
@@ -371,7 +371,7 @@ const storeGeneratedImage = async (
         await context.runMutation(internal.agent.files.markNsfwFailed, { fileId });
     }
 
-    return stored;
+    return { ...stored, mediaType };
 };
 
 /**
@@ -4135,10 +4135,13 @@ export const generateImage = internalAction
                 // Store all generated images
                 const storedImages = await Promise.all(
                     images.map(async (image) => {
-                        const mimeType = image.mimeType || "image/png";
-                        const { file, filePart } = await storeGeneratedImage(context, image.uint8Array, mimeType, { threadId, userId });
+                        const { file, filePart, mediaType } = await storeGeneratedImage(context, image.uint8Array, image.mimeType || "image/png", {
+                            threadId,
+                            userId,
+                        });
 
-                        return { file, filePart, mimeType };
+                        // The type the stored bytes actually have, not the provider's declaration.
+                        return { file, filePart, mimeType: mediaType };
                     }),
                 );
 

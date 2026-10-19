@@ -186,9 +186,17 @@ const endOfScan = (bytes: Uint8Array, start: number): number => {
 };
 
 /**
- * A C2PA manifest is an APP11 segment whose payload starts with "JP" (JUMBF). It can
- * sit between scans of a progressive JPEG, so every segment is walked, not just the
- * header. Matching bytes inside another segment's payload do not count.
+ * True when the bytes at `start` open a JUMBF box: the "JP" common identifier, the
+ * box instance and sequence fields, then a box whose type is "jumb". A bare "JP"
+ * prefix is not enough; other APP11 segments use it too.
+ */
+const isJumbfBox = (bytes: Uint8Array, start: number): boolean =>
+    bytes[start] === 0x4a && bytes[start + 1] === 0x50 && decoder.decode(bytes.subarray(start + 12, start + 16)) === "jumb";
+
+/**
+ * A C2PA manifest is an APP11 segment holding a JUMBF box. It can sit between scans
+ * of a progressive JPEG, so every segment is walked, not just the header. Matching
+ * bytes inside another segment's payload do not count.
  */
 const hasJumbfSegment = (bytes: Uint8Array): boolean => {
     let offset = 2;
@@ -211,7 +219,7 @@ const hasJumbfSegment = (bytes: Uint8Array): boolean => {
                 return false;
             }
 
-            if (marker === 0xeb && bytes[offset + 4] === 0x4a && bytes[offset + 5] === 0x50) {
+            if (marker === 0xeb && isJumbfBox(bytes, offset + 4)) {
                 return true;
             }
 
