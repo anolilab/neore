@@ -5713,6 +5713,53 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
+installCompiledValidatorMap(lunora_knowledge_functions_102.saveChunks.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (!Array.isArray(source["chunks"])) return DEFER;
+const __arr1 = new Array(source["chunks"].length);
+for (let __i1 = 0; __i1 < source["chunks"].length; __i1++) {
+const __e1 = source["chunks"][__i1];
+if (typeof __e1 !== "object" || __e1 === null || Array.isArray(__e1)) return DEFER;
+if (Object.getPrototypeOf(__e1) !== Object.prototype && Object.getPrototypeOf(__e1) !== null) return DEFER;
+if (typeof __e1["chunkIndex"] !== "number" || !Number.isFinite(__e1["chunkIndex"])) return DEFER;
+if (typeof __e1["content"] !== "string") return DEFER;
+let __has2 = false;
+let __val2;
+if (__e1["embeddingId"] !== undefined) {
+if (typeof __e1["embeddingId"] !== "string") return DEFER;
+__val2 = __e1["embeddingId"];
+__has2 = true;
+}
+let __has3 = false;
+let __val3;
+if (__e1["pageNumber"] !== undefined) {
+if (typeof __e1["pageNumber"] !== "number" || !Number.isFinite(__e1["pageNumber"])) return DEFER;
+__val3 = __e1["pageNumber"];
+__has3 = true;
+}
+let __has4 = false;
+let __val4;
+if (__e1["sectionHeading"] !== undefined) {
+if (typeof __e1["sectionHeading"] !== "string") return DEFER;
+if (__e1["sectionHeading"].length > 500) return DEFER;
+__val4 = __e1["sectionHeading"];
+__has4 = true;
+}
+let __has5 = false;
+let __val5;
+if (__e1["tokenCount"] !== undefined) {
+if (typeof __e1["tokenCount"] !== "number" || !Number.isFinite(__e1["tokenCount"])) return DEFER;
+__val5 = __e1["tokenCount"];
+__has5 = true;
+}
+const __obj6 = { "chunkIndex": __e1["chunkIndex"], "content": __e1["content"], ...(__has2 ? { "embeddingId": __val2 } : {}), ...(__has3 ? { "pageNumber": __val3 } : {}), ...(__has4 ? { "sectionHeading": __val4 } : {}), ...(__has5 ? { "tokenCount": __val5 } : {}) };
+__arr1[__i1] = __obj6;
+}
+if (typeof source["fileId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "chunks": __arr1, "fileId": source["fileId"], "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_knowledge_functions_102.updateFileStatus.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -8875,7 +8922,7 @@ export interface Caller {
         };
         steps: {
             collectActivityForExport: (args: { userId: string }) => Promise<{ knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown>; usageDaily: Array<unknown> }>;
-            collectConversations: (args: { userId: string }) => Promise<{ messages: { _id: string; createdAt: number; model?: string; order?: number; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
+            collectConversations: (args: { userId: string }) => Promise<{ messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
             collectFiles: (args: { userId: string }) => Promise<{ files: Array<{ _id: Id<"files">; createdAt: number; name: string; size: number; tags?: Array<string>; type: string; updatedAt: number }>; folders: Array<{ _id: Id<"folders">; createdAt: number; name: string; updatedAt: number }> }>;
             collectProfile: (args: { userId: string }) => Promise<{ createdAt: number; email: string; emailVerified: boolean; id: string; image: string; name: string } | null>;
             collectPrompts: (args: { userId: string }) => Promise<{ promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
