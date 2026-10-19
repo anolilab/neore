@@ -18793,19 +18793,19 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 782,
+      "line": 786,
       "reason": "\"rateLimitGuard\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 871,
+      "line": 875,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 913,
+      "line": 917,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {

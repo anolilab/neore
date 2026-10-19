@@ -157,7 +157,7 @@ export const listSkillFilesInternal = internalQuery
  * `registry-fetch.ts` bounds the answer (deadline, no redirects, size cap).
  */
 export const fetchSkillFromUrl = authAction
-    .use(rateLimit("skills/create"))
+    .use(rateLimit("skills/fetch"))
     .input({ url: v.string().max(MAX_LENGTH.url) })
     .output(v.object({ filename: v.string(), markdown: v.string(), sourceUrl: v.string() }))
     .action(async ({ args, ctx }) => {
