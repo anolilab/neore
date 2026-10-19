@@ -20,7 +20,7 @@ const makeEnv = async (extra: Record<string, string>, usage: { requests: number;
     const prepare = mockDb.prepare.bind(mockDb);
 
     mockDb.prepare = ((sql: string) =>
-        sql.includes("COUNT(*) AS requests")
+        sql.includes("AS requests")
             ? {
                   bind: () => {
                       return { first: async () => usage };

@@ -5,7 +5,7 @@
  * auth (gk_* keys) validated via bearerAuth middleware.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
-import type { ModelMessage } from "ai";
+import type { ModelMessage, ToolChoice, ToolSet } from "ai";
 import { generateText, streamText } from "ai";
 import { z } from "zod";
 
@@ -36,12 +36,6 @@ import { UsageTracker } from "../../usage/tracker.js";
 
 const completionsRouter = new OpenAPIHono<HonoEnv>();
 
-/** An OpenAI tool converted to the AI SDK's shape. `parameters` is an unvalidated JSON Schema blob. */
-interface AiToolDefinition {
-    description: string;
-    parameters: unknown;
-}
-
 /** One `chat.completion.chunk` SSE frame, as the OpenAI streaming API defines it. */
 interface ChatCompletionChunk {
     choices: {
@@ -56,18 +50,39 @@ interface ChatCompletionChunk {
     id: string;
     model: string;
     object: string;
+    /** Only on the final chunk of a stream that asked for `stream_options.include_usage`. */
+    usage?: ChatUsage;
 }
+
+interface ChatUsage {
+    completion_tokens: number;
+    prompt_tokens: number;
+    total_tokens: number;
+}
+
+/** A tool call as the AI SDK returns it, before it is written in the chat wire shape. */
+interface ToolCallLike {
+    input: unknown;
+    toolCallId: string;
+    toolName: string;
+}
+
+const toolCallSchema = z.object({
+    function: z.object({ arguments: z.string(), name: z.string() }),
+    id: z.string(),
+    type: z.literal("function"),
+});
 
 const requestSchema = z.object({
     frequency_penalty: z.number().optional(),
     max_tokens: z.number().optional(),
     messages: z.array(
         z.object({
-            content: z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]),
+            content: z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]).nullish(),
             name: z.string().optional(),
             role: z.enum(["system", "user", "assistant", "tool"]),
             tool_call_id: z.string().optional(),
-            tool_calls: z.array(z.record(z.string(), z.unknown())).optional(),
+            tool_calls: z.array(toolCallSchema).optional(),
         }),
     ),
     model: z.string(),
@@ -82,7 +97,12 @@ const requestSchema = z.object({
         .optional(),
     stop: z.union([z.string(), z.array(z.string())]).optional(),
     stream: z.boolean().optional().default(false),
+    /** Only `include_usage` is read: when set, a streamed reply ends with a usage chunk. */
+    stream_options: z.object({ include_usage: z.boolean().optional() }).optional(),
     temperature: z.number().optional(),
+    tool_choice: z
+        .union([z.enum(["auto", "none", "required"]), z.object({ function: z.object({ name: z.string() }), type: z.literal("function") })])
+        .optional(),
     tools: z
         .array(
             z.object({
@@ -100,31 +120,117 @@ const requestSchema = z.object({
     transforms: z.array(z.string()).optional(),
 });
 
+type RequestMessage = z.infer<typeof requestSchema>["messages"][number];
+
+/** The text of a message's content: a string as is, a parts array as its text parts joined. */
+const plainText = (content: RequestMessage["content"]): string => {
+    if (typeof content === "string") {
+        return content;
+    }
+
+    return (content ?? []).map((part) => (typeof part.text === "string" ? part.text : "")).join("");
+};
+
+/** Clients send tool arguments as a JSON string; the model wants the object. Text that is not JSON is passed as sent. */
+const parseArguments = (raw: string): unknown => {
+    try {
+        return JSON.parse(raw) as unknown;
+    } catch {
+        return raw;
+    }
+};
+
 /**
- * Convert OpenAI-format messages to AI SDK ModelMessage format.
+ * Convert OpenAI-format messages to AI SDK ModelMessage format. An assistant's
+ * `tool_calls` become tool-call parts, and each tool result takes its tool's name
+ * from the call it answers, matched by id: the AI SDK needs both to replay a
+ * tool round trip.
  */
-const convertMessages = (messages: z.infer<typeof requestSchema>["messages"]): ModelMessage[] =>
-    messages.map((message) => {
+export const convertMessages = (messages: RequestMessage[]): ModelMessage[] => {
+    const toolNames = new Map<string, string>();
+
+    for (const message of messages) {
+        const calls = message.tool_calls ?? [];
+
+        for (const call of calls) {
+            toolNames.set(call.id, call.function.name);
+        }
+    }
+
+    return messages.map((message): ModelMessage => {
         if (message.role === "tool") {
-            // AI SDK v6 ToolResultPart has complex output typing — cast through unknown
+            const toolCallId = message.tool_call_id ?? "";
+            const value = typeof message.content === "string" || message.content == null ? (message.content ?? "") : JSON.stringify(message.content);
+
             return {
                 content: [
                     {
-                        output: [{ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content), type: "text" }],
-                        toolCallId: message.tool_call_id ?? "",
-                        toolName: "",
+                        output: { type: "text", value },
+                        toolCallId,
+                        toolName: toolNames.get(toolCallId) ?? message.name ?? "",
                         type: "tool-result",
                     },
                 ],
                 role: "tool",
-            } as unknown as ModelMessage;
+            };
+        }
+
+        if (message.role === "assistant" && message.tool_calls?.length) {
+            const text = plainText(message.content);
+
+            return {
+                content: [
+                    ...(text === "" ? [] : [{ text, type: "text" as const }]),
+                    ...message.tool_calls.map((call) => {
+                        return {
+                            input: parseArguments(call.function.arguments),
+                            toolCallId: call.id,
+                            toolName: call.function.name,
+                            type: "tool-call" as const,
+                        };
+                    }),
+                ],
+                role: "assistant",
+            };
         }
 
         return {
-            content: typeof message.content === "string" ? message.content : (message.content as ModelMessage["content"]),
+            content: message.content ?? "",
             role: message.role as "system" | "user" | "assistant",
         } as ModelMessage;
     });
+};
+
+/** A tool call in the chat wire shape. Arguments are a JSON string, as OpenAI sends them. */
+const chatToolCall = (call: ToolCallLike) => {
+    return {
+        function: { arguments: JSON.stringify(call.input ?? {}), name: call.toolName },
+        id: call.toolCallId,
+        type: "function" as const,
+    };
+};
+
+/** A whole tool call as one stream delta. `index` numbers the calls within the stream, so clients can tell two apart. */
+const toolCallDelta = (call: ToolCallLike, index: number) => {
+    return { ...chatToolCall(call), index };
+};
+
+const usageJson = (tokens: { completionTokens: number; promptTokens: number }): ChatUsage => {
+    return {
+        completion_tokens: tokens.completionTokens,
+        prompt_tokens: tokens.promptTokens,
+        total_tokens: tokens.promptTokens + tokens.completionTokens,
+    };
+};
+
+/** The AI SDK's tool choice for the request's `tool_choice`. `undefined` leaves the SDK default, `auto`. */
+const toolChoiceOf = (choice: z.infer<typeof requestSchema>["tool_choice"]): ToolChoice<ToolSet> | undefined => {
+    if (choice === undefined) {
+        return undefined;
+    }
+
+    return typeof choice === "string" ? choice : { toolName: choice.function.name, type: "tool" };
+};
 
 // Standard Hono route (not openapi) because streaming returns raw Response,
 // which is incompatible with OpenAPIHono's typed response system.
@@ -149,6 +255,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
     const orgId = c.get("orgId");
     const apiKeyId = c.get("apiKeyId");
     const startTime = Date.now();
+    const isUsageRequested = body.stream_options?.include_usage === true;
 
     const healthService = new ProviderHealthService(c.env);
     const pricingService = new PricingService(c.env);
@@ -295,8 +402,10 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
     const completionId = `chatcmpl-${crypto.randomUUID().replaceAll("-", "").slice(0, 29)}`;
     const created = Math.floor(Date.now() / 1000);
 
-    // Convert OpenAI-format tools to AI SDK tool definitions
+    // Convert OpenAI-format tools to AI SDK tool definitions. The tool choice only means
+    // something alongside tools, so both travel in one spread.
     const aiTools = openAIToolsToToolSet(body.tools);
+    const toolOptions = aiTools ? { toolChoice: toolChoiceOf(body.tool_choice), tools: aiTools } : {};
 
     try {
         const model = await createProviderModelForEnv(c.env, provider, modelApiId, apiKey);
@@ -310,7 +419,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                 messages: effectiveMessages as Parameters<typeof streamText>[0]["messages"],
                 model,
                 temperature: body.temperature,
-                ...(aiTools && { tools: aiTools }),
+                ...toolOptions,
             } as Parameters<typeof streamText>[0]);
 
             const execContext = c.executionCtx;
@@ -332,6 +441,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                         send(`data: ${JSON.stringify(data)}\n\n`);
                     };
                     let hasFailed = false;
+                    let toolCallCount = 0;
 
                     try {
                         for await (const part of result.fullStream) {
@@ -361,25 +471,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
 
                                 case "tool-call": {
                                     sendChunk({
-                                        choices: [
-                                            {
-                                                delta: {
-                                                    tool_calls: [
-                                                        {
-                                                            function: {
-                                                                arguments: JSON.stringify(part.input ?? {}),
-                                                                name: part.toolName,
-                                                            },
-                                                            id: part.toolCallId,
-                                                            index: 0,
-                                                            type: "function",
-                                                        },
-                                                    ],
-                                                },
-                                                finish_reason: null,
-                                                index: 0,
-                                            },
-                                        ],
+                                        choices: [{ delta: { tool_calls: [toolCallDelta(part, toolCallCount++)] }, finish_reason: null, index: 0 }],
                                         created,
                                         id: completionId,
                                         model: modelId,
@@ -396,6 +488,8 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
 
                         // Final chunk with finish_reason
                         const finishReason = await result.finishReason;
+                        const finalUsage = await result.usage;
+                        const tokens = extractTokenCounts(finalUsage);
 
                         sendChunk({
                             choices: [{ delta: {}, finish_reason: mapFinishReason(finishReason), index: 0 }],
@@ -405,12 +499,14 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                             object: "chat.completion.chunk",
                         });
 
+                        if (isUsageRequested) {
+                            sendChunk({ choices: [], created, id: completionId, model: modelId, object: "chat.completion.chunk", usage: usageJson(tokens) });
+                        }
+
                         send("data: [DONE]\n\n");
 
                         // Record usage
-                        const finalUsage = await result.usage;
                         const latencyMs = Date.now() - startTime;
-                        const tokens = extractTokenCounts(finalUsage);
                         const pricing = await pricingService.getPricing(modelApiId);
                         const costMicrodollars = pricing
                             ? calculateCost(pricing, {
@@ -552,7 +648,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
             messages: effectiveMessages as Parameters<typeof generateText>[0]["messages"],
             model,
             temperature: body.temperature,
-            ...(aiTools && { tools: aiTools }),
+            ...toolOptions,
         } as Parameters<typeof generateText>[0]);
 
         const latencyMs = Date.now() - startTime;
@@ -573,10 +669,11 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
         const allViolationsJson = guardrailViolationsJson ?? (outputScan.violations.length > 0 ? JSON.stringify(outputScan.violations) : undefined);
 
         // ── Structured output validation and healing ──
+        // A turn that calls tools has no final answer to validate yet; its text is empty by design.
         let isHealed = false;
         const responseFormat = body.response_format;
 
-        if (responseFormat && responseFormat.type !== "text") {
+        if (responseFormat && responseFormat.type !== "text" && result.toolCalls.length === 0) {
             const schema = responseFormat.type === "json_schema" ? (responseFormat.json_schema as JSONSchema) : undefined;
             const schemaDesc = schema ? JSON.stringify(schema).slice(0, 500) : "JSON object";
 
@@ -680,18 +777,18 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                     {
                         finish_reason: mapFinishReason(result.finishReason),
                         index: 0,
-                        message: { content: responseText, role: "assistant" },
+                        message: {
+                            content: responseText === "" ? null : responseText,
+                            role: "assistant",
+                            ...(result.toolCalls.length > 0 && { tool_calls: result.toolCalls.map((call) => chatToolCall(call)) }),
+                        },
                     },
                 ],
                 created,
                 id: completionId,
                 model: modelId,
                 object: "chat.completion",
-                usage: {
-                    completion_tokens: tokens.completionTokens,
-                    prompt_tokens: tokens.promptTokens,
-                    total_tokens: tokens.promptTokens + tokens.completionTokens,
-                },
+                usage: usageJson(tokens),
             },
             200,
         );
@@ -723,11 +820,6 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
 
                 const fallbackCompletionId = `chatcmpl-${crypto.randomUUID().replaceAll("-", "").slice(0, 29)}`;
                 const fallbackCreated = Math.floor(Date.now() / 1000);
-                const fallbackTools: Record<string, AiToolDefinition> | undefined = body.tools
-                    ? Object.fromEntries(
-                          body.tools.map((t) => [t.function.name, { description: t.function.description ?? "", parameters: t.function.parameters ?? {} }]),
-                      )
-                    : undefined;
 
                 if (body.stream) {
                     const fbResult = streamText({
@@ -735,7 +827,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                         messages: fallbackMessages as Parameters<typeof streamText>[0]["messages"],
                         model: fallbackModel,
                         temperature: body.temperature,
-                        ...(fallbackTools && { tools: fallbackTools }),
+                        ...toolOptions,
                     } as Parameters<typeof streamText>[0]);
 
                     const execContext = c.executionCtx;
@@ -745,6 +837,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                             const sendChunk = (data: ChatCompletionChunk) => {
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
                             };
+                            let toolCallCount = 0;
 
                             try {
                                 for await (const part of fbResult.fullStream) {
@@ -756,10 +849,20 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                             model: fallbackCandidate.modelId,
                                             object: "chat.completion.chunk",
                                         });
+                                    } else if (part.type === "tool-call") {
+                                        sendChunk({
+                                            choices: [{ delta: { tool_calls: [toolCallDelta(part, toolCallCount++)] }, finish_reason: null, index: 0 }],
+                                            created: fallbackCreated,
+                                            id: fallbackCompletionId,
+                                            model: fallbackCandidate.modelId,
+                                            object: "chat.completion.chunk",
+                                        });
                                     }
                                 }
 
                                 const finishReason = await fbResult.finishReason;
+                                const finalUsage = await fbResult.usage;
+                                const tokens = extractTokenCounts(finalUsage);
 
                                 sendChunk({
                                     choices: [{ delta: {}, finish_reason: mapFinishReason(finishReason), index: 0 }],
@@ -768,11 +871,21 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                     model: fallbackCandidate.modelId,
                                     object: "chat.completion.chunk",
                                 });
+
+                                if (isUsageRequested) {
+                                    sendChunk({
+                                        choices: [],
+                                        created: fallbackCreated,
+                                        id: fallbackCompletionId,
+                                        model: fallbackCandidate.modelId,
+                                        object: "chat.completion.chunk",
+                                        usage: usageJson(tokens),
+                                    });
+                                }
+
                                 controller.enqueue(encoder.encode("data: [DONE]\n\n"));
 
-                                const finalUsage = await fbResult.usage;
                                 const latencyMs = Date.now() - startTime;
-                                const tokens = extractTokenCounts(finalUsage);
                                 const pricing = await pricingService.getPricing(fallbackCandidate.modelApiId);
                                 const costMicrodollars = pricing
                                     ? calculateCost(pricing, {
@@ -842,7 +955,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                     messages: fallbackMessages as Parameters<typeof generateText>[0]["messages"],
                     model: fallbackModel,
                     temperature: body.temperature,
-                    ...(fallbackTools && { tools: fallbackTools }),
+                    ...toolOptions,
                 } as Parameters<typeof generateText>[0]);
 
                 const latencyMs = Date.now() - startTime;
@@ -893,16 +1006,22 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
 
                 const jsonResp = c.json(
                     {
-                        choices: [{ finish_reason: mapFinishReason(fbResult.finishReason), index: 0, message: { content: responseText, role: "assistant" } }],
+                        choices: [
+                            {
+                                finish_reason: mapFinishReason(fbResult.finishReason),
+                                index: 0,
+                                message: {
+                                    content: responseText === "" ? null : responseText,
+                                    role: "assistant",
+                                    ...(fbResult.toolCalls.length > 0 && { tool_calls: fbResult.toolCalls.map((call) => chatToolCall(call)) }),
+                                },
+                            },
+                        ],
                         created: fallbackCreated,
                         id: fallbackCompletionId,
                         model: fallbackCandidate.modelId,
                         object: "chat.completion",
-                        usage: {
-                            completion_tokens: tokens.completionTokens,
-                            prompt_tokens: tokens.promptTokens,
-                            total_tokens: tokens.promptTokens + tokens.completionTokens,
-                        },
+                        usage: usageJson(tokens),
                     },
                     200,
                 );

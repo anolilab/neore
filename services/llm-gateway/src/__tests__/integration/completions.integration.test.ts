@@ -5,6 +5,7 @@
  * Verifies request parsing, response shape, model resolution, and
  * error handling — all without real LLM provider calls.
  */
+import { generateText } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
 import { createMockEnv, makeVirtualKeyRow } from "../helpers/mock-env.js";
@@ -185,5 +186,27 @@ describe("POST /v1/chat/completions (non-streaming)", () => {
         const res = await fetchApp(request, env);
 
         expect(res.status).toBe(401);
+    });
+
+    it("masks PII in a non-streaming reply before it leaves the gateway", async () => {
+        vi.mocked(generateText).mockResolvedValueOnce({
+            finishReason: "stop",
+            text: "Reach jane@example.com for details",
+            toolCalls: [],
+            usage: { inputTokens: 10, outputTokens: 8 },
+        } as never);
+
+        const res = await fetchApp(
+            new Request("http://localhost/v1/chat/completions", {
+                body: JSON.stringify({ messages: [{ content: "Who do I contact?", role: "user" }], model: "gpt-4o-mini" }),
+                headers: authHeaders(),
+                method: "POST",
+            }),
+            env,
+        );
+        const body = (await res.json()) as { choices: { message: { content: string } }[] };
+
+        expect(res.status).toBe(200);
+        expect(body.choices[0]?.message.content).toBe("Reach [REDACTED:EMAIL] for details");
     });
 });

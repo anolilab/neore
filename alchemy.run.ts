@@ -724,6 +724,7 @@ const llmGatewayEnv = (siteOrigins: Output.Output<string | undefined>) => ({
         "OTEL_EXPORTER_OTLP_ENDPOINT",
         "OTEL_EXPORTER_OTLP_HEADERS",
         "REQUESTY_API_KEY",
+        "TOKENS_PER_MINUTE_LIMITS",
         "XAI_API_KEY",
     ]),
 });

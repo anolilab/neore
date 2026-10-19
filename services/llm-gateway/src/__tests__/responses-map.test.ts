@@ -4,7 +4,6 @@ import type { ChatCompletion } from "../routes/v1/responses-map.js";
 import {
     chatCompletionToResponse,
     createResponsesStream,
-    foldResponsesStream,
     isResponsesRequestError,
     passthroughHeaders,
     takeSseData,
@@ -237,22 +236,30 @@ describe("translateRequest — refused fields", () => {
         expect(refusal({ input: "x" }).param).toBe("model");
     });
 
-    it('refuses tool_choice other than "auto" and names it', () => {
-        expect(refusal({ input: "x", model: "m", tool_choice: "required" }).param).toBe("tool_choice");
-        expect(refusal({ input: "x", model: "m", tool_choice: "none" }).param).toBe("tool_choice");
-        expect(refusal({ input: "x", model: "m", tool_choice: { name: "f", type: "function" } }).param).toBe("tool_choice");
+    it("refuses a hosted tool_choice and names it", () => {
+        expect(refusal({ input: "x", model: "m", tool_choice: { type: "file_search" } }).param).toBe("tool_choice");
+        expect(refusal({ input: "x", model: "m", tool_choice: "sometimes" }).param).toBe("tool_choice");
     });
 
-    it('accepts an absent, null or "auto" tool_choice', () => {
-        expect(() => translateRequest({ input: "x", model: "m", tool_choice: "auto" })).not.toThrow();
-        expect(() => translateRequest({ input: "x", model: "m", tool_choice: null })).not.toThrow();
+    it("maps tool_choice onto the chat names, and an absent or null one to nothing", () => {
+        expect(translateRequest({ input: "x", model: "m", tool_choice: "required" }).tool_choice).toBe("required");
+        expect(translateRequest({ input: "x", model: "m", tool_choice: { name: "f", type: "function" } }).tool_choice).toEqual({
+            function: { name: "f" },
+            type: "function",
+        });
+        expect(translateRequest({ input: "x", model: "m", tool_choice: null })).not.toHaveProperty("tool_choice");
     });
 
-    it("refuses text.format with tools on a non-streaming request, and allows it when streaming", () => {
+    it("allows text.format with tools both streaming and not; the chat route validates the non-streaming one", () => {
         const raw = { input: "x", model: "m", text: { format: { schema: { type: "object" }, type: "json_schema" } }, tools: [{ name: "f", type: "function" }] };
 
-        expect(refusal(raw).param).toBe("text.format");
+        expect(translateRequest(raw).response_format).toEqual({ json_schema: { type: "object" }, type: "json_schema" });
         expect(translateRequest({ ...raw, stream: true }).response_format).toEqual({ json_schema: { type: "object" }, type: "json_schema" });
+    });
+
+    it("asks a stream for its usage chunk, and a non-streaming request for nothing extra", () => {
+        expect(translateRequest({ input: "x", model: "m", stream: true }).stream_options).toEqual({ include_usage: true });
+        expect(translateRequest({ input: "x", model: "m" })).not.toHaveProperty("stream_options");
     });
 });
 
@@ -326,6 +333,15 @@ describe("chatCompletionToResponse — finish reasons and output", () => {
 });
 
 describe("createResponsesStream — event order", () => {
+    it("reports the usage chunk the chat stream sends last on response.completed", async () => {
+        const usage = { completion_tokens: 3, prompt_tokens: 7, total_tokens: 10 };
+        const { raw } = await runStream("m", sse(textChunk("Hi"), finishChunk("stop"), { choices: [], usage }));
+        const frame = raw.split("\n\n").find((part) => part.startsWith("event: response.completed")) ?? "";
+        const response = JSON.parse(frame.slice(frame.indexOf("data: ") + 6)).response as { usage: unknown };
+
+        expect(response.usage).toEqual({ input_tokens: 7, output_tokens: 3, total_tokens: 10 });
+    });
+
     it("emits created, the text item lifecycle, completed, then [DONE]", async () => {
         const text = sse(textChunk("Hel"), textChunk("lo"), finishChunk("stop"));
         const { events, raw } = await runStream("m", text);
@@ -414,62 +430,6 @@ describe("createResponsesStream — event order", () => {
         const { events } = await runStream("m", text);
 
         expect(events.at(-1)?.type).toBe("response.completed");
-    });
-});
-
-describe("foldResponsesStream", () => {
-    /** A body that delivers `text` in `size`-byte reads, so frames can straddle reads. */
-    const streamOf = (text: string, size = text.length): ReadableStream<Uint8Array> => {
-        const bytes = encoder.encode(text);
-
-        return new ReadableStream<Uint8Array>({
-            start(controller) {
-                for (let offset = 0; offset < bytes.length; offset += size) {
-                    controller.enqueue(bytes.slice(offset, offset + size));
-                }
-
-                controller.close();
-            },
-        });
-    };
-
-    it("folds a text stream into one completed message", async () => {
-        const response = await foldResponsesStream(streamOf(sse(textChunk("Hel"), textChunk("lo"), finishChunk("stop"))), "m");
-
-        expect(response.status).toBe("completed");
-        expect(response.output).toEqual([
-            {
-                content: [{ annotations: [], text: "Hello", type: "output_text" }],
-                id: expect.stringMatching(MESSAGE_ID),
-                role: "assistant",
-                status: "completed",
-                type: "message",
-            },
-        ]);
-    });
-
-    it("folds a tool-call stream into a function_call item, even across reads", async () => {
-        const text = sse(callChunk("call_1", "get_weather", '{"city":"Oslo"}'), finishChunk("tool_calls"));
-        const response = await foldResponsesStream(streamOf(text, 5), "m");
-
-        expect(response.status).toBe("completed");
-        expect(response.output).toEqual([
-            {
-                arguments: '{"city":"Oslo"}',
-                call_id: "call_1",
-                id: expect.stringMatching(FUNCTION_CALL_ID),
-                name: "get_weather",
-                status: "completed",
-                type: "function_call",
-            },
-        ]);
-    });
-
-    it("folds a failed stream to a failed response, not a completed one", async () => {
-        const response = await foldResponsesStream(streamOf(sse({ error: { message: "provider down" } }, finishChunk("stop"))), "m");
-
-        expect(response.status).toBe("failed");
-        expect(response.error).toEqual({ code: "server_error", message: "provider down" });
     });
 });
 

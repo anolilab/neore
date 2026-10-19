@@ -15,7 +15,10 @@ export interface ChatRequestBody {
     model: string;
     response_format?: { type: "json_object" } | { json_schema: Record<string, unknown>; type: "json_schema" };
     stream: boolean;
+    /** Streams end with a usage chunk only when asked, and `response.completed` needs it. */
+    stream_options?: { include_usage: true };
     temperature?: number;
+    tool_choice?: "auto" | "none" | "required" | { function: { name: string }; type: "function" };
     tools?: ChatTool[];
     top_p?: number;
 }
@@ -160,6 +163,7 @@ const requestSchema = z.object({
             format: z.object({ name: z.string().optional(), schema: z.record(z.string(), z.unknown()).optional(), type: z.string() }).nullish(),
         })
         .nullish(),
+    tool_choice: z.union([z.enum(["auto", "none", "required"]), z.object({ name: z.string(), type: z.literal("function") })]).nullish(),
     tools: z.array(z.unknown()).nullish(),
     top_p: z.number().optional(),
 });
@@ -342,14 +346,6 @@ export const translateRequest = (raw: unknown): ChatRequestBody => {
         throw refusal("background is not supported: requests run synchronously", "background");
     }
 
-    // Completions has no tool_choice (zod strips it), so forcing or forbidding a
-    // tool would silently do nothing. Only the default is honoured.
-    const choice = raw.tool_choice;
-
-    if (choice !== undefined && choice !== null && choice !== "auto") {
-        throw refusal('tool_choice: only "auto" is supported; the gateway cannot force or forbid a tool call', "tool_choice");
-    }
-
     const body = parseOrThrow(requestSchema, raw, "");
     const messages: ChatMessage[] = [];
 
@@ -361,20 +357,16 @@ export const translateRequest = (raw: unknown): ChatRequestBody => {
 
     const tools = translateTools(body.tools);
     const responseFormat = translateResponseFormat(body.text);
-
-    // A non-streaming request with tools is served as a stream and folded back
-    // (see routes/v1/responses.ts). The chat stream carries no structured-output
-    // validation, so the two cannot be combined.
-    if (responseFormat && tools && body.stream !== true) {
-        throw refusal("text.format: not supported with tools unless stream is true", "text.format");
-    }
+    const toolChoice = body.tool_choice;
 
     return {
         messages,
         model: body.model,
         stream: body.stream === true,
+        ...(body.stream === true && { stream_options: { include_usage: true as const } }),
         ...(body.max_output_tokens !== undefined && { max_tokens: body.max_output_tokens }),
         ...(body.temperature !== undefined && { temperature: body.temperature }),
+        ...(toolChoice && { tool_choice: typeof toolChoice === "string" ? toolChoice : { function: { name: toolChoice.name }, type: "function" as const } }),
         ...(body.top_p !== undefined && { top_p: body.top_p }),
         ...(tools && { tools }),
         ...(responseFormat && { response_format: responseFormat }),
@@ -489,9 +481,6 @@ interface OpenFunctionCall {
  * completed one.
  */
 export class ResponsesStreamTranslator {
-    /** The terminal response object, set by {@link ResponsesStreamTranslator.finish}. */
-    result: ResponseObject | null = null;
-
     readonly createdAt = Math.floor(Date.now() / 1000);
 
     readonly id = newId("resp");
@@ -578,7 +567,7 @@ export class ResponsesStreamTranslator {
         const events: ResponseStreamEvent[] = [];
         const current = this.open?.kind === "function_call" ? this.open : null;
 
-        // Completions sends each call whole, with `index: 0`, so calls are told apart by id.
+        // Completions sends each call whole, numbered in stream order, so calls are told apart by id.
         // A delta without an id continues the open call.
         const item =
             current !== null && (call.id === undefined || call.id === current.callId)
@@ -710,7 +699,6 @@ export class ResponsesStreamTranslator {
         const incomplete = status === "incomplete" && reason !== null ? { reason } : null;
         const response = this.snapshot(status, incomplete, this.failure);
 
-        this.result = response;
         events.push(this.emit(`response.${status}`, { response }));
 
         return events;
@@ -812,30 +800,6 @@ export const createResponsesStream = (model: string): TransformStream<Uint8Array
             write(controller, drained.events);
         },
     });
-};
-
-/**
- * Reads a whole chat SSE body through the translator and returns the Responses
- * object it ends with. Used for a non-streaming request that was served as a
- * stream, so a function call or a failure is not lost.
- */
-export const foldResponsesStream = async (body: ReadableStream<Uint8Array>, model: string): Promise<ResponseObject> => {
-    const translator = new ResponsesStreamTranslator(model);
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    for await (const bytes of body) {
-        buffer = drain(translator, buffer + decoder.decode(bytes, { stream: true })).rest;
-    }
-
-    drain(translator, `${buffer}${decoder.decode()}\n\n`);
-    translator.finish();
-
-    if (translator.result === null) {
-        throw new Error("The chat stream ended without a terminal event.");
-    }
-
-    return translator.result;
 };
 
 // ---------------------------------------------------------------------------

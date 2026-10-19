@@ -159,6 +159,8 @@ export interface AppEnv {
     // ── Secrets (set via `wrangler secret put`) ─────────────────────────
     /** HMAC shared secret for Backend &lt;-> Gateway auth */
     SIGNING_SECRET: string;
+    /** As `DAILY_REQUEST_LIMITS`, in tokens per rolling minute. Unset = no cap. */
+    TOKENS_PER_MINUTE_LIMITS?: string;
     // ── Cloudflare bindings ──────────────────────────────────────────────
     USAGE_DB: D1Database;
 

@@ -98,6 +98,22 @@ describe("estimateTokens", () => {
 // ---------------------------------------------------------------------------
 
 describe("applyMiddleOut", () => {
+    it("drops a tool result together with the message that precedes it, never alone", () => {
+        const messages = [
+            { content: "small question", role: "user" },
+            { content: "y".repeat(4000), role: "assistant" },
+            { content: "tiny result", role: "tool" },
+            { content: "latest", role: "user" },
+            { content: "reply", role: "assistant" },
+        ];
+
+        // Dropping only the big assistant message would fit the budget and orphan the tool result.
+        const result = applyMiddleOut(messages, 1000, 1);
+
+        expect(result.compressed).toBe(true);
+        expect(result.messages.some((message) => message.role === "tool")).toBe(false);
+    });
+
     it("returns compressed=false when already within limit", () => {
         const messages = [
             { content: "Hello", role: "user" },

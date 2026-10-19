@@ -535,6 +535,7 @@ jobs:
                   # environment variables, not secrets). Unset = no cap.
                   DAILY_REQUEST_LIMITS: "${{ vars.DAILY_REQUEST_LIMITS }}"
                   DAILY_TOKEN_LIMITS: "${{ vars.DAILY_TOKEN_LIMITS }}"
+                  TOKENS_PER_MINUTE_LIMITS: "${{ vars.TOKENS_PER_MINUTE_LIMITS }}"
                   GATEWAY_ADMIN_USER_IDS: "${{ secrets.GATEWAY_ADMIN_USER_IDS }}"
                   GOOGLE_API_KEY: "${{ secrets.GOOGLE_API_KEY }}"
                   OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"

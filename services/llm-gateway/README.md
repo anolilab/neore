@@ -267,18 +267,19 @@ When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, every request is wrapped in a SERVER 
 | ----------------------------- | --------------------------------------------------------------------------------- |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Base URL of OTLP/HTTP collector (`https://api.honeycomb.io`, etc). HTTP(S) only.  |
 | `OTEL_EXPORTER_OTLP_HEADERS`  | Comma-separated `key=value` headers (e.g. `x-honeycomb-team=...,x-dataset=prod`). |
+| `OTEL_SERVICE_NAME`           | Override `service.name` resource attribute. Falls back to `APP_NAME`.             |
 
 ### Daily caps
 
 Optional per-tier caps on the public chat route (`/v1/chat/completions`, and `/v1/responses` through it), counted from `usage_log` for the UTC day. Unset means no cap; a tier without an entry is uncapped.
 
-| Variable               | Meaning                                                     |
-| ---------------------- | ----------------------------------------------------------- |
-| `DAILY_REQUEST_LIMITS` | Finished public-API calls per day, e.g. `free=200,pro=5000` |
-| `DAILY_TOKEN_LIMITS`   | Prompt + completion tokens per day, e.g. `free=100000`      |
+| Variable                   | Meaning                                                                     |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `DAILY_REQUEST_LIMITS`     | Finished public-API calls per day, e.g. `free=200,pro=5000`                 |
+| `DAILY_TOKEN_LIMITS`       | Prompt + completion tokens per day, e.g. `free=100000`                      |
+| `TOKENS_PER_MINUTE_LIMITS` | Prompt + completion tokens per rolling minute, e.g. `free=20000,pro=200000` |
 
-Over the cap the route answers `429` with code `DAILY_LIMIT_EXCEEDED` and a `Retry-After` to 00:00 UTC. Locally, set them in `.dev.vars`.
-| `OTEL_SERVICE_NAME` | Override `service.name` resource attribute. Falls back to `APP_NAME`. |
+Over a daily cap the route answers `429` with code `DAILY_LIMIT_EXCEEDED` and a `Retry-After` to 00:00 UTC; over the per-minute token cap, `429` with code `TOKENS_PER_MINUTE_EXCEEDED` and `Retry-After: 60`. Locally, set them in `.dev.vars`. `GET /v1/rate-limits` reports each window's count and cap for the caller's tier.
 
 ## API Reference
 

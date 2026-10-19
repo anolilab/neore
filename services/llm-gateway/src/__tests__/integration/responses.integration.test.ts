@@ -4,7 +4,8 @@
  *
  * Pins two things the dispatch wiring must keep: the user's per-minute limit is
  * counted once for the chat request this route makes, and a non-streaming tool
- * call comes back as a `function_call` item rather than an empty message.
+ * call comes back as a `function_call` item rather than an empty message. The
+ * stream's usage reaches `response.completed`.
  */
 import { describe, expect, it } from "vitest";
 
@@ -52,6 +53,19 @@ describe("POST /v1/responses through the real app", () => {
         expect(body.status).toBe("completed");
         expect(body.output[0].type).toBe("message");
         expect(body.output[0].content?.[0].text).toContain("Mock reply");
+    });
+
+    it("streams a response.completed that carries the chat stream's usage", async () => {
+        const res = await fetchApp(responsesRequest({ input: "ping", model: "mock/echo", stream: true }), await envWithUsed(0));
+        const text = await res.text();
+        const frame = text.split("\n\n").find((part) => part.startsWith("event: response.completed")) ?? "";
+        const response = JSON.parse(frame.slice(frame.indexOf("data: ") + "data: ".length)).response as {
+            usage: { input_tokens: number; output_tokens: number; total_tokens: number } | null;
+        };
+
+        expect(response.usage?.input_tokens).toBeGreaterThan(0);
+        expect(response.usage?.output_tokens).toBeGreaterThan(0);
+        expect(response.usage?.total_tokens).toBe((response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0));
     });
 
     it("returns a non-streaming tool call as a function_call item", async () => {

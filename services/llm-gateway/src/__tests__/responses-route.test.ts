@@ -29,8 +29,6 @@ const CHAT_REPLY = {
     usage: { completion_tokens: 1, prompt_tokens: 2, total_tokens: 3 },
 };
 
-const sse = (...frames: unknown[]): string => frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join("");
-
 /** Builds a dispatcher that records what it receives and answers with `reply`. */
 const stubDispatch = (reply: () => Response) => {
     const calls: Recorded[] = [];
@@ -51,7 +49,6 @@ const jsonReply =
     (body: unknown, status = 200) =>
     () =>
         Response.json(body, { headers: { "Content-Type": "application/json" }, status });
-const sseReply = (text: string) => () => new Response(text, { headers: { "Content-Type": "text/event-stream" }, status: 200 });
 
 const post = (body: unknown, headers: Record<string, string> = {}) =>
     new Request("https://gateway.test/v1/responses", {
@@ -114,13 +111,16 @@ describe("POST /v1/responses — forwarding", () => {
         expect(((await response.json()) as { error: { param: string } }).error.param).toBe("previous_response_id");
     });
 
-    it('refuses a tool_choice other than "auto" with a 400 that names it, and never dispatches', async () => {
+    it("passes tool_choice through to the dispatched body in the chat shape", async () => {
         const { calls, dispatch } = stubDispatch(jsonReply(CHAT_REPLY));
-        const response = await appWith(dispatch).fetch(post({ input: "x", model: "gpt-x", tool_choice: "required" }), env, ctx);
 
-        expect(response.status).toBe(400);
-        expect(calls).toHaveLength(0);
-        expect(((await response.json()) as { error: { param: string } }).error.param).toBe("tool_choice");
+        await appWith(dispatch).fetch(
+            post({ input: "x", model: "gpt-x", tool_choice: { name: "get_weather", type: "function" }, tools: [{ name: "get_weather", type: "function" }] }),
+            env,
+            ctx,
+        );
+
+        expect(calls[0].body.tool_choice).toEqual({ function: { name: "get_weather" }, type: "function" });
     });
 
     it("does not forward user: the dispatched body has no user field", async () => {
@@ -133,33 +133,39 @@ describe("POST /v1/responses — forwarding", () => {
 });
 
 describe("POST /v1/responses — non-streaming with tools", () => {
-    it("dispatches as a stream and folds the reply into a function_call item", async () => {
-        const text = sse(
+    const TOOL_REPLY = {
+        choices: [
             {
-                choices: [
-                    {
-                        delta: { tool_calls: [{ function: { arguments: '{"city":"Oslo"}', name: "get_weather" }, id: "call_1", index: 0, type: "function" }] },
-                        finish_reason: null,
-                        index: 0,
-                    },
-                ],
+                finish_reason: "tool_calls",
+                message: {
+                    content: null,
+                    role: "assistant",
+                    tool_calls: [{ function: { arguments: '{"city":"Oslo"}', name: "get_weather" }, id: "call_1", type: "function" }],
+                },
             },
-            { choices: [{ delta: {}, finish_reason: "tool_calls", index: 0 }] },
-        );
-        const { calls, dispatch } = stubDispatch(sseReply(text));
+        ],
+        created: 1,
+        id: "chatcmpl-2",
+        model: "gpt-x",
+        object: "chat.completion",
+        usage: { completion_tokens: 4, prompt_tokens: 9, total_tokens: 13 },
+    };
+
+    it("dispatches as non-streaming and returns the tool call the chat reply carries as a function_call item", async () => {
+        const { calls, dispatch } = stubDispatch(jsonReply(TOOL_REPLY));
         const response = await appWith(dispatch).fetch(
             post({ input: "weather?", model: "gpt-x", tools: [{ name: "get_weather", parameters: { type: "object" }, type: "function" }] }),
             env,
             ctx,
         );
 
-        expect(calls[0].body.stream).toBe(true);
+        expect(calls[0].body.stream).toBe(false);
         expect(response.status).toBe(200);
 
-        const body = (await response.json()) as { object: string; output: unknown[]; status: string };
+        const body = (await response.json()) as { output: unknown[]; status: string; usage: unknown };
 
-        expect(body.object).toBe("response");
         expect(body.status).toBe("completed");
+        expect(body.usage).toEqual({ input_tokens: 9, output_tokens: 4, total_tokens: 13 });
         expect(body.output).toEqual([
             {
                 arguments: '{"city":"Oslo"}',
@@ -172,21 +178,8 @@ describe("POST /v1/responses — non-streaming with tools", () => {
         ]);
     });
 
-    it("masks PII in the folded text, as completions does for its non-streaming reply", async () => {
-        const text = sse(
-            { choices: [{ delta: { content: "Mail jane@example.com please" }, finish_reason: null, index: 0 }] },
-            { choices: [{ delta: {}, finish_reason: "stop", index: 0 }] },
-        );
-        const { dispatch } = stubDispatch(sseReply(text));
-        const response = await appWith(dispatch).fetch(post({ input: "x", model: "gpt-x", tools: [{ name: "f", type: "function" }] }), env, ctx);
-        const serialised = JSON.stringify(await response.json());
-
-        expect(serialised).not.toContain("jane@example.com");
-    });
-
-    it("answers 502 with the provider's message when the folded stream failed", async () => {
-        const text = sse({ error: { message: "provider down" } }, { choices: [{ delta: {}, finish_reason: "stop", index: 0 }] });
-        const { dispatch } = stubDispatch(sseReply(text));
+    it("answers with the upstream's message and status when the chat request failed", async () => {
+        const { dispatch } = stubDispatch(jsonReply({ error: { message: "provider down", type: "server_error" } }, 502));
         const response = await appWith(dispatch).fetch(post({ input: "x", model: "gpt-x", tools: [{ name: "f", type: "function" }] }), env, ctx);
 
         expect(response.status).toBe(502);

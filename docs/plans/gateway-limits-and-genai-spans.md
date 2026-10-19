@@ -1,7 +1,7 @@
 # Gateway daily caps and GenAI spans — Implementation Plan
 
 **Created:** 2026-10-19
-**Status:** Implemented (2026-10-19)
+**Status:** Implemented (2026-10-19; per-minute token cap and status counts added the same day)
 **Scope:** `services/llm-gateway/src/` (`middleware/daily-limit.ts`, `usage/tracker.ts`, `lib/otel/tracer.ts`)
 
 ## Daily caps for the public chat route
@@ -12,25 +12,34 @@ The backend has daily quotas for its own chat traffic, but a direct `gk_` key
 calling `/v1/chat/completions` (or `/v1/responses`, which goes through it) had
 no daily or token cap besides credits.
 
-- `DAILY_REQUEST_LIMITS` and `DAILY_TOKEN_LIMITS`, `"free=200,pro=5000"`. **Both
-  unset by default, and a tier with no entry is uncapped**, so deploying changes
-  nothing until an operator chooses numbers. Set them as the GitHub environment
-  variables of the same names (`deploy.yml` passes them to `alchemy.run.ts`,
-  which binds them where set) or in `services/llm-gateway/.dev.vars` locally.
+- `DAILY_REQUEST_LIMITS`, `DAILY_TOKEN_LIMITS` and `TOKENS_PER_MINUTE_LIMITS`,
+  `"free=200,pro=5000"`. **All unset by default, and a tier with no entry is
+  uncapped**, so deploying changes nothing until an operator chooses numbers. Set
+  them as the GitHub environment variables of the same names (`deploy.yml` passes
+  them to `alchemy.run.ts`, which binds them where set) or in
+  `services/llm-gateway/.dev.vars` locally.
 - **Counted from `usage_log`** (`user_id, created_at` is indexed): one aggregate
-  read per request, and only when a cap is configured for the caller's tier. A
-  first version kept KV counters; KV allows about one write a second per key, so
-  the counter would have stalled under exactly the burst a cap is for.
+  read per request, and only when a cap is configured for the caller's tier. All
+  three windows come from that one read. A first version kept KV counters; KV
+  allows about one write a second per key, so the counter would have stalled under
+  exactly the burst a cap is for. The aggregate was checked against SQLite with the
+  migrations applied (rows at now, now-30s, now-90s, yesterday, and a midnight
+  straddle): the day, the minute and the straddle all count as written.
 - Refusal is a `429` with code `DAILY_LIMIT_EXCEEDED` and `Retry-After` to
-  00:00 UTC. A failed read lets the request through.
+  00:00 UTC, or, for the per-minute token cap, `TOKENS_PER_MINUTE_EXCEEDED` with
+  `Retry-After: 60`. A failed read lets the request through.
 - **Approximate by design:** only finished calls are counted, so requests in
   flight are not; a burst of concurrent requests can pass a limit by that many,
   and one call can run the token cap over because it is checked before the call.
   It counts every `saas_api` row of the key, so embeddings and media calls made
   with it count too. It stops a runaway key; credits remain the billing
   boundary.
-- Not covered: the cap is only enforced on the chat route, and `/v1/rate-limits`
-  does not report the daily counts.
+- Enforced on the chat route (and `/v1/responses`, through it) only. Embeddings
+  and media calls made with the same key are counted, so they use up the caps,
+  but their routes do not refuse. Mounting the middleware there is a separate
+  change: those routes have their own auth and limit chain and their own tests.
+- `GET /v1/rate-limits` reports each window's count and cap for the caller's tier.
+  A `used` of `null` means the count could not be read.
 
 ## GenAI spans
 

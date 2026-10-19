@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import type { HonoEnv } from "../env.js";
-import { dailyLimitMiddleware, parseTierLimits, readDailyUsage, secondsUntilUtcMidnight } from "../middleware/daily-limit.js";
+import { capsFor, dailyLimitMiddleware, parseTierLimits, readDailyUsage, secondsUntilUtcMidnight } from "../middleware/daily-limit.js";
 
 /** A D1 double whose `usage_log` aggregate answers `usage`, or fails when it is `null`. */
-const makeDb = (usage: { requests: number; tokens: number } | null) => {
+const makeDb = (usage: { requests: number; tokens: number; tokensLastMinute?: number } | null) => {
     const first = vi.fn(async () => {
         if (usage === null) {
             throw new Error("d1 down");
@@ -61,6 +61,17 @@ describe("parseTierLimits", () => {
     });
 });
 
+describe("capsFor", () => {
+    it("reads each cap for the tier, and null where none is set", () => {
+        expect(capsFor({ DAILY_REQUEST_LIMITS: "free=2", DAILY_TOKEN_LIMITS: "pro=9", TOKENS_PER_MINUTE_LIMITS: "free=20000,pro=200000" }, "free")).toEqual({
+            dailyRequests: 2,
+            dailyTokens: null,
+            tokensPerMinute: 20_000,
+        });
+        expect(capsFor({}, "pro")).toEqual({ dailyRequests: null, dailyTokens: null, tokensPerMinute: null });
+    });
+});
+
 describe("secondsUntilUtcMidnight", () => {
     it("counts to the end of the UTC day", () => {
         expect(secondsUntilUtcMidnight(Date.UTC(2026, 9, 19, 23, 59, 30))).toBe(30);
@@ -69,11 +80,20 @@ describe("secondsUntilUtcMidnight", () => {
 });
 
 describe("readDailyUsage", () => {
-    it("counts the user's public-API rows since 00:00 UTC", async () => {
-        const { bind, db } = makeDb({ requests: 4, tokens: 900 });
+    it("counts the user's public-API rows since 00:00 UTC, and the last minute's tokens", async () => {
+        const { bind, db } = makeDb({ requests: 4, tokens: 900, tokensLastMinute: 120 });
 
-        expect(await readDailyUsage(db, "user-1", Date.UTC(2026, 9, 19, 13, 5))).toEqual({ requests: 4, tokens: 900 });
-        expect(bind).toHaveBeenCalledWith("user-1", "2026-10-19 00:00:00");
+        expect(await readDailyUsage(db, "user-1", Date.UTC(2026, 9, 19, 13, 5))).toEqual({ requests: 4, tokens: 900, tokensLastMinute: 120 });
+        // The scan starts at the day, since the minute (13:04:00) is inside it.
+        expect(bind).toHaveBeenCalledWith("user-1", "2026-10-19 00:00:00", "2026-10-19 13:04:00", "2026-10-19 00:00:00");
+    });
+
+    it("scans from the minute when it starts before midnight", async () => {
+        const { bind, db } = makeDb({ requests: 0, tokens: 0, tokensLastMinute: 0 });
+
+        await readDailyUsage(db, "user-1", Date.UTC(2026, 9, 19, 0, 0, 30));
+
+        expect(bind).toHaveBeenCalledWith("user-1", "2026-10-19 00:00:00", "2026-10-18 23:59:30", "2026-10-18 23:59:30");
     });
 
     it("is zero for a user with no rows", async () => {
@@ -87,7 +107,7 @@ describe("readDailyUsage", () => {
             },
         } as unknown as D1Database;
 
-        expect(await readDailyUsage(db, "user-1")).toEqual({ requests: 0, tokens: 0 });
+        expect(await readDailyUsage(db, "user-1")).toEqual({ requests: 0, tokens: 0, tokensLastMinute: 0 });
     });
 });
 
@@ -139,6 +159,23 @@ describe("dailyLimitMiddleware", () => {
         await call(makeApp("free", "user-42"), { DAILY_REQUEST_LIMITS: "free=1", USAGE_DB: db });
 
         expect(bind.mock.calls[0]?.[0]).toBe("user-42");
+    });
+
+    it("refuses at the per-minute token cap, with a 60 second Retry-After and its own code", async () => {
+        const { db } = makeDb({ requests: 1, tokens: 500, tokensLastMinute: 20_000 });
+        const res = await call(makeApp(), { TOKENS_PER_MINUTE_LIMITS: "free=20000", USAGE_DB: db });
+        const body = (await res.json()) as { error: { code: string; message: string } };
+
+        expect(res.status).toBe(429);
+        expect(body.error.code).toBe("TOKENS_PER_MINUTE_EXCEEDED");
+        expect(body.error.message).toContain("per minute");
+        expect(res.headers.get("Retry-After")).toBe("60");
+    });
+
+    it("lets a request through under the per-minute cap, even at the day's token total", async () => {
+        const { db } = makeDb({ requests: 1, tokens: 99_999, tokensLastMinute: 19_999 });
+
+        expect(await statusOf(makeApp(), { TOKENS_PER_MINUTE_LIMITS: "free=20000", USAGE_DB: db })).toBe(200);
     });
 
     it("lets a request through when the usage cannot be read", async () => {
