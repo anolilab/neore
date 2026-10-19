@@ -465,6 +465,15 @@ describe("createResponsesStream — event order", () => {
         expect(pieces.events.at(-1)?.type).toBe("response.completed");
     });
 
+    it("fails the response when a frame cannot be read, instead of completing around the hole", async () => {
+        const text = `${sse(textChunk("before"))}data: {"choices":[{"delta":{"content":"lost"\n\n${sse(finishChunk("stop"))}`;
+        const { events } = await runStream("m", text);
+        const types = events.map((event) => event.type);
+
+        expect(types).not.toContain("response.completed");
+        expect(types.at(-1)).toBe("response.failed");
+    });
+
     it("handles a final frame that lacks its blank line", async () => {
         const text = `${sse(textChunk("tail"))}data: ${JSON.stringify(finishChunk("stop"))}`;
         const { events } = await runStream("m", text);

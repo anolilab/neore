@@ -422,6 +422,8 @@ const outputFunctionCall = (callId: string, name: string, args: string, id: stri
     };
 };
 
+const UNREADABLE_FRAME_MESSAGE = "The model stream sent a frame that could not be read.";
+
 const CHAT_COMPLETION_PREFIX = /^chatcmpl-/;
 
 /** The completion's id without its `chatcmpl-` prefix, or `undefined` when it carries none. */
@@ -756,8 +758,8 @@ export const takeSseData = (buffer: string): { data: string[]; rest: string } =>
 
 /**
  * Feeds the complete frames in `buffer` through the translator and returns the
- * events they produced, with the unfinished tail. `[DONE]` and unparseable
- * payloads are skipped.
+ * events they produced, with the unfinished tail. `[DONE]` is skipped; an
+ * unparseable payload fails the response.
  */
 const drain = (translator: ResponsesStreamTranslator, buffer: string): { events: ResponseStreamEvent[]; rest: string } => {
     const { data, rest } = takeSseData(buffer);
@@ -773,7 +775,9 @@ const drain = (translator: ResponsesStreamTranslator, buffer: string): { events:
         try {
             chunk = JSON.parse(payload) as ChatCompletionChunk;
         } catch {
-            continue;
+            // A frame that cannot be read may have carried text, a tool call or the usage: say so, rather than
+            // let a later stop frame complete a reply with a hole in it.
+            chunk = { error: { message: UNREADABLE_FRAME_MESSAGE } };
         }
 
         events.push(...translator.push(chunk));
