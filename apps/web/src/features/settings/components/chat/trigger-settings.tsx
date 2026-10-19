@@ -12,6 +12,7 @@ import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
 import { Textarea } from "@neore/ui/components/textarea";
@@ -37,7 +38,7 @@ import {
     Zap,
 } from "lucide-react";
 import type { FC } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
 import env from "@/lib/env";
@@ -51,6 +52,8 @@ const PAYLOAD_TOKEN = "{{payload}}";
 type TriggerType = "event" | "schedule" | "webhook";
 
 interface TriggerFormData {
+    botComputer: boolean;
+    botId: string;
     cronExpression: string;
     description: string;
     inputTemplate: string;
@@ -75,6 +78,8 @@ interface TriggerFormData {
 interface TriggerRow {
     _creationTime: number;
     _id: Id<"triggers">;
+    botComputer: boolean;
+    botId: string | null;
     createdAt: number;
     cronExpression: string | null;
     description: string | null;
@@ -102,7 +107,12 @@ interface TriggerExecutionRow {
     threadId: string | null;
 }
 
+/** Stands in for "no bot" in the picker: a select value cannot be empty. */
+const NO_BOT = "__no_bot__";
+
 const EMPTY_FORM: TriggerFormData = {
+    botComputer: false,
+    botId: "",
     cronExpression: "0 8 * * *",
     description: "",
     inputTemplate: "",
@@ -148,7 +158,12 @@ interface TriggerFormProps {
 }
 
 const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onChange, onSubmit, title }) => {
+    // Generated ids: the create and edit forms can be open together, and fixed ids would make their labels ambiguous.
+    const botPickerId = useId();
+    const botComputerId = useId();
     const { i18n, t } = useLingui();
+    const crpc = useCRPC();
+    const { data: bots = [] } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
 
     return (
         <Card>
@@ -170,6 +185,42 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 </div>
 
                 {/* Description */}
+                {/* Bot: a routine that names a bot runs on the bot's model and instructions */}
+                <div className="space-y-1.5">
+                    <Label htmlFor={botPickerId}>{t`Run as bot (optional)`}</Label>
+                    <Select
+                        onValueChange={(value) => onChange({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") })}
+                        value={formData.botId || NO_BOT}
+                    >
+                        <SelectTrigger id={botPickerId}>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={NO_BOT}>{t`No bot`}</SelectItem>
+                            {bots.map((bot) => (
+                                <SelectItem key={bot._id} value={bot._id}>
+                                    {bot.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                {formData.type === "schedule" && bots.some((bot) => bot._id === formData.botId && bot.computerEnabled) && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <Label htmlFor={botComputerId}>{t`Let the bot use its computer`}</Label>
+                            <p className="text-muted-foreground text-xs">
+                                {t`Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings.`}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={formData.botComputer}
+                            id={botComputerId}
+                            onCheckedChange={(checked: boolean) => onChange({ ...formData, botComputer: checked })}
+                        />
+                    </div>
+                )}
+
                 <div className="space-y-1.5">
                     <Label htmlFor="trigger-desc">{t`Description (optional)`}</Label>
                     <Input
@@ -417,6 +468,8 @@ const TriggerSettings: FC = () => {
 
         createTrigger(
             {
+                botComputer: formData.type === "schedule" && formData.botId !== "" && formData.botComputer ? true : undefined,
+                botId: formData.botId || undefined,
                 cronExpression: formData.type === "schedule" ? formData.cronExpression : undefined,
                 description: formData.description || undefined,
                 inputTemplate: formData.inputTemplate || undefined,
@@ -445,6 +498,9 @@ const TriggerSettings: FC = () => {
 
         updateTrigger(
             {
+                // `null` clears the bot; the form always carries the row's current botId, so this is never "leave unchanged".
+                botComputer: editFormData.type === "schedule" && editFormData.botId !== "" && editFormData.botComputer,
+                botId: editFormData.botId || null,
                 cronExpression: editFormData.type === "schedule" ? editFormData.cronExpression : undefined,
                 description: editFormData.description || undefined,
                 inputTemplate: editFormData.inputTemplate || undefined,
@@ -535,6 +591,8 @@ const TriggerSettings: FC = () => {
     const startEditing = useCallback((trigger: TriggerRow) => {
         setEditingTriggerId(trigger._id);
         setEditFormData({
+            botComputer: trigger.botComputer,
+            botId: trigger.botId ?? "",
             cronExpression: trigger.cronExpression ?? "0 8 * * *",
             description: trigger.description ?? "",
             inputTemplate: trigger.inputTemplate ?? "",
@@ -629,7 +687,11 @@ const TriggerSettings: FC = () => {
                 {/* Trigger List */}
                 {triggers && triggers.length > 0 ? (
                     <div className="space-y-3">
-                        {(triggers as TriggerRow[]).map((trigger) => {
+                        {(
+                            triggers.map((trigger) => {
+                                return { ...trigger, _id: trigger._id as Id<"triggers"> };
+                            }) as TriggerRow[]
+                        ).map((trigger) => {
                             const isEditing = editingTriggerId === trigger._id;
 
                             if (isEditing) {

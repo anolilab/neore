@@ -406,6 +406,9 @@ export const generateExportFile = internalAction
         // (`collectActivityForExport`). Optional for the same in-flight-replay
         // reason as `threadTags`.
         activity: v.optional(v.any()),
+        // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        bots: v.optional(v.any()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
@@ -446,6 +449,7 @@ export const generateExportFile = internalAction
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
         const exportData = {
+            bots: args.bots ?? { bots: [] },
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {

@@ -240,7 +240,12 @@ export const countSearchWords = (text: string): number => {
 };
 
 /** The memory block for the system prompt, and which memories went into it. */
-const retrieveMemories = async (ctx: ActionCtx, userId: string, searchText: string): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
+const retrieveMemories = async (
+    ctx: ActionCtx,
+    userId: string,
+    searchText: string,
+    botId?: string,
+): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
     // A prompt of two words or fewer ("thanks", "ok", "yes") has nothing to match
     // a memory against, so it skips the embedding and the vector search.
     if (countSearchWords(searchText) < MIN_MEMORY_SEARCH_WORDS) {
@@ -256,12 +261,12 @@ const retrieveMemories = async (ctx: ActionCtx, userId: string, searchText: stri
         // from a 60 s cache. A memory deleted in that minute can still reach one
         // reply, which is the cost of skipping the embedding call.
         const memories = servesUser(userId)
-            ? await new ActionCache<{ searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
+            ? await new ActionCache<{ botId?: string; searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
                   action: internal.memory.retrieve.retrieveRelevantMemories,
                   name: "memory/retrieve",
                   ttl: MEMORY_RETRIEVAL_CACHE_TTL_MS,
-              }).fetch(ctx, { searchText: searchText.trim().toLowerCase(), userId })
-            : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, { searchText, userId }, { shardKey: userId });
+              }).fetch(ctx, { botId, searchText: searchText.trim().toLowerCase(), userId })
+            : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, { botId, searchText, userId }, { shardKey: userId });
 
         return {
             context: memories.length > 0 ? buildMemoryContext(memories) : undefined,
@@ -276,8 +281,8 @@ const retrieveMemories = async (ctx: ActionCtx, userId: string, searchText: stri
     }
 };
 
-export const retrieveMemoryContext = async (ctx: ActionCtx, userId: string, searchText: string): Promise<string | undefined> => {
-    const { context } = await retrieveMemories(ctx, userId, searchText);
+export const retrieveMemoryContext = async (ctx: ActionCtx, userId: string, searchText: string, botId?: string): Promise<string | undefined> => {
+    const { context } = await retrieveMemories(ctx, userId, searchText, botId);
 
     return context;
 };
@@ -327,15 +332,35 @@ export const loadRunContext = async (
     // and the project only for the thread settings that name it.
     const prefsPromise = ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
     const threadSettingsPromise = ctx.runQuery(internal.chat.functions.getThreadSettings, { threadId });
-    const [prefs, threadSettings, userProviderKeys, memoryContext, knowledgeContext, project] = await Promise.all([
+    // A missing or foreign bot reads as null: the chat runs as the plain assistant,
+    // on the user's own memories.
+    const botPromise = threadSettingsPromise.then(async (settings) => {
+        if (!settings?.botId) {
+            return null;
+        }
+
+        const bot = await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: settings.botId, userId });
+
+        return bot ? { ...bot, botId: settings.botId } : null;
+    });
+    const [prefs, threadSettings, userProviderKeys, memoryContext, knowledgeContext, project, bot] = await Promise.all([
         prefsPromise,
         threadSettingsPromise,
         loadUserProviderKeys(ctx, userId),
-        prefsPromise.then(async (loaded) => (loaded.memoryEnabled && retrievalText ? await retrieveMemories(ctx, userId, retrievalText) : undefined)),
+        prefsPromise.then(async (loaded) => {
+            if (!loaded.memoryEnabled || !retrievalText) {
+                return undefined;
+            }
+
+            const memoryBot = await botPromise;
+
+            return await retrieveMemories(ctx, userId, retrievalText, memoryBot?.botId);
+        }),
         retrievalText ? retrieveKnowledgeContext(ctx, { query: retrievalText, threadId, userId }) : undefined,
         threadSettingsPromise.then(async (settings) =>
             settings?.projectId ? await ctx.runQuery(api.agent.projects.getProject, { projectId: settings.projectId as Id<"projects"> }) : null,
         ),
+        botPromise,
     ]);
 
     const customSystemPrompt = threadSettings?.customSystemPrompt ?? args.customSystemPrompt;
@@ -353,11 +378,17 @@ export const loadRunContext = async (
         contextParts.push(`PROJECT CONTEXT:\n${project.context}`);
     }
 
+    if (bot) {
+        contextParts.push(`BOT (${bot.name}) INSTRUCTIONS:\n${bot.instructions}`);
+    }
+
     if (customSystemPrompt) {
         contextParts.push(`ADDITIONAL INSTRUCTIONS:\n${customSystemPrompt}`);
     }
 
     return {
+        /** The bot this chat runs as, when it resolves; its memory is written in that scope. */
+        botId: bot?.botId,
         /** Appended to the agent's instructions, in this order. */
         contextParts,
         /** The passages behind the `[n]` citations; `afterRun` records them on the reply. */
@@ -424,6 +455,8 @@ const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summa
 export const afterRun = (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
     args: {
+        /** The bot the run is for, so its memory extraction stays in that bot's scope. */
+        botId?: string;
         extractMemory: boolean;
         firstTokenTime: number | undefined;
         /** From `loadRunContext`; recorded on the reply's first row as citation sources. */
@@ -514,6 +547,7 @@ export const afterRun = (
     const toolResults = summariseToolResults(savedMessages);
 
     void scheduleMemory(internal.memory.extract.extractMemories, {
+        ...(args.botId && { botId: args.botId }),
         assistantResponse: assistantText.slice(0, 4000),
         threadId: threadId as Id<"threads">,
         userId,

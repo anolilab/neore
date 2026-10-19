@@ -34,6 +34,21 @@ export const aiUserPreferences = sqliteTable("aiUserPreferences", {
     by_userId: index("by_userId").on(t.userId),
 }));
 
+export const bots = sqliteTable("bots", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    computerEnabled: integer("computerEnabled", { mode: "boolean" }).notNull(),
+    createdAt: real("createdAt").notNull(),
+    description: text("description"),
+    instructions: text("instructions").notNull(),
+    model: text("model").notNull(),
+    name: text("name").notNull(),
+    updatedAt: real("updatedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+}));
+
 export const browserActions = sqliteTable("browserActions", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -700,6 +715,7 @@ export const mcpServerGrants = sqliteTable("mcpServerGrants", {
 export const memories = sqliteTable("memories", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    botId: text("botId").references((): AnySQLiteColumn => bots._id),
     confidence: real("confidence"),
     embeddingId: text("embeddingId"),
     importance: real("importance"),
@@ -715,6 +731,7 @@ export const memories = sqliteTable("memories", {
     userId: text("userId"),
     version: real("version"),
 }, (t) => ({
+    by_userId_botId: index("by_userId_botId").on(t.userId, t.botId, t.type),
     by_userId_supersededBy: index("by_userId_supersededBy").on(t.userId, t.supersededBy),
     by_userId_type: index("by_userId_type").on(t.userId, t.type),
     embeddingId: index("embeddingId").on(t.embeddingId),
@@ -1077,6 +1094,7 @@ export const sandboxActions = sqliteTable("sandboxActions", {
 export const sandboxSessions = sqliteTable("sandboxSessions", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    botId: text("botId").references((): AnySQLiteColumn => bots._id),
     cleanupFnId: text("cleanupFnId"),
     completedAt: real("completedAt"),
     errorMessage: text("errorMessage"),
@@ -1091,6 +1109,7 @@ export const sandboxSessions = sqliteTable("sandboxSessions", {
 }, (t) => ({
     by_status: index("by_status").on(t.status),
     by_userId: index("by_userId").on(t.userId),
+    by_botId_status: index("by_botId_status").on(t.botId, t.status),
     by_threadId_status: index("by_threadId_status").on(t.threadId, t.status),
 }));
 
@@ -1318,6 +1337,7 @@ export const threads = sqliteTable("threads", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     activeLeafMessageId: text("activeLeafMessageId"),
+    botId: text("botId").references((): AnySQLiteColumn => bots._id),
     category: text("category"),
     createdAt: real("createdAt"),
     createdBy: text("createdBy"),
@@ -1431,6 +1451,8 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
 export const triggers = sqliteTable("triggers", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    botComputer: integer("botComputer", { mode: "boolean" }),
+    botId: text("botId").references((): AnySQLiteColumn => bots._id),
     createdAt: real("createdAt").notNull(),
     cronExpression: text("cronExpression"),
     description: text("description"),

@@ -48,6 +48,24 @@ const assertCronExpression = (cronExpression: string): void => {
 const firstRunOf = (trigger: Doc<"triggers">, now: number): number | undefined =>
     trigger.type === "schedule" && trigger.cronExpression && trigger.nextTriggerAt === undefined ? findNextCronTime(trigger.cronExpression, now) : undefined;
 
+/**
+ * A routine may use its bot's computer only when it has a bot and runs on a
+ * schedule. A webhook payload is untrusted input, so it never drives a shell.
+ */
+export const assertComputerRoutine = (routine: { botComputer: boolean; botId: string | undefined; type: Doc<"triggers">["type"] }): void => {
+    if (!routine.botComputer) {
+        return;
+    }
+
+    if (!routine.botId) {
+        throw new LunoraError("INVALID_ARGUMENT", "Only a routine with a bot can use the bot's computer.");
+    }
+
+    if (routine.type !== "schedule") {
+        throw new LunoraError("INVALID_ARGUMENT", "Only a scheduled routine can use the bot's computer.");
+    }
+};
+
 // ============================================================================
 // cRPC-exposed queries/mutations (authenticated)
 // ============================================================================
@@ -57,6 +75,8 @@ const vGetTriggersOutput = v.array(
     v.object({
         _creationTime: v.number(),
         _id: v.string(),
+        botComputer: v.boolean(),
+        botId: v.union(v.string(), v.null()),
         createdAt: v.number(),
         cronExpression: v.union(v.string(), v.null()),
         description: v.union(v.string(), v.null()),
@@ -88,6 +108,8 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
         return {
             _creationTime: t._creationTime,
             _id: t._id as string,
+            botComputer: t.botComputer === true,
+            botId: t.botId ?? null,
             createdAt: t.createdAt,
             cronExpression: t.cronExpression ?? null,
             description: t.description ?? null,
@@ -112,6 +134,8 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({
+        botComputer: v.optional(v.boolean()),
+        botId: v.optional(v.string().max(MAX_LENGTH.id)),
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
         description: v.optional(v.string().max(MAX_LENGTH.long)),
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
@@ -140,7 +164,17 @@ export const createTrigger = authMutation
         const plaintextSecret = triggerType === "webhook" ? crypto.randomUUID() : undefined;
         // Encrypt the secret before storing — only the encrypted form is persisted
         const webhookSecret = plaintextSecret ? await encryptKey(plaintextSecret, "tool-keys") : undefined;
+
+        // A routine can only name a bot the caller owns; a foreign id is a refusal, not a silent plain routine.
+        if (args.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
+            throw new LunoraError("NOT_FOUND", "Bot not found");
+        }
+
+        assertComputerRoutine({ botComputer: args.botComputer === true, botId: args.botId, type: triggerType });
+
         const inserted = await context.db.insert("triggers", {
+            botComputer: args.botComputer === true ? true : undefined,
+            botId: args.botId as Id<"bots"> | undefined,
             createdAt: now,
             cronExpression: args.cronExpression,
             description: args.description,
@@ -181,6 +215,9 @@ export const createTrigger = authMutation
 export const updateTrigger = authMutation
     .use(rateLimit("triggers/update"))
     .input({
+        botComputer: v.optional(v.boolean()),
+        // `null` clears the bot; `undefined` leaves it as it is.
+        botId: v.optional(v.union(v.string().max(MAX_LENGTH.id), v.null())),
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
         description: v.optional(v.string().max(MAX_LENGTH.long)),
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
@@ -230,7 +267,26 @@ export const updateTrigger = authMutation
 
         if (args.inputTemplate !== undefined) patch.inputTemplate = args.inputTemplate;
 
-        await context.db.patch(args.triggerId as Id<"triggers">, withoutUndefined(patch));
+        // Clearing the bot clears its computer flag too: a routine without a bot has no computer.
+        const nextBotId = args.botId === undefined ? trigger.botId : (args.botId ?? undefined);
+        // A different bot starts without the computer permission the previous bot had: the owner grants it again.
+        const botChanged = args.botId !== undefined && args.botId !== trigger.botId;
+        const keptComputer = botChanged ? undefined : trigger.botComputer;
+        const nextComputer = nextBotId === undefined ? undefined : (args.botComputer ?? keptComputer);
+
+        // An unchanged bot is not re-checked, so a routine whose bot was deleted stays editable.
+        if (args.botId && args.botId !== trigger.botId && !(await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }))) {
+            throw new LunoraError("NOT_FOUND", "Bot not found");
+        }
+
+        assertComputerRoutine({ botComputer: nextComputer === true, botId: nextBotId, type: trigger.type });
+
+        // `patchRow` removes a field set to `undefined`, which a plain patch cannot do.
+        await patchRow(context.db, trigger, {
+            ...withoutUndefined(patch),
+            ...(args.botId !== undefined && { botId: nextBotId }),
+            ...((args.botId !== undefined || args.botComputer !== undefined) && { botComputer: nextComputer === true ? true : undefined }),
+        });
 
         if (trigger.enabled === true) {
             // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
@@ -486,7 +542,9 @@ export const admitTriggerRun = internalMutation
         }
 
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
-        const model = trigger.model || DEFAULT_CHAT_MODEL;
+        // The model the run uses (`execute.ts`): a bot's current model first, so the check and the run agree.
+        const bot = trigger.botId ? await ctx.db.get(trigger.botId) : null;
+        const model = bot?.model || trigger.model || DEFAULT_CHAT_MODEL;
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
             return `The model '${model}' is no longer available for triggers. Pick another model and enable the trigger again.`;

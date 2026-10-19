@@ -244,6 +244,25 @@ export const schema = defineSchema({
         .index("action", ["action"])
         .index("timestamp", ["timestamp"]),
 
+    /**
+     * A persistent teammate: a named persona (instructions + model) the user
+     * chats with and schedules routines for. Its threads, routines, memories and
+     * computer carry `botId`; deleting the bot unlinks nothing, so anything still
+     * pointing at it falls back to the plain assistant (`bots/functions.ts`).
+     */
+    bots: defineTable({
+        computerEnabled: v.boolean(),
+        createdAt: v.number(),
+        description: v.optional(v.string()),
+        instructions: v.string(),
+        model: v.string(),
+        name: v.string(),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"]),
+
     browserActions: defineTable({
         action: v.union(v.literal("navigate"), v.literal("screenshot"), v.literal("click"), v.literal("type"), v.literal("extract"), v.literal("scroll")),
         durationMs: v.optional(v.number()),
@@ -1212,6 +1231,9 @@ export const schema = defineSchema({
         .triggers((t) => auditTriggersFor(t, "memberCredits", AUDIT_TABLES["memberCredits"]!)),
 
     memories: defineTable({
+        // Unset = the user's own memory, visible to every chat. Set = the memory of one bot:
+        // only that bot reads it, and its extraction never merges into the user's memories.
+        botId: v.optional(v.id("bots")),
         confidence: v.optional(v.number()),
         embeddingId: v.optional(v.string()),
         importance: v.optional(v.number()),
@@ -1235,7 +1257,10 @@ export const schema = defineSchema({
         .index("threadId", ["threadId"])
         .index("embeddingId", ["embeddingId"])
         .index("by_userId_type", ["userId", "type"])
-        .index("by_userId_supersededBy", ["userId", "supersededBy"]),
+        .index("by_userId_supersededBy", ["userId", "supersededBy"])
+        // A scope's rows read directly: the user's own (`botId` null) or one bot's. `type` keeps
+        // the type-first order the old by_userId_type read had, so a window still keeps preferences.
+        .index("by_userId_botId", ["userId", "botId", "type"]),
 
     // One nightly-reflection digest ("what I learned today") per run. See `memory/reflection.ts`.
     memoryDigests: defineTable({
@@ -1901,6 +1926,9 @@ export const schema = defineSchema({
     }).index("by_sessionId_timestamp", ["sessionId", "timestamp"]),
 
     sandboxSessions: defineTable({
+        // Set for a bot's computer: one long-lived sandbox per bot, paused when idle
+        // and resumed on the next call (`chat/tools/sandbox-node.ts`). No threadId.
+        botId: v.optional(v.id("bots")),
         cleanupFnId: v.optional(v.string()),
         completedAt: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
@@ -1915,6 +1943,7 @@ export const schema = defineSchema({
     })
         .shardBy("userId")
         .index("by_threadId_status", ["threadId", "status"])
+        .index("by_botId_status", ["botId", "status"])
         .index("by_userId", ["userId"])
         .index("by_status", ["status"]),
 
@@ -2464,6 +2493,9 @@ export const schema = defineSchema({
         // Unset = the thread never branched, and reads stay on the linear fast
         // path. The displayed path descends from here by latest child.
         activeLeafMessageId: v.optional(v.string()),
+        // The bot this chat was started with. Set once at creation; its
+        // instructions are read live on each run (`chat/lib/agent-run.ts`).
+        botId: v.optional(v.id("bots")),
         category: v.optional(v.string()),
         // Creation time in ms, the sidebar's sort key. `_creationTime` is system-set and
         // cannot carry an imported chat's source time; unset on rows from before this column.
@@ -2614,6 +2646,10 @@ export const schema = defineSchema({
     }).index("by_triggerId_startedAt", ["triggerId", "startedAt"]),
 
     triggers: defineTable({
+        // Set when the routine belongs to a bot: the run uses the bot's model and instructions.
+        // With `botComputer` too, the run may use the bot's shell and file tools (scheduled routines only).
+        botComputer: v.optional(v.boolean()),
+        botId: v.optional(v.id("bots")),
         createdAt: v.number(),
         cronExpression: v.optional(v.string()),
         description: v.optional(v.string()),

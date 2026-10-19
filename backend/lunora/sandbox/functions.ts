@@ -7,8 +7,11 @@
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
+import { internal } from "../_generated/internal";
+import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
+import { MAX_LENGTH } from "../lib/validators";
 
 export const getActiveSession = internalQuery
     .input({
@@ -120,6 +123,16 @@ export const checkAndTerminateIdle = internalMutation
     .input({
         sessionId: v.id("sandboxSessions"),
     })
+    .output(
+        v.object({
+            decidedAt: v.optional(v.number()),
+            pause: v.optional(v.boolean()),
+            recheckInMs: v.optional(v.number()),
+            sandboxId: v.optional(v.string()),
+            shouldTerminate: v.boolean(),
+            userId: v.optional(v.string()),
+        }),
+    )
     .mutation(async ({ args: { sessionId }, ctx }) => {
         const session = await ctx.db.get(sessionId);
 
@@ -130,15 +143,160 @@ export const checkAndTerminateIdle = internalMutation
         const idleMs = ctx.now - session.lastActivityAt;
         const timeoutMs = session.timeoutMs ?? 300_000;
 
-        if (idleMs >= timeoutMs) {
-            await ctx.db.patch(sessionId, {
-                completedAt: ctx.now,
-                lastActivityAt: ctx.now,
-                status: "terminated",
-            });
-
-            return { sandboxId: session.sandboxId, shouldTerminate: true };
+        if (idleMs < timeoutMs) {
+            // Not idle yet: the cleanup action checks again once the idle window has run out.
+            return { recheckInMs: timeoutMs - idleMs, shouldTerminate: false, userId: session.userId };
         }
 
-        return { shouldTerminate: false };
+        // A bot's computer keeps its filesystem and memory: it is paused, not killed,
+        // and the next call resumes it (`sandbox-node.ts#getOrCreateBotComputer`).
+        // A bot's computer stays active until its pause succeeds (`markBotComputerPaused`), so a failed pause is retried.
+        if (session.botId !== undefined) {
+            return { decidedAt: ctx.now, pause: true, sandboxId: session.sandboxId, shouldTerminate: true, userId: session.userId };
+        }
+
+        await ctx.db.patch(sessionId, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
+
+        return { pause: false, sandboxId: session.sandboxId, shouldTerminate: true, userId: session.userId };
+    });
+
+/**
+ * Records a bot computer as paused once its remote pause has succeeded. A call that used the computer after the
+ * pause was decided is newer than `decidedAt`: the computer stays active, and that call's next use resumes it.
+ */
+export const markBotComputerPaused = internalMutation
+    .input({ decidedAt: v.number(), sessionId: v.id("sandboxSessions") })
+    .output(v.null())
+    .mutation(async ({ args: { decidedAt, sessionId }, ctx }) => {
+        const session = await ctx.db.get(sessionId);
+
+        if (!session || session.status !== "active" || session.lastActivityAt > decidedAt) {
+            return null;
+        }
+
+        await ctx.db.patch(sessionId, { status: "paused" });
+
+        return null;
+    });
+
+/** A `starting` claim older than this was abandoned mid-create, so the next caller may take over. */
+const STALE_STARTING_MS = 2 * 60_000;
+
+/**
+ * Find-or-create a bot's computer in ONE mutation, so two chats or routines
+ * cannot each create one. The loser sees the winner's row (`created: false`).
+ */
+export const claimBotComputer = internalMutation
+    .input({
+        botId: v.id("bots"),
+        timeoutMs: v.number(),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(
+        v.object({
+            created: v.boolean(),
+            sandboxId: v.optional(v.string()),
+            sessionId: v.id("sandboxSessions"),
+            status: v.string(),
+        }),
+    )
+    .mutation(async ({ args: { botId, timeoutMs, userId }, ctx }) => {
+        for (const status of ["active", "paused"] as const) {
+            const live = await ctx.db
+                .query("sandboxSessions")
+                .withIndex("by_botId_status", (q) => q.eq("botId", botId).eq("status", status))
+                .first();
+
+            if (live) {
+                return { created: false, sandboxId: live.sandboxId, sessionId: live._id, status };
+            }
+        }
+
+        const starting = await ctx.db
+            .query("sandboxSessions")
+            .withIndex("by_botId_status", (q) => q.eq("botId", botId).eq("status", "starting"))
+            .first();
+
+        if (starting && ctx.now - starting.startedAt < STALE_STARTING_MS) {
+            return { created: false, sessionId: starting._id, status: "starting" };
+        }
+
+        if (starting) {
+            await ctx.db.patch(starting._id, { completedAt: ctx.now, errorMessage: "Abandoned while starting", status: "failed" });
+        }
+
+        const sessionId = await ctx.db.insert("sandboxSessions", {
+            botId,
+            lastActivityAt: ctx.now,
+            startedAt: ctx.now,
+            status: "starting",
+            timeoutMs,
+            userId,
+        });
+
+        return { created: true, sessionId, status: "starting" };
+    });
+
+/**
+ * Retire every computer a bot owns, for bot deletion: mark each session
+ * terminated and schedule its sandbox kill (the kill needs an action).
+ */
+/**
+ * Retire every computer a bot owns: mark each session terminated and schedule its sandbox kill
+ * (the kill needs an action). Shared by bot deletion and account erasure, so an erased bot's
+ * computer is destroyed, not left running.
+ */
+export const retireBotComputersIn = async (ctx: MutationCtx, botId: Id<"bots">): Promise<void> => {
+    for (const status of ["active", "paused", "starting"] as const) {
+        const sessions = await ctx.db
+            .query("sandboxSessions")
+            .withIndex("by_botId_status", (q) => q.eq("botId", botId).eq("status", status))
+            .take(50);
+
+        for (const session of sessions) {
+            await ctx.db.patch(session._id, { completedAt: ctx.now, lastActivityAt: ctx.now, status: "terminated" });
+
+            if (session.sandboxId) {
+                await ctx.scheduler.runAfter(0, internal.sandbox.cleanup.killSandboxById, { sandboxId: session.sandboxId });
+            }
+        }
+    }
+};
+
+export const retireBotComputers = internalMutation
+    .input({ botId: v.id("bots") })
+    .output(v.null())
+    .mutation(async ({ args: { botId }, ctx }) => {
+        await retireBotComputersIn(ctx, botId);
+
+        return null;
+    });
+
+/**
+ * Marks a bot's computer active once its sandbox exists or has resumed. Accepts only a session
+ * still holding that claim: `starting`, `paused`, or already active on the same sandbox. Any
+ * other state means it was replaced or retired meanwhile, and the caller must kill its sandbox.
+ */
+export const activateBotComputer = internalMutation
+    .input({ sandboxId: v.string().max(MAX_LENGTH.id), sessionId: v.id("sandboxSessions") })
+    .output(v.boolean())
+    .mutation(async ({ args: { sandboxId, sessionId }, ctx }) => {
+        const session = await ctx.db.get(sessionId);
+
+        if (!session) {
+            return false;
+        }
+
+        const stillOurs = session.status === "starting" || session.status === "paused" || (session.status === "active" && session.sandboxId === sandboxId);
+
+        // A claim that landed after the bot was retired, or was deleted, is refused even though its row is fresh.
+        const botStillExists = session.botId !== undefined && (await ctx.db.get(session.botId)) !== null;
+
+        if (!stillOurs || !botStillExists) {
+            return false;
+        }
+
+        await ctx.db.patch(sessionId, { lastActivityAt: ctx.now, sandboxId, status: "active" });
+
+        return true;
     });

@@ -22,6 +22,7 @@ import {
     MessageSquare,
     Settings,
     Shield,
+    Sparkles,
     User,
     UserCog,
     Users,
@@ -160,6 +161,11 @@ const getNavigationItems = (
                 icon: Bot,
                 name: translate(DASHBOARD_PAGE_NAMES.agent),
                 url: "/dashboard/settings/chat/agent",
+            },
+            {
+                icon: Sparkles,
+                name: translate(DASHBOARD_PAGE_NAMES.bots),
+                url: "/dashboard/settings/chat/bots",
             },
             {
                 icon: MessageCircle,

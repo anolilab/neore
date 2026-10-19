@@ -105,6 +105,8 @@ export interface RetrievedMemory {
 
 export const retrieveRelevantMemories = internalAction
     .input({
+        /** The bot the chat runs as: its memories join the user's own. Unset = the user's own only. */
+        botId: v.optional(v.string()),
         searchText: v.string(),
         userId: v.string(),
     })
@@ -142,6 +144,8 @@ export const retrieveRelevantMemories = internalAction
             type: string;
         };
         const activeMemories = (await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
+            botId: args.botId,
+            includeUserWide: true,
             limit: 100,
             userId: args.userId,
         })) as ActiveMemory[];

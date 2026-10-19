@@ -151,6 +151,8 @@ type ThreadRow = NonNullable<ReturnOf<typeof api.chat.functions.getThread>>;
 
 interface ThreadData {
     _id: string;
+    /** Set on a bot thread: the bot's model is the one that runs. */
+    botId?: string | null;
     branchName?: string;
     branchPoint?: number;
     customSystemPrompt?: string;

@@ -54,6 +54,8 @@ export interface HeadlessRunOptions {
     approvedTools?: ReadonlyArray<string>;
     /** Runs once the agent is built, right before a new thread is created — the last point to refuse. */
     beforeThread?: () => Promise<void>;
+    /** The bot the run is for: its memories are read and written in that bot's scope. Unset = the user's own. */
+    botId?: string;
     /** A step cap for a quick reply. Default: Deep Work's budget, with context compression between steps. */
     maxSteps?: number;
     /** Retrieve memories before, and extract them after. */
@@ -154,7 +156,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
             userProviderKeys,
         });
 
-        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt) : undefined;
+        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId) : undefined;
         const extraParts = [options.system, memoryContext].filter((part): part is string => !!part);
         const generateArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({ model, reasoningEffort: skill?.config?.reasoningEffort, shouldAutoContinue: options.maxSteps === undefined }),
@@ -173,6 +175,12 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
 
             threadId = created.threadId;
             thread = created.thread!;
+
+            // Before the run: a tool call reads `thread.botId` to find the bot's computer.
+            if (options.botId) {
+                await ctx.runMutation(internal.agent.threads.updateThread, { patch: { botId: options.botId }, threadId: threadId as Id<"threads"> });
+            }
+
             await options.onThread?.(threadId);
         } else {
             threadId = existingThreadId;
@@ -191,6 +199,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         if (extractMemory && text && prompt && servesUser(userId)) {
             void ctx.scheduler.runAfter(0, internal.memory.extract.extractMemories, {
                 assistantResponse: text.slice(0, 4000),
+                ...(options.botId && { botId: options.botId }),
                 threadId: threadId as Id<"threads">,
                 userId,
                 userMessage: prompt,
