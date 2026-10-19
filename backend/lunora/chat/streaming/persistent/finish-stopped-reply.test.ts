@@ -241,6 +241,18 @@ describe("stopActiveForThread", () => {
         expect(await statusOf(other)).toBe("streaming");
     });
 
+    it("leaves the thread running while another reply is still live, and ends the run once none is", async () => {
+        const { streamIds, threadId } = await liveStreams(2);
+        const statusOfThread = async () => await statusOf(threadId);
+
+        await stopThread(threadId, "prompt-0");
+        expect(await statusOfThread()).toBe("running");
+
+        await stopThread(threadId, "prompt-1");
+        expect(await statusOfThread()).toBe("abort");
+        expect(await statusOf(streamIds[1] ?? "")).toBe("done");
+    });
+
     it("falls back to the whole thread when no live stream carries the id", async () => {
         const { streamIds, threadId } = await liveStreams(2);
         const [first = "", second = ""] = streamIds;

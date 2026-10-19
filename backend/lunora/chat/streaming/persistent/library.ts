@@ -196,7 +196,8 @@ export const stopActiveForThread = internalMutation
             await ctx.db.patch(stream._id, { status: "done" });
         }
 
-        if (streams.length > 0) {
+        // The thread leaves `running` only when no live reply is left to keep running.
+        if (streams.length > 0 && streams.length === live.length) {
             const threadId = args.threadId as Id<"threads">;
 
             await patchThread(ctx.db, threadId, { status: "abort", updatedAt: ctx.now });

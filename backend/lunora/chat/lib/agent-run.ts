@@ -665,7 +665,7 @@ export const finishRun = async (
  * A sidebar stop refused one of this run's chunk writes. The text the reply still owes is saved first
  * (`finishStoppedReply`), and only then is the model call aborted: the agent marks its pending row failed on
  * abort, which would undo the save. The aborted result is then drained, so a step the agent was saving when the
- * stop landed is written before this returns. Any other error, and a refusal that was not a stop, is rethrown as it was.
+ * stop landed is written before this returns. A save that is rejected still aborts and drains before its error is rethrown. Any other error, and a refusal that was not a stop, is rethrown as it was.
  *
  * Returns the ids of the rows this saved (none when no text was owed).
  */
@@ -692,15 +692,23 @@ export const endStoppedRun = async (
         throw originalWriteError(error);
     }
 
-    const stopped = await ctx.runMutation(internal.chat.streaming.persistent.library.finishStoppedReply, {
-        ...(args.agentName !== undefined && { agentName: args.agentName }),
-        continuation: args.continuation,
-        order: args.order,
-        pendingReasoning: error.pending.reasoning,
-        pendingText: error.pending.text,
-        promptMessageId: args.promptMessageId,
-        streamId: args.streamId as Id<"persistentStreams">,
-    });
+    const stopped = await ctx
+        .runMutation(internal.chat.streaming.persistent.library.finishStoppedReply, {
+            ...(args.agentName !== undefined && { agentName: args.agentName }),
+            continuation: args.continuation,
+            order: args.order,
+            pendingReasoning: error.pending.reasoning,
+            pendingText: error.pending.text,
+            promptMessageId: args.promptMessageId,
+            streamId: args.streamId as Id<"persistentStreams">,
+        })
+        .catch(async (saveError: unknown) => {
+            // The save was rejected (an owed text past the stored-document limit): the run is over all the same, so the model call must not keep going.
+            args.stop.abort();
+            await args.result.consumeStream();
+
+            throw saveError;
+        });
 
     if (!stopped.stopped) {
         throw originalWriteError(error);

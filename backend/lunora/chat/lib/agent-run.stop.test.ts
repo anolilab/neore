@@ -94,6 +94,31 @@ describe(endStoppedRun, () => {
         expect(drained).toStrictEqual([true]);
     });
 
+    it("a rejected save still aborts the model call and drains the result, then rethrows the save's error", async () => {
+        const rejected = new Error("owed text too large");
+        const stop = new AbortController();
+        const drained: boolean[] = [];
+        const ctx = {
+            runMutation: async () => {
+                throw rejected;
+            },
+        };
+
+        await expect(
+            endStoppedRun(ctx as never, streamWriteRefused({ reasoning: "", text: "Hello." }, conflict()), {
+                ...STOP_ARGS,
+                result: {
+                    consumeStream: async () => {
+                        drained.push(stop.signal.aborted);
+                    },
+                },
+                stop,
+            }),
+        ).rejects.toBe(rejected);
+        expect(stop.signal.aborted).toBe(true);
+        expect(drained).toStrictEqual([true]);
+    });
+
     it("rethrows the original error when nothing was stopped, and does not abort", async () => {
         const { ctx } = stoppedCtx(false);
         const stop = new AbortController();

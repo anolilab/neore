@@ -3834,13 +3834,18 @@ export const abortStreamByMessageId = authMutation
 
         // The id is a prompt row, or a placeholder key that is not one (the first reply of a new thread). A
         // persistent reply is found by thread, so it stops either way. Only a row of this thread gives a legacy order.
+        let lookupFailed = false;
         const messages = await context
             .runQuery(internal.agent.messages.getMessagesByIds, {
                 messageIds: [messageId as Id<"messages">],
                 threadId: threadId as Id<"threads">,
                 unlockProof,
             })
-            .catch(() => []);
+            .catch(() => {
+                lookupFailed = true;
+
+                return [];
+            });
         const message = messages[0];
         let legacy = false;
 
@@ -3864,15 +3869,13 @@ export const abortStreamByMessageId = authMutation
             });
         }
 
-        // Persistent replies (the normal path) have no streamingMessages row to find by order. A real prompt
-        // row stops its own reply; a placeholder key (a new thread's first reply) stops the thread's.
-        const persistent = await context.runMutation(internal.chat.streaming.persistent.library.stopActiveForThread, {
-            messageId: message ? messageId : undefined,
-            threadId,
-        });
+        // Persistent replies (the normal path) have no streamingMessages row to find by order. The id always goes
+        // along: it stops its own reply when a live stream carries it, and a placeholder key (a new thread's first
+        // reply) or a failed lookup matches none, so the thread's replies stop. A failed lookup is logged below.
+        const persistent = await context.runMutation(internal.chat.streaming.persistent.library.stopActiveForThread, { messageId, threadId });
         const aborted = legacy || persistent;
 
-        context.log.event("chat.abort_stream_by_message_id", { aborted, legacy, persistent });
+        context.log.event("chat.abort_stream_by_message_id", { aborted, legacy, lookupFailed, persistent });
 
         return { aborted };
     });
