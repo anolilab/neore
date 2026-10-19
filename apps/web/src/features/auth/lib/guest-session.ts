@@ -29,7 +29,7 @@
  *
  * ✅ Safe to import in client components
  */
-import { waitForCredentialRequests } from "@/lib/auth/sign-in-lock";
+import { waitForCredentialRequests } from "@neore/client-runtime";
 
 export interface GuestSessionClient {
     getSession: () => Promise<{ data?: { user?: unknown } | null; error?: unknown }>;

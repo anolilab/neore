@@ -14,7 +14,7 @@ import { KeyboardShortcutsManager } from "@/features/keyboard/components/keyboar
 import useKeyboardShortcutHandler from "@/features/keyboard/hooks/use-keyboard-shortcut-handler";
 import { PresentationViewerRoot } from "@/features/slides";
 import { createLunoraQueryOptions } from "@/lib/lunora/crpc";
-import { LUNORA_ID_SOURCE } from "@/lib/lunora/ids";
+import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
 import { isAuthError } from "@/lib/utilities";
 
 const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);

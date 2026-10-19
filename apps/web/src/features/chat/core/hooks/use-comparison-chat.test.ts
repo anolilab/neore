@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { forgetAllUnlockProofs, rememberUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { forgetAllUnlockProofs, rememberUnlockProof } from "@neore/client-runtime";
 
 import { useModelStore } from "../stores/model-store";
 import useComparisonChat from "./use-comparison-chat";

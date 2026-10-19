@@ -19,7 +19,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import env from "@/lib/env";
 import { useCRPC, useLunora } from "@/lib/lunora/crpc";
-import { withUnlockProofBody } from "@/lib/lunora/unlock-proofs";
+import { withUnlockProofBody } from "@neore/client-runtime";
 
 import type { ComparisonBranch } from "../../thread/comparison-view";
 import type { PendingAttachment } from "../stores/chat-ui-store";

@@ -42,6 +42,18 @@ const RETRY_AFTER_HEADERS = ["x-retry-after", "retry-after"] as const;
 
 const DIGITS_RE = /^\d+$/;
 
+/**
+ * Matches a `DOMException` named `AbortError` by name alone: `DOMException` is not a
+ * global on every JS runtime this runs on (React Native's Hermes has none).
+ */
+const isAbortError = (error: unknown): boolean => (error as { name?: unknown } | null | undefined)?.name === "AbortError";
+
+const abortError = (): Error => {
+    const message = "The operation was aborted.";
+
+    return typeof DOMException === "function" ? new DOMException(message, "AbortError") : Object.assign(new Error(message), { name: "AbortError" });
+};
+
 export const isRetryableStatus = (status: number): boolean => RETRYABLE_STATUSES.has(status);
 
 /**
@@ -160,7 +172,7 @@ export const readWithRetry = async (read: () => Promise<Response>, { policy, sig
             await response.body?.cancel().catch(() => undefined);
         } catch (error) {
             // An abort is the caller giving up, not the server failing.
-            if (error instanceof DOMException && error.name === "AbortError") {
+            if (isAbortError(error)) {
                 throw error;
             }
 
@@ -317,7 +329,7 @@ const untilAborted = async <T>(promise: Promise<T>, signal?: AbortSignal | null)
 
     return await new Promise<T>((resolve, reject) => {
         const onAbort = () => {
-            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+            reject(signal.reason ?? abortError());
         };
 
         signal.addEventListener("abort", onAbort, { once: true });

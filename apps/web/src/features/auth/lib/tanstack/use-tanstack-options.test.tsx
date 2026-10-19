@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { currentUnlockProof, rememberUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { currentUnlockProof, rememberUnlockProof } from "@neore/client-runtime";
 
 import useTanstackOptions from "./use-tanstack-options";
 

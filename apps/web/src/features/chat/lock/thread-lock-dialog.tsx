@@ -9,7 +9,7 @@ import type { FormEvent } from "react";
 import { useId, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
-import { forgetUnlockProof, rememberUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { forgetUnlockProof, rememberUnlockProof } from "@neore/client-runtime";
 
 /** What the dialog does: set a passcode, unlock, change it, or remove it. */
 export type ThreadLockMode = "change" | "remove" | "set" | "unlock";

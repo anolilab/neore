@@ -4,7 +4,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useCRPC } from "@/lib/lunora/crpc";
-import { isThreadShardKnown, noteThreadShard } from "@/lib/lunora/shard-routing";
+import { isThreadShardKnown, noteThreadShard } from "@neore/client-runtime";
 
 /** Whether `threadId` is in a thread list page already in the cache — then it is the caller's own. */
 const isListedThread = (queryClient: QueryClient, threadId: string): boolean =>

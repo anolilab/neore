@@ -13,8 +13,7 @@ import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-op
 import { LockedChatGate } from "@/features/chat/lock/locked-chat-gate";
 import { useThreadShard } from "@/features/chat/sharing/use-thread-shard";
 import { createLunoraActionQueryOptions, createLunoraQueryOptions, useCRPC } from "@/lib/lunora/crpc";
-import { isLunoraId, LUNORA_ID_SOURCE } from "@/lib/lunora/ids";
-import { useUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { isLunoraId, LUNORA_ID_SOURCE, useUnlockProof } from "@neore/client-runtime";
 
 const CHAT_THREAD_PATH_RE = new RegExp(`/chat/(${LUNORA_ID_SOURCE})(?:/|$)`);
 

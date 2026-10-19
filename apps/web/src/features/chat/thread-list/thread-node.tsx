@@ -51,8 +51,7 @@ import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
-import { LUNORA_ID_SOURCE } from "@/lib/lunora/ids";
-import { forgetUnlockProof, useUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { forgetUnlockProof, LUNORA_ID_SOURCE, useUnlockProof } from "@neore/client-runtime";
 import { showError } from "@/lib/toast";
 
 import MessageSearchMatches from "./message-search-matches";

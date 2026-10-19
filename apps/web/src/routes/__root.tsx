@@ -35,8 +35,8 @@ import getSessionToken, { getSessionAuthState } from "@/lib/auth/server-function
 import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
-import { seedHydratedAuthToken } from "@/lib/lunora/hydrate-auth-token";
-import { TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@/lib/lunora/token-refresh";
+import { seedHydratedAuthToken } from "@neore/client-runtime";
+import { TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@neore/client-runtime";
 import NativeBridge from "@/lib/native/native-bridge";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";

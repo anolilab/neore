@@ -7,7 +7,7 @@ import { useEffect, useId, useState } from "react";
 
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { forgetUnlockProof, isThreadLockedError, onUnlockExpired, useUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { forgetUnlockProof, isThreadLockedError, onUnlockExpired, useUnlockProof } from "@neore/client-runtime";
 
 import { ThreadLockDialog } from "./thread-lock-dialog";
 

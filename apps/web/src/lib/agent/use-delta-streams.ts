@@ -5,8 +5,7 @@ import type { SyncStreamsReturnValue } from "@neore/backend/agent/types";
 import type { StreamArgs, StreamDelta, StreamMessage } from "@neore/backend/agent/validators";
 import { useState } from "react";
 
-import { shardOptionsFor } from "@/lib/lunora/shard-routing";
-import { withUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
 
 import { assert } from "./type-utilities";
 import type { StreamQuery, StreamQueryArgs } from "./types";

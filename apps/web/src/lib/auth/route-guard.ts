@@ -15,7 +15,7 @@
  */
 import { redirect } from "@tanstack/react-router";
 
-import type { SessionAuthStatus } from "./session-read";
+import type { SessionAuthStatus } from "@neore/client-runtime";
 
 export interface AuthGuardContext {
     /** Absent only on a context built before the root route ran; then `isAuthenticated` decides. */
