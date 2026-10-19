@@ -966,7 +966,10 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                             },
                                             c.var.telemetry,
                                         ),
-                                        healthService.recordSuccess(fallbackCandidate.provider, fallbackCandidate.modelApiId, latencyMs),
+                                        // A provider error inside the stream is a failed call: the circuit breaker must see it as one.
+                                        hasFailed
+                                            ? healthService.recordFailure(fallbackCandidate.provider, fallbackCandidate.modelApiId)
+                                            : healthService.recordSuccess(fallbackCandidate.provider, fallbackCandidate.modelApiId, latencyMs),
                                     ]),
                                 );
                             } catch {

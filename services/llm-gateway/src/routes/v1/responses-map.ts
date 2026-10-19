@@ -424,26 +424,30 @@ const outputFunctionCall = (callId: string, name: string, args: string, id: stri
 
 const CHAT_COMPLETION_PREFIX = /^chatcmpl-/;
 
-/** `chatcmpl-abc` -> `resp_abc`. A random id only when the completion carries none. */
-const responseIdOf = (completionId: string | undefined): string => {
-    const suffix = completionId?.replace(CHAT_COMPLETION_PREFIX, "");
+/** The completion's id without its `chatcmpl-` prefix, or `undefined` when it carries none. */
+const completionSuffix = (completionId: string | undefined): string | undefined => completionId?.replace(CHAT_COMPLETION_PREFIX, "") || undefined;
 
-    return suffix ? `resp_${suffix}` : newId("resp");
-};
+/** `chatcmpl-abc` -> `resp_abc`. A random id only when the completion carries none. */
+const responseIdOf = (suffix: string | undefined): string => (suffix ? `resp_${suffix}` : newId("resp"));
+
+/** An output item's id, derived from the completion and its place in the output so a replayed reply keeps it. */
+const itemIdOf = (prefix: "fc" | "msg", suffix: string | undefined, position: number): string =>
+    suffix ? `${prefix}_${suffix}_${String(position)}` : newId(prefix);
 
 /** A non-streaming chat completion as a Responses object. */
 export const chatCompletionToResponse = (completion: ChatCompletion): ResponseObject => {
     const choice = completion.choices[0];
     const text = choice?.message.content ?? "";
     const calls = choice?.message.tool_calls ?? [];
+    const suffix = completionSuffix(completion.id);
     const output: ResponseOutputItem[] = [];
 
     if (text !== "" || calls.length === 0) {
-        output.push(outputMessage(text));
+        output.push(outputMessage(text, itemIdOf("msg", suffix, output.length)));
     }
 
     for (const call of calls) {
-        output.push(outputFunctionCall(call.id, call.function.name, call.function.arguments));
+        output.push(outputFunctionCall(call.id, call.function.name, call.function.arguments, itemIdOf("fc", suffix, output.length)));
     }
 
     const reason = incompleteReason(choice?.finish_reason ?? null);
@@ -452,7 +456,7 @@ export const chatCompletionToResponse = (completion: ChatCompletion): ResponseOb
         created_at: completion.created,
         error: null,
         // Derived from the completion's id, so a replayed (idempotent) reply keeps its id.
-        id: responseIdOf(completion.id),
+        id: responseIdOf(suffix),
         incomplete_details: reason === null ? null : { reason },
         model: completion.model,
         object: "response",

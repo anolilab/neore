@@ -345,6 +345,17 @@ describe("chatCompletionToResponse — finish reasons and output", () => {
         expect(chatCompletionToResponse(withId).id).toBe(chatCompletionToResponse({ ...withId }).id);
     });
 
+    it("derives output item ids from the completion id and their place, so a replayed reply keeps them", () => {
+        const withCalls: ChatCompletion = {
+            ...completion("tool_calls", { content: "Checking.", tool_calls: [{ function: { arguments: "{}", name: "f" }, id: "call_1", type: "function" }] }),
+            id: "chatcmpl-abc",
+        };
+        const first = chatCompletionToResponse(withCalls).output.map((item) => item.id);
+
+        expect(first).toEqual(["msg_abc_0", "fc_abc_1"]);
+        expect(chatCompletionToResponse({ ...withCalls }).output.map((item) => item.id)).toEqual(first);
+    });
+
     it("falls back to a random response id when the completion has none", () => {
         const first = chatCompletionToResponse(completion("stop", { content: "x" })).id;
         const second = chatCompletionToResponse(completion("stop", { content: "x" })).id;

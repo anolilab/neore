@@ -9,6 +9,7 @@
 import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provider";
 import { describe, expect, it, vi } from "vitest";
 
+import { ProviderHealthService } from "../../providers/health.js";
 import { UsageTracker } from "../../usage/tracker.js";
 import { createMockEnv, makeVirtualKeyRow } from "../helpers/mock-env.js";
 import { useTrackedAppFetch } from "../helpers/tracked-app-fetch.js";
@@ -173,6 +174,27 @@ describe("chat fallback: streaming", () => {
             expect(entries).toContainEqual(expect.objectContaining({ errorCode: "PROVIDER_ERROR", fallbackReason: "infra" }));
         } finally {
             recordSpy.mockRestore();
+        }
+    });
+
+    it("tells the circuit breaker a fallback stream with a provider error failed, not succeeded", async () => {
+        state.failNextModel = true;
+        state.streamErrorNext = true;
+
+        const failure = vi.spyOn(ProviderHealthService.prototype, "recordFailure");
+        const success = vi.spyOn(ProviderHealthService.prototype, "recordSuccess");
+
+        try {
+            const res = await fetchApp(chat({ messages: [{ content: "ping", role: "user" }], stream: true }), await env());
+
+            await res.text();
+
+            // The fallback candidate is the second provider recorded: the first (infra) failure came from the primary.
+            expect(failure).toHaveBeenCalledTimes(2);
+            expect(success).not.toHaveBeenCalled();
+        } finally {
+            failure.mockRestore();
+            success.mockRestore();
         }
     });
 });
