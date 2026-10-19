@@ -44,6 +44,22 @@ describe("useFocusOrderedNodes", () => {
         expect(result.current[1]?.position.y).toBe(500);
     });
 
+    it("does not reorder when a drag starts after a keyboard move", () => {
+        const { rerender, result } = renderHook(({ nodes }) => useFocusOrderedNodes(nodes), {
+            initialProps: { nodes: [node("a", 0, 0), node("b", 0, 100)] },
+        });
+
+        // A keyboard move leaves the order alone; grabbing another node with the pointer must not apply it.
+        rerender({ nodes: [node("a", 0, 500), node("b", 0, 100)] });
+        rerender({ nodes: [node("a", 0, 500), node("b", 0, 100, true)] });
+
+        expect(ids(result.current)).toEqual(["a", "b"]);
+
+        rerender({ nodes: [node("a", 0, 500), node("b", 0, 100)] });
+
+        expect(ids(result.current)).toEqual(["b", "a"]);
+    });
+
     it("re-sorts when a node is added", () => {
         const { rerender, result } = renderHook(({ nodes }) => useFocusOrderedNodes(nodes), {
             initialProps: { nodes: [node("a", 0, 0), node("b", 0, 100)] },
