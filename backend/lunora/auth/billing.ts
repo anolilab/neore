@@ -441,24 +441,29 @@ export const reserveGatewayCredits = internalMutation
  * Gives back a reservation from `reserveGatewayCredits` whose paid work produced no clip: removes its ledger
  * row and the credits it took. With no row (never taken, or already released) it does nothing.
  */
-export const releaseGatewayCredits = internalMutation.input({ requestId: v.string().max(MAX_LENGTH.long) }).mutation(async ({ args, ctx: context }) => {
-    const row = await context.db
-        .query("gatewayUsageDeductions")
-        .withIndex("by_requestId", (q) => q.eq("requestId", args.requestId))
-        .first();
+export const releaseGatewayCredits = internalMutation
+    .input({ requestId: v.string().max(MAX_LENGTH.long) })
+    .output(v.null())
+    .mutation(async ({ args, ctx: context }) => {
+        const row = await context.db
+            .query("gatewayUsageDeductions")
+            .withIndex("by_requestId", (q) => q.eq("requestId", args.requestId))
+            .first();
 
-    if (!row) {
-        return;
-    }
+        if (!row) {
+            return null;
+        }
 
-    const record = await context.db.memberCredits.findFirst({ where: { organizationId: row.orgId, userId: row.userId } });
+        const record = await context.db.memberCredits.findFirst({ where: { organizationId: row.orgId, userId: row.userId } });
 
-    if (record) {
-        await context.db.patch(record._id, { usedCredits: Math.max((record.usedCredits ?? 0) - row.creditsDeducted, 0) });
-    }
+        if (record) {
+            await context.db.patch(record._id, { usedCredits: Math.max((record.usedCredits ?? 0) - row.creditsDeducted, 0) });
+        }
 
-    await context.db.delete(row._id);
-});
+        await context.db.delete(row._id);
+
+        return null;
+    });
 
 /**
  * Get the list of members with their credit information for the active organization.
