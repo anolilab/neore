@@ -5879,7 +5879,18 @@ export const generateImageToVideo = internalAction
 
         const videoResponse = await fetchOk(resolvedVideo.url, { errorPrefix: "Failed to download generated video", timeoutMs: FETCH_TIMEOUT_LONG_MS });
         const mimeType = resolvedVideo.contentType;
-        const { file } = await storeFile(context, bytesToBlob(new Uint8Array(await videoResponse.arrayBuffer()), mimeType), { threadId, userId });
+        const videoBlob = bytesToBlob(new Uint8Array(await videoResponse.arrayBuffer()), mimeType);
+        // The clip is paid for once it is generated. A store that keeps failing is reported, so it can be followed up.
+        const { file } = await retryClipStore(() => storeFile(context, videoBlob, { threadId, userId }), {
+            attempts: 3,
+            onGiveUp: (error) => {
+                context.log.event("workflow.video_clip_not_stored", {
+                    error: error instanceof Error ? error.message : String(error),
+                    modelId: endpoint,
+                    provider: "fal",
+                });
+            },
+        });
 
         return {
             fileId: file.fileId,
