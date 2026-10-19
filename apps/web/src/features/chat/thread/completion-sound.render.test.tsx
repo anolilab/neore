@@ -70,6 +70,16 @@ describe("completion sound", () => {
         expect(ping).not.toHaveBeenCalled();
     });
 
+    it("pings for a reply that was still streaming when the watcher mounted", () => {
+        setChat(true, [reply("old"), reply("new", "streaming")]);
+        const view = render(<CompletionSound />);
+
+        setChat(false, [reply("old"), reply("new")]);
+        view.rerender(<CompletionSound />);
+
+        expect(ping).toHaveBeenCalledTimes(1);
+    });
+
     it("stays silent for history that was already there", () => {
         const view = render(<CompletionSound />);
 

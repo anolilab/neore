@@ -7,7 +7,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { handleDownload } from "./download";
 
 const thread = { _creationTime: Date.UTC(2026, 9, 19), title: "Plan" } as Doc<"threads">;
+const toolRow = {
+    _creationTime: 3,
+    message: { content: [{ output: { type: "json", value: { ok: true } }, type: "tool-result" }], role: "tool" },
+    text: undefined,
+    tool: true,
+};
 const messages = [
+    toolRow,
     { _creationTime: 1, message: { role: "user" }, text: "First line\nSecond line" },
     { _creationTime: 2, message: { role: "assistant" }, text: "Done." },
 ] as unknown as Doc<"messages">[];
@@ -28,10 +35,19 @@ describe("chat export", () => {
     });
 
     it("puts every line of a text export on its own line", async () => {
-        const text = await (await exported("txt")).text();
+        const blob = await exported("txt");
+        const text = await blob.text();
 
         expect(text).toContain("User: First line\nSecond line\nAssistant: Done.");
         expect(text).not.toContain(String.raw`\n`);
+    });
+
+    it("exports a tool result's output, not a placeholder", async () => {
+        const blob = await exported("txt");
+        const text = await blob.text();
+
+        expect(text).toContain('Tool Output: {"ok":true}');
+        expect(text).not.toContain("No result");
     });
 
     it("writes a Word document with the thread's messages", async () => {

@@ -1,7 +1,9 @@
 import JsZip from "jszip";
 import { describe, expect, it } from "vitest";
 
-import { buildDocx, buildDocumentXml, escapeXml } from "./docx";
+import { buildDocumentXml, buildDocx, escapeXml } from "./docx";
+
+const byName = (a: string, b: string): number => a.localeCompare(b);
 
 const content = {
     date: "10/19/26, 5:32 PM",
@@ -15,7 +17,7 @@ const content = {
 describe(escapeXml, () => {
     it("escapes markup and drops characters XML cannot carry", () => {
         expect(escapeXml("a & b < c > d")).toBe("a &amp; b &lt; c &gt; d");
-        expect(escapeXml("bell\u0007 tab\t")).toBe("bell tab\t");
+        expect(escapeXml("bell\u{7} tab\t")).toBe("bell tab\t");
     });
 });
 
@@ -48,8 +50,8 @@ describe(buildDocx, () => {
         expect(
             Object.keys(zip.files)
                 .filter((name) => !name.endsWith("/"))
-                .toSorted(),
-        ).toStrictEqual(["[Content_Types].xml", "_rels/.rels", "word/document.xml"]);
+                .toSorted(byName),
+        ).toStrictEqual(["[Content_Types].xml", "_rels/.rels", "word/document.xml"].toSorted(byName));
         expect(await zip.file("word/document.xml")?.async("string")).toContain("Both hold.");
     });
 });

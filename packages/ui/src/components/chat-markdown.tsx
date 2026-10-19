@@ -51,25 +51,6 @@ const toMaxHeight = (value: number | string): string | undefined => {
     return typeof value === "number" ? `${value}px` : value;
 };
 
-type BlockTag = "blockquote" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "ol" | "p" | "ul";
-type BlockProps<Tag extends BlockTag> = ComponentProps<Tag> & ExtraProps;
-
-/**
- * Wraps one of Streamdown's block renderers so the browser picks that block's
- * direction from its own first strong character (`dir="auto"`). A reply that
- * mixes Hebrew or Arabic with English then lays out each paragraph the right way
- * round, whatever the UI direction is. Code blocks and tables are left alone.
- */
-export const autoDirection = <Tag extends BlockTag>(tag: Tag): FC<BlockProps<Tag>> => {
-    // Every block renderer spreads its props onto its element, so `dir` passes through.
-    const Default = defaultComponents[tag] as FC<ExtraProps & { dir?: string }>;
-    const AutoDirection: FC<BlockProps<Tag>> = (props) => <Default {...props} dir="auto" />;
-
-    AutoDirection.displayName = `AutoDirection(${tag})`;
-
-    return AutoDirection;
-};
-
 export const ChatCode: FC<CodeProps> = ({ children, className, ...props }) => {
     const { t } = useLingui();
     const { capLongCodeBlocks } = useStreamdownAppearance();

@@ -12,9 +12,18 @@ export type DownloadFormat = "docx" | "json" | "md" | "txt" | "pdf";
  * This is the slice the exporters read out of it.
  */
 interface StoredMessagePayload {
-    content?: { content?: string; text?: string }[];
+    content?: { content?: string; output?: { value?: unknown }; text?: string }[];
     role?: string;
 }
+
+/** A tool result's output as text: strings as they are, anything else as JSON. Undefined when there is no output. */
+const toolOutputText = (value: unknown): string | undefined => {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+
+    return typeof value === "string" ? value : JSON.stringify(value);
+};
 
 const getStoredMessage = (message: Message): StoredMessagePayload | undefined => message.message as StoredMessagePayload | undefined;
 
@@ -23,7 +32,9 @@ const toEntry = (message: Message): { role: string; text: string } => {
     const stored = getStoredMessage(message);
 
     if (message.tool) {
-        return { role: "Tool Output", text: stored?.content?.[0]?.content ?? message.text ?? "No result" };
+        const first = stored?.content?.[0];
+
+        return { role: "Tool Output", text: toolOutputText(first?.output?.value) ?? first?.content ?? message.text ?? "No result" };
     }
 
     const role: string = stored?.role ?? "assistant";

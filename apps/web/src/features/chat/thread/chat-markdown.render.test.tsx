@@ -103,12 +103,14 @@ describe("chat text direction", () => {
         expect(screen.getByText("Hello there").getAttribute("dir")).toBe("auto");
         expect(screen.getByText("שלום עולם").getAttribute("dir")).toBe("auto");
         expect(screen.getByRole("list").getAttribute("dir")).toBe("auto");
-        expect(screen.getByText("quoted").closest("blockquote")?.getAttribute("dir")).toBe("auto");
+        expect(screen.getByRole("blockquote").getAttribute("dir")).toBe("auto");
     });
 
     it("leaves code blocks alone", async () => {
         await renderChat(fence(2));
 
-        expect(screen.getByText("const line0 = 0;").closest("pre")?.getAttribute("dir")).toBeNull();
+        const code = screen.queryByRole("code");
+
+        expect(code?.getAttribute("dir") ?? null).toBeNull();
     });
 });

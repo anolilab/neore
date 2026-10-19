@@ -131,8 +131,8 @@ export const ReasoningTrigger = memo(({ children, className, getThinkingMessage 
     return (
         <CollapsibleTrigger
             aria-label={i18n._(getTriggerLabel(isStreaming, isOpen))}
-            id={triggerId}
             className={cn("text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors", className)}
+            id={triggerId}
             {...props}
         >
             {children ?? (
@@ -171,7 +171,7 @@ export const ReasoningContent = memo(({ children, className, ...props }: Reasoni
     // The button below the text disappears with it, so keyboard focus goes back up to the trigger.
     const handleCollapse = () => {
         setIsOpen(false);
-        document.getElementById(triggerId)?.focus();
+        document.querySelector<HTMLElement>(`[id="${CSS.escape(triggerId)}"]`)?.focus();
     };
 
     return (
