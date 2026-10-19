@@ -165,13 +165,17 @@ describe("chat fallback: streaming", () => {
 
         try {
             const res = await fetchApp(chat({ messages: [{ content: "ping", role: "user" }], stream: true }), await env());
-
-            await res.text();
+            const streamedFrames = await framesOf(res);
+            const streamedFinishReasons = streamedFrames
+                .filter((frame) => frame !== "[DONE]")
+                .map((frame) => (JSON.parse(frame) as { choices?: { finish_reason: string | null }[] }).choices?.[0]?.finish_reason);
 
             // Usage is written in waitUntil, so an earlier test's entry can land in this spy too: match this call, not the first one.
             const entries = recordSpy.mock.calls.map(([usageEntry]) => usageEntry);
 
             expect(entries).toContainEqual(expect.objectContaining({ errorCode: "PROVIDER_ERROR", fallbackReason: "infra" }));
+            // The client sees the same error finish chunk the primary stream sends.
+            expect(streamedFinishReasons).toContain("error");
         } finally {
             recordSpy.mockRestore();
         }

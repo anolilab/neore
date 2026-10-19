@@ -20,6 +20,14 @@ in the one place that already owns them. The chat route gained what the adapter
 needed (tool calls in replies and in replayed history, usage on streams), so the
 fixes live there and benefit both routes.
 
+Telemetry is recorded once per client call. The inner request carries the outer
+request's id and telemetry (`lib/dispatched-request.ts`, a module-private symbol on
+the env, never a header), so the app-level middleware records the call on the
+outer `/v1/responses` request only: one SERVER root span, one
+`gateway.requests_total`, one log line. The chat call's GenAI span nests under
+that root. The outer request is the one recorded, so its refusals (401, 400
+before dispatch) still show.
+
 Request mapping:
 
 - `input` string → one user message; array of items → `message` items (roles,
@@ -66,8 +74,12 @@ These are the chat route's, inherited (see the header of `responses.ts`):
 fields, `tool_choice` mapping, finish-reason mapping, SSE event order, usage on
 `response.completed`, and a tool-call stream. `responses-route.test.ts`: a stubbed
 dispatcher proves auth headers are forwarded and a tool request is dispatched
-non-streaming. `integration/responses.integration.test.ts`: the real app with the
-mock model. `integration/tool-calls.integration.test.ts` and
+non-streaming, and the real app-level middleware records the call once with the
+inner request adopting the outer's id and telemetry.
+`integration/responses.integration.test.ts`: the real app with the mock model.
+`integration/otel-export.integration.test.ts` drives `POST /v1/responses`, streamed
+and not, and pins one SERVER span, one `gateway.requests_total` datapoint and the
+GenAI span parented to the root. `integration/tool-calls.integration.test.ts` and
 `convert-messages.test.ts` cover the chat route's tool replay, tool calls and
 stream usage that this route depends on, and `integration/tool-choice.integration.test.ts`
 pins each `tool_choice` form at the model.

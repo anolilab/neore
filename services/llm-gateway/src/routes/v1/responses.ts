@@ -3,11 +3,12 @@
  *
  * The request is rewritten into a `/v1/chat/completions` body and dispatched
  * in-process through the TOP-LEVEL app (`dispatch`, wired in `src/index.ts`; it
- * cannot be imported here without a cycle). The app-level middleware (request
- * id, telemetry, logging) therefore runs for the inner request, and the
- * completions route's own middleware (bearer auth, rate limit, idempotency)
- * runs once, for that inner request only. The reply is translated back by
- * `responses-map.ts`.
+ * cannot be imported here without a cycle). The inner request adopts the outer
+ * one's request id and telemetry (`lib/dispatched-request.ts`), so the app-level
+ * middleware records the call once, on the outer `/v1/responses` request: one
+ * root span, one `gateway.requests_total`, one log line. The completions route's
+ * own middleware (bearer auth, rate limit, idempotency) runs once, for the inner
+ * request. The reply is translated back by `responses-map.ts`.
  *
  * Nothing is stored. `previous_response_id`, `conversation`, hosted tools and
  * background mode are refused with a 400 that names the field.
@@ -22,6 +23,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import type { AppEnv, HonoEnv } from "../../env.js";
+import { asDispatchedEnv } from "../../lib/dispatched-request.js";
 import type { ChatCompletion, ChatRequestBody } from "./responses-map.js";
 import {
     chatCompletionToResponse,
@@ -97,7 +99,7 @@ export const createResponsesRouter = (dispatch: Dispatch): OpenAPIHono<HonoEnv> 
 
         const upstream = await dispatch(
             new Request(new URL("/v1/chat/completions", c.req.url), { body: JSON.stringify(chat), headers, method: "POST" }),
-            c.env,
+            asDispatchedEnv(c.env, { requestId: c.get("requestId"), rootSpan: c.get("rootSpan"), telemetry: c.get("telemetry") }),
             c.executionCtx,
         );
         const kept = passthroughHeaders(upstream.headers);

@@ -1,10 +1,19 @@
 /**
  * GET /v1/rate-limits — Limit status for a user.
  *
- * `rpm.limit` is the tier's per-minute limit, from the same table the limiter enforces
- * (`rpmFor` in `middleware/rate-limit.ts`). `rpm.current` is always 0: the per-minute
- * count lives in the native Rate Limiting binding, which only answers allowed or not,
- * so it is not tracked here. The field stays so the response shape does not change.
+ * `rpm.limit` is the tier's per-minute limit, the number the limiter enforces (`rpmFor` in
+ * `middleware/rate-limit.ts`). `rpm.current` and `rpm.remaining` are always `null`: there
+ * is no count to report, and none is kept.
+ *
+ * - The limiter counts on Cloudflare's native Rate Limiting binding. That binding answers
+ *   only allowed or not, and cannot be read back.
+ * - A KV counter would show the count, but KV allows about one write a second per key, so
+ *   under a burst the stored count stalls behind the real one. That is the wrong number
+ *   exactly when it matters.
+ * - `usage_log` could give a count, but it counts finished calls on any route. The limiter
+ *   counts attempts on the chat route, so it is a different quantity.
+ *
+ * `null` therefore means "not readable", never "zero". The limit above it still applies.
  *
  * `blocked` and `blockedUntil` come from RATE_LIMIT_KV (`blocked:<userId>`, written when
  * a budget rule fires). The day's request and token counts with the caps configured for
@@ -40,9 +49,12 @@ const rateLimitStatusSchema = z.object({
         tokens: quotaSchema,
     }),
     rpm: z.object({
-        current: z.number(),
+        /** Always null: the native binding cannot be read (see the header). */
+        current: z.number().nullable(),
+        /** The tier's per-minute limit. */
         limit: z.number(),
-        remaining: z.number(),
+        /** Always null, for the same reason as `current`. */
+        remaining: z.number().nullable(),
     }),
     tier: z.string(),
     tokensPerMinute: quotaSchema,
@@ -78,11 +90,10 @@ async function getRateLimitStatus(env: AppEnv, userId: string, tier: string) {
             resetsAt: new Date(Date.now() + secondsUntilUtcMidnight() * 1000).toISOString(),
             tokens: { limit: caps.dailyTokens, used: usage?.tokens ?? null },
         },
-        // Not tracked (see the header): always 0, so the whole limit reads as remaining.
         rpm: {
-            current: 0,
+            current: null,
             limit: rpm,
-            remaining: rpm,
+            remaining: null,
         },
         tier,
         tokensPerMinute: { limit: caps.tokensPerMinute, used: usage?.tokensLastMinute ?? null },

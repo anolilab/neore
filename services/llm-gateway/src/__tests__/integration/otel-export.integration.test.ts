@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { app } from "../../index.js";
+import { SpanKind } from "../../lib/otel/index.js";
 import { createMockCtx, createMockEnv, makeVirtualKeyRow } from "../helpers/mock-env.js";
 
 const TOKEN = "gk_otel_export_integration_test";
@@ -19,6 +20,7 @@ interface OtlpAttribute {
 
 interface OtlpSpan {
     attributes: OtlpAttribute[];
+    kind: number;
     name: string;
     parentSpanId?: string;
     spanId: string;
@@ -139,5 +141,141 @@ describe.each([
 
         expect(Number(prompt?.asInt)).toBeGreaterThan(0);
         expect(prompt?.asInt).toBe(attribute(chat[0]?.attributes ?? [], "gen_ai.usage.input_tokens"));
+    });
+});
+
+describe.each([
+    { isStreaming: false, label: "a non-streamed reply" },
+    { isStreaming: true, label: "a streamed reply" },
+])("OTLP export of POST /v1/responses with $label", ({ isStreaming }) => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+        fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+        vi.stubGlobal("fetch", fetchMock);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("exports one SERVER root span, one requests_total datapoint and one GenAI span under the root", async () => {
+        const ctx = createMockCtx();
+        const res = await app.fetch(
+            new Request("http://localhost/v1/responses", {
+                body: JSON.stringify({ input: "ping", model: "mock/echo", stream: isStreaming }),
+                headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+                method: "POST",
+            }),
+            await makeEnv(),
+            ctx as unknown as ExecutionContext,
+        );
+
+        expect(res.status).toBe(200);
+
+        if (isStreaming) {
+            await res.text();
+        } else {
+            await res.json();
+        }
+
+        let seen = -1;
+
+        while (fetchMock.mock.calls.length !== seen) {
+            seen = fetchMock.mock.calls.length;
+            await ctx.flush();
+        }
+
+        const exported = fetchMock.mock.calls
+            .filter(([url]) => URL.canParse(String(url)) && new URL(String(url)).origin === COLLECTOR)
+            .map(([url, init]) => {
+                return { body: JSON.parse(String((init as RequestInit).body)) as unknown, path: new URL(String(url)).pathname };
+            });
+        const spans = exported
+            .filter((entry) => entry.path === "/v1/traces")
+            .flatMap((entry) => (entry.body as { resourceSpans: { scopeSpans: { spans: OtlpSpan[] }[] }[] }).resourceSpans)
+            .flatMap((resource) => resource.scopeSpans.flatMap((scope) => scope.spans));
+        const points = exported
+            .filter((entry) => entry.path === "/v1/metrics")
+            .flatMap((entry) => (entry.body as { resourceMetrics: { scopeMetrics: { metrics: OtlpMetric[] }[] }[] }).resourceMetrics)
+            .flatMap((resource) => resource.scopeMetrics.flatMap((scope) => scope.metrics))
+            .filter((metric) => metric.name === "gateway.requests_total")
+            .flatMap((metric) => metric.sum?.dataPoints ?? []);
+
+        const server = spans.filter((span) => span.name === "POST /v1/responses");
+        const chat = spans.filter((span) => span.name.startsWith("chat "));
+
+        expect(spans.filter((span) => span.name.startsWith("POST "))).toHaveLength(1);
+        expect(server).toHaveLength(1);
+        expect(server[0]?.kind).toBe(SpanKind.SERVER);
+        expect(chat).toHaveLength(1);
+        expect(chat[0]?.parentSpanId).toBe(server[0]?.spanId);
+        expect(attribute(chat[0]?.attributes ?? [], "gateway.request_id")).toBe(res.headers.get("x-request-id"));
+
+        expect(points).toHaveLength(1);
+        expect(points[0]?.asInt).toBe("1");
+        expect(attribute(points[0]?.attributes ?? [], "http.route")).toBe("/v1/responses");
+    });
+});
+
+describe("OTLP export of a POST /v1/responses refused before dispatch", () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+        fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+        vi.stubGlobal("fetch", fetchMock);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("records the outer request once, with its 401", async () => {
+        const ctx = createMockCtx();
+        const res = await app.fetch(
+            new Request("http://localhost/v1/responses", {
+                body: JSON.stringify({ input: "ping", model: "mock/echo" }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+            }),
+            await makeEnv(),
+            ctx as unknown as ExecutionContext,
+        );
+
+        expect(res.status).toBe(401);
+        await res.json();
+
+        let seen = -1;
+
+        while (fetchMock.mock.calls.length !== seen) {
+            seen = fetchMock.mock.calls.length;
+            await ctx.flush();
+        }
+
+        const exported = fetchMock.mock.calls
+            .filter(([url]) => URL.canParse(String(url)) && new URL(String(url)).origin === COLLECTOR)
+            .map(([url, init]) => {
+                return { body: JSON.parse(String((init as RequestInit).body)) as unknown, path: new URL(String(url)).pathname };
+            });
+        const spans = exported
+            .filter((entry) => entry.path === "/v1/traces")
+            .flatMap((entry) => (entry.body as { resourceSpans: { scopeSpans: { spans: OtlpSpan[] }[] }[] }).resourceSpans)
+            .flatMap((resource) => resource.scopeSpans.flatMap((scope) => scope.spans));
+        const points = exported
+            .filter((entry) => entry.path === "/v1/metrics")
+            .flatMap((entry) => (entry.body as { resourceMetrics: { scopeMetrics: { metrics: OtlpMetric[] }[] }[] }).resourceMetrics)
+            .flatMap((resource) => resource.scopeMetrics.flatMap((scope) => scope.metrics))
+            .filter((metric) => metric.name === "gateway.requests_total")
+            .flatMap((metric) => metric.sum?.dataPoints ?? []);
+
+        const server = spans.filter((span) => span.name === "POST /v1/responses");
+
+        expect(server).toHaveLength(1);
+        expect(server[0]?.kind).toBe(SpanKind.SERVER);
+        expect(attribute(server[0]?.attributes ?? [], "http.status_code")).toBe("401");
+
+        expect(points).toHaveLength(1);
+        expect(points[0]?.asInt).toBe("1");
+        expect(attribute(points[0]?.attributes ?? [], "http.status_code")).toBe("401");
     });
 });

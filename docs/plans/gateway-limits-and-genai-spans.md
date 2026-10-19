@@ -38,8 +38,7 @@ no daily or token cap besides credits.
   and media calls made with the same key are counted, so they use up the caps,
   but their routes do not refuse. Mounting the middleware there is a separate
   change: those routes have their own auth and limit chain and their own tests.
-- `GET /v1/rate-limits` reports each window's count and cap for the caller's tier.
-  A `used` of `null` means the count could not be read.
+- `GET /v1/rate-limits` reports each daily and per-minute-token cap for the caller's tier with its `used`; `used` is `null` when the count could not be read. Its `rpm` carries the per-minute limit with `current` and `remaining` `null`: the limiter's native binding cannot be read, and a KV counter stalls under bursts.
 
 ## GenAI spans
 
@@ -65,4 +64,6 @@ backends that ingest OTLP show it as a generation:
   recorded before the first `await`, and the tracker flushes once more after its
   D1 write, so a streamed reply (recorded after the middleware's flush) is still
   exported exactly once. `integration/otel-export.integration.test.ts` drives the
-  real app to pin it.
+  real app to pin it, for `/v1/chat/completions` and `/v1/responses`. An in-process
+  dispatch (`/v1/responses`) records into the outer request's telemetry, so it is
+  exported under the outer request's single root span.

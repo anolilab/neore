@@ -4,9 +4,13 @@
  * `integration/responses.integration.test.ts`.
  */
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { AppEnv, HonoEnv } from "../env.js";
+import { logger } from "../lib/logger.js";
+import loggerMiddleware from "../middleware/logger.js";
+import { securityMiddleware } from "../middleware/security.js";
+import { telemetryMiddleware } from "../middleware/telemetry.js";
 import type { Dispatch } from "../routes/v1/responses.js";
 import { createResponsesRouter } from "../routes/v1/responses.js";
 
@@ -262,24 +266,34 @@ describe("POST /v1/responses — streaming", () => {
 });
 
 describe("POST /v1/responses — dispatch through the top-level app", () => {
-    it("runs the app-level middleware for the inner request, and the route middleware once", async () => {
-        const seen = { inner: [] as string[], rateLimitHits: 0 };
+    it("records the call once, on the outer request, and runs the route middleware once for the inner one", async () => {
+        const seen = { inner: [] as { requestId: string; rootSpan: unknown; telemetry: unknown }[], rateLimitHits: 0 };
+        const outer = {} as { requestId?: string; rootSpan?: unknown; telemetry?: unknown };
         const topLevel = new Hono<HonoEnv>();
-        let runs = 0;
+        const info = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+        const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+        const error = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 
-        // Stands in for securityMiddleware: sets a per-request var each time it runs.
-        topLevel.use("*", async (c, next) => {
-            runs += 1;
-            c.set("requestId", `req-${runs}`);
+        // The real app-level middleware, in the order `src/index.ts` mounts them.
+        topLevel.use("*", securityMiddleware);
+        topLevel.use("*", telemetryMiddleware);
+        topLevel.use("*", loggerMiddleware);
+        // Records what the outer request holds, just before the responses route dispatches.
+        topLevel.use("/v1/responses", async (c, next) => {
+            outer.requestId = c.get("requestId");
+            outer.rootSpan = c.get("rootSpan");
+            outer.telemetry = c.get("telemetry");
+
             await next();
         });
         // Stands in for the completions route's rateLimitMiddleware, which is mounted on that path only.
         topLevel.use("/v1/chat/completions", async (_c, next) => {
             seen.rateLimitHits += 1;
+
             await next();
         });
         topLevel.post("/v1/chat/completions", (c) => {
-            seen.inner.push(c.get("requestId") ?? "");
+            seen.inner.push({ requestId: c.get("requestId"), rootSpan: c.get("rootSpan"), telemetry: c.get("telemetry") });
 
             return c.json(CHAT_REPLY);
         });
@@ -288,11 +302,25 @@ describe("POST /v1/responses — dispatch through the top-level app", () => {
             createResponsesRouter((request, dispatchEnv, dispatchCtx) => topLevel.fetch(request, dispatchEnv, dispatchCtx)),
         );
 
-        const response = await topLevel.fetch(post({ input: "x", model: "gpt-x" }), env, ctx);
+        try {
+            const response = await topLevel.fetch(post({ input: "x", model: "gpt-x" }), env, ctx);
 
-        expect(response.status).toBe(200);
-        expect(runs).toBe(2);
-        expect(seen.inner).toEqual(["req-2"]);
-        expect(seen.rateLimitHits).toBe(1);
+            expect(response.status).toBe(200);
+            expect(response.headers.get("X-Request-Id")).toBe(outer.requestId);
+
+            expect(seen.rateLimitHits).toBe(1);
+            expect(seen.inner).toHaveLength(1);
+            expect(seen.inner[0].requestId).toBe(outer.requestId);
+            expect(seen.inner[0].rootSpan).toBe(outer.rootSpan);
+            expect(seen.inner[0].telemetry).toBe(outer.telemetry);
+
+            // One line for the call, from the outer request's logger middleware.
+            expect(info.mock.calls.length + warn.mock.calls.length + error.mock.calls.length).toBe(1);
+            expect(info).toHaveBeenCalledWith(expect.objectContaining({ path: "/v1/responses", requestId: outer.requestId, status: 200 }));
+        } finally {
+            info.mockRestore();
+            warn.mockRestore();
+            error.mockRestore();
+        }
     });
 });

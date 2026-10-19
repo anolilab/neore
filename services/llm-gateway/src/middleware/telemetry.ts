@@ -11,13 +11,30 @@
  * W3C trace context: if the incoming request carries a `traceparent` header
  * we adopt the trace ID so spans from upstream callers (backend, web app) get
  * linked into the same trace.
+ *
+ * An in-process dispatch (`/v1/responses`) adopts its outer request's telemetry instead
+ * of starting one; see `lib/dispatched-request.ts`.
  */
 import { createMiddleware } from "hono/factory";
 
 import type { HonoEnv } from "../env.js";
+import { dispatchedFrom } from "../lib/dispatched-request.js";
 import { parseOtelConfig, parseTraceparent, RequestTelemetry, SpanKind } from "../lib/otel/index.js";
 
 export const telemetryMiddleware = createMiddleware<HonoEnv>(async (c, next) => {
+    // An in-process dispatch records into the outer request's telemetry: no second root
+    // span, counter or histogram, and no flush. The outer request does all four.
+    const outer = dispatchedFrom(c.env);
+
+    if (outer) {
+        c.set("telemetry", outer.telemetry);
+        c.set("rootSpan", outer.rootSpan);
+
+        await next();
+
+        return;
+    }
+
     const config = parseOtelConfig(c.env);
     const incoming = parseTraceparent(c.req.header("traceparent"));
     const telemetry = new RequestTelemetry(config, incoming?.traceId);

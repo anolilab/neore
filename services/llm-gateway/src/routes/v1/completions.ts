@@ -874,6 +874,13 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                     switch (part.type) {
                                         case "error": {
                                             hasFailed = true;
+                                            sendChunk({
+                                                choices: [{ delta: {}, finish_reason: "error", index: 0 }],
+                                                created: fallbackCreated,
+                                                id: fallbackCompletionId,
+                                                model: fallbackCandidate.modelId,
+                                                object: "chat.completion.chunk",
+                                            });
                                             break;
                                         }
                                         case "text-delta": {
