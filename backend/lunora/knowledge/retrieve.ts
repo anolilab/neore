@@ -314,8 +314,24 @@ export const searchKnowledgeBase = async (
     // only the "everything indexed" fallback covers all of it.
     let scoped = true;
 
+    // Files on the caller's LOCKED chats are never searched by id or through the
+    // general index, whatever the caller names: only the chat this request opens
+    // (admitted, or proven) is searchable. Unlocked chats' files pass through.
+    const openFileIds = async (ids: string[]): Promise<string[]> => {
+        const gated = new Set(
+            await ctx.runQuery(internal.knowledge.collections.gatedKnowledgeFileIds, {
+                ...(args.admittedRun && { admittedRun: true }),
+                ...(args.threadId && { threadId: args.threadId as Id<"threads"> }),
+                ...(args.unlockProof && { unlockProof: args.unlockProof }),
+                userId: args.userId,
+            }),
+        );
+
+        return ids.filter((id) => !gated.has(id));
+    };
+
     if (args.fileIds && args.fileIds.length > 0) {
-        knowledgeFileIds = args.fileIds;
+        knowledgeFileIds = await openFileIds(args.fileIds);
     } else if (args.threadId) {
         // `threadId` is declared `v.union(v.id("threads"), v.string())` because callers
         // also pass raw thread strings, so it has to be re-branded for the query. This
@@ -334,7 +350,7 @@ export const searchKnowledgeBase = async (
     }
 
     if (!knowledgeFileIds) {
-        knowledgeFileIds = await ctx.runQuery(internal.knowledge.functions.getIndexedFileIds, { userId: args.userId });
+        knowledgeFileIds = await openFileIds(await ctx.runQuery(internal.knowledge.functions.getIndexedFileIds, { userId: args.userId }));
         scoped = false;
     }
 

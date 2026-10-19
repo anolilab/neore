@@ -7,7 +7,7 @@ import type { ModelFilterRules } from "./use-model-filter-rules";
 
 // What the backend holds for the user's rules; the fake saves whatever the mutation sends, or refuses while `failSaves` is set.
 const server = vi.hoisted(() => {
-    return { failSaves: false, rules: undefined as ModelFilterRules | undefined };
+    return { failSaves: false, noRow: false, rules: undefined as ModelFilterRules | undefined };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -19,9 +19,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                         getAIUserPreferences: {
                             queryOptions: () => {
                                 return {
-                                    queryFn: async () => {
-                                        return { modelFilterRules: server.rules };
-                                    },
+                                    queryFn: async () => (server.noRow ? null : { modelFilterRules: server.rules }),
                                     queryKey: ["aiUserPreferences"],
                                 };
                             },
@@ -35,6 +33,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                                         }
 
                                         server.rules = input.modelFilterRules;
+                                        server.noRow = false;
 
                                         return {};
                                     },
@@ -188,6 +187,26 @@ describe(useUpdateModelFilterRules, () => {
 
         expect(page.current.rules).toEqual({ requireZDR: true });
         expect(server.rules).toEqual({ requireZDR: true });
+    });
+
+    it("two edits from a user with no preferences row both survive", async () => {
+        server.noRow = true;
+        server.rules = undefined;
+
+        const { page } = await mountBoth(newClient());
+
+        await act(async () => {
+            await page.current.updateRules((current) => {
+                return { ...current, blockedRegions: ["EU"] };
+            });
+        });
+        await act(async () => {
+            await page.current.updateRules((current) => {
+                return { ...current, requireZDR: true };
+            });
+        });
+
+        expect(server.rules).toEqual({ blockedRegions: ["EU"], requireZDR: true });
     });
 
     it("clearing the last rule saves an empty object, which the server stores", async () => {

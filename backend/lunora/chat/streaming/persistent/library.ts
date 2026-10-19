@@ -6,6 +6,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import { addMessagesHandler } from "../../../agent/messages";
 import { patchThread } from "../../../agent/table-writes";
 import { internal } from "../../../_generated/internal";
 import type { Id } from "../../../_generated/dataModel";
@@ -158,9 +159,9 @@ export const setStreamStatus = internalMutation
 /**
  * The sidebar's stop for a persistent reply. Each live stream of the thread ends
  * `done` with the chunks it already has, so the run's next chunk write is refused
- * (`CONFLICT`), which stops generation; `failRun` sees `done` and writes no error
- * line. The thread leaves `running` the way a legacy abort does: `abort`, then
- * back to `active` a second later. Returns whether anything was stopped.
+ * (`CONFLICT`); the run then saves what it has (`finishStoppedReply`). The thread
+ * leaves `running` the way a legacy abort does: `abort`, then back to `active` a
+ * second later. Returns whether anything was stopped.
  *
  * ponytail: the stop lands at the run's next chunk write, so a long tool step keeps running (and billing) until then. Abort the in-flight call if that bites.
  */
@@ -168,8 +169,8 @@ export const stopActiveForThread = internalMutation
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
+        // No `limit`: `findMany` returns every match, and the patch takes each row out of the filter.
         const { page: streams } = await ctx.db.persistentStreams.findMany({
-            limit: 100,
             where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
         });
 
@@ -185,6 +186,58 @@ export const stopActiveForThread = internalMutation
         }
 
         return streams.length > 0;
+    });
+
+/**
+ * The run that a sidebar stop refused (`stopActiveForThread`) saves what it has as
+ * its reply: the chunks already written plus `pending`, the text it had not yet
+ * written. Only a stream ended `done` counts, so a timeout or a failure is left to
+ * the run's own error path. Returns whether a reply was saved.
+ *
+ * The run's assistant row is the pending one for the prompt (the step in flight),
+ * so it is completed in place. Called once per claimed run; a redelivery never gets
+ * here (`claimStreamRun`), and a second Stop finds no live stream.
+ */
+export const finishStoppedReply = internalMutation
+    .input({
+        pendingReasoning: v.string(),
+        pendingText: v.string(),
+        streamId: v.id("persistentStreams"),
+    })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
+
+        if (!stream || stream.status !== "done") {
+            return false;
+        }
+
+        const threadId = stream.threadId as Id<"threads">;
+        const { page: chunks } = await ctx.db.persistentChunks.findMany({ orderBy: [{ seq: "asc" }], where: { streamId: args.streamId } });
+        const text = chunks.map((chunk) => chunk.text).join("") + args.pendingText;
+        const reasoning = chunks.map((chunk) => chunk.reasoning ?? "").join("") + args.pendingReasoning;
+        const prompt = await ctx.db.get(stream.messageId as Id<"messages">);
+
+        if (prompt && (text.length > 0 || reasoning.length > 0)) {
+            const { page: pendingRows } = await ctx.db.messages.findMany({
+                where: { order: prompt.order, status: "pending", threadId, tool: false },
+            });
+            const pending = pendingRows.toSorted((a, b) => b.stepOrder - a.stepOrder)[0];
+            const content = [...(reasoning ? [{ text: reasoning, type: "reasoning" as const }] : []), ...(text ? [{ text, type: "text" as const }] : [])];
+
+            await addMessagesHandler(ctx, {
+                failPendingSteps: false,
+                messages: [{ message: { content, role: "assistant" }, status: "success" }],
+                pendingMessageId: pending?._id,
+                promptMessageId: prompt._id,
+                threadId,
+                userId: stream.userId,
+            });
+        }
+
+        await patchThread(ctx.db, threadId, { status: "active", updatedAt: ctx.now });
+
+        return true;
     });
 
 export const getStreamStatus = internalQuery

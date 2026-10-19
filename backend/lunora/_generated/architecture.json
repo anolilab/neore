@@ -1528,6 +1528,11 @@
     {
       "from": "function:chat_execute:runStreamingAgent",
       "kind": "call",
+      "to": "function:chat_streaming_persistent_library:finishStoppedReply"
+    },
+    {
+      "from": "function:chat_execute:runStreamingAgent",
+      "kind": "call",
       "to": "function:chat_streaming:streamRunThread"
     },
     {
@@ -4069,6 +4074,26 @@
       "from": "function:knowledge_collections:detachCollectionFromThread",
       "kind": "write",
       "to": "table:knowledgeCollectionLinks"
+    },
+    {
+      "from": "function:knowledge_collections:gatedKnowledgeFileIds",
+      "kind": "read",
+      "to": "table:knowledgeCollectionLinks"
+    },
+    {
+      "from": "function:knowledge_collections:gatedKnowledgeFileIds",
+      "kind": "read",
+      "to": "table:knowledgeFiles"
+    },
+    {
+      "from": "function:knowledge_collections:gatedKnowledgeFileIds",
+      "kind": "read",
+      "to": "table:threadKnowledge"
+    },
+    {
+      "from": "function:knowledge_collections:gatedKnowledgeFileIds",
+      "kind": "read",
+      "to": "table:threadPasscodes"
     },
     {
       "from": "function:knowledge_collections:getProjectCollections",
@@ -9977,6 +10002,13 @@
       "module": "chat"
     },
     {
+      "detail": "mutation",
+      "id": "function:chat_streaming_persistent_library:finishStoppedReply",
+      "kind": "function",
+      "name": "chat.streaming.persistent.library.finishStoppedReply",
+      "module": "chat"
+    },
+    {
       "detail": "query",
       "id": "function:chat_streaming_persistent_library:getChunksAfter",
       "kind": "function",
@@ -11500,6 +11532,13 @@
       "id": "function:knowledge_collections:detachCollectionFromThread",
       "kind": "function",
       "name": "knowledge.collections.detachCollectionFromThread",
+      "module": "knowledge"
+    },
+    {
+      "detail": "query",
+      "id": "function:knowledge_collections:gatedKnowledgeFileIds",
+      "kind": "function",
+      "name": "knowledge.collections.gatedKnowledgeFileIds",
       "module": "knowledge"
     },
     {
@@ -16770,121 +16809,121 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 300,
+      "line": 302,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 300,
+      "line": 302,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 320,
+      "line": 322,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 320,
+      "line": 322,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 449,
+      "line": 451,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 449,
+      "line": 451,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 458,
+      "line": 460,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 458,
+      "line": 460,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 483,
+      "line": 485,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 483,
+      "line": 485,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 491,
+      "line": 493,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 491,
+      "line": 493,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 519,
+      "line": 521,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 519,
+      "line": 521,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 520,
+      "line": 522,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 520,
+      "line": 522,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 568,
+      "line": 570,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 656,
+      "line": 658,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 672,
+      "line": 674,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 682,
+      "line": 684,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -17142,13 +17181,13 @@
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 93,
+      "line": 108,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-tools",
       "kind": "call",
-      "line": 94,
+      "line": 109,
       "reason": "\"buildAgentTools\" is not a registered function"
     },
     {
@@ -17220,7 +17259,7 @@
     {
       "file": "chat/lib/persist-stream",
       "kind": "call",
-      "line": 72,
+      "line": 91,
       "reason": "\"pipeToPersistentChunks\" is not a registered function"
     },
     {
@@ -17562,7 +17601,13 @@
     {
       "file": "chat/tools/knowledge-search",
       "kind": "call",
-      "line": 31,
+      "line": 38,
+      "reason": "\"admittedKnowledgeSearchTool\" is not a registered function"
+    },
+    {
+      "file": "chat/tools/knowledge-search",
+      "kind": "call",
+      "line": 38,
       "reason": "the default export is not a registered function"
     },
     {
@@ -18492,13 +18537,19 @@
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 323,
+      "line": 322,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 337,
+      "line": 339,
+      "reason": "\"searchKnowledgeBase\" is not a registered function"
+    },
+    {
+      "file": "knowledge/retrieve",
+      "kind": "call",
+      "line": 353,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {

@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
-import { resolveRetrievalScope } from "./collections";
+import { gatedKnowledgeFileIds, resolveRetrievalScope } from "./collections";
 
 const SECRET = "test-storage-signing-secret";
 const OWNER = "owner-knowledge";
@@ -114,5 +114,63 @@ describe("resolveRetrievalScope for a locked chat", () => {
         const scope = await scopeOf(openId);
 
         expect(scope.fileIds).toEqual([fileId]);
+    });
+});
+
+describe("gatedKnowledgeFileIds: knowledge on a locked chat is gated for id and index searches", () => {
+    const gated = async (options: { admittedRun?: boolean; threadId?: string; unlockProof?: string } = {}) =>
+        (await run(async (ctx) => await ctx.runQuery(gatedKnowledgeFileIds, { userId: OWNER, ...options }))) as string[];
+
+    it("gates a file attached to the locked chat when nothing opens it (negative)", async () => {
+        await expect(gated()).resolves.toContain(fileId);
+    });
+
+    it("leaves a file attached only to the unlocked chat alone (positive)", async () => {
+        const openOnly = await run(
+            async (ctx) =>
+                await ctx.db.insert("knowledgeFiles", { createdAt: 1, mimeType: "text/plain", name: "open.txt", size: 1, status: "indexed", userId: OWNER }),
+        );
+
+        await run(async (ctx) => {
+            await ctx.db.insert("threadKnowledge", { addedAt: 1, knowledgeFileId: openOnly, threadId: openId });
+        });
+
+        expect(await gated()).not.toContain(openOnly);
+    });
+
+    it("opens the named locked chat with its valid proof (positive)", async () => {
+        expect(await gated({ threadId: lockedId, unlockProof: await proofFor() })).not.toContain(fileId);
+    });
+
+    it("opens the named locked chat for an admitted run (positive)", async () => {
+        expect(await gated({ admittedRun: true, threadId: lockedId })).not.toContain(fileId);
+    });
+
+    it("keeps it gated for a proof from an older epoch (negative)", async () => {
+        expect(await gated({ threadId: lockedId, unlockProof: await proofFor(newPasscodeEpoch()) })).toContain(fileId);
+    });
+
+    it("gates a file reached through a collection the locked chat holds (negative)", async () => {
+        const collectionId = await run(
+            async (ctx) => await ctx.db.insert("knowledgeCollections", { createdAt: 1, name: "Salary", updatedAt: 1, userId: OWNER }),
+        );
+        const collectionFileId = await run(
+            async (ctx) =>
+                await ctx.db.insert("knowledgeFiles", {
+                    collectionId,
+                    createdAt: 1,
+                    mimeType: "text/plain",
+                    name: "pay.txt",
+                    size: 1,
+                    status: "indexed",
+                    userId: OWNER,
+                }),
+        );
+
+        await run(async (ctx) => {
+            await ctx.db.insert("knowledgeCollectionLinks", { addedAt: 1, collectionId, threadId: lockedId, userId: OWNER });
+        });
+
+        expect(await gated()).toContain(collectionFileId);
     });
 });

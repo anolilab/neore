@@ -20,11 +20,24 @@ import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";
 import { getMCPTools } from "./mcp-tools";
 import type { SearchMode } from "./tool-builder";
+import { ToolName } from "../tools";
+import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
 import { getToolsForModelAndMode, listBuiltInTools } from "./tool-builder";
 import type { ToolDescriptor, ToolPermissionOverrides } from "./tool-permissions";
 import { applyToolPermissions, toolPermissionKey } from "./tool-permissions";
 
+/**
+ * The built-ins for a run the stream gate admitted under its chat's lock: the
+ * knowledge search tool that may reach the chat's own locked files. Every other
+ * run keeps the fail-closed tool. Set only by `runStreamingAgent` and the group
+ * turn, both after `streamRunThread`.
+ */
+export const withAdmittedBuiltIns = (builtIns: ToolSet, admittedRun: boolean | undefined): ToolSet =>
+    admittedRun && builtIns[ToolName.KnowledgeSearch] ? { ...builtIns, [ToolName.KnowledgeSearch]: admittedKnowledgeSearchTool } : builtIns;
+
 export interface BuildAgentToolsOptions {
+    /** Set ONLY by a run the stream gate admitted under the chat's lock (`streamRunThread`). See {@link withAdmittedBuiltIns}. */
+    admittedRun?: boolean;
     autoMediaEnrichment?: boolean;
     /**
      * The thread an INTERACTIVE run is in: offers the user's online devices'
@@ -76,7 +89,8 @@ export interface BuildAgentToolsResult {
 }
 
 export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOptions): Promise<BuildAgentToolsResult> => {
-    const { autoMediaEnrichment, deviceThreadId, headless, headlessApproved, mcpServerNames, model, searchMode, skillTools, snapshot, userId } = options;
+    const { admittedRun, autoMediaEnrichment, deviceThreadId, headless, headlessApproved, mcpServerNames, model, searchMode, skillTools, snapshot, userId } =
+        options;
 
     // Built-ins beyond the search mode's set: a skill's extra tools on a fresh
     // run, or — on a snapshot rebuild — every built-in the paused run had (a
@@ -85,9 +99,10 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     const availableBuiltIns = new Set(listBuiltInTools().flatMap((tool) => (tool.available ? [tool.name as string] : [])));
     const extraBuiltIns = (snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? [])).filter((name) => availableBuiltIns.has(name));
 
-    const builtInTools = getToolsForModelAndMode(model, searchMode, extraBuiltIns.length > 0 ? { additionalTools: extraBuiltIns } : undefined, {
-        autoMediaEnrichment,
-    });
+    const builtInTools = withAdmittedBuiltIns(
+        getToolsForModelAndMode(model, searchMode, extraBuiltIns.length > 0 ? { additionalTools: extraBuiltIns } : undefined, { autoMediaEnrichment }),
+        admittedRun,
+    );
 
     const [allMcpServers, overrides, connectorServers] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),

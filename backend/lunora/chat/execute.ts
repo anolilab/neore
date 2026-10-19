@@ -42,7 +42,7 @@ import { getMaxSteps } from "./lib/auto-continue";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { closeMCPClients } from "./lib/mcp-tools";
-import { pipeToPersistentChunks } from "./lib/persist-stream";
+import { isStreamWriteRefused, pipeToPersistentChunks, type PipedStream } from "./lib/persist-stream";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import type { SearchMode } from "./lib/tool-builder";
@@ -237,6 +237,8 @@ export const runStreamingAgent = internalAction
             const [toolResult, runContext] = await Promise.all([
                 allowTools
                     ? buildAgentTools(ctx, {
+                          // Admitted by `streamRunThread` above: the knowledge tool may reach this chat's own files.
+                          admittedRun: true,
                           autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                           // Interactive: the user's devices, if this thread may reach them.
                           deviceThreadId: threadId,
@@ -328,6 +330,10 @@ export const runStreamingAgent = internalAction
 
             // Stream text
             // Admitted by `streamRunThread` above: the run reads its context without a proof.
+            // Aborted only after a sidebar stop's reply is saved (see the catch below).
+            const stopping = new AbortController();
+
+            streamTextArgs.abortSignal = stopping.signal;
             const result = await threadObject.streamText(streamTextArgs, {
                 admittedRun: true,
                 statelessMode: threadStatelessMode,
@@ -335,7 +341,33 @@ export const runStreamingAgent = internalAction
 
             // Write chunks to persistent storage (DB only, no HTTP response)
             const timingStart = Date.now();
-            const { firstTokenTime, pending } = await pipeToPersistentChunks(ctx, streamId, result.fullStream);
+            let piped: PipedStream;
+
+            try {
+                piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream);
+            } catch (error) {
+                // A sidebar stop refused the write: keep what was written as the reply, then abort the
+                // model call. The abort comes second because the agent marks its pending row failed on abort.
+                if (!isStreamWriteRefused(error)) {
+                    throw error;
+                }
+
+                const saved = await ctx.runMutation(internal.chat.streaming.persistent.library.finishStoppedReply, {
+                    pendingReasoning: error.pending.reasoning,
+                    pendingText: error.pending.text,
+                    streamId: streamId as Id<"persistentStreams">,
+                });
+
+                if (!saved) {
+                    throw error;
+                }
+
+                stopping.abort();
+
+                return;
+            }
+
+            const { firstTokenTime, pending } = piped;
 
             // Wait for the agent to save the final message
             await result.consumeStream();

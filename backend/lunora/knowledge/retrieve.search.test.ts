@@ -36,10 +36,14 @@ vi.mock("../lib/cross-shard", () => {
 
 const REQUESTER = "user-member";
 
-const makeCtx = (scope: { fileIds: string[]; foreign: { collectionIds: string[]; ownerId: string }[]; hasExplicitScope: boolean }) => {
+const makeCtx = (scope: { fileIds: string[]; foreign: { collectionIds: string[]; ownerId: string }[]; hasExplicitScope: boolean }, gated: string[] = []) => {
     const runQuery = vi.fn(async (reference: unknown) => {
         if (reference === internal.knowledge.collections.resolveRetrievalScope) {
             return scope;
+        }
+
+        if (reference === internal.knowledge.collections.gatedKnowledgeFileIds) {
+            return gated;
         }
 
         if (reference === internal.knowledge.functions.getIndexedFileIds) {
@@ -92,6 +96,47 @@ describe(searchKnowledgeBase, () => {
             [100, REQUESTER],
             [15, REQUESTER],
         ]);
+    });
+
+    it("drops explicit file ids that sit on a locked chat the request does not open (negative)", async () => {
+        const ctx = makeCtx({ fileIds: [], foreign: [], hasExplicitScope: false }, ["locked-1"]);
+
+        await searchKnowledgeBase(ctx, { fileIds: ["own-1", "locked-1"], query: "q", userId: REQUESTER });
+
+        expect((ctx as unknown as { runQuery: ReturnType<typeof vi.fn> }).runQuery).toHaveBeenCalledWith(
+            internal.knowledge.functions.keywordSearchChunks,
+            expect.objectContaining({ knowledgeFileIds: ["own-1"] }),
+        );
+    });
+
+    it("searches nothing when every explicit id is on a locked chat (negative)", async () => {
+        const ctx = makeCtx({ fileIds: [], foreign: [], hasExplicitScope: false }, ["locked-1"]);
+
+        await expect(searchKnowledgeBase(ctx, { fileIds: ["locked-1"], query: "q", userId: REQUESTER })).resolves.toStrictEqual([]);
+        expect(mocks.embedMany).not.toHaveBeenCalled();
+        expect(mocks.searchVectors).not.toHaveBeenCalled();
+    });
+
+    it("keeps the general index from reaching a locked chat's file, but keeps unlocked files (negative and positive)", async () => {
+        const ctx = makeCtx({ fileIds: [], foreign: [], hasExplicitScope: false }, ["own-2"]);
+
+        await searchKnowledgeBase(ctx, { query: "q", userId: REQUESTER });
+
+        expect((ctx as unknown as { runQuery: ReturnType<typeof vi.fn> }).runQuery).toHaveBeenCalledWith(
+            internal.knowledge.functions.keywordSearchChunks,
+            expect.objectContaining({ knowledgeFileIds: ["own-1"] }),
+        );
+    });
+
+    it("passes the admitted run and the proof to the gate, so the named chat opens (positive)", async () => {
+        const ctx = makeCtx({ fileIds: [], foreign: [], hasExplicitScope: false }, []);
+
+        await searchKnowledgeBase(ctx, { admittedRun: true, fileIds: ["own-1"], query: "q", threadId: "t1", userId: REQUESTER });
+
+        expect((ctx as unknown as { runQuery: ReturnType<typeof vi.fn> }).runQuery).toHaveBeenCalledWith(
+            internal.knowledge.collections.gatedKnowledgeFileIds,
+            expect.objectContaining({ admittedRun: true, threadId: "t1", userId: REQUESTER }),
+        );
     });
 
     it("still runs the keyword leg when the query cannot be embedded", async () => {

@@ -27,6 +27,7 @@ import { getMemberByOrganizationAndUser, getMembersByUserId } from "../auth/lib/
 import { callOnShard } from "../lib/cross-shard";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
+import { isThreadLocked } from "../lib/thread-lock";
 import { DELETING_STATUS } from "./file-removal";
 import { canReadCollection, planRetrievalScope } from "./scope";
 import { MAX_LENGTH } from "../lib/validators";
@@ -653,6 +654,71 @@ export const resolveRetrievalScope = internalQuery
             foreign: plan.foreign,
             hasExplicitScope: plan.hasExplicitScope,
         };
+    });
+
+/**
+ * The knowledge files a search for `userId` may NOT use for this request: those
+ * attached to one of the caller's LOCKED chats, directly or through a collection
+ * the chat holds. The chat the request names is opened only when the run is
+ * admitted or the request carries its valid proof; any other locked chat stays
+ * gated. Unlocked chats' files are never returned here.
+ *
+ * ponytail: reads every link of each locked chat per search. Index the files by
+ * chat if this shows up in profiles.
+ */
+export const gatedKnowledgeFileIds = internalQuery
+    .input({
+        admittedRun: v.optional(v.boolean()),
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        userId: v.string(),
+    })
+    .output(v.array(v.string()))
+    .query(async ({ args, ctx }) => {
+        const passcodes = await ctx.db
+            .query("threadPasscodes")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .collect();
+        const gated = new Set<string>();
+
+        for (const { threadId: lockedId } of passcodes) {
+            if (lockedId === args.threadId && (args.admittedRun || !(await isLockedWithoutProof(ctx, lockedId, args.unlockProof)))) {
+                continue;
+            }
+
+            const thread = await ctx.db.get(lockedId);
+
+            if (!thread || !isThreadLocked(thread)) {
+                continue;
+            }
+
+            const direct = await ctx.db
+                .query("threadKnowledge")
+                .withIndex("by_threadId", (q) => q.eq("threadId", lockedId))
+                .collect();
+
+            for (const link of direct) {
+                gated.add(link.knowledgeFileId as string);
+            }
+
+            const collectionLinks = await ctx.db
+                .query("knowledgeCollectionLinks")
+                .withIndex("by_threadId", (q) => q.eq("threadId", lockedId))
+                .collect();
+
+            for (const link of collectionLinks) {
+                const files = await ctx.db
+                    .query("knowledgeFiles")
+                    .withIndex("by_userId_collectionId", (q) => q.eq("userId", args.userId).eq("collectionId", link.collectionId))
+                    .collect();
+
+                for (const file of files) {
+                    gated.add(file._id as string);
+                }
+            }
+        }
+
+        return [...gated];
     });
 
 /**

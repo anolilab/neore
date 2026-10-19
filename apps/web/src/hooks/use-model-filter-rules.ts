@@ -179,7 +179,11 @@ export const useUpdateModelFilterRules = () => {
 
             const previous = cached?.modelFilterRules;
             const next = cleanRules(update((previous as ModelFilterRules | undefined) ?? {}));
-            const write = (value: unknown) => queryClient.setQueryData<PreferencesCache>(queryKey, (old) => (old ? { ...old, modelFilterRules: value } : old));
+            // A user with no preferences row caches `null`: the write creates the value, so the next edit builds on this one.
+            const write = (value: unknown) =>
+                queryClient.setQueryData<PreferencesCache>(queryKey, (old) => {
+                    return { ...old, modelFilterRules: value };
+                });
 
             write(next);
 

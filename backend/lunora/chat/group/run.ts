@@ -228,6 +228,8 @@ const runSpeaker = async (
 
         const toolResult = allowTools
             ? await buildAgentTools(ctx, {
+                  // The group turn runs inside the admitted stream (`runGroupTurn`, after `streamRunThread`).
+                  admittedRun: true,
                   autoMediaEnrichment: turn.agentPrefs.autoMediaEnrichment,
                   mcpServerNames: turn.mcpServerNames,
                   model,

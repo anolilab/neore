@@ -7,7 +7,7 @@ import { useEffect, useId, useState } from "react";
 
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { isThreadLockedError, onUnlockExpired, useUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { forgetUnlockProof, isThreadLockedError, onUnlockExpired, useUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 import { ThreadLockDialog } from "./thread-lock-dialog";
 
@@ -47,8 +47,20 @@ export const LockedChatGate = ({ children, threadId }: { children: ReactNode; th
         setRelocked(false);
     }
 
-    // A relocked chat whose passcode was removed answers the read with no proof, so it shows again.
-    const hidden = proof === undefined && (isThreadLockedError(error) || (relocked && !isSuccess));
+    // A refused read with a proof in hand means that proof is stale (the passcode epoch
+    // rotated on another tab or device). Forget it: that relocks the chat and drops what it
+    // read. The next read carries no proof, is refused once more, and does not forget again.
+    const staleProof = proof !== undefined && isThreadLockedError(error);
+
+    useEffect(() => {
+        if (staleProof) {
+            forgetUnlockProof(threadId);
+        }
+    }, [staleProof, threadId]);
+
+    // A refusal hides the chat whether or not a proof is held. A relocked chat whose passcode
+    // was removed answers the read with no proof, so it shows again.
+    const hidden = isThreadLockedError(error) || (proof === undefined && relocked && !isSuccess);
 
     if (!hidden) {
         return children;

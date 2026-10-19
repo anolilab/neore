@@ -117,6 +117,42 @@ describe("abortThreadStream", () => {
         await expect(run(async (context) => await context.runMutation(addChunk, { final: false, streamId, text: "more" }))).rejects.toThrow(CONFLICT);
     });
 
+    it("stops every live reply in the thread, not only the first hundred", async () => {
+        const threadId = await runningThread();
+        const streamIds = await run(async (context) => {
+            const ids: string[] = [];
+
+            for (let i = 0; i < 120; i += 1) {
+                ids.push(
+                    await context.db.insert("persistentStreams", {
+                        expiresAt: Date.now() + 60_000,
+                        messageId: "m1",
+                        status: "streaming",
+                        streamingConfig: { contentType: "text", model: "m" },
+                        threadId,
+                        userId: OWNER,
+                    }),
+                );
+            }
+
+            return ids;
+        });
+
+        const result = await harness.withIdentity({ userId: OWNER } as never).mutation(threadStopProcedure(), { threadId } as never);
+
+        expect(result).toStrictEqual({ aborted: true });
+
+        const statuses = await run(async (context) => {
+            const { page } = await context.db.persistentStreams.findMany({ where: { threadId } });
+
+            return page.map((row: { status: string }) => row.status);
+        });
+
+        expect(statuses).toHaveLength(streamIds.length);
+        expect(statuses.every((status: string) => status === "done")).toBe(true);
+        expect(await fieldOf(threadId, "status")).toBe("abort");
+    });
+
     it("returns false and changes nothing when no run is active", async () => {
         const threadId = await runningThread();
         const streamId = await insertPersistentStream(threadId, "done");

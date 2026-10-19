@@ -375,6 +375,7 @@ export interface InternalApiTypes {
                     claimStreamRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, boolean>;
                     cleanupExpiredStreams: FunctionReference<"mutation", {}, void>;
                     createStream: FunctionReference<"mutation", { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, Id<"persistentStreams">>;
+                    finishStoppedReply: FunctionReference<"mutation", { pendingReasoning: string; pendingText: string; streamId: Id<"persistentStreams"> }, boolean>;
                     getChunksAfter: FunctionReference<"query", { afterIndex: number; streamId: Id<"persistentStreams"> }, { chunks: Array<{ reasoning?: string; speaker?: { name: string; skillId: string }; text: string }>; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, "streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, { messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
@@ -607,6 +608,7 @@ export interface InternalApiTypes {
             resolveKnowledgeFiles: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, { fileIds: string[]; source: "thread"; } | { fileIds: string[]; source: "all"; }>;
         };
         collections: {
+            gatedKnowledgeFileIds: FunctionReference<"query", { admittedRun?: boolean; threadId?: Id<"threads">; unlockProof?: string; userId: string }, Array<string>>;
             getCollectionOwner: FunctionReference<"query", { collectionId: Id<"knowledgeCollections"> }, null | string>;
             listFilesInCollection: FunctionReference<"query", { collectionId: Id<"knowledgeCollections">; requesterId: string }, null | Array<{ _id: Id<"knowledgeFiles">; chunkCount?: number; createdAt: number; mimeType: string; name: string; relativePath?: string; size: number; sourceUrl?: string; status: string }>>;
             resolveRetrievalScope: FunctionReference<"query", { admittedRun?: boolean; threadId: Id<"threads">; unlockProof?: string; userId: string }, { fileIds: Array<string>; foreign: Array<{ collectionIds: Array<string>; ownerId: string }>; hasExplicitScope: boolean }>;
@@ -1366,6 +1368,7 @@ export const internal: InternalApiTypes = {
                     claimStreamRun: { __lunoraRef: "chat_streaming_persistent_library:claimStreamRun" },
                     cleanupExpiredStreams: { __lunoraRef: "chat_streaming_persistent_library:cleanupExpiredStreams" },
                     createStream: { __lunoraRef: "chat_streaming_persistent_library:createStream" },
+                    finishStoppedReply: { __lunoraRef: "chat_streaming_persistent_library:finishStoppedReply" },
                     getChunksAfter: { __lunoraRef: "chat_streaming_persistent_library:getChunksAfter" },
                     getStreamStatus: { __lunoraRef: "chat_streaming_persistent_library:getStreamStatus" },
                     getStreamText: { __lunoraRef: "chat_streaming_persistent_library:getStreamText" },
@@ -1598,6 +1601,7 @@ export const internal: InternalApiTypes = {
             resolveKnowledgeFiles: { __lunoraRef: "knowledge_agent_assignment:resolveKnowledgeFiles" },
         },
         collections: {
+            gatedKnowledgeFileIds: { __lunoraRef: "knowledge_collections:gatedKnowledgeFileIds" },
             getCollectionOwner: { __lunoraRef: "knowledge_collections:getCollectionOwner" },
             listFilesInCollection: { __lunoraRef: "knowledge_collections:listFilesInCollection" },
             resolveRetrievalScope: { __lunoraRef: "knowledge_collections:resolveRetrievalScope" },

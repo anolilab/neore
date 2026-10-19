@@ -50,6 +50,24 @@ export class StreamFailedError extends Error {
     }
 }
 
+/** Brands a refused chunk write, so a caller can tell it from any other failure. */
+const WRITE_REFUSED = Symbol.for("neore.stream-write-refused");
+
+/** A refused chunk write, carrying the text the run had buffered and not yet written. */
+export interface StreamWriteRefused extends Error {
+    pending: { reasoning: string; text: string };
+}
+
+/**
+ * `addChunk` refused a write with `CONFLICT`: the stream was ended while its run
+ * was writing, which is a sidebar stop (`stopActiveForThread`). The run keeps the
+ * text it had buffered and not yet written, so the stopped reply can keep it.
+ */
+export const streamWriteRefused = (pending: { reasoning: string; text: string }): StreamWriteRefused =>
+    Object.assign(new Error("Stream write refused: the stream was ended"), { pending, [WRITE_REFUSED]: true });
+
+export const isStreamWriteRefused = (error: unknown): error is StreamWriteRefused => typeof error === "object" && error !== null && WRITE_REFUSED in error;
+
 export interface PipedStream {
     /** Wall-clock ms of the first non-empty delta, if any. */
     firstTokenTime: number | undefined;
@@ -69,12 +87,24 @@ export const pipeToPersistentChunks = async (
     let lastFlushAt: number | undefined;
 
     const flush = async (): Promise<void> => {
-        await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-            final: false,
-            reasoning: pending.reasoning || undefined,
-            streamId: streamId as Id<"persistentStreams">,
-            text: pending.text,
-        });
+        try {
+            await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+                final: false,
+                reasoning: pending.reasoning || undefined,
+                streamId: streamId as Id<"persistentStreams">,
+                text: pending.text,
+            });
+        } catch (error) {
+            // A thrown `LunoraError` carries `code`; a wire-decoded one carries it in `data`.
+            const { code, data } = (error ?? {}) as { code?: unknown; data?: { code?: unknown } };
+
+            if (code === "CONFLICT" || data?.code === "CONFLICT") {
+                throw streamWriteRefused({ ...pending });
+            }
+
+            throw error;
+        }
+
         pending = { reasoning: "", text: "" };
         lastFlushAt = Date.now();
     };

@@ -718,6 +718,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_streaming_persistent_library:claimStreamRun": lunora_chat_streaming_persistent_library_64.claimStreamRun as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:cleanupExpiredStreams": lunora_chat_streaming_persistent_library_64.cleanupExpiredStreams as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:createStream": lunora_chat_streaming_persistent_library_64.createStream as unknown as RegisteredLunoraFunction,
+    "chat_streaming_persistent_library:finishStoppedReply": lunora_chat_streaming_persistent_library_64.finishStoppedReply as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:getChunksAfter": lunora_chat_streaming_persistent_library_64.getChunksAfter as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:getStreamStatus": lunora_chat_streaming_persistent_library_64.getStreamStatus as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:getStreamText": lunora_chat_streaming_persistent_library_64.getStreamText as unknown as RegisteredLunoraFunction,
@@ -933,6 +934,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "knowledge_collections:deleteCollection": lunora_knowledge_collections_101.deleteCollection as unknown as RegisteredLunoraFunction,
     "knowledge_collections:detachCollectionFromProject": lunora_knowledge_collections_101.detachCollectionFromProject as unknown as RegisteredLunoraFunction,
     "knowledge_collections:detachCollectionFromThread": lunora_knowledge_collections_101.detachCollectionFromThread as unknown as RegisteredLunoraFunction,
+    "knowledge_collections:gatedKnowledgeFileIds": lunora_knowledge_collections_101.gatedKnowledgeFileIds as unknown as RegisteredLunoraFunction,
     "knowledge_collections:getCollectionOwner": lunora_knowledge_collections_101.getCollectionOwner as unknown as RegisteredLunoraFunction,
     "knowledge_collections:getProjectCollections": lunora_knowledge_collections_101.getProjectCollections as unknown as RegisteredLunoraFunction,
     "knowledge_collections:getThreadCollections": lunora_knowledge_collections_101.getThreadCollections as unknown as RegisteredLunoraFunction,
@@ -4211,6 +4213,14 @@ const __obj9 = { "contentType": source["streamingConfig"]["contentType"], ...(__
 if (typeof source["threadId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "messageId": source["messageId"], "streamingConfig": __obj9, "threadId": source["threadId"], "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_chat_streaming_persistent_library_64.finishStoppedReply.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["pendingReasoning"] !== "string") return DEFER;
+if (typeof source["pendingText"] !== "string") return DEFER;
+if (typeof source["streamId"] !== "string") return DEFER;
+return { "pendingReasoning": source["pendingReasoning"], "pendingText": source["pendingText"], "streamId": source["streamId"] };
 });
 installCompiledValidatorMap(lunora_chat_streaming_persistent_library_64.getChunksAfter.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8423,6 +8433,7 @@ export interface Caller {
                     claimStreamRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                     cleanupExpiredStreams: (args?: {}) => Promise<void>;
                     createStream: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<Id<"persistentStreams">>;
+                    finishStoppedReply: (args: { pendingReasoning: string; pendingText: string; streamId: Id<"persistentStreams"> }) => Promise<boolean>;
                     getChunksAfter: (args: { afterIndex: number; streamId: Id<"persistentStreams"> }) => Promise<{ chunks: Array<{ reasoning?: string; speaker?: { name: string; skillId: string }; text: string }>; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
@@ -8752,6 +8763,7 @@ export interface Caller {
             deleteCollection: (args: { collectionId: Id<"knowledgeCollections">; deleteFiles?: boolean }) => Promise<{ filesDeleted: number; filesUnfiled: number }>;
             detachCollectionFromProject: (args: { collectionId: Id<"knowledgeCollections">; projectId: Id<"projects"> }) => Promise<null>;
             detachCollectionFromThread: (args: { collectionId: Id<"knowledgeCollections">; threadId: Id<"threads">; unlockProof?: string }) => Promise<null>;
+            gatedKnowledgeFileIds: (args: { admittedRun?: boolean; threadId?: Id<"threads">; unlockProof?: string; userId: string }) => Promise<Array<string>>;
             getCollectionOwner: (args: { collectionId: Id<"knowledgeCollections"> }) => Promise<null | string>;
             getProjectCollections: (args: { projectId: Id<"projects"> }) => Promise<Array<{ addedAt: number; collectionId: Id<"knowledgeCollections">; isOwner: boolean; name: string }>>;
             getThreadCollections: (args: { threadId: Id<"threads">; unlockProof?: string }) => Promise<Array<{ addedAt: number; collectionId: Id<"knowledgeCollections">; isOwner: boolean; name: string }>>;
@@ -10033,6 +10045,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
                     claimStreamRun: (args) => callRegistered(context, "chat_streaming_persistent_library:claimStreamRun", args),
                     cleanupExpiredStreams: (args) => callRegistered(context, "chat_streaming_persistent_library:cleanupExpiredStreams", args),
                     createStream: (args) => callRegistered(context, "chat_streaming_persistent_library:createStream", args),
+                    finishStoppedReply: (args) => callRegistered(context, "chat_streaming_persistent_library:finishStoppedReply", args),
                     getChunksAfter: (args) => callRegistered(context, "chat_streaming_persistent_library:getChunksAfter", args),
                     getStreamStatus: (args) => callRegistered(context, "chat_streaming_persistent_library:getStreamStatus", args),
                     getStreamText: (args) => callRegistered(context, "chat_streaming_persistent_library:getStreamText", args),
@@ -10362,6 +10375,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             deleteCollection: (args) => callRegistered(context, "knowledge_collections:deleteCollection", args),
             detachCollectionFromProject: (args) => callRegistered(context, "knowledge_collections:detachCollectionFromProject", args),
             detachCollectionFromThread: (args) => callRegistered(context, "knowledge_collections:detachCollectionFromThread", args),
+            gatedKnowledgeFileIds: (args) => callRegistered(context, "knowledge_collections:gatedKnowledgeFileIds", args),
             getCollectionOwner: (args) => callRegistered(context, "knowledge_collections:getCollectionOwner", args),
             getProjectCollections: (args) => callRegistered(context, "knowledge_collections:getProjectCollections", args),
             getThreadCollections: (args) => callRegistered(context, "knowledge_collections:getThreadCollections", args),

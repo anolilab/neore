@@ -1,26 +1,30 @@
 /**
  * `<LockedChatGate>` with the REAL unlock store, cRPC and query options. Only the
  * transport (`useLunora`'s client) and i18n are faked: the fake client refuses a
- * read without a proof the way the backend does, and records the args it got.
+ * read whose proof is not the current passcode epoch's, the way the backend does,
+ * and records the args it got.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { forgetAllUnlockProofs, forgetUnlockProof, rememberUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { currentUnlockProof, forgetAllUnlockProofs, forgetUnlockProof, rememberUnlockProof } from "@/lib/lunora/unlock-proofs";
 
 import { LockedChatGate } from "./locked-chat-gate";
 
 const harness = vi.hoisted(() => {
-    const state = { passcodeRemoved: false };
+    // `validProof` is the passcode epoch: null accepts any proof, a string accepts only that one.
+    const state = { passcodeRemoved: false, validProof: null as string | null };
     const client = {
         action: vi.fn(),
         getAuthToken: () => null,
         mutation: vi.fn(),
         onAuthTokenChange: () => () => {},
         query: vi.fn(async (_reference: unknown, args: { unlockProof?: string }) => {
-            if (args.unlockProof === undefined && !state.passcodeRemoved) {
+            const accepted = state.passcodeRemoved || (args.unlockProof !== undefined && (state.validProof === null || args.unlockProof === state.validProof));
+
+            if (!accepted) {
                 throw Object.assign(new Error("This chat is locked"), { data: { code: "THREAD_LOCKED" } });
             }
 
@@ -50,13 +54,15 @@ vi.mock("@lunora/react", async (importOriginal) => {
 const renderGate = () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-    return render(
+    const view = render(
         <QueryClientProvider client={queryClient}>
             <LockedChatGate threadId="thread-1">
                 <p>chat body</p>
             </LockedChatGate>
         </QueryClientProvider>,
     );
+
+    return { ...view, queryClient };
 };
 
 const promptHeading = () => screen.findByRole("heading", { name: "This chat is locked" });
@@ -67,9 +73,19 @@ const lastReadArgs = (): Record<string, unknown> => {
     return (calls.at(-1)?.[1] ?? {}) as Record<string, unknown>;
 };
 
+/** Lets pending promises and timers run, so a refetch loop would show up as more calls. */
+const settle = async (ms = 50) => {
+    await act(async () => {
+        await new Promise((resolve) => {
+            setTimeout(resolve, ms);
+        });
+    });
+};
+
 beforeEach(() => {
     harness.client.query.mockClear();
     harness.state.passcodeRemoved = false;
+    harness.state.validProof = null;
 });
 
 afterEach(() => {
@@ -140,6 +156,89 @@ describe("a locked chat behind its gate", () => {
 
         expect(await screen.findByText("chat body")).toBeTruthy();
         expect(screen.queryByRole("heading", { name: "This chat is locked" })).toBeNull();
+    });
+});
+
+describe("a stale proof behind its gate (the passcode epoch rotated elsewhere)", () => {
+    it("a refused read hides the mounted chat, forgets the proof and shows the prompt", async () => {
+        const { queryClient } = renderGate();
+
+        await promptHeading();
+        act(() => {
+            rememberUnlockProof("thread-1", "proof-old", Date.now() + 60_000);
+        });
+        expect(await screen.findByText("chat body")).toBeTruthy();
+
+        // Another tab or device rotates the epoch; this tab's proof is now refused on refetch.
+        harness.state.validProof = "proof-new";
+        await act(async () => {
+            await queryClient.invalidateQueries();
+        });
+
+        expect(await promptHeading()).toBeTruthy();
+        expect(screen.queryByText("chat body")).toBeNull();
+        expect(currentUnlockProof("thread-1")).toBeUndefined();
+    });
+
+    it("does not loop: once the stale proof is forgotten, the refusal settles", async () => {
+        const { queryClient } = renderGate();
+
+        await promptHeading();
+        act(() => {
+            rememberUnlockProof("thread-1", "proof-old", Date.now() + 60_000);
+        });
+        expect(await screen.findByText("chat body")).toBeTruthy();
+        harness.state.validProof = "proof-new";
+        await act(async () => {
+            await queryClient.invalidateQueries();
+        });
+        await promptHeading();
+
+        const callsAfterRefusal = harness.client.query.mock.calls.length;
+
+        await settle();
+
+        expect(harness.client.query.mock.calls).toHaveLength(callsAfterRefusal);
+    });
+
+    it("a fresh unlock after the stale refusal renders the chat again", async () => {
+        const { queryClient } = renderGate();
+
+        await promptHeading();
+        act(() => {
+            rememberUnlockProof("thread-1", "proof-old", Date.now() + 60_000);
+        });
+        expect(await screen.findByText("chat body")).toBeTruthy();
+        harness.state.validProof = "proof-new";
+        await act(async () => {
+            await queryClient.invalidateQueries();
+        });
+        await promptHeading();
+
+        act(() => {
+            rememberUnlockProof("thread-1", "proof-new", Date.now() + 60_000);
+        });
+
+        expect(await screen.findByText("chat body")).toBeTruthy();
+        expect(lastReadArgs()).toMatchObject({ unlockProof: "proof-new" });
+        expect(screen.queryByRole("heading", { name: "This chat is locked" })).toBeNull();
+    });
+
+    it("keeps the chat and the proof when the refetch is still accepted (no false positive)", async () => {
+        const { queryClient } = renderGate();
+
+        await promptHeading();
+        act(() => {
+            rememberUnlockProof("thread-1", "proof-ok", Date.now() + 60_000);
+        });
+        expect(await screen.findByText("chat body")).toBeTruthy();
+
+        await act(async () => {
+            await queryClient.invalidateQueries();
+        });
+
+        expect(screen.getByText("chat body")).toBeTruthy();
+        expect(currentUnlockProof("thread-1")).toBe("proof-ok");
     });
 });
 
