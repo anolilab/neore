@@ -99,6 +99,12 @@ export const getThreadPromptOutline = liteAuthQuery
                 }
             }
 
+            // The newest MAX_OUTLINE_PROMPTS are already known once one more prompt is found; the scan
+            // need not read the rest of its rows to know the outline is truncated. Same items and flag.
+            if (newestFirst.length > MAX_OUTLINE_PROMPTS) {
+                break;
+            }
+
             scanned += page.rows.length;
 
             if (page.isDone || page.continueCursor === null) {
