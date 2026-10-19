@@ -1,7 +1,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
-import { deductCreditsFromGateway } from "../auth/billing";
+import { deductCreditsFromGateway, releaseGatewayCredits, reserveGatewayCredits } from "../auth/billing";
 import schema from "../schema";
 import { internal } from "../_generated/internal";
 import type { WorkflowNode } from "./core";
@@ -35,6 +35,10 @@ const makeCtx = ({ creditsLeft = null, limitOk = true }: Answers = {}) => {
         throw new Error("unexpected query");
     });
     const runMutation = vi.fn(async (reference: unknown, _args?: unknown) => {
+        if (reference === internal.auth.billing.reserveGatewayCredits) {
+            return true;
+        }
+
         if (reference === internal.chat.daily_charge.chargeDailyUnit) {
             return limitOk;
         }
@@ -83,6 +87,10 @@ const ledgerCtx = ({ deductFailures = 0, recordFails = false }: { deductFailures
 
             claims.push(args);
 
+            return true;
+        }
+
+        if (reference === internal.auth.billing.reserveGatewayCredits) {
             return true;
         }
 
@@ -324,6 +332,161 @@ describe("the recorded charge's lapse target", () => {
                         await ctx.runMutation(deductCreditsFromGateway, { claimKey: "k", costMicrodollars: 1, modelId: "m", requestId: "r", userId: "u" }),
                 ),
             ).resolves.toBeUndefined();
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+/**
+ * One member's balance, taken the way `reserveGatewayCredits` takes it: the check and the take in one step. Every
+ * `creditsLeft` read answers the full balance, as two runs that start together both read it before either reserves.
+ */
+const balanceCtx = ({ balance, quotaFails = false, quotaOk = true }: { balance: number; quotaFails?: boolean; quotaOk?: boolean }) => {
+    let left = balance;
+    const reserved = new Map<string, number>();
+    const runMutation = vi.fn(async (reference: unknown, args?: any) => {
+        if (reference === internal.auth.billing.reserveGatewayCredits) {
+            // 1 credit is 1,000 microdollars.
+            const credits = args.costMicrodollars / 1000;
+
+            if (credits > left) {
+                return false;
+            }
+
+            left -= credits;
+            reserved.set(args.requestId, credits);
+
+            return true;
+        }
+
+        if (reference === internal.auth.billing.releaseGatewayCredits) {
+            left += reserved.get(args.requestId) ?? 0;
+            reserved.delete(args.requestId);
+
+            return undefined;
+        }
+
+        if (reference === internal.chat.daily_charge.chargeDailyUnit) {
+            if (quotaFails) {
+                throw new Error("quota unavailable");
+            }
+
+            return quotaOk;
+        }
+
+        return undefined;
+    });
+    const runQuery = vi.fn(async () => {
+        return { creditsLeft: balance };
+    });
+
+    return { left: () => left, runMutation, runQuery };
+};
+
+describe("the clip's credit reservation", () => {
+    it("refuses the second of two runs racing for a balance that covers one clip, before its paid call", async () => {
+        const ctx = balanceCtx({ balance: 600 });
+        const dispatchA = vi.fn(async () => "clip-a");
+        const dispatchB = vi.fn(async () => "clip-b");
+
+        const results = await Promise.allSettled([
+            runBilledVideo(ctx, executionContextOf({ orgId: "org-1", runId: "run-a" }), videoNode, "u1", costs(), dispatchA),
+            runBilledVideo(ctx, executionContextOf({ orgId: "org-1", runId: "run-b" }), videoNode, "u1", costs(), dispatchB),
+        ]);
+
+        expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+        expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+        expect(dispatchA.mock.calls.length + dispatchB.mock.calls.length).toBe(1);
+        const refusal = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+
+        expect(refusal?.reason).toBeInstanceOf(Error);
+        expect((refusal?.reason as Error).message).toContain("Not enough credits");
+        expect(ctx.left()).toBe(100);
+    });
+
+    it("gives the reservation back when the paid work makes no clip", async () => {
+        const ctx = balanceCtx({ balance: 1000 });
+
+        await expect(
+            runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => {
+                throw new Error("fal is down");
+            }),
+        ).rejects.toThrow("fal is down");
+        expect(ctx.left()).toBe(1000);
+    });
+
+    it("gives the reservation back when the daily quota call throws, not only when it refuses", async () => {
+        const ctx = balanceCtx({ balance: 1000, quotaFails: true });
+
+        await expect(runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip")).rejects.toThrow(
+            "quota unavailable",
+        );
+        expect(ctx.left()).toBe(1000);
+    });
+
+    it("gives the reservation back when the daily quota refuses the run", async () => {
+        const ctx = balanceCtx({ balance: 1000, quotaOk: false });
+
+        await expect(runBilledVideo(ctx, executionContextOf({ orgId: "org-1" }), videoNode, "u1", costs(), async () => "clip")).rejects.toThrow(
+            "daily video generation limit",
+        );
+        expect(ctx.left()).toBe(1000);
+    });
+});
+
+describe("the clip's reservation against the real ledger", () => {
+    it("takes a clip within the balance, refuses one past it, gives a release back once, and posts nothing after", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const observed = await harness.run(async (ctx: any) => {
+                // 1,000 credits: one credit is 1,000 microdollars.
+                const orgId = await ctx.db.insert("organization", { createdAt: Date.now(), name: "Org", slug: "org" });
+
+                await ctx.db.insert("memberCredits", { creditOverride: 1000, memberId: "member-1", organizationId: orgId, usedCredits: 0, userId: "u1" });
+
+                const usedCredits = async (): Promise<number> => {
+                    const record = await ctx.db.memberCredits.findFirst({ where: { organizationId: orgId, userId: "u1" } });
+
+                    return (record as { usedCredits?: number }).usedCredits ?? 0;
+                };
+                const reserve = async (costMicrodollars: number, requestId: string): Promise<boolean> =>
+                    await ctx.runMutation(reserveGatewayCredits, { costMicrodollars, modelId: PAID, orgId, requestId, userId: "u1" });
+                const ledgerRowOf = async (requestId: string): Promise<unknown> =>
+                    await ctx.db
+                        .query("gatewayUsageDeductions")
+                        .withIndex("by_requestId", (q: any) => q.eq("requestId", requestId))
+                        .first();
+
+                const first = await reserve(500_000, "r-1");
+                const afterFirst = await usedCredits();
+                const second = await reserve(500_000, "r-2");
+                const afterSecond = await usedCredits();
+                const third = await reserve(1000, "r-3");
+                const afterRefusal = await usedCredits();
+
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-1" });
+                const afterRelease = await usedCredits();
+                const rowAfterRelease = await ledgerRowOf("r-1");
+
+                await ctx.runMutation(releaseGatewayCredits, { requestId: "r-1" });
+                const afterSecondRelease = await usedCredits();
+
+                return { afterFirst, afterRefusal, afterRelease, afterSecond, afterSecondRelease, first, rowAfterRelease, second, third };
+            });
+
+            expect(observed).toMatchObject({
+                afterFirst: 500,
+                afterRefusal: 1000,
+                afterRelease: 500,
+                afterSecond: 1000,
+                first: true,
+                second: true,
+                third: false,
+            });
+            expect(observed.rowAfterRelease).toBeFalsy();
+            expect(observed.afterSecondRelease).toBe(500);
         } finally {
             harness.close();
         }

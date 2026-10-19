@@ -9,10 +9,12 @@
  *   credits, when the account has a credit record. The calls are the clip and, when this node is the first
  *   to need it in the run, the frame extracted for it. The node run takes one unit of the daily video quota that
  *   `/chat/media` and the chat video tool take, once: a retry of the same node finds it taken (frame extraction takes none);
- * - per node, after a clip is made: its cost is deducted from the account's credits, keyed on the run and
- *   node so a retry is a no-op. A failed generation settles nothing, so it is not charged. A deduction that
- *   fails is retried once, then recorded as a claim the next sweep deducts again (`chargePaidCall`); the clip is
- *   returned either way, since the paid work is done.
+ * - per node, the clip's cost is reserved from the account's credits in the same mutation as its check
+ *   (`reserveGatewayCredits`), so two runs cannot both spend one balance. A run that makes no clip gives the
+ *   reservation back (`releaseGatewayCredits`), so a failed generation is not charged. Once a clip is made, its
+ *   charge is posted under the reservation's request id, and `chargePaidCall` is then a no-op. A deduction that
+ *   fails is retried once, then recorded as a claim the next sweep deducts again; the clip is returned either way,
+ *   since the paid work is done.
  * - per frame extraction: charged by the extraction action (`media-ops.ts`) once fal has accepted the request,
  *   whatever happens after. Keyed on the run and source clip, so a second node reading the frame pays nothing.
  *
@@ -80,17 +82,61 @@ const beginVideoRun = async (context: RunContext, run: ExecutionContext, node: W
         }
     }
 
-    // The same unit `/chat/media` charges: the tier and the admin exemption are read where the quota is kept. Keyed on the node run,
-    // so a retry of it takes no second unit.
-    const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
-        kind: "Video",
-        organizationId: run.orgId,
-        requestId: videoRequestId(run.runId, node.id),
-        userId,
-    });
+    // The clip is taken with its own check in one mutation, so two runs cannot both pass the snapshot above on one balance.
+    if (costs.clipMicrodollars !== undefined && run.orgId) {
+        const reserved = await context.runMutation(internal.auth.billing.reserveGatewayCredits, {
+            costMicrodollars: costs.clipMicrodollars,
+            modelId: clipModelIdOf(node),
+            orgId: run.orgId,
+            requestId: videoRequestId(run.runId, node.id),
+            userId,
+        });
 
-    if (!charged) {
-        throw new Error("You've reached your daily video generation limit.");
+        if (!reserved) {
+            throw new Error(`Not enough credits for the "${String(node.data.label ?? node.type)}" video`);
+        }
+    }
+
+    // The same unit `/chat/media` charges: the tier and the admin exemption are read where the quota is kept. Keyed on the node run,
+    // so a retry of it takes no second unit. Any failure here, a refusal or a throw, gives the clip's reservation back.
+    try {
+        const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+            kind: "Video",
+            organizationId: run.orgId,
+            requestId: videoRequestId(run.runId, node.id),
+            userId,
+        });
+
+        if (!charged) {
+            throw new Error("You've reached your daily video generation limit.");
+        }
+    } catch (error) {
+        await releaseClip(context, run, node, costs);
+
+        throw error;
+    }
+};
+
+/** The model the clip is charged to, as the ledger records it. */
+const clipModelIdOf = (node: WorkflowNode): string => {
+    const kind = videoKindOf(node);
+
+    return kind === undefined ? "" : modelIdFor(node, kind);
+};
+
+/**
+ * Gives back the clip's reservation when no clip was made. A failed release leaves the reservation taken, so the
+ * member is charged for a clip they did not get. That is logged, and not retried here (a residual ceiling).
+ */
+const releaseClip = async (context: Pick<ActionCtx, "runMutation">, run: ExecutionContext, node: WorkflowNode, costs: VideoRunCosts): Promise<void> => {
+    if (costs.clipMicrodollars === undefined || !run.orgId) {
+        return;
+    }
+
+    try {
+        await context.runMutation(internal.auth.billing.releaseGatewayCredits, { requestId: videoRequestId(run.runId, node.id) });
+    } catch (error) {
+        chatLogger.error("[workflow] video credit reservation could not be released", { error, requestId: videoRequestId(run.runId, node.id) });
     }
 };
 
@@ -206,16 +252,23 @@ export const runBilledVideo = async <T>(
 ): Promise<T> => {
     await beginVideoRun(context, run, node, userId, costs);
 
-    const result = await dispatch();
+    let result: T;
+
+    try {
+        result = await dispatch();
+    } catch (error) {
+        await releaseClip(context, run, node, costs);
+
+        throw error;
+    }
 
     if (costs.clipMicrodollars !== undefined) {
-        const kind = videoKindOf(node);
-
+        // The reservation in `beginVideoRun` already posted this request id, so the ledger makes this a no-op.
         await chargePaidCall(
             context,
             {
                 costMicrodollars: costs.clipMicrodollars,
-                modelId: kind === undefined ? "" : modelIdFor(node, kind),
+                modelId: clipModelIdOf(node),
                 orgId: run.orgId,
                 requestId: videoRequestId(run.runId, node.id),
             },

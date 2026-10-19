@@ -1056,6 +1056,26 @@
       "to": "table:user"
     },
     {
+      "from": "function:auth_billing:releaseGatewayCredits",
+      "kind": "read",
+      "to": "table:gatewayUsageDeductions"
+    },
+    {
+      "from": "function:auth_billing:releaseGatewayCredits",
+      "kind": "write",
+      "to": "table:gatewayUsageDeductions"
+    },
+    {
+      "from": "function:auth_billing:releaseGatewayCredits",
+      "kind": "write",
+      "to": "table:memberCredits"
+    },
+    {
+      "from": "function:auth_billing:reserveGatewayCredits",
+      "kind": "read",
+      "to": "table:gatewayUsageDeductions"
+    },
+    {
       "from": "function:auth_billing:setMemberCreditOverride",
       "kind": "write",
       "to": "table:memberCredits"
@@ -8102,6 +8122,20 @@
       "id": "function:auth_billing:listMemberCredits",
       "kind": "function",
       "name": "auth.billing.listMemberCredits",
+      "module": "auth"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:auth_billing:releaseGatewayCredits",
+      "kind": "function",
+      "name": "auth.billing.releaseGatewayCredits",
+      "module": "auth"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:auth_billing:reserveGatewayCredits",
+      "kind": "function",
+      "name": "auth.billing.reserveGatewayCredits",
       "module": "auth"
     },
     {
@@ -19752,25 +19786,37 @@
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 73,
+      "line": 75,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 85,
+      "line": 87,
       "reason": "\"runBilledVideo\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 120,
+      "line": 102,
+      "reason": "\"runBilledVideo\" is not a registered function"
+    },
+    {
+      "file": "workflow/video-billing",
+      "kind": "call",
+      "line": 133,
+      "reason": "\"runBilledVideo\" is not a registered function"
+    },
+    {
+      "file": "workflow/video-billing",
+      "kind": "call",
+      "line": 162,
       "reason": "\"chargePaidCall\" is not a registered function"
     },
     {
       "file": "workflow/video-billing",
       "kind": "call",
-      "line": 172,
+      "line": 214,
       "reason": "\"chargePaidCall\" is not a registered function"
     }
   ],

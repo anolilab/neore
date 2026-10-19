@@ -16,7 +16,7 @@ import { adminMutation, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { getMemberByOrganizationAndUser, getOrganization, getUser } from "./lib/better-auth-queries";
 import { getUserEffectiveSettings } from "./lib/settings-resolver";
 import { resolveUserPlan } from "./lib/plan";
-import { vBillingMode } from "./lib/gateway-credits";
+import { computeGatewayCredits, vBillingMode } from "./lib/gateway-credits";
 import { applyGatewayDeduction } from "./lib/gateway-deduction";
 import { creemTierPatch } from "../billing/plans";
 import { authLogger } from "../lib/logger";
@@ -394,6 +394,71 @@ export const deductCreditsFromGateway = internalMutation
         // Idempotent on `requestId` — the gateway retries usage reports.
         await applyGatewayDeduction(context, args);
     });
+
+/**
+ * Takes a platform run's clip cost from the member's credits before the paid call, and refuses when they
+ * have fewer left. The check and the deduction are one mutation, so two runs cannot both pass on the same
+ * balance. The deduction is the one `deductCreditsFromGateway` makes, keyed on `requestId`, so the charge
+ * made after the run is then a no-op. `false` is a refusal. No organization or no credit record is not refused, as in chat.
+ */
+export const reserveGatewayCredits = internalMutation
+    .input({
+        costMicrodollars: v.number(),
+        modelId: v.string(),
+        orgId: v.string().max(MAX_LENGTH.id),
+        requestId: v.string(),
+        userId: v.string(),
+    })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx: context }) => {
+        const prior = await context.db
+            .query("gatewayUsageDeductions")
+            .withIndex("by_requestId", (q) => q.eq("requestId", args.requestId))
+            .first();
+
+        // A retry of the node: its reservation is already taken.
+        if (prior) {
+            return true;
+        }
+
+        const record = await context.db.memberCredits.findFirst({ where: { organizationId: args.orgId, userId: args.userId } });
+
+        if (record) {
+            const settings = await getUserEffectiveSettings(context, args.userId, args.orgId);
+            const credits = computeGatewayCredits({ billingMode: "platform", costMicrodollars: args.costMicrodollars });
+
+            if (credits > settings.credits - (record.usedCredits ?? 0)) {
+                return false;
+            }
+        }
+
+        await applyGatewayDeduction(context, { ...args, billingMode: "platform" });
+
+        return true;
+    });
+
+/**
+ * Gives back a reservation from `reserveGatewayCredits` whose paid work produced no clip: removes its ledger
+ * row and the credits it took. With no row (never taken, or already released) it does nothing.
+ */
+export const releaseGatewayCredits = internalMutation.input({ requestId: v.string() }).mutation(async ({ args, ctx: context }) => {
+    const row = await context.db
+        .query("gatewayUsageDeductions")
+        .withIndex("by_requestId", (q) => q.eq("requestId", args.requestId))
+        .first();
+
+    if (!row) {
+        return;
+    }
+
+    const record = await context.db.memberCredits.findFirst({ where: { organizationId: row.orgId, userId: row.userId } });
+
+    if (record) {
+        await context.db.patch(record._id, { usedCredits: Math.max((record.usedCredits ?? 0) - row.creditsDeducted, 0) });
+    }
+
+    await context.db.delete(row._id);
+});
 
 /**
  * Get the list of members with their credit information for the active organization.
