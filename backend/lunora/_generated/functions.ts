@@ -8430,7 +8430,7 @@ export interface Caller {
                     getStreamStatus: (args: { streamId: Id<"persistentStreams"> }) => Promise<"streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: (args: { streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: (args: { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }) => Promise<void>;
-                    stopActiveForThread: (args: { threadId: string }) => Promise<boolean>;
+                    stopActiveForThread: (args: { messageId?: string; threadId: string }) => Promise<boolean>;
                 };
             };
         };

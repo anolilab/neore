@@ -380,7 +380,7 @@ export interface InternalApiTypes {
                     getStreamStatus: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, "streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, { messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: FunctionReference<"mutation", { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }, void>;
-                    stopActiveForThread: FunctionReference<"mutation", { threadId: string }, boolean>;
+                    stopActiveForThread: FunctionReference<"mutation", { messageId?: string; threadId: string }, boolean>;
                 };
             };
         };

@@ -16792,61 +16792,37 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 171,
+      "line": 172,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 171,
+      "line": 172,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 302,
+      "line": 304,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 302,
+      "line": 304,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 323,
+      "line": 350,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 323,
-      "reason": "\"runGroupTurn\" is not a registered function"
-    },
-    {
-      "file": "chat/group/run",
-      "kind": "call",
-      "line": 452,
-      "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
-    },
-    {
-      "file": "chat/group/run",
-      "kind": "call",
-      "line": 452,
-      "reason": "\"runGroupTurn\" is not a registered function"
-    },
-    {
-      "file": "chat/group/run",
-      "kind": "call",
-      "line": 461,
-      "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
-    },
-    {
-      "file": "chat/group/run",
-      "kind": "call",
-      "line": 461,
+      "line": 350,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
@@ -16863,62 +16839,86 @@
     },
     {
       "file": "chat/group/run",
+      "kind": "call",
+      "line": 495,
+      "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
+    },
+    {
+      "file": "chat/group/run",
+      "kind": "call",
+      "line": 495,
+      "reason": "\"runGroupTurn\" is not a registered function"
+    },
+    {
+      "file": "chat/group/run",
+      "kind": "call",
+      "line": 525,
+      "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
+    },
+    {
+      "file": "chat/group/run",
+      "kind": "call",
+      "line": 525,
+      "reason": "\"runGroupTurn\" is not a registered function"
+    },
+    {
+      "file": "chat/group/run",
       "kind": "schedule",
-      "line": 494,
+      "line": 533,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 494,
+      "line": 533,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 522,
+      "line": 561,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 522,
+      "line": 561,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 523,
+      "line": 562,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 523,
+      "line": 562,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 571,
+      "line": 610,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 659,
+      "line": 698,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 677,
+      "line": 716,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 687,
+      "line": 726,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -17260,7 +17260,7 @@
     {
       "file": "chat/lib/persist-stream",
       "kind": "call",
-      "line": 119,
+      "line": 114,
       "reason": "\"pipeToPersistentChunks\" is not a registered function"
     },
     {

@@ -7,7 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../../../schema";
-import { finishStoppedReply } from "./library";
+import { finishStoppedReply, stopActiveForThread } from "./library";
 
 const OWNER = "user-owner";
 
@@ -167,5 +167,73 @@ describe("finishStoppedReply", () => {
         const { promptId, streamId } = await seed("done", { pendingRow: true });
 
         await expect(stop(streamId, { pendingText: "x".repeat(2_000_001), promptMessageId: promptId })).rejects.toThrow();
+    });
+});
+
+describe("stopActiveForThread", () => {
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    const liveStreams = async (count: number) =>
+        await run(async (context) => {
+            const threadId = await context.db.insert("threads", { model: "m", status: "running", title: "t", userId: OWNER });
+            const streamIds: string[] = [];
+
+            for (let index = 0; index < count; index += 1) {
+                streamIds.push(
+                    await context.db.insert("persistentStreams", {
+                        expiresAt: Date.now() + 60_000,
+                        messageId: `prompt-${index}`,
+                        status: "streaming",
+                        streamingConfig: { contentType: "text", model: "m" },
+                        threadId,
+                        userId: OWNER,
+                    }),
+                );
+            }
+
+            return { streamIds, threadId };
+        });
+
+    const stopThread = async (threadId: string, messageId?: string) =>
+        await run(async (context) => await context.runMutation(stopActiveForThread, { messageId, threadId }));
+
+    it("stops only the named prompt's reply when a live stream carries that id", async () => {
+        const { streamIds, threadId } = await liveStreams(2);
+        const [named = "", other = ""] = streamIds;
+
+        expect(await stopThread(threadId, "prompt-0")).toBe(true);
+        expect(await statusOf(named)).toBe("done");
+        expect(await statusOf(other)).toBe("streaming");
+    });
+
+    it("falls back to the whole thread when no live stream carries the id", async () => {
+        const { streamIds, threadId } = await liveStreams(2);
+        const [first = "", second = ""] = streamIds;
+
+        expect(await stopThread(threadId, "placeholder")).toBe(true);
+        expect(await statusOf(first)).toBe("done");
+        expect(await statusOf(second)).toBe("done");
+    });
+
+    it("stops every live stream past one page", async () => {
+        const { streamIds, threadId } = await liveStreams(120);
+
+        expect(await stopThread(threadId)).toBe(true);
+
+        const statuses = await Promise.all(streamIds.map(async (id) => await statusOf(id)));
+
+        expect(statuses.every((status) => status === "done")).toBe(true);
+    });
+
+    it("reports nothing stopped when no stream is live", async () => {
+        const { threadId } = await liveStreams(0);
+
+        expect(await stopThread(threadId)).toBe(false);
     });
 });

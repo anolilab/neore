@@ -9,13 +9,14 @@ import { LunoraError, v } from "lunorash/server";
 import { addMessagesHandler } from "../../../agent/messages";
 import { patchThread } from "../../../agent/table-writes";
 import { internal } from "../../../_generated/internal";
-import type { Id } from "../../../_generated/dataModel";
+import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery } from "../../../_generated/server";
 import { MAX_LENGTH } from "../../../lib/validators";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
 
 const STREAM_TTL_MS = 20 * 60 * 1000; // 20 minutes
+const LIVE_STREAM_PAGE = 50;
 
 export const createStream = internalMutation
     .input({
@@ -166,13 +167,28 @@ export const setStreamStatus = internalMutation
  * ponytail: the stop lands at the run's next chunk write, so a long tool step keeps running (and billing) until then. Abort the in-flight call if that bites.
  */
 export const stopActiveForThread = internalMutation
-    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .input({ messageId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.string().max(MAX_LENGTH.id) })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        // No `limit`: `findMany` returns every match, and the patch takes each row out of the filter.
-        const { page: streams } = await ctx.db.persistentStreams.findMany({
-            where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
-        });
+        // Read the live streams in pages (a thread has one or two; the bound is for a runaway one), then stop them.
+        const live: Doc<"persistentStreams">[] = [];
+        let cursor: string | undefined;
+
+        do {
+            const page = await ctx.db.persistentStreams.findMany({
+                cursor,
+                limit: LIVE_STREAM_PAGE,
+                where: { status: { in: ["pending", "streaming"] }, threadId: args.threadId },
+            });
+
+            live.push(...page.page);
+            cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+        } while (cursor);
+
+        // A stop that names a prompt ends that prompt's reply only. When no live stream carries the id (a
+        // placeholder key, or a reply started from another row), it falls back to the whole thread.
+        const named = args.messageId === undefined ? [] : live.filter((stream) => stream.messageId === args.messageId);
+        const streams = named.length > 0 ? named : live;
 
         for (const stream of streams) {
             await ctx.db.patch(stream._id, { status: "done" });
@@ -222,10 +238,10 @@ export const finishStoppedReply = internalMutation
         const threadId = stream.threadId as Id<"threads">;
 
         if (args.pendingText.length > 0 || args.pendingReasoning.length > 0) {
-            const { page: rows } = await ctx.db.messages.findMany({
+            const pending = await ctx.db.messages.findFirst({
+                orderBy: [{ stepOrder: "desc" }],
                 where: { order: args.order, status: "pending", threadId, tool: false },
             });
-            const pending = rows.toSorted((a, b) => b.stepOrder - a.stepOrder)[0];
             const content = [
                 ...(args.pendingReasoning ? [{ text: args.pendingReasoning, type: "reasoning" as const }] : []),
                 ...(args.pendingText ? [{ text: args.pendingText, type: "text" as const }] : []),

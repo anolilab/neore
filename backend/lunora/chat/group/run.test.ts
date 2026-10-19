@@ -151,7 +151,7 @@ let promptId: string;
 let streamId: string;
 const skillIds: Record<string, string> = {};
 
-const { scriptedModel, textStep, toolCallStep } = await import("./test-models");
+const { scriptedModel, stalledModel, textStep, toolCallStep } = await import("./test-models");
 
 type ScriptedModel = ReturnType<typeof scriptedModel>;
 
@@ -443,6 +443,30 @@ describe("runGroupTurn — stop", () => {
         await runTurn();
 
         expect(await speakersSaid()).toStrictEqual(["WRITER"]);
+        expect((speakerModels.get("INSTR:checker") as ScriptedModel).doStreamCalls).toHaveLength(0);
+        expect(await streamStatus()).toBe("done");
+    });
+
+    it("a stop from the composer or sidebar saves the reply the speaker was writing, and starts no one else", async () => {
+        await setGroup("supervisor", ["writer", "checker"]);
+        routerScript.speakers = ["p1", "p2"];
+
+        // The stop ends the stream while the writer is mid-reply; the model only ends once it is aborted.
+        speakerModels.set(
+            "INSTR:writer",
+            stalledModel("writer says hi.", async () => {
+                const { stopActiveForThread } = await import("../streaming/persistent/library");
+
+                await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId }));
+            }),
+        );
+
+        await runTurn();
+
+        const replies = await assistantRows();
+
+        expect(replies.map((row) => row.agentName)).toStrictEqual(["WRITER"]);
+        expect(JSON.stringify(replies[0].message.content)).toContain("writer says hi.");
         expect((speakerModels.get("INSTR:checker") as ScriptedModel).doStreamCalls).toHaveLength(0);
         expect(await streamStatus()).toBe("done");
     });

@@ -77,11 +77,6 @@ export const isStreamWriteRefused = (error: unknown): error is StreamWriteRefuse
 /** The error a caller should see: the original of a refused write, anything else as it was. */
 export const originalWriteError = (error: unknown): unknown => (isStreamWriteRefused(error) ? error.cause : error);
 
-/** For a caller that does not handle a stop: rethrows the original error, so its behaviour is unchanged. */
-export const rethrowOriginalWriteError = (error: unknown): never => {
-    throw originalWriteError(error);
-};
-
 /** Turns a `CONFLICT` from `addChunk` into a refused write that keeps `pending`; any other error passes through. */
 export const asRefusedWrite = (error: unknown, pending: StreamText): unknown => {
     // A thrown `LunoraError` carries `code`; a wire-decoded one carries it in `data`.

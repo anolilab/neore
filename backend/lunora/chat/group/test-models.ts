@@ -46,6 +46,50 @@ export const scriptedModel = (steps: ScriptStep[], onCall?: () => Promise<void>)
     });
 };
 
+/** Settles when `signal` aborts (at once if it already has); never, without a signal. */
+const untilAborted = async (signal: AbortSignal | undefined): Promise<void> => {
+    if (!signal || signal.aborted) {
+        return;
+    }
+
+    await new Promise<void>((resolve) => {
+        signal.addEventListener(
+            "abort",
+            () => {
+                resolve();
+            },
+            { once: true },
+        );
+    });
+};
+
+/**
+ * A reply cut off mid-generation: `onText` runs, then `text` streams and the model waits for the
+ * call's abort signal (what a long generation does) before it ends. The first write is thus already refused.
+ */
+export const stalledModel = (text: string, onText: () => Promise<void>) =>
+    new MockLanguageModelV3({
+        doStream: async ({ abortSignal }) => {
+            const stream = new ReadableStream<LanguageModelV3StreamPart>({
+                async start(controller) {
+                    controller.enqueue({ type: "stream-start", warnings: [] });
+                    controller.enqueue({ id: "t", type: "text-start" });
+
+                    await onText();
+
+                    controller.enqueue({ delta: text, id: "t", type: "text-delta" });
+
+                    await untilAborted(abortSignal);
+
+                    controller.enqueue(finish("stop"));
+                    controller.close();
+                },
+            });
+
+            return { stream };
+        },
+    });
+
 /** The supervisor's routing call (`generateText` with structured output). */
 export const routerModel = (speakers: string[]) =>
     new MockLanguageModelV3({

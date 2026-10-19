@@ -3864,8 +3864,12 @@ export const abortStreamByMessageId = authMutation
             });
         }
 
-        // Persistent replies (the normal path) have no streamingMessages row to find by order.
-        const persistent = await context.runMutation(internal.chat.streaming.persistent.library.stopActiveForThread, { threadId });
+        // Persistent replies (the normal path) have no streamingMessages row to find by order. A real prompt
+        // row stops its own reply; a placeholder key (a new thread's first reply) stops the thread's.
+        const persistent = await context.runMutation(internal.chat.streaming.persistent.library.stopActiveForThread, {
+            messageId: message ? messageId : undefined,
+            threadId,
+        });
         const aborted = legacy || persistent;
 
         context.log.event("chat.abort_stream_by_message_id", { aborted, legacy, persistent });

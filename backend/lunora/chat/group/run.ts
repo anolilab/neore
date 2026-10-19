@@ -44,6 +44,7 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    endStoppedRun,
     finishRun,
     loadRunContext,
     resolveRunModel,
@@ -56,7 +57,7 @@ import { buildAgentTools } from "../lib/agent-tools";
 import { getMaxSteps } from "../lib/auto-continue";
 import getAgent from "../lib/get-agent";
 import { closeMCPClients } from "../lib/mcp-tools";
-import { pipeToPersistentChunks, rethrowOriginalWriteError } from "../lib/persist-stream";
+import { pipeToPersistentChunks, type PipedStream } from "../lib/persist-stream";
 import type { SearchMode } from "../lib/tool-builder";
 import type { ToolRunConfig } from "../lib/tool-run-config";
 import type { GroupHistoryRow, GroupParticipantInfo } from "./logic";
@@ -210,15 +211,16 @@ const lastSpeakerOf = (history: ReadonlyArray<GroupHistoryRow>): string | undefi
 
 /**
  * Run ONE participant into the turn's stream. Returns whether it paused on a
- * tool approval (which ends the turn) and the id of its last saved row — where
- * the next speaker continues from.
+ * tool approval or was stopped (either ends the turn) and the id of its last
+ * saved row — where the next speaker continues from. A stop saves the reply
+ * the speaker still owed before the model call is aborted (`endStoppedRun`).
  */
 const runSpeaker = async (
     ctx: ActionCtx,
     turn: TurnContext,
     speaker: GroupParticipantRun,
     position: QueuePosition,
-): Promise<{ lastMessageId: string | undefined; paused: boolean }> => {
+): Promise<{ lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     let mcpClients: MCPClient[] = [];
 
     try {
@@ -306,14 +308,39 @@ const runSpeaker = async (
             text: "",
         });
 
+        // Aborted only after a stop's reply is saved (`stoppedAt` below).
+        const stopping = new AbortController();
+
+        streamTextArgs.abortSignal = stopping.signal;
+
         // Admitted by the stream this turn runs on (`streamRunThread`): the context is read without a proof.
         const result = await agent.streamText(ctx, { threadId: turn.threadId, userId: turn.userId }, streamTextArgs as never, {
             admittedRun: true,
             saveStreamDeltas: false,
         });
         const timingStart = Date.now();
-        // Not stop-aware yet: a refused write surfaces as the original error, as before.
-        const { firstTokenTime, pending } = await pipeToPersistentChunks(ctx, turn.streamId, result.fullStream).catch(rethrowOriginalWriteError);
+        // A stop ends the turn here, with the reply this speaker still owed saved.
+        const stoppedAt = async (error: unknown) => {
+            await endStoppedRun(ctx, error, {
+                agentName: speaker.name,
+                continuation: false,
+                order: result.order,
+                promptMessageId: result.promptMessageId,
+                stop: stopping,
+                streamId: turn.streamId,
+            });
+
+            return { lastMessageId: undefined, paused: false, stopped: true };
+        };
+        let piped: PipedStream;
+
+        try {
+            piped = await pipeToPersistentChunks(ctx, turn.streamId, result.fullStream);
+        } catch (error) {
+            return await stoppedAt(error);
+        }
+
+        const { firstTokenTime, pending, unsaved } = piped;
 
         await result.consumeStream();
 
@@ -343,16 +370,23 @@ const runSpeaker = async (
             toolPermissionKeys: toolResult.permissionKeys,
         };
 
-        const { paused } = await finishRun(ctx, {
-            keepOpenUnlessPaused: true,
-            mcpLabels: toolResult.mcpLabels,
-            pending,
-            savedMessages: result.savedMessages,
-            snapshot,
-            streamId: turn.streamId,
-            threadId: turn.threadId,
-            userId: turn.userId,
-        }).catch(rethrowOriginalWriteError);
+        let paused: boolean;
+
+        try {
+            ({ paused } = await finishRun(ctx, {
+                keepOpenUnlessPaused: true,
+                mcpLabels: toolResult.mcpLabels,
+                pending,
+                savedMessages: result.savedMessages,
+                snapshot,
+                streamId: turn.streamId,
+                threadId: turn.threadId,
+                unsaved,
+                userId: turn.userId,
+            }));
+        } catch (error) {
+            return await stoppedAt(error);
+        }
 
         // Timing only: memory is not extracted from group turns — the exchange
         // is several participants' voices, not the user talking to one assistant.
@@ -368,7 +402,7 @@ const runSpeaker = async (
             userId: turn.userId,
         });
 
-        return { lastMessageId: savedIds.at(-1), paused };
+        return { lastMessageId: savedIds.at(-1), paused, stopped: false };
     } finally {
         await closeMCPClients(mcpClients);
     }
@@ -467,7 +501,7 @@ const runQueue = async (
 
         spoken.push(speaker.skillId);
 
-        const { lastMessageId, paused } = await runSpeaker(ctx, turn, speaker, {
+        const { lastMessageId, paused, stopped } = await runSpeaker(ctx, turn, speaker, {
             continueFromMessageId: continueFrom,
             remaining: queue,
             spokenSkillIds: spoken,
@@ -477,6 +511,11 @@ const runQueue = async (
         if (paused) {
             // `finishRun` closed the stream; the approval's continuation picks up
             // this speaker and the rest of `queue` from the snapshot.
+            return;
+        }
+
+        if (stopped) {
+            // The stop ended the stream and the thread's run; no further speaker.
             return;
         }
 
