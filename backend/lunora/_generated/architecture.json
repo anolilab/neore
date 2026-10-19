@@ -16711,31 +16711,31 @@
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 895,
+      "line": 892,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1007,
+      "line": 1004,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1015,
+      "line": 1012,
       "reason": "\"editMessageHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1156,
+      "line": 1153,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {
       "file": "chat/http",
       "kind": "call",
-      "line": 1182,
+      "line": 1179,
       "reason": "\"mediaGenerationHttpAction\" is not a registered function"
     },
     {

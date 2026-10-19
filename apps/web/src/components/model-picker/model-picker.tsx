@@ -498,7 +498,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
     // Use provided models list or fall back to the feature-flagged gateway models
     const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
-    const { blockedCreators, setBlockedCreators } = useBlockedCreators();
+    const { blockedCreators, isLoaded: isRulesLoaded, setBlockedCreators } = useBlockedCreators();
     const { hooks } = useAuth();
     const { data: sessionData } = hooks.useSession();
     // Hiding writes the account's filter rules, so it is offered to signed-in users only.
@@ -950,7 +950,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                 {creatorInfo.map(({ name, slug }) => (
                                     <div className="group/lab relative flex" key={slug}>
                                         <ProviderSidebarItem isSelected={selectedProvider === slug} name={name} onSelect={handleProviderSelect} slug={slug} />
-                                        {isSignedIn ? (
+                                        {isSignedIn && isRulesLoaded ? (
                                             <button
                                                 aria-label={t`Hide ${name} from model picker`}
                                                 className="text-muted-foreground hover:text-foreground focus-visible:outline-ring absolute top-1/2 right-1 -translate-y-1/2 rounded p-1 opacity-0 transition-opacity group-hover/lab:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 pointer-coarse:opacity-100"

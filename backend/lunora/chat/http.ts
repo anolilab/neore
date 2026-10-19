@@ -882,13 +882,10 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         // Get thread to determine model
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
-        if (!thread) {
-            return Response.json({ error: "Thread not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
-        }
-
-        // Verify the authenticated user owns this thread
-        if (thread.userId !== userId) {
-            return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
+        // A message in a thread the caller does not own answers exactly like a message that does not exist,
+        // so a message id cannot be probed (a locked chat's included).
+        if (!thread || thread.userId !== userId) {
+            return Response.json({ error: "Message not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
         }
 
         // An edit writes a sibling prompt and a reply into the thread: a locked chat needs its proof.

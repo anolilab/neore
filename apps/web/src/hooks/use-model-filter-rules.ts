@@ -127,18 +127,26 @@ export const withoutCreator = (blocked: ReadonlyArray<string>, slug: string): st
  */
 export const useBlockedCreators = () => {
     const crpc = useCRPC();
-    const rules = useModelFilterRules();
+    const { data: aiPreferences, isSuccess: isLoaded } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const rules = aiPreferences?.modelFilterRules as ModelFilterRules | undefined;
     const updateMutation = useMutation(crpc.auth.functions.updateAIUserPreferences.mutationOptions());
     const { mutateAsync } = updateMutation;
     // ponytail: a refetch that lands mid-save resets this to the server copy, which can lack that save. Serialise saves if that bites.
     const newest = useRef(rules);
+    const loaded = useRef(isLoaded);
 
     useEffect(() => {
         newest.current = rules;
-    }, [rules]);
+        loaded.current = isLoaded;
+    }, [isLoaded, rules]);
 
     const setBlockedCreators = useCallback(
-        (update: (current: ReadonlyArray<string>) => string[]) => {
+        async (update: (current: ReadonlyArray<string>) => string[]) => {
+            // Before the preferences load there are no rules to carry over, and saving would replace the user's other filters.
+            if (!loaded.current) {
+                throw new Error("The model filter rules have not loaded yet");
+            }
+
             const base = newest.current;
             const next: ModelFilterRules = { ...base, blockedCreators: update(base?.blockedCreators ?? NO_BLOCKED_CREATORS) };
 
@@ -155,5 +163,5 @@ export const useBlockedCreators = () => {
         [mutateAsync],
     );
 
-    return { blockedCreators: rules?.blockedCreators ?? NO_BLOCKED_CREATORS, isPending: updateMutation.isPending, setBlockedCreators };
+    return { blockedCreators: rules?.blockedCreators ?? NO_BLOCKED_CREATORS, isLoaded, isPending: updateMutation.isPending, setBlockedCreators };
 };

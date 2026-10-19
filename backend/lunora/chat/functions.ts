@@ -62,6 +62,7 @@ import { patchBrowserSession } from "../browser/session-writes";
 import { authAction, authMutation, authQuery, liteAuthQuery, optionalAuthQuery, publicQuery, rateLimit } from "../lib/crpc";
 import { throwBadRequest, throwForbidden, throwThreadNotFound, throwUnauthorized } from "../lib/error-helpers";
 import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
+import { storedRetentionHours } from "../lib/temporary-retention";
 import { chatLogger, streamLogger } from "../lib/logger";
 import type { RateLimitContext } from "../lib/rate-limiter";
 import { checkRateLimit, createRatelimit, getRateLimitKey, getUserTier } from "../lib/rate-limiter";
@@ -542,7 +543,7 @@ export const createThread = authMutation
                         .withIndex("by_userId", (q) => q.eq("userId", userId))
                         .unique();
 
-                    retentionHoursToUse = userSettings?.temporaryChatRetentionHours ?? 24;
+                    retentionHoursToUse = storedRetentionHours(userSettings?.temporaryChatRetentionHours);
                 }
 
                 const expiresAt = context.now + retentionHoursToUse! * 60 * 60 * 1000;
@@ -650,7 +651,7 @@ export const createThreadWithInitialMessage = internalMutation
                     .query("userSettings")
                     .withIndex("by_userId", (q) => q.eq("userId", userId))
                     .unique();
-                const hours = retentionHours ?? userSettings?.temporaryChatRetentionHours ?? 24;
+                const hours = retentionHours ?? storedRetentionHours(userSettings?.temporaryChatRetentionHours);
 
                 await context.runMutation(internal.agent.threads.createTemporaryThread, {
                     expiresAt: context.now + hours * 60 * 60 * 1000,
@@ -789,7 +790,7 @@ export const makeThreadTemporary = authMutation
                 .withIndex("by_userId", (q) => q.eq("userId", userId))
                 .unique();
 
-            retentionHoursToUse = userSettings?.temporaryChatRetentionHours ?? 24;
+            retentionHoursToUse = storedRetentionHours(userSettings?.temporaryChatRetentionHours);
         }
 
         const expiresAt = context.now + retentionHoursToUse! * 60 * 60 * 1000;

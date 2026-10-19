@@ -82,6 +82,27 @@ describe(useBlockedCreators, () => {
         expect(server.rules).toEqual({ blockedCreators: ["meta", "anthropic"], requireZDR: true });
     });
 
+    it("refuses to save before the preferences have loaded, so other filters are not replaced", async () => {
+        server.rules = { blockedProviders: ["groq"], requireZDR: true };
+
+        const { result } = mount();
+
+        // The first render has not received the query result yet.
+        expect(result.current.isLoaded).toBe(false);
+        await expect(result.current.setBlockedCreators((current) => withCreatorHidden(current, "meta"))).rejects.toThrow("have not loaded");
+        expect(server.rules).toEqual({ blockedProviders: ["groq"], requireZDR: true });
+
+        await waitFor(() => {
+            expect(result.current.isLoaded).toBe(true);
+        });
+
+        await act(async () => {
+            await result.current.setBlockedCreators((current) => withCreatorHidden(current, "meta"));
+        });
+
+        expect(server.rules).toEqual({ blockedCreators: ["meta"], blockedProviders: ["groq"], requireZDR: true });
+    });
+
     it("hiding a lab that is already hidden does not repeat it", () => {
         expect(withCreatorHidden(["meta"], "meta")).toEqual(["meta"]);
         expect(withCreatorHidden(["meta"], "openai")).toEqual(["meta", "openai"]);
