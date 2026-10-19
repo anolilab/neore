@@ -44,6 +44,7 @@ import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId, PendingSettings } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
 import { mapNavigatorLanguage } from "../utils/language-utilities";
+import { newChatTemporaryFields } from "../utils/new-chat-temporary";
 import { createReadinessGate } from "../utils/readiness-gate";
 
 const HTTP_STATUS_RE = /HTTP (\d+)/;
@@ -875,6 +876,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     },
                     prompt: text,
                     systemPrompt: isCreatingNewThread ? pendingSettings?.customSystemPrompt : threadDataRef.current?.customSystemPrompt,
+                    temporary: isCreatingNewThread ? newChatTemporaryFields(pendingSettings, newChatsTemporary) : undefined,
                     threadId,
                 });
 
@@ -965,11 +967,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                         requestBody.statelessMode = pendingSettings.statelessMode;
                     }
 
-                    // The dropdown's explicit choice for this chat wins over the user's default.
-                    if (pendingSettings?.isTempChat ?? newChatsTemporary) {
-                        requestBody.temporary = true;
-                        requestBody.retentionHours = pendingSettings?.retentionHours;
-                    }
+                    Object.assign(requestBody, newChatTemporaryFields(pendingSettings, newChatsTemporary));
                 } else if (changedSettings) {
                     // Existing thread: also send changed settings
                     Object.assign(requestBody, changedSettings);

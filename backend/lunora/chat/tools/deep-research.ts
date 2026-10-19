@@ -19,7 +19,7 @@ import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { EXA_API_KEY, TAVILY_API_KEY } from "../../env";
 import { toolsLogger } from "../../lib/logger";
-import { filterBlockedResults } from "./search-domains";
+import { EXA_MAX_DOMAINS, filterBlockedResults, mergeExcludeDomains, TAVILY_MAX_EXCLUDE_DOMAINS } from "./search-domains";
 import { deduplicateByDomainAndUrl, fetchWithTimeout, isSafeUrl, truncateText, withRetry } from "./utilities";
 import type { WebSearchResult } from "./web-search";
 
@@ -27,9 +27,16 @@ const TRAILING_PERIOD_RE = /\.$/;
 const TITLE_TAG_RE = /<title[^>]*>(.*?)<\/title>/i;
 
 /**
- * Perform a web search for the research pipeline.
+ * Perform a web search for the research pipeline. The user's blocklist goes to
+ * the provider as its exclude list, and the results are filtered again here, so a
+ * provider that ignores the list still cannot put a blocked page in front of the model.
  */
-const researchSearch = async (query: string, maxResults: number): Promise<WebSearchResult[]> => {
+export const researchSearch = async (query: string, maxResults: number, blocklist: string[] = []): Promise<WebSearchResult[]> =>
+    filterBlockedResults(await fetchResearchResults(query, maxResults, blocklist), blocklist);
+
+const fetchResearchResults = async (query: string, maxResults: number, blocklist: string[]): Promise<WebSearchResult[]> => {
+    const excludeDomains = mergeExcludeDomains(undefined, blocklist);
+
     // Try Tavily first (best for comprehensive research)
     if (TAVILY_API_KEY) {
         try {
@@ -42,6 +49,7 @@ const researchSearch = async (query: string, maxResults: number): Promise<WebSea
                     query,
                     search_depth: "advanced",
                     topic: "general",
+                    ...(excludeDomains.length > 0 && { exclude_domains: excludeDomains.slice(0, TAVILY_MAX_EXCLUDE_DOMAINS) }),
                 }),
                 headers: { "Content-Type": "application/json" },
                 method: "POST",
@@ -70,11 +78,13 @@ const researchSearch = async (query: string, maxResults: number): Promise<WebSea
     if (EXA_API_KEY) {
         try {
             const response = await fetchWithTimeout("https://api.exa.ai/search", {
+                // Exa's REST API is camelCase (https://exa.ai/docs/reference/search).
                 body: JSON.stringify({
-                    contents: { text: { max_characters: 3000 } },
-                    num_results: maxResults,
+                    contents: { text: { maxCharacters: 3000 } },
+                    numResults: maxResults,
                     query,
                     use_autoprompt: true,
+                    ...(excludeDomains.length > 0 && { excludeDomains: excludeDomains.slice(0, EXA_MAX_DOMAINS) }),
                 }),
                 headers: {
                     "Content-Type": "application/json",
@@ -297,9 +307,7 @@ Requirements:
         const blocklist = context.userId ? await context.runQuery(internal.auth.functions.getSearchDomainBlocklistQuery, { userId: context.userId }) : [];
 
         const searchPromises = searchQueries.map((query) =>
-            withRetry(() => researchSearch(query, resultsPerQuery), { maxRetries: 1 })
-                .then((results) => filterBlockedResults(results, blocklist))
-                .catch(() => [] as WebSearchResult[]),
+            withRetry(() => researchSearch(query, resultsPerQuery, blocklist), { maxRetries: 1 }).catch(() => [] as WebSearchResult[]),
         );
 
         const searchResults = await Promise.all(searchPromises);

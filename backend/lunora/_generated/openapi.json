@@ -16316,6 +16316,12 @@
                       "reply": {
                         "type": "string"
                       },
+                      "retentionHours": {
+                        "type": "number"
+                      },
+                      "temporary": {
+                        "type": "boolean"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",

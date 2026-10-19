@@ -106,6 +106,16 @@ export const mergeExcludeDomains = (modelExclude: ReadonlyArray<string> | undefi
 ];
 
 /**
+ * Per-request list limits the providers document. Tavily: `exclude_domains`
+ * max 150, `include_domains` max 300 (https://docs.tavily.com/documentation/api-reference/endpoint/search).
+ * Exa: `includeDomains` and `excludeDomains` max 1200 each (https://exa.ai/docs/reference/search).
+ * A longer list is cut at the provider call; the post-filter still applies the whole blocklist.
+ */
+export const TAVILY_MAX_EXCLUDE_DOMAINS = 150;
+export const TAVILY_MAX_INCLUDE_DOMAINS = 300;
+export const EXA_MAX_DOMAINS = 1200;
+
+/**
  * The model's `include_domains` with blocked entries removed. Entries that are
  * not hostnames stay as the model sent them, as before. When the caller asked
  * for includes and every one was blocked, the result is empty, and the caller

@@ -12,7 +12,14 @@ import { EXA_API_KEY, PARALLEL_API_KEY, TAVILY_API_KEY } from "../../env";
 import { assertOk } from "../../lib/fetch-timeout";
 import { toolsLogger } from "../../lib/logger";
 import toonEncodeOutput from "./toon-encode";
-import { filterBlockedResults, filterIncludeDomains, mergeExcludeDomains } from "./search-domains";
+import {
+    EXA_MAX_DOMAINS,
+    filterBlockedResults,
+    filterIncludeDomains,
+    mergeExcludeDomains,
+    TAVILY_MAX_EXCLUDE_DOMAINS,
+    TAVILY_MAX_INCLUDE_DOMAINS,
+} from "./search-domains";
 import { deduplicateByDomainAndUrl, fetchWithTimeout, formatError, withRetry } from "./utilities";
 
 export interface WebSearchResult {
@@ -85,8 +92,8 @@ const searchWithTavily = async (
             query,
             search_depth: "advanced",
             topic,
-            ...(domainFilter?.includeDomains?.length && { include_domains: domainFilter.includeDomains }),
-            ...(domainFilter?.excludeDomains?.length && { exclude_domains: domainFilter.excludeDomains }),
+            ...(domainFilter?.includeDomains?.length && { include_domains: domainFilter.includeDomains.slice(0, TAVILY_MAX_INCLUDE_DOMAINS) }),
+            ...(domainFilter?.excludeDomains?.length && { exclude_domains: domainFilter.excludeDomains.slice(0, TAVILY_MAX_EXCLUDE_DOMAINS) }),
         }),
         headers: {
             "Content-Type": "application/json",
@@ -120,16 +127,21 @@ const searchWithExa = async (
         throw new Error("EXA_API_KEY is not configured");
     }
 
+    // Exa's REST API is camelCase (https://exa.ai/docs/reference/search). Its docs do not
+    // say whether includeDomains and excludeDomains combine, so excludes go only when there
+    // is no include list. The post-filter still drops any blocked result.
+    const excludeDomains = domainFilter?.includeDomains?.length ? undefined : domainFilter?.excludeDomains;
+
     const response = await fetchWithTimeout("https://api.exa.ai/search", {
         body: JSON.stringify({
             contents: {
-                text: { max_characters: 2000 },
+                text: { maxCharacters: 2000 },
             },
-            num_results: maxResults,
+            numResults: maxResults,
             query,
             use_autoprompt: true,
-            ...(domainFilter?.includeDomains?.length && { include_domains: domainFilter.includeDomains }),
-            ...(domainFilter?.excludeDomains?.length && { exclude_domains: domainFilter.excludeDomains }),
+            ...(domainFilter?.includeDomains?.length && { includeDomains: domainFilter.includeDomains.slice(0, EXA_MAX_DOMAINS) }),
+            ...(excludeDomains?.length && { excludeDomains: excludeDomains.slice(0, EXA_MAX_DOMAINS) }),
         }),
         headers: {
             "Content-Type": "application/json",

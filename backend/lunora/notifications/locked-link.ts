@@ -9,12 +9,15 @@ import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 
 const CHAT_LINK = /^\/chat\/([^/?#]+)/;
 
+/** The chat a `/chat/<threadId>` link names, or `undefined` for any other link. */
+export const threadIdOfLink = (link: string | undefined): string | undefined => link?.match(CHAT_LINK)?.[1];
+
 /** True when `link` names a thread that is currently locked. Unreadable threads are not locked here. */
 export const linksToLockedThread = async (
     db: { get: (id: Id<"threads">) => Promise<{ lockedAt?: number | null } | null> },
     link: string | undefined,
 ): Promise<boolean> => {
-    const threadId = link?.match(CHAT_LINK)?.[1];
+    const threadId = threadIdOfLink(link);
 
     if (threadId === undefined) {
         return false;

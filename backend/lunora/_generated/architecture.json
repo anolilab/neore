@@ -4771,6 +4771,16 @@
       "to": "table:outcomeEmails"
     },
     {
+      "from": "function:notifications_locked_redact:redactLockedLinks",
+      "kind": "read",
+      "to": "table:notifications"
+    },
+    {
+      "from": "function:notifications_locked_redact:redactLockedLinks",
+      "kind": "write",
+      "to": "table:outcomeEmails"
+    },
+    {
       "from": "function:notifications_push:sendPushForNotification",
       "kind": "call",
       "to": "function:notifications_push:loadPushNotification"
@@ -12321,6 +12331,13 @@
       "module": "notifications"
     },
     {
+      "detail": "mutation",
+      "id": "function:notifications_locked_redact:redactLockedLinks",
+      "kind": "function",
+      "name": "notifications.locked_redact.redactLockedLinks",
+      "module": "notifications"
+    },
+    {
       "detail": "query",
       "id": "function:notifications_push:getPushConfig",
       "kind": "function",
@@ -17047,7 +17064,19 @@
     {
       "file": "chat/local-models",
       "kind": "read",
-      "line": 68,
+      "line": 74,
+      "reason": "\"saveLocalTurnHandler\" is not a registered function"
+    },
+    {
+      "file": "chat/local-models",
+      "kind": "read",
+      "line": 132,
+      "reason": "\"saveLocalTurnHandler\" is not a registered function"
+    },
+    {
+      "file": "chat/local-models",
+      "kind": "call",
+      "line": 138,
       "reason": "\"saveLocalTurnHandler\" is not a registered function"
     },
     {
@@ -17215,19 +17244,19 @@
     {
       "file": "chat/tools/deep-research",
       "kind": "call",
-      "line": 297,
+      "line": 307,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "chat/tools/deep-research",
       "kind": "call",
-      "line": 358,
+      "line": 366,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "chat/tools/deep-research",
       "kind": "call",
-      "line": 425,
+      "line": 433,
       "reason": "the default export is not a registered function"
     },
     {
@@ -17455,13 +17484,13 @@
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 236,
+      "line": 248,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 259,
+      "line": 271,
       "reason": "the default export is not a registered function"
     },
     {

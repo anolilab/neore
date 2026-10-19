@@ -779,6 +779,9 @@ export interface InternalApiTypes {
             collectNotificationsForExport: FunctionReference<"query", { userId: string }, { notifications: Array<unknown>; outcomeEmails: Array<unknown>; pushSubscriptions: Array<unknown> }>;
             deleteUserNotifications: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
+        locked_redact: {
+            redactLockedLinks: FunctionReference<"mutation", { cursor?: string; threadId: Id<"threads">; userId: string }, null>;
+        };
         push: {
             loadPushNotification: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { body?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
             sendPushForNotification: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
@@ -1756,6 +1759,9 @@ export const internal: InternalApiTypes = {
         gdpr: {
             collectNotificationsForExport: { __lunoraRef: "notifications_gdpr:collectNotificationsForExport" },
             deleteUserNotifications: { __lunoraRef: "notifications_gdpr:deleteUserNotifications" },
+        },
+        locked_redact: {
+            redactLockedLinks: { __lunoraRef: "notifications_locked_redact:redactLockedLinks" },
         },
         push: {
             loadPushNotification: { __lunoraRef: "notifications_push:loadPushNotification" },

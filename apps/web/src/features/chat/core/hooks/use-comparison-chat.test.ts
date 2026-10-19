@@ -1,0 +1,138 @@
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useModelStore } from "../stores/model-store";
+import useComparisonChat from "./use-comparison-chat";
+
+const settings = { newChatsTemporary: false };
+const mutations: { args: Record<string, unknown>; name: string }[] = [];
+
+vi.mock("@lingui/react/macro", () => {
+    return {
+        useLingui: () => {
+            return { t: (strings: TemplateStringsArray) => strings[0] };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-user-settings", () => {
+    return {
+        useUserSettings: () => {
+            return { data: settings };
+        },
+    };
+});
+
+vi.mock("@/lib/env", () => {
+    return {
+        default: { VITE_LLM_GATEWAY_URL: "https://gateway.test" },
+    };
+});
+
+vi.mock("@/lib/lunora/crpc", () => {
+    return {
+        useCRPC: () => {
+            return {
+                chat: {
+                    functions: {
+                        createThread: {
+                            mutationOptions: () => {
+                                return { name: "createThread" };
+                            },
+                        },
+                        createThreadRelationshipPublic: {
+                            mutationOptions: () => {
+                                return { name: "createThreadRelationshipPublic" };
+                            },
+                        },
+                    },
+                },
+            };
+        },
+        useLunora: () => {
+            return { getAuthToken: () => "token" };
+        },
+    };
+});
+
+vi.mock("@tanstack/react-query", () => {
+    return {
+        useMutation: (options: { name: string }) => {
+            return {
+                mutateAsync: async (args: Record<string, unknown>) => {
+                    mutations.push({ args, name: options.name });
+
+                    return options.name === "createThread" ? `thread-${mutations.length}` : undefined;
+                },
+            };
+        },
+    };
+});
+
+vi.mock("@tanstack/react-router", () => {
+    return {
+        useNavigate: () => vi.fn(),
+    };
+});
+
+const createdThreads = () => mutations.filter((entry) => entry.name === "createThread").map((entry) => entry.args);
+
+beforeEach(() => {
+    mutations.length = 0;
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => Response.json({ streamId: "stream" }, { status: 200 })),
+    );
+    useModelStore.getState().setPendingSettings(undefined);
+});
+
+describe("useComparisonChat temporary choice", () => {
+    it("creates a new comparison, its parent and both children, as temporary when the setting is on", async () => {
+        settings.newChatsTemporary = true;
+        useModelStore.getState().setPendingSettings({ retentionHours: 12 });
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt" }));
+
+        await act(async () => {
+            await result.current.sendComparisonMessage("hi", ["model-a", "model-b"]);
+        });
+
+        expect(createdThreads()).toHaveLength(3);
+
+        for (const args of createdThreads()) {
+            expect(args).toMatchObject({ retentionHours: 12, temporary: true });
+        }
+    });
+
+    it("creates them permanent when the setting is off", async () => {
+        settings.newChatsTemporary = false;
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt" }));
+
+        await act(async () => {
+            await result.current.sendComparisonMessage("hi", ["model-a", "model-b"]);
+        });
+
+        expect(createdThreads()).toHaveLength(3);
+
+        for (const args of createdThreads()) {
+            expect(args).not.toHaveProperty("temporary");
+        }
+    });
+
+    it("adds children to an existing comparison permanently, whatever the setting", async () => {
+        settings.newChatsTemporary = true;
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt", parentThreadId: "parent" }));
+
+        await act(async () => {
+            await result.current.sendComparisonMessage("hi", ["model-a", "model-b"]);
+        });
+
+        expect(createdThreads()).toHaveLength(2);
+
+        for (const args of createdThreads()) {
+            expect(args).not.toHaveProperty("temporary");
+        }
+    });
+});

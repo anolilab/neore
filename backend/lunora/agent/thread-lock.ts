@@ -17,6 +17,8 @@ import { throwThreadNotFound } from "../lib/error-helpers";
 import { patchRow } from "../lib/patch";
 import { hashPasscode, isAcceptablePasscode, isThreadLocked, mintUnlockProof, newPasscodeEpoch, PASSCODE_MAX_LENGTH, verifyPasscode } from "../lib/thread-lock";
 
+import { scheduleGranteeRedaction } from "../notifications/locked-redact";
+
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
 import { requireOwnedThreadIgnoringLock } from "./thread-read-access";
 
@@ -117,6 +119,8 @@ export const enableThreadLock = authMutation
             userId,
         });
         await patchRow(context.db, thread, { lockedAt: now, updatedAt: now });
+        // Former collaborators' notifications for this chat stop showing its title (`notifications/locked-redact.ts`).
+        await scheduleGranteeRedaction(context, threadId, userId);
 
         const { expiresAt, proof } = await mintUnlockProof({ epoch, threadId, userId }, unlockSecret(), now);
 

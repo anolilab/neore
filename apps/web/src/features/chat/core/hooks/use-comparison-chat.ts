@@ -16,6 +16,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import env from "@/lib/env";
 import { useCRPC, useLunora } from "@/lib/lunora/crpc";
 
@@ -24,6 +25,7 @@ import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
+import { newChatTemporaryFields } from "../utils/new-chat-temporary";
 
 /** Chat stream endpoint — all requests go through the LLM Gateway */
 const CHAT_STREAM_URL = `${env.VITE_LLM_GATEWAY_URL}/v1/chat`;
@@ -73,6 +75,8 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
     const comparisonMode = useModelStore((state) => state.comparisonMode);
     const selectedModels = useModelStore((state) => state.selectedModelsForComparison);
     const getPendingSettings = useModelStore((state) => state.getPendingSettings);
+    const { data: userSettings } = useUserSettings();
+    const newChatsTemporary = userSettings?.newChatsTemporary === true;
 
     // clearComposer is only called inside an async callback, not in render output,
     // so access it via getState() to avoid an unnecessary store subscription.
@@ -110,6 +114,9 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
             try {
                 const pendingSettings = getPendingSettings();
                 const authHeader = bearerHeader(lunora.getAuthToken() ?? jwtToken);
+                // Only a comparison this send starts is a new chat; its parent and children share the choice.
+                // Children added to an existing comparison stay permanent, so the parent never lists an expired child.
+                const temporaryFields = parentThread ? undefined : newChatTemporaryFields(pendingSettings, newChatsTemporary);
 
                 // Create parent comparison thread if it doesn't exist
                 let comparisonParentId = parentThread;
@@ -121,6 +128,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                         language: pendingSettings?.language,
                         model: models[0] ?? "unknown",
                         multiChat: true, // Flag for instant detection without querying children
+                        ...temporaryFields,
                     });
                     setParentThread(comparisonParentId);
                 }
@@ -139,6 +147,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                         model,
                         reasoningEffort: pendingSettings?.reasoningEffort,
                         statelessMode: pendingSettings?.statelessMode,
+                        ...temporaryFields,
                     });
 
                     // Create relationship to parent and send message in parallel —
@@ -220,7 +229,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                 setIsLoading(false);
             }
         },
-        [parentThread, jwtToken, lunora, getPendingSettings, createThreadMutation, createRelationshipMutation, navigate, t],
+        [parentThread, jwtToken, lunora, getPendingSettings, newChatsTemporary, createThreadMutation, createRelationshipMutation, navigate, t],
     );
 
     /**
