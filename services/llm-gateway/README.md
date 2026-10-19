@@ -43,12 +43,12 @@ Upstream Providers
 
 ### Cloudflare Bindings
 
-| Binding         | Type        | Purpose                                                           |
-| --------------- | ----------- | ----------------------------------------------------------------- |
-| `USAGE_DB`      | D1 Database | Usage logs, daily aggregates, provider health, webhooks, API keys |
-| `RATE_LIMIT_KV` | KV          | Per-user rate limit counters (`rl:*`)                             |
-| `PRICING_KV`    | KV          | Pricing cache from models.dev, routing decisions (`pricing:*`)    |
-| `CACHE_KV`      | KV          | Prompt cache stats, idempotency keys (`cache:*`, `idem:*`)        |
+| Binding         | Type        | Purpose                                                                                      |
+| --------------- | ----------- | -------------------------------------------------------------------------------------------- |
+| `USAGE_DB`      | D1 Database | Usage logs, daily aggregates, provider health, webhooks, API keys                            |
+| `RATE_LIMIT_KV` | KV          | Budget blocks (`blocked:*`), video job records (`video_job:*`), provider health (`health:*`) |
+| `PRICING_KV`    | KV          | Pricing cache from models.dev, routing decisions (`pricing:*`)                               |
+| `CACHE_KV`      | KV          | Prompt cache stats, idempotency keys (`cache:*`, `idem:*`)                                   |
 
 ### D1 Schema (migrations applied in order)
 
@@ -269,6 +269,18 @@ When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, every request is wrapped in a SERVER 
 | `OTEL_EXPORTER_OTLP_HEADERS`  | Comma-separated `key=value` headers (e.g. `x-honeycomb-team=...,x-dataset=prod`). |
 | `OTEL_SERVICE_NAME`           | Override `service.name` resource attribute. Falls back to `APP_NAME`.             |
 
+### Daily caps
+
+Optional per-tier caps on the public chat route (`/v1/chat/completions`, and `/v1/responses` through it), counted from `usage_log` for the UTC day. Unset means no cap; a tier without an entry is uncapped.
+
+| Variable                   | Meaning                                                                     |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `DAILY_REQUEST_LIMITS`     | Finished public-API calls per day, e.g. `free=200,pro=5000`                 |
+| `DAILY_TOKEN_LIMITS`       | Prompt + completion tokens per day, e.g. `free=100000`                      |
+| `TOKENS_PER_MINUTE_LIMITS` | Prompt + completion tokens per rolling minute, e.g. `free=20000,pro=200000` |
+
+Over a daily cap the route answers `429` with code `DAILY_LIMIT_EXCEEDED` and a `Retry-After` to 00:00 UTC; over the per-minute token cap, `429` with code `TOKENS_PER_MINUTE_EXCEEDED` and `Retry-After: 60`. Locally, set them in `.dev.vars`. `GET /v1/rate-limits` reports the caller's tier caps with today's usage, and the per-minute limit with no per-minute count (`rpm.current` and `rpm.remaining` are `null`: the native rate-limit binding cannot be read).
+
 ## API Reference
 
 ### SaaS API (`/v1/*`)
@@ -352,7 +364,7 @@ Bidirectional WebSocket proxy to OpenAI Realtime API. Session limits: 2 concurre
 ```http
 GET /v1/usage           Daily usage summary
 GET /v1/logs            Paginated request history
-GET /v1/rate-limits     Current rate limit status
+GET /v1/rate-limits     Limits for the caller's tier, with today's usage
 ```
 
 #### Cache

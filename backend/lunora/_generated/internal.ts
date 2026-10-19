@@ -533,7 +533,7 @@ export interface InternalApiTypes {
         };
         steps: {
             collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown>; usageDaily: Array<unknown> }>;
-            collectConversations: FunctionReference<"action", { userId: string }, { messages: { _id: string; createdAt: number; model?: string; order?: number; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
+            collectConversations: FunctionReference<"action", { userId: string }, { messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
             collectFiles: FunctionReference<"query", { userId: string }, { files: Array<{ _id: Id<"files">; createdAt: number; name: string; size: number; tags?: Array<string>; type: string; updatedAt: number }>; folders: Array<{ _id: Id<"folders">; createdAt: number; name: string; updatedAt: number }> }>;
             collectProfile: FunctionReference<"query", { userId: string }, { createdAt: number; email: string; emailVerified: boolean; id: string; image: string; name: string } | null>;
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
@@ -612,15 +612,15 @@ export interface InternalApiTypes {
             insertStoredDocuments: FunctionReference<"mutation", { collectionId?: Id<"knowledgeCollections">; documents: Array<{ mimeType: string; name: string; relativePath?: string; size: number; storageKey: string }>; tier: "free" | "premium"; userId: string }, Array<Id<"knowledgeFiles">>>;
         };
         functions: {
-            getChunksByEmbeddingIds: FunctionReference<"query", { embeddingIds: Array<string>; knowledgeFileIds: Array<string>; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; embeddingId: string; fileId: string; fileName: string }>>;
+            getChunksByEmbeddingIds: FunctionReference<"query", { embeddingIds: Array<string>; knowledgeFileIds: Array<string>; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; embeddingId: string; fileId: string; fileName: string; pageNumber?: number }>>;
             getFile: FunctionReference<"query", { fileId: Id<"knowledgeFiles"> }, import("./dataModel.js").Doc_knowledgeFiles | null>;
             getFileChunks: FunctionReference<"query", { fileId: Id<"knowledgeFiles">; limit?: number }, { chunkIndex: number; content: string; }[]>;
             getIndexedFileIds: FunctionReference<"query", { userId: string }, string[]>;
             getThreadKnowledgeFileIds: FunctionReference<"query", { threadId: Id<"threads"> }, string[]>;
             getVaultFile: FunctionReference<"query", { vaultFileId: Id<"files"> }, { _id: Id<"files">; key: string | undefined; name: string; } | undefined>;
-            keywordSearchChunks: FunctionReference<"query", { knowledgeFileIds: Array<string>; limit: number; query: string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }>>;
+            keywordSearchChunks: FunctionReference<"query", { knowledgeFileIds: Array<string>; limit: number; query: string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
             recordKnowledgeSources: FunctionReference<"mutation", { messageId: Id<"messages">; sources: Array<{ id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type?: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" }> }, null>;
-            saveChunks: FunctionReference<"mutation", { chunks: Array<{ chunkIndex: number; content: string; embeddingId?: string; tokenCount?: number }>; fileId: Id<"knowledgeFiles">; userId: string }, boolean>;
+            saveChunks: FunctionReference<"mutation", { chunks: Array<{ chunkIndex: number; content: string; embeddingId?: string; pageNumber?: number; sectionHeading?: string; tokenCount?: number }>; fileId: Id<"knowledgeFiles">; userId: string }, boolean>;
             updateFileStatus: FunctionReference<"mutation", { chunkCount?: number; error?: string; fileId: Id<"knowledgeFiles">; name?: string; size?: number; status: string; summary?: string }, boolean>;
         };
         housekeeping: {
@@ -632,9 +632,9 @@ export interface InternalApiTypes {
             ingestFile: FunctionReference<"action", { knowledgeFileId: Id<"knowledgeFiles">; userId: string }, void>;
         };
         retrieve: {
-            default: FunctionReference<"action", { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }>>;
-            search: FunctionReference<"action", { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }>>;
-            searchSharedCollections: FunctionReference<"action", { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; query: string; queryVector: Array<number> | null; requesterId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }>>;
+            default: FunctionReference<"action", { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
+            search: FunctionReference<"action", { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
+            searchSharedCollections: FunctionReference<"action", { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; query: string; queryVector: Array<number> | null; requesterId: string }, Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
         };
         summarize: {
             resummarizeFile: FunctionReference<"action", { knowledgeFileId: Id<"knowledgeFiles"> }, { error: string; success: boolean; documentType?: undefined; summary?: undefined; topics?: undefined; } | { documentType: "data" | "code" | "other" | "technical_doc" | "article" | "report" | "guide" | "reference" | "correspondence"; success: boolean; summary: string; topics: string[]; error?: undefined; }>;

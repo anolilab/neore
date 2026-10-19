@@ -85,12 +85,28 @@ export const collectSettings = internalQuery
  * only what the projection reads keeps the field TYPES tied to the schema
  * without inheriting the brands the wire has already erased.
  */
-const projectMessage = (message: Pick<Doc<"messages">, "_creationTime" | "model" | "order" | "status" | "stepOrder" | "text" | "tool"> & { _id: string }) => {
+/** `user` | `assistant` | `system` | `tool`, from the stored UI message; the row itself has no role column. */
+const roleOf = (message: unknown): string | undefined => {
+    const role = (message as { role?: unknown } | null | undefined)?.role;
+
+    return typeof role === "string" ? role : undefined;
+};
+
+const projectMessage = (
+    message: Pick<
+        Doc<"messages">,
+        "_creationTime" | "createdAt" | "message" | "model" | "order" | "parentMessageId" | "status" | "stepOrder" | "text" | "tool"
+    > & { _id: string },
+) => {
     return {
         _id: message._id,
-        createdAt: message._creationTime,
+        // The display time: an imported message keeps its source time there, and a re-import should keep it too.
+        createdAt: message.createdAt ?? message._creationTime,
         model: message.model,
         order: message.order,
+        // As stored, so `"root"` (a top-level sibling) stays distinct from an id that is simply missing.
+        parentMessageId: message.parentMessageId,
+        role: roleOf(message.message),
         status: message.status,
         stepOrder: message.stepOrder,
         text: message.text,
@@ -103,11 +119,16 @@ const projectMessage = (message: Pick<Doc<"messages">, "_creationTime" | "model"
  * to names — the ids alone mean nothing to the data subject.
  */
 const projectThread = (
-    thread: Pick<Doc<"threads">, "_creationTime" | "category" | "model" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"> & { _id: string },
+    thread: Pick<Doc<"threads">, "_creationTime" | "activeLeafMessageId" | "category" | "model" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"> & {
+        _id: string;
+    },
     tagNames: ReadonlyMap<string, string>,
 ) => {
     return {
         _id: thread._id,
+        // Where the user last pointed the branch switcher. Unset for a thread that never branched. A re-import
+        // uses it to keep only the replies the user kept, rather than every alternative (`parsers/neore.ts`).
+        activeLeafMessageId: thread.activeLeafMessageId,
         category: thread.category,
         createdAt: thread._creationTime,
         model: thread.model,
@@ -150,9 +171,21 @@ export const collectConversations = internalAction.input({ userId: v.string() })
     // `thread.summaryTYPO` an error; this annotation only has to describe the
     // wire shape.
     const conversations: {
-        messages: { _id: string; createdAt: number; model?: string; order?: number; status?: string; stepOrder?: number; text?: string; tool?: boolean }[];
+        messages: {
+            _id: string;
+            createdAt: number;
+            model?: string;
+            order?: number;
+            parentMessageId?: string;
+            role?: string;
+            status?: string;
+            stepOrder?: number;
+            text?: string;
+            tool?: boolean;
+        }[];
         thread: {
             _id: string;
+            activeLeafMessageId?: string;
             category?: string;
             createdAt: number;
             model?: string;

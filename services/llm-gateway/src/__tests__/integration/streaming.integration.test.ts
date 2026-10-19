@@ -5,8 +5,10 @@
  * Verifies SSE format, chunk structure, [DONE] termination, and that
  * each data chunk contains valid OpenAI-compatible chunk objects.
  */
+import { streamText } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
+import { UsageTracker } from "../../usage/tracker.js";
 import { createMockEnv, makeVirtualKeyRow } from "../helpers/mock-env.js";
 import { useTrackedAppFetch } from "../helpers/tracked-app-fetch.js";
 
@@ -208,5 +210,45 @@ describe("POST /v1/chat/completions (stream=true)", () => {
         const res = await fetchApp(request, env);
 
         expect(res.headers.get("Cache-Control")).toBe("no-store");
+    });
+});
+
+describe("POST /v1/chat/completions (stream=true) with a provider error mid-stream", () => {
+    it("records the usage entry with errorCode so its span exports as failed", async () => {
+        vi.mocked(streamText).mockReturnValueOnce({
+            finishReason: Promise.resolve("error"),
+            fullStream: (async function* failingStream() {
+                yield { text: "partial", type: "text-delta" };
+                yield { error: new Error("provider exploded"), type: "error" };
+            })(),
+            usage: Promise.resolve({ inputTokens: 10, outputTokens: 1 }),
+        } as never);
+
+        const recordSpy = vi.spyOn(UsageTracker.prototype, "recordAndEvaluate");
+
+        try {
+            const res = await fetchApp(
+                new Request("http://localhost/v1/chat/completions", {
+                    body: JSON.stringify({ messages: [{ content: "hi", role: "user" }], model: "gpt-4o-mini", stream: true }),
+                    headers: { Authorization: `Bearer ${TEST_TOKEN}`, "Content-Type": "application/json" },
+                    method: "POST",
+                }),
+                env,
+            );
+
+            const body = await res.text();
+
+            const [entry] = recordSpy.mock.calls.map(([usageEntry]) => usageEntry);
+            const finishReasons = body
+                .matchAll(/"finish_reason":"(\w+)"/g)
+                .map((match) => match[1])
+                .toArray();
+
+            expect(entry?.errorCode).toBe("PROVIDER_ERROR");
+            // The error finish chunk is the only one: a later "stop" would read as a normal end.
+            expect(finishReasons).toEqual(["error"]);
+        } finally {
+            recordSpy.mockRestore();
+        }
     });
 });

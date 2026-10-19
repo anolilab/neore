@@ -10,6 +10,7 @@ import parseClaude from "./claude";
 import parseClaudeCode, { isClaudeCodeRecord } from "./claude-code";
 import parseCodex, { isCodexRecord } from "./codex";
 import parseGemini from "./gemini";
+import parseNeore, { isNeoreExport } from "./neore";
 import type { ImportProvider, NormalizedConversation, ParseResult } from "./types";
 
 export type { ImportProvider, NormalizedConversation, NormalizedMessage, ParseResult } from "./types";
@@ -48,6 +49,12 @@ const NON_CONVERSATION_EXPORT_FILES = new Set([
  * - Gemini: Object/array with `messages` field and role = "USER"/"MODEL".
  */
 const detectProvider = (data: unknown): ImportProvider => {
+    // Neore export root (`exportVersion` + `conversations`). Checked first: it is the only format whose
+    // root object carries both, and a `.json` file arrives wrapped once in an array. Any entry will do: the parser skips the ones that are not exports.
+    if (isNeoreExport(data) || (Array.isArray(data) && data.some((entry) => isNeoreExport(entry)))) {
+        return "neore";
+    }
+
     if (Array.isArray(data) && data.length > 0) {
         const first = data[0];
 
@@ -108,7 +115,9 @@ const detectProvider = (data: unknown): ImportProvider => {
         }
     }
 
-    throw new ChatImportError(msg`Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude.`);
+    throw new ChatImportError(
+        msg`Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export.`,
+    );
 };
 
 /**
@@ -139,6 +148,10 @@ export const parseExportFile = (data: unknown, provider?: ImportProvider): Parse
         }
         case "gemini": {
             conversations = parseGemini(data);
+            break;
+        }
+        case "neore": {
+            conversations = parseNeore(data);
             break;
         }
         default: {

@@ -16,6 +16,42 @@ use serde::Serialize;
 /// same number before a byte is sent; this is the backstop.
 pub const MAX_DOCUMENT_BYTES: usize = 25 * 1024 * 1024;
 
+/// What `POST /extract` returns as `content`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentFormat {
+    /// xberg's plain-text rendering — the default, and what every caller got before `format` existed.
+    Plain,
+    /// Markdown: headings, lists and tables kept. Knowledge ingestion asks for it.
+    Markdown,
+}
+
+/// The `format` query value. Absent means plain; `None` is an unknown value,
+/// which the caller refuses rather than guessing at.
+pub fn parse_format(value: Option<&str>) -> Option<ContentFormat> {
+    match value {
+        None | Some("plain") => Some(ContentFormat::Plain),
+        Some("markdown") => Some(ContentFormat::Markdown),
+        Some(_) => None,
+    }
+}
+
+const PDF: &str = "application/pdf";
+const PPTX: &str = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+/// Whether xberg's per-page content is real pagination (PDF) or real slides
+/// (PPTX). DOCX and XLSX have none that xberg can see: a page number there
+/// would be a guess, so they get no page markers.
+pub fn is_paged(mime: &str) -> bool {
+    mime == PDF || is_slides(mime)
+}
+
+/// PPTX. Its Markdown is not used: xberg puts a slide's title and body on ONE
+/// `## ` line, so every slide would be a section heading that swallows its
+/// body. Slides are read as plain text, page by page.
+pub fn is_slides(mime: &str) -> bool {
+    mime == PPTX
+}
+
 /// The MIME type xberg should parse a document as: the `Content-Type` without
 /// parameters, lower-cased, `application/octet-stream` when absent.
 pub fn normalize_mime(header: Option<&str>) -> String {
@@ -92,12 +128,40 @@ pub struct ExtractedTable {
     pub page_number: u32,
 }
 
+/// One page of a paged document's Markdown. The page number travels beside the
+/// text, not inside it, so no text can pass for a page boundary.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractedPage {
+    pub page_number: u32,
+    pub content: String,
+}
+
+impl ExtractedPage {
+    /// Trailing whitespace is cut in place, so a page does not carry the blank
+    /// lines xberg ends it with, and no second copy of the text is made.
+    pub fn new(page_number: u32, mut content: String) -> Self {
+        content.truncate(content.trim_end().len());
+
+        Self {
+            page_number,
+            content,
+        }
+    }
+}
+
 /// `POST /extract`'s 200 body — the contract `@neore/service-sdk`'s
 /// `ExtractResponse` describes (`packages/service-sdk/openapi/document-parser.json`).
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExtractResponse {
+    /// The whole text. Empty when `pages` is present: the text is then only
+    /// there, page by page, so the response never holds it twice.
     pub content: String,
+    /// A paged document's Markdown, one entry per page, in order. Absent for
+    /// every other document and format.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pages: Option<Vec<ExtractedPage>>,
     pub mime_type: String,
     pub tables: Vec<ExtractedTable>,
     pub metadata: serde_json::Value,
@@ -245,6 +309,77 @@ mod tests {
         ] {
             assert_eq!(strip_heading_attributes(line), line);
         }
+    }
+
+    #[test]
+    fn parses_the_format_option() {
+        assert_eq!(parse_format(None), Some(ContentFormat::Plain));
+        assert_eq!(parse_format(Some("plain")), Some(ContentFormat::Plain));
+        assert_eq!(
+            parse_format(Some("markdown")),
+            Some(ContentFormat::Markdown)
+        );
+        assert_eq!(parse_format(Some("Markdown")), None);
+        assert_eq!(parse_format(Some("")), None);
+        assert_eq!(parse_format(Some("html")), None);
+    }
+
+    #[test]
+    fn only_pdf_and_pptx_are_paged_and_only_pptx_is_slides() {
+        assert!(is_paged("application/pdf"));
+        assert!(is_paged(
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ));
+        assert!(is_slides(
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ));
+        assert!(!is_slides("application/pdf"));
+        assert!(!is_paged(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ));
+        assert!(!is_paged(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ));
+    }
+
+    #[test]
+    fn cuts_trailing_whitespace_from_a_page() {
+        assert_eq!(
+            ExtractedPage::new(1, "# One\n\nalpha\n\n".to_owned()),
+            ExtractedPage {
+                page_number: 1,
+                content: "# One\n\nalpha".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn omits_pages_unless_the_document_has_them() {
+        let plain = ExtractResponse {
+            content: "text".to_owned(),
+            pages: None,
+            mime_type: "application/pdf".to_owned(),
+            tables: Vec::new(),
+            metadata: serde_json::json!({}),
+        };
+        assert!(serde_json::to_value(&plain).unwrap().get("pages").is_none());
+
+        let paged = ExtractResponse {
+            content: String::new(),
+            pages: Some(vec![ExtractedPage::new(1, "beta".to_owned())]),
+            ..plain
+        };
+
+        assert_eq!(
+            serde_json::to_value(&paged).unwrap(),
+            serde_json::json!({
+                "content": "",
+                "pages": [{ "pageNumber": 1, "content": "beta" }],
+                "mimeType": "application/pdf",
+                "tables": [],
+                "metadata": {}
+            })
+        );
     }
 
     #[test]

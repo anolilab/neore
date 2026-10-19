@@ -120,6 +120,7 @@ export const zKnowledgeHitSchema = z.object({
     chunkIndex: z.number(),
     content: z.string(),
     fileName: z.string(),
+    pageNumber: z.number().optional().meta({ description: "The page the passage starts on (PDF and PPTX only)." }),
     score: z.number().meta({ description: "Reciprocal-rank-fusion score; comparable within one response only." }),
 });
 

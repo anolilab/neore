@@ -47,6 +47,20 @@ different runtime — see `docs/plans/document-parser.md`.
 **Request:** the raw file bytes as the body, with the file's MIME type as
 `Content-Type` (for example, `application/pdf`).
 
+**Query:** `format` selects the shape of `content`:
+
+| `format` | `content` |
+| --- | --- |
+| omitted, or `plain` | xberg's plain-text rendering. The default, unchanged by the option. |
+| `markdown` | Markdown: headings, lists and tables kept. A PDF is split into pages, and a PPTX into slides (as plain text: its Markdown would put each slide's title and body on one heading line). Those pages come back in `pages` and `content` is `""`. Knowledge ingestion asks for this. |
+
+Any other value is `400`. `tables` is returned in both formats; in Markdown the
+same tables already sit in `content` or `pages`.
+
+With `format=markdown` a paged document is answered with `pages` (one entry per
+page, in order, 1-based `pageNumber`) and an empty `content`, so the text is
+never sent twice. Every other response has no `pages` key.
+
 **Response (200):**
 
 ```json
@@ -58,11 +72,23 @@ different runtime — see `docs/plans/document-parser.md`.
 }
 ```
 
+A paged document in Markdown adds `pages` and empties `content`:
+
+```json
+{
+    "content": "",
+    "pages": [{ "pageNumber": 1, "content": "# Title\n\nFirst page." }],
+    "mimeType": "application/pdf",
+    "tables": [],
+    "metadata": { "format": { "format_type": "pdf" } }
+}
+```
+
 **Error responses** carry `{ "error": string, "details"?: string }`:
 
 | Status | Meaning |
 | --- | --- |
-| `400` | Empty request body |
+| `400` | Empty request body, or an unknown `format` |
 | `413` | File exceeds 25 MB (`maxBytes` carries the limit) |
 | `500` | Extraction failed (unsupported or corrupt file) |
 

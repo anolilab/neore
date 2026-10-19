@@ -15,7 +15,8 @@
  *   - `[[reasoning]]`                  — emit a reasoning part before the text
  *   - `[[tool:&lt;name> &lt;json>]]`         — call tool `&lt;name>` with `&lt;json>` as input,
  *                                        once; the follow-up turn (after the tool
- *                                        result) answers with plain text
+ *                                        result) answers with plain text. Not when
+ *                                        the request sets `tool_choice: "none"`
  *   - `[[delay:&lt;ms>]]`                 — wait that long (at most 60s) before
  *                                        answering — a stand-in for a slow model,
  *                                        for measuring concurrency and ordering
@@ -424,7 +425,7 @@ export const planMockResponse = (options: LanguageModelV3CallOptions): MockPlan 
     const results = toolResultsSinceLastUser(options.prompt);
     const toolMatch = TOOL_MARKER.exec(userText);
 
-    if (toolMatch?.[1] && results.length === 0) {
+    if (toolMatch?.[1] && results.length === 0 && options.toolChoice?.type !== "none") {
         const toolName = toolMatch[1];
         const available = (options.tools ?? []).some((tool) => tool.name === toolName);
 

@@ -10111,6 +10111,10 @@
                           {
                             "const": "codex",
                             "type": "string"
+                          },
+                          {
+                            "const": "neore",
+                            "type": "string"
                           }
                         ]
                       },
@@ -26877,6 +26881,9 @@
                       },
                       "fileName": {
                         "type": "string"
+                      },
+                      "pageNumber": {
+                        "type": "number"
                       },
                       "score": {
                         "type": "number"

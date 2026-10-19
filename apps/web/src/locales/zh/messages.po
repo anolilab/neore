@@ -30,7 +30,7 @@ msgid ", unread"
 msgstr "，未读"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:339
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:340
 msgid "...and {0} more"
 msgstr "……还有 {0} 个"
 
@@ -81,7 +81,7 @@ msgstr "当前的 Azure OpenAI API 请使用 \"v1\"。带日期的版本（如 2
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "（{0}/{MAX_PARTICIPANTS}，至少 {MIN_PARTICIPANTS} 个）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 个失败）"
 
@@ -196,7 +196,7 @@ msgid "{0, plural, one {# line} other {# lines}}"
 msgstr "{0, plural, other {# 行}}"
 
 #. placeholder {0}: node.relevantMessages.length
-#: src/features/chat/thread-list/thread-node.tsx:882
+#: src/features/chat/thread-list/thread-node.tsx:890
 msgid "{0, plural, one {# match} other {# matches}}"
 msgstr "{0, plural, other {# 个匹配}}"
 
@@ -206,7 +206,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 名成员}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:336
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, other {# 条消息}}"
 
@@ -371,18 +371,18 @@ msgid "{0} chunks"
 msgstr "{0} 个分块"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
 msgid "{0} conversations failed to import"
 msgstr "{0} 个对话导入失败"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
 msgid "{0} conversations found"
 msgstr "找到 {0} 个对话"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
 msgid "{0} conversations imported from {1}"
 msgstr "已从 {1} 导入 {0} 个对话"
 
@@ -483,7 +483,7 @@ msgstr "已完成 {0}/{1} 个用例"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:370
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
 msgid "{0} of {1} conversations imported"
 msgstr "已导入 {0}/{1} 个对话"
 
@@ -501,7 +501,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "已使用 {0}/{1} 个 token（{2}%）"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1019
+#: src/components/model-picker/model-picker.tsx:1018
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "已选择 {0}/{MAX_PARALLEL} 个"
 
@@ -546,7 +546,7 @@ msgid "{0} to review"
 msgstr "{0} 个待审核"
 
 #. placeholder {0}: formatNumber(Math.round(stats.averageTokensPerSecond * 10) / 10, locale)
-#: src/features/chat/header/thread-stats-dialog.tsx:76
+#: src/features/chat/header/thread-stats-dialog.tsx:73
 msgid "{0} tok/s"
 msgstr ""
 
@@ -769,7 +769,7 @@ msgstr "{fps} fps"
 msgid "{hours} hours"
 msgstr "{hours} 小时"
 
-#: src/features/chat/thread-list/thread-node.tsx:279
+#: src/features/chat/thread-list/thread-node.tsx:287
 msgid "{hours}h {minutes}m"
 msgstr "{hours} 小时 {minutes} 分钟"
 
@@ -818,7 +818,7 @@ msgstr "{mins} 分"
 msgid "{mins}m {secs}s"
 msgstr "{mins} 分 {secs} 秒"
 
-#: src/features/chat/thread-list/thread-node.tsx:282
+#: src/features/chat/thread-list/thread-node.tsx:290
 msgid "{minutes}m"
 msgstr "{minutes} 分钟"
 
@@ -895,7 +895,7 @@ msgstr "{name} 连接已激活"
 msgid "{name} disconnected"
 msgstr "{name} 已断开连接"
 
-#: src/components/model-picker/model-picker.tsx:634
+#: src/components/model-picker/model-picker.tsx:633
 msgid "{name} hidden from the model picker"
 msgstr ""
 
@@ -2470,8 +2470,8 @@ msgstr "垂直对齐（V）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:617
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
-#: src/components/model-picker/model-picker.tsx:889
-#: src/components/model-picker/model-picker.tsx:947
+#: src/components/model-picker/model-picker.tsx:888
+#: src/components/model-picker/model-picker.tsx:946
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:417
@@ -2549,7 +2549,7 @@ msgid "All MCP servers active"
 msgstr "所有 MCP 服务器已启用"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:563
-#: src/components/model-picker/model-picker.tsx:840
+#: src/components/model-picker/model-picker.tsx:839
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "所有模型"
@@ -3145,7 +3145,7 @@ msgstr "确定要删除此 API 密钥吗？此操作无法撤销。"
 msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "确定要删除此项吗？此操作无法撤销。"
 
-#: src/features/chat/thread-list/thread-node.tsx:838
+#: src/features/chat/thread-list/thread-node.tsx:846
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "确定要删除此对话吗？此操作无法撤销，并将永久删除此对话中的所有消息。"
 
@@ -3346,7 +3346,7 @@ msgid "Auckland"
 msgstr "奥克兰"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
-#: src/components/model-picker/model-picker.tsx:935
+#: src/components/model-picker/model-picker.tsx:934
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:119
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -3562,7 +3562,7 @@ msgstr "平均延迟"
 msgid "Average score"
 msgstr "平均得分"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:72
+#: src/features/chat/header/thread-stats-dialog.tsx:69
 msgid "Average speed"
 msgstr ""
 
@@ -4546,7 +4546,7 @@ msgstr "加拿大"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:347
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:348
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4570,7 +4570,7 @@ msgstr "取消深度工作"
 msgid "Cancel Export"
 msgstr "取消导出"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:375
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:376
 msgid "Cancel Import"
 msgstr "取消导入"
 
@@ -4775,7 +4775,7 @@ msgid "Change colors"
 msgstr "更改颜色"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
-#: src/features/chat/thread-list/thread-node.tsx:710
+#: src/features/chat/thread-list/thread-node.tsx:718
 msgid "Change passcode"
 msgstr ""
 
@@ -4889,12 +4889,12 @@ msgstr "对话导入失败"
 msgid "Chat import finished"
 msgstr "对话导入完成"
 
-#: src/features/chat/thread-list/thread-node.tsx:677
-#: src/features/chat/thread-list/thread-node.tsx:691
+#: src/features/chat/thread-list/thread-node.tsx:685
+#: src/features/chat/thread-list/thread-node.tsx:699
 msgid "Chat lock"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:677
+#: src/features/chat/thread-list/thread-node.tsx:685
 msgid "Chat lock: locked"
 msgstr ""
 
@@ -5280,7 +5280,7 @@ msgstr "点击"
 msgid "Click \"{selector}\""
 msgstr "点击“{selector}”"
 
-#: src/components/model-picker/model-picker.tsx:979
+#: src/components/model-picker/model-picker.tsx:978
 msgid "Click ★ on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型上的 ★ 即可添加到这里。"
 
@@ -6001,7 +6001,7 @@ msgstr "已配置"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1041
+#: src/components/model-picker/model-picker.tsx:1040
 msgid "Confirm"
 msgstr "确认"
 
@@ -6427,6 +6427,10 @@ msgstr "通过光圈设置控制景深"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:22
+msgid "Control panel"
+msgstr ""
+
 #: src/features/workflow/components/nodes/controlnet-node.tsx:182
 msgid "Control Strength"
 msgstr "控制强度"
@@ -6506,7 +6510,7 @@ msgstr "转换为附件以便阅读？"
 msgid "Convert to Full Account"
 msgstr "转换为正式账号"
 
-#: src/features/chat/thread-list/thread-node.tsx:814
+#: src/features/chat/thread-list/thread-node.tsx:822
 msgid "Convert to permanent"
 msgstr "转为永久对话"
 
@@ -6518,7 +6522,7 @@ msgstr "转换以保存你的数据"
 msgid "Convert to TypeScript"
 msgstr "转换为 TypeScript"
 
-#: src/features/chat/thread-list/thread-node.tsx:814
+#: src/features/chat/thread-list/thread-node.tsx:822
 msgid "Converting..."
 msgstr "正在转换..."
 
@@ -6527,7 +6531,7 @@ msgstr "正在转换..."
 msgid "Copied"
 msgstr "已复制"
 
-#: src/features/chat/thread/copy-last-code-block.tsx:41
+#: src/features/chat/thread/copy-last-code-block.tsx:53
 msgid "Copied the last code block"
 msgstr ""
 
@@ -6752,7 +6756,7 @@ msgstr ""
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr ""
 
-#: src/features/chat/thread/copy-last-code-block.tsx:46
+#: src/features/chat/thread/copy-last-code-block.tsx:41
 msgid "Could not copy to the clipboard"
 msgstr ""
 
@@ -6789,9 +6793,13 @@ msgstr "无法删除评论"
 msgid "Could not delete the page"
 msgstr "无法删除页面"
 
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:119
+msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+msgstr ""
+
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:111
-msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
-msgstr "无法识别聊天提供商。请确认你上传的是来自 ChatGPT、Gemini 或 Claude 的有效导出文件。"
+#~ msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
+#~ msgstr "无法识别聊天提供商。请确认你上传的是来自 ChatGPT、Gemini 或 Claude 的有效导出文件。"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:58
 msgid "Could not export the workflow"
@@ -6809,7 +6817,7 @@ msgstr "无法导入工作流"
 msgid "Could not load image"
 msgstr "无法加载图片"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:63
+#: src/features/chat/header/thread-stats-dialog.tsx:60
 msgid "Could not load statistics for this thread."
 msgstr ""
 
@@ -6934,7 +6942,7 @@ msgstr "无法开始试运行。"
 msgid "Could not stop the conversation"
 msgstr "无法停止对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:513
+#: src/features/chat/thread-list/thread-node.tsx:521
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
@@ -7069,7 +7077,7 @@ msgstr ""
 
 #: src/components/command-palette.tsx:313
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:93
-#: src/features/chat/thread-list/thread-node.tsx:615
+#: src/features/chat/thread-list/thread-node.tsx:623
 msgid "Create branch"
 msgstr "创建分支"
 
@@ -7220,7 +7228,7 @@ msgstr "创建时间：{createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "创建一个一次性链接，有效期 7 天。任何已登录的人打开它即可获得访问权限。"
 
-#: src/features/chat/thread-list/thread-node.tsx:615
+#: src/features/chat/thread-list/thread-node.tsx:623
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
@@ -8143,12 +8151,12 @@ msgstr "删除此用例？"
 #: src/components/command-palette.tsx:331
 #: src/components/command-palette.tsx:457
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:85
-#: src/features/chat/thread-list/thread-node.tsx:835
+#: src/features/chat/thread-list/thread-node.tsx:843
 #: src/features/pages/components/page-comments-panel.tsx:188
 msgid "Delete thread"
 msgstr "删除对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:850
+#: src/features/chat/thread-list/thread-node.tsx:858
 msgid "Delete Thread"
 msgstr "删除对话"
 
@@ -8176,7 +8184,7 @@ msgstr "{0, plural, other {已删除 # 个提示词}}"
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1473
 #: src/components/delete-confirmation-dialog.tsx:65
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:285
-#: src/features/chat/thread-list/thread-node.tsx:835
+#: src/features/chat/thread-list/thread-node.tsx:843
 msgid "Deleting..."
 msgstr "正在删除..."
 
@@ -8428,7 +8436,7 @@ msgid "Details for case {0}"
 msgstr "用例 {0} 的详情"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:324
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
 msgid "Detected: {0}"
 msgstr "检测到：{0}"
 
@@ -8774,6 +8782,10 @@ msgstr "双击编辑"
 msgid "Double-click to rename"
 msgstr "双击重命名"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:15
+msgid "down"
+msgstr ""
+
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:180
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:775
@@ -8857,11 +8869,11 @@ msgstr "已开始下载"
 msgid "Download Text"
 msgstr "下载文本"
 
-#: src/features/chat/thread-list/thread-node.tsx:739
+#: src/features/chat/thread-list/thread-node.tsx:747
 msgid "Download thread"
 msgstr "下载对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:739
+#: src/features/chat/thread-list/thread-node.tsx:747
 msgid "Downloading..."
 msgstr "正在下载..."
 
@@ -9824,7 +9836,7 @@ msgstr "输入默认值..."
 msgid "Enter email address"
 msgstr "输入邮箱地址"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:46
+#: src/features/chat/lock/locked-chat-gate.tsx:49
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr ""
 
@@ -10115,7 +10127,7 @@ msgstr "Escape"
 msgid "Est. provider cost"
 msgstr "预估提供商费用"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:78
+#: src/features/chat/header/thread-stats-dialog.tsx:75
 msgid "Estimated cost"
 msgstr ""
 
@@ -10479,7 +10491,7 @@ msgstr "有效期已更新为 {0}"
 msgid "expired"
 msgstr "已过期"
 
-#: src/features/chat/thread-list/thread-node.tsx:272
+#: src/features/chat/thread-list/thread-node.tsx:280
 #: src/features/devices/components/devices-settings.tsx:134
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
@@ -10508,7 +10520,7 @@ msgstr "过期时间"
 msgid "Expires {date}"
 msgstr "{date} 过期"
 
-#: src/features/chat/thread-list/thread-node.tsx:876
+#: src/features/chat/thread-list/thread-node.tsx:884
 msgid "Expires in {remainingTime}"
 msgstr "{remainingTime} 后过期"
 
@@ -10733,7 +10745,7 @@ msgstr "失败"
 msgid "failed"
 msgstr "失败"
 
-#: src/features/chat/thread-list/thread-node.tsx:483
+#: src/features/chat/thread-list/thread-node.tsx:491
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/devices/components/devices-settings.tsx:135
 #: src/features/evals/components/model-comparison.tsx:112
@@ -11109,7 +11121,7 @@ msgstr "移动对话失败"
 msgid "Failed to optimize prompt"
 msgstr "优化提示词失败"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:238
 msgid "Failed to parse file"
 msgstr "解析文件失败"
 
@@ -11294,7 +11306,7 @@ msgstr "发送验证邮件失败"
 msgid "Failed to start impersonation"
 msgstr "开始模拟登录失败"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:272
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:273
 msgid "Failed to start import"
 msgstr "开始导入失败"
 
@@ -11372,8 +11384,8 @@ msgstr "更新收藏失败"
 msgid "Failed to update favorite status"
 msgstr "更新收藏状态失败"
 
-#: src/components/model-picker/model-picker.tsx:629
-#: src/components/model-picker/model-picker.tsx:638
+#: src/components/model-picker/model-picker.tsx:628
+#: src/components/model-picker/model-picker.tsx:637
 #: src/features/settings/components/chat/model-filter-settings.tsx:53
 #: src/features/settings/components/chat/model-filter-settings.tsx:88
 msgid "Failed to update filter rules"
@@ -12122,6 +12134,7 @@ msgid "Fisheye, extreme distortion"
 msgstr "鱼眼，极度畸变"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:54
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:23
 msgid "Fit view"
 msgstr "适应视图"
 
@@ -13486,7 +13499,7 @@ msgstr "访客账号"
 msgid "Guest accounts"
 msgstr "访客账号"
 
-#: src/components/model-picker/model-picker.tsx:804
+#: src/components/model-picker/model-picker.tsx:803
 msgid "Guest accounts use free models only."
 msgstr "访客账号只能使用免费模型。"
 
@@ -13518,6 +13531,10 @@ msgstr "高"
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:239
 msgid "Hand (pan)"
 msgstr "抓手（平移）"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:28
+msgid "Handle"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:298
 msgid "Handles demanding creative concepts"
@@ -13621,7 +13638,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:956
+#: src/components/model-picker/model-picker.tsx:955
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -14038,7 +14055,7 @@ msgstr "插画"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:911
+#: src/components/model-picker/model-picker.tsx:910
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -14228,11 +14245,11 @@ msgstr "已停止模拟登录"
 msgid "Import"
 msgstr "导入"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
 msgid "Import All"
 msgstr "全部导入"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:283
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
 msgid "Import cancelled"
 msgstr "导入已取消"
 
@@ -14240,28 +14257,32 @@ msgstr "导入已取消"
 msgid "Import cases"
 msgstr "导入用例"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:384
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
 msgid "Import complete!"
 msgstr "导入完成！"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:300
 msgid "Import Conversations"
 msgstr "导入对话"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:298
-msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:298
+#~ msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#~ msgstr ""
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:210
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "从 ChatGPT、Google Gemini 或 Claude 导入对话。上传你导出的 JSON 或 ZIP 文件。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:132
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:398
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:133
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:399
 msgid "Import failed"
 msgstr "导入失败"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:390
 msgid "Import More"
 msgstr "继续导入"
 
@@ -14269,7 +14290,7 @@ msgstr "继续导入"
 msgid "Import Notion export (.zip)"
 msgstr "导入 Notion 导出文件（.zip）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:211
 msgid "Import one kind of export at a time."
 msgstr ""
 
@@ -14320,7 +14341,7 @@ msgid "Imported skill \"{0}\""
 msgstr "已导入技能“{0}”"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:363
 msgid "Importing from {0}..."
 msgstr "正在从 {0} 导入..."
 
@@ -14466,7 +14487,7 @@ msgstr "Inception 基于扩散的语言模型"
 msgid "Includes audio generation"
 msgstr "包含音频生成"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:87
+#: src/features/chat/header/thread-stats-dialog.tsx:84
 msgid "Includes replies billed to your own API key."
 msgstr ""
 
@@ -14559,7 +14580,7 @@ msgstr "输入或转换文本"
 msgid "Input Template"
 msgstr "输入模板"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:68
+#: src/features/chat/header/thread-stats-dialog.tsx:65
 #: src/features/chat/thread/message-cost-badge.tsx:52
 msgid "Input tokens"
 msgstr "输入 token"
@@ -15311,7 +15332,7 @@ msgstr "最后一帧"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:410
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:411
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "上次导入：{2} 从 {1} 导入了 {0} 个对话"
 
@@ -15561,6 +15582,10 @@ msgstr "离开组织"
 msgid "Leave Team"
 msgstr "离开团队"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:16
+msgid "left"
+msgstr ""
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:397
 #: src/features/workflow/components/nodes/outpaint-node.tsx:25
 msgid "Left"
@@ -15668,7 +15693,7 @@ msgstr "第 {0} 行：{1}"
 msgid "Line {line}, column {column}"
 msgstr "第 {line} 行，第 {column} 列"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:168
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:181
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
 msgstr ""
 
@@ -15965,7 +15990,7 @@ msgstr "正在加载技能…"
 msgid "Loading spreadsheet…"
 msgstr "正在加载电子表格…"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:62
+#: src/features/chat/header/thread-stats-dialog.tsx:59
 msgid "Loading statistics…"
 msgstr ""
 
@@ -16021,7 +16046,7 @@ msgstr "正在加载..."
 msgid "Loading…"
 msgstr "正在加载…"
 
-#: src/features/chat/core/context/chat-context.tsx:850
+#: src/features/chat/core/context/chat-context.tsx:851
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "本地模型仅支持文本。请移除附件后再发送。"
 
@@ -16046,7 +16071,7 @@ msgstr "位置"
 msgid "Location updated"
 msgstr "位置已更新"
 
-#: src/features/chat/thread-list/thread-node.tsx:714
+#: src/features/chat/thread-list/thread-node.tsx:722
 msgid "Lock chat"
 msgstr ""
 
@@ -16059,7 +16084,7 @@ msgstr "锁定分组"
 msgid "Lock node"
 msgstr "锁定节点"
 
-#: src/features/chat/thread-list/thread-node.tsx:706
+#: src/features/chat/thread-list/thread-node.tsx:714
 msgid "Lock now"
 msgstr ""
 
@@ -16067,12 +16092,12 @@ msgstr ""
 msgid "Lock this chat"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:238
+#: src/features/chat/thread-list/thread-node.tsx:246
 msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1024
+#: src/components/model-picker/model-picker.tsx:1023
 msgid "Locked to {0} models"
 msgstr "已锁定为{0}模型"
 
@@ -16349,7 +16374,7 @@ msgstr "管理同意偏好"
 #~ msgid "Manage gateway API keys with per-key budgets and rate limits"
 #~ msgstr "管理网关 API 密钥，支持按密钥设置预算和速率限制"
 
-#: src/components/model-picker/model-picker.tsx:641
+#: src/components/model-picker/model-picker.tsx:640
 msgid "Manage hidden labs"
 msgstr ""
 
@@ -16573,7 +16598,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大大小：{size} • 最多 {maxFiles} 个文件"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
-#: src/components/model-picker/model-picker.tsx:1018
+#: src/components/model-picker/model-picker.tsx:1017
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "已达到 {MAX_PARALLEL} 个模型的上限"
 
@@ -16835,8 +16860,8 @@ msgstr "消息"
 msgid "Messages API (/v1/messages) — Anthropic and services that mirror it."
 msgstr "Messages API（/v1/messages）——Anthropic 及与其兼容的服务。"
 
-#: src/features/chat/thread-list/thread-node.tsx:542
-#: src/features/chat/thread-list/thread-node.tsx:554
+#: src/features/chat/thread-list/thread-node.tsx:550
+#: src/features/chat/thread-list/thread-node.tsx:562
 msgid "Messages from {sourceName}"
 msgstr "来自 {sourceName} 的消息"
 
@@ -16907,6 +16932,10 @@ msgstr "你的 Azure Bot 的 Microsoft App ID"
 #: src/features/appearance/components/appearance-controls.tsx:129
 msgid "Min"
 msgstr "Min"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:29
+msgid "Mini map"
+msgstr ""
 
 #: src/features/canvas/components/design-preset-selector.tsx:179
 msgid "Minimal Card"
@@ -17120,11 +17149,11 @@ msgstr "模型已被屏蔽"
 msgid "Model Breakdown"
 msgstr "模型明细"
 
-#: src/features/chat/thread-list/thread-node.tsx:484
+#: src/features/chat/thread-list/thread-node.tsx:492
 msgid "Model comparison"
 msgstr "模型对比"
 
-#: src/features/chat/core/hooks/use-comparison-chat.ts:108
+#: src/features/chat/core/hooks/use-comparison-chat.ts:112
 #: src/features/workflow/templates/index.ts:258
 msgid "Model Comparison"
 msgstr "模型对比"
@@ -17180,7 +17209,7 @@ msgstr "模型：OpenAI Whisper"
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:262
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/chat/header/thread-stats-dialog.tsx:92
+#: src/features/chat/header/thread-stats-dialog.tsx:89
 #: src/features/evals/components/dataset-panel.tsx:132
 #: src/features/layout/lib/dashboard-page-names.ts:31
 #: src/features/marketing/components/landing-footer.tsx:111
@@ -17475,7 +17504,7 @@ msgstr "移到下一个单元格"
 msgid "Move to previous cell"
 msgstr "移到上一个单元格"
 
-#: src/features/chat/thread-list/thread-node.tsx:634
+#: src/features/chat/thread-list/thread-node.tsx:642
 msgid "Move to project"
 msgstr "移动到项目"
 
@@ -17490,6 +17519,11 @@ msgstr "上移"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:108
 msgid "Move up one page"
 msgstr "向上移动一页"
+
+#. placeholder {0}: directions[direction] ?? direction
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:33
+msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
+msgstr ""
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:113
 msgid "MP4/MOV video"
@@ -18284,7 +18318,7 @@ msgstr "无内容"
 msgid "No content to display"
 msgstr "无可显示的内容"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:219
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:220
 msgid "No conversations found in the file."
 msgstr "文件中未找到对话。"
 
@@ -18463,7 +18497,7 @@ msgid "No models found matching your filters."
 msgstr "未找到符合筛选条件的模型。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:711
-#: src/components/model-picker/model-picker.tsx:985
+#: src/components/model-picker/model-picker.tsx:984
 msgid "No models found."
 msgstr "未找到模型。"
 
@@ -18653,7 +18687,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "未检测到语音。免提模式已停止。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:703
-#: src/components/model-picker/model-picker.tsx:977
+#: src/components/model-picker/model-picker.tsx:976
 msgid "No starred models"
 msgstr "没有星标模型"
 
@@ -20028,7 +20062,7 @@ msgstr "输出格式"
 msgid "Output Mode"
 msgstr "输出模式"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:70
+#: src/features/chat/header/thread-stats-dialog.tsx:67
 #: src/features/chat/thread/message-cost-badge.tsx:60
 msgid "Output tokens"
 msgstr "输出 token"
@@ -20167,7 +20201,7 @@ msgid "Paraguay"
 msgstr "巴拉圭"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:595
-#: src/components/model-picker/model-picker.tsx:870
+#: src/components/model-picker/model-picker.tsx:869
 msgid "Parallel"
 msgstr "并行"
 
@@ -20180,7 +20214,7 @@ msgstr "并行对比"
 msgid "Paris"
 msgstr "巴黎"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:318
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:319
 msgid "Parsing file..."
 msgstr "正在解析文件..."
 
@@ -20216,9 +20250,15 @@ msgid "Pass rate"
 msgstr "通过率"
 
 #. placeholder {0}: citation.chunkIndex + 1
-#: src/features/knowledge/components/knowledge-source-group.tsx:66
+#: src/features/knowledge/components/knowledge-source-group.tsx:68
 msgid "Passage {0}, cited as [{position}]"
 msgstr "段落 {0}，引用为 [{position}]"
+
+#. placeholder {0}: citation.chunkIndex + 1
+#. placeholder {1}: citation.pageNumber
+#: src/features/knowledge/components/knowledge-source-group.tsx:69
+msgid "Passage {0}, page {1}, cited as [{position}]"
+msgstr ""
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:168
 msgid "Passcode"
@@ -21030,6 +21070,18 @@ msgstr "预设"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1177
 msgid "Press ? for keyboard shortcuts"
 msgstr "按 ? 查看键盘快捷键"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:30
+msgid "Press enter or space to select a node. Press delete to remove it and escape to cancel."
+msgstr ""
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:31
+msgid "Press enter or space to select a node. You can then use the arrow keys to move the node around. Press delete to remove it and escape to cancel."
+msgstr ""
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:27
+msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:241
 msgid "Press Enter to send"
@@ -22617,7 +22669,7 @@ msgid "Remove or add objects in an image"
 msgstr "移除或添加图像中的物体"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:151
-#: src/features/chat/thread-list/thread-node.tsx:711
+#: src/features/chat/thread-list/thread-node.tsx:719
 msgid "Remove passcode"
 msgstr ""
 
@@ -22713,7 +22765,7 @@ msgstr "重新播放新手引导"
 msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "重新播放欢迎导览，回顾 Neore 的核心功能。"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:66
+#: src/features/chat/header/thread-stats-dialog.tsx:63
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:144
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:246
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
@@ -22749,7 +22801,7 @@ msgstr "所选期间内每个技能或智能体的回复、token 和支出"
 msgid "Reply"
 msgstr "回复"
 
-#: src/features/chat/core/context/chat-context.tsx:769
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "Reply ready"
 msgstr "回复已就绪"
 
@@ -22931,7 +22983,7 @@ msgstr "资源"
 msgid "Response"
 msgstr "响应"
 
-#: src/features/chat/thread-list/thread-node.tsx:493
+#: src/features/chat/thread-list/thread-node.tsx:501
 msgid "Response failed - try again"
 msgstr "回复失败——请重试"
 
@@ -23146,6 +23198,10 @@ msgstr "生成中融入丰富的世界知识"
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:109
 msgid "RIFF (WAV/AVI/WebP)"
 msgstr "RIFF（WAV/AVI/WebP）"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:17
+msgid "right"
+msgstr ""
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:399
 #: src/features/workflow/components/nodes/outpaint-node.tsx:26
@@ -23806,7 +23862,7 @@ msgid "Search models by name, ID, or provider..."
 msgstr "按名称、ID 或提供商搜索模型..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:528
-#: src/components/model-picker/model-picker.tsx:811
+#: src/components/model-picker/model-picker.tsx:810
 msgid "Search models..."
 msgstr "搜索模型..."
 
@@ -24043,7 +24099,7 @@ msgstr "选择听写语言"
 msgid "Select duration"
 msgstr "选择时长"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:312
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:313
 msgid "Select File"
 msgstr "选择文件"
 
@@ -24810,7 +24866,7 @@ msgid "Singapore"
 msgstr "新加坡"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:582
-#: src/components/model-picker/model-picker.tsx:858
+#: src/components/model-picker/model-picker.tsx:857
 msgid "Single"
 msgstr "单个"
 
@@ -24929,7 +24985,7 @@ msgid "Skipped"
 msgstr "已跳过"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:328
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
 msgid "Skipped files that are not chat exports: {0}"
 msgstr ""
 
@@ -25470,7 +25526,7 @@ msgid "Star"
 msgstr "星形"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:547
-#: src/components/model-picker/model-picker.tsx:827
+#: src/components/model-picker/model-picker.tsx:826
 msgid "Starred"
 msgstr "星标"
 
@@ -25629,7 +25685,7 @@ msgstr "正在启动"
 msgid "Starting {0}…"
 msgstr "正在开始拉取 {0}…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
 msgid "Starting import..."
 msgstr "正在开始导入..."
 
@@ -25728,8 +25784,8 @@ msgstr "停止"
 msgid "Stop after the current speaker"
 msgstr "在当前发言者之后停止"
 
-#: src/features/chat/thread-list/thread-node.tsx:502
-#: src/features/chat/thread-list/thread-node.tsx:524
+#: src/features/chat/thread-list/thread-node.tsx:510
+#: src/features/chat/thread-list/thread-node.tsx:532
 #: src/features/chat/thread/composer-input-area.tsx:298
 #: src/features/chat/thread/composer-input-area.tsx:311
 msgid "Stop generating"
@@ -25784,11 +25840,11 @@ msgstr "讲故事"
 msgid "Streamable HTTP (Recommended)"
 msgstr "Streamable HTTP（推荐）"
 
-#: src/features/chat/thread-list/thread-node.tsx:482
+#: src/features/chat/thread-list/thread-node.tsx:490
 msgid "Streaming"
 msgstr "流式输出中"
 
-#: src/features/chat/thread-list/thread-node.tsx:492
+#: src/features/chat/thread-list/thread-node.tsx:500
 msgid "Streaming..."
 msgstr "流式输出中..."
 
@@ -26158,7 +26214,7 @@ msgstr "子代理未获批准。"
 msgid "Subheading"
 msgstr "副标题"
 
-#: src/components/model-picker/model-picker.tsx:806
+#: src/components/model-picker/model-picker.tsx:805
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "以 $8/月订阅，解锁所有模型。"
 
@@ -26185,7 +26241,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "成功标准不能超过 {CRITERIA_MAX} 个字符"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:128
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:129
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "已成功从 {0} 导入 {imported} 个对话"
 
@@ -26270,9 +26326,13 @@ msgstr "出众的多文件代码生成与重构"
 msgid "Superior understanding of complex visual concepts"
 msgstr "对复杂视觉概念的理解出众"
 
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
+msgstr ""
+
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:309
-msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
-msgstr "支持的格式：ChatGPT 导出（conversations.json）、Google Gemini（Takeout ZIP）、Claude.ai 导出。"
+#~ msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
+#~ msgstr "支持的格式：ChatGPT 导出（conversations.json）、Google Gemini（Takeout ZIP）、Claude.ai 导出。"
 
 #: src/features/marketing/data/models-data.ts:249
 msgid "Supports 10-second video durations"
@@ -26464,7 +26524,7 @@ msgstr "标签是你自己给聊天加的标记。你可以结合自动分类，
 msgid "Tags for {threadTitle}"
 msgstr "{threadTitle} 的标签"
 
-#: src/features/chat/thread-list/thread-node.tsx:645
+#: src/features/chat/thread-list/thread-node.tsx:653
 msgid "Tags unavailable for temporary chats"
 msgstr "临时聊天不可使用标签"
 
@@ -26729,7 +26789,7 @@ msgstr "模板"
 msgid "Temporary"
 msgstr "临时"
 
-#: src/features/chat/thread-list/thread-node.tsx:876
+#: src/features/chat/thread-list/thread-node.tsx:884
 msgid "Temporary chat"
 msgstr "临时聊天"
 
@@ -26745,7 +26805,7 @@ msgstr "临时聊天模式"
 msgid "Temporary Chat Retention (hours)"
 msgstr "临时聊天保留时长（小时）"
 
-#: src/features/chat/thread-list/thread-node.tsx:657
+#: src/features/chat/thread-list/thread-node.tsx:665
 msgid "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
 msgstr "临时聊天会过期，因此无法添加标签。将其转为永久聊天即可添加标签。"
 
@@ -26809,7 +26869,7 @@ msgstr "文本"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:629
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:900
+#: src/components/model-picker/model-picker.tsx:899
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -27469,7 +27529,7 @@ msgstr "此操作无法撤销。这将永久删除该组织及所有相关数据
 msgid "This browser cannot receive push notifications here."
 msgstr "此浏览器无法在此处接收推送通知。"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:44
+#: src/features/chat/lock/locked-chat-gate.tsx:47
 msgid "This chat is locked"
 msgstr ""
 
@@ -27678,7 +27738,7 @@ msgstr "这会从你的电脑中删除模型文件。你以后可以重新拉取
 msgid "This run is no longer available."
 msgstr "此运行已不可用。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:225
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:226
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr ""
 
@@ -27861,7 +27921,7 @@ msgid "Thread restored"
 msgstr "对话已恢复"
 
 #: src/features/chat/header/thread-download-button.tsx:132
-#: src/features/chat/header/thread-stats-dialog.tsx:59
+#: src/features/chat/header/thread-stats-dialog.tsx:56
 msgid "Thread statistics"
 msgstr ""
 
@@ -27998,6 +28058,10 @@ msgstr "切换列"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:575
 msgid "Toggle element palette"
 msgstr "切换元素面板"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:24
+msgid "Toggle interactivity"
+msgstr ""
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("sidebarLeft"))
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:85
@@ -28187,7 +28251,7 @@ msgstr "总成本"
 msgid "Total Users"
 msgstr "用户总数"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:60
+#: src/features/chat/header/thread-stats-dialog.tsx:57
 msgid "Totals across every reply in this thread, including regenerated alternatives."
 msgstr ""
 
@@ -28415,7 +28479,7 @@ msgstr "重试"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
 msgid "Try Again"
 msgstr "重试"
 
@@ -28530,7 +28594,7 @@ msgstr "你的账号当前已启用双重验证，为账号增加了一层额外
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
-#: src/components/model-picker/model-picker.tsx:880
+#: src/components/model-picker/model-picker.tsx:879
 msgid "Type"
 msgstr "类型"
 
@@ -28708,7 +28772,7 @@ msgid "Under the Hood"
 msgstr "技术内幕"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: src/components/model-picker/model-picker.tsx:636
+#: src/components/model-picker/model-picker.tsx:635
 #: src/features/canvas/canvas-panel.tsx:242
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
@@ -28799,8 +28863,8 @@ msgstr "无限请求"
 msgid "Unlink"
 msgstr "取消关联"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:48
-#: src/features/chat/thread-list/thread-node.tsx:709
+#: src/features/chat/lock/locked-chat-gate.tsx:51
+#: src/features/chat/thread-list/thread-node.tsx:717
 msgid "Unlock chat"
 msgstr ""
 
@@ -28863,7 +28927,7 @@ msgstr "未保存的更改"
 #~ msgid "Unsupported file format. Please upload a .json or .zip file."
 #~ msgstr "不支持的文件格式。请上传 .json 或 .zip 文件。"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:243
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:256
 msgid "Unsupported file format. Please upload a .json, .jsonl or .zip file."
 msgstr ""
 
@@ -28901,6 +28965,10 @@ msgstr "无标题对话"
 #: src/routes/(chat)/workflow/index.tsx:21
 msgid "Untitled Workflow"
 msgstr "无标题工作流"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:18
+msgid "up"
+msgstr ""
 
 #: src/features/workflow/components/version-history.tsx:150
 msgid "Up to {MAX_HISTORY_ENTRIES} versions saved"
@@ -29153,7 +29221,7 @@ msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:355
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
 msgid "Uploading data for import from {0}..."
 msgstr "正在上传来自 {0} 的数据以便导入..."
 
@@ -29773,7 +29841,7 @@ msgid "video"
 msgstr "视频"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
-#: src/components/model-picker/model-picker.tsx:922
+#: src/components/model-picker/model-picker.tsx:921
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -30219,7 +30287,7 @@ msgstr "等待：{0}"
 msgid "Want to continue from here?"
 msgstr "想从这里继续吗？"
 
-#: src/features/chat/core/context/chat-context.tsx:810
+#: src/features/chat/core/context/chat-context.tsx:811
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "我们未能及时确认你的会话。你的消息仍在输入框中，请重新发送。"
 
@@ -30590,6 +30658,10 @@ msgstr "Workers、KV、R2 及 Cloudflare 平台工具"
 msgid "Workflow automation across thousands of apps"
 msgstr "跨数千款应用的工作流自动化"
 
+#: src/features/workflow/components/canvas/workflow-canvas.tsx:306
+msgid "Workflow canvas"
+msgstr ""
+
 #: src/routes/(chat)/workflow/$workflowId.tsx:57
 #: src/routes/(chat)/workflow/shared/$token.tsx:45
 msgid "Workflow not found"
@@ -30957,7 +31029,7 @@ msgstr "你的 AI 工作区<0>从这里开始。</0>"
 msgid "Your answer"
 msgstr "你的回答"
 
-#: src/features/chat/core/context/chat-context.tsx:769
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "Your answer in Neore has finished."
 msgstr "你在 Neore 中的回复已生成完毕。"
 
@@ -31056,7 +31128,7 @@ msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请�
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 
-#: src/features/chat/core/context/chat-context.tsx:1005
+#: src/features/chat/core/context/chat-context.tsx:1003
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "你的消息包含不当内容，无法发送。"
 
@@ -31215,6 +31287,7 @@ msgstr "ZIP 压缩包"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:283
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:289
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
 msgid "Zoom in"
 msgstr "放大"
 
@@ -31230,6 +31303,7 @@ msgstr "变焦镜头"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:249
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:255
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
 msgid "Zoom out"
 msgstr "缩小"
 

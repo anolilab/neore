@@ -29,7 +29,7 @@ msgid ", unread"
 msgstr ", unread"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:339
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:340
 msgid "...and {0} more"
 msgstr "...and {0} more"
 
@@ -80,7 +80,7 @@ msgstr "\"v1\" for the current Azure OpenAI API. A dated version such as 2024-10
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} failed)"
 
@@ -195,7 +195,7 @@ msgid "{0, plural, one {# line} other {# lines}}"
 msgstr "{0, plural, one {# line} other {# lines}}"
 
 #. placeholder {0}: node.relevantMessages.length
-#: src/features/chat/thread-list/thread-node.tsx:882
+#: src/features/chat/thread-list/thread-node.tsx:890
 msgid "{0, plural, one {# match} other {# matches}}"
 msgstr "{0, plural, one {# match} other {# matches}}"
 
@@ -205,7 +205,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, one {# member} other {# members}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:336
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, one {# message} other {# messages}}"
 
@@ -370,18 +370,18 @@ msgid "{0} chunks"
 msgstr "{0} chunks"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
 msgid "{0} conversations failed to import"
 msgstr "{0} conversations failed to import"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
 msgid "{0} conversations found"
 msgstr "{0} conversations found"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
 msgid "{0} conversations imported from {1}"
 msgstr "{0} conversations imported from {1}"
 
@@ -482,7 +482,7 @@ msgstr "{0} of {1} cases finished"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:370
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
 msgid "{0} of {1} conversations imported"
 msgstr "{0} of {1} conversations imported"
 
@@ -500,7 +500,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{0} of {1} tokens used ({2}%)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1019
+#: src/components/model-picker/model-picker.tsx:1018
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} of {MAX_PARALLEL} selected"
 
@@ -545,7 +545,7 @@ msgid "{0} to review"
 msgstr "{0} to review"
 
 #. placeholder {0}: formatNumber(Math.round(stats.averageTokensPerSecond * 10) / 10, locale)
-#: src/features/chat/header/thread-stats-dialog.tsx:76
+#: src/features/chat/header/thread-stats-dialog.tsx:73
 msgid "{0} tok/s"
 msgstr "{0} tok/s"
 
@@ -768,7 +768,7 @@ msgstr "{fps} fps"
 msgid "{hours} hours"
 msgstr "{hours} hours"
 
-#: src/features/chat/thread-list/thread-node.tsx:279
+#: src/features/chat/thread-list/thread-node.tsx:287
 msgid "{hours}h {minutes}m"
 msgstr "{hours}h {minutes}m"
 
@@ -817,7 +817,7 @@ msgstr "{mins}m"
 msgid "{mins}m {secs}s"
 msgstr "{mins}m {secs}s"
 
-#: src/features/chat/thread-list/thread-node.tsx:282
+#: src/features/chat/thread-list/thread-node.tsx:290
 msgid "{minutes}m"
 msgstr "{minutes}m"
 
@@ -894,7 +894,7 @@ msgstr "{name} connection activated"
 msgid "{name} disconnected"
 msgstr "{name} disconnected"
 
-#: src/components/model-picker/model-picker.tsx:634
+#: src/components/model-picker/model-picker.tsx:633
 msgid "{name} hidden from the model picker"
 msgstr "{name} hidden from the model picker"
 
@@ -2469,8 +2469,8 @@ msgstr "Align vertically (V)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:617
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
-#: src/components/model-picker/model-picker.tsx:889
-#: src/components/model-picker/model-picker.tsx:947
+#: src/components/model-picker/model-picker.tsx:888
+#: src/components/model-picker/model-picker.tsx:946
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:417
@@ -2548,7 +2548,7 @@ msgid "All MCP servers active"
 msgstr "All MCP servers active"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:563
-#: src/components/model-picker/model-picker.tsx:840
+#: src/components/model-picker/model-picker.tsx:839
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "All models"
@@ -3144,7 +3144,7 @@ msgstr "Are you sure you want to delete this API key? This action cannot be undo
 msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "Are you sure you want to delete this item? This action cannot be undone."
 
-#: src/features/chat/thread-list/thread-node.tsx:838
+#: src/features/chat/thread-list/thread-node.tsx:846
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 
@@ -3345,7 +3345,7 @@ msgid "Auckland"
 msgstr "Auckland"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
-#: src/components/model-picker/model-picker.tsx:935
+#: src/components/model-picker/model-picker.tsx:934
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:119
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -3561,7 +3561,7 @@ msgstr "Average latency"
 msgid "Average score"
 msgstr "Average score"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:72
+#: src/features/chat/header/thread-stats-dialog.tsx:69
 msgid "Average speed"
 msgstr "Average speed"
 
@@ -4545,7 +4545,7 @@ msgstr "Canada"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:347
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:348
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4569,7 +4569,7 @@ msgstr "Cancel deep work"
 msgid "Cancel Export"
 msgstr "Cancel Export"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:375
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:376
 msgid "Cancel Import"
 msgstr "Cancel Import"
 
@@ -4774,7 +4774,7 @@ msgid "Change colors"
 msgstr "Change colors"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
-#: src/features/chat/thread-list/thread-node.tsx:710
+#: src/features/chat/thread-list/thread-node.tsx:718
 msgid "Change passcode"
 msgstr "Change passcode"
 
@@ -4888,12 +4888,12 @@ msgstr "Chat import failed"
 msgid "Chat import finished"
 msgstr "Chat import finished"
 
-#: src/features/chat/thread-list/thread-node.tsx:677
-#: src/features/chat/thread-list/thread-node.tsx:691
+#: src/features/chat/thread-list/thread-node.tsx:685
+#: src/features/chat/thread-list/thread-node.tsx:699
 msgid "Chat lock"
 msgstr "Chat lock"
 
-#: src/features/chat/thread-list/thread-node.tsx:677
+#: src/features/chat/thread-list/thread-node.tsx:685
 msgid "Chat lock: locked"
 msgstr "Chat lock: locked"
 
@@ -5279,7 +5279,7 @@ msgstr "Click"
 msgid "Click \"{selector}\""
 msgstr "Click \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:979
+#: src/components/model-picker/model-picker.tsx:978
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Click ★ on any model in All models to add it here."
 
@@ -6000,7 +6000,7 @@ msgstr "Configured"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1041
+#: src/components/model-picker/model-picker.tsx:1040
 msgid "Confirm"
 msgstr "Confirm"
 
@@ -6426,6 +6426,10 @@ msgstr "Control depth of field with aperture setting"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "Control how your personal information is displayed in the UI."
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:22
+msgid "Control panel"
+msgstr "Control panel"
+
 #: src/features/workflow/components/nodes/controlnet-node.tsx:182
 msgid "Control Strength"
 msgstr "Control Strength"
@@ -6505,7 +6509,7 @@ msgstr "Convert to attachment for better readability?"
 msgid "Convert to Full Account"
 msgstr "Convert to Full Account"
 
-#: src/features/chat/thread-list/thread-node.tsx:814
+#: src/features/chat/thread-list/thread-node.tsx:822
 msgid "Convert to permanent"
 msgstr "Convert to permanent"
 
@@ -6517,7 +6521,7 @@ msgstr "Convert to save your data"
 msgid "Convert to TypeScript"
 msgstr "Convert to TypeScript"
 
-#: src/features/chat/thread-list/thread-node.tsx:814
+#: src/features/chat/thread-list/thread-node.tsx:822
 msgid "Converting..."
 msgstr "Converting..."
 
@@ -6526,7 +6530,7 @@ msgstr "Converting..."
 msgid "Copied"
 msgstr "Copied"
 
-#: src/features/chat/thread/copy-last-code-block.tsx:41
+#: src/features/chat/thread/copy-last-code-block.tsx:53
 msgid "Copied the last code block"
 msgstr "Copied the last code block"
 
@@ -6751,7 +6755,7 @@ msgstr "Could not copy automatically. Public link: {publicLink}"
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr "Could not copy the secret. Select it and copy it manually."
 
-#: src/features/chat/thread/copy-last-code-block.tsx:46
+#: src/features/chat/thread/copy-last-code-block.tsx:41
 msgid "Could not copy to the clipboard"
 msgstr "Could not copy to the clipboard"
 
@@ -6788,9 +6792,13 @@ msgstr "Could not delete the comment"
 msgid "Could not delete the page"
 msgstr "Could not delete the page"
 
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:119
+msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+msgstr "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:111
-msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
-msgstr "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
+#~ msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
+#~ msgstr "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:58
 msgid "Could not export the workflow"
@@ -6808,7 +6816,7 @@ msgstr "Could not import the workflow"
 msgid "Could not load image"
 msgstr "Could not load image"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:63
+#: src/features/chat/header/thread-stats-dialog.tsx:60
 msgid "Could not load statistics for this thread."
 msgstr "Could not load statistics for this thread."
 
@@ -6933,7 +6941,7 @@ msgstr "Could not start the test drive."
 msgid "Could not stop the conversation"
 msgstr "Could not stop the conversation"
 
-#: src/features/chat/thread-list/thread-node.tsx:513
+#: src/features/chat/thread-list/thread-node.tsx:521
 msgid "Could not stop the reply. Please try again."
 msgstr "Could not stop the reply. Please try again."
 
@@ -7068,7 +7076,7 @@ msgstr "Create bot"
 
 #: src/components/command-palette.tsx:313
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:93
-#: src/features/chat/thread-list/thread-node.tsx:615
+#: src/features/chat/thread-list/thread-node.tsx:623
 msgid "Create branch"
 msgstr "Create branch"
 
@@ -7219,7 +7227,7 @@ msgstr "Created: {createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 
-#: src/features/chat/thread-list/thread-node.tsx:615
+#: src/features/chat/thread-list/thread-node.tsx:623
 msgid "Creating branch..."
 msgstr "Creating branch..."
 
@@ -8142,12 +8150,12 @@ msgstr "Delete this case?"
 #: src/components/command-palette.tsx:331
 #: src/components/command-palette.tsx:457
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:85
-#: src/features/chat/thread-list/thread-node.tsx:835
+#: src/features/chat/thread-list/thread-node.tsx:843
 #: src/features/pages/components/page-comments-panel.tsx:188
 msgid "Delete thread"
 msgstr "Delete thread"
 
-#: src/features/chat/thread-list/thread-node.tsx:850
+#: src/features/chat/thread-list/thread-node.tsx:858
 msgid "Delete Thread"
 msgstr "Delete Thread"
 
@@ -8175,7 +8183,7 @@ msgstr "Deleted {0, plural, one {# prompt} other {# prompts}}"
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1473
 #: src/components/delete-confirmation-dialog.tsx:65
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:285
-#: src/features/chat/thread-list/thread-node.tsx:835
+#: src/features/chat/thread-list/thread-node.tsx:843
 msgid "Deleting..."
 msgstr "Deleting..."
 
@@ -8427,7 +8435,7 @@ msgid "Details for case {0}"
 msgstr "Details for case {0}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:324
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
 msgid "Detected: {0}"
 msgstr "Detected: {0}"
 
@@ -8773,6 +8781,10 @@ msgstr "Double-click to edit"
 msgid "Double-click to rename"
 msgstr "Double-click to rename"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:15
+msgid "down"
+msgstr "down"
+
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:180
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:775
@@ -8856,11 +8868,11 @@ msgstr "Download started"
 msgid "Download Text"
 msgstr "Download Text"
 
-#: src/features/chat/thread-list/thread-node.tsx:739
+#: src/features/chat/thread-list/thread-node.tsx:747
 msgid "Download thread"
 msgstr "Download thread"
 
-#: src/features/chat/thread-list/thread-node.tsx:739
+#: src/features/chat/thread-list/thread-node.tsx:747
 msgid "Downloading..."
 msgstr "Downloading..."
 
@@ -9823,7 +9835,7 @@ msgstr "Enter default value..."
 msgid "Enter email address"
 msgstr "Enter email address"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:46
+#: src/features/chat/lock/locked-chat-gate.tsx:49
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 
@@ -10114,7 +10126,7 @@ msgstr "Escape"
 msgid "Est. provider cost"
 msgstr "Est. provider cost"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:78
+#: src/features/chat/header/thread-stats-dialog.tsx:75
 msgid "Estimated cost"
 msgstr "Estimated cost"
 
@@ -10478,7 +10490,7 @@ msgstr "Expiration updated to {0}"
 msgid "expired"
 msgstr "expired"
 
-#: src/features/chat/thread-list/thread-node.tsx:272
+#: src/features/chat/thread-list/thread-node.tsx:280
 #: src/features/devices/components/devices-settings.tsx:134
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
@@ -10507,7 +10519,7 @@ msgstr "Expires"
 msgid "Expires {date}"
 msgstr "Expires {date}"
 
-#: src/features/chat/thread-list/thread-node.tsx:876
+#: src/features/chat/thread-list/thread-node.tsx:884
 msgid "Expires in {remainingTime}"
 msgstr "Expires in {remainingTime}"
 
@@ -10732,7 +10744,7 @@ msgstr "Fail"
 msgid "failed"
 msgstr "failed"
 
-#: src/features/chat/thread-list/thread-node.tsx:483
+#: src/features/chat/thread-list/thread-node.tsx:491
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/devices/components/devices-settings.tsx:135
 #: src/features/evals/components/model-comparison.tsx:112
@@ -11108,7 +11120,7 @@ msgstr "Failed to move thread"
 msgid "Failed to optimize prompt"
 msgstr "Failed to optimize prompt"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:238
 msgid "Failed to parse file"
 msgstr "Failed to parse file"
 
@@ -11293,7 +11305,7 @@ msgstr "Failed to send verification email"
 msgid "Failed to start impersonation"
 msgstr "Failed to start impersonation"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:272
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:273
 msgid "Failed to start import"
 msgstr "Failed to start import"
 
@@ -11371,8 +11383,8 @@ msgstr "Failed to update favorite"
 msgid "Failed to update favorite status"
 msgstr "Failed to update favorite status"
 
-#: src/components/model-picker/model-picker.tsx:629
-#: src/components/model-picker/model-picker.tsx:638
+#: src/components/model-picker/model-picker.tsx:628
+#: src/components/model-picker/model-picker.tsx:637
 #: src/features/settings/components/chat/model-filter-settings.tsx:53
 #: src/features/settings/components/chat/model-filter-settings.tsx:88
 msgid "Failed to update filter rules"
@@ -12121,6 +12133,7 @@ msgid "Fisheye, extreme distortion"
 msgstr "Fisheye, extreme distortion"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:54
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:23
 msgid "Fit view"
 msgstr "Fit view"
 
@@ -13485,7 +13498,7 @@ msgstr "Guest Account"
 msgid "Guest accounts"
 msgstr "Guest accounts"
 
-#: src/components/model-picker/model-picker.tsx:804
+#: src/components/model-picker/model-picker.tsx:803
 msgid "Guest accounts use free models only."
 msgstr "Guest accounts use free models only."
 
@@ -13517,6 +13530,10 @@ msgstr "H"
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:239
 msgid "Hand (pan)"
 msgstr "Hand (pan)"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:28
+msgid "Handle"
+msgstr "Handle"
 
 #: src/features/marketing/data/models-data.ts:298
 msgid "Handles demanding creative concepts"
@@ -13620,7 +13637,7 @@ msgstr "Here they are: planning, budget and next steps."
 msgid "Hidden in Model Picker"
 msgstr "Hidden in Model Picker"
 
-#: src/components/model-picker/model-picker.tsx:956
+#: src/components/model-picker/model-picker.tsx:955
 msgid "Hide {name} from model picker"
 msgstr "Hide {name} from model picker"
 
@@ -14037,7 +14054,7 @@ msgstr "illustration"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:911
+#: src/components/model-picker/model-picker.tsx:910
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -14227,11 +14244,11 @@ msgstr "Impersonation Stopped"
 msgid "Import"
 msgstr "Import"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
 msgid "Import All"
 msgstr "Import All"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:283
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
 msgid "Import cancelled"
 msgstr "Import cancelled"
 
@@ -14239,28 +14256,32 @@ msgstr "Import cancelled"
 msgid "Import cases"
 msgstr "Import cases"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:384
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
 msgid "Import complete!"
 msgstr "Import complete!"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:300
 msgid "Import Conversations"
 msgstr "Import Conversations"
 
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+msgstr "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:298
-msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
-msgstr "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#~ msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#~ msgstr "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:210
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:132
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:398
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:133
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:399
 msgid "Import failed"
 msgstr "Import failed"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:390
 msgid "Import More"
 msgstr "Import More"
 
@@ -14268,7 +14289,7 @@ msgstr "Import More"
 msgid "Import Notion export (.zip)"
 msgstr "Import Notion export (.zip)"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:211
 msgid "Import one kind of export at a time."
 msgstr "Import one kind of export at a time."
 
@@ -14319,7 +14340,7 @@ msgid "Imported skill \"{0}\""
 msgstr "Imported skill \"{0}\""
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:363
 msgid "Importing from {0}..."
 msgstr "Importing from {0}..."
 
@@ -14465,7 +14486,7 @@ msgstr "Inception's diffusion-based language model"
 msgid "Includes audio generation"
 msgstr "Includes audio generation"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:87
+#: src/features/chat/header/thread-stats-dialog.tsx:84
 msgid "Includes replies billed to your own API key."
 msgstr "Includes replies billed to your own API key."
 
@@ -14558,7 +14579,7 @@ msgstr "Input or transform text"
 msgid "Input Template"
 msgstr "Input Template"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:68
+#: src/features/chat/header/thread-stats-dialog.tsx:65
 #: src/features/chat/thread/message-cost-badge.tsx:52
 msgid "Input tokens"
 msgstr "Input tokens"
@@ -15310,7 +15331,7 @@ msgstr "Last frame"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:410
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:411
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "Last import: {0} conversations from {1} on {2}"
 
@@ -15560,6 +15581,10 @@ msgstr "Leave Organization"
 msgid "Leave Team"
 msgstr "Leave Team"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:16
+msgid "left"
+msgstr "left"
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:397
 #: src/features/workflow/components/nodes/outpaint-node.tsx:25
 msgid "Left"
@@ -15667,7 +15692,7 @@ msgstr "Line {0}: {1}"
 msgid "Line {line}, column {column}"
 msgstr "Line {line}, column {column}"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:168
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:181
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
 msgstr "Line {number} of this transcript is not valid JSON, so the import was stopped."
 
@@ -15964,7 +15989,7 @@ msgstr "Loading skills…"
 msgid "Loading spreadsheet…"
 msgstr "Loading spreadsheet…"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:62
+#: src/features/chat/header/thread-stats-dialog.tsx:59
 msgid "Loading statistics…"
 msgstr "Loading statistics…"
 
@@ -16020,7 +16045,7 @@ msgstr "Loading..."
 msgid "Loading…"
 msgstr "Loading…"
 
-#: src/features/chat/core/context/chat-context.tsx:850
+#: src/features/chat/core/context/chat-context.tsx:851
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Local models are text only. Remove the attachments to send."
 
@@ -16045,7 +16070,7 @@ msgstr "Location"
 msgid "Location updated"
 msgstr "Location updated"
 
-#: src/features/chat/thread-list/thread-node.tsx:714
+#: src/features/chat/thread-list/thread-node.tsx:722
 msgid "Lock chat"
 msgstr "Lock chat"
 
@@ -16058,7 +16083,7 @@ msgstr "Lock group"
 msgid "Lock node"
 msgstr "Lock node"
 
-#: src/features/chat/thread-list/thread-node.tsx:706
+#: src/features/chat/thread-list/thread-node.tsx:714
 msgid "Lock now"
 msgstr "Lock now"
 
@@ -16066,12 +16091,12 @@ msgstr "Lock now"
 msgid "Lock this chat"
 msgstr "Lock this chat"
 
-#: src/features/chat/thread-list/thread-node.tsx:238
+#: src/features/chat/thread-list/thread-node.tsx:246
 msgid "Locked chat"
 msgstr "Locked chat"
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1024
+#: src/components/model-picker/model-picker.tsx:1023
 msgid "Locked to {0} models"
 msgstr "Locked to {0} models"
 
@@ -16348,7 +16373,7 @@ msgstr "Manage Consent Preferences"
 #~ msgid "Manage gateway API keys with per-key budgets and rate limits"
 #~ msgstr "Manage gateway API keys with per-key budgets and rate limits"
 
-#: src/components/model-picker/model-picker.tsx:641
+#: src/components/model-picker/model-picker.tsx:640
 msgid "Manage hidden labs"
 msgstr "Manage hidden labs"
 
@@ -16572,7 +16597,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Max size: {size} • Max {maxFiles} files"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
-#: src/components/model-picker/model-picker.tsx:1018
+#: src/components/model-picker/model-picker.tsx:1017
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Maximum {MAX_PARALLEL} models reached"
 
@@ -16834,8 +16859,8 @@ msgstr "Messages"
 msgid "Messages API (/v1/messages) — Anthropic and services that mirror it."
 msgstr "Messages API (/v1/messages) — Anthropic and services that mirror it."
 
-#: src/features/chat/thread-list/thread-node.tsx:542
-#: src/features/chat/thread-list/thread-node.tsx:554
+#: src/features/chat/thread-list/thread-node.tsx:550
+#: src/features/chat/thread-list/thread-node.tsx:562
 msgid "Messages from {sourceName}"
 msgstr "Messages from {sourceName}"
 
@@ -16906,6 +16931,10 @@ msgstr "Microsoft App ID of your Azure Bot"
 #: src/features/appearance/components/appearance-controls.tsx:129
 msgid "Min"
 msgstr "Min"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:29
+msgid "Mini map"
+msgstr "Mini map"
 
 #: src/features/canvas/components/design-preset-selector.tsx:179
 msgid "Minimal Card"
@@ -17119,11 +17148,11 @@ msgstr "Model already blocked"
 msgid "Model Breakdown"
 msgstr "Model Breakdown"
 
-#: src/features/chat/thread-list/thread-node.tsx:484
+#: src/features/chat/thread-list/thread-node.tsx:492
 msgid "Model comparison"
 msgstr "Model comparison"
 
-#: src/features/chat/core/hooks/use-comparison-chat.ts:108
+#: src/features/chat/core/hooks/use-comparison-chat.ts:112
 #: src/features/workflow/templates/index.ts:258
 msgid "Model Comparison"
 msgstr "Model Comparison"
@@ -17179,7 +17208,7 @@ msgstr "Model: OpenAI Whisper"
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:262
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/chat/header/thread-stats-dialog.tsx:92
+#: src/features/chat/header/thread-stats-dialog.tsx:89
 #: src/features/evals/components/dataset-panel.tsx:132
 #: src/features/layout/lib/dashboard-page-names.ts:31
 #: src/features/marketing/components/landing-footer.tsx:111
@@ -17474,7 +17503,7 @@ msgstr "Move to next cell"
 msgid "Move to previous cell"
 msgstr "Move to previous cell"
 
-#: src/features/chat/thread-list/thread-node.tsx:634
+#: src/features/chat/thread-list/thread-node.tsx:642
 msgid "Move to project"
 msgstr "Move to project"
 
@@ -17489,6 +17518,11 @@ msgstr "Move up"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:108
 msgid "Move up one page"
 msgstr "Move up one page"
+
+#. placeholder {0}: directions[direction] ?? direction
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:33
+msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
+msgstr "Moved selected node {0}. New position, x: {x}, y: {y}"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:113
 msgid "MP4/MOV video"
@@ -18283,7 +18317,7 @@ msgstr "No content"
 msgid "No content to display"
 msgstr "No content to display"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:219
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:220
 msgid "No conversations found in the file."
 msgstr "No conversations found in the file."
 
@@ -18462,7 +18496,7 @@ msgid "No models found matching your filters."
 msgstr "No models found matching your filters."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:711
-#: src/components/model-picker/model-picker.tsx:985
+#: src/components/model-picker/model-picker.tsx:984
 msgid "No models found."
 msgstr "No models found."
 
@@ -18652,7 +18686,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "No speech detected. Hands-free mode stopped."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:703
-#: src/components/model-picker/model-picker.tsx:977
+#: src/components/model-picker/model-picker.tsx:976
 msgid "No starred models"
 msgstr "No starred models"
 
@@ -20027,7 +20061,7 @@ msgstr "Output Format"
 msgid "Output Mode"
 msgstr "Output Mode"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:70
+#: src/features/chat/header/thread-stats-dialog.tsx:67
 #: src/features/chat/thread/message-cost-badge.tsx:60
 msgid "Output tokens"
 msgstr "Output tokens"
@@ -20166,7 +20200,7 @@ msgid "Paraguay"
 msgstr "Paraguay"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:595
-#: src/components/model-picker/model-picker.tsx:870
+#: src/components/model-picker/model-picker.tsx:869
 msgid "Parallel"
 msgstr "Parallel"
 
@@ -20179,7 +20213,7 @@ msgstr "Parallel Compare"
 msgid "Paris"
 msgstr "Paris"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:318
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:319
 msgid "Parsing file..."
 msgstr "Parsing file..."
 
@@ -20215,9 +20249,15 @@ msgid "Pass rate"
 msgstr "Pass rate"
 
 #. placeholder {0}: citation.chunkIndex + 1
-#: src/features/knowledge/components/knowledge-source-group.tsx:66
+#: src/features/knowledge/components/knowledge-source-group.tsx:68
 msgid "Passage {0}, cited as [{position}]"
 msgstr "Passage {0}, cited as [{position}]"
+
+#. placeholder {0}: citation.chunkIndex + 1
+#. placeholder {1}: citation.pageNumber
+#: src/features/knowledge/components/knowledge-source-group.tsx:69
+msgid "Passage {0}, page {1}, cited as [{position}]"
+msgstr "Passage {0}, page {1}, cited as [{position}]"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:168
 msgid "Passcode"
@@ -21029,6 +21069,18 @@ msgstr "Presets"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1177
 msgid "Press ? for keyboard shortcuts"
 msgstr "Press ? for keyboard shortcuts"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:30
+msgid "Press enter or space to select a node. Press delete to remove it and escape to cancel."
+msgstr "Press enter or space to select a node. Press delete to remove it and escape to cancel."
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:31
+msgid "Press enter or space to select a node. You can then use the arrow keys to move the node around. Press delete to remove it and escape to cancel."
+msgstr "Press enter or space to select a node. You can then use the arrow keys to move the node around. Press delete to remove it and escape to cancel."
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:27
+msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
+msgstr "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 
 #: src/features/settings/components/account/account-settings.tsx:241
 msgid "Press Enter to send"
@@ -22616,7 +22668,7 @@ msgid "Remove or add objects in an image"
 msgstr "Remove or add objects in an image"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:151
-#: src/features/chat/thread-list/thread-node.tsx:711
+#: src/features/chat/thread-list/thread-node.tsx:719
 msgid "Remove passcode"
 msgstr "Remove passcode"
 
@@ -22712,7 +22764,7 @@ msgstr "Replay Onboarding"
 msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "Replay the welcome tour to review the core features of Neore."
 
-#: src/features/chat/header/thread-stats-dialog.tsx:66
+#: src/features/chat/header/thread-stats-dialog.tsx:63
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:144
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:246
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
@@ -22748,7 +22800,7 @@ msgstr "Replies, tokens and spend per skill or agent for the selected period"
 msgid "Reply"
 msgstr "Reply"
 
-#: src/features/chat/core/context/chat-context.tsx:769
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "Reply ready"
 msgstr "Reply ready"
 
@@ -22930,7 +22982,7 @@ msgstr "Resources"
 msgid "Response"
 msgstr "Response"
 
-#: src/features/chat/thread-list/thread-node.tsx:493
+#: src/features/chat/thread-list/thread-node.tsx:501
 msgid "Response failed - try again"
 msgstr "Response failed - try again"
 
@@ -23145,6 +23197,10 @@ msgstr "Rich world knowledge baked into generation"
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:109
 msgid "RIFF (WAV/AVI/WebP)"
 msgstr "RIFF (WAV/AVI/WebP)"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:17
+msgid "right"
+msgstr "right"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:399
 #: src/features/workflow/components/nodes/outpaint-node.tsx:26
@@ -23805,7 +23861,7 @@ msgid "Search models by name, ID, or provider..."
 msgstr "Search models by name, ID, or provider..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:528
-#: src/components/model-picker/model-picker.tsx:811
+#: src/components/model-picker/model-picker.tsx:810
 msgid "Search models..."
 msgstr "Search models..."
 
@@ -24042,7 +24098,7 @@ msgstr "Select dictation language"
 msgid "Select duration"
 msgstr "Select duration"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:312
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:313
 msgid "Select File"
 msgstr "Select File"
 
@@ -24809,7 +24865,7 @@ msgid "Singapore"
 msgstr "Singapore"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:582
-#: src/components/model-picker/model-picker.tsx:858
+#: src/components/model-picker/model-picker.tsx:857
 msgid "Single"
 msgstr "Single"
 
@@ -24928,7 +24984,7 @@ msgid "Skipped"
 msgstr "Skipped"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:328
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
 msgid "Skipped files that are not chat exports: {0}"
 msgstr "Skipped files that are not chat exports: {0}"
 
@@ -25469,7 +25525,7 @@ msgid "Star"
 msgstr "Star"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:547
-#: src/components/model-picker/model-picker.tsx:827
+#: src/components/model-picker/model-picker.tsx:826
 msgid "Starred"
 msgstr "Starred"
 
@@ -25628,7 +25684,7 @@ msgstr "Starting"
 msgid "Starting {0}…"
 msgstr "Starting {0}…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
 msgid "Starting import..."
 msgstr "Starting import..."
 
@@ -25727,8 +25783,8 @@ msgstr "Stop"
 msgid "Stop after the current speaker"
 msgstr "Stop after the current speaker"
 
-#: src/features/chat/thread-list/thread-node.tsx:502
-#: src/features/chat/thread-list/thread-node.tsx:524
+#: src/features/chat/thread-list/thread-node.tsx:510
+#: src/features/chat/thread-list/thread-node.tsx:532
 #: src/features/chat/thread/composer-input-area.tsx:298
 #: src/features/chat/thread/composer-input-area.tsx:311
 msgid "Stop generating"
@@ -25783,11 +25839,11 @@ msgstr "storytelling"
 msgid "Streamable HTTP (Recommended)"
 msgstr "Streamable HTTP (Recommended)"
 
-#: src/features/chat/thread-list/thread-node.tsx:482
+#: src/features/chat/thread-list/thread-node.tsx:490
 msgid "Streaming"
 msgstr "Streaming"
 
-#: src/features/chat/thread-list/thread-node.tsx:492
+#: src/features/chat/thread-list/thread-node.tsx:500
 msgid "Streaming..."
 msgstr "Streaming..."
 
@@ -26157,7 +26213,7 @@ msgstr "Sub-agent was not approved."
 msgid "Subheading"
 msgstr "Subheading"
 
-#: src/components/model-picker/model-picker.tsx:806
+#: src/components/model-picker/model-picker.tsx:805
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Subscribe for $8/mo to unlock all models."
 
@@ -26184,7 +26240,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "Success criteria must be {CRITERIA_MAX} characters or less"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:128
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:129
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "Successfully imported {imported} conversations from {0}"
 
@@ -26269,9 +26325,13 @@ msgstr "Superior multi-file code generation and refactoring"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Superior understanding of complex visual concepts"
 
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
+msgstr "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
+
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:309
-msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
-msgstr "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
+#~ msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
+#~ msgstr "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
 
 #: src/features/marketing/data/models-data.ts:249
 msgid "Supports 10-second video durations"
@@ -26463,7 +26523,7 @@ msgstr "Tags are your own labels for chats. Filter the chat list by them alongsi
 msgid "Tags for {threadTitle}"
 msgstr "Tags for {threadTitle}"
 
-#: src/features/chat/thread-list/thread-node.tsx:645
+#: src/features/chat/thread-list/thread-node.tsx:653
 msgid "Tags unavailable for temporary chats"
 msgstr "Tags unavailable for temporary chats"
 
@@ -26728,7 +26788,7 @@ msgstr "Templates"
 msgid "Temporary"
 msgstr "Temporary"
 
-#: src/features/chat/thread-list/thread-node.tsx:876
+#: src/features/chat/thread-list/thread-node.tsx:884
 msgid "Temporary chat"
 msgstr "Temporary chat"
 
@@ -26744,7 +26804,7 @@ msgstr "Temporary chat mode"
 msgid "Temporary Chat Retention (hours)"
 msgstr "Temporary Chat Retention (hours)"
 
-#: src/features/chat/thread-list/thread-node.tsx:657
+#: src/features/chat/thread-list/thread-node.tsx:665
 msgid "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
 msgstr "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
 
@@ -26808,7 +26868,7 @@ msgstr "text"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:629
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:900
+#: src/components/model-picker/model-picker.tsx:899
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -27468,7 +27528,7 @@ msgstr "This action cannot be undone. This will permanently delete the organizat
 msgid "This browser cannot receive push notifications here."
 msgstr "This browser cannot receive push notifications here."
 
-#: src/features/chat/lock/locked-chat-gate.tsx:44
+#: src/features/chat/lock/locked-chat-gate.tsx:47
 msgid "This chat is locked"
 msgstr "This chat is locked"
 
@@ -27677,7 +27737,7 @@ msgstr "This removes the model files from your computer. You can pull it again l
 msgid "This run is no longer available."
 msgstr "This run is no longer available."
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:225
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:226
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "This selection is too large to import at once. Import fewer files at a time."
 
@@ -27860,7 +27920,7 @@ msgid "Thread restored"
 msgstr "Thread restored"
 
 #: src/features/chat/header/thread-download-button.tsx:132
-#: src/features/chat/header/thread-stats-dialog.tsx:59
+#: src/features/chat/header/thread-stats-dialog.tsx:56
 msgid "Thread statistics"
 msgstr "Thread statistics"
 
@@ -27997,6 +28057,10 @@ msgstr "Toggle columns"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:575
 msgid "Toggle element palette"
 msgstr "Toggle element palette"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:24
+msgid "Toggle interactivity"
+msgstr "Toggle interactivity"
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("sidebarLeft"))
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:85
@@ -28186,7 +28250,7 @@ msgstr "Total Cost"
 msgid "Total Users"
 msgstr "Total Users"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:60
+#: src/features/chat/header/thread-stats-dialog.tsx:57
 msgid "Totals across every reply in this thread, including regenerated alternatives."
 msgstr "Totals across every reply in this thread, including regenerated alternatives."
 
@@ -28414,7 +28478,7 @@ msgstr "Try again"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
 msgid "Try Again"
 msgstr "Try Again"
 
@@ -28529,7 +28593,7 @@ msgstr "Two-factor authentication is currently enabled for your account. This ad
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
-#: src/components/model-picker/model-picker.tsx:880
+#: src/components/model-picker/model-picker.tsx:879
 msgid "Type"
 msgstr "Type"
 
@@ -28707,7 +28771,7 @@ msgid "Under the Hood"
 msgstr "Under the Hood"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: src/components/model-picker/model-picker.tsx:636
+#: src/components/model-picker/model-picker.tsx:635
 #: src/features/canvas/canvas-panel.tsx:242
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
@@ -28798,8 +28862,8 @@ msgstr "Unlimited requests"
 msgid "Unlink"
 msgstr "Unlink"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:48
-#: src/features/chat/thread-list/thread-node.tsx:709
+#: src/features/chat/lock/locked-chat-gate.tsx:51
+#: src/features/chat/thread-list/thread-node.tsx:717
 msgid "Unlock chat"
 msgstr "Unlock chat"
 
@@ -28862,7 +28926,7 @@ msgstr "Unsaved changes"
 #~ msgid "Unsupported file format. Please upload a .json or .zip file."
 #~ msgstr "Unsupported file format. Please upload a .json or .zip file."
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:243
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:256
 msgid "Unsupported file format. Please upload a .json, .jsonl or .zip file."
 msgstr "Unsupported file format. Please upload a .json, .jsonl or .zip file."
 
@@ -28900,6 +28964,10 @@ msgstr "Untitled Thread"
 #: src/routes/(chat)/workflow/index.tsx:21
 msgid "Untitled Workflow"
 msgstr "Untitled Workflow"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:18
+msgid "up"
+msgstr "up"
 
 #: src/features/workflow/components/version-history.tsx:150
 msgid "Up to {MAX_HISTORY_ENTRIES} versions saved"
@@ -29152,7 +29220,7 @@ msgid "Uploading {attachmentName}"
 msgstr "Uploading {attachmentName}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:355
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
 msgid "Uploading data for import from {0}..."
 msgstr "Uploading data for import from {0}..."
 
@@ -29772,7 +29840,7 @@ msgid "video"
 msgstr "video"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
-#: src/components/model-picker/model-picker.tsx:922
+#: src/components/model-picker/model-picker.tsx:921
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -30218,7 +30286,7 @@ msgstr "Waits on: {0}"
 msgid "Want to continue from here?"
 msgstr "Want to continue from here?"
 
-#: src/features/chat/core/context/chat-context.tsx:810
+#: src/features/chat/core/context/chat-context.tsx:811
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 
@@ -30589,6 +30657,10 @@ msgstr "Workers, KV, R2, and Cloudflare platform tools"
 msgid "Workflow automation across thousands of apps"
 msgstr "Workflow automation across thousands of apps"
 
+#: src/features/workflow/components/canvas/workflow-canvas.tsx:306
+msgid "Workflow canvas"
+msgstr "Workflow canvas"
+
 #: src/routes/(chat)/workflow/$workflowId.tsx:57
 #: src/routes/(chat)/workflow/shared/$token.tsx:45
 msgid "Workflow not found"
@@ -30956,7 +31028,7 @@ msgstr "Your AI workspace <0>starts here.</0>"
 msgid "Your answer"
 msgstr "Your answer"
 
-#: src/features/chat/core/context/chat-context.tsx:769
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "Your answer in Neore has finished."
 msgstr "Your answer in Neore has finished."
 
@@ -31055,7 +31127,7 @@ msgstr "Your local server answered, but refused this site (CORS). Allow this sit
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 
-#: src/features/chat/core/context/chat-context.tsx:1005
+#: src/features/chat/core/context/chat-context.tsx:1003
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Your message contains inappropriate content that cannot be sent."
 
@@ -31214,6 +31286,7 @@ msgstr "ZIP archive"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:283
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:289
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
 msgid "Zoom in"
 msgstr "Zoom in"
 
@@ -31229,6 +31302,7 @@ msgstr "Zoom Lens"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:249
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:255
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
 msgid "Zoom out"
 msgstr "Zoom out"
 

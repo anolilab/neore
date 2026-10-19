@@ -30,7 +30,7 @@ msgid ", unread"
 msgstr "、未読"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:339
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:340
 msgid "...and {0} more"
 msgstr "…他 {0} 件"
 
@@ -81,7 +81,7 @@ msgstr "現在の Azure OpenAI API には \"v1\" を指定します。2024-10-21
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "（{0} / {MAX_PARTICIPANTS}、最低 {MIN_PARTICIPANTS}）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 件失敗）"
 
@@ -196,7 +196,7 @@ msgid "{0, plural, one {# line} other {# lines}}"
 msgstr "{0, plural, other {# 行}}"
 
 #. placeholder {0}: node.relevantMessages.length
-#: src/features/chat/thread-list/thread-node.tsx:882
+#: src/features/chat/thread-list/thread-node.tsx:890
 msgid "{0, plural, one {# match} other {# matches}}"
 msgstr "{0, plural, other {# 件一致}}"
 
@@ -206,7 +206,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 人のメンバー}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:336
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, other {# 件のメッセージ}}"
 
@@ -371,18 +371,18 @@ msgid "{0} chunks"
 msgstr "{0} チャンク"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
 msgid "{0} conversations failed to import"
 msgstr "{0} 件の会話をインポートできませんでした"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
 msgid "{0} conversations found"
 msgstr "{0} 件の会話が見つかりました"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
 msgid "{0} conversations imported from {1}"
 msgstr "{1} から {0} 件の会話をインポートしました"
 
@@ -483,7 +483,7 @@ msgstr "{1} 件中 {0} 件のケースが完了"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:370
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
 msgid "{0} of {1} conversations imported"
 msgstr "{1} 件中 {0} 件の会話をインポートしました"
 
@@ -501,7 +501,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{1} トークン中 {0} トークン使用（{2}%）"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1019
+#: src/components/model-picker/model-picker.tsx:1018
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} / {MAX_PARALLEL} 個を選択中"
 
@@ -546,7 +546,7 @@ msgid "{0} to review"
 msgstr "要レビュー {0} 件"
 
 #. placeholder {0}: formatNumber(Math.round(stats.averageTokensPerSecond * 10) / 10, locale)
-#: src/features/chat/header/thread-stats-dialog.tsx:76
+#: src/features/chat/header/thread-stats-dialog.tsx:73
 msgid "{0} tok/s"
 msgstr ""
 
@@ -769,7 +769,7 @@ msgstr "{fps} fps"
 msgid "{hours} hours"
 msgstr "{hours} 時間"
 
-#: src/features/chat/thread-list/thread-node.tsx:279
+#: src/features/chat/thread-list/thread-node.tsx:287
 msgid "{hours}h {minutes}m"
 msgstr "{hours}時間{minutes}分"
 
@@ -818,7 +818,7 @@ msgstr "{mins} 分"
 msgid "{mins}m {secs}s"
 msgstr "{mins} 分 {secs} 秒"
 
-#: src/features/chat/thread-list/thread-node.tsx:282
+#: src/features/chat/thread-list/thread-node.tsx:290
 msgid "{minutes}m"
 msgstr "{minutes}分"
 
@@ -895,7 +895,7 @@ msgstr "{name} の接続を有効化しました"
 msgid "{name} disconnected"
 msgstr "{name} の接続を解除しました"
 
-#: src/components/model-picker/model-picker.tsx:634
+#: src/components/model-picker/model-picker.tsx:633
 msgid "{name} hidden from the model picker"
 msgstr ""
 
@@ -2470,8 +2470,8 @@ msgstr "垂直方向に整列（V）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:617
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
-#: src/components/model-picker/model-picker.tsx:889
-#: src/components/model-picker/model-picker.tsx:947
+#: src/components/model-picker/model-picker.tsx:888
+#: src/components/model-picker/model-picker.tsx:946
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:417
@@ -2549,7 +2549,7 @@ msgid "All MCP servers active"
 msgstr "すべての MCP サーバーが有効"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:563
-#: src/components/model-picker/model-picker.tsx:840
+#: src/components/model-picker/model-picker.tsx:839
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "すべてのモデル"
@@ -3145,7 +3145,7 @@ msgstr "この API キーを削除してもよろしいですか？この操作�
 msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "この項目を削除してもよろしいですか？この操作は元に戻せません。"
 
-#: src/features/chat/thread-list/thread-node.tsx:838
+#: src/features/chat/thread-list/thread-node.tsx:846
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "このスレッドを削除してもよろしいですか？この操作は元に戻せず、この会話のすべてのメッセージが完全に削除されます。"
 
@@ -3346,7 +3346,7 @@ msgid "Auckland"
 msgstr "オークランド"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
-#: src/components/model-picker/model-picker.tsx:935
+#: src/components/model-picker/model-picker.tsx:934
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:119
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -3562,7 +3562,7 @@ msgstr "平均レイテンシ"
 msgid "Average score"
 msgstr "平均スコア"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:72
+#: src/features/chat/header/thread-stats-dialog.tsx:69
 msgid "Average speed"
 msgstr ""
 
@@ -4546,7 +4546,7 @@ msgstr "カナダ"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:347
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:348
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4570,7 +4570,7 @@ msgstr "ディープワークをキャンセル"
 msgid "Cancel Export"
 msgstr "エクスポートをキャンセル"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:375
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:376
 msgid "Cancel Import"
 msgstr "インポートをキャンセル"
 
@@ -4775,7 +4775,7 @@ msgid "Change colors"
 msgstr "色を変更"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
-#: src/features/chat/thread-list/thread-node.tsx:710
+#: src/features/chat/thread-list/thread-node.tsx:718
 msgid "Change passcode"
 msgstr ""
 
@@ -4889,12 +4889,12 @@ msgstr "チャットのインポートに失敗しました"
 msgid "Chat import finished"
 msgstr "チャットのインポートが完了しました"
 
-#: src/features/chat/thread-list/thread-node.tsx:677
-#: src/features/chat/thread-list/thread-node.tsx:691
+#: src/features/chat/thread-list/thread-node.tsx:685
+#: src/features/chat/thread-list/thread-node.tsx:699
 msgid "Chat lock"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:677
+#: src/features/chat/thread-list/thread-node.tsx:685
 msgid "Chat lock: locked"
 msgstr ""
 
@@ -5280,7 +5280,7 @@ msgstr "クリック"
 msgid "Click \"{selector}\""
 msgstr "「{selector}」をクリック"
 
-#: src/components/model-picker/model-picker.tsx:979
+#: src/components/model-picker/model-picker.tsx:978
 msgid "Click ★ on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの ★ をクリックすると、ここに追加されます。"
 
@@ -6001,7 +6001,7 @@ msgstr "設定済み"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1041
+#: src/components/model-picker/model-picker.tsx:1040
 msgid "Confirm"
 msgstr "確認"
 
@@ -6427,6 +6427,10 @@ msgstr "絞り設定で被写界深度を調整します"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "UI での個人情報の表示方法を管理します。"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:22
+msgid "Control panel"
+msgstr ""
+
 #: src/features/workflow/components/nodes/controlnet-node.tsx:182
 msgid "Control Strength"
 msgstr "制御の強さ"
@@ -6506,7 +6510,7 @@ msgstr "読みやすくするために添付ファイルに変換しますか？
 msgid "Convert to Full Account"
 msgstr "正式なアカウントに変換"
 
-#: src/features/chat/thread-list/thread-node.tsx:814
+#: src/features/chat/thread-list/thread-node.tsx:822
 msgid "Convert to permanent"
 msgstr "永続化する"
 
@@ -6518,7 +6522,7 @@ msgstr "データを保存するには変換してください"
 msgid "Convert to TypeScript"
 msgstr "TypeScript に変換"
 
-#: src/features/chat/thread-list/thread-node.tsx:814
+#: src/features/chat/thread-list/thread-node.tsx:822
 msgid "Converting..."
 msgstr "変換しています..."
 
@@ -6527,7 +6531,7 @@ msgstr "変換しています..."
 msgid "Copied"
 msgstr "コピーしました"
 
-#: src/features/chat/thread/copy-last-code-block.tsx:41
+#: src/features/chat/thread/copy-last-code-block.tsx:53
 msgid "Copied the last code block"
 msgstr ""
 
@@ -6752,7 +6756,7 @@ msgstr ""
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr ""
 
-#: src/features/chat/thread/copy-last-code-block.tsx:46
+#: src/features/chat/thread/copy-last-code-block.tsx:41
 msgid "Could not copy to the clipboard"
 msgstr ""
 
@@ -6789,9 +6793,13 @@ msgstr "コメントを削除できませんでした"
 msgid "Could not delete the page"
 msgstr "ページを削除できませんでした"
 
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:119
+msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, Claude, or a Neore data export."
+msgstr ""
+
 #: src/features/settings/components/privacy/chat-import/parsers/index.ts:111
-msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
-msgstr "チャットのプロバイダーを検出できませんでした。ChatGPT、Gemini、Claude の有効なエクスポートファイルをアップロードしたか確認してください。"
+#~ msgid "Could not detect the chat provider. Please ensure you uploaded a valid export file from ChatGPT, Gemini, or Claude."
+#~ msgstr "チャットのプロバイダーを検出できませんでした。ChatGPT、Gemini、Claude の有効なエクスポートファイルをアップロードしたか確認してください。"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:58
 msgid "Could not export the workflow"
@@ -6809,7 +6817,7 @@ msgstr "ワークフローをインポートできませんでした"
 msgid "Could not load image"
 msgstr "画像を読み込めませんでした"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:63
+#: src/features/chat/header/thread-stats-dialog.tsx:60
 msgid "Could not load statistics for this thread."
 msgstr ""
 
@@ -6934,7 +6942,7 @@ msgstr "試用を開始できませんでした。"
 msgid "Could not stop the conversation"
 msgstr "会話を停止できませんでした"
 
-#: src/features/chat/thread-list/thread-node.tsx:513
+#: src/features/chat/thread-list/thread-node.tsx:521
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
@@ -7069,7 +7077,7 @@ msgstr ""
 
 #: src/components/command-palette.tsx:313
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:93
-#: src/features/chat/thread-list/thread-node.tsx:615
+#: src/features/chat/thread-list/thread-node.tsx:623
 msgid "Create branch"
 msgstr "ブランチを作成"
 
@@ -7220,7 +7228,7 @@ msgstr "作成日：{createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "7 日間有効な 1 回限りのリンクを作成します。サインインした状態で開いた人がアクセス権を得ます。"
 
-#: src/features/chat/thread-list/thread-node.tsx:615
+#: src/features/chat/thread-list/thread-node.tsx:623
 msgid "Creating branch..."
 msgstr "ブランチを作成しています..."
 
@@ -8143,12 +8151,12 @@ msgstr "このケースを削除しますか？"
 #: src/components/command-palette.tsx:331
 #: src/components/command-palette.tsx:457
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:85
-#: src/features/chat/thread-list/thread-node.tsx:835
+#: src/features/chat/thread-list/thread-node.tsx:843
 #: src/features/pages/components/page-comments-panel.tsx:188
 msgid "Delete thread"
 msgstr "スレッドを削除"
 
-#: src/features/chat/thread-list/thread-node.tsx:850
+#: src/features/chat/thread-list/thread-node.tsx:858
 msgid "Delete Thread"
 msgstr "スレッドを削除"
 
@@ -8176,7 +8184,7 @@ msgstr "{0, plural, other {# 件のプロンプトを削除しました}}"
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:1473
 #: src/components/delete-confirmation-dialog.tsx:65
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:285
-#: src/features/chat/thread-list/thread-node.tsx:835
+#: src/features/chat/thread-list/thread-node.tsx:843
 msgid "Deleting..."
 msgstr "削除しています..."
 
@@ -8428,7 +8436,7 @@ msgid "Details for case {0}"
 msgstr "ケース {0} の詳細"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:324
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
 msgid "Detected: {0}"
 msgstr "検出：{0}"
 
@@ -8774,6 +8782,10 @@ msgstr "ダブルクリックして編集"
 msgid "Double-click to rename"
 msgstr "ダブルクリックして名前を変更"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:15
+msgid "down"
+msgstr ""
+
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:180
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:775
@@ -8857,11 +8869,11 @@ msgstr "ダウンロードを開始しました"
 msgid "Download Text"
 msgstr "テキストをダウンロード"
 
-#: src/features/chat/thread-list/thread-node.tsx:739
+#: src/features/chat/thread-list/thread-node.tsx:747
 msgid "Download thread"
 msgstr "スレッドをダウンロード"
 
-#: src/features/chat/thread-list/thread-node.tsx:739
+#: src/features/chat/thread-list/thread-node.tsx:747
 msgid "Downloading..."
 msgstr "ダウンロードしています..."
 
@@ -9824,7 +9836,7 @@ msgstr "既定値を入力..."
 msgid "Enter email address"
 msgstr "メールアドレスを入力"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:46
+#: src/features/chat/lock/locked-chat-gate.tsx:49
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr ""
 
@@ -10115,7 +10127,7 @@ msgstr "Escape"
 msgid "Est. provider cost"
 msgstr "推定プロバイダーコスト"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:78
+#: src/features/chat/header/thread-stats-dialog.tsx:75
 msgid "Estimated cost"
 msgstr ""
 
@@ -10479,7 +10491,7 @@ msgstr "有効期限を {0} に更新しました"
 msgid "expired"
 msgstr "期限切れ"
 
-#: src/features/chat/thread-list/thread-node.tsx:272
+#: src/features/chat/thread-list/thread-node.tsx:280
 #: src/features/devices/components/devices-settings.tsx:134
 #: src/features/settings/connectors/connector-card.tsx:75
 msgid "Expired"
@@ -10508,7 +10520,7 @@ msgstr "有効期限"
 msgid "Expires {date}"
 msgstr "有効期限 {date}"
 
-#: src/features/chat/thread-list/thread-node.tsx:876
+#: src/features/chat/thread-list/thread-node.tsx:884
 msgid "Expires in {remainingTime}"
 msgstr "{remainingTime} 後に期限切れ"
 
@@ -10733,7 +10745,7 @@ msgstr "不合格"
 msgid "failed"
 msgstr "不合格"
 
-#: src/features/chat/thread-list/thread-node.tsx:483
+#: src/features/chat/thread-list/thread-node.tsx:491
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/devices/components/devices-settings.tsx:135
 #: src/features/evals/components/model-comparison.tsx:112
@@ -11109,7 +11121,7 @@ msgstr "スレッドを移動できませんでした"
 msgid "Failed to optimize prompt"
 msgstr "プロンプトを最適化できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:238
 msgid "Failed to parse file"
 msgstr "ファイルを解析できませんでした"
 
@@ -11294,7 +11306,7 @@ msgstr "確認メールを送信できませんでした"
 msgid "Failed to start impersonation"
 msgstr "なりすましを開始できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:272
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:273
 msgid "Failed to start import"
 msgstr "インポートを開始できませんでした"
 
@@ -11372,8 +11384,8 @@ msgstr "お気に入りを更新できませんでした"
 msgid "Failed to update favorite status"
 msgstr "お気に入りの状態を更新できませんでした"
 
-#: src/components/model-picker/model-picker.tsx:629
-#: src/components/model-picker/model-picker.tsx:638
+#: src/components/model-picker/model-picker.tsx:628
+#: src/components/model-picker/model-picker.tsx:637
 #: src/features/settings/components/chat/model-filter-settings.tsx:53
 #: src/features/settings/components/chat/model-filter-settings.tsx:88
 msgid "Failed to update filter rules"
@@ -12122,6 +12134,7 @@ msgid "Fisheye, extreme distortion"
 msgstr "魚眼、極端な歪み"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:54
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:23
 msgid "Fit view"
 msgstr "全体を表示"
 
@@ -13486,7 +13499,7 @@ msgstr "ゲストアカウント"
 msgid "Guest accounts"
 msgstr "ゲストアカウント"
 
-#: src/components/model-picker/model-picker.tsx:804
+#: src/components/model-picker/model-picker.tsx:803
 msgid "Guest accounts use free models only."
 msgstr "ゲストアカウントでは無料モデルのみ利用できます。"
 
@@ -13518,6 +13531,10 @@ msgstr "H"
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:239
 msgid "Hand (pan)"
 msgstr "ハンド（パン）"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:28
+msgid "Handle"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:298
 msgid "Handles demanding creative concepts"
@@ -13621,7 +13638,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:956
+#: src/components/model-picker/model-picker.tsx:955
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -14038,7 +14055,7 @@ msgstr "イラスト"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:911
+#: src/components/model-picker/model-picker.tsx:910
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -14228,11 +14245,11 @@ msgstr "なりすましを終了"
 msgid "Import"
 msgstr "インポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
 msgid "Import All"
 msgstr "すべてインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:283
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
 msgid "Import cancelled"
 msgstr "インポートをキャンセルしました"
 
@@ -14240,28 +14257,32 @@ msgstr "インポートをキャンセルしました"
 msgid "Import cases"
 msgstr "ケースをインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:384
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
 msgid "Import complete!"
 msgstr "インポートが完了しました！"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:300
 msgid "Import Conversations"
 msgstr "会話をインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:298
-msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:298
+#~ msgid "Import conversations from ChatGPT, Google Gemini, Claude, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
+#~ msgstr ""
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:210
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "ChatGPT、Google Gemini、Claude から会話をインポートします。エクスポートした JSON または ZIP ファイルをアップロードしてください。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:132
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:398
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:133
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:399
 msgid "Import failed"
 msgstr "インポートに失敗しました"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:390
 msgid "Import More"
 msgstr "さらにインポート"
 
@@ -14269,7 +14290,7 @@ msgstr "さらにインポート"
 msgid "Import Notion export (.zip)"
 msgstr "Notion のエクスポートをインポート（.zip）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:210
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:211
 msgid "Import one kind of export at a time."
 msgstr ""
 
@@ -14320,7 +14341,7 @@ msgid "Imported skill \"{0}\""
 msgstr "スキル「{0}」をインポートしました"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:363
 msgid "Importing from {0}..."
 msgstr "{0} からインポートしています..."
 
@@ -14466,7 +14487,7 @@ msgstr "Inception の拡散ベースの言語モデル"
 msgid "Includes audio generation"
 msgstr "音声生成を含む"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:87
+#: src/features/chat/header/thread-stats-dialog.tsx:84
 msgid "Includes replies billed to your own API key."
 msgstr ""
 
@@ -14559,7 +14580,7 @@ msgstr "テキストを入力または変換"
 msgid "Input Template"
 msgstr "入力テンプレート"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:68
+#: src/features/chat/header/thread-stats-dialog.tsx:65
 #: src/features/chat/thread/message-cost-badge.tsx:52
 msgid "Input tokens"
 msgstr "入力トークン"
@@ -15311,7 +15332,7 @@ msgstr "最後のフレーム"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:410
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:411
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "前回のインポート：{2} に {1} から {0} 件の会話"
 
@@ -15561,6 +15582,10 @@ msgstr "組織から退出"
 msgid "Leave Team"
 msgstr "チームから退出"
 
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:16
+msgid "left"
+msgstr ""
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:397
 #: src/features/workflow/components/nodes/outpaint-node.tsx:25
 msgid "Left"
@@ -15668,7 +15693,7 @@ msgstr "{0} 行目：{1}"
 msgid "Line {line}, column {column}"
 msgstr "{line} 行目、{column} 列目"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:168
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:181
 msgid "Line {number} of this transcript is not valid JSON, so the import was stopped."
 msgstr ""
 
@@ -15965,7 +15990,7 @@ msgstr "スキルを読み込んでいます…"
 msgid "Loading spreadsheet…"
 msgstr "スプレッドシートを読み込んでいます…"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:62
+#: src/features/chat/header/thread-stats-dialog.tsx:59
 msgid "Loading statistics…"
 msgstr ""
 
@@ -16021,7 +16046,7 @@ msgstr "読み込んでいます..."
 msgid "Loading…"
 msgstr "読み込んでいます…"
 
-#: src/features/chat/core/context/chat-context.tsx:850
+#: src/features/chat/core/context/chat-context.tsx:851
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "ローカルモデルはテキストのみに対応しています。送信するには添付ファイルを削除してください。"
 
@@ -16046,7 +16071,7 @@ msgstr "所在地"
 msgid "Location updated"
 msgstr "所在地を更新しました"
 
-#: src/features/chat/thread-list/thread-node.tsx:714
+#: src/features/chat/thread-list/thread-node.tsx:722
 msgid "Lock chat"
 msgstr ""
 
@@ -16059,7 +16084,7 @@ msgstr "グループをロック"
 msgid "Lock node"
 msgstr "ノードをロック"
 
-#: src/features/chat/thread-list/thread-node.tsx:706
+#: src/features/chat/thread-list/thread-node.tsx:714
 msgid "Lock now"
 msgstr ""
 
@@ -16067,12 +16092,12 @@ msgstr ""
 msgid "Lock this chat"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:238
+#: src/features/chat/thread-list/thread-node.tsx:246
 msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1024
+#: src/components/model-picker/model-picker.tsx:1023
 msgid "Locked to {0} models"
 msgstr "{0}モデルに固定"
 
@@ -16349,7 +16374,7 @@ msgstr "同意設定を管理"
 #~ msgid "Manage gateway API keys with per-key budgets and rate limits"
 #~ msgstr "キーごとの予算とレート制限でゲートウェイの API キーを管理"
 
-#: src/components/model-picker/model-picker.tsx:641
+#: src/components/model-picker/model-picker.tsx:640
 msgid "Manage hidden labs"
 msgstr ""
 
@@ -16573,7 +16598,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大サイズ: {size} • 最大 {maxFiles} ファイル"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
-#: src/components/model-picker/model-picker.tsx:1018
+#: src/components/model-picker/model-picker.tsx:1017
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "モデルは最大 {MAX_PARALLEL} 個までです"
 
@@ -16835,8 +16860,8 @@ msgstr "メッセージ"
 msgid "Messages API (/v1/messages) — Anthropic and services that mirror it."
 msgstr "Messages API（/v1/messages）— Anthropic および同じ形式のサービス。"
 
-#: src/features/chat/thread-list/thread-node.tsx:542
-#: src/features/chat/thread-list/thread-node.tsx:554
+#: src/features/chat/thread-list/thread-node.tsx:550
+#: src/features/chat/thread-list/thread-node.tsx:562
 msgid "Messages from {sourceName}"
 msgstr "{sourceName} からのメッセージ"
 
@@ -16907,6 +16932,10 @@ msgstr "Azure Bot の Microsoft App ID"
 #: src/features/appearance/components/appearance-controls.tsx:129
 msgid "Min"
 msgstr "Min"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:29
+msgid "Mini map"
+msgstr ""
 
 #: src/features/canvas/components/design-preset-selector.tsx:179
 msgid "Minimal Card"
@@ -17120,11 +17149,11 @@ msgstr "このモデルは既にブロックされています"
 msgid "Model Breakdown"
 msgstr "モデル別内訳"
 
-#: src/features/chat/thread-list/thread-node.tsx:484
+#: src/features/chat/thread-list/thread-node.tsx:492
 msgid "Model comparison"
 msgstr "モデル比較"
 
-#: src/features/chat/core/hooks/use-comparison-chat.ts:108
+#: src/features/chat/core/hooks/use-comparison-chat.ts:112
 #: src/features/workflow/templates/index.ts:258
 msgid "Model Comparison"
 msgstr "モデル比較"
@@ -17180,7 +17209,7 @@ msgstr "モデル: OpenAI Whisper"
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:262
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/chat/header/thread-stats-dialog.tsx:92
+#: src/features/chat/header/thread-stats-dialog.tsx:89
 #: src/features/evals/components/dataset-panel.tsx:132
 #: src/features/layout/lib/dashboard-page-names.ts:31
 #: src/features/marketing/components/landing-footer.tsx:111
@@ -17475,7 +17504,7 @@ msgstr "次のセルへ移動"
 msgid "Move to previous cell"
 msgstr "前のセルへ移動"
 
-#: src/features/chat/thread-list/thread-node.tsx:634
+#: src/features/chat/thread-list/thread-node.tsx:642
 msgid "Move to project"
 msgstr "プロジェクトへ移動"
 
@@ -17490,6 +17519,11 @@ msgstr "上へ移動"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:108
 msgid "Move up one page"
 msgstr "1 ページ上へ移動"
+
+#. placeholder {0}: directions[direction] ?? direction
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:33
+msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
+msgstr ""
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:113
 msgid "MP4/MOV video"
@@ -18284,7 +18318,7 @@ msgstr "コンテンツなし"
 msgid "No content to display"
 msgstr "表示するコンテンツがありません"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:219
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:220
 msgid "No conversations found in the file."
 msgstr "ファイル内に会話が見つかりませんでした。"
 
@@ -18463,7 +18497,7 @@ msgid "No models found matching your filters."
 msgstr "フィルターに一致するモデルが見つかりません。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:711
-#: src/components/model-picker/model-picker.tsx:985
+#: src/components/model-picker/model-picker.tsx:984
 msgid "No models found."
 msgstr "モデルが見つかりません。"
 
@@ -18653,7 +18687,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "音声が検出されませんでした。ハンズフリーモードを停止しました。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:703
-#: src/components/model-picker/model-picker.tsx:977
+#: src/components/model-picker/model-picker.tsx:976
 msgid "No starred models"
 msgstr "スター付きのモデルはありません"
 
@@ -20028,7 +20062,7 @@ msgstr "出力形式"
 msgid "Output Mode"
 msgstr "出力モード"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:70
+#: src/features/chat/header/thread-stats-dialog.tsx:67
 #: src/features/chat/thread/message-cost-badge.tsx:60
 msgid "Output tokens"
 msgstr "出力トークン"
@@ -20167,7 +20201,7 @@ msgid "Paraguay"
 msgstr "パラグアイ"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:595
-#: src/components/model-picker/model-picker.tsx:870
+#: src/components/model-picker/model-picker.tsx:869
 msgid "Parallel"
 msgstr "並列"
 
@@ -20180,7 +20214,7 @@ msgstr "並列比較"
 msgid "Paris"
 msgstr "パリ"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:318
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:319
 msgid "Parsing file..."
 msgstr "ファイルを解析しています..."
 
@@ -20216,9 +20250,15 @@ msgid "Pass rate"
 msgstr "合格率"
 
 #. placeholder {0}: citation.chunkIndex + 1
-#: src/features/knowledge/components/knowledge-source-group.tsx:66
+#: src/features/knowledge/components/knowledge-source-group.tsx:68
 msgid "Passage {0}, cited as [{position}]"
 msgstr "パッセージ {0}（[{position}] として引用）"
+
+#. placeholder {0}: citation.chunkIndex + 1
+#. placeholder {1}: citation.pageNumber
+#: src/features/knowledge/components/knowledge-source-group.tsx:69
+msgid "Passage {0}, page {1}, cited as [{position}]"
+msgstr ""
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:168
 msgid "Passcode"
@@ -21030,6 +21070,18 @@ msgstr "プリセット"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1177
 msgid "Press ? for keyboard shortcuts"
 msgstr "? キーでキーボードショートカットを表示"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:30
+msgid "Press enter or space to select a node. Press delete to remove it and escape to cancel."
+msgstr ""
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:31
+msgid "Press enter or space to select a node. You can then use the arrow keys to move the node around. Press delete to remove it and escape to cancel."
+msgstr ""
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:27
+msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:241
 msgid "Press Enter to send"
@@ -22617,7 +22669,7 @@ msgid "Remove or add objects in an image"
 msgstr "画像内のオブジェクトを削除または追加"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:151
-#: src/features/chat/thread-list/thread-node.tsx:711
+#: src/features/chat/thread-list/thread-node.tsx:719
 msgid "Remove passcode"
 msgstr ""
 
@@ -22713,7 +22765,7 @@ msgstr "オンボーディングを再生"
 msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "ウェルカムツアーを再生して、Neore の主な機能を確認します。"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:66
+#: src/features/chat/header/thread-stats-dialog.tsx:63
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:144
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:246
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
@@ -22749,7 +22801,7 @@ msgstr "選択した期間のスキルまたはエージェントごとの返信
 msgid "Reply"
 msgstr "返信"
 
-#: src/features/chat/core/context/chat-context.tsx:769
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "Reply ready"
 msgstr "返信の準備ができました"
 
@@ -22931,7 +22983,7 @@ msgstr "リソース"
 msgid "Response"
 msgstr "応答"
 
-#: src/features/chat/thread-list/thread-node.tsx:493
+#: src/features/chat/thread-list/thread-node.tsx:501
 msgid "Response failed - try again"
 msgstr "応答に失敗しました - もう一度お試しください"
 
@@ -23146,6 +23198,10 @@ msgstr "豊富な世界知識を生成に活用"
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:109
 msgid "RIFF (WAV/AVI/WebP)"
 msgstr "RIFF (WAV/AVI/WebP)"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:17
+msgid "right"
+msgstr ""
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:399
 #: src/features/workflow/components/nodes/outpaint-node.tsx:26
@@ -23806,7 +23862,7 @@ msgid "Search models by name, ID, or provider..."
 msgstr "名前、ID、プロバイダーでモデルを検索..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:528
-#: src/components/model-picker/model-picker.tsx:811
+#: src/components/model-picker/model-picker.tsx:810
 msgid "Search models..."
 msgstr "モデルを検索..."
 
@@ -24043,7 +24099,7 @@ msgstr "音声入力の言語を選択"
 msgid "Select duration"
 msgstr "期間を選択"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:312
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:313
 msgid "Select File"
 msgstr "ファイルを選択"
 
@@ -24810,7 +24866,7 @@ msgid "Singapore"
 msgstr "シンガポール"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:582
-#: src/components/model-picker/model-picker.tsx:858
+#: src/components/model-picker/model-picker.tsx:857
 msgid "Single"
 msgstr "単一"
 
@@ -24929,7 +24985,7 @@ msgid "Skipped"
 msgstr "スキップ済み"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:328
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
 msgid "Skipped files that are not chat exports: {0}"
 msgstr ""
 
@@ -25470,7 +25526,7 @@ msgid "Star"
 msgstr "星"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:547
-#: src/components/model-picker/model-picker.tsx:827
+#: src/components/model-picker/model-picker.tsx:826
 msgid "Starred"
 msgstr "スター付き"
 
@@ -25629,7 +25685,7 @@ msgstr "開始中"
 msgid "Starting {0}…"
 msgstr "{0} を開始しています…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
 msgid "Starting import..."
 msgstr "インポートを開始しています..."
 
@@ -25728,8 +25784,8 @@ msgstr "停止"
 msgid "Stop after the current speaker"
 msgstr "現在の話者の後に停止"
 
-#: src/features/chat/thread-list/thread-node.tsx:502
-#: src/features/chat/thread-list/thread-node.tsx:524
+#: src/features/chat/thread-list/thread-node.tsx:510
+#: src/features/chat/thread-list/thread-node.tsx:532
 #: src/features/chat/thread/composer-input-area.tsx:298
 #: src/features/chat/thread/composer-input-area.tsx:311
 msgid "Stop generating"
@@ -25784,11 +25840,11 @@ msgstr "ストーリーテリング"
 msgid "Streamable HTTP (Recommended)"
 msgstr "Streamable HTTP（推奨）"
 
-#: src/features/chat/thread-list/thread-node.tsx:482
+#: src/features/chat/thread-list/thread-node.tsx:490
 msgid "Streaming"
 msgstr "ストリーミング"
 
-#: src/features/chat/thread-list/thread-node.tsx:492
+#: src/features/chat/thread-list/thread-node.tsx:500
 msgid "Streaming..."
 msgstr "ストリーミング中..."
 
@@ -26158,7 +26214,7 @@ msgstr "サブエージェントは承認されませんでした。"
 msgid "Subheading"
 msgstr "小見出し"
 
-#: src/components/model-picker/model-picker.tsx:806
+#: src/components/model-picker/model-picker.tsx:805
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "月額 $8 で登録すると、すべてのモデルを利用できます。"
 
@@ -26185,7 +26241,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "成功基準は {CRITERIA_MAX} 文字以内で入力してください"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:128
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:129
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "{0} から {imported} 件の会話をインポートしました"
 
@@ -26270,9 +26326,13 @@ msgstr "複数ファイルにまたがる優れたコード生成とリファク
 msgid "Superior understanding of complex visual concepts"
 msgstr "複雑な視覚的コンセプトへの優れた理解"
 
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
+msgstr ""
+
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:309
-msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
-msgstr "対応形式：ChatGPT のエクスポート（conversations.json）、Google Gemini（Takeout ZIP）、Claude.ai のエクスポート。"
+#~ msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export."
+#~ msgstr "対応形式：ChatGPT のエクスポート（conversations.json）、Google Gemini（Takeout ZIP）、Claude.ai のエクスポート。"
 
 #: src/features/marketing/data/models-data.ts:249
 msgid "Supports 10-second video durations"
@@ -26464,7 +26524,7 @@ msgstr "タグはチャットに付ける独自のラベルです。自動カテ
 msgid "Tags for {threadTitle}"
 msgstr "{threadTitle} のタグ"
 
-#: src/features/chat/thread-list/thread-node.tsx:645
+#: src/features/chat/thread-list/thread-node.tsx:653
 msgid "Tags unavailable for temporary chats"
 msgstr "一時チャットではタグを使用できません"
 
@@ -26729,7 +26789,7 @@ msgstr "テンプレート"
 msgid "Temporary"
 msgstr "一時"
 
-#: src/features/chat/thread-list/thread-node.tsx:876
+#: src/features/chat/thread-list/thread-node.tsx:884
 msgid "Temporary chat"
 msgstr "一時チャット"
 
@@ -26745,7 +26805,7 @@ msgstr "一時チャットモード"
 msgid "Temporary Chat Retention (hours)"
 msgstr "一時チャットの保持期間（時間）"
 
-#: src/features/chat/thread-list/thread-node.tsx:657
+#: src/features/chat/thread-list/thread-node.tsx:665
 msgid "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
 msgstr "一時チャットは期限切れになるため、タグを付けられません。タグを追加するには永続的なチャットに変換してください。"
 
@@ -26809,7 +26869,7 @@ msgstr "テキスト"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:629
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:900
+#: src/components/model-picker/model-picker.tsx:899
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -27469,7 +27529,7 @@ msgstr "この操作は元に戻せません。組織と関連するすべての
 msgid "This browser cannot receive push notifications here."
 msgstr "このブラウザーではここでプッシュ通知を受信できません。"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:44
+#: src/features/chat/lock/locked-chat-gate.tsx:47
 msgid "This chat is locked"
 msgstr ""
 
@@ -27678,7 +27738,7 @@ msgstr "コンピューターからモデルファイルを削除します。後
 msgid "This run is no longer available."
 msgstr "この実行は利用できなくなりました。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:225
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:226
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr ""
 
@@ -27861,7 +27921,7 @@ msgid "Thread restored"
 msgstr "スレッドを復元しました"
 
 #: src/features/chat/header/thread-download-button.tsx:132
-#: src/features/chat/header/thread-stats-dialog.tsx:59
+#: src/features/chat/header/thread-stats-dialog.tsx:56
 msgid "Thread statistics"
 msgstr ""
 
@@ -27998,6 +28058,10 @@ msgstr "列の表示を切り替え"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:575
 msgid "Toggle element palette"
 msgstr "要素パレットの表示を切り替え"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:24
+msgid "Toggle interactivity"
+msgstr ""
 
 #. placeholder {0}: formatShortcutForDisplay(getDefaultShortcut("sidebarLeft"))
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:85
@@ -28187,7 +28251,7 @@ msgstr "合計コスト"
 msgid "Total Users"
 msgstr "ユーザー総数"
 
-#: src/features/chat/header/thread-stats-dialog.tsx:60
+#: src/features/chat/header/thread-stats-dialog.tsx:57
 msgid "Totals across every reply in this thread, including regenerated alternatives."
 msgstr ""
 
@@ -28415,7 +28479,7 @@ msgstr "再試行"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
 msgid "Try Again"
 msgstr "もう一度試す"
 
@@ -28530,7 +28594,7 @@ msgstr "お使いのアカウントでは現在、二要素認証が有効にな
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
-#: src/components/model-picker/model-picker.tsx:880
+#: src/components/model-picker/model-picker.tsx:879
 msgid "Type"
 msgstr "種類"
 
@@ -28708,7 +28772,7 @@ msgid "Under the Hood"
 msgstr "内部の仕組み"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: src/components/model-picker/model-picker.tsx:636
+#: src/components/model-picker/model-picker.tsx:635
 #: src/features/canvas/canvas-panel.tsx:242
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
@@ -28799,8 +28863,8 @@ msgstr "無制限のリクエスト"
 msgid "Unlink"
 msgstr "リンク解除"
 
-#: src/features/chat/lock/locked-chat-gate.tsx:48
-#: src/features/chat/thread-list/thread-node.tsx:709
+#: src/features/chat/lock/locked-chat-gate.tsx:51
+#: src/features/chat/thread-list/thread-node.tsx:717
 msgid "Unlock chat"
 msgstr ""
 
@@ -28863,7 +28927,7 @@ msgstr "未保存の変更"
 #~ msgid "Unsupported file format. Please upload a .json or .zip file."
 #~ msgstr "サポートされていないファイル形式です。.json または .zip ファイルをアップロードしてください。"
 
-#: src/features/settings/components/privacy/chat-import/parsers/index.ts:243
+#: src/features/settings/components/privacy/chat-import/parsers/index.ts:256
 msgid "Unsupported file format. Please upload a .json, .jsonl or .zip file."
 msgstr ""
 
@@ -28901,6 +28965,10 @@ msgstr "無題のスレッド"
 #: src/routes/(chat)/workflow/index.tsx:21
 msgid "Untitled Workflow"
 msgstr "無題のワークフロー"
+
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:18
+msgid "up"
+msgstr ""
 
 #: src/features/workflow/components/version-history.tsx:150
 msgid "Up to {MAX_HISTORY_ENTRIES} versions saved"
@@ -29153,7 +29221,7 @@ msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} をアップロードしています"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:355
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
 msgid "Uploading data for import from {0}..."
 msgstr "{0} からのインポート用データをアップロードしています..."
 
@@ -29773,7 +29841,7 @@ msgid "video"
 msgstr "動画"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
-#: src/components/model-picker/model-picker.tsx:922
+#: src/components/model-picker/model-picker.tsx:921
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -30219,7 +30287,7 @@ msgstr "待機対象：{0}"
 msgid "Want to continue from here?"
 msgstr "ここから続けますか？"
 
-#: src/features/chat/core/context/chat-context.tsx:810
+#: src/features/chat/core/context/chat-context.tsx:811
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "時間内にセッションを確認できませんでした。メッセージは入力欄に残っています。もう一度送信してください。"
 
@@ -30590,6 +30658,10 @@ msgstr "Workers、KV、R2 などの Cloudflare プラットフォームツール
 msgid "Workflow automation across thousands of apps"
 msgstr "数千のアプリをまたぐワークフロー自動化"
 
+#: src/features/workflow/components/canvas/workflow-canvas.tsx:306
+msgid "Workflow canvas"
+msgstr ""
+
 #: src/routes/(chat)/workflow/$workflowId.tsx:57
 #: src/routes/(chat)/workflow/shared/$token.tsx:45
 msgid "Workflow not found"
@@ -30957,7 +31029,7 @@ msgstr "あなたの AI ワークスペースは<0>ここから始まります�
 msgid "Your answer"
 msgstr "あなたの回答"
 
-#: src/features/chat/core/context/chat-context.tsx:769
+#: src/features/chat/core/context/chat-context.tsx:770
 msgid "Your answer in Neore has finished."
 msgstr "Neore での回答が完了しました。"
 
@@ -31056,7 +31128,7 @@ msgstr "ローカルサーバーは応答しましたが、このサイトを拒
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "所在地（例：「アメリカ、ニューヨーク」「ドイツ、ベルリン」）。"
 
-#: src/features/chat/core/context/chat-context.tsx:1005
+#: src/features/chat/core/context/chat-context.tsx:1003
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "メッセージに不適切なコンテンツが含まれているため、送信できません。"
 
@@ -31215,6 +31287,7 @@ msgstr "ZIP アーカイブ"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:283
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:289
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
 msgid "Zoom in"
 msgstr "拡大"
 
@@ -31230,6 +31303,7 @@ msgstr "ズームレンズ"
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:249
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:255
+#: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
 msgid "Zoom out"
 msgstr "縮小"
 

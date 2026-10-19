@@ -63,7 +63,11 @@ const KnowledgeSourceGroup: FC<{ sources: SourcePart[] }> = memo(({ sources }) =
                             <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)]">
                                 <PopoverHeader>
                                     <PopoverTitle className="truncate text-sm">{citation.fileName}</PopoverTitle>
-                                    <PopoverDescription className="text-xs">{t`Passage ${citation.chunkIndex + 1}, cited as [${position}]`}</PopoverDescription>
+                                    <PopoverDescription className="text-xs">
+                                        {citation.pageNumber === undefined
+                                            ? t`Passage ${citation.chunkIndex + 1}, cited as [${position}]`
+                                            : t`Passage ${citation.chunkIndex + 1}, page ${citation.pageNumber}, cited as [${position}]`}
+                                    </PopoverDescription>
                                 </PopoverHeader>
                                 <blockquote className="text-muted-foreground mt-2 max-h-72 overflow-y-auto border-l-2 pl-3 text-xs leading-relaxed whitespace-pre-wrap">
                                     {citation.passage}

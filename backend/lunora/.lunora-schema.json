@@ -1589,6 +1589,13 @@
               "optional": false,
               "unique": false,
               "literal": "\"gemini\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"neore\""
             }
           ]
         },

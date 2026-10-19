@@ -80,6 +80,7 @@ export const getChunksByEmbeddingIds = internalQuery
                 embeddingId: v.string(),
                 fileId: v.string(),
                 fileName: v.string(),
+                pageNumber: v.optional(v.number()),
             }),
         ),
     )
@@ -92,6 +93,7 @@ export const getChunksByEmbeddingIds = internalQuery
             embeddingId: string;
             fileId: string;
             fileName: string;
+            pageNumber?: number;
         }[] = [];
 
         for (const embeddingId of embeddingIds) {
@@ -115,6 +117,8 @@ export const getChunksByEmbeddingIds = internalQuery
                 continue;
             }
 
+            const pageNumber = chunk.metadata?.pageNumber;
+
             results.push({
                 chunkId: chunk._id as string,
                 chunkIndex: chunk.chunkIndex,
@@ -122,6 +126,7 @@ export const getChunksByEmbeddingIds = internalQuery
                 embeddingId: chunk.embeddingId ?? "",
                 fileId: chunk.fileId as string,
                 fileName: file.name,
+                ...(pageNumber !== undefined && { pageNumber }),
             });
         }
 
@@ -154,6 +159,7 @@ export const keywordSearchChunks = internalQuery
                 content: v.string(),
                 fileId: v.string(),
                 fileName: v.string(),
+                pageNumber: v.optional(v.number()),
                 score: v.number(),
             }),
         ),
@@ -189,7 +195,7 @@ export const keywordSearchChunks = internalQuery
 
         const fileIdSet = new Set(knowledgeFileIds);
         const fileNames = new Map<string, string>(indexedFiles.map((file) => [file._id as string, file.name]));
-        const results: { chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }[] = [];
+        const results: { chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }[] = [];
 
         for (const { candidate, score } of scoreKeywordCandidates(termHits, corpusSize)) {
             if (results.length >= limit) {
@@ -216,7 +222,17 @@ export const keywordSearchChunks = internalQuery
                 fileNames.set(fileId, fileName);
             }
 
-            results.push({ chunkId: candidate.id, chunkIndex: candidate.chunk.chunkIndex, content: candidate.content, fileId, fileName, score });
+            const pageNumber = candidate.chunk.metadata?.pageNumber;
+
+            results.push({
+                chunkId: candidate.id,
+                chunkIndex: candidate.chunk.chunkIndex,
+                content: candidate.content,
+                fileId,
+                fileName,
+                ...(pageNumber !== undefined && { pageNumber }),
+                score,
+            });
         }
 
         return results;
@@ -281,6 +297,16 @@ export const updateFileStatus = internalMutation
         return true;
     });
 
+/** A chunk's `metadata`, with only the fields it has: no undefined members, and `undefined` when it has none. */
+const chunkMetadata = ({ pageNumber, sectionHeading }: { pageNumber?: number; sectionHeading?: string }) => {
+    const metadata = {
+        ...(sectionHeading && { sectionHeading }),
+        ...(pageNumber !== undefined && { pageNumber }),
+    };
+
+    return Object.keys(metadata).length > 0 ? metadata : undefined;
+};
+
 export const saveChunks = internalMutation
     .input({
         chunks: v.array(
@@ -288,6 +314,9 @@ export const saveChunks = internalMutation
                 chunkIndex: v.number(),
                 content: v.string(),
                 embeddingId: v.optional(v.string()),
+                pageNumber: v.optional(v.number()),
+                // A literal bound (the value of `MAX_LENGTH.short`): with an imported one codegen drops this procedure's compiled argument validator.
+                sectionHeading: v.optional(v.string().max(500)),
                 tokenCount: v.optional(v.number()),
             }),
         ),
@@ -310,6 +339,7 @@ export const saveChunks = internalMutation
                 content: chunk.content,
                 embeddingId: chunk.embeddingId,
                 fileId,
+                metadata: chunkMetadata(chunk),
                 tokenCount: chunk.tokenCount,
                 userId,
             }),

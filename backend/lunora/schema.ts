@@ -383,7 +383,7 @@ export const schema = defineSchema({
         failedConversations: v.optional(v.number()),
         importedConversations: v.number(),
         progress: v.optional(v.number()),
-        provider: v.union(v.literal("chatgpt"), v.literal("gemini"), v.literal("claude"), v.literal("claude-code"), v.literal("codex")),
+        provider: v.union(v.literal("chatgpt"), v.literal("gemini"), v.literal("claude"), v.literal("claude-code"), v.literal("codex"), v.literal("neore")),
         r2Key: v.optional(v.string()),
         status: v.union(v.literal("pending"), v.literal("processing"), v.literal("completed"), v.literal("failed")),
         totalConversations: v.number(),

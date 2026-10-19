@@ -1,11 +1,11 @@
 ---
 title: Chat Import
-description: Import conversations from ChatGPT, Google Gemini, or Claude into Neore Chat
+description: Import conversations from ChatGPT, Google Gemini, Claude, or a Neore data export into Neore Chat
 ---
 
 # Chat Import
 
-Bring your conversations from other AI chat platforms into Neore Chat. The import tool supports ChatGPT, Google Gemini, and Claude exports — it auto-detects the provider and preserves your message history.
+Bring your conversations from other AI chat platforms into Neore Chat. The import tool supports ChatGPT, Google Gemini, Claude, and Neore data exports — it auto-detects the provider and preserves your message history.
 
 ## Quick Start
 
@@ -66,6 +66,26 @@ The import tool handles the entire process:
 - The exported `.json` file from Claude
 
 **How it works:** Claude exports use `human` and `assistant` sender fields with `chat_messages` arrays. The importer normalizes these to the standard user/assistant roles.
+
+### Neore data export
+
+**Export method:**
+1. Go to **Settings → Privacy & Data** and find **Data Export**
+2. Click **Request Data Export** and wait for the email
+3. Download the export from the link in the email, then use the `.json` file
+
+**Accepted files:**
+- The exported `.json` file from Neore (the file with an `exportVersion` field)
+
+**How it works:** The export lists each conversation with its thread and messages. The importer keeps the text, order and timestamps of each message. Files, memories, usage history, settings and other data are not part of a chat import; they stay in the export.
+
+**Limits:**
+- An export made now imports the branch you were looking at: the replies you regenerated or edited and did not keep are left out. An export made before Neore recorded which branch you were on still contains every alternative, and the import combines them into one message. Request a new export to avoid that.
+- Exports made before Neore recorded each message's role do not say who wrote it. Replies that did not follow one of your prompts are then imported as your messages: results of sub-agent and coding-agent runs, the text after a tool approval or an answered question, and the replies of later speakers in a group chat. Request a new export to avoid this.
+- A failed or interrupted reply keeps the text it had.
+- A message keeps the time it was imported with (its original time when it came from another platform), and the time Neore created it otherwise. A conversation's time is the creation time Neore recorded.
+- Importing the same export twice creates the conversations twice. Delete the duplicates from the thread list if you import it again.
+- The export is capped at 32 MB. An import whose conversations come to more than 25 MB is refused with a "too large" message; nothing is cut short.
 
 ## Import Process
 
@@ -129,7 +149,7 @@ For each conversation, the following is preserved:
 Export your ChatGPT history and import it into Neore Chat to continue your conversations with any AI model.
 
 **Consolidating conversations:**
-Import conversations from multiple providers (ChatGPT, Gemini, Claude) to have all your AI chat history in one place.
+Import conversations from multiple providers (ChatGPT, Gemini, Claude, Neore) to have all your AI chat history in one place.
 
 **Backing up before switching platforms:**
 Import your history first, then use Neore Chat's [data export](/docs/privacy#data-export-article-20---right-to-data-portability) feature for ongoing backups.

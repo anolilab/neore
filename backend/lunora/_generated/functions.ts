@@ -5474,13 +5474,28 @@ __has2 = true;
 }
 let __has3 = false;
 let __val3;
-if (__e1["tokenCount"] !== undefined) {
-if (typeof __e1["tokenCount"] !== "number" || !Number.isFinite(__e1["tokenCount"])) return DEFER;
-__val3 = __e1["tokenCount"];
+if (__e1["pageNumber"] !== undefined) {
+if (typeof __e1["pageNumber"] !== "number" || !Number.isFinite(__e1["pageNumber"])) return DEFER;
+__val3 = __e1["pageNumber"];
 __has3 = true;
 }
-const __obj4 = { "chunkIndex": __e1["chunkIndex"], "content": __e1["content"], ...(__has2 ? { "embeddingId": __val2 } : {}), ...(__has3 ? { "tokenCount": __val3 } : {}) };
-__arr1[__i1] = __obj4;
+let __has4 = false;
+let __val4;
+if (__e1["sectionHeading"] !== undefined) {
+if (typeof __e1["sectionHeading"] !== "string") return DEFER;
+if (__e1["sectionHeading"].length > 500) return DEFER;
+__val4 = __e1["sectionHeading"];
+__has4 = true;
+}
+let __has5 = false;
+let __val5;
+if (__e1["tokenCount"] !== undefined) {
+if (typeof __e1["tokenCount"] !== "number" || !Number.isFinite(__e1["tokenCount"])) return DEFER;
+__val5 = __e1["tokenCount"];
+__has5 = true;
+}
+const __obj6 = { "chunkIndex": __e1["chunkIndex"], "content": __e1["content"], ...(__has2 ? { "embeddingId": __val2 } : {}), ...(__has3 ? { "pageNumber": __val3 } : {}), ...(__has4 ? { "sectionHeading": __val4 } : {}), ...(__has5 ? { "tokenCount": __val5 } : {}) };
+__arr1[__i1] = __obj6;
 }
 if (typeof source["fileId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
@@ -8462,7 +8477,7 @@ export interface Caller {
         functions: {
             cancelImportJob: (args: { jobId: string }) => Promise<null>;
             getImportStatus: (args?: {}) => Promise<{ _id: string; completedAt: number | null; createdAt: number; currentStep: string | null; errorMessage: string | null; failedConversations: number | null; importedConversations: number; progress: number | null; provider: string; status: string; totalConversations: number } | null>;
-            startImportJob: (args: { provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex"; totalConversations: number; uploadId: string }) => Promise<{ jobId: string }>;
+            startImportJob: (args: { provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore"; totalConversations: number; uploadId: string }) => Promise<{ jobId: string }>;
         };
         steps: {
             checkJobCancelled: (args: { jobId: Id<"chatImportJobs"> }) => Promise<boolean>;
@@ -8662,7 +8677,7 @@ export interface Caller {
         };
         steps: {
             collectActivityForExport: (args: { userId: string }) => Promise<{ knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown>; usageDaily: Array<unknown> }>;
-            collectConversations: (args: { userId: string }) => Promise<{ messages: { _id: string; createdAt: number; model?: string; order?: number; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
+            collectConversations: (args: { userId: string }) => Promise<{ messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
             collectFiles: (args: { userId: string }) => Promise<{ files: Array<{ _id: Id<"files">; createdAt: number; name: string; size: number; tags?: Array<string>; type: string; updatedAt: number }>; folders: Array<{ _id: Id<"folders">; createdAt: number; name: string; updatedAt: number }> }>;
             collectProfile: (args: { userId: string }) => Promise<{ createdAt: number; email: string; emailVerified: boolean; id: string; image: string; name: string } | null>;
             collectPrompts: (args: { userId: string }) => Promise<{ promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
@@ -8766,18 +8781,18 @@ export interface Caller {
             addFile: (args: { collectionId?: Id<"knowledgeCollections">; mimeType: string; name: string; relativePath?: string; size: number; vaultFileId: Id<"files"> }) => Promise<import("lunorash/server").Id<"knowledgeFiles">>;
             attachToThread: (args: { knowledgeFileId: Id<"knowledgeFiles">; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ alreadyAttached: boolean; success?: undefined; } | { success: boolean; alreadyAttached?: undefined; }>;
             detachFromThread: (args: { knowledgeFileId: Id<"knowledgeFiles">; threadId: Id<"threads">; unlockProof?: string }) => Promise<{ success: boolean; }>;
-            getChunksByEmbeddingIds: (args: { embeddingIds: Array<string>; knowledgeFileIds: Array<string>; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; embeddingId: string; fileId: string; fileName: string }>>;
+            getChunksByEmbeddingIds: (args: { embeddingIds: Array<string>; knowledgeFileIds: Array<string>; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; embeddingId: string; fileId: string; fileName: string; pageNumber?: number }>>;
             getFile: (args: { fileId: Id<"knowledgeFiles"> }) => Promise<import("./dataModel.js").Doc_knowledgeFiles | null>;
             getFileChunks: (args: { fileId: Id<"knowledgeFiles">; limit?: number }) => Promise<{ chunkIndex: number; content: string; }[]>;
             getIndexedFileIds: (args: { userId: string }) => Promise<string[]>;
             getThreadKnowledge: (args: { threadId: Id<"threads">; unlockProof?: string }) => Promise<({ addedAt: number; _id: Id<"knowledgeFiles">; _creationTime: number; chunkCount?: number; collectionId?: Id<"knowledgeCollections">; createdAt: number; error?: string; mimeType: string; name: string; organizationId?: string; relativePath?: string; size: number; sourceUrl?: string; status: string; storageKey?: string; summary?: string; updatedAt?: number; userId: string; vaultFileId?: Id<"files">; } | null)[]>;
             getThreadKnowledgeFileIds: (args: { threadId: Id<"threads"> }) => Promise<string[]>;
             getVaultFile: (args: { vaultFileId: Id<"files"> }) => Promise<{ _id: Id<"files">; key: string | undefined; name: string; } | undefined>;
-            keywordSearchChunks: (args: { knowledgeFileIds: Array<string>; limit: number; query: string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }>>;
+            keywordSearchChunks: (args: { knowledgeFileIds: Array<string>; limit: number; query: string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
             listFiles: (args?: {}) => Promise<import("./dataModel.js").Doc_knowledgeFiles[]>;
             recordKnowledgeSources: (args: { messageId: Id<"messages">; sources: Array<{ id: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "url"; title?: string; type?: "source"; url: string } | { filename?: string; id: string; mediaType: string; providerMetadata?: Record<string, Record<string, unknown>>; providerOptions?: Record<string, Record<string, unknown>>; sourceType: "document"; title: string; type: "source" }> }) => Promise<null>;
             removeFile: (args: { fileId: Id<"knowledgeFiles"> }) => Promise<{ success: boolean; }>;
-            saveChunks: (args: { chunks: Array<{ chunkIndex: number; content: string; embeddingId?: string; tokenCount?: number }>; fileId: Id<"knowledgeFiles">; userId: string }) => Promise<boolean>;
+            saveChunks: (args: { chunks: Array<{ chunkIndex: number; content: string; embeddingId?: string; pageNumber?: number; sectionHeading?: string; tokenCount?: number }>; fileId: Id<"knowledgeFiles">; userId: string }) => Promise<boolean>;
             updateFileStatus: (args: { chunkCount?: number; error?: string; fileId: Id<"knowledgeFiles">; name?: string; size?: number; status: string; summary?: string }) => Promise<boolean>;
         };
         housekeeping: {
@@ -8789,10 +8804,10 @@ export interface Caller {
             ingestFile: (args: { knowledgeFileId: Id<"knowledgeFiles">; userId: string }) => Promise<void>;
         };
         retrieve: {
-            default: (args: { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }>>;
-            search: (args: { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }>>;
-            searchKnowledge: (args: { query: string }) => Promise<Array<{ chunkIndex: number; content: string; fileName: string; score: number }>>;
-            searchSharedCollections: (args: { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; query: string; queryVector: Array<number> | null; requesterId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; score: number }>>;
+            default: (args: { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
+            search: (args: { fileIds?: Array<string>; query: string; threadId?: Id<"threads"> | string; userId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
+            searchKnowledge: (args: { query: string }) => Promise<Array<{ chunkIndex: number; content: string; fileName: string; pageNumber?: number; score: number }>>;
+            searchSharedCollections: (args: { collectionIds: Array<Id<"knowledgeCollections">>; ownerId: string; query: string; queryVector: Array<number> | null; requesterId: string }) => Promise<Array<{ chunkId: string; chunkIndex: number; content: string; fileId: string; fileName: string; pageNumber?: number; score: number }>>;
         };
         summarize: {
             resummarizeFile: (args: { knowledgeFileId: Id<"knowledgeFiles"> }) => Promise<{ error: string; success: boolean; documentType?: undefined; summary?: undefined; topics?: undefined; } | { documentType: "data" | "code" | "other" | "technical_doc" | "article" | "report" | "guide" | "reference" | "correspondence"; success: boolean; summary: string; topics: string[]; error?: undefined; }>;
