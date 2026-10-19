@@ -18623,7 +18623,7 @@
     {
       "file": "knowledge/retrieve",
       "kind": "call",
-      "line": 353,
+      "line": 354,
       "reason": "\"searchKnowledgeBase\" is not a registered function"
     },
     {

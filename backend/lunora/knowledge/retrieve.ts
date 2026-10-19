@@ -344,7 +344,8 @@ export const searchKnowledgeBase = async (
         });
 
         if (scope.hasExplicitScope) {
-            knowledgeFileIds = scope.fileIds;
+            // A file the thread holds may also sit in another locked chat of the caller.
+            knowledgeFileIds = await openFileIds(scope.fileIds);
             ({ foreign } = scope);
         }
     }

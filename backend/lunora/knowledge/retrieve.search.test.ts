@@ -128,6 +128,24 @@ describe(searchKnowledgeBase, () => {
         );
     });
 
+    it("drops a thread-scope file that also sits on another locked chat, and keeps the rest (negative and positive)", async () => {
+        const ctx = makeCtx({ fileIds: ["own-1", "shared-with-locked"], foreign: [], hasExplicitScope: true }, ["shared-with-locked"]);
+
+        await searchKnowledgeBase(ctx, { query: "q", threadId: "t1", userId: REQUESTER });
+
+        expect((ctx as unknown as { runQuery: ReturnType<typeof vi.fn> }).runQuery).toHaveBeenCalledWith(
+            internal.knowledge.functions.keywordSearchChunks,
+            expect.objectContaining({ knowledgeFileIds: ["own-1"] }),
+        );
+    });
+
+    it("searches nothing when every thread-scope file is on another locked chat (negative)", async () => {
+        const ctx = makeCtx({ fileIds: ["locked-1"], foreign: [], hasExplicitScope: true }, ["locked-1"]);
+
+        await expect(searchKnowledgeBase(ctx, { query: "q", threadId: "t1", userId: REQUESTER })).resolves.toStrictEqual([]);
+        expect(mocks.embedMany).not.toHaveBeenCalled();
+    });
+
     it("passes the admitted run and the proof to the gate, so the named chat opens (positive)", async () => {
         const ctx = makeCtx({ fileIds: [], foreign: [], hasExplicitScope: false }, []);
 
