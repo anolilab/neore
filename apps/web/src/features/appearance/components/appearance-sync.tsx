@@ -9,10 +9,21 @@ import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { authClient } from "@/lib/auth/client";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { applyAccentAttribute, applyRootAttribute } from "../lib/accent-boot-script";
+import { applyAccentAttribute, applyContrastAttribute, applyRootAttribute } from "../lib/accent-boot-script";
 import { DEFAULT_ACCENT, isAccentId } from "../lib/accent-presets";
 import { CODE_HIGHLIGHT_THEMES, isCodeHighlightThemeId, isMermaidThemeId } from "../lib/code-themes";
-import { DEFAULT_DENSITY, DEFAULT_MAIN_FONT, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, isDensityId, isMainFontId } from "../lib/display-preferences";
+import {
+    DEFAULT_CONTRAST,
+    DEFAULT_DENSITY,
+    DEFAULT_MAIN_FONT,
+    DENSITY_ATTRIBUTE,
+    effectiveContrast,
+    FONT_ATTRIBUTE,
+    isContrastId,
+    isDensityId,
+    isMainFontId,
+    PREFERS_MORE_CONTRAST_QUERY,
+} from "../lib/display-preferences";
 
 /**
  * Applies the Appearance settings app-wide; renders nothing.
@@ -27,7 +38,7 @@ import { DEFAULT_DENSITY, DEFAULT_MAIN_FONT, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, 
  *   and first paint's query budget is not spent on it.
  */
 const AppearanceSync = () => {
-    const { accentColor, capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, density, mainFont, mermaidTheme } = useUIStateStore(
+    const { accentColor, capLongCodeBlocks, codeHighlightTheme, codeLineNumbers, contrast, density, mainFont, mermaidTheme } = useUIStateStore(
         (state) => state.appearance,
     );
     const setAppearance = useUIStateStore((state) => state.setAppearance);
@@ -35,6 +46,16 @@ const AppearanceSync = () => {
     useEffect(() => {
         applyAccentAttribute(isAccentId(accentColor) ? accentColor : DEFAULT_ACCENT);
     }, [accentColor]);
+
+    useEffect(() => {
+        const systemPreference = globalThis.matchMedia(PREFERS_MORE_CONTRAST_QUERY);
+        const apply = () => applyContrastAttribute(effectiveContrast(isContrastId(contrast) ? contrast : DEFAULT_CONTRAST, systemPreference.matches));
+
+        apply();
+        systemPreference.addEventListener("change", apply);
+
+        return () => systemPreference.removeEventListener("change", apply);
+    }, [contrast]);
 
     useEffect(() => {
         applyRootAttribute(DENSITY_ATTRIBUTE, isDensityId(density) ? density : DEFAULT_DENSITY, DEFAULT_DENSITY);
@@ -62,6 +83,7 @@ const AppearanceSync = () => {
     const storedAccent = userSettings?.accentColor;
     const storedCodeTheme = userSettings?.codeHighlightTheme;
     const storedMermaidTheme = userSettings?.mermaidTheme;
+    const storedContrast = userSettings?.contrast;
     const storedDensity = userSettings?.density;
     const storedMainFont = userSettings?.mainFont;
     const storedCapLongCodeBlocks = userSettings?.capLongCodeBlocks;
@@ -90,6 +112,10 @@ const AppearanceSync = () => {
             changes.mermaidTheme = storedMermaidTheme;
         }
 
+        if (isContrastId(storedContrast)) {
+            changes.contrast = storedContrast;
+        }
+
         if (isDensityId(storedDensity)) {
             changes.density = storedDensity;
         }
@@ -101,7 +127,17 @@ const AppearanceSync = () => {
         if (Object.keys(changes).length > 0) {
             setAppearance(changes);
         }
-    }, [storedAccent, storedCapLongCodeBlocks, storedCodeLineNumbers, storedCodeTheme, storedDensity, storedMainFont, storedMermaidTheme, setAppearance]);
+    }, [
+        storedAccent,
+        storedCapLongCodeBlocks,
+        storedCodeLineNumbers,
+        storedCodeTheme,
+        storedContrast,
+        storedDensity,
+        storedMainFont,
+        storedMermaidTheme,
+        setAppearance,
+    ]);
 
     return null;
 };

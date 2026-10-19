@@ -1861,7 +1861,9 @@ export interface Doc_userSettings {
     codeFont?: string;
     codeHighlightTheme?: string;
     codeLineNumbers?: boolean;
+    contrast?: string;
     composerAutocompleteEnabled?: boolean;
+    composerVimMode?: boolean;
     customInstructions?: string;
     dailyBriefEnabled?: boolean;
     density?: string;
@@ -4584,7 +4586,9 @@ export interface Insert_userSettings {
     codeFont?: string;
     codeHighlightTheme?: string;
     codeLineNumbers?: boolean;
+    contrast?: string;
     composerAutocompleteEnabled?: boolean;
+    composerVimMode?: boolean;
     customInstructions?: string;
     dailyBriefEnabled?: boolean;
     density?: string;

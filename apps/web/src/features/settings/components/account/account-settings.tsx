@@ -84,6 +84,8 @@ const AccountSettings: FC = () => {
     // OPT-IN: absent is off — every suggestion sends the draft to a model.
     const isComposerAutocompleteEnabled = userSettings?.composerAutocompleteEnabled === true;
     const isResumeLastChat = userSettings?.resumeLastChat === true;
+    // Opt-in: absent means off.
+    const isComposerVimMode = userSettings?.composerVimMode === true;
 
     // Common timezones
     const commonTimezones = useMemo(
@@ -441,6 +443,24 @@ const AccountSettings: FC = () => {
                             id="composer-autocomplete"
                             onCheckedChange={(checked) => {
                                 handleUpdateSetting("composerAutocompleteEnabled", checked, checked ? t`Autocomplete enabled` : t`Autocomplete disabled`);
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="composer-vim-mode">
+                                {t`Vim keys in the composer`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="composer-vim-mode-description">
+                                {t`Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby="composer-vim-mode-description"
+                            checked={isComposerVimMode}
+                            id="composer-vim-mode"
+                            onCheckedChange={(checked) => {
+                                handleUpdateSetting("composerVimMode", checked, checked ? t`Vim keys enabled` : t`Vim keys disabled`);
                             }}
                         />
                     </div>

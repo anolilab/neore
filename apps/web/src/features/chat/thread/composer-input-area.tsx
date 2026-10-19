@@ -27,6 +27,7 @@ import { lazy, Suspense, useImperativeHandle, useRef } from "react";
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 
+import type { ChatReference } from "./chat-reference";
 import ComposerTextCounter from "./composer-text-counter";
 import type { ComposerTiptapEditorRef } from "./composer-tiptap/composer-tiptap-editor";
 import { ComposerTiptapEditor } from "./composer-tiptap/composer-tiptap-editor";
@@ -55,6 +56,8 @@ interface ComposerInputAreaProps {
     canQueueWhileStreaming?: boolean;
     /** Show compact version */
     compact?: boolean;
+    /** The chat being typed into; the @ popup does not offer it as a reference */
+    currentThreadId?: string;
     /** Custom variables for {{variable}} autocomplete */
     customVariables?: PromptVariable[];
     /** Whether input is disabled */
@@ -79,6 +82,8 @@ interface ComposerInputAreaProps {
     onHistoryNavigate?: (direction: PromptHistoryDirection) => string | null;
     /** Called on paste */
     onPaste?: (event: React.ClipboardEvent) => void;
+    /** Called when a chat is selected from the @ popup, to attach its text */
+    onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected from the @ popup */
     onSelectFileUpload?: () => void;
     /** Called when a vault file is selected from the @ popup */
@@ -115,10 +120,12 @@ const ComposerInputArea = ({
     onAddAttachment,
     onCancel,
     onCaptureScreen,
+    currentThreadId,
     onChange,
     onDraw,
     onHistoryNavigate,
     onPaste,
+    onSelectChat,
     onSelectFileUpload,
     onSelectVaultFile,
     onSubmit,
@@ -230,6 +237,7 @@ const ComposerInputArea = ({
                     <ComposerTiptapEditor
                         autoFocus={autoFocus}
                         bannedWordMatches={bannedWordMatches}
+                        currentThreadId={currentThreadId}
                         customVariables={customVariables}
                         disabled={disabled}
                         isStreaming={isStreaming}
@@ -238,6 +246,7 @@ const ComposerInputArea = ({
                         onChange={onChange}
                         onHistoryNavigate={onHistoryNavigate}
                         onPaste={onPaste}
+                        onSelectChat={onSelectChat}
                         onSelectFileUpload={onSelectFileUpload}
                         onSelectVaultFile={onSelectVaultFile}
                         onSubmit={onSubmit}

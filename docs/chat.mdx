@@ -387,6 +387,14 @@ While Deep Work is active, a status bar shows:
 - Multiple files per message
 - File preview in messages
 
+### Asking About Another Chat
+
+Type `@` in the composer to search your files and your recent chats. Picking a chat attaches its text (the newest messages that fit, about 10,000 tokens) as a plain-text file named `chat-<title>.txt`, so you can ask a question about it in the current chat. The attachment is quoted reference material, marked so the model treats it as data rather than instructions, and you can remove it before sending like any file.
+
+- Only your own chats are offered. The chat you are typing in is not.
+- A locked chat is never offered. If a chat is locked after the menu loaded, reading it fails and nothing is attached.
+- The attachment is a copy: later messages in the other chat do not update it.
+
 ### Audio Recording and Transcription
 
 **Features:**
@@ -518,6 +526,22 @@ Use slash commands in the composer for quick actions:
 - Keyboard navigation (arrow keys, Enter)
 - Quick access to common actions
 - No need to leave composer
+
+### Vim Keys in the Composer
+
+Turn on **Vim keys in the composer** in **Settings → Account** (off by default). The composer starts in typing mode and shows `-- INSERT --`; press `Escape` for `-- NORMAL --` and a block cursor.
+
+| Keys | Action |
+|---|---|
+| `h` `l` / `j` `k` | Left, right / next line, previous line |
+| `w` `b` | Next / previous word |
+| `0` `^` `$` | Start of line / first character / end of line |
+| `i` `a` / `I` `A` | Type before / after the cursor / at the start / at the end of the line |
+| `o` `O` | Open a line below / above |
+| `x` `D` `dd` | Delete a character / to the end of the line / the whole line |
+| `u` | Undo |
+
+A line is a paragraph; `Shift+Enter` starts a new one. `Enter` still sends, and shortcuts with `Ctrl`, `Cmd` or `Alt` still work. Counts, yank and paste, visual mode and `.` are not supported. In normal mode `Escape` still stops a running reply.
 
 ### Variable Autocomplete
 

@@ -44,6 +44,8 @@ import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { trackEvent } from "@/lib/analytics";
 import { showError } from "@/lib/toast";
 
+import type { ChatReference } from "./chat-reference";
+import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
@@ -51,6 +53,7 @@ import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
+import { readChatMessages } from "./read-chat-messages";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
 
@@ -940,6 +943,43 @@ const ComposerInput = ({
         mentionFileInputRef.current?.click();
     }, []);
 
+    // Attach a file the composer generated (converted text, a referenced chat) and upload it like any other.
+    const attachGeneratedFile = useCallback(
+        async (file: File, failureLabel: string): Promise<boolean> => {
+            const attachmentId = addAttachment(file);
+
+            try {
+                updateAttachment(attachmentId, { status: "uploading" });
+
+                const result = await attachmentAdapter.upload({
+                    file,
+                    onProgress: (progress) => {
+                        updateAttachment(attachmentId, { progress });
+                    },
+                });
+
+                const fileId = getAttachmentFileId(result);
+
+                updateAttachment(attachmentId, {
+                    fileId,
+                    progress: 100,
+                    status: "complete",
+                });
+
+                return true;
+            } catch (error) {
+                console.error("Failed to attach generated file:", error);
+                updateAttachment(attachmentId, {
+                    error: errorMessage(error, failureLabel, describeUploadError),
+                    status: "error",
+                });
+
+                return false;
+            }
+        },
+        [addAttachment, attachmentAdapter, updateAttachment, describeUploadError],
+    );
+
     // Convert long text to attachment
     const handleConvertToAttachment = useCallback(async () => {
         if (!text.trim()) {
@@ -951,37 +991,27 @@ const ComposerInput = ({
         const timestamp = new Date().toISOString().split("T", 1)[0];
         const file = new File([blob], `text-input-${timestamp}.txt`, { type: "text/plain" });
 
-        // Add as attachment
-        const attachmentId = addAttachment(file);
-
-        try {
-            updateAttachment(attachmentId, { status: "uploading" });
-
-            const result = await attachmentAdapter.upload({
-                file,
-                onProgress: (progress) => {
-                    updateAttachment(attachmentId, { progress });
-                },
-            });
-
-            const fileId = getAttachmentFileId(result);
-
-            updateAttachment(attachmentId, {
-                fileId,
-                progress: 100,
-                status: "complete",
-            });
-
-            // Clear the text after successful conversion
+        // Clear the text after successful conversion
+        if (await attachGeneratedFile(file, t`Conversion failed`)) {
             setText("");
-        } catch (error) {
-            console.error("Failed to convert text to attachment:", error);
-            updateAttachment(attachmentId, {
-                error: errorMessage(error, t`Conversion failed`, describeUploadError),
-                status: "error",
-            });
         }
-    }, [text, addAttachment, attachmentAdapter, updateAttachment, setText, t, describeUploadError]);
+    }, [text, attachGeneratedFile, setText, t]);
+
+    // "@" a chat: read it through the thread view's own query (so the usual access and lock checks apply), then attach its text.
+    const handleSelectChat = useCallback(
+        async (chat: ChatReference) => {
+            try {
+                const messages = await readChatMessages(lunora, chat.id);
+                const transcript = buildChatTranscript(chat.title, messages);
+
+                await attachGeneratedFile(new File([transcript], chatReferenceFileName(chat.title), { type: "text/plain" }), t`Could not attach the chat`);
+            } catch (error) {
+                console.error("Failed to read the referenced chat:", error);
+                showError(t`Could not read that chat. If it is locked, unlock it first.`);
+            }
+        },
+        [lunora, attachGeneratedFile, t],
+    );
 
     // Handle attachment file update (for editing)
     const handleAttachmentUpdate = useCallback(
@@ -1125,6 +1155,7 @@ const ComposerInput = ({
                     )
                 }
                 canQueueWhileStreaming={isThreadComposer && !isComparisonValid}
+                currentThreadId={threadId}
                 disabled={disabled || isComparisonLoading}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}
@@ -1136,6 +1167,7 @@ const ComposerInput = ({
                 onDraw={compact ? undefined : onOpenDraw}
                 onHistoryNavigate={isThreadComposer ? promptHistory.navigate : undefined}
                 onPaste={compact ? undefined : handlePaste}
+                onSelectChat={compact ? undefined : handleSelectChat}
                 onSelectFileUpload={compact ? undefined : handleSelectFileUpload}
                 onSelectVaultFile={compact ? undefined : handleSelectVaultFile}
                 onSubmit={handleSubmit}

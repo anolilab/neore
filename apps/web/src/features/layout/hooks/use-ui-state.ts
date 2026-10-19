@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 
-import { DEFAULT_DENSITY, DEFAULT_MAIN_FONT, isDensityId, isMainFontId } from "@/features/appearance/lib/display-preferences";
+import type { ContrastId } from "@/features/appearance/lib/display-preferences";
+import { DEFAULT_CONTRAST, DEFAULT_DENSITY, DEFAULT_MAIN_FONT, isContrastId, isDensityId, isMainFontId } from "@/features/appearance/lib/display-preferences";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
@@ -56,6 +57,7 @@ type AppearanceSettingsHookReturn = AppearanceSettings & {
     setCapLongCodeBlocks: (capLongCodeBlocks: boolean) => void;
     setCodeHighlightTheme: (codeHighlightTheme: AppearanceSettings["codeHighlightTheme"]) => void;
     setCodeLineNumbers: (codeLineNumbers: boolean) => void;
+    setContrast: (contrast: ContrastId) => void;
     setDensity: (density: AppearanceSettings["density"]) => void;
     setMainFont: (mainFont: AppearanceSettings["mainFont"]) => void;
     setMermaidTheme: (mermaidTheme: AppearanceSettings["mermaidTheme"]) => void;
@@ -313,6 +315,7 @@ export const useAppearanceSettings = (): AppearanceSettingsHookReturn => {
     return {
         ...appearance,
         // Persisted state from before density and font existed has neither key (zustand merges shallowly), so read them through the guards.
+        contrast: isContrastId(appearance.contrast) ? appearance.contrast : DEFAULT_CONTRAST,
         density: isDensityId(appearance.density) ? appearance.density : DEFAULT_DENSITY,
         mainFont: isMainFontId(appearance.mainFont) ? appearance.mainFont : DEFAULT_MAIN_FONT,
         resetAppearance,
@@ -320,6 +323,7 @@ export const useAppearanceSettings = (): AppearanceSettingsHookReturn => {
         setCapLongCodeBlocks: (capLongCodeBlocks: boolean) => update({ capLongCodeBlocks }),
         setCodeHighlightTheme: (codeHighlightTheme: AppearanceSettings["codeHighlightTheme"]) => update({ codeHighlightTheme }),
         setCodeLineNumbers: (codeLineNumbers: boolean) => update({ codeLineNumbers }),
+        setContrast: (contrast: ContrastId) => update({ contrast }),
         setDensity: (density: AppearanceSettings["density"]) => update({ density }),
         setMainFont: (mainFont: AppearanceSettings["mainFont"]) => update({ mainFont }),
         setMermaidTheme: (mermaidTheme: AppearanceSettings["mermaidTheme"]) => update({ mermaidTheme }),

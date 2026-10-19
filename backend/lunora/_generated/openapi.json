@@ -6451,7 +6451,26 @@
                       "codeLineNumbers": {
                         "type": "boolean"
                       },
+                      "contrast": {
+                        "anyOf": [
+                          {
+                            "const": "system",
+                            "type": "string"
+                          },
+                          {
+                            "const": "standard",
+                            "type": "string"
+                          },
+                          {
+                            "const": "high",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "composerAutocompleteEnabled": {
+                        "type": "boolean"
+                      },
+                      "composerVimMode": {
                         "type": "boolean"
                       },
                       "customInstructions": {

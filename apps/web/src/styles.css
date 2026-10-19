@@ -13,6 +13,7 @@
 @import "./features/appearance/accent-presets.css";
 /* UI density tokens and font families (`data-density` / `data-font`) */
 @import "./features/appearance/display-presets.css";
+@import "./features/appearance/contrast-presets.css";
 @import "@c15t/react/styles.css";
 /* Import KaTeX styles for math rendering */
 @import "katex/dist/katex.min.css";

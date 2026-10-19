@@ -47,7 +47,10 @@ export const userSettingsFieldsWithoutUserId = {
     ),
     // Appearance: show line numbers in chat code blocks. Absent means off.
     codeLineNumbers: v.optional(v.boolean()),
+    // Appearance: "high" forces the high-contrast tokens, "standard" forces them off, "system" (absent) follows `prefers-contrast: more`.
+    contrast: v.optional(v.union(v.literal("system"), v.literal("standard"), v.literal("high"))),
     composerAutocompleteEnabled: v.optional(v.boolean()), // Ghost-text completions in the chat composer. OPT-IN: absent means off.
+    composerVimMode: v.optional(v.boolean()), // Vim keys (normal/insert mode) in the chat composer. OPT-IN: absent means off.
     customInstructions: v.optional(v.string().max(MAX_LENGTH.document)), // Custom instructions for how AI should respond (max 3000 chars)
     dailyBriefEnabled: v.optional(v.boolean()), // Opt-in morning summary notification. OPT-IN: absent means off.
     // Appearance: UI spacing preset (`apps/web/src/features/appearance/lib/display-preferences.ts`). Absent = comfortable.

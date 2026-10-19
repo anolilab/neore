@@ -25,6 +25,14 @@ msgstr " · 模型：{modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}，{1, plural, other {# 列}}"
 
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:557
+msgid "-- INSERT --"
+msgstr ""
+
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:557
+msgid "-- NORMAL --"
+msgstr ""
+
 #: src/features/notifications/components/notification-list.tsx:107
 msgid ", unread"
 msgstr "，未读"
@@ -61,6 +69,23 @@ msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 
 #: src/features/chat/thread/composer-input.tsx:481
+#: src/features/chat/thread/composer-input.tsx:484
+msgid "\"{fileName}\" cannot be attached: this file type is not supported."
+msgstr "无法附加“{fileName}”：不支持此文件类型。"
+
+#: src/features/chat/thread/composer-input.tsx:477
+msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
+msgstr "无法附加“{fileName}”：文件内容与其文件类型不符。"
+
+#: src/features/chat/thread/composer-input.tsx:479
+msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
+msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重试。"
+
+#: src/features/chat/thread/composer-input.tsx:482
+msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
+msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
+
+#: src/features/chat/thread/composer-input.tsx:483
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
@@ -1499,11 +1524,11 @@ msgstr "超过 {FREE_PLAN_MAX_HEIGHT}p 需要 Pro 套餐。否则视频将以 {F
 msgid "Academic"
 msgstr "学术"
 
-#: src/features/appearance/components/appearance-controls.tsx:150
+#: src/features/appearance/components/appearance-controls.tsx:162
 msgid "Accent Color"
 msgstr "强调色"
 
-#: src/features/appearance/components/appearance-controls.tsx:162
+#: src/features/appearance/components/appearance-controls.tsx:174
 msgid "Accent color updated"
 msgstr "强调色已更新"
 
@@ -1603,7 +1628,7 @@ msgstr "操作"
 msgid "Action Log"
 msgstr "操作日志"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:284
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:335
 #: src/features/evals/components/dataset-panel.tsx:149
 msgid "Actions"
 msgstr "操作"
@@ -1736,9 +1761,9 @@ msgstr "至少添加一个模型——使用“获取模型”或手动输入 ID
 msgid "Add at least one model id"
 msgstr "请至少添加一个模型 ID"
 
-#: src/features/chat/thread/composer-input-area.tsx:163
-#: src/features/chat/thread/composer-input-area.tsx:197
-#: src/features/chat/thread/composer-input-area.tsx:217
+#: src/features/chat/thread/composer-input-area.tsx:170
+#: src/features/chat/thread/composer-input-area.tsx:204
+#: src/features/chat/thread/composer-input-area.tsx:224
 #: src/features/chat/thread/edit-composer.tsx:125
 msgid "Add attachment"
 msgstr "添加附件"
@@ -2034,7 +2059,7 @@ msgstr "仅管理员"
 msgid "advanced"
 msgstr "高级"
 
-#: src/features/settings/components/account/account-settings.tsx:592
+#: src/features/settings/components/account/account-settings.tsx:612
 msgid "Advanced"
 msgstr "高级"
 
@@ -2092,7 +2117,7 @@ msgstr "先进的多模态分析能力"
 msgid "Advanced multimodal reasoning"
 msgstr "先进的多模态推理"
 
-#: src/features/settings/components/account/account-settings.tsx:592
+#: src/features/settings/components/account/account-settings.tsx:612
 msgid "Advanced options for power users."
 msgstr "面向高级用户的选项。"
 
@@ -2112,15 +2137,15 @@ msgstr "支持原生 4K 输出的高级推理 Kling 视频模型"
 msgid "Advanced reasoning with improved output quality"
 msgstr "先进推理，输出质量更高"
 
-#: src/features/settings/components/account/account-settings.tsx:597
+#: src/features/settings/components/account/account-settings.tsx:617
 msgid "Advanced User Mode"
 msgstr "高级用户模式"
 
-#: src/features/settings/components/account/account-settings.tsx:606
+#: src/features/settings/components/account/account-settings.tsx:626
 msgid "Advanced user mode disabled"
 msgstr "已关闭高级用户模式"
 
-#: src/features/settings/components/account/account-settings.tsx:606
+#: src/features/settings/components/account/account-settings.tsx:626
 msgid "Advanced user mode enabled"
 msgstr "已开启高级用户模式"
 
@@ -2716,7 +2741,7 @@ msgstr "琥珀色"
 msgid "Amount"
 msgstr "金额"
 
-#: src/features/settings/components/account/account-settings.tsx:102
+#: src/features/settings/components/account/account-settings.tsx:104
 msgid "Amsterdam"
 msgstr "阿姆斯特丹"
 
@@ -2806,15 +2831,15 @@ msgstr "用 AI 让静态图片动起来"
 msgid "animation"
 msgstr "动画"
 
-#: src/features/settings/components/account/account-settings.tsx:526
+#: src/features/settings/components/account/account-settings.tsx:546
 msgid "Animations"
 msgstr "动画"
 
-#: src/features/settings/components/account/account-settings.tsx:535
+#: src/features/settings/components/account/account-settings.tsx:555
 msgid "Animations disabled"
 msgstr "已关闭动画"
 
-#: src/features/settings/components/account/account-settings.tsx:535
+#: src/features/settings/components/account/account-settings.tsx:555
 msgid "Animations enabled"
 msgstr "已开启动画"
 
@@ -3011,7 +3036,7 @@ msgstr "Meta 应用“应用设置 > 基本”中的 App Secret，用于验证 X
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
 #: src/features/projects/components/project-form-dialog.tsx:232
-#: src/features/settings/components/account/account-settings.tsx:173
+#: src/features/settings/components/account/account-settings.tsx:175
 msgid "Appearance"
 msgstr "外观"
 
@@ -3358,7 +3383,7 @@ msgstr "尝试"
 msgid "Attempts: {0}"
 msgstr "尝试次数：{0}"
 
-#: src/features/settings/components/account/account-settings.tsx:113
+#: src/features/settings/components/account/account-settings.tsx:115
 msgid "Auckland"
 msgstr "奥克兰"
 
@@ -3437,15 +3462,15 @@ msgstr "自动媒体补充"
 msgid "Auto pricing"
 msgstr "自动定价"
 
-#: src/features/settings/components/account/account-settings.tsx:542
+#: src/features/settings/components/account/account-settings.tsx:562
 msgid "Auto Save"
 msgstr "自动保存"
 
-#: src/features/settings/components/account/account-settings.tsx:551
+#: src/features/settings/components/account/account-settings.tsx:571
 msgid "Auto save disabled"
 msgstr "已关闭自动保存"
 
-#: src/features/settings/components/account/account-settings.tsx:551
+#: src/features/settings/components/account/account-settings.tsx:571
 msgid "Auto save enabled"
 msgstr "已开启自动保存"
 
@@ -3478,7 +3503,7 @@ msgstr "自动布局"
 msgid "Auto-layout (L)"
 msgstr "自动布局（L）"
 
-#: src/features/settings/components/account/account-settings.tsx:380
+#: src/features/settings/components/account/account-settings.tsx:382
 msgid "Auto-read replies"
 msgstr "自动朗读回复"
 
@@ -3490,15 +3515,15 @@ msgstr "自动保存"
 msgid "Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so \"Ask\" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only."
 msgstr "自动：无需询问直接运行。询问：暂停等待你批准/拒绝。关闭：助手完全看不到该工具。自动化（触发器、消息机器人、工作流）无法询问，因此“询问”类工具在那里不可用。MCP 工具默认为“询问”，除非服务器将其标记为只读。"
 
-#: src/features/settings/components/account/account-settings.tsx:443
+#: src/features/settings/components/account/account-settings.tsx:445
 msgid "Autocomplete disabled"
 msgstr "自动补全已停用"
 
-#: src/features/settings/components/account/account-settings.tsx:443
+#: src/features/settings/components/account/account-settings.tsx:445
 msgid "Autocomplete enabled"
 msgstr "自动补全已启用"
 
-#: src/features/settings/components/account/account-settings.tsx:432
+#: src/features/settings/components/account/account-settings.tsx:434
 msgid "Autocomplete while typing"
 msgstr "输入时自动补全"
 
@@ -3539,7 +3564,7 @@ msgstr "使用搜索模式时，在文字回复旁自动附上相关图片和视
 msgid "Automatically run cleanup based on configuration"
 msgstr "根据配置自动运行清理"
 
-#: src/features/settings/components/account/account-settings.tsx:544
+#: src/features/settings/components/account/account-settings.tsx:564
 msgid "Automatically save your work."
 msgstr "自动保存你的工作。"
 
@@ -3736,7 +3761,7 @@ msgstr "已封禁用户"
 msgid "Bans"
 msgstr "封禁"
 
-#: src/features/appearance/components/appearance-controls.tsx:138
+#: src/features/appearance/components/appearance-controls.tsx:150
 msgid "Base"
 msgstr "基础"
 
@@ -3787,7 +3812,7 @@ msgstr "之前"
 msgid "beginner"
 msgstr "入门"
 
-#: src/features/settings/components/account/account-settings.tsx:223
+#: src/features/settings/components/account/account-settings.tsx:225
 msgid "Behavior"
 msgstr "行为"
 
@@ -3819,7 +3844,7 @@ msgstr "孟加拉语"
 msgid "Bengali (Bangladesh)"
 msgstr "孟加拉语（孟加拉国）"
 
-#: src/features/settings/components/account/account-settings.tsx:99
+#: src/features/settings/components/account/account-settings.tsx:101
 msgid "Berlin"
 msgstr "柏林"
 
@@ -3996,7 +4021,7 @@ msgstr ""
 msgid "Blog Header"
 msgstr "博客头图"
 
-#: src/features/appearance/components/appearance-controls.tsx:114
+#: src/features/appearance/components/appearance-controls.tsx:126
 #: src/features/canvas/canvas-panel.tsx:219
 #: src/features/chat/tags/thread-tag-color-picker.tsx:16
 #: src/features/workflow/components/nodes/comment-node.tsx:15
@@ -4691,7 +4716,7 @@ msgstr "说明文字"
 #~ msgid "Capture {label}"
 #~ msgstr "截取 {label}"
 
-#: src/features/chat/thread/composer-input-area.tsx:192
+#: src/features/chat/thread/composer-input-area.tsx:199
 msgid "Capture screen"
 msgstr "截取屏幕"
 
@@ -4742,7 +4767,7 @@ msgstr "加泰罗尼亚语（西班牙）"
 msgid "Category"
 msgstr "分类"
 
-#: src/features/appearance/components/appearance-controls.tsx:126
+#: src/features/appearance/components/appearance-controls.tsx:138
 msgid "Catppuccin"
 msgstr "Catppuccin"
 
@@ -4754,7 +4779,7 @@ msgstr "熔断至 {circuitBreakerUntil}"
 msgid "Center"
 msgstr "居中"
 
-#: src/features/settings/components/account/account-settings.tsx:92
+#: src/features/settings/components/account/account-settings.tsx:94
 msgid "Central Time (US & Canada)"
 msgstr "中部时间（美国和加拿大）"
 
@@ -4874,7 +4899,7 @@ msgstr "聊天"
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:28
 #: src/features/chat/thread/composer-search-mode.tsx:48
 #: src/features/layout/lib/dashboard-page-names.ts:20
-#: src/features/settings/components/account/account-settings.tsx:356
+#: src/features/settings/components/account/account-settings.tsx:358
 #: src/features/settings/components/chat/bots-settings.tsx:172
 msgid "Chat"
 msgstr "聊天"
@@ -4939,6 +4964,10 @@ msgstr "ChatGPT（$20）、Midjourney（$10–30）、Runway（$15）、Claude�
 #: src/features/marketing/components/landing-page.tsx:276
 msgid "ChatGPT gives you one model family. Neore gives you 30+ models from 12 providers — chat, image generation, video creation, a canvas editor, code execution, and deep research. Same $20/month, but you get GPT-4 plus Claude, Gemini, FLUX, Runway, and 25 more."
 msgstr "ChatGPT 只提供一个模型系列。Neore 提供来自 12 家提供商的 30+ 个模型——聊天、图像生成、视频创作、画布编辑器、代码执行和深度研究。同样每月 $20，你却能同时获得 GPT-4 以及 Claude、Gemini、FLUX、Runway 等 25 个以上模型。"
+
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:390
+msgid "Chats"
+msgstr ""
 
 #: src/features/knowledge/components/project-knowledge-collections.tsx:49
 msgid "Chats in this project search these collections and cite them."
@@ -5068,7 +5097,7 @@ msgstr "选择默认视频模型"
 msgid "Choose how Neore tells you about finished work and things that need you."
 msgstr "选择 Neore 如何通知你已完成的工作和需要你处理的事项。"
 
-#: src/features/settings/components/account/account-settings.tsx:229
+#: src/features/settings/components/account/account-settings.tsx:231
 msgid "Choose how to send messages in the chat."
 msgstr "选择在聊天中发送消息的方式。"
 
@@ -5302,7 +5331,7 @@ msgstr "点击“{selector}”"
 msgid "Click ★ on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型上的 ★ 即可添加到这里。"
 
-#: src/features/settings/components/account/account-settings.tsx:243
+#: src/features/settings/components/account/account-settings.tsx:245
 msgid "Click button to send"
 msgstr "点击按钮发送"
 
@@ -5332,6 +5361,7 @@ msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
 #: src/features/chat/thread/composer-input.tsx:249
+#: src/features/chat/thread/composer-input.tsx:251
 msgid "Click to edit"
 msgstr "点击编辑"
 
@@ -5442,19 +5472,19 @@ msgstr "代码执行和沙盒文件"
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
-#: src/features/settings/components/account/account-settings.tsx:178
+#: src/features/settings/components/account/account-settings.tsx:180
 msgid "Code Font"
 msgstr "代码字体"
 
-#: src/features/settings/components/account/account-settings.tsx:183
+#: src/features/settings/components/account/account-settings.tsx:185
 msgid "Code font updated"
 msgstr "代码字体已更新"
 
-#: src/features/appearance/components/appearance-controls.tsx:231
+#: src/features/appearance/components/appearance-controls.tsx:264
 msgid "Code Highlighting Theme"
 msgstr "代码高亮主题"
 
-#: src/features/appearance/components/appearance-controls.tsx:241
+#: src/features/appearance/components/appearance-controls.tsx:274
 msgid "Code highlighting theme updated"
 msgstr "代码高亮主题已更新"
 
@@ -5644,7 +5674,7 @@ msgstr "第 {index} 列"
 msgid "Columns"
 msgstr "列"
 
-#: src/features/appearance/components/appearance-controls.tsx:95
+#: src/features/appearance/components/appearance-controls.tsx:107
 msgid "Comfortable (default)"
 msgstr ""
 
@@ -5725,7 +5755,7 @@ msgstr "社区支持"
 msgid "compact"
 msgstr "紧凑"
 
-#: src/features/appearance/components/appearance-controls.tsx:94
+#: src/features/appearance/components/appearance-controls.tsx:106
 msgid "Compact"
 msgstr ""
 
@@ -5960,7 +5990,7 @@ msgstr "条件分支"
 msgid "Configure advanced AI agent modules for enhanced task execution"
 msgstr "配置高级 AI 智能体模块，增强任务执行能力"
 
-#: src/features/settings/components/account/account-settings.tsx:356
+#: src/features/settings/components/account/account-settings.tsx:358
 msgid "Configure chat behavior and preferences."
 msgstr "配置聊天行为和偏好。"
 
@@ -5968,11 +5998,11 @@ msgstr "配置聊天行为和偏好。"
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "为此项目中新建的聊天配置默认模型、推理强度和功能。"
 
-#: src/features/settings/components/account/account-settings.tsx:223
+#: src/features/settings/components/account/account-settings.tsx:225
 msgid "Configure how the application behaves."
 msgstr "配置应用的行为方式。"
 
-#: src/features/settings/components/account/account-settings.tsx:250
+#: src/features/settings/components/account/account-settings.tsx:252
 msgid "Configure language preferences and location settings."
 msgstr "配置语言偏好和位置设置。"
 
@@ -5997,7 +6027,7 @@ msgstr "配置账单联系人和可用的 AI 模型"
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "配置匿名用户清理的阈值和批次限制"
 
-#: src/features/settings/components/account/account-settings.tsx:521
+#: src/features/settings/components/account/account-settings.tsx:541
 msgid "Configure UI preferences and display options."
 msgstr "配置界面偏好和显示选项。"
 
@@ -6287,7 +6317,7 @@ msgstr "风格一致，角色还原度高"
 msgid "Consistent, reliable output quality"
 msgstr "稳定可靠的输出质量"
 
-#: src/features/settings/components/account/account-settings.tsx:193
+#: src/features/settings/components/account/account-settings.tsx:195
 msgid "Consolas"
 msgstr "Consolas"
 
@@ -6426,6 +6456,7 @@ msgstr "推理和指令遵循能力持续提升"
 msgid "Continued quality improvements over 2.5"
 msgstr "在 2.5 基础上持续提升质量"
 
+#: src/features/appearance/components/appearance-controls.tsx:198
 #: src/features/canvas/canvas-panel.tsx:142
 msgid "Contrast"
 msgstr "对比度"
@@ -6435,6 +6466,11 @@ msgid "Contrast Ratio"
 msgstr "对比度"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:364
+#: src/features/appearance/components/appearance-controls.tsx:211
+msgid "Contrast updated"
+msgstr ""
+
+#: src/features/settings/components/chat/model-filter-settings.tsx:385
 msgid "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 msgstr "控制 AI 提供商的数据处理和保留策略。隐私设置目前仅对通过 OpenRouter 路由的模型生效。"
 
@@ -6442,7 +6478,7 @@ msgstr "控制 AI 提供商的数据处理和保留策略。隐私设置目前�
 msgid "Control depth of field with aperture setting"
 msgstr "通过光圈设置控制景深"
 
-#: src/features/settings/components/account/account-settings.tsx:136
+#: src/features/settings/components/account/account-settings.tsx:138
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
@@ -6501,6 +6537,8 @@ msgstr "对话不可用"
 
 #: src/features/chat/thread/composer-input.tsx:688
 #: src/features/chat/thread/composer-input.tsx:980
+#: src/features/chat/thread/composer-input.tsx:690
+#: src/features/chat/thread/composer-input.tsx:994
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -6756,6 +6794,10 @@ msgstr "哥斯达黎加"
 msgid "Could not apply the changes"
 msgstr "无法应用更改"
 
+#: src/features/chat/thread/composer-input.tsx:1006
+msgid "Could not attach the chat"
+msgstr ""
+
 #: src/features/chat/thread/sandbox-files.tsx:294
 msgid "could not be saved"
 msgstr "无法保存"
@@ -6898,6 +6940,10 @@ msgstr "无法预览 · 点击下载"
 #: src/features/local-models/components/ollama-model-manager.tsx:328
 msgid "Could not pull {0}: {1}"
 msgstr "无法拉取 {0}：{1}"
+
+#: src/features/chat/thread/composer-input.tsx:1009
+msgid "Could not read that chat. If it is locked, unlock it first."
+msgstr ""
 
 #: src/features/skills/components/skill-builder-dialog.tsx:132
 msgid "Could not refine the draft. Try again."
@@ -7525,7 +7571,7 @@ msgstr "自定义并重新生成"
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "为常用操作自定义键盘快捷键。点击“录制”并按下你想要的组合键。"
 
-#: src/features/settings/components/account/account-settings.tsx:173
+#: src/features/settings/components/account/account-settings.tsx:175
 msgid "Customize the appearance of the application."
 msgstr "自定义应用的外观。"
 
@@ -7623,7 +7669,7 @@ msgstr "丹麦语"
 msgid "Danish (Denmark)"
 msgstr "丹麦语（丹麦）"
 
-#: src/features/appearance/components/appearance-controls.tsx:139
+#: src/features/appearance/components/appearance-controls.tsx:151
 msgid "Dark"
 msgstr "深色"
 
@@ -7799,7 +7845,7 @@ msgstr "DeepSeek 的实验性高级聊天 LLM"
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek 支持思考的实验性高级聊天 LLM"
 
-#: src/features/appearance/components/appearance-controls.tsx:140
+#: src/features/appearance/components/appearance-controls.tsx:152
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:70
 msgid "Default"
 msgstr "默认"
@@ -7809,7 +7855,7 @@ msgstr "默认"
 msgid "Default agent"
 msgstr "默认智能体"
 
-#: src/features/settings/components/account/account-settings.tsx:254
+#: src/features/settings/components/account/account-settings.tsx:256
 msgid "Default AI Response Language"
 msgstr "默认 AI 回复语言"
 
@@ -7821,19 +7867,19 @@ msgstr "默认 AI 设置"
 msgid "Default branch"
 msgstr "默认分支"
 
-#: src/features/settings/components/account/account-settings.tsx:279
+#: src/features/settings/components/account/account-settings.tsx:281
 msgid "Default Dictation Language"
 msgstr "默认听写语言"
 
-#: src/features/settings/components/account/account-settings.tsx:281
+#: src/features/settings/components/account/account-settings.tsx:283
 msgid "Default dictation language for new threads (BCP 47 code)."
 msgstr "新对话的默认听写语言（BCP 47 代码）。"
 
-#: src/features/settings/components/account/account-settings.tsx:256
+#: src/features/settings/components/account/account-settings.tsx:258
 msgid "Default language for AI responses in new threads (BCP 47 code)."
 msgstr "新对话中 AI 回复的默认语言（BCP 47 代码）。"
 
-#: src/features/settings/components/account/account-settings.tsx:259
+#: src/features/settings/components/account/account-settings.tsx:261
 msgid "Default language updated"
 msgstr "默认语言已更新"
 
@@ -8263,11 +8309,11 @@ msgstr "已在 {device} 上拒绝"
 msgid "Denmark"
 msgstr "丹麦"
 
-#: src/features/appearance/components/appearance-controls.tsx:186
+#: src/features/appearance/components/appearance-controls.tsx:219
 msgid "Density"
 msgstr ""
 
-#: src/features/appearance/components/appearance-controls.tsx:197
+#: src/features/appearance/components/appearance-controls.tsx:230
 msgid "Density updated"
 msgstr ""
 
@@ -8537,11 +8583,11 @@ msgstr "设备已移除"
 msgid "Devices"
 msgstr "设备"
 
-#: src/features/appearance/components/appearance-controls.tsx:259
+#: src/features/appearance/components/appearance-controls.tsx:292
 msgid "Diagram Theme"
 msgstr "图表主题"
 
-#: src/features/appearance/components/appearance-controls.tsx:269
+#: src/features/appearance/components/appearance-controls.tsx:302
 msgid "Diagram theme updated"
 msgstr "图表主题已更新"
 
@@ -8549,7 +8595,7 @@ msgstr "图表主题已更新"
 msgid "Diamond"
 msgstr "菱形"
 
-#: src/features/settings/components/account/account-settings.tsx:284
+#: src/features/settings/components/account/account-settings.tsx:286
 msgid "Dictation language updated"
 msgstr "听写语言已更新"
 
@@ -8589,7 +8635,7 @@ msgstr "全部停用"
 msgid "Disable deep work mode"
 msgstr "关闭深度工作模式"
 
-#: src/features/settings/components/account/account-settings.tsx:157
+#: src/features/settings/components/account/account-settings.tsx:159
 msgid "Disable External Link Warning"
 msgstr "关闭外部链接警告"
 
@@ -8693,7 +8739,7 @@ msgstr "在结果上显示模型名称"
 msgid "Display results"
 msgstr "显示结果"
 
-#: src/features/settings/components/account/account-settings.tsx:560
+#: src/features/settings/components/account/account-settings.tsx:580
 msgid "Display timestamps on messages."
 msgstr "在消息上显示时间戳。"
 
@@ -8949,7 +8995,7 @@ msgstr "将文件拖到此处"
 msgid "Draw an image"
 msgstr "绘制图像"
 
-#: src/features/chat/thread/composer-input-area.tsx:186
+#: src/features/chat/thread/composer-input-area.tsx:193
 msgid "Draw image"
 msgstr "绘制图像"
 
@@ -8972,6 +9018,7 @@ msgstr "拖放文件或点击上传"
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:2083
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:2162
 #: src/features/chat/thread/composer-input.tsx:1151
+#: src/features/chat/thread/composer-input.tsx:1181
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -9004,7 +9051,7 @@ msgstr "试运行（仅预览——不删除）"
 msgid "Dry run complete"
 msgstr "试运行完成"
 
-#: src/features/settings/components/account/account-settings.tsx:109
+#: src/features/settings/components/account/account-settings.tsx:111
 msgid "Dubai"
 msgstr "迪拜"
 
@@ -9050,7 +9097,7 @@ msgstr "荷兰语（比利时）"
 msgid "dynamic motion"
 msgstr "动态运动"
 
-#: src/features/appearance/components/appearance-controls.tsx:107
+#: src/features/appearance/components/appearance-controls.tsx:119
 msgid "Dyslexia-friendly"
 msgstr ""
 
@@ -9159,7 +9206,7 @@ msgstr "抢先体验阿里巴巴即将推出的模型能力"
 msgid "Early adopters who want to experiment with Google's next-generation Flash capabilities"
 msgstr "希望尝试 Google 下一代 Flash 能力的早期用户"
 
-#: src/features/settings/components/account/account-settings.tsx:91
+#: src/features/settings/components/account/account-settings.tsx:93
 msgid "Eastern Time (US & Canada)"
 msgstr "东部时间（美国和加拿大）"
 
@@ -9238,6 +9285,7 @@ msgid "Edit collection"
 msgstr "编辑集合"
 
 #: src/features/chat/thread/composer-input.tsx:267
+#: src/features/chat/thread/composer-input.tsx:269
 msgid "Edit content"
 msgstr "编辑内容"
 
@@ -9600,7 +9648,7 @@ msgstr "启用双重验证"
 msgid "Enable a skill first — only enabled skills can be evaluated."
 msgstr "请先启用一个技能——只有已启用的技能才能被评测。"
 
-#: src/features/settings/components/account/account-settings.tsx:599
+#: src/features/settings/components/account/account-settings.tsx:619
 msgid "Enable advanced features and options."
 msgstr "启用高级功能和选项。"
 
@@ -9609,7 +9657,7 @@ msgstr "启用高级功能和选项。"
 msgid "Enable All"
 msgstr "全部启用"
 
-#: src/features/settings/components/account/account-settings.tsx:528
+#: src/features/settings/components/account/account-settings.tsx:548
 msgid "Enable animations and transitions in the UI."
 msgstr "在界面中启用动画和过渡效果。"
 
@@ -9637,7 +9685,7 @@ msgstr "开启深度工作模式"
 msgid "Enable Deep Work mode for complex multi-step tasks. The AI will iterate up to 25 times to complete your request."
 msgstr "为复杂的多步骤任务开启深度工作模式。AI 会最多迭代 25 次来完成你的请求。"
 
-#: src/features/settings/components/account/account-settings.tsx:361
+#: src/features/settings/components/account/account-settings.tsx:363
 msgid "Enable Follow-up Suggestions"
 msgstr "启用后续建议"
 
@@ -9997,7 +10045,7 @@ msgstr "输入你的全名或显示名称"
 msgid "Enter your information to create an account"
 msgstr "输入你的信息以创建账号"
 
-#: src/features/settings/components/account/account-settings.tsx:326
+#: src/features/settings/components/account/account-settings.tsx:328
 msgid "Enter your location"
 msgstr "输入你的位置"
 
@@ -10698,11 +10746,11 @@ msgstr "最大 Qwen 模型上的扩展思考模式"
 msgid "Extended thinking on Anthropic's most capable Opus"
 msgstr "Anthropic 能力最强的 Opus 上的扩展思考"
 
-#: src/features/settings/components/account/account-settings.tsx:166
+#: src/features/settings/components/account/account-settings.tsx:168
 msgid "External link warnings disabled"
 msgstr "已关闭外部链接警告"
 
-#: src/features/settings/components/account/account-settings.tsx:166
+#: src/features/settings/components/account/account-settings.tsx:168
 msgid "External link warnings enabled"
 msgstr "已开启外部链接警告"
 
@@ -10825,6 +10873,7 @@ msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
 #: src/features/chat/thread/composer-input.tsx:887
+#: src/features/chat/thread/composer-input.tsx:889
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -11229,6 +11278,7 @@ msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
 #: src/features/chat/thread/composer-input.tsx:919
+#: src/features/chat/thread/composer-input.tsx:921
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -11301,7 +11351,7 @@ msgstr "无法保存提供商"
 msgid "Failed to save rating"
 msgstr "保存评分失败"
 
-#: src/features/settings/components/account/account-settings.tsx:126
+#: src/features/settings/components/account/account-settings.tsx:128
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:40
 #: src/features/settings/components/personalization/personalization-settings.tsx:94
 msgid "Failed to save settings"
@@ -12147,7 +12197,7 @@ msgstr "芬兰语"
 msgid "Finnish (Finland)"
 msgstr "芬兰语（芬兰）"
 
-#: src/features/settings/components/account/account-settings.tsx:191
+#: src/features/settings/components/account/account-settings.tsx:193
 msgid "Fira Code"
 msgstr "Fira Code"
 
@@ -12250,20 +12300,24 @@ msgstr "焦距"
 msgid "Focal Length"
 msgstr "焦距"
 
+#: src/features/appearance/components/appearance-controls.tsx:97
+msgid "Follow my system (default)"
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:130
 msgid "Follow these steps to connect your {platform} account."
 msgstr "按以下步骤连接你的 {platform} 账号。"
 
-#: src/features/settings/components/account/account-settings.tsx:372
+#: src/features/settings/components/account/account-settings.tsx:374
 msgid "Follow-up suggestions disabled"
 msgstr "已关闭后续建议"
 
-#: src/features/settings/components/account/account-settings.tsx:372
+#: src/features/settings/components/account/account-settings.tsx:374
 msgid "Follow-up suggestions enabled"
 msgstr "已开启后续建议"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:361
-#: src/features/appearance/components/appearance-controls.tsx:212
+#: src/features/appearance/components/appearance-controls.tsx:245
 msgid "Font"
 msgstr "字体"
 
@@ -12275,7 +12329,7 @@ msgstr "字体系列"
 msgid "Font size"
 msgstr "字号"
 
-#: src/features/appearance/components/appearance-controls.tsx:223
+#: src/features/appearance/components/appearance-controls.tsx:256
 msgid "Font updated"
 msgstr ""
 
@@ -12315,7 +12369,7 @@ msgstr "适用于安装程序设置的 systemd 服务。如果你是自己运行
 msgid "For this model"
 msgstr "用于此模型"
 
-#: src/features/appearance/components/appearance-controls.tsx:141
+#: src/features/appearance/components/appearance-controls.tsx:153
 msgid "Forest"
 msgstr "森林"
 
@@ -13073,7 +13127,7 @@ msgstr "入门指南"
 msgid "GIF image"
 msgstr "GIF 图像"
 
-#: src/features/appearance/components/appearance-controls.tsx:128
+#: src/features/appearance/components/appearance-controls.tsx:140
 #: src/features/chat/thread/composer-search-mode.tsx:57
 #: src/features/skills/components/skill-item.tsx:81
 msgid "GitHub"
@@ -13476,7 +13530,7 @@ msgstr "希腊语"
 msgid "Greek (Greece)"
 msgstr "希腊语（希腊）"
 
-#: src/features/appearance/components/appearance-controls.tsx:116
+#: src/features/appearance/components/appearance-controls.tsx:128
 #: src/features/canvas/canvas-panel.tsx:222
 #: src/features/chat/tags/thread-tag-color-picker.tsx:18
 #: src/features/workflow/components/nodes/comment-node.tsx:16
@@ -13596,7 +13650,7 @@ msgstr "免提模式已关闭"
 msgid "Hands-free mode stopped: {0}"
 msgstr "免提模式已停止：{0}"
 
-#: src/features/settings/components/account/account-settings.tsx:399
+#: src/features/settings/components/account/account-settings.tsx:401
 msgid "Hands-free voice"
 msgstr "免提模式语音"
 
@@ -13604,7 +13658,7 @@ msgstr "免提模式语音"
 msgid "Hands-free voice mode — talk, and replies are read aloud"
 msgstr "免提语音模式 — 直接说话，回复会被朗读出来"
 
-#: src/features/settings/components/account/account-settings.tsx:410
+#: src/features/settings/components/account/account-settings.tsx:412
 msgid "Hands-free voice updated"
 msgstr "免提模式语音已更新"
 
@@ -13677,7 +13731,7 @@ msgstr "帮我给经理写一封专业的邮件"
 msgid "Help the AI understand you better by sharing some information about yourself. This information is used to personalize responses across all tasks."
 msgstr "分享一些关于你的信息，帮助 AI 更好地了解你。这些信息会用于在所有任务中个性化回复。"
 
-#: src/features/appearance/components/appearance-controls.tsx:207
+#: src/features/appearance/components/appearance-controls.tsx:240
 msgid "Here they are: planning, budget and next steps."
 msgstr ""
 
@@ -13710,7 +13764,7 @@ msgstr "隐藏输出"
 msgid "Hide password"
 msgstr "隐藏密码"
 
-#: src/features/settings/components/account/account-settings.tsx:141
+#: src/features/settings/components/account/account-settings.tsx:143
 msgid "Hide Personal Information"
 msgstr "隐藏个人信息"
 
@@ -13722,7 +13776,7 @@ msgstr "隐藏运行历史"
 msgid "Hide translation"
 msgstr "隐藏翻译"
 
-#: src/features/settings/components/account/account-settings.tsx:143
+#: src/features/settings/components/account/account-settings.tsx:145
 msgid "Hides your name and email from the UI."
 msgstr "在界面中隐藏你的姓名和邮箱。"
 
@@ -13734,6 +13788,14 @@ msgstr "高"
 #: src/features/marketing/data/models-data.ts:744
 msgid "High code quality from Alibaba's specialized training"
 msgstr "经阿里巴巴专门训练，代码质量高"
+
+#: src/features/appearance/components/appearance-controls.tsx:99
+msgid "High contrast"
+msgstr ""
+
+#: src/features/appearance/components/appearance-controls.tsx:201
+msgid "High contrast uses black and white text, stronger borders and a heavier focus ring. By default it follows your system's contrast setting."
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:249
 msgid "High level of creative control"
@@ -13933,7 +13995,7 @@ msgid "Honduras"
 msgstr "洪都拉斯"
 
 #: src/features/chat/core/utils/language-utilities.ts:358
-#: src/features/settings/components/account/account-settings.tsx:107
+#: src/features/settings/components/account/account-settings.tsx:109
 msgid "Hong Kong"
 msgstr "香港"
 
@@ -13974,7 +14036,7 @@ msgstr "智能路由如何工作？"
 msgid "How is Neore different from ChatGPT?"
 msgstr "Neore 与 ChatGPT 有何不同？"
 
-#: src/features/settings/components/account/account-settings.tsx:471
+#: src/features/settings/components/account/account-settings.tsx:491
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "临时聊天在自动删除前保留的时长。默认：24 小时。"
 
@@ -15021,7 +15083,7 @@ msgstr "爪哇语"
 msgid "Javanese (Indonesia)"
 msgstr "爪哇语（印度尼西亚）"
 
-#: src/features/settings/components/account/account-settings.tsx:194
+#: src/features/settings/components/account/account-settings.tsx:196
 msgid "JetBrains Mono"
 msgstr "JetBrains Mono"
 
@@ -15318,7 +15380,7 @@ msgstr "横向（宽屏）"
 msgid "Language"
 msgstr "语言"
 
-#: src/features/settings/components/account/account-settings.tsx:250
+#: src/features/settings/components/account/account-settings.tsx:252
 msgid "Language & Localization"
 msgstr "语言与本地化"
 
@@ -15643,7 +15705,7 @@ msgstr "左"
 msgid "Left organization successfully"
 msgstr "已离开组织"
 
-#: src/features/settings/components/account/account-settings.tsx:215
+#: src/features/settings/components/account/account-settings.tsx:217
 msgid "Left to Right (LTR)"
 msgstr "从左到右（LTR）"
 
@@ -15719,11 +15781,11 @@ msgstr "使用阿里巴巴小模型及思考能力的轻量推理任务"
 msgid "Like General, but also specifies output format, validation rules, and examples."
 msgstr "与“通用”类似，但还会指定输出格式、验证规则和示例。"
 
-#: src/features/appearance/components/appearance-controls.tsx:115
+#: src/features/appearance/components/appearance-controls.tsx:127
 msgid "Lime (default)"
 msgstr "青柠（默认）"
 
-#: src/features/appearance/components/appearance-controls.tsx:304
+#: src/features/appearance/components/appearance-controls.tsx:337
 msgid "Limit height of long code blocks"
 msgstr ""
 
@@ -15753,15 +15815,15 @@ msgstr "LINE Channel Access Token"
 msgid "LINE Channel Secret"
 msgstr "LINE Channel Secret"
 
-#: src/features/appearance/components/appearance-controls.tsx:297
+#: src/features/appearance/components/appearance-controls.tsx:330
 msgid "Line numbers hidden"
 msgstr ""
 
-#: src/features/appearance/components/appearance-controls.tsx:288
+#: src/features/appearance/components/appearance-controls.tsx:321
 msgid "Line numbers in code blocks"
 msgstr ""
 
-#: src/features/appearance/components/appearance-controls.tsx:297
+#: src/features/appearance/components/appearance-controls.tsx:330
 msgid "Line numbers shown"
 msgstr ""
 
@@ -16111,11 +16173,11 @@ msgstr "本地请求失败。"
 msgid "localhost or 127.0.0.1 only. Ollama: {OLLAMA_DEFAULT_BASE_URL} · LM Studio: {LM_STUDIO_DEFAULT_BASE_URL}"
 msgstr "仅限 localhost 或 127.0.0.1。Ollama：{OLLAMA_DEFAULT_BASE_URL} · LM Studio：{LM_STUDIO_DEFAULT_BASE_URL}"
 
-#: src/features/settings/components/account/account-settings.tsx:304
+#: src/features/settings/components/account/account-settings.tsx:306
 msgid "Location"
 msgstr "位置"
 
-#: src/features/settings/components/account/account-settings.tsx:314
+#: src/features/settings/components/account/account-settings.tsx:316
 msgid "Location updated"
 msgstr "位置已更新"
 
@@ -16181,19 +16243,19 @@ msgstr "徽标"
 msgid "logos"
 msgstr "标志"
 
-#: src/features/settings/components/account/account-settings.tsx:97
+#: src/features/settings/components/account/account-settings.tsx:99
 msgid "London"
 msgstr "伦敦"
 
-#: src/features/appearance/components/appearance-controls.tsx:313
+#: src/features/appearance/components/appearance-controls.tsx:346
 msgid "Long code blocks limited"
 msgstr ""
 
-#: src/features/appearance/components/appearance-controls.tsx:306
+#: src/features/appearance/components/appearance-controls.tsx:339
 msgid "Long code blocks scroll inside a fixed height until you expand them."
 msgstr ""
 
-#: src/features/appearance/components/appearance-controls.tsx:313
+#: src/features/appearance/components/appearance-controls.tsx:346
 msgid "Long code blocks shown in full"
 msgstr ""
 
@@ -16334,7 +16396,7 @@ msgstr "微距"
 msgid "Macro telephoto, tight framing"
 msgstr "微距长焦，紧凑构图"
 
-#: src/features/settings/components/account/account-settings.tsx:101
+#: src/features/settings/components/account/account-settings.tsx:103
 msgid "Madrid"
 msgstr "马德里"
 
@@ -16774,7 +16836,7 @@ msgstr "中低"
 msgid "Medium-quality video generation with Alibaba's latest Wan improvements for general-purpose use"
 msgstr "借助阿里巴巴最新 Wan 改进的中等质量通用视频生成"
 
-#: src/features/settings/components/account/account-settings.tsx:112
+#: src/features/settings/components/account/account-settings.tsx:114
 msgid "Melbourne"
 msgstr "墨尔本"
 
@@ -16977,7 +17039,7 @@ msgstr "麦克风访问被拒绝。请在浏览器设置中允许访问麦克风
 msgid "Microsoft App ID of your Azure Bot"
 msgstr "你的 Azure Bot 的 Microsoft App ID"
 
-#: src/features/appearance/components/appearance-controls.tsx:129
+#: src/features/appearance/components/appearance-controls.tsx:141
 msgid "Min"
 msgstr "Min"
 
@@ -17352,11 +17414,11 @@ msgstr "蒙古语"
 msgid "Mongolian (Mongolia)"
 msgstr "蒙古语（蒙古）"
 
-#: src/features/settings/components/account/account-settings.tsx:192
+#: src/features/settings/components/account/account-settings.tsx:194
 msgid "Mono"
 msgstr "等宽"
 
-#: src/features/appearance/components/appearance-controls.tsx:105
+#: src/features/appearance/components/appearance-controls.tsx:117
 msgid "Monospace"
 msgstr ""
 
@@ -17482,7 +17544,7 @@ msgstr "运动提示词"
 msgid "Motion: {motionPercent}%"
 msgstr "运动：{motionPercent}%"
 
-#: src/features/settings/components/account/account-settings.tsx:93
+#: src/features/settings/components/account/account-settings.tsx:95
 msgid "Mountain Time (US & Canada)"
 msgstr "山地时间（美国和加拿大）"
 
@@ -17638,7 +17700,7 @@ msgstr "需要 Z.AI 视觉 GLM 模型理解图像和文本的多模态任务"
 msgid "Multimodal tasks where MiniMax's M2 delivers reliable vision and text understanding"
 msgstr "MiniMax M2 可提供可靠视觉与文本理解的多模态任务"
 
-#: src/features/settings/components/account/account-settings.tsx:110
+#: src/features/settings/components/account/account-settings.tsx:112
 msgid "Mumbai, Kolkata"
 msgstr "孟买、加尔各答"
 
@@ -17967,7 +18029,7 @@ msgstr "嵌套到上一页面下"
 msgid "Netherlands"
 msgstr "荷兰"
 
-#: src/features/appearance/components/appearance-controls.tsx:142
+#: src/features/appearance/components/appearance-controls.tsx:154
 msgid "Neutral"
 msgstr "中性"
 
@@ -18449,8 +18511,8 @@ msgid "No fields found."
 msgstr "未找到字段。"
 
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:339
-msgid "No files found"
-msgstr "未找到文件"
+#~ msgid "No files found"
+#~ msgstr "未找到文件"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:399
 msgid "No files here yet."
@@ -19011,6 +19073,10 @@ msgstr "给下次运行的备注（可选）"
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模块以优化 token 用量。"
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:418
+msgid "Nothing found"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:127
 msgid "Nothing has run on a device yet."
 msgstr "尚未在任何设备上运行过操作。"
@@ -19099,7 +19165,7 @@ msgstr "NSFW 审核后端尚未实现。后端功能可用后，此页面将显�
 msgid "Number"
 msgstr "数字"
 
-#: src/features/appearance/components/appearance-controls.tsx:290
+#: src/features/appearance/components/appearance-controls.tsx:323
 msgid "Number each line of code in chat replies. Off by default."
 msgstr ""
 
@@ -19230,7 +19296,7 @@ msgstr "下次访问聊天时将重新开始新手引导。"
 msgid "Onboarding wizard"
 msgstr "新手引导向导"
 
-#: src/features/appearance/components/appearance-controls.tsx:130
+#: src/features/appearance/components/appearance-controls.tsx:142
 msgid "One"
 msgstr "One"
 
@@ -19811,7 +19877,7 @@ msgstr "OpenAI 最小的 LLM"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "OpenAI 最小的模型，速度最快"
 
-#: src/features/settings/components/account/account-settings.tsx:462
+#: src/features/settings/components/account/account-settings.tsx:482
 msgid "Opening a blank chat"
 msgstr ""
 
@@ -19823,7 +19889,7 @@ msgstr "正在创建拉取请求——进度见日志"
 msgid "Opening pull request…"
 msgstr "正在创建拉取请求…"
 
-#: src/features/settings/components/account/account-settings.tsx:453
+#: src/features/settings/components/account/account-settings.tsx:473
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr ""
 
@@ -19978,7 +20044,7 @@ msgstr "或在终端中："
 msgid "Or type your own answer…"
 msgstr "或输入你自己的回答…"
 
-#: src/features/appearance/components/appearance-controls.tsx:117
+#: src/features/appearance/components/appearance-controls.tsx:129
 #: src/features/chat/tags/thread-tag-color-picker.tsx:19
 #: src/features/workflow/components/nodes/comment-node.tsx:19
 msgid "Orange"
@@ -20194,7 +20260,7 @@ msgstr "用我的版本覆盖"
 msgid "Owner"
 msgstr "所有者"
 
-#: src/features/settings/components/account/account-settings.tsx:94
+#: src/features/settings/components/account/account-settings.tsx:96
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
@@ -20293,7 +20359,7 @@ msgstr "并行"
 msgid "Parallel Compare"
 msgstr "并行对比"
 
-#: src/features/settings/components/account/account-settings.tsx:98
+#: src/features/settings/components/account/account-settings.tsx:100
 msgid "Paris"
 msgstr "巴黎"
 
@@ -20307,7 +20373,7 @@ msgstr "属于循环依赖的一部分"
 
 #: src/features/chat/group/create-group-chat-button.tsx:175
 #: src/features/chat/group/group-participant-bar.tsx:138
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:257
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:308
 msgid "Participants"
 msgstr "参与者"
 
@@ -20617,11 +20683,11 @@ msgstr "个人"
 msgid "Personal Account"
 msgstr "个人账号"
 
-#: src/features/settings/components/account/account-settings.tsx:150
+#: src/features/settings/components/account/account-settings.tsx:152
 msgid "Personal information is now hidden"
 msgstr "个人信息已隐藏"
 
-#: src/features/settings/components/account/account-settings.tsx:150
+#: src/features/settings/components/account/account-settings.tsx:152
 msgid "Personal information is now visible"
 msgstr "个人信息已显示"
 
@@ -20809,6 +20875,9 @@ msgstr "回复完成时播放短提示音。仅适用于此浏览器。"
 #: src/features/settings/components/account/account-settings.tsx:576
 #~ msgid "Play sound effects for UI interactions."
 #~ msgstr "为界面交互播放音效。"
+#: src/features/settings/components/account/account-settings.tsx:596
+msgid "Play sound effects for UI interactions."
+msgstr "为界面交互播放音效。"
 
 #: src/features/auth/components/auth/auth-card.tsx:373
 msgid "Please authenticate to continue"
@@ -20893,7 +20962,7 @@ msgstr "PNG（透明）"
 msgid "PNG image"
 msgstr "PNG 图像"
 
-#: src/features/appearance/components/appearance-controls.tsx:127
+#: src/features/appearance/components/appearance-controls.tsx:139
 msgid "Poimandres (default)"
 msgstr "Poimandres（默认）"
 
@@ -21170,7 +21239,7 @@ msgstr ""
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:241
+#: src/features/settings/components/account/account-settings.tsx:243
 msgid "Press Enter to send"
 msgstr "按 Enter 发送"
 
@@ -21179,10 +21248,15 @@ msgid "Press Enter to send, Shift+Enter for new line"
 msgstr "按 Enter 发送，Shift+Enter 换行"
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:229
+#: src/features/settings/components/account/account-settings.tsx:455
+msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
+msgstr ""
+
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:223
 msgid "Press keys..."
 msgstr "请按键..."
 
-#: src/features/settings/components/account/account-settings.tsx:242
+#: src/features/settings/components/account/account-settings.tsx:244
 msgid "Press Shift+Enter to send"
 msgstr "按 Shift+Enter 发送"
 
@@ -21354,6 +21428,8 @@ msgstr "优先支持"
 #: src/features/marketing/components/landing-footer.tsx:272
 #: src/features/settings/components/account/account-settings.tsx:136
 #: src/features/settings/components/chat/model-filter-settings.tsx:361
+#: src/features/settings/components/account/account-settings.tsx:138
+#: src/features/settings/components/chat/model-filter-settings.tsx:382
 msgid "Privacy"
 msgstr "隐私"
 
@@ -21877,11 +21953,11 @@ msgstr "路由引擎分配的查询复杂度等级"
 msgid "Query usage analytics and costs"
 msgstr "查询用量分析和成本"
 
-#: src/features/chat/thread/composer-input-area.tsx:271
+#: src/features/chat/thread/composer-input-area.tsx:280
 msgid "Queue message"
 msgstr "排队消息"
 
-#: src/features/chat/thread/composer-input-area.tsx:290
+#: src/features/chat/thread/composer-input-area.tsx:299
 msgid "Queue message — sends when the current reply finishes"
 msgstr "排队消息——当前回复完成后发送"
 
@@ -21994,7 +22070,7 @@ msgstr "随机种子"
 msgid "Range to keep"
 msgstr "保留范围"
 
-#: src/features/settings/components/account/account-settings.tsx:515
+#: src/features/settings/components/account/account-settings.tsx:535
 msgid "Range: 1 hour to 7 days (168 hours)"
 msgstr "范围：1 小时到 7 天（168 小时）"
 
@@ -22047,7 +22123,7 @@ msgstr "读写"
 msgid "Read aloud"
 msgstr "朗读"
 
-#: src/features/settings/components/account/account-settings.tsx:382
+#: src/features/settings/components/account/account-settings.tsx:384
 msgid "Read every assistant reply aloud when it finishes, using your browser's voice."
 msgstr "每条助手回复完成后，使用浏览器的声音朗读出来。"
 
@@ -22077,6 +22153,7 @@ msgid "Read-only shared conversation"
 msgstr "只读共享对话"
 
 #: src/features/chat/thread/composer-input.tsx:213
+#: src/features/chat/thread/composer-input.tsx:215
 msgid "Reading \"{attachmentName}\"…"
 msgstr "正在读取“{attachmentName}”…"
 
@@ -22614,6 +22691,8 @@ msgstr "记住我"
 #: src/features/chat/sharing/thread-share-button.tsx:339
 #: src/features/chat/thread/composer-input.tsx:285
 #: src/features/chat/thread/composer-input.tsx:347
+#: src/features/chat/thread/composer-input.tsx:287
+#: src/features/chat/thread/composer-input.tsx:349
 #: src/features/devices/components/devices-settings.tsx:85
 #: src/features/devices/components/devices-settings.tsx:89
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -22893,11 +22972,11 @@ msgstr "回复可以搜索、生成图片等，费用计入你的账户。设为
 msgid "Replies use the free reply token when the answer is quick, and fall back to a push message (which counts against your LINE quota) when it is not."
 msgstr "回答较快时使用免费的回复令牌，否则改用推送消息（会计入你的 LINE 配额）。"
 
-#: src/features/settings/components/account/account-settings.tsx:391
+#: src/features/settings/components/account/account-settings.tsx:393
 msgid "Replies will be read aloud"
 msgstr "回复将被朗读"
 
-#: src/features/settings/components/account/account-settings.tsx:391
+#: src/features/settings/components/account/account-settings.tsx:393
 msgid "Replies will no longer be read aloud"
 msgstr "回复将不再被朗读"
 
@@ -23147,16 +23226,16 @@ msgstr "结果"
 msgid "Resume"
 msgstr "恢复"
 
-#: src/features/settings/components/account/account-settings.tsx:450
+#: src/features/settings/components/account/account-settings.tsx:470
 msgid "Resume your latest chat"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:462
+#: src/features/settings/components/account/account-settings.tsx:482
 msgid "Resuming your latest chat"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:483
-#: src/features/settings/components/account/account-settings.tsx:508
+#: src/features/settings/components/account/account-settings.tsx:503
+#: src/features/settings/components/account/account-settings.tsx:528
 msgid "Retention period updated to {hours} hours"
 msgstr "保留时长已更新为 {hours} 小时"
 
@@ -23317,7 +23396,7 @@ msgstr ""
 msgid "Right"
 msgstr "右"
 
-#: src/features/settings/components/account/account-settings.tsx:216
+#: src/features/settings/components/account/account-settings.tsx:218
 msgid "Right to Left (RTL)"
 msgstr "从右到左（RTL）"
 
@@ -23361,11 +23440,11 @@ msgstr "罗马尼亚语"
 msgid "Romanian (Romania)"
 msgstr "罗马尼亚语（罗马尼亚）"
 
-#: src/features/settings/components/account/account-settings.tsx:100
+#: src/features/settings/components/account/account-settings.tsx:102
 msgid "Rome"
 msgstr "罗马"
 
-#: src/features/appearance/components/appearance-controls.tsx:118
+#: src/features/appearance/components/appearance-controls.tsx:130
 msgid "Rose"
 msgstr "玫瑰色"
 
@@ -23621,7 +23700,7 @@ msgstr "采样器"
 msgid "Sandbox & Code Execution"
 msgstr "沙盒与代码执行"
 
-#: src/features/appearance/components/appearance-controls.tsx:103
+#: src/features/appearance/components/appearance-controls.tsx:115
 msgid "Sans (default)"
 msgstr ""
 
@@ -23842,6 +23921,7 @@ msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
 #: src/features/chat/thread/composer-input.tsx:844
+#: src/features/chat/thread/composer-input.tsx:846
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -23923,9 +24003,13 @@ msgstr "搜索深度：{0}"
 msgid "Search fields..."
 msgstr "搜索字段..."
 
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:302
+msgid "Search files and chats..."
+msgstr ""
+
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:251
-msgid "Search files..."
-msgstr "搜索文件..."
+#~ msgid "Search files..."
+#~ msgstr "搜索文件..."
 
 #: ../../packages/ui/src/components/icon-picker.tsx:443
 msgid "Search for an icon..."
@@ -24164,7 +24248,7 @@ msgstr "选择要预览的版本"
 msgid "Select a version to see changes"
 msgstr "选择一个版本查看更改"
 
-#: src/features/settings/components/account/account-settings.tsx:415
+#: src/features/settings/components/account/account-settings.tsx:417
 msgid "Select a voice"
 msgstr "选择语音"
 
@@ -24200,7 +24284,7 @@ msgstr "选为参考"
 msgid "Select by date"
 msgstr ""
 
-#: src/features/settings/components/account/account-settings.tsx:289
+#: src/features/settings/components/account/account-settings.tsx:291
 msgid "Select dictation language"
 msgstr "选择听写语言"
 
@@ -24220,7 +24304,7 @@ msgstr "选择要上传的文件"
 msgid "Select image as reference"
 msgstr "选择图像作为参考"
 
-#: src/features/settings/components/account/account-settings.tsx:264
+#: src/features/settings/components/account/account-settings.tsx:266
 msgid "Select language"
 msgstr "选择语言"
 
@@ -24382,7 +24466,7 @@ msgstr "发送回答"
 msgid "Send Backward"
 msgstr "下移一层"
 
-#: src/features/settings/components/account/account-settings.tsx:233
+#: src/features/settings/components/account/account-settings.tsx:235
 msgid "Send behavior updated"
 msgstr "发送方式已更新"
 
@@ -24396,12 +24480,12 @@ msgid "Send Magic Link"
 msgstr "发送魔法链接"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:324
-#: src/features/chat/thread/composer-input-area.tsx:338
+#: src/features/chat/thread/composer-input-area.tsx:333
+#: src/features/chat/thread/composer-input-area.tsx:347
 msgid "Send message"
 msgstr "发送消息"
 
-#: src/features/settings/components/account/account-settings.tsx:227
+#: src/features/settings/components/account/account-settings.tsx:229
 msgid "Send Message Behavior"
 msgstr "消息发送方式"
 
@@ -24457,7 +24541,7 @@ msgstr "塞尔维亚语"
 msgid "Serbian (Serbia)"
 msgstr "塞尔维亚语（塞尔维亚）"
 
-#: src/features/appearance/components/appearance-controls.tsx:104
+#: src/features/appearance/components/appearance-controls.tsx:116
 msgid "Serif"
 msgstr "衬线"
 
@@ -24522,7 +24606,7 @@ msgstr "设置密码"
 msgid "Set the focal length in millimeters"
 msgstr "设置焦距（毫米）"
 
-#: src/features/settings/components/account/account-settings.tsx:203
+#: src/features/settings/components/account/account-settings.tsx:205
 msgid "Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian."
 msgstr "设置应用的文字方向。RTL 用于阿拉伯语、希伯来语和波斯语等语言。"
 
@@ -24569,7 +24653,7 @@ msgstr "你的多个技能在同一个对话中回答。用 @ 提及其中一个
 msgid "Shallow, cinematic separation"
 msgstr "浅景深，电影感分离"
 
-#: src/features/settings/components/account/account-settings.tsx:106
+#: src/features/settings/components/account/account-settings.tsx:108
 msgid "Shanghai"
 msgstr "上海"
 
@@ -24704,7 +24788,7 @@ msgstr "显示附加内容"
 msgid "Show follow-up suggestions"
 msgstr "显示后续建议"
 
-#: src/features/settings/components/account/account-settings.tsx:363
+#: src/features/settings/components/account/account-settings.tsx:365
 msgid "Show follow-up suggestions after assistant messages."
 msgstr "在助手消息后显示后续建议。"
 
@@ -24763,7 +24847,7 @@ msgstr "显示此目标的任务"
 msgid "Show this help"
 msgstr "显示此帮助"
 
-#: src/features/settings/components/account/account-settings.tsx:558
+#: src/features/settings/components/account/account-settings.tsx:578
 msgid "Show Timestamps"
 msgstr "显示时间戳"
 
@@ -24970,7 +25054,7 @@ msgstr "简化"
 msgid "since replaced"
 msgstr "已被替换"
 
-#: src/features/settings/components/account/account-settings.tsx:108
+#: src/features/settings/components/account/account-settings.tsx:110
 msgid "Singapore"
 msgstr "新加坡"
 
@@ -25077,7 +25161,7 @@ msgstr "跳过 CLIP 层（0 = 不跳过，1-2 = 更风格化）"
 msgid "Skip questions"
 msgstr "跳过问题"
 
-#: src/features/settings/components/account/account-settings.tsx:159
+#: src/features/settings/components/account/account-settings.tsx:161
 msgid "Skip the warning dialog when clicking external links."
 msgstr "点击外部链接时跳过警告对话框。"
 
@@ -25249,7 +25333,7 @@ msgstr "软件工程"
 msgid "Solarize"
 msgstr "负感"
 
-#: src/features/appearance/components/appearance-controls.tsx:131
+#: src/features/appearance/components/appearance-controls.tsx:143
 msgid "Solarized"
 msgstr "Solarized"
 
@@ -25328,15 +25412,15 @@ msgstr "SOTA 级性价比，支持 2M token 上下文"
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "通过 Replicate 提供的支持矢量图和排版的 SOTA"
 
-#: src/features/settings/components/account/account-settings.tsx:574
+#: src/features/settings/components/account/account-settings.tsx:594
 msgid "Sound Effects"
 msgstr "音效"
 
-#: src/features/settings/components/account/account-settings.tsx:583
+#: src/features/settings/components/account/account-settings.tsx:603
 msgid "Sound effects disabled"
 msgstr "已关闭音效"
 
-#: src/features/settings/components/account/account-settings.tsx:583
+#: src/features/settings/components/account/account-settings.tsx:603
 msgid "Sound effects enabled"
 msgstr "已开启音效"
 
@@ -25359,7 +25443,7 @@ msgstr "来源 {position}：{0}，段落 {1}"
 msgid "Source chat"
 msgstr "来源聊天"
 
-#: src/features/settings/components/account/account-settings.tsx:195
+#: src/features/settings/components/account/account-settings.tsx:197
 msgid "Source Code Pro"
 msgstr "Source Code Pro"
 
@@ -25379,11 +25463,11 @@ msgstr "韩国"
 msgid "Space"
 msgstr "Space"
 
-#: src/features/appearance/components/appearance-controls.tsx:188
+#: src/features/appearance/components/appearance-controls.tsx:221
 msgid "Spacing between messages, in chat bubbles and in the thread list."
 msgstr ""
 
-#: src/features/appearance/components/appearance-controls.tsx:96
+#: src/features/appearance/components/appearance-controls.tsx:108
 msgid "Spacious"
 msgstr ""
 
@@ -25605,6 +25689,7 @@ msgstr "稳定物理"
 msgid "Stable, consistent frame output"
 msgstr "稳定、一致的帧输出"
 
+#: src/features/appearance/components/appearance-controls.tsx:98
 #: src/features/chat/thread/media-gallery-view.tsx:59
 #: src/features/marketing/components/model-detail-page.tsx:36
 msgid "Standard"
@@ -25882,7 +25967,7 @@ msgstr "步数"
 msgid "Stock and currency information"
 msgstr "股票和汇率信息"
 
-#: src/features/settings/components/account/account-settings.tsx:103
+#: src/features/settings/components/account/account-settings.tsx:105
 msgid "Stockholm"
 msgstr "斯德哥尔摩"
 
@@ -25905,6 +25990,10 @@ msgstr "在当前发言者之后停止"
 #: src/features/chat/thread-list/thread-node.tsx:533
 #: src/features/chat/thread/composer-input-area.tsx:298
 #: src/features/chat/thread/composer-input-area.tsx:311
+#: src/features/chat/thread-list/thread-node.tsx:510
+#: src/features/chat/thread-list/thread-node.tsx:532
+#: src/features/chat/thread/composer-input-area.tsx:307
+#: src/features/chat/thread/composer-input-area.tsx:320
 msgid "Stop generating"
 msgstr "停止生成"
 
@@ -26380,10 +26469,11 @@ msgid "Suggested answers"
 msgstr "建议的答案"
 
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:412
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:435
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
 
-#: src/features/settings/components/account/account-settings.tsx:435
+#: src/features/settings/components/account/account-settings.tsx:437
 msgid "Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion."
 msgstr "以灰色文字建议如何补全消息；在行尾按右方向键接受，按 Esc 忽略。你的草稿会发送给 AI 模型以生成建议。"
 
@@ -26391,7 +26481,7 @@ msgstr "以灰色文字建议如何补全消息；在行尾按右方向键接受
 msgid "Suited for complex tasks: Role / Background / Attention / Skills / Goals / Constraints / Workflow."
 msgstr "适合复杂任务：Role / Background / Attention / Skills / Goals / Constraints / Workflow。"
 
-#: src/features/appearance/components/appearance-controls.tsx:205
+#: src/features/appearance/components/appearance-controls.tsx:238
 msgid "Summarise my notes in three bullets."
 msgstr ""
 
@@ -26551,7 +26641,7 @@ msgstr "已切换到团队视图"
 msgid "Switzerland"
 msgstr "瑞士"
 
-#: src/features/settings/components/account/account-settings.tsx:111
+#: src/features/settings/components/account/account-settings.tsx:113
 msgid "Sydney"
 msgstr "悉尼"
 
@@ -26559,7 +26649,7 @@ msgstr "悉尼"
 msgid "Synchronized audio and visual output"
 msgstr "同步的音频与画面输出"
 
-#: src/features/appearance/components/appearance-controls.tsx:233
+#: src/features/appearance/components/appearance-controls.tsx:266
 msgid "Syntax colors for code blocks in chat. Each theme has a light and a dark variant."
 msgstr "聊天中代码块的语法颜色。每个主题都有浅色和深色两种变体。"
 
@@ -26611,7 +26701,7 @@ msgstr "系统提示词预设"
 msgid "System Prompts"
 msgstr "系统提示词"
 
-#: src/features/appearance/components/appearance-controls.tsx:106
+#: src/features/appearance/components/appearance-controls.tsx:118
 msgid "System UI"
 msgstr ""
 
@@ -26764,7 +26854,7 @@ msgstr "需要 Anthropic 均衡模型及透明思维链推理的任务"
 msgid "Tasks requiring xAI's vision capabilities and real-time information access via Grok 3"
 msgstr "需要通过 Grok 3 使用 xAI 视觉能力和实时信息获取的任务"
 
-#: src/features/appearance/components/appearance-controls.tsx:119
+#: src/features/appearance/components/appearance-controls.tsx:131
 #: src/features/chat/tags/thread-tag-color-picker.tsx:22
 msgid "Teal"
 msgstr "青色"
@@ -26918,7 +27008,7 @@ msgstr "临时聊天"
 msgid "Temporary chat mode"
 msgstr "临时聊天模式"
 
-#: src/features/settings/components/account/account-settings.tsx:468
+#: src/features/settings/components/account/account-settings.tsx:488
 msgid "Temporary Chat Retention (hours)"
 msgstr "临时聊天保留时长（小时）"
 
@@ -27022,19 +27112,20 @@ msgstr "文本对齐"
 msgid "Text Content"
 msgstr "文本内容"
 
-#: src/features/settings/components/account/account-settings.tsx:201
+#: src/features/settings/components/account/account-settings.tsx:203
 msgid "Text Direction"
 msgstr "文字方向"
 
-#: src/features/settings/components/account/account-settings.tsx:207
+#: src/features/settings/components/account/account-settings.tsx:209
 msgid "Text direction set to LTR"
 msgstr "文字方向已设为 LTR"
 
-#: src/features/settings/components/account/account-settings.tsx:207
+#: src/features/settings/components/account/account-settings.tsx:209
 msgid "Text direction set to RTL"
 msgstr "文字方向已设为 RTL"
 
 #: src/features/chat/thread/composer-input.tsx:249
+#: src/features/chat/thread/composer-input.tsx:251
 msgid "Text document"
 msgstr "文本文档"
 
@@ -27505,6 +27596,7 @@ msgstr "面向现代 AI 应用的统一 LLM 网关。"
 #~ msgstr "要添加的用户的唯一标识符"
 
 #: src/features/chat/thread/composer-input.tsx:476
+#: src/features/chat/thread/composer-input.tsx:478
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "“{fileName}”的上传已过期。请重新附加该文件。"
 
@@ -27520,7 +27612,7 @@ msgstr "在允许的修复轮次之后，验证器仍未通过此结果。你可
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "只有满足所有标准，验证器才会通过结果。"
 
-#: src/features/settings/components/account/account-settings.tsx:402
+#: src/features/settings/components/account/account-settings.tsx:404
 msgid "The voice hands-free mode reads replies in. A skill with its own voice uses that instead. Spoken replies count against a daily allowance; after it, your browser's voice takes over."
 msgstr "免提模式朗读回复时使用的语音。带有自有语音的技能会改用其语音。朗读的回复计入每日额度，用完后由浏览器的语音接替。"
 
@@ -27544,7 +27636,7 @@ msgstr "工作流文件过大。"
 msgid "The workflow has too many nodes."
 msgstr "工作流的节点过多。"
 
-#: src/features/appearance/components/appearance-controls.tsx:261
+#: src/features/appearance/components/appearance-controls.tsx:294
 msgid "Theme for Mermaid diagrams in chat."
 msgstr "聊天中 Mermaid 图表的主题。"
 
@@ -28103,20 +28195,20 @@ msgstr "移轴"
 msgid "Timeline image"
 msgstr "时间轴图片"
 
-#: src/features/settings/components/account/account-settings.tsx:567
+#: src/features/settings/components/account/account-settings.tsx:587
 msgid "Timestamps disabled"
 msgstr "已关闭时间戳"
 
-#: src/features/settings/components/account/account-settings.tsx:567
+#: src/features/settings/components/account/account-settings.tsx:587
 msgid "Timestamps enabled"
 msgstr "已开启时间戳"
 
-#: src/features/settings/components/account/account-settings.tsx:332
+#: src/features/settings/components/account/account-settings.tsx:334
 #: src/features/settings/components/chat/trigger-settings.tsx:286
 msgid "Timezone"
 msgstr "时区"
 
-#: src/features/settings/components/account/account-settings.tsx:337
+#: src/features/settings/components/account/account-settings.tsx:339
 msgid "Timezone updated"
 msgstr "时区已更新"
 
@@ -28251,7 +28343,7 @@ msgstr "Token"
 msgid "Tokens used on your own endpoint are not charged as credits. Daily message limits still apply."
 msgstr "使用你自己的端点消耗的 token 不计入积分，但每日消息限额仍然适用。"
 
-#: src/features/settings/components/account/account-settings.tsx:105
+#: src/features/settings/components/account/account-settings.tsx:107
 msgid "Tokyo"
 msgstr "东京"
 
@@ -28355,7 +28447,7 @@ msgstr "在复杂基准测试中推理顶级"
 msgid "Top-tier text-to-video quality"
 msgstr "顶级文生视频质量"
 
-#: src/features/settings/components/account/account-settings.tsx:95
+#: src/features/settings/components/account/account-settings.tsx:97
 msgid "Toronto"
 msgstr "多伦多"
 
@@ -28746,10 +28838,12 @@ msgstr "输入你的回答…"
 
 #: src/features/chat/thread/composer-input.tsx:1142
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:151
+#: src/features/chat/thread/composer-input.tsx:1172
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:162
 msgid "Type your message..."
 msgstr "输入你的消息..."
 
-#: src/features/appearance/components/appearance-controls.tsx:214
+#: src/features/appearance/components/appearance-controls.tsx:247
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr ""
 
@@ -28769,7 +28863,7 @@ msgstr "文字排版"
 msgid "UAE"
 msgstr "阿联酋"
 
-#: src/features/settings/components/account/account-settings.tsx:521
+#: src/features/settings/components/account/account-settings.tsx:541
 msgid "UI Preferences"
 msgstr "界面偏好"
 
@@ -29112,6 +29206,7 @@ msgid "Update Duration"
 msgstr "更新时长"
 
 #: src/features/chat/thread/composer-input.tsx:1013
+#: src/features/chat/thread/composer-input.tsx:1042
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -29288,6 +29383,7 @@ msgid "Upload documents to your knowledge base and group them into collections. 
 msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关上下文，并引用所用的段落。"
 
 #: src/features/chat/thread/composer-input.tsx:523
+#: src/features/chat/thread/composer-input.tsx:525
 msgid "Upload failed"
 msgstr "上传失败"
 
@@ -29295,7 +29391,7 @@ msgstr "上传失败"
 #~ msgid "Upload failed: {statusText}"
 #~ msgstr "上传失败：{statusText}"
 
-#: src/features/chat/thread/composer-input-area.tsx:181
+#: src/features/chat/thread/composer-input-area.tsx:188
 msgid "Upload file"
 msgstr "上传文件"
 
@@ -29320,7 +29416,7 @@ msgstr "上传图像 / 视频"
 msgid "Upload Logo"
 msgstr "上传徽标"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:295
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:346
 msgid "Upload new file"
 msgstr "上传新文件"
 
@@ -29342,6 +29438,7 @@ msgid "Uploaded {fileName}"
 msgstr "已上传 {fileName}"
 
 #: src/features/chat/thread/composer-input.tsx:291
+#: src/features/chat/thread/composer-input.tsx:293
 msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
@@ -29545,7 +29642,7 @@ msgstr "使用次数"
 msgid "Used {0}"
 msgstr "使用了 {0}"
 
-#: src/features/appearance/components/appearance-controls.tsx:152
+#: src/features/appearance/components/appearance-controls.tsx:164
 msgid "Used for buttons, highlights and focus rings. Every option keeps text readable in light and dark mode."
 msgstr "用于按钮、高亮和焦点环。每个选项在浅色和深色模式下都能保持文字清晰可读。"
 
@@ -29711,7 +29808,7 @@ msgstr "有效的 JSON"
 msgid "Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking."
 msgstr "验证数据质量并优先采用权威来源。对研究任务和事实核查至关重要。"
 
-#: src/features/settings/components/account/account-settings.tsx:96
+#: src/features/settings/components/account/account-settings.tsx:98
 msgid "Vancouver"
 msgstr "温哥华"
 
@@ -29757,7 +29854,7 @@ msgstr "以“context.”或“user.”开头的变量由系统管理，无法�
 msgid "Variables:"
 msgstr "变量："
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:305
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:356
 msgid "Vault files"
 msgstr "文件库文件"
 
@@ -30158,11 +30255,23 @@ msgstr "查看会话"
 msgid "Viewing: {selectedNodeId}"
 msgstr "正在查看：{selectedNodeId}"
 
+#: src/features/settings/components/account/account-settings.tsx:463
+msgid "Vim keys disabled"
+msgstr ""
+
+#: src/features/settings/components/account/account-settings.tsx:463
+msgid "Vim keys enabled"
+msgstr ""
+
+#: src/features/settings/components/account/account-settings.tsx:452
+msgid "Vim keys in the composer"
+msgstr ""
+
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:35
 msgid "Vintage indie, chunky grain"
 msgstr "复古独立电影，粗颗粒"
 
-#: src/features/appearance/components/appearance-controls.tsx:120
+#: src/features/appearance/components/appearance-controls.tsx:132
 #: src/features/chat/tags/thread-tag-color-picker.tsx:23
 msgid "Violet"
 msgstr "紫罗兰色"
@@ -30311,7 +30420,7 @@ msgstr "需要阿里巴巴高效 30B 多模态模型的视觉语言任务"
 msgid "Visual web design and CMS platform"
 msgstr "可视化网页设计与 CMS 平台"
 
-#: src/features/appearance/components/appearance-controls.tsx:132
+#: src/features/appearance/components/appearance-controls.tsx:144
 msgid "Vitesse"
 msgstr "Vitesse"
 
@@ -30383,10 +30492,10 @@ msgstr "正在等待所有者回答"
 msgid "Waiting for the owner to approve"
 msgstr "正在等待所有者批准"
 
-#: src/features/chat/thread/composer-input-area.tsx:271
-#: src/features/chat/thread/composer-input-area.tsx:290
-#: src/features/chat/thread/composer-input-area.tsx:324
-#: src/features/chat/thread/composer-input-area.tsx:338
+#: src/features/chat/thread/composer-input-area.tsx:280
+#: src/features/chat/thread/composer-input-area.tsx:299
+#: src/features/chat/thread/composer-input-area.tsx:333
+#: src/features/chat/thread/composer-input-area.tsx:347
 msgid "Waiting for uploads to complete…"
 msgstr "正在等待上传完成…"
 
@@ -31224,11 +31333,13 @@ msgstr "你的第一次聊天"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
 #: src/features/chat/thread/composer-input.tsx:569
+#: src/features/chat/thread/composer-input.tsx:571
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "你的输入较大（约 {0} 个 token），将占用模型上下文窗口的很大一部分。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
 #: src/features/chat/thread/composer-input.tsx:562
+#: src/features/chat/thread/composer-input.tsx:564
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "你的输入过大（约 {0} 个 token），超出了模型的上下文窗口。请缩短消息或移除附件后再提交。"
 
@@ -31249,7 +31360,7 @@ msgstr "你最新的更改尚未保存。"
 msgid "Your local server answered, but refused this site (CORS). Allow this site's origin — for Ollama set OLLAMA_ORIGINS, for LM Studio turn on \"Enable CORS\" — then restart the server."
 msgstr "你的本地服务器有响应，但拒绝了此网站（CORS）。请允许此网站的来源——Ollama 设置 OLLAMA_ORIGINS，LM Studio 开启“Enable CORS”——然后重启服务器。"
 
-#: src/features/settings/components/account/account-settings.tsx:306
+#: src/features/settings/components/account/account-settings.tsx:308
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 
@@ -31321,7 +31432,7 @@ msgstr "你的标签"
 msgid "Your Team plans will be cancelled"
 msgstr "你的 Team 套餐将被取消"
 
-#: src/features/settings/components/account/account-settings.tsx:334
+#: src/features/settings/components/account/account-settings.tsx:336
 msgid "Your timezone (IANA timezone identifier)."
 msgstr "你的时区（IANA 时区标识符）。"
 
@@ -31445,7 +31556,7 @@ msgstr "祖鲁语"
 msgid "Zulu (South Africa)"
 msgstr "祖鲁语（南非）"
 
-#: src/features/settings/components/account/account-settings.tsx:104
+#: src/features/settings/components/account/account-settings.tsx:106
 msgid "Zurich"
 msgstr "苏黎世"
 
