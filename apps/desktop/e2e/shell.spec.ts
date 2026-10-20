@@ -31,7 +31,8 @@ const serve = (port: number, origin: string) =>
     new Promise<http.Server>((resolve) => {
         const server = http.createServer((request, response) => {
             response.setHeader("content-type", "text/html");
-            response.end(htmlPage(`${origin} ${request.url ?? ""}`));
+            // The request path is echoed into HTML, so it is encoded first.
+            response.end(htmlPage(`${origin} ${encodeURIComponent(request.url ?? "")}`));
         });
 
         server.listen(port, "127.0.0.1", () => {
