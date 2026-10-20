@@ -257,8 +257,7 @@ const makeDefaultToolCall = (
  * `firstIndex` numbers them from a later position when an app renders the
  * earlier sources itself (a `SourceGroup` override delegating the rest here).
  */
-export const DefaultSourceGroup: FC<{ firstIndex?: number; sources: (SourceDocumentPart | SourceUrlPart)[] }> = memo(({ firstIndex: firstIndexProp, sources }) => {
-    const firstIndex = firstIndexProp ?? 1;
+export const DefaultSourceGroup: FC<{ firstIndex?: number; sources: (SourceDocumentPart | SourceUrlPart)[] }> = memo(({ firstIndex, sources }) => {
     const { t } = useLingui();
 
     if (sources.length === 0) {
@@ -274,11 +273,16 @@ export const DefaultSourceGroup: FC<{ firstIndex?: number; sources: (SourceDocum
                 {sources.map((source, index) => {
                     if (source.type === "source-url") {
                         return (
-                            <Source href={safeHttpUrl(source.url) ?? "#"} index={index + firstIndex} key={source.sourceId} title={source.title || source.url} />
+                            <Source
+                                href={safeHttpUrl(source.url) ?? "#"}
+                                index={index + (firstIndex ?? 1)}
+                                key={source.sourceId}
+                                title={source.title || source.url}
+                            />
                         );
                     }
 
-                    return <Source href="#" index={index + firstIndex} key={source.sourceId} title={source.title || source.filename || t`Document`} />;
+                    return <Source href="#" index={index + (firstIndex ?? 1)} key={source.sourceId} title={source.title || source.filename || t`Document`} />;
                 })}
             </SourcesContent>
         </Sources>
