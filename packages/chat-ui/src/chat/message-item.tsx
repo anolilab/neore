@@ -244,7 +244,10 @@ const AssistantMessage = ({
     );
 };
 
-const MessageItem = memo(({ components, isLast = false, isStreaming = false, maxWidth, message, onBranch, onCopy, onPin, onRegenerate }: MessageItemProps) => {
+const MessageItem = memo(({ components, isLast: isLastProp, isStreaming: isStreamingProp, maxWidth, message, onBranch, onCopy, onPin, onRegenerate }: MessageItemProps) => {
+    const isLast = isLastProp ?? false;
+    const isStreaming = isStreamingProp ?? false;
+
     if (message.role === "user") {
         return <UserMessage maxWidth={maxWidth} message={message} onBranch={onBranch} onCopy={onCopy} onPin={onPin} />;
     }

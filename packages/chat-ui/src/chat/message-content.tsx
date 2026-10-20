@@ -146,8 +146,8 @@ DefaultText.displayName = "DefaultText";
 /**
  * Default Reasoning renderer with collapsible
  */
-const DefaultReasoning: FC<{ isStreaming?: boolean; text: string }> = memo(({ isStreaming = false, text }) => (
-    <Reasoning isStreaming={isStreaming}>
+const DefaultReasoning: FC<{ isStreaming?: boolean; text: string }> = memo(({ isStreaming, text }) => (
+    <Reasoning isStreaming={isStreaming ?? false}>
         <ReasoningTrigger />
         <ReasoningContent>{text}</ReasoningContent>
     </Reasoning>
@@ -257,7 +257,8 @@ const makeDefaultToolCall = (
  * `firstIndex` numbers them from a later position when an app renders the
  * earlier sources itself (a `SourceGroup` override delegating the rest here).
  */
-export const DefaultSourceGroup: FC<{ firstIndex?: number; sources: (SourceDocumentPart | SourceUrlPart)[] }> = memo(({ firstIndex = 1, sources }) => {
+export const DefaultSourceGroup: FC<{ firstIndex?: number; sources: (SourceDocumentPart | SourceUrlPart)[] }> = memo(({ firstIndex: firstIndexProp, sources }) => {
+    const firstIndex = firstIndexProp ?? 1;
     const { t } = useLingui();
 
     if (sources.length === 0) {
@@ -715,7 +716,9 @@ BrowserToolResultView.displayName = "BrowserToolResultView";
 /**
  * Main MessageContent component
  */
-const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className, components = NO_COMPONENTS, isStreaming = false, message }) => {
+const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className, components: componentsProp, isStreaming: isStreamingProp, message }) => {
+    const components = componentsProp ?? NO_COMPONENTS;
+    const isStreaming = isStreamingProp ?? false;
     const { t } = useLingui();
     const {
         DeviceToolCall,
