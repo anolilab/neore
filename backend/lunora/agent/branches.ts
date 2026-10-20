@@ -48,6 +48,8 @@ export const listActivePathPage = async (
     thread: Pick<Doc<"threads">, "_id" | "activeLeafMessageId">,
     paginationOptions: { cursor: string | null; endCursor?: string; numItems: number },
     unlockProof?: string | null,
+    // Callers that never show the switcher (the prompt outline) skip one sibling read per row.
+    withSiblings = true,
 ): Promise<(PaginationResult<Doc<"messages">> & { branches: Map<string, MessageBranch> }) | null> => {
     if (!thread.activeLeafMessageId) {
         return null;
@@ -82,19 +84,21 @@ export const listActivePathPage = async (
 
     // Each row's parent is the row after it in the walk; the last row's is
     // `next` (`null` = top level). Siblings are that parent's children.
-    await Promise.all(
-        rows.map(async (row, index) => {
-            const siblings = await childrenOf(context, threadId, rows[index + 1] ?? next);
+    if (withSiblings) {
+        await Promise.all(
+            rows.map(async (row, index) => {
+                const siblings = await childrenOf(context, threadId, rows[index + 1] ?? next);
 
-            if (siblings.length > 1) {
-                branches.set(row._id, {
-                    count: siblings.length,
-                    index: siblings.findIndex((sibling) => sibling._id === row._id),
-                    siblingIds: siblings.map((sibling) => sibling._id as string),
-                });
-            }
-        }),
-    );
+                if (siblings.length > 1) {
+                    branches.set(row._id, {
+                        count: siblings.length,
+                        index: siblings.findIndex((sibling) => sibling._id === row._id),
+                        siblingIds: siblings.map((sibling) => sibling._id as string),
+                    });
+                }
+            }),
+        );
+    }
 
     return { branches, continueCursor: next ? `${BRANCH_CURSOR_PREFIX}${next._id}` : "", isDone: next === null, page: rows };
 };

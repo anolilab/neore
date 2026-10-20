@@ -31,4 +31,42 @@ export const buildMinimapItems = (messages: ReadonlyArray<{ id: string; role: st
             return { id: message.id, preview: toMinimapPreview(message.text) };
         });
 
+/**
+ * Ids a prompt carries before the server names it. Sending replaces them, so they are
+ * not a prompt that went missing.
+ */
+export const isProvisionalId = (id: string): boolean => id.startsWith("optimistic-") || id.startsWith("transitioning-");
+
+/**
+ * The loaded prompts, merged with the server outline. The outline is the newest run of
+ * prompts, and the loaded window is a contiguous run too, so: loaded prompts before the
+ * first one the outline shares are older than it and go ahead; loaded prompts after the
+ * outline's own are prompts sent since it was read and go at the end. The outline is
+ * `undefined` until it loads, and while the whole chat is loaded it is not asked for at all.
+ */
+export const mergeOutline = (outline: ReadonlyArray<{ id: string; text: string }> | undefined, loaded: ReadonlyArray<MinimapItem>): MinimapItem[] => {
+    if (!outline || outline.length === 0) {
+        return [...loaded];
+    }
+
+    const known = new Set(outline.map((entry) => entry.id));
+    const older = outline.map((entry) => {
+        return { id: entry.id, preview: toMinimapPreview(entry.text) };
+    });
+    const cut = loaded.findIndex((item) => known.has(item.id));
+
+    if (cut === -1) {
+        return [...older, ...loaded];
+    }
+
+    return [...loaded.slice(0, cut), ...older, ...loaded.slice(cut).filter((item) => !known.has(item.id))];
+};
+
+/**
+ * Whether a prompt that was loaded is gone from the loaded list. Loading older pages and
+ * sending a prompt only ADD ids; switching branch, editing a prompt or deleting one
+ * REMOVES some, and the server outline (read once) then lists prompts that are off the path.
+ */
+export const promptsDropped = (previous: ReadonlySet<string>, current: ReadonlySet<string>): boolean => [...previous].some((id) => !current.has(id));
+
 export const shouldShowMinimap = (items: ReadonlyArray<MinimapItem>): boolean => items.length >= MINIMAP_MIN_PROMPTS;

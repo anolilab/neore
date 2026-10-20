@@ -3332,7 +3332,7 @@ msgstr "附件"
 msgid "Attachment (hidden)"
 msgstr "附件（已隐藏）"
 
-#: src/features/chat/thread/thread-minimap.tsx:42
+#: src/features/chat/thread/thread-minimap.tsx:55
 msgid "Attachment only"
 msgstr ""
 
@@ -15016,7 +15016,7 @@ msgstr "评委得分"
 msgid "Judge: {0}"
 msgstr "评委：{0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:50
+#: src/features/chat/thread/thread-minimap.tsx:63
 msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr ""
 
@@ -21591,7 +21591,7 @@ msgstr "提示词变量"
 msgid "Prompts"
 msgstr "提示词"
 
-#: src/features/chat/thread/thread-minimap.tsx:37
+#: src/features/chat/thread/thread-minimap.tsx:50
 msgid "Prompts in this conversation"
 msgstr ""
 
