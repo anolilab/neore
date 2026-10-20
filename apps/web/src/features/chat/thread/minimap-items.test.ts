@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMinimapItems, isProvisionalId, mergeOutline, MINIMAP_PREVIEW_CHARS, minimapGapLabel, promptsDropped, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
+import {
+    buildMinimapItems,
+    isProvisionalId,
+    mergeOutline,
+    MINIMAP_PREVIEW_CHARS,
+    minimapGapLabel,
+    promptsDropped,
+    shouldShowMinimap,
+    toMinimapPreview,
+} from "./minimap-items";
 
 describe("toMinimapPreview", () => {
     it("collapses whitespace and newlines to one line", () => {
@@ -117,6 +126,22 @@ describe("mergeOutline", () => {
 
         expect(shouldShowMinimap([{ id: "x", preview: "only one loaded" }])).toBe(false);
         expect(shouldShowMinimap(mergeOutline(outline, [{ id: "x", preview: "only one loaded" }]))).toBe(true);
+    });
+
+    it("keeps the send time of a loaded prompt that the outline also lists", () => {
+        const prompts = [
+            { id: "p1", preview: "first", createdAt: 1000 },
+            { id: "p2", preview: "second", createdAt: 2000 },
+        ];
+        const merged = mergeOutline(
+            [
+                { id: "p1", text: "first" },
+                { id: "p2", text: "second" },
+            ],
+            prompts,
+        );
+
+        expect(merged.map((item) => item.createdAt)).toStrictEqual([1000, 2000]);
     });
 });
 

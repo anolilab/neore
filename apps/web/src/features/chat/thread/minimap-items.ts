@@ -77,8 +77,10 @@ export const mergeOutline = (outline: ReadonlyArray<{ id: string; text: string }
     }
 
     const known = new Set(outline.map((entry) => entry.id));
+    // The outline carries no times, so a prompt that is also loaded keeps the time the loaded copy has.
+    const loadedTimes = new Map(loaded.map((item) => [item.id, item.createdAt]));
     const older = outline.map((entry) => {
-        return { id: entry.id, preview: toMinimapPreview(entry.text) };
+        return { id: entry.id, preview: toMinimapPreview(entry.text), createdAt: loadedTimes.get(entry.id) };
     });
     const cut = loaded.findIndex((item) => known.has(item.id));
 

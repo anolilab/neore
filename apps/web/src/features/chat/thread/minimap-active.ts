@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 
 /**
  * Which prompt the reader is at, for the minimap's highlight: the LAST prompt, in rail order,
- * whose row has reached the reading band. A row that was never observed counts as not reached,
- * so a prompt still in the virtualized head or not loaded yet is simply not picked.
+ * whose row has reached the reading line. A prompt that is not in the DOM (virtualized out, or not
+ * loaded yet) is not in `reached`, so it is simply not picked.
  */
 export const lastReachedId = (order: ReadonlyArray<string>, reached: ReadonlySet<string>): string | undefined => {
     for (let index = order.length - 1; index >= 0; index -= 1) {
@@ -20,81 +20,79 @@ export const lastReachedId = (order: ReadonlyArray<string>, reached: ReadonlySet
 /** Rows are tagged by the message list; the rail reads the same tag. */
 const ROW_SELECTOR = "[data-list-message-id]";
 const LIST_SELECTOR = ".message-list";
-/** Used when the observer cannot report the band itself: the top 40% of the viewport. */
-const FALLBACK_BAND_RATIO = 0.4;
 
 /**
- * Observes the prompt rows of the message list and returns the id of the prompt being read.
- * A row counts as reached once its top has crossed the band's bottom edge, so a prompt scrolled
- * past stays reached until the reader scrolls back above it.
+ * The reading line sits at the middle of the viewport. A row counts as reached once its top is
+ * above it, so a prompt the click handler centres is reached too.
+ */
+const READING_LINE_RATIO = 0.5;
+
+/**
+ * Returns the id of the prompt being read. It is measured from the rows themselves on every
+ * scroll, resize and list change, rather than from observer entries, so a row that jumps past
+ * the line without crossing an observed edge cannot leave a stale highlight.
  */
 export const useActivePromptId = (ids: ReadonlyArray<string>): string | undefined => {
     const [active, setActive] = useState<string | undefined>(undefined);
-    // A string key, so a new array with the same ids does not restart the observer.
+    // A string key, so a new array with the same ids does not restart the measuring.
     const key = ids.join("\u{0}");
 
     useEffect(() => {
         const order = key === "" ? [] : key.split("\u{0}");
         const wanted = new Set(order);
 
-        if (order.length === 0 || typeof IntersectionObserver === "undefined") {
+        if (order.length === 0) {
             setActive(undefined);
 
             return undefined;
         }
 
-        const reached = new Set<string>();
-        const watched = new WeakSet<Element>();
+        let frame = 0;
 
-        const observer = new IntersectionObserver(
-            (entries) => {
-                for (const entry of entries) {
-                    const id = (entry.target as HTMLElement).dataset.listMessageId;
+        const measure = () => {
+            frame = 0;
 
-                    if (id === undefined || !wanted.has(id)) {
-                        continue;
-                    }
+            const line = window.innerHeight * READING_LINE_RATIO;
+            const reached = new Set<string>();
 
-                    const band = entry.rootBounds?.bottom ?? window.innerHeight * FALLBACK_BAND_RATIO;
-                    const isReached = entry.boundingClientRect.top <= band;
-
-                    if (isReached) {
-                        reached.add(id);
-                    } else {
-                        reached.delete(id);
-                    }
-                }
-
-                setActive(lastReachedId(order, reached));
-            },
-            // The top 40% of the viewport is the reading band; a row below it is not reached yet.
-            { rootMargin: `0px 0px -${(1 - FALLBACK_BAND_RATIO) * 100}% 0px` },
-        );
-
-        const observeRows = () => {
             for (const row of document.querySelectorAll<HTMLElement>(ROW_SELECTOR)) {
                 const id = row.dataset.listMessageId;
 
-                if (id !== undefined && wanted.has(id) && !watched.has(row)) {
-                    watched.add(row);
-                    observer.observe(row);
+                if (id !== undefined && wanted.has(id) && row.getBoundingClientRect().top <= line) {
+                    reached.add(id);
                 }
+            }
+
+            setActive(lastReachedId(order, reached));
+        };
+
+        // At most one measure per frame: scroll events arrive far faster than the screen repaints.
+        const schedule = () => {
+            if (frame === 0) {
+                frame = requestAnimationFrame(measure);
             }
         };
 
-        observeRows();
+        schedule();
+        // Scroll events do not bubble, so the scrolling chat container is caught in the capture phase.
+        window.addEventListener("scroll", schedule, { capture: true, passive: true });
+        window.addEventListener("resize", schedule);
 
-        // Rows mount as the reader scrolls (the head is virtualized), so watch the list for new ones.
         const list = document.querySelector(LIST_SELECTOR);
-        const mutations = list ? new MutationObserver(observeRows) : undefined;
+        const mutations = list ? new MutationObserver(schedule) : undefined;
 
         if (list && mutations) {
             mutations.observe(list, { childList: true, subtree: true });
         }
 
         return () => {
+            if (frame !== 0) {
+                cancelAnimationFrame(frame);
+            }
+
+            window.removeEventListener("scroll", schedule, { capture: true });
+            window.removeEventListener("resize", schedule);
             mutations?.disconnect();
-            observer.disconnect();
         };
     }, [key]);
 

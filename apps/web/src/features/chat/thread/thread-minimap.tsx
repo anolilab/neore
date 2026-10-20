@@ -131,14 +131,17 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
                                             >
                                                 <span aria-hidden="true" className="relative h-0.5 w-4 rounded-full">
                                                     <span className="bg-muted-foreground/40 group-hover:bg-foreground absolute inset-0 rounded-full motion-safe:transition-colors" />
-                                                    <span className="bg-foreground absolute inset-0 rounded-full opacity-0 motion-safe:transition-opacity motion-safe:duration-150 group-data-[active=true]:opacity-100" />
+                                                    <span className="bg-foreground absolute inset-0 rounded-full opacity-0 group-data-[active=true]:opacity-100 motion-safe:transition-opacity motion-safe:duration-150" />
                                                 </span>
                                             </button>
                                         }
                                     />
                                     <TooltipContent className="max-w-xs" side="left">
                                         {item.createdAt !== undefined && (
-                                            <time className="text-muted-foreground block text-[10px] tabular-nums" dateTime={new Date(item.createdAt).toISOString()}>
+                                            <time
+                                                className="text-muted-foreground block text-[10px] tabular-nums"
+                                                dateTime={new Date(item.createdAt).toISOString()}
+                                            >
                                                 {formatMessageTime(item.createdAt, i18n.locale)}
                                             </time>
                                         )}
