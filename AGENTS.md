@@ -1877,8 +1877,8 @@ error")` (any transport, including the SSRF-guarded tool
   `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
   `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
   beta is a day old and a deploy has passed on it. The Lunora catalog follows the `alpha` tags
-  and every `@lunora/*` package resolves to one version (2026-10-16: `lunorash` 397, `cli` 398,
-  `workflow` 78 everywhere). A meta-package release lags the package it pins by one release wave
+  and every `@lunora/*` package resolves to one version (2026-10-20: `lunorash` 405, `cli` 406,
+  `workflow` 87 everywhere). A meta-package release lags the package it pins by one release wave
   (`lunorash` 389 still pinned the `observability` that had the `ctx.db` facade bug when that was
   fixed), so wait until `npm view lunorash@alpha dependencies` shows the fixed version before
   bumping, rather than overriding.
