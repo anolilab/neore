@@ -10,6 +10,7 @@ import { streamText } from "ai";
 import { z } from "zod";
 
 import type { HonoEnv } from "../../env.js";
+import { countPromptTextChars, estimateCancelledUsage } from "../../lib/cancelled-usage.js";
 import { contextPreflight } from "../../lib/context-preflight.js";
 import type { ErrorCode } from "../../lib/errors.js";
 import { enrichError, GatewayError } from "../../lib/errors.js";
@@ -418,6 +419,38 @@ streamRouter.openapi(
             const execContext = c.executionCtx;
 
             let isCancelled = false;
+            let emittedChars = 0;
+            let reasoningChars = 0;
+
+            /** Counts the text a relayed chunk carries, for the usage estimate of a cancelled stream. */
+            const countDelta = (chunk: string): void => {
+                const payload = SSE_SINGLE_EVENT_RE.exec(chunk)?.[1];
+
+                if (!payload?.startsWith('{"textDelta"')) {
+                    return;
+                }
+
+                try {
+                    const { textDelta, type } = JSON.parse(payload) as { textDelta: string; type: string };
+
+                    if (type === "reasoning") {
+                        reasoningChars += textDelta.length;
+                    } else {
+                        emittedChars += textDelta.length;
+                    }
+                } catch {
+                    // Not a JSON payload: nothing to count.
+                }
+            };
+
+            // A cancel before the provider's finish rejects `usage`; that stream is billed on an estimate below.
+            const unlessCancelled = (error: unknown): undefined => {
+                if (isCancelled) {
+                    return undefined;
+                }
+
+                throw error;
+            };
 
             const stream = new ReadableStream({
                 cancel(reason) {
@@ -435,6 +468,7 @@ streamRouter.openapi(
                     try {
                         // Replay the buffered first chunk from the warm-up peek.
                         if (firstChunk !== undefined) {
+                            countDelta(firstChunk);
                             send(firstChunk);
                         }
 
@@ -448,14 +482,19 @@ streamRouter.openapi(
                                 ttftMs = Date.now() - startTime;
                             }
 
+                            countDelta(chunk);
                             send(chunk);
                         }
 
-                        // Wait for the result to complete and get final usage
-                        const finalUsage = await result.usage;
-                        const finishReason = await result.finishReason;
+                        // Wait for the result to complete and get final usage. The provider already produced
+                        // what a cancelled stream relayed, so a cancel without usage is billed on an estimate.
+                        const finalUsage = await result.usage.then(undefined, unlessCancelled);
+                        const isEstimated = isCancelled && finalUsage === undefined;
+                        const finishReason = isEstimated ? "cancelled" : await result.finishReason;
                         const latencyMs = Date.now() - startTime;
-                        const tokens = extractTokenCounts(finalUsage);
+                        const tokens = isEstimated
+                            ? estimateCancelledUsage({ emittedChars, promptChars: countPromptTextChars(cachedMessages, body.system), reasoningChars })
+                            : extractTokenCounts(finalUsage);
 
                         // Calculate cost
                         const pricing = await pricingService.getPricing(body.modelApiId, body.provider);
@@ -494,6 +533,7 @@ streamRouter.openapi(
                                         costMicrodollars,
                                         // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
                                         ...(isErrored && { errorCode: "PROVIDER_ERROR" }),
+                                        ...(isEstimated && { errorCode: "CANCELLED" }),
                                         finishReason,
                                         guardrailViolations: guardrailViolationsJson,
                                         isStreaming: true,
