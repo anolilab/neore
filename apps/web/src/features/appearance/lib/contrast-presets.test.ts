@@ -37,6 +37,7 @@ const TEXT_PAIRS = [
     ["--secondary-foreground", "--secondary"],
     ["--accent-foreground", "--accent"],
     ["--destructive", "--background"],
+    ["--destructive-foreground", "--destructive"],
     ["--sidebar-foreground", "--sidebar"],
     ["--sidebar-accent-foreground", "--sidebar-accent"],
 ] as const;
