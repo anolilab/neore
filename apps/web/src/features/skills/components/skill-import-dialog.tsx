@@ -44,7 +44,7 @@ interface SkillImportDialogProps {
 const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClose, onImported }) => {
     const { t } = useLingui();
     const [upload, setUpload] = useState<SkillUpload>({ filename: "SKILL.md", files: [], markdown: "" });
-    // Bumped by every edit of the upload. A link fetch that was started before a later edit is stale and must not replace it.
+    // Bumped by every edit of the upload and of the link. A file read or link fetch started before a later edit is stale and must not replace it.
     const uploadRevision = useRef(0);
     const replaceUpload = (next: SkillUpload) => {
         uploadRevision.current += 1;
@@ -79,28 +79,48 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
             return;
         }
 
-        try {
-            replaceUpload(await readSkillUpload(file, loadJsZip));
+        const revision = uploadRevision.current;
+        // Settled before the check below, so a read that was superseded never reports its error either.
+        const outcome = await readSkillUpload(file, loadJsZip)
+            .then((next) => {
+                return { ok: true as const, next };
+            })
+            .catch((error: unknown) => {
+                return { ok: false as const, message: describeReadError(error, t`This file could not be read.`, (megabytes) => t`The file is larger than ${megabytes} MB.`) };
+            });
+
+        if (revision !== uploadRevision.current) {
+            return;
+        }
+
+        if (outcome.ok) {
+            replaceUpload(outcome.next);
             setReadError(null);
-        } catch (error) {
-            setReadError(describeReadError(error, t`This file could not be read.`, (megabytes) => t`The file is larger than ${megabytes} MB.`));
+        } else {
+            setReadError(outcome.message);
         }
     };
 
     // The server reads the SKILL.md (GitHub links only); it lands in the box below for the same preview and checks as pasted text.
     const handleFetchLink = async () => {
-        try {
-            const revision = uploadRevision.current;
-            const fetched = await fetchSkill({ url: link });
+        const revision = uploadRevision.current;
+        const outcome = await fetchSkill({ url: link })
+            .then((fetched) => {
+                return { ok: true as const, fetched };
+            })
+            .catch((error: unknown) => {
+                return { ok: false as const, message: error instanceof Error && error.message ? error.message : t`That link could not be read.` };
+            });
 
-            if (revision !== uploadRevision.current) {
-                return;
-            }
+        if (revision !== uploadRevision.current) {
+            return;
+        }
 
-            replaceUpload({ filename: fetched.filename, files: [], markdown: fetched.markdown });
+        if (outcome.ok) {
+            replaceUpload({ filename: outcome.fetched.filename, files: [], markdown: outcome.fetched.markdown });
             setReadError(null);
-        } catch (error) {
-            setReadError(error instanceof Error && error.message ? error.message : t`That link could not be read.`);
+        } else {
+            setReadError(outcome.message);
         }
     };
 
@@ -158,7 +178,11 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                         <Input
                             id={linkId}
                             inputMode="url"
-                            onChange={(event) => setLink(event.target.value)}
+                            onChange={(event) => {
+                                // A fetch in flight is for the link the user just replaced: its result must not land.
+                                uploadRevision.current += 1;
+                                setLink(event.target.value);
+                            }}
                             onKeyDown={handleLinkKeyDown}
                             placeholder="https://github.com/owner/repo/tree/main/skills/my-skill"
                             type="url"
@@ -216,7 +240,7 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                 <Button onClick={onClose} type="button" variant="outline">
                     {t`Cancel`}
                 </Button>
-                <Button disabled={!preview?.ok || isPending} onClick={handleImport} type="button">
+                <Button disabled={!preview?.ok || isPending || isFetching} onClick={handleImport} type="button">
                     {isPending && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
                     {t`Import`}
                 </Button>
