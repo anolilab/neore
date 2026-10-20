@@ -31,8 +31,9 @@ const $ = (id: string): HTMLElement => {
 };
 
 // Page-wide state, kept on one object so the functions below assign properties rather than module bindings.
-const state: { current: Prompt | null; expiryTimer?: ReturnType<typeof setInterval>; settings: SettingsView | null } = {
+const state: { current: Prompt | null; expiryTimer?: ReturnType<typeof setInterval>; saves: Promise<void>; settings: SettingsView | null } = {
     current: null,
+    saves: Promise.resolve(),
     settings: null,
 };
 
@@ -171,15 +172,34 @@ const listItem = (label: string, action?: string, onAction?: () => void): HTMLLI
     return item;
 };
 
-const update = async (changes: Record<string, unknown>): Promise<void> => {
-    try {
-        state.settings = await globalThis.neoreDevice.settingsUpdate(changes);
-        status("Saved.");
-        renderSettings();
-    } catch (error) {
-        status(String(error));
-    }
+// Each change is built from the settings as they stand when its turn comes, so a quick second edit cannot overwrite the first.
+const update = async (change: (latest: SettingsView) => Record<string, unknown>): Promise<void> => {
+    const previous = state.saves;
+
+    state.saves = (async () => {
+        await previous;
+
+        if (state.settings === null) {
+            return;
+        }
+
+        try {
+            state.settings = await globalThis.neoreDevice.settingsUpdate(change(state.settings));
+            status("Saved.");
+            renderSettings();
+        } catch (error) {
+            status(String(error));
+        }
+    })();
+
+    await state.saves;
 };
+
+const removeRoot = (root: string): Promise<void> => update((latest) => ({ roots: latest.roots.filter((other) => other !== root) }));
+
+const removeServer = (name: string): Promise<void> => update((latest) => ({ mcpServers: latest.mcpServers.filter((other) => other.name !== name) }));
+
+const removeRule = (rule: string): Promise<void> => update((latest) => ({ allowRules: latest.allowRules.filter((other) => other !== rule) }));
 
 const renderSettings = (): void => {
     if (state.settings === null) {
@@ -203,18 +223,16 @@ const renderSettings = (): void => {
             : `Not available on this computer: ${view.sandboxUnavailable}. ${unsandboxed}`,
     );
 
-    $("roots").replaceChildren(...view.roots.map((root) => listItem(root, "Remove", () => update({ roots: view.roots.filter((other) => other !== root) }))));
+    $("roots").replaceChildren(...view.roots.map((root) => listItem(root, "Remove", () => removeRoot(root))));
     $("servers").replaceChildren(
         ...view.mcpServers.map((server) =>
-            listItem(`${server.name}: ${[server.command, ...server.args].join(" ")}`, "Remove", () =>
-                update({ mcpServers: view.mcpServers.filter((other) => other.name !== server.name) }),
-            ),
+            listItem(`${server.name}: ${[server.command, ...server.args].join(" ")}`, "Remove", () => removeServer(server.name)),
         ),
     );
     $("rules").replaceChildren(
         ...(view.allowRules.length === 0
             ? [listItem("None — every action asks.")]
-            : view.allowRules.map((rule) => listItem(rule, "Remove", () => update({ allowRules: view.allowRules.filter((other) => other !== rule) })))),
+            : view.allowRules.map((rule) => listItem(rule, "Remove", () => removeRule(rule)))),
     );
     setText("audit-path", `Full log: ${view.auditPath}`);
 };
@@ -244,8 +262,8 @@ const loadSettings = async (): Promise<void> => {
 const addRoot = async (path: string): Promise<void> => {
     const trimmed = path.trim();
 
-    if (trimmed && state.settings !== null) {
-        await update({ roots: [...state.settings.roots, trimmed] });
+    if (trimmed) {
+        await update((latest) => ({ roots: [...latest.roots, trimmed] }));
     }
 };
 
@@ -279,7 +297,7 @@ $("require-sandbox").addEventListener("change", async (event) => {
         return;
     }
 
-    await update({ requireShellSandbox: required });
+    await update(() => ({ requireShellSandbox: required }));
 });
 
 $("allow-network").addEventListener("change", async (event) => {
@@ -295,12 +313,12 @@ $("allow-network").addEventListener("change", async (event) => {
         return;
     }
 
-    await update({ allowShellNetwork: allowed });
+    await update(() => ({ allowShellNetwork: allowed }));
 });
 
 $("unpair").addEventListener("click", async () => {
     if (await globalThis.neoreDevice.confirm("Unpair this computer? The agent will no longer be able to ask for anything here.")) {
-        await update({ unpair: true });
+        await update(() => ({ unpair: true }));
     }
 });
 
@@ -335,7 +353,7 @@ $("server-form").addEventListener("submit", async (event) => {
             .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
     );
 
-    await update({ mcpServers: [...state.settings.mcpServers, { args, command, env, name }] });
+    await update((latest) => ({ mcpServers: [...latest.mcpServers, { args, command, env, name }] }));
     (event.target as HTMLFormElement).reset();
 });
 

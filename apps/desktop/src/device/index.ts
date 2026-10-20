@@ -35,9 +35,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         core?: DeviceCore;
         coreError?: unknown;
         local?: BrowserWindowInstance;
-        /** The site frame that last made a trusted relay call: progress and changes go there. */
-        site?: WebContents;
     } = {};
+    /** Every site window that has made a trusted relay call and is still open: progress and changes go to each. */
+    const sites = new Set<WebContents>();
     const localUrl = pathToFileURL(LOCAL_PAGE).href;
 
     const requireCore = (): DeviceCore => {
@@ -128,7 +128,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
                 throw new Error("device: untrusted sender");
             }
 
-            state.site = event.sender;
+            if (!sites.has(event.sender)) {
+                sites.add(event.sender);
+                event.sender.once("destroyed", () => sites.delete(event.sender));
+            }
 
             return handler(event, ...args);
         });
@@ -160,12 +163,18 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
         switch (event.type) {
             case "changed": {
-                send(state.site, DEVICE_CHANNEL.changed);
+                for (const site of sites) {
+                    send(site, DEVICE_CHANNEL.changed);
+                }
+
                 break;
             }
             case "progress": {
                 // The signed report; the page forwards it to the backend, which verifies it.
-                send(state.site, DEVICE_CHANNEL.progress, { callId: event.callId, payload: event.payload, signature: event.signature });
+                for (const site of sites) {
+                    send(site, DEVICE_CHANNEL.progress, { callId: event.callId, payload: event.payload, signature: event.signature });
+                }
+
                 break;
             }
             case "prompt": {

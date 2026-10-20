@@ -14,9 +14,11 @@ import type { DeviceIpcOptions } from "./index";
 
 type Frame = { url: string };
 type WebContents = {
+    destroy: () => void;
     destroyed: boolean;
     isDestroyed: () => boolean;
     mainFrame: Frame;
+    once: (event: string, listener: () => void) => void;
     send: ReturnType<typeof vi.fn>;
 };
 type IpcEvent = { sender: WebContents; senderFrame: Frame | null };
@@ -36,9 +38,11 @@ const fake = vi.hoisted(() => {
 vi.mock("electron", () => {
     const contentsOf = (): WebContents => {
         const contents: WebContents = {
+            destroy: () => {},
             destroyed: false,
             isDestroyed: () => contents.destroyed,
             mainFrame: { url: "file:///app/device.html" },
+            once: () => {},
             send: vi.fn(),
         };
 
@@ -121,6 +125,21 @@ const options: DeviceIpcOptions = {
     isTrusted: (event) => isTrustedUrl(SITE_ORIGIN, (event as unknown as IpcEvent).senderFrame?.url),
 };
 
+const siteWebContents = (url: string): WebContents => {
+    const listeners = new Map<string, () => void>();
+
+    return {
+        destroy: () => listeners.get("destroyed")?.(),
+        destroyed: false,
+        isDestroyed: () => false,
+        mainFrame: { url },
+        once: (event, listener) => {
+            listeners.set(event, listener);
+        },
+        send: vi.fn(),
+    };
+};
+
 let siteContents: WebContents;
 const siteEvent = (): IpcEvent => {
     return { sender: siteContents, senderFrame: { url: "https://neore.example/chat" } };
@@ -189,7 +208,7 @@ beforeEach(() => {
     fake.coreThrows = false;
     core = makeCore();
     fake.coreImpl = core;
-    siteContents = { destroyed: false, isDestroyed: () => false, mainFrame: { url: "https://neore.example/chat" }, send: vi.fn() };
+    siteContents = siteWebContents("https://neore.example/chat");
     registerDeviceIpc(options);
 });
 
@@ -290,6 +309,24 @@ describe("events", () => {
         invoke(DEVICE_CHANNEL.status, siteEvent());
         fake.coreEmit?.(JSON.stringify({ type: "changed" }));
 
+        expect(siteContents.send).toHaveBeenCalledWith(DEVICE_CHANNEL.changed, undefined);
+    });
+
+    it("sends events to every open site window, and only to the open ones", () => {
+        const thread = siteWebContents("https://neore.example/chat/thread");
+
+        invoke(DEVICE_CHANNEL.status, siteEvent());
+        invoke(DEVICE_CHANNEL.status, { sender: thread, senderFrame: thread.mainFrame });
+        fake.coreEmit?.(JSON.stringify({ type: "changed" }));
+
+        expect(siteContents.send).toHaveBeenCalledWith(DEVICE_CHANNEL.changed, undefined);
+        expect(thread.send).toHaveBeenCalledWith(DEVICE_CHANNEL.changed, undefined);
+
+        thread.destroy();
+        thread.send.mockClear();
+        fake.coreEmit?.(JSON.stringify({ type: "changed" }));
+
+        expect(thread.send).not.toHaveBeenCalled();
         expect(siteContents.send).toHaveBeenCalledWith(DEVICE_CHANNEL.changed, undefined);
     });
 
