@@ -7,6 +7,7 @@
  */
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 import type { VimMode as VimModeName, VimState } from "../vim-keys";
@@ -20,6 +21,14 @@ export interface VimModeOptions {
 }
 
 const vimPluginKey = new PluginKey<VimState>("vimMode");
+
+/**
+ * Re-reads the plugin's attributes and decorations, and resets it to insert mode. The plugin only reads the setting on an
+ * editor update, so a setting changed while the editor is open takes effect here rather than at the next keystroke.
+ */
+export const refreshVimMode = (view: EditorView): void => {
+    view.dispatch(view.state.tr.setMeta(vimPluginKey, INITIAL_VIM_STATE));
+};
 
 const VimMode = Extension.create<VimModeOptions>({
     addOptions() {

@@ -43,7 +43,7 @@ import SlashCommand from "./extensions/slash-command";
 import SubmitOnEnter from "./extensions/submit-on-enter";
 import type { VariableAutocompleteMatch } from "./extensions/variable-autocomplete";
 import VariableAutocomplete from "./extensions/variable-autocomplete";
-import VimMode from "./extensions/vim-mode";
+import VimMode, { refreshVimMode } from "./extensions/vim-mode";
 import type { VaultFileRef } from "./file-mention-popup";
 import FileMentionPopup from "./file-mention-popup";
 import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-completion-controller";
@@ -386,6 +386,13 @@ const ComposerTiptapEditor = ({
             editor.setEditable(!disabled);
         }
     }, [disabled, editor]);
+
+    // Turning Vim on or off while the editor is open: the caret class and the mode label follow at once, not at the next keystroke.
+    useEffect(() => {
+        if (editor && !editor.isDestroyed) {
+            refreshVimMode(editor.view);
+        }
+    }, [isVimEnabled, editor]);
 
     // Update banned word decorations when matches change
     useEffect(() => {
