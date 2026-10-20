@@ -12,6 +12,7 @@ import { withoutUndefined } from "../lib/patch";
 import { systemDb } from "../lib/rls/scope";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { withDependency } from "../lib/dependency";
+import { signedReadUrl } from "../lib/storage-read";
 
 export const getExportStatus = authQuery.query(async ({ ctx }) => {
     const { userId } = ctx.user;
@@ -357,7 +358,7 @@ export const getExportDownloadUrl = authAction
         }
 
         const { storageId } = request;
-        const url = await withDependency("file storage", () => ctx.storage.getUrl(storageId));
+        const url = await withDependency("file storage", () => signedReadUrl(ctx.storage, String(storageId), 3600));
 
         if (!url) {
             throw new LunoraError("INTERNAL_SERVER_ERROR", "Failed to generate download URL. Please try again.");
