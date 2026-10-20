@@ -1,5 +1,6 @@
 import type { Id } from "../../../_generated/dataModel";
 import { internalMutation } from "../../../_generated/server";
+import { patchThread } from "../../../agent/table-writes";
 import { purgeExpiredToolApprovalRuns } from "../../lib/tool-approval-cleanup";
 
 const BATCH_SIZE = 100;
@@ -28,7 +29,7 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
         const live = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId: stream.threadId } });
 
         if (thread?.status === "running" && !live) {
-            await ctx.db.patch(thread._id, { status: "active", updatedAt: now });
+            await patchThread(ctx.db, thread._id, { status: "active", updatedAt: now });
         }
     }
 

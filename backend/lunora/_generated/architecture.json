@@ -781,11 +781,6 @@
       "to": "table:threadRelationships"
     },
     {
-      "from": "function:agent_threads:listPinnedThreads",
-      "kind": "read",
-      "to": "table:threads"
-    },
-    {
       "from": "function:agent_threads:listThreadOrders",
       "kind": "read",
       "to": "table:threads"
@@ -16369,43 +16364,43 @@
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 205,
+      "line": 207,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 217,
+      "line": 219,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 356,
+      "line": 358,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 373,
+      "line": 375,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 424,
+      "line": 426,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 434,
+      "line": 436,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 440,
+      "line": 442,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
@@ -16573,7 +16568,7 @@
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1425,
+      "line": 1431,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -18889,13 +18884,13 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 875,
+      "line": 882,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 917,
+      "line": 930,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
