@@ -23,6 +23,9 @@ const AuthContext = createContext<AuthValue | null>(null);
 /** Re-mint the JWT this long before the client's own refresh point, if `exp` is unknown. */
 const FALLBACK_REFRESH_MS = 60_000;
 
+/** How long to wait before re-minting after the token route failed without answering "no session". */
+const TOKEN_RETRY_MS = 15_000;
+
 /**
  * Keeps the Lunora client's bearer in step with the stored grant. The JWT lives in
  * memory only; it is re-minted when client-runtime says the current one is due.
@@ -42,7 +45,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const isStale = () => isCancelled || signOutsAtStart !== signOutCount.current;
 
         const run = async () => {
-            const jwt = await fetchAccessToken({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
+            let jwt: string | null;
+
+            try {
+                jwt = await fetchAccessToken({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
+            } catch {
+                // The grant is still stored: keep the current state and try again.
+                if (!isStale()) {
+                    timer = setTimeout(() => setRefreshTick((tick) => tick + 1), TOKEN_RETRY_MS);
+                }
+
+                return;
+            }
 
             if (isStale()) {
                 return;
