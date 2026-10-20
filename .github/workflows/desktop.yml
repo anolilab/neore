@@ -145,6 +145,20 @@ jobs:
               if: "matrix.name == 'windows'"
               run: "pnpm --filter @neore/device-core-node run build -- --target aarch64-pc-windows-msvc"
 
+            # The packaged version is the tag's (`desktop-v1.2.3` → `1.2.3`): electron-updater compares
+            # versions, so a `0.0.0` installer would never be offered as an update. Runner-only, not committed.
+            - name: "Set the packaged version from the tag"
+              shell: "bash"
+              env:
+                  TAG: "${{ github.ref_name }}"
+              run: |
+                  version="${TAG#desktop-v}"
+                  if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+                      echo "Tag $TAG does not carry a semver version" >&2
+                      exit 1
+                  fi
+                  node -e "const fs = require('node:fs'); const file = 'apps/desktop/package.json'; const pkg = JSON.parse(fs.readFileSync(file, 'utf8')); pkg.version = process.argv[1]; fs.writeFileSync(file, JSON.stringify(pkg, null, 4) + '\n');" "$version"
+
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"
 
