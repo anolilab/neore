@@ -19,6 +19,29 @@ vi.mock("../env", () => env);
 const { checkoutProducts, planProducts } = await import("./products");
 const { planOfProduct } = await import("./plans");
 
+describe("product ids", () => {
+    it("refuses a product id that two plans or intervals share, rather than choosing one", () => {
+        const saved = env.CREEM_PRODUCT_TEAM_YEARLY;
+
+        env.CREEM_PRODUCT_TEAM_YEARLY = "prod_pro";
+
+        expect(() => planProducts()).toThrow("more than one plan or interval");
+        expect(() => checkoutProducts()).toThrow("more than one plan or interval");
+
+        env.CREEM_PRODUCT_TEAM_YEARLY = saved;
+    });
+
+    it("ignores an unconfigured (empty) id when checking for a collision", () => {
+        const saved = env.CREEM_PRODUCT_TEAM_YEARLY;
+
+        env.CREEM_PRODUCT_TEAM_YEARLY = "";
+
+        expect(() => planProducts()).not.toThrow();
+
+        env.CREEM_PRODUCT_TEAM_YEARLY = saved;
+    });
+});
+
 describe("yearly gate", () => {
     it("offers no yearly checkout while the flag is off, but still recognises the yearly products", () => {
         expect(checkoutProducts().yearly).toBeUndefined();
