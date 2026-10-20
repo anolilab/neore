@@ -891,14 +891,17 @@ export const checkRateLimit = async (
     } catch (error: any) {
         // Scoped to the code, not to `instanceof LunoraError`. Only the rate-limit
         // error this function throws itself is meant to propagate; anything else
-        // (a failed internal mutation, an infra error) still fails OPEN below, as
-        // it did when this checked the earlier error class. Widening it to any
-        // LunoraError would turn those into request rejections.
+        // (a failed internal mutation, an infra error) fails OPEN below: every
+        // caller reads `ok: false` as "limited" and drops the request (a messenger
+        // or trigger webhook is not redelivered). Widening it to any LunoraError
+        // would turn those into request rejections.
         if (error instanceof LunoraError && error.code === "TOO_MANY_REQUESTS") {
             throw error;
         }
 
-        return { ok: false };
+        console.error("[rate-limit] check failed open", { error, operation });
+
+        return { ok: true };
     }
 };
 

@@ -1,8 +1,8 @@
 import { shareLinkBucket } from "./rate-limiter";
 import { createDbStore, RateLimiter } from "lunorash/ratelimit";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { getRateLimitKey, getUserTier, RATE_LIMIT_CONFIGS } from "./rate-limiter";
+import { checkRateLimit, getRateLimitKey, getUserTier, RATE_LIMIT_CONFIGS } from "./rate-limiter";
 import { compareStrings } from "./collections";
 
 const SHARE_BUCKET_KEY = /^share:[0-9a-f]{64}$/u;
@@ -179,5 +179,27 @@ describe("shareLinkBucket", () => {
 
         expect(await shareLinkBucket("token-a")).toBe(await shareLinkBucket("token-a"));
         expect(await shareLinkBucket("token-a")).not.toBe(await shareLinkBucket("token-b"));
+    });
+});
+
+describe("checkRateLimit", () => {
+    it("fails open when the limiter itself fails", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        const failing = {
+            runMutation: async () => {
+                throw new Error("D1 unavailable");
+            },
+        };
+
+        await expect(checkRateLimit(failing as never, "messenger/connection:free", { throws: true })).resolves.toEqual({ ok: true });
+        await expect(checkRateLimit(failing as never, "messenger/connection:free")).resolves.toEqual({ ok: true });
+    });
+
+    it("still rejects a request that is over the limit", async () => {
+        const limited = { runMutation: async () => ({ ok: false, retryAfter: 1000 }) };
+
+        await expect(checkRateLimit(limited as never, "messenger/connection:free", { throws: true })).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+        await expect(checkRateLimit(limited as never, "messenger/connection:free")).resolves.toEqual({ ok: false, retryAfter: 1000 });
     });
 });
