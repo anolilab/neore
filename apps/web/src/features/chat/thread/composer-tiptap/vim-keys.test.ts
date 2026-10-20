@@ -15,6 +15,16 @@ const schema = new Schema({
     },
 });
 
+/** The composer's schema: a paragraph holds text and Shift+Enter hard breaks, which are the lines Vim moves between. */
+const breakSchema = new Schema({
+    nodes: {
+        doc: { content: "paragraph+" },
+        hardBreak: { group: "inline", inline: true, leafText: () => "\n", selectable: false },
+        paragraph: { content: "inline*", toDOM: () => ["p", 0] },
+        text: { group: "inline" },
+    },
+});
+
 const NORMAL: VimState = { mode: "normal", pending: "" };
 
 const stateOf = (lines: string[], cursor: number): EditorState => {
@@ -211,5 +221,100 @@ describe("what normal mode leaves alone", () => {
         expect(runVimKey(hello(0), NORMAL, key("j", { ctrlKey: true })).handled).toBe(false);
         expect(runVimKey(hello(0), NORMAL, key("k", { metaKey: true })).handled).toBe(false);
         expect(runVimKey(hello(0), NORMAL, key("x", { altKey: true })).handled).toBe(false);
+    });
+});
+
+/** `paragraphs[i]` is the displayed lines of paragraph i; each line after the first starts after a hard break. */
+const brokenState = (paragraphs: string[][], cursor: number): EditorState => {
+    const doc = breakSchema.node(
+        "doc",
+        null,
+        paragraphs.map((segments) =>
+            breakSchema.node(
+                "paragraph",
+                null,
+                segments.flatMap((segment, index) => [...(index > 0 ? [breakSchema.node("hardBreak")] : []), ...(segment ? [breakSchema.text(segment)] : [])]),
+            ),
+        ),
+    );
+    const state = EditorState.create({ doc, plugins: [history()], schema: breakSchema });
+
+    return state.apply(state.tr.setSelection(TextSelection.create(doc, cursor)));
+};
+
+/** The displayed lines of each paragraph, as the cursor sees them. */
+const displayed = (state: EditorState): string[][] =>
+    state.doc.children.map((paragraph) => paragraph.textBetween(0, paragraph.content.size, undefined, "\n").split("\n"));
+
+describe("displayed lines split at hard breaks", () => {
+    // One paragraph: "one", "two", "three" (breaks at offsets 3, 7). "two" starts at offset 4, "three" at 8.
+    const three = [["one", "two", "three"]];
+
+    it("dd on the first line removes it and its break, leaving the cursor on the next line", () => {
+        const result = press(brokenState(three, 1), ["d", "d"]);
+
+        expect(displayed(result.state)).toStrictEqual([["two", "three"]]);
+        expect(offsetOf(result.state)).toBe(0);
+    });
+
+    it("dd on the middle line removes only that line", () => {
+        const result = press(brokenState(three, 5), ["d", "d"]);
+
+        expect(displayed(result.state)).toStrictEqual([["one", "three"]]);
+        expect(offsetOf(result.state)).toBe(4);
+    });
+
+    it("dd on the last line removes it with the break before it", () => {
+        const result = press(brokenState(three, 9), ["d", "d"]);
+
+        expect(displayed(result.state)).toStrictEqual([["one", "two"]]);
+    });
+
+    it("j and k move between displayed lines, keeping the column", () => {
+        const down = press(brokenState(three, 2), ["j"]);
+
+        expect(offsetOf(down.state)).toBe(4 + 1);
+
+        const up = press(brokenState(three, 11), ["k"]);
+
+        expect(offsetOf(up.state)).toBe(4 + 3 - 1);
+    });
+
+    it("j crosses from one paragraph's last line into the next paragraph", () => {
+        const result = press(brokenState([["ab", "cd"], ["ef"]], 5), ["j"]);
+
+        expect(result.state.selection.$head.index(0)).toBe(1);
+    });
+
+    it("$, 0 and D work on the line the cursor is in", () => {
+        expect(offsetOf(press(brokenState(three, 5), ["$"]).state)).toBe(4 + 2);
+        expect(offsetOf(press(brokenState(three, 6), ["0"]).state)).toBe(4);
+        expect(displayed(press(brokenState(three, 6), ["D"]).state)).toStrictEqual([["one", "t", "three"]]);
+    });
+
+    it("A appends at the end of the displayed line, before its break", () => {
+        const result = press(brokenState(three, 5), ["A"]);
+
+        expect(offsetOf(result.state)).toBe(4 + 3);
+        expect(result.vim.mode).toBe("insert");
+    });
+
+    it("o opens a displayed line below, as a new hard break, and O above", () => {
+        const below = press(brokenState(three, 5), ["o"]);
+
+        expect(displayed(below.state)).toStrictEqual([["one", "two", "", "three"]]);
+        expect(offsetOf(below.state)).toBe(8);
+
+        const above = press(brokenState(three, 5), ["O"]);
+
+        expect(displayed(above.state)).toStrictEqual([["one", "", "two", "three"]]);
+        expect(offsetOf(above.state)).toBe(4);
+    });
+
+    it("a paragraph that starts with a break has an empty first line the cursor can sit on", () => {
+        const result = press(brokenState([["", "one"]], 1), ["j"]);
+
+        expect(displayed(result.state)).toStrictEqual([["", "one"]]);
+        expect(offsetOf(result.state)).toBe(1);
     });
 });

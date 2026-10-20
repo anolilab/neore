@@ -4,7 +4,8 @@
  *
  * A deliberately small subset, enough to edit a prompt: modes (insert / normal),
  * `h j k l w b 0 ^ $` motions, `i a I A o O` to insert, `x D dd` to delete and `u`
- * to undo. A "line" is a paragraph (Shift+Enter starts one). There are no counts,
+ * to undo. A "line" is a displayed line: a paragraph, split at each Shift+Enter hard
+ * break. There are no counts,
  * registers (so no yank/paste), visual mode or `.` repeat; `j`/`k` do not remember
  * a preferred column.
  */
@@ -95,22 +96,65 @@ const firstNonSpace = (text: string): number => {
 };
 
 interface Line {
+    /** Offset of the line's first character inside its paragraph. */
+    from: number;
+    /** Index of the paragraph the line is in. */
     index: number;
     /** Document position of the line's first character. */
     start: number;
+    /** The line's text, up to its hard break (or the end of the paragraph). */
     text: string;
 }
 
-const lineAt = (doc: ProseMirrorNode, index: number): Line => {
+const paragraphText = (paragraph: ProseMirrorNode): string => paragraph.textBetween(0, paragraph.content.size, undefined, "\n");
+
+/** Document position of the first character of paragraph `index`. */
+const paragraphStart = (doc: ProseMirrorNode, index: number): number => {
     let start = 1;
 
     for (let before = 0; before < index; before += 1) {
         start += doc.child(before).nodeSize;
     }
 
-    const paragraph = doc.child(index);
+    return start;
+};
 
-    return { index, start, text: paragraph.textBetween(0, paragraph.content.size, undefined, "\n") };
+/**
+ * The displayed line holding `offset` in paragraph `index`. A hard break reads as "\n" in `paragraphText`, one position wide
+ * like the break itself, so a line runs from the break before `offset` to the next one.
+ */
+const segmentAt = (doc: ProseMirrorNode, index: number, offset: number): Line => {
+    const text = paragraphText(doc.child(index));
+    // `lastIndexOf` with -1 would still inspect index 0, so the first line is special-cased.
+    const from = offset === 0 ? 0 : text.lastIndexOf("\n", offset - 1) + 1;
+    const breakAt = text.indexOf("\n", from);
+    const to = breakAt === -1 ? text.length : breakAt;
+
+    return { index, from, start: paragraphStart(doc, index) + from, text: text.slice(from, to) };
+};
+
+/** The displayed line before `line`: the one ending at the break before it, or the last one of the paragraph before. */
+const previousLine = (doc: ProseMirrorNode, line: Line): Line | null => {
+    if (line.from > 0) {
+        return segmentAt(doc, line.index, line.from - 1);
+    }
+
+    if (line.index === 0) {
+        return null;
+    }
+
+    return segmentAt(doc, line.index - 1, paragraphText(doc.child(line.index - 1)).length);
+};
+
+/** The displayed line after `line`: the one past the break after it, or the first one of the next paragraph. */
+const nextLine = (doc: ProseMirrorNode, line: Line): Line | null => {
+    const end = line.from + line.text.length;
+
+    if (end < paragraphText(doc.child(line.index)).length) {
+        return segmentAt(doc, line.index, end + 1);
+    }
+
+    return line.index + 1 < doc.childCount ? segmentAt(doc, line.index + 1, 0) : null;
 };
 
 /** The cursor's line and its offset into it, or `null` when the cursor is not inside a paragraph. */
@@ -121,7 +165,9 @@ const cursorOf = (state: EditorState): { line: Line; offset: number } | null => 
         return null;
     }
 
-    return { line: lineAt(state.doc, $head.index(0)), offset: $head.parentOffset };
+    const line = segmentAt(state.doc, $head.index(0), $head.parentOffset);
+
+    return { line, offset: $head.parentOffset - line.from };
 };
 
 /** In normal mode the cursor sits ON a character, so the last valid offset is `length - 1`. */
@@ -148,16 +194,41 @@ const enterInsert = (state: EditorState, vim: VimState, line: Line, offset: numb
 };
 
 const openLine = (state: EditorState, vim: VimState, line: Line, below: boolean): VimResult => {
-    const { paragraph } = state.schema.nodes;
-    const at = below ? line.start - 1 + state.doc.child(line.index).nodeSize : line.start - 1;
+    const { hardBreak, paragraph } = state.schema.nodes;
+
+    if (hardBreak) {
+        // Within a paragraph a new line is a new hard break: after this line's text for `o`, before it for `O`.
+        const at = below ? line.start + line.text.length : line.start;
+        const tr = state.tr.insert(at, hardBreak.create());
+
+        return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, below ? at + 1 : at)), { mode: "insert" });
+    }
+
+    const at = below ? paragraphStart(state.doc, line.index) - 1 + state.doc.child(line.index).nodeSize : paragraphStart(state.doc, line.index) - 1;
     const tr = state.tr.insert(at, paragraph!.create());
 
     return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, at + 1)), { mode: "insert" });
 };
 
+/**
+ * `dd`: removes the line with the break after it, or the break before it when it is the last line, so the lines around it
+ * keep their own breaks. A paragraph with one line is removed as a paragraph.
+ */
 const deleteLine = (state: EditorState, vim: VimState, line: Line): VimResult => {
     const { paragraph } = state.schema.nodes;
-    const from = line.start - 1;
+    const hasBreakAfter = line.from + line.text.length < paragraphText(state.doc.child(line.index)).length;
+
+    if (hasBreakAfter || line.from > 0) {
+        const from = hasBreakAfter ? line.start : line.start - 1;
+        const to = hasBreakAfter ? line.start + line.text.length + 1 : line.start + line.text.length;
+        const tr = state.tr.delete(from, to);
+        const target = segmentAt(tr.doc, line.index, hasBreakAfter ? line.from : line.from - 1);
+        const cursor = target.start + Math.min(firstNonSpace(target.text), lastOffset(target));
+
+        return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, cursor)));
+    }
+
+    const from = paragraphStart(state.doc, line.index) - 1;
     const to = from + state.doc.child(line.index).nodeSize;
 
     if (state.doc.childCount === 1) {
@@ -167,7 +238,7 @@ const deleteLine = (state: EditorState, vim: VimState, line: Line): VimResult =>
     }
 
     const tr = state.tr.delete(from, to);
-    const target = lineAt(tr.doc, Math.min(line.index, tr.doc.childCount - 1));
+    const target = segmentAt(tr.doc, Math.min(line.index, tr.doc.childCount - 1), 0);
 
     const cursor = target.start + Math.min(firstNonSpace(target.text), lastOffset(target));
 
@@ -227,9 +298,9 @@ const normalKey = (state: EditorState, vim: VimState, key: string): VimResult =>
             return enterInsert(state, vim, line, line.text.length);
         }
         case "b": {
-            if (offset === 0 && line.index > 0) {
-                const preceding = lineAt(state.doc, line.index - 1);
+            const preceding = offset === 0 ? previousLine(state.doc, line) : null;
 
+            if (preceding) {
                 return move(state, vim, preceding, previousWordStart(preceding.text, preceding.text.length));
             }
 
@@ -253,9 +324,9 @@ const normalKey = (state: EditorState, vim: VimState, key: string): VimResult =>
         }
         case "j":
         case "k": {
-            const index = line.index + (key === "j" ? 1 : -1);
+            const target = key === "j" ? nextLine(state.doc, line) : previousLine(state.doc, line);
 
-            return index < 0 || index >= state.doc.childCount ? handledAt(vim, undefined) : move(state, vim, lineAt(state.doc, index), offset);
+            return target ? move(state, vim, target, offset) : handledAt(vim, undefined);
         }
         case "l": {
             return move(state, vim, line, offset + 1);
@@ -269,10 +340,9 @@ const normalKey = (state: EditorState, vim: VimState, key: string): VimResult =>
         }
         case "w": {
             const next = nextWordStart(line.text, offset);
+            const following = next >= line.text.length ? nextLine(state.doc, line) : null;
 
-            if (next >= line.text.length && line.index < state.doc.childCount - 1) {
-                const following = lineAt(state.doc, line.index + 1);
-
+            if (following) {
                 return move(state, vim, following, firstNonSpace(following.text));
             }
 
