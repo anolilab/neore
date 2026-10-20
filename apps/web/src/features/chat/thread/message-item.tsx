@@ -234,6 +234,26 @@ const DefaultSystemMessage: FC<SystemMessageRendererProps> = ({ children }) => (
 /** Seeded and local rows can lack a creation time, and formatting NaN throws during render. */
 const hasCreationTime = (message: UIMessage): boolean => Number.isFinite(message._creationTime) && message._creationTime > 0;
 
+/** The creation time, when Show Timestamps is on. Its own component, so a row without the action bar (a system message) shows it too. */
+const MessageTimestamp: FC<{ message: UIMessage }> = ({ message }) => {
+    const { i18n } = useLingui();
+    const showTimestamps = useUIStateStore((state) => state.preferences.showTimestamps);
+
+    if (!showTimestamps || !hasCreationTime(message)) {
+        return null;
+    }
+
+    return (
+        <time
+            className="text-muted-foreground ml-1 text-xs tabular-nums"
+            dateTime={new Date(message._creationTime).toISOString()}
+            title={new Date(message._creationTime).toLocaleString(i18n.locale)}
+        >
+            {formatMessageTime(message._creationTime, i18n.locale)}
+        </time>
+    );
+};
+
 /**
  * Default Action Bar - Full featured with image/video/voice generation
  * Uses MessageActions and MessageAction from AI elements
@@ -246,8 +266,7 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
     const { createBranch } = useThreadManager(true);
     const [isForkDialogOpen, setIsForkDialogOpen] = useState(false);
     const { mutate: createPin } = useMutation(crpc.chat.pins.functions.createPin.mutationOptions());
-    const { i18n, t } = useLingui();
-    const showTimestamps = useUIStateStore((state) => state.preferences.showTimestamps);
+    const { t } = useLingui();
 
     // Hide action bar while streaming
     if (isStreaming) {
@@ -429,15 +448,7 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                     </>
                 )}
 
-                {showTimestamps && hasCreationTime(message) && (
-                    <time
-                        className="text-muted-foreground ml-1 text-xs tabular-nums"
-                        dateTime={new Date(message._creationTime).toISOString()}
-                        title={new Date(message._creationTime).toLocaleString(i18n.locale)}
-                    >
-                        {formatMessageTime(message._creationTime, i18n.locale)}
-                    </time>
-                )}
+                <MessageTimestamp message={message} />
             </MessageActions>
 
             {isAssistant && <ForkBranchDialog onCancel={() => setIsForkDialogOpen(false)} onCreate={handleCreateBranch} open={isForkDialogOpen} />}
@@ -561,6 +572,7 @@ const MessageItem: FC<MessageItemProps> = memo(
             return (
                 <div {...containerProps}>
                     <SystemMessage>{content}</SystemMessage>
+                    <MessageTimestamp message={message} />
                 </div>
             );
         }
