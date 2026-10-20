@@ -30,6 +30,19 @@ const AUTO_CLOSE_DELAY = 1000;
 const MS_IN_S = 1000;
 const COPIED_FEEDBACK_MS = 2000;
 
+/**
+ * Moves focus to the trigger when focus is inside the block, before the block closes: a control in its content goes with it.
+ * The block is the trigger's nearest `not-prose` ancestor, the root this component renders.
+ */
+const focusTriggerIfInside = (triggerId: string): void => {
+    const trigger = document.querySelector<HTMLElement>(`[id="${CSS.escape(triggerId)}"]`);
+    const block = trigger?.closest(".not-prose");
+
+    if (trigger && block?.contains(document.activeElement)) {
+        trigger.focus();
+    }
+};
+
 export const Reasoning = memo(
     ({ children, className, defaultOpen = true, duration: durationProp, isStreaming = false, onOpenChange, open, ...props }: ReasoningProps) => {
         const [isOpen, setIsOpen] = useControllableState({
@@ -43,6 +56,7 @@ export const Reasoning = memo(
         });
 
         const [hasAutoClosed, setHasAutoClosed] = useState(false);
+        const triggerId = useId();
         // A ref, not state: the start timestamp is never rendered, it only feeds the
         // duration computed when streaming stops.
         const startTimeRef = useRef<number | null>(null);
@@ -62,6 +76,7 @@ export const Reasoning = memo(
             if (defaultOpen && !isStreaming && isOpen && !hasAutoClosed) {
                 // Add a small delay before closing to allow user to see the content
                 const timer = setTimeout(() => {
+                    focusTriggerIfInside(triggerId);
                     setIsOpen(false);
                     setHasAutoClosed(true);
                 }, AUTO_CLOSE_DELAY);
@@ -70,13 +85,11 @@ export const Reasoning = memo(
             }
 
             return undefined;
-        }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosed]);
+        }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosed, triggerId]);
 
         const handleOpenChange = (newOpen: boolean) => {
             setIsOpen(newOpen);
         };
-
-        const triggerId = useId();
 
         const contextValue = useMemo<ReasoningContextValue>(() => {
             return { duration, isOpen, isStreaming, setIsOpen, triggerId };
