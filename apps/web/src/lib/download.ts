@@ -27,14 +27,24 @@ const toolOutputText = (value: unknown): string | undefined => {
 
 const getStoredMessage = (message: Message): StoredMessagePayload | undefined => message.message as StoredMessagePayload | undefined;
 
+/** Every tool-result part as text, in stored order. A reply with no readable output falls back to the row's text. */
+const toolResultText = (message: Message, stored: StoredMessagePayload | undefined): string => {
+    const parts = (stored?.content ?? [])
+        .map((part) => toolOutputText(part.output?.value) ?? part.content)
+        .filter((part): part is string => part !== undefined);
+
+    return parts.length > 0 ? parts.join("\n") : (message.text ?? "No result");
+};
+
+/** A persisted assistant message that holds a tool call carries the tool flag too; only a reply to one is a tool output. */
+const isToolReply = (message: Message, stored: StoredMessagePayload | undefined): boolean => Boolean(message.tool) && stored?.role !== "assistant";
+
 /** A message as the exporters print it: who said it, and what. */
 const toEntry = (message: Message): { role: string; text: string } => {
     const stored = getStoredMessage(message);
 
-    if (message.tool) {
-        const first = stored?.content?.[0];
-
-        return { role: "Tool Output", text: toolOutputText(first?.output?.value) ?? first?.content ?? message.text ?? "No result" };
+    if (isToolReply(message, stored)) {
+        return { role: "Tool Output", text: toolResultText(message, stored) };
     }
 
     const role: string = stored?.role ?? "assistant";
@@ -60,10 +70,10 @@ export const formatAsMarkdown = (thread: Chat, messages: Message[]): string => {
     for (const message of sortedMessages) {
         const stored = getStoredMessage(message);
 
-        if (message.tool) {
-            const toolResult = stored?.content?.[0]?.content ?? message.text ?? "No result";
+        if (isToolReply(message, stored)) {
+            const toolResult = toolResultText(message, stored).split("\n");
 
-            lines.push(`> **Tool Output**`, `> ${toolResult}`, "");
+            lines.push(`> **Tool Output**`, ...toolResult.map((line) => `> ${line}`), "");
 
             continue;
         }

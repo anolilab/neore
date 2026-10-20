@@ -20,11 +20,11 @@ const messages = [
 ] as unknown as Doc<"messages">[];
 
 /** Runs an export and returns the blob it handed to the browser. */
-const exported = async (format: Parameters<typeof handleDownload>[2]): Promise<Blob> => {
+const exported = async (format: Parameters<typeof handleDownload>[2], rows: Doc<"messages">[] = messages): Promise<Blob> => {
     const createObjectURL = vi.fn((_blob: Blob) => "blob:test");
 
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
-    await handleDownload(thread, messages, format);
+    await handleDownload(thread, rows, format);
 
     return createObjectURL.mock.calls[0]![0];
 };
@@ -48,6 +48,39 @@ describe("chat export", () => {
 
         expect(text).toContain('Tool Output: {"ok":true}');
         expect(text).not.toContain("No result");
+    });
+
+    it("exports every result part of a tool message, in order", async () => {
+        const multi = {
+            _creationTime: 4,
+            message: {
+                content: [
+                    { output: { type: "text", value: "first" }, type: "tool-result" },
+                    { output: { type: "text", value: "second" }, type: "tool-result" },
+                ],
+                role: "tool",
+            },
+            text: undefined,
+            tool: true,
+        } as unknown as Doc<"messages">;
+
+        const blob = await exported("txt", [multi]);
+
+        expect(await blob.text()).toContain("Tool Output: first\nsecond");
+    });
+
+    it("labels an assistant message that made a tool call as the assistant, not as tool output", async () => {
+        const call = {
+            _creationTime: 5,
+            message: { content: [{ type: "tool-call" }], role: "assistant" },
+            text: "Let me check.",
+            tool: true,
+        } as unknown as Doc<"messages">;
+
+        const blob = await exported("txt", [call]);
+
+        expect(await blob.text()).toContain("Assistant: Let me check.");
+        expect(await blob.text()).not.toContain("Tool Output");
     });
 
     it("writes a Word document with the thread's messages", async () => {
