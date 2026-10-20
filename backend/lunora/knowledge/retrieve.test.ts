@@ -57,6 +57,41 @@ describe("knowledge search file ids", () => {
         expect(rows).toMatchObject([{ fileId, fileName: "refunds.txt" }]);
     });
 
+    it("returns the vector leg's chunks in embedding-id order, and only the user's own", async () => {
+        const { otherFileId } = await harness.run(async (ctx: any) => {
+            const id = await ctx.db.insert("knowledgeFiles", {
+                chunkCount: 2,
+                createdAt: 1,
+                mimeType: "text/plain",
+                name: "shipping.txt",
+                size: 1,
+                status: "indexed",
+                userId: USER,
+            });
+
+            await ctx.db.insert("knowledgeChunks", { chunkIndex: 0, content: "Ships in two days.", embeddingId: "emb-2", fileId: id, userId: USER });
+            await ctx.db.insert("knowledgeChunks", { chunkIndex: 1, content: "Refunds take a week.", embeddingId: "emb-3", fileId, userId: USER });
+            await ctx.db.insert("knowledgeChunks", { chunkIndex: 2, content: "Someone else's.", embeddingId: "emb-x", fileId: id, userId: "user-b" });
+
+            return { otherFileId: id };
+        });
+
+        const rows = await harness.run(
+            async (ctx: any) =>
+                await ctx.runQuery(getChunksByEmbeddingIds, {
+                    embeddingIds: ["emb-3", "emb-x", "emb-2", "emb-1", "emb-missing"],
+                    knowledgeFileIds: [fileId, otherFileId],
+                    userId: USER,
+                }),
+        );
+
+        expect(rows.map((row: { embeddingId: string; fileName: string }) => [row.embeddingId, row.fileName])).toStrictEqual([
+            ["emb-3", "refunds.txt"],
+            ["emb-2", "shipping.txt"],
+            ["emb-1", "refunds.txt"],
+        ]);
+    });
+
     it("returns the file id from the keyword leg", async () => {
         const rows = await harness.run(
             async (ctx: any) => await ctx.runQuery(keywordSearchChunks, { knowledgeFileIds: [fileId], limit: 5, query: "refunds thirty days", userId: USER }),
