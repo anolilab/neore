@@ -270,18 +270,27 @@ describe("main window", () => {
         }
     });
 
-    it("lets navigation to ordinary origins through", () => {
-        let isPrevented = false;
+    it("keeps same-site navigation in the window and sends other web links to the system browser", () => {
+        const isNavigationPrevented = (url: string): boolean => {
+            let isPrevented = false;
 
-        guardOf(mainWindow(), "will-navigate")?.(
-            {
-                preventDefault: () => {
-                    isPrevented = true;
+            guardOf(mainWindow(), "will-navigate")?.(
+                {
+                    preventDefault: () => {
+                        isPrevented = true;
+                    },
                 },
-            },
-            "https://example.org/",
-        );
-        expect(isPrevented).toBe(false);
+                url,
+            );
+
+            return isPrevented;
+        };
+
+        expect(isNavigationPrevented(`${SITE}/chat/thread-2`)).toBe(false);
+        expect(isNavigationPrevented("https://example.org/")).toBe(true);
+        expect(isNavigationPrevented("file:///etc/passwd")).toBe(true);
+        expect(fake().opened).toContain("https://example.org/");
+        expect(fake().opened.every((url) => url.startsWith("http"))).toBe(true);
     });
 });
 

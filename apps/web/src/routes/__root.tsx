@@ -20,7 +20,7 @@ import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts, useRouteContext, useRouter } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import type { SettingsTab } from "@/components/settings/settings-modal";
 import ImpersonationBanner from "@/features/admin/components/impersonation-banner";
@@ -356,6 +356,12 @@ const RootComponent = () => {
     // in the browser, so this is the only place the SSR token reaches the
     // browser's client. See `seedHydratedAuthToken`.
     seedHydratedAuthToken(context.lunoraClient, context.token);
+    // The native bridge exists only in the browser, so it is read after mount: the server and the first client render must match.
+    const [isNative, setIsNative] = useState(false);
+
+    useEffect(() => {
+        setIsNative(isNativeShell());
+    }, []);
     const router = useRouter();
     const { i18n } = useLingui();
     const direction = useUIStateStore((state) => state.layout.direction);
@@ -446,7 +452,7 @@ const RootComponent = () => {
                                                 >
                                                     <ImpersonationBanner />
                                                     {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
-                                                    {isNativeShell() && <OfflineScreen />}
+                                                    {isNative && <OfflineScreen />}
                                                     <ScreenSizeDebug />
                                                     <Outlet />
                                                     <Suspense fallback={null}>

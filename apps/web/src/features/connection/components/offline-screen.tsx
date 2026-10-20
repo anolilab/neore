@@ -1,15 +1,33 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { AlertDialog, AlertDialogContent, AlertDialogTitle } from "@neore/ui/components/alert-dialog";
 import { Button } from "@neore/ui/components/button";
 import { WifiOff } from "lucide-react";
 
 import { useOfflineScreen } from "../hooks/use-offline-screen";
 
 /**
+ * A reload while the network or the server is down replaces the app with the browser's error page, so
+ * the button reloads only once the origin answers. A failed probe leaves the screen up.
+ */
+const reloadWhenReachable = async (): Promise<void> => {
+    try {
+        const response = await fetch(globalThis.location.origin, { cache: "no-store", method: "HEAD" });
+
+        if (response.ok) {
+            globalThis.location.reload();
+        }
+    } catch {
+        // Still unreachable: the screen stays up.
+    }
+};
+
+/**
  * Full-screen cover for the native shell when the app has been unreachable for a while, in place of
  * a blank window. It overlays the routes and does not replace them, so page state survives. The
- * live region stays mounted and only the overlay is conditional, so the message is announced.
+ * alert dialog takes focus and keeps it until the connection is back. The live region stays mounted
+ * and only the dialog is conditional, so the message is announced.
  */
 const OfflineScreen = () => {
     const { t } = useLingui();
@@ -25,15 +43,15 @@ const OfflineScreen = () => {
 
     return (
         <div aria-live="polite" role="status">
-            {message !== "" && (
-                <div className="bg-background text-foreground fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 p-6 text-center">
+            <AlertDialog open={message !== ""}>
+                <AlertDialogContent className="bg-background text-foreground inset-0 top-0 left-0 z-[100] grid h-dvh max-w-none translate-x-0 translate-y-0 place-content-center justify-items-center gap-4 rounded-none p-6 text-center ring-0 data-[size=default]:max-w-none data-[size=default]:sm:max-w-none">
                     <WifiOff aria-hidden="true" className="text-muted-foreground size-10" />
-                    <p className="max-w-sm text-sm">{message}</p>
-                    <Button onClick={() => globalThis.location.reload()} type="button" variant="outline">
+                    <AlertDialogTitle className="max-w-sm text-sm font-normal">{message}</AlertDialogTitle>
+                    <Button onClick={reloadWhenReachable} type="button" variant="outline">
                         {t`Try again`}
                     </Button>
-                </div>
-            )}
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 };
