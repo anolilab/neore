@@ -33,6 +33,14 @@ describe(fetchSkillMarkdown, () => {
         expect(fetcher).toHaveBeenCalledTimes(1);
     });
 
+    it("says a link that cannot be reached is worth retrying, not an internal error", async () => {
+        const fetcher = vi.fn(async () => {
+            throw new DOMException("The operation timed out.", "TimeoutError");
+        });
+
+        await expect(fetchSkillMarkdown(URLS, fetcher)).rejects.toThrow("could not be reached");
+    });
+
     it("stops reading a body that grows past the cap, whatever Content-Length says", async () => {
         const big = new Response("x".repeat(5000), { headers: { "content-length": "10" }, status: 200 });
 

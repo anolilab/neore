@@ -179,12 +179,8 @@ export const fetchSkillFromUrl = authAction
             throw new LunoraError("NOT_FOUND", "No SKILL.md was found at that link.");
         }
 
-        const parsed = parseSkillMarkdown(found.markdown);
-
-        if (!parsed.ok) {
-            throw new LunoraError("BAD_REQUEST", parsed.errors.join("; "));
-        }
-
+        // Returned even when it does not parse: the dialog's preview lists the problems so the user can fix them in place,
+        // and importSkill checks it again.
         ctx.log.event("skills.fetch_from_url", { bytes: found.markdown.length });
 
         return { filename: SKILL_MARKDOWN_FILE, markdown: found.markdown, sourceUrl: found.url };
