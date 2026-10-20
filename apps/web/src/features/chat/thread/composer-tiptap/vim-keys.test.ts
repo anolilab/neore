@@ -292,6 +292,13 @@ describe("displayed lines split at hard breaks", () => {
         expect(displayed(press(brokenState(three, 6), ["D"]).state)).toStrictEqual([["one", "t", "three"]]);
     });
 
+    it("x just before a break deletes nothing, so the two lines stay apart", () => {
+        const result = press(brokenState([["one", "two"]], 4), ["x"]);
+
+        expect(displayed(result.state)).toStrictEqual([["one", "two"]]);
+        expect(offsetOf(result.state)).toBe(3);
+    });
+
     it("A appends at the end of the displayed line, before its break", () => {
         const result = press(brokenState(three, 5), ["A"]);
 

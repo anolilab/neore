@@ -246,7 +246,8 @@ const deleteLine = (state: EditorState, vim: VimState, line: Line): VimResult =>
 };
 
 const deleteRange = (state: EditorState, vim: VimState, line: Line, offset: number, length: number): VimResult => {
-    if (line.text.length === 0) {
+    // Past the line's last character there is nothing to delete: the position is the break after the line, which must stay.
+    if (line.text.length === 0 || offset >= line.text.length) {
         return handledAt(vim, undefined);
     }
 
