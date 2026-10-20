@@ -83,6 +83,21 @@ describe("chat export", () => {
         expect(await blob.text()).not.toContain("No result");
     });
 
+    it("writes the reason of a denied tool call, not a placeholder", async () => {
+        const denied = {
+            _creationTime: 8,
+            message: { content: [{ output: { reason: "Not allowed to delete files", type: "execution-denied" }, type: "tool-result" }], role: "tool" },
+            text: undefined,
+            tool: true,
+        } as unknown as Doc<"messages">;
+
+        const blob = await exported("txt", [denied]);
+        const text = await blob.text();
+
+        expect(text).toContain("Tool Output: Not allowed to delete files");
+        expect(text).not.toContain("No result");
+    });
+
     it("names an image in a tool output instead of exporting its bytes", async () => {
         const image = {
             _creationTime: 7,

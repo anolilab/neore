@@ -12,6 +12,7 @@ export type DownloadFormat = "docx" | "json" | "md" | "txt" | "pdf";
  * This is the slice the exporters read out of it.
  */
 interface StoredToolOutput {
+    reason?: string;
     type?: string;
     value?: unknown;
 }
@@ -59,6 +60,11 @@ const toolOutputText = (output: StoredToolOutput | undefined): string | undefine
 
     if ((type === "text" || type === "error-text") && typeof value === "string") {
         return value;
+    }
+
+    // A denied approval has no value; its explanation is the reason the user (or the policy) gave.
+    if (type === "execution-denied") {
+        return output.reason ?? "Tool execution denied";
     }
 
     return JSON.stringify(value);
