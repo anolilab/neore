@@ -21,6 +21,7 @@ interface Row {
 }
 
 const NEW_THREAD = "new";
+const MAX_HISTORY_PAGES = 10;
 
 /** The text parts of a stored UI message. Other part kinds are not shown in this slice. */
 const toRow = (message: { id: string; parts: unknown[]; role: string }): Row => {
@@ -33,6 +34,12 @@ const toRow = (message: { id: string; parts: unknown[]; role: string }): Row => 
     };
 };
 
+const fetchMessagePage = (threadId: string, cursor: string | null) =>
+    getClient().query(api.chat.functions.getThreadUIMessages, {
+        paginationOpts: { cursor, numItems: 100 },
+        threadId: threadId as Id<"threads">,
+    });
+
 export default function ChatScreen() {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
@@ -44,12 +51,24 @@ export default function ChatScreen() {
     const [error, setError] = useState<string | null>(null);
 
     const loadMessages = useCallback(async (id: string) => {
-        const page = await getClient().query(api.chat.functions.getThreadUIMessages, {
-            paginationOpts: { cursor: null, numItems: 100 },
-            threadId: id as Id<"threads">,
-        });
+        // ponytail: first 10 pages (200 messages, the server returns 20 per page); older history needs a load-more control.
+        const pages: Row[][] = [];
+        let cursor: string | null = null;
 
-        setRows(page.page.map(toRow));
+        for (let index = 0; index < MAX_HISTORY_PAGES; index += 1) {
+            // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
+            const page = await fetchMessagePage(id, cursor);
+
+            pages.unshift(page.page.map(toRow));
+
+            if (page.isDone) {
+                break;
+            }
+
+            cursor = page.continueCursor;
+        }
+
+        setRows(pages.flat());
     }, []);
 
     useEffect(() => {

@@ -129,11 +129,11 @@ describe("grant storage", () => {
         expect(store.value).toBeNull();
     });
 
-    it("a 500 from the token route keeps the grant", async () => {
+    it("a 500 from the token route throws and keeps the grant", async () => {
         const store = memoryStore({ token: "session-1", user: USER });
         const fetch: Fetch = async () => json({ error: "server_error" }, 500);
 
-        expect(await fetchAccessToken({ fetch, lunoraUrl: LUNORA, store })).toBeNull();
+        await expect(fetchAccessToken({ fetch, lunoraUrl: LUNORA, store })).rejects.toThrow("Could not reach the server.");
         expect(store.value).toEqual({ token: "session-1", user: USER });
     });
 

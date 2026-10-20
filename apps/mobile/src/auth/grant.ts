@@ -192,9 +192,9 @@ export const exchangeGrant = async (input: {
 };
 
 /**
- * A short-lived JWT for the stored grant, or `null` when signed out. A 401 means
- * the session behind the grant is gone (expired or revoked), so the grant is
- * dropped. Any other failure returns `null` without dropping it.
+ * A short-lived JWT for the stored grant, or `null` when the user is signed out:
+ * no grant, or a 401 (the session is gone), which also drops the grant. Any other
+ * failure throws and keeps the grant, so callers can tell it from a revoked session.
  */
 export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string; store: GrantStore }): Promise<string | null> => {
     const grant = await input.store.get();
@@ -203,27 +203,29 @@ export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string;
         return null;
     }
 
+    let response: Response;
+
     try {
-        const response = await postJson(input.fetch, `${input.lunoraUrl}/extension/auth/token`, { token: grant.token });
-
-        if (response.status === 401) {
-            await input.store.clear();
-
-            return null;
-        }
-
-        if (!response.ok) {
-            await response.body?.cancel();
-
-            return null;
-        }
-
-        const { token } = (await response.json()) as { token: string };
-
-        return token;
+        response = await postJson(input.fetch, `${input.lunoraUrl}/extension/auth/token`, { token: grant.token });
     } catch {
+        throw new Error("Could not reach the server. Try again.");
+    }
+
+    if (response.status === 401) {
+        await input.store.clear();
+
         return null;
     }
+
+    if (!response.ok) {
+        await response.body?.cancel();
+
+        throw new Error("Could not reach the server. Try again.");
+    }
+
+    const { token } = (await response.json()) as { token: string };
+
+    return token;
 };
 
 /** Revoke the session server-side, then forget it even if the revoke fails. */
