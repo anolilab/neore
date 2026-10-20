@@ -33,12 +33,16 @@ describe(fetchSkillMarkdown, () => {
         expect(fetcher).toHaveBeenCalledTimes(1);
     });
 
-    it("says a link that cannot be reached is worth retrying, not an internal error", async () => {
-        const fetcher = vi.fn(async () => {
+    it("says a deadline or a failed connection is worth retrying, not an internal error", async () => {
+        const timedOut = vi.fn(async () => {
             throw new DOMException("The operation timed out.", "TimeoutError");
         });
+        const refused = vi.fn(async () => {
+            throw new TypeError("fetch failed");
+        });
 
-        await expect(fetchSkillMarkdown(URLS, fetcher)).rejects.toThrow("could not be reached");
+        await expect(fetchSkillMarkdown(URLS, timedOut)).rejects.toThrow("did not answer in time");
+        await expect(fetchSkillMarkdown(URLS, refused)).rejects.toThrow("could not be reached");
     });
 
     it("stops reading a body that grows past the cap, whatever Content-Length says", async () => {

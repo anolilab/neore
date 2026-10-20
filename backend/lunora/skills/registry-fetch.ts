@@ -10,8 +10,32 @@ import { SKILL_IMPORT_LIMITS } from "./markdown";
 /** A refusal with a message fit to show the user. */
 export class SkillSourceError extends Error {}
 
-/** A deadline, DNS or connection failure: the user can retry, so say so rather than an internal error. */
-const UNREACHABLE_MESSAGE = "That link could not be reached. Try again in a moment.";
+const TIMED_OUT_MESSAGE = "GitHub did not answer in time. Try again in a moment.";
+const UNREACHABLE_MESSAGE = "GitHub could not be reached. Try again in a moment.";
+
+/** A deadline or a failed connection is worth a retry, so it reads as one. Anything else is an internal error and stays one. */
+const transportError = (error: unknown): SkillSourceError => {
+    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+
+    return new SkillSourceError(timedOut ? TIMED_OUT_MESSAGE : UNREACHABLE_MESSAGE);
+};
+
+/** A failed request, or a body cut off mid-read, becomes a message the user can act on. A refusal already reads well and passes through. */
+const fetchCandidate = async (fetcher: Fetcher, url: string): Promise<Response> => {
+    try {
+        return await fetcher(url, { headers: { accept: "text/plain" }, redirect: "manual", timeoutMs: FETCH_TIMEOUT_MS });
+    } catch (error) {
+        throw transportError(error);
+    }
+};
+
+const readBody = async (response: Response, limit: number): Promise<string> => {
+    try {
+        return await readCapped(response, limit);
+    } catch (error) {
+        throw error instanceof SkillSourceError ? error : transportError(error);
+    }
+};
 
 type Fetcher = (url: string, init: RequestInit & { timeoutMs?: number }) => Promise<Response>;
 
@@ -69,13 +93,7 @@ export const fetchSkillMarkdown = async (
     limit: number = SKILL_IMPORT_LIMITS.markdownBytes,
 ): Promise<{ markdown: string; url: string } | null> => {
     for (const url of urls) {
-        let response: Response;
-
-        try {
-            response = await fetcher(url, { headers: { accept: "text/plain" }, redirect: "manual", timeoutMs: FETCH_TIMEOUT_MS });
-        } catch {
-            throw new SkillSourceError(UNREACHABLE_MESSAGE);
-        }
+        const response = await fetchCandidate(fetcher, url);
 
         if (response.status === 404) {
             await response.body?.cancel();
@@ -95,12 +113,7 @@ export const fetchSkillMarkdown = async (
             throw error instanceof HttpError ? new SkillSourceError(`GitHub answered ${error.status}.`) : error;
         }
 
-        try {
-            return { markdown: await readCapped(response, limit), url };
-        } catch (error) {
-            // A body cut off by the deadline is a timeout, not a bug; the size and encoding errors already read well.
-            throw error instanceof SkillSourceError ? error : new SkillSourceError(UNREACHABLE_MESSAGE);
-        }
+        return { markdown: await readBody(response, limit), url };
     }
 
     return null;
