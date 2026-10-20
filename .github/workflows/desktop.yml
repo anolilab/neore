@@ -114,13 +114,9 @@ jobs:
               with:
                   toolchain: "stable"
 
-            - name: "Cache Rust build"
-              uses: "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6" # v2.9.2
-              with:
-                  workspaces: "packages/device-core-node -> target"
-                  # A release build restores the cache but never writes it: what it builds
-                  # is published, so a cache it saved could carry into later builds.
-                  save-if: "${{ !startsWith(github.ref, 'refs/tags/') }}"
+            # No Rust build cache here: this workflow runs only on tags and publishes what it
+            # builds, and zizmor's cache-poisoning audit flags any cache a release restores,
+            # whether or not it is saved. A cold build is slower and that is the price.
 
             # The Linux keyring backend (`keyring`'s Secret Service) links libdbus at build time.
             - name: "Install libdbus for the Linux keyring"
