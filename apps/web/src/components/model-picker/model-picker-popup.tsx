@@ -21,7 +21,7 @@ const ModelPickerPopup: FC = () => {
     const { close } = useModelPickerPopupActions();
     const { isAnonymous } = useIsAnonymous();
     const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
-    const { favoriteModelIds, toggleFavorite } = useFavoriteModels();
+    const { favoriteModelIds, reorderFavorites, toggleFavorite } = useFavoriteModels();
 
     const handleSelect = (modelId: string) => {
         options?.onSelect?.(modelId);
@@ -48,6 +48,7 @@ const ModelPickerPopup: FC = () => {
                             initialModelId={options?.initialModelId}
                             isAnonymous={isAnonymous}
                             models={featureFlaggedModels}
+                            onMoveFavorite={reorderFavorites}
                             onSelect={handleSelect}
                             onToggleFavorite={toggleFavorite}
                             panelClassName="h-[50vh]"
@@ -67,6 +68,7 @@ const ModelPickerPopup: FC = () => {
                     initialModelId={options?.initialModelId}
                     isAnonymous={isAnonymous}
                     models={featureFlaggedModels}
+                    onMoveFavorite={reorderFavorites}
                     onSelect={handleSelect}
                     onToggleFavorite={toggleFavorite}
                 />

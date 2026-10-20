@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { localizeModelDescription } from "@/lib/model-descriptions";
 
 import {
+    adjacentFavorite,
     filterModelsByBlockedCreators,
     filterModelsByQuery,
     formatPricePerMillion,
@@ -186,5 +187,17 @@ describe(moveFavorite, () => {
         expect(moveFavorite(favorites, "x", "a")).toStrictEqual(favorites);
         expect(moveFavorite(favorites, "a", "x")).toStrictEqual(favorites);
         expect(moveFavorite(favorites, "a", "a")).toStrictEqual(favorites);
+    });
+});
+
+describe(adjacentFavorite, () => {
+    it("returns the neighbour on the screen, and nothing past either end", () => {
+        const visible = ["a", "b", "c"];
+
+        expect(adjacentFavorite(visible, "b", -1)).toBe("a");
+        expect(adjacentFavorite(visible, "b", 1)).toBe("c");
+        expect(adjacentFavorite(visible, "a", -1)).toBeUndefined();
+        expect(adjacentFavorite(visible, "c", 1)).toBeUndefined();
+        expect(adjacentFavorite(visible, "x", 1)).toBeUndefined();
     });
 });

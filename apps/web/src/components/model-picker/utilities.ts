@@ -440,3 +440,14 @@ export const moveFavorite = (favorites: ReadonlyArray<string>, movedId: string, 
 
     return next;
 };
+
+/**
+ * The favorite that sits `delta` places away from `modelId` in the list on
+ * screen, or `undefined` at either end. Moving onto it with `moveFavorite`
+ * swaps the two in the stored list, skipping any hidden favorites between them.
+ */
+export const adjacentFavorite = (visibleIds: ReadonlyArray<string>, modelId: string, delta: -1 | 1): string | undefined => {
+    const index = visibleIds.indexOf(modelId);
+
+    return index === -1 ? undefined : visibleIds[index + delta];
+};
