@@ -4,6 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import { getVisibleUserText } from "@neore/chat-ui/utils/page-context";
 import { Button } from "@neore/ui/components/button";
+import { chatMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
 import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, ChevronRightIcon, LanguagesIcon, Loader2Icon, RotateCcwIcon, XIcon } from "lucide-react";
@@ -38,7 +39,9 @@ const TranslatedText: FC<{ language: string; text: string }> = ({ language, text
 
     return (
         <div lang={language}>
-            <Streamdown plugins={plugins}>{text}</Streamdown>
+            <Streamdown components={chatMarkdownComponents} plugins={plugins}>
+                {text}
+            </Streamdown>
         </div>
     );
 };
