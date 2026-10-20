@@ -319,6 +319,14 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
 
         // Determine which provider to use
         const getSearchFunction = (): ((query: string, max: number) => Promise<WebSearchResult[]>) => {
+            // Only Tavily applies the news topic. Exa and Parallel would run a news query as a general search, so refuse it
+            // instead of returning results of the wrong kind.
+            const tavilyAvailable = Boolean(userTavilyKey || TAVILY_API_KEY);
+
+            if (topic === "news" && (provider === "exa" || provider === "parallel" || (provider === "auto" && !tavilyAvailable))) {
+                throw new Error("News search needs Tavily: Exa and Parallel have no news topic. Add a Tavily key, or search with the general topic.");
+            }
+
             switch (provider) {
                 case "exa": {
                     return (q, max) => searchWithExa(q, max, domainFilter);

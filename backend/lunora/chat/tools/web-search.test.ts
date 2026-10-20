@@ -205,6 +205,13 @@ describe("web search provider requests", () => {
         ]);
     });
 
+    it("refuses a news search that Parallel would run as a general one, and sends nothing", async () => {
+        stubProvider({ results: [] });
+
+        await expect(run([], { provider: "parallel", topic: "news" })).rejects.toThrow("News search needs Tavily");
+        expect(sent).toHaveLength(0);
+    });
+
     it("Parallel keeps the other results when one has no excerpts, and reads a missing results list as none", async () => {
         stubProvider({
             results: [
