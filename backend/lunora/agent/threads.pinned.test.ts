@@ -68,6 +68,6 @@ describe("pinned threads", () => {
 
         const pinned = (await as.query(listPinnedThreads as never, { userId: OWNER } as never)) as any[];
 
-        expect(pinned.map((thread) => thread._id).toSorted()).toEqual([restored, fresh].toSorted());
+        expect(pinned.map((thread) => thread._id)).toEqual([restored, fresh]);
     });
 });

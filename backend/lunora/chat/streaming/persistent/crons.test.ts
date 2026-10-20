@@ -35,7 +35,12 @@ const cleanup = async (): Promise<void> => {
     await run(async (context) => await context.runMutation(cleanupExpiredStreams, {}));
 };
 
-const read = async (id: string): Promise<any> => await run(async (context) => await context.db.get(id));
+const statusOf = async (id: string): Promise<string> =>
+    await run(async (context) => {
+        const row = await context.db.get(id);
+
+        return row.status;
+    });
 
 beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -54,8 +59,8 @@ describe("cleanupExpiredStreams", () => {
 
         await cleanup();
 
-        expect((await read(streamId)).status).toBe("timeout");
-        expect((await read(threadId)).status).toBe("active");
+        expect(await statusOf(streamId)).toBe("timeout");
+        expect(await statusOf(threadId)).toBe("active");
     });
 
     it("leaves a thread that is not running as it is", async () => {
@@ -64,8 +69,8 @@ describe("cleanupExpiredStreams", () => {
 
         await cleanup();
 
-        expect((await read(streamId)).status).toBe("timeout");
-        expect((await read(threadId)).status).toBe("active");
+        expect(await statusOf(streamId)).toBe("timeout");
+        expect(await statusOf(threadId)).toBe("active");
     });
 
     it("leaves the thread running while a newer stream on it is live", async () => {
@@ -76,7 +81,7 @@ describe("cleanupExpiredStreams", () => {
 
         await cleanup();
 
-        expect((await read(expired)).status).toBe("timeout");
-        expect((await read(threadId)).status).toBe("running");
+        expect(await statusOf(expired)).toBe("timeout");
+        expect(await statusOf(threadId)).toBe("running");
     });
 });

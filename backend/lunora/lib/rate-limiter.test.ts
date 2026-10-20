@@ -203,7 +203,11 @@ describe("checkRateLimit", () => {
     });
 
     it("still rejects a request that is over the limit", async () => {
-        const limited = { runMutation: async () => ({ ok: false, retryAfter: 1000 }) };
+        const limited = {
+            runMutation: async () => {
+                return { ok: false, retryAfter: 1000 };
+            },
+        };
 
         await expect(checkRateLimit(limited as never, "messenger/connection:free", { throws: true })).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
         await expect(checkRateLimit(limited as never, "messenger/connection:free")).resolves.toEqual({ ok: false, retryAfter: 1000 });

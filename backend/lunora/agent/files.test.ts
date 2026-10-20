@@ -25,12 +25,17 @@ afterEach(() => {
 });
 
 const refcountOf = async (fileId: string): Promise<number> =>
-    await harness.run(async (ctx: any) => (await ctx.db.chatFiles.findFirst({ where: { _id: fileId } })).refcount);
+    await harness.run(async (ctx: any) => {
+        const file = await ctx.db.chatFiles.findFirst({ where: { _id: fileId } });
+
+        return file.refcount;
+    });
 
 describe("deleteByIds", () => {
     it("releases one file reference per deleted message", async () => {
         const { fileId } = (await harness.run(
-            async (ctx: any) => await ctx.runMutation(addFile, { filename: "a.png", hash: "h1", mediaType: "image/png", storageId: "agent-files/h1", userId: OWNER }),
+            async (ctx: any) =>
+                await ctx.runMutation(addFile, { filename: "a.png", hash: "h1", mediaType: "image/png", storageId: "agent-files/h1", userId: OWNER }),
         )) as { fileId: string };
 
         const messageIds = await harness.run(async (ctx: any) => {

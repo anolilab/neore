@@ -1,3 +1,4 @@
+import type { Id } from "../../../_generated/dataModel";
 import { internalMutation } from "../../../_generated/server";
 import { purgeExpiredToolApprovalRuns } from "../../lib/tool-approval-cleanup";
 
@@ -23,7 +24,7 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
         // A run that died without reaching `failRun` (evicted, or a dropped redelivery)
         // leaves its thread `running`; nothing else resets it. A newer live stream on the
         // thread means another run owns that status.
-        const thread = await ctx.db.threads.findFirst({ where: { _id: stream.threadId } });
+        const thread = await ctx.db.threads.findFirst({ where: { _id: stream.threadId as Id<"threads"> } });
         const live = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId: stream.threadId } });
 
         if (thread?.status === "running" && !live) {

@@ -166,7 +166,10 @@ describe("testRunTrigger", () => {
     // trigger only for the action's length meant a disabled trigger never ran.
     it("runs a disabled trigger without enabling it", async () => {
         const as = harness.withIdentity({ userId: "user-a" } as never);
-        const { triggerId } = (await as.mutation(createTrigger as never, { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" } as never)) as {
+        const { triggerId } = (await as.mutation(
+            createTrigger as never,
+            { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" } as never,
+        )) as {
             triggerId: string;
         };
         const before = await readTrigger(triggerId);
