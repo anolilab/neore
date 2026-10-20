@@ -313,7 +313,9 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                 )}
                 style={{ width: MENU_WIDTH }}
             >
-                <Command>
+                {/* Filtering happens above (per list, on the title and the server search); the Command's own filter would hide a chat
+                    matched by its summary while the keyboard index still counted it. */}
+                <Command filter={null}>
                     <CommandInput onChange={(e) => setSearchQuery(e.target.value)} placeholder={t`Search files and chats...`} value={searchQuery} />
                     <CommandList className="max-h-[300px]">
                         {/* Group chat participants - first, when the thread has them */}
@@ -323,6 +325,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                                     <CommandGroupLabel>{t`Participants`}</CommandGroupLabel>
                                     {filteredParticipants.map((participant, index) => (
                                         <CommandItem
+                                            aria-selected={index === selectedIndex}
                                             className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={participant.skillId}
                                             onClick={(e) => {
@@ -349,6 +352,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                         <CommandGroup>
                             <CommandGroupLabel>{t`Actions`}</CommandGroupLabel>
                             <CommandItem
+                                aria-selected={selectedIndex === participantCount}
                                 className={clsx("transition-colors", selectedIndex === participantCount && "bg-accent text-accent-foreground")}
                                 onClick={(e) => {
                                     e.preventDefault();
@@ -374,6 +378,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
 
                                     return (
                                         <CommandItem
+                                            aria-selected={participantCount + index + 1 === selectedIndex}
                                             className={clsx(
                                                 "transition-colors",
                                                 participantCount + index + 1 === selectedIndex && "bg-accent text-accent-foreground",
@@ -405,6 +410,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                                     <CommandGroupLabel>{t`Chats`}</CommandGroupLabel>
                                     {filteredChats.map((chat, index) => (
                                         <CommandItem
+                                            aria-selected={participantCount + filteredFiles.length + index + 1 === selectedIndex}
                                             className={clsx(
                                                 "transition-colors",
                                                 participantCount + filteredFiles.length + index + 1 === selectedIndex && "bg-accent text-accent-foreground",
