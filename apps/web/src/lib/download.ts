@@ -11,27 +11,64 @@ export type DownloadFormat = "docx" | "json" | "md" | "txt" | "pdf";
  * `Doc<"messages">.message` is an untyped JSON blob (a persisted AI SDK core message).
  * This is the slice the exporters read out of it.
  */
+interface StoredToolOutput {
+    type?: string;
+    value?: unknown;
+}
+
 interface StoredMessagePayload {
-    content?: { content?: string; output?: { value?: unknown }; text?: string }[];
+    content?: { content?: string; output?: StoredToolOutput; text?: string }[];
     role?: string;
 }
 
-/** A tool result's output as text: strings as they are, anything else as JSON. Undefined when there is no output. */
-const toolOutputText = (value: unknown): string | undefined => {
-    if (value === undefined || value === null) {
+/**
+ * One part of a `content` tool output (text, or an image or file). Binary parts carry their bytes in `data`, which
+ * is never written out: the export says what the part was.
+ */
+interface StoredContentPart {
+    mediaType?: string;
+    text?: string;
+    type?: string;
+}
+
+/** A content part as text: its text, or a placeholder for an image or file, so a base64 payload never reaches an export. */
+const contentPartText = (part: StoredContentPart): string => {
+    if (part.type === "text") {
+        return part.text ?? "";
+    }
+
+    const kind = part.type?.startsWith("image") ? "image" : "file";
+
+    return part.mediaType ? `[${kind}: ${part.mediaType}]` : `[${kind}]`;
+};
+
+/**
+ * A stored tool output as text, by its type. Only a missing output is absent: a `null` value is written as `null`.
+ * Structured output is JSON; a `content` output keeps its text and names its images and files.
+ */
+const toolOutputText = (output: StoredToolOutput | undefined): string | undefined => {
+    if (output === undefined) {
         return undefined;
     }
 
-    return typeof value === "string" ? value : JSON.stringify(value);
+    const { type, value } = output;
+
+    if (type === "content" && Array.isArray(value)) {
+        return value.map((part: StoredContentPart) => contentPartText(part)).join("\n");
+    }
+
+    if ((type === "text" || type === "error-text") && typeof value === "string") {
+        return value;
+    }
+
+    return JSON.stringify(value);
 };
 
 const getStoredMessage = (message: Message): StoredMessagePayload | undefined => message.message as StoredMessagePayload | undefined;
 
 /** Every tool-result part as text, in stored order. A reply with no readable output falls back to the row's text. */
 const toolResultText = (message: Message, stored: StoredMessagePayload | undefined): string => {
-    const parts = (stored?.content ?? [])
-        .map((part) => toolOutputText(part.output?.value) ?? part.content)
-        .filter((part): part is string => part !== undefined);
+    const parts = (stored?.content ?? []).map((part) => toolOutputText(part.output) ?? part.content).filter((part): part is string => part !== undefined);
 
     return parts.length > 0 ? parts.join("\n") : (message.text ?? "No result");
 };

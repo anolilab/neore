@@ -69,6 +69,49 @@ describe("chat export", () => {
         expect(await blob.text()).toContain("Tool Output: first\nsecond");
     });
 
+    it("writes a null tool output as null, not as a placeholder", async () => {
+        const nullOutput = {
+            _creationTime: 6,
+            message: { content: [{ output: { type: "json", value: null }, type: "tool-result" }], role: "tool" },
+            text: undefined,
+            tool: true,
+        } as unknown as Doc<"messages">;
+
+        const blob = await exported("txt", [nullOutput]);
+
+        expect(await blob.text()).toContain("Tool Output: null");
+        expect(await blob.text()).not.toContain("No result");
+    });
+
+    it("names an image in a tool output instead of exporting its bytes", async () => {
+        const image = {
+            _creationTime: 7,
+            message: {
+                content: [
+                    {
+                        output: {
+                            type: "content",
+                            value: [
+                                { text: "Chart ready", type: "text" },
+                                { data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB", mediaType: "image/png", type: "image-data" },
+                            ],
+                        },
+                        type: "tool-result",
+                    },
+                ],
+                role: "tool",
+            },
+            text: undefined,
+            tool: true,
+        } as unknown as Doc<"messages">;
+
+        const blob = await exported("txt", [image]);
+        const text = await blob.text();
+
+        expect(text).toContain("Chart ready\n[image: image/png]");
+        expect(text).not.toContain("iVBORw0KGgo");
+    });
+
     it("labels an assistant message that made a tool call as the assistant, not as tool output", async () => {
         const call = {
             _creationTime: 5,
