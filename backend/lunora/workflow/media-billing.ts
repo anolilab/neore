@@ -60,27 +60,7 @@ export const workflowMediaErrors = (account: RunAccount, nodes: ReadonlyArray<Wo
 /** The request id one node run's daily unit is taken under. */
 export const mediaRequestId = (runId: string, nodeId: string): string => `workflow-media:${JSON.stringify([runId, nodeId])}`;
 
-/** Takes one daily unit for an image or audio node run; throws when the quota is spent. Other nodes are not charged here. */
-export const chargeMediaUnit = async (context: Pick<ActionCtx, "runMutation">, run: ExecutionContext, node: WorkflowNode, userId: string): Promise<void> => {
-    const kind = mediaKindOf(node);
-
-    if (kind !== "Image" && kind !== "Audio") {
-        return;
-    }
-
-    const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
-        kind,
-        organizationId: run.orgId,
-        requestId: mediaRequestId(run.runId, node.id),
-        userId,
-    });
-
-    if (!charged) {
-        throw new Error(`You've reached your daily ${kind.toLowerCase()} generation limit.`);
-    }
-};
-
-/** Runs `execute` after the node's daily unit is taken; a refusal throws before any paid work. */
+/** Takes one daily unit for an image or audio node run before `execute`; a spent quota throws before any paid work. */
 export const withMediaCharge = async <T>(
     context: Pick<ActionCtx, "runMutation">,
     run: ExecutionContext,
@@ -88,7 +68,20 @@ export const withMediaCharge = async <T>(
     userId: string,
     execute: () => Promise<T>,
 ): Promise<T> => {
-    await chargeMediaUnit(context, run, node, userId);
+    const kind = mediaKindOf(node);
+
+    if (kind === "Image" || kind === "Audio") {
+        const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+            kind,
+            organizationId: run.orgId,
+            requestId: mediaRequestId(run.runId, node.id),
+            userId,
+        });
+
+        if (!charged) {
+            throw new Error(`You've reached your daily ${kind.toLowerCase()} generation limit.`);
+        }
+    }
 
     return await execute();
 };

@@ -444,8 +444,7 @@ export const testRunTrigger = authAction
         const wasEnabled = trigger.enabled === true;
         const payload = args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
 
-        // The run reads the trigger only when it starts, so it is told to run a disabled
-        // one; enabling the trigger for the length of this action was undone before then.
+        // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
         await context.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
             ignoreDisabled: true,
             payload,
