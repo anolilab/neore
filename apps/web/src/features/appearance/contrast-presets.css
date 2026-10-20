@@ -80,11 +80,16 @@
         .text-muted-foreground\/70,
         .text-muted-foreground\/72,
         .text-muted-foreground\/80
-    ):not([class*=":text-"]) {
+    ):not([class*="placeholder:text-"]):not([class*="hover:text-"]):not([class*="focus:text-"]):not([class*="focus-visible:text-"]):not(
+        [class*="active:text-"]
+    ) {
     color: var(--muted-foreground);
 }
 
-:root[data-contrast="high"] :is(.border-border\/30, .border-border\/40, .border-border\/50, .border-border\/60, .border-border\/70):not([class*=":border-"]) {
+:root[data-contrast="high"]
+    :is(.border-border\/30, .border-border\/40, .border-border\/50, .border-border\/60, .border-border\/70):not([class*="hover:border-"]):not(
+        [class*="focus:border-"]
+    ):not([class*="focus-visible:border-"]):not([class*="active:border-"]) {
     border-color: var(--border);
 }
 
@@ -169,6 +174,26 @@
 :root.dark[data-contrast="high"][data-accent="teal"] {
     --primary: #2dd4bf;
     --primary-foreground: #191919;
+}
+
+/*
+ * The documentation sidebar sets its colours with !important, so its high-contrast rules are more specific and
+ * also !important. The dark rule carries the extra `.dark`, as the layout's does.
+ */
+:root[data-contrast="high"] #nd-sidebar {
+    --color-fd-muted: #f2f2f2;
+    --color-fd-muted-foreground: #333333;
+    background-color: #ffffff !important;
+    border-color: #595959 !important;
+    color: #000000 !important;
+}
+
+:root.dark[data-contrast="high"] #nd-sidebar {
+    --color-fd-muted: #262626;
+    --color-fd-muted-foreground: #d9d9d9;
+    background-color: #000000 !important;
+    border-color: #a6a6a6 !important;
+    color: #ffffff !important;
 }
 
 /*

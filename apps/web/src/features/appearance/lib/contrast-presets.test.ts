@@ -79,6 +79,13 @@ describe.each(["blue", "violet", "green", "orange", "rose", "teal"])("high contr
     });
 });
 
+describe("documentation sidebar", () => {
+    it("is restyled in both themes, against its own !important colours", () => {
+        expect(CSS).toContain(':root[data-contrast="high"] #nd-sidebar {');
+        expect(CSS).toContain(':root.dark[data-contrast="high"] #nd-sidebar {');
+    });
+});
+
 describe.each([
     ["light", ':root[data-contrast="high"] #nd-docs-layout'],
     ["dark", ':root.dark[data-contrast="high"] #nd-docs-layout'],
@@ -113,8 +120,8 @@ describe("dimmed theme colours", () => {
     it("are restored to the full token", () => {
         expect(CSS).toContain(String.raw`.text-muted-foreground\/50`);
         expect(CSS).toContain(String.raw`.border-border\/40`);
-        expect(CSS).toContain(':not([class*=":text-"])');
-        expect(CSS).toContain(':not([class*=":border-"])');
+        expect(CSS).toContain(':not([class*="hover:text-"])');
+        expect(CSS).toContain(':not([class*="hover:border-"])');
     });
 });
 
