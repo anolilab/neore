@@ -136,7 +136,6 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
     // search goes to the server instead: a chat older than that page is still found by its title.
     const { lunora: threads } = useAllThreadsData(isOpen && onSelectChat !== undefined);
     const chatSearch = (searchQuery || match?.query || "").trim();
-    const crpc = useCRPC();
     const { data: searchedThreads } = useQuery(
         crpc.chat.functions.searchThreads.queryOptions(
             isOpen && onSelectChat !== undefined && chatSearch
