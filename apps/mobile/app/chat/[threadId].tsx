@@ -53,10 +53,10 @@ export default function ChatScreen() {
     }, []);
 
     useEffect(() => {
-        if (status === "signed-in" && threadId) {
+        if (status === "signed-in" && threadId && !sending) {
             loadMessages(threadId).catch((error_: unknown) => setError(error_ instanceof Error ? error_.message : "Could not load messages."));
         }
-    }, [loadMessages, status, threadId]);
+    }, [loadMessages, sending, status, threadId]);
 
     const send = async () => {
         const prompt = draft.trim();
@@ -81,6 +81,8 @@ export default function ChatScreen() {
                 throw new ChatError("Your sign-in expired. Sign in again.");
             }
 
+            getClient().setAuthToken(jwt);
+
             const started = await startChat({
                 body: { model: DEFAULT_CHAT_MODEL, prompt, ...threadId && { threadId } },
                 fetch,
@@ -94,14 +96,16 @@ export default function ChatScreen() {
                 router.setParams({ threadId: started.threadId });
             }
 
-            await relayReply({
+            const outcome = await relayReply({
                 fetch,
                 gatewayUrl: config.gatewayUrl,
                 onDelta: ({ text }) => setRows((current) => current.map((row) => (row.id === assistantId ? { ...row, text: row.text + text } : row))),
                 streamToken: started.streamToken,
             });
 
-            await loadMessages(started.threadId);
+            if (outcome === "failed") {
+                throw new ChatError("The reply did not finish. Try again.");
+            }
         } catch (error_) {
             setError(error_ instanceof Error ? error_.message : "Could not send.");
         } finally {
