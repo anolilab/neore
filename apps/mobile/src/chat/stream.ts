@@ -32,8 +32,9 @@ export const splitLines = (buffer: string): { lines: string[]; rest: string } =>
 /**
  * Relay one reply. `onDelta` is called once per relayed chunk. A resume marker
  * makes the loop POST again with the counted `lastChunkIndex`, so nothing is sent
- * twice or skipped. Resolves "finished" for 205 or a completed relay, "failed" for
- * a bad status, a missing body, or an error line.
+ * twice or skipped. Resolves "finished" for 205 or a relay that ends with the end
+ * line, "failed" for a bad status, a missing body, an error line, or a stream that
+ * closes with neither the end line nor a resume marker (cut off).
  */
 export const relayReply = async (input: {
     fetch: Fetch;
@@ -45,7 +46,7 @@ export const relayReply = async (input: {
     let counted = 0;
 
     for (let attempt = 0; attempt <= MAX_RESUMES; attempt += 1) {
-        const body = { resumable: true, streamToken: input.streamToken, ...counted > 0 && { lastChunkIndex: counted } };
+        const body = { endMarker: true, resumable: true, streamToken: input.streamToken, ...(counted > 0 && { lastChunkIndex: counted }) };
 
         const response = await input.fetch(`${input.gatewayUrl}/v1/stream`, {
             body: JSON.stringify(body),
@@ -66,10 +67,14 @@ export const relayReply = async (input: {
             return "failed";
         }
 
-        const outcome = await readAttempt(response.body, (delta, index) => {
-            counted = index;
-            input.onDelta(delta);
-        }, counted);
+        const outcome = await readAttempt(
+            response.body,
+            (delta, index) => {
+                counted = index;
+                input.onDelta(delta);
+            },
+            counted,
+        );
 
         if (outcome === "failed") {
             return "failed";
@@ -96,6 +101,7 @@ const readAttempt = async (
     let buffer = "";
     let index = startIndex;
     let isResumed = false;
+    let isEnded = false;
 
     /** Returns false when the line is an error, which fails the whole reply. */
     const handle = (line: string): boolean => {
@@ -103,6 +109,12 @@ const readAttempt = async (
 
         if (parsed.kind === "error") {
             return false;
+        }
+
+        if (parsed.kind === "end") {
+            isEnded = true;
+
+            return true;
         }
 
         if (parsed.kind === "resume") {
@@ -146,5 +158,10 @@ const readAttempt = async (
         return "failed";
     }
 
-    return isResumed ? "resume" : "done";
+    if (isResumed) {
+        return "resume";
+    }
+
+    // Closing without the end line means the connection dropped mid-reply: not a finished one.
+    return isEnded ? "done" : "failed";
 };

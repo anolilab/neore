@@ -41,17 +41,17 @@ const scripted = (responses: Response[]): { bodies: unknown[]; fetch: Fetch } =>
 
 describe("splitLines", () => {
     it("keeps an unfinished tail for the next read", () => {
-        expect(splitLines("{\"text\":\"a\"}\n{\"te")).toEqual({ lines: ["{\"text\":\"a\"}"], rest: "{\"te" });
+        expect(splitLines('{"text":"a"}\n{"te')).toEqual({ lines: ['{"text":"a"}'], rest: '{"te' });
     });
 
     it("returns several lines from one read", () => {
-        expect(splitLines("{\"text\":\"a\"}\n{\"text\":\"b\"}\n").lines).toHaveLength(2);
+        expect(splitLines('{"text":"a"}\n{"text":"b"}\n').lines).toHaveLength(2);
     });
 });
 
 describe("relayReply", () => {
     it("reassembles a line split across reads", async () => {
-        const { fetch } = scripted([streamResponse(["{\"te", "xt\":\"Hel", "lo\"}\n"])]);
+        const { fetch } = scripted([streamResponse(['{"te', 'xt":"Hel', 'lo"}\n', '{"type":"end"}\n'])]);
         const deltas: string[] = [];
 
         const outcome = await relayReply({
@@ -66,7 +66,7 @@ describe("relayReply", () => {
     });
 
     it("delivers several lines in one read and flushes a trailing line at done", async () => {
-        const { fetch } = scripted([streamResponse(["{\"text\":\"a\"}\n{\"text\":\"b\"}\n{\"text\":\"c\"}"])]);
+        const { fetch } = scripted([streamResponse(['{"text":"a"}\n{"text":"b"}\n{"text":"c"}'])]);
         const deltas: string[] = [];
 
         await relayReply({ fetch, gatewayUrl: "https://gw", onDelta: (d) => deltas.push(d.text), streamToken: "tok" });
@@ -76,8 +76,8 @@ describe("relayReply", () => {
 
     it("on a resume marker, posts again with the counted lastChunkIndex", async () => {
         const { bodies, fetch } = scripted([
-            streamResponse(["{\"text\":\"a\"}\n{\"text\":\"b\"}\n{\"type\":\"resume\",\"lastChunkIndex\":2}\n"]),
-            streamResponse(["{\"text\":\"c\"}\n"]),
+            streamResponse(['{"text":"a"}\n{"text":"b"}\n{"type":"resume","lastChunkIndex":2}\n']),
+            streamResponse(['{"text":"c"}\n{"type":"end"}\n']),
         ]);
         const deltas: string[] = [];
 
@@ -85,8 +85,18 @@ describe("relayReply", () => {
 
         expect(outcome).toBe("finished");
         expect(deltas).toEqual(["a", "b", "c"]);
-        expect(bodies[0]).toEqual({ resumable: true, streamToken: "tok" });
-        expect(bodies[1]).toEqual({ lastChunkIndex: 2, resumable: true, streamToken: "tok" });
+        expect(bodies[0]).toEqual({ endMarker: true, resumable: true, streamToken: "tok" });
+        expect(bodies[1]).toEqual({ endMarker: true, lastChunkIndex: 2, resumable: true, streamToken: "tok" });
+    });
+
+    it("a stream that closes without the end line or a resume marker fails the reply", async () => {
+        const { fetch } = scripted([streamResponse(['{"text":"Hel"}\n{"text":"lo"}\n'])]);
+        const deltas: string[] = [];
+
+        const outcome = await relayReply({ fetch, gatewayUrl: "https://gw", onDelta: (d) => deltas.push(d.text), streamToken: "tok" });
+
+        expect(outcome).toBe("failed");
+        expect(deltas).toEqual(["Hel", "lo"]);
     });
 
     it("a 205 means the stream already finished", async () => {
@@ -96,7 +106,7 @@ describe("relayReply", () => {
     });
 
     it("an error line fails the reply", async () => {
-        const { fetch } = scripted([streamResponse(["{\"text\":\"a\"}\n{\"error\":\"boom\"}\n"])]);
+        const { fetch } = scripted([streamResponse(['{"text":"a"}\n{"error":"boom"}\n'])]);
         const deltas: string[] = [];
 
         const outcome = await relayReply({ fetch, gatewayUrl: "https://gw", onDelta: (d) => deltas.push(d.text), streamToken: "tok" });
