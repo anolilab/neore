@@ -40,7 +40,6 @@ const origin = siteOrigin();
 const composerPage = pathToFileURL(path.join(__dirname, "quick-composer", "index.html"));
 const ALLOWED_PERMISSIONS = new Set(["clipboard-sanitized-write", "media", "notifications"]);
 const QUICK_COMPOSER_SHORTCUT = "CommandOrControl+Shift+Space";
-const WEB_LINK = /^(?:https?|mailto):/u;
 
 /**
  * macOS draws the page under a hidden title bar: the traffic lights sit inside the
@@ -117,14 +116,30 @@ const startBrowserSignIn = (): void => {
     openInBrowser(url.href);
 };
 
+/** The system browser gets web links only: never `file:`, a custom scheme or anything else. */
+const openWebLinkExternally = (url: URL | undefined): void => {
+    if (url?.protocol === "http:" || url?.protocol === "https:") {
+        openInBrowser(url.href);
+    }
+};
+
 const guardNavigation = (event: { preventDefault: () => void }, url: string): void => {
-    if (!isBlockedOauthUrl(url)) {
+    if (isBlockedOauthUrl(url)) {
+        // Google refuses embedded webviews: cancel, and run the flow in the system browser.
+        event.preventDefault();
+        startBrowserSignIn();
+
         return;
     }
 
-    // Google refuses embedded webviews: cancel, and run the flow in the system browser.
+    const parsed = URL.parse(url) ?? undefined;
+
+    if (parsed !== undefined && isSameOrigin(origin, parsed)) {
+        return;
+    }
+
     event.preventDefault();
-    startBrowserSignIn();
+    openWebLinkExternally(parsed);
 };
 
 /**
@@ -184,8 +199,8 @@ const guardSiteWindow = (win: BrowserWindow): void => {
         } else if (parsed !== undefined && isSameOrigin(origin, parsed)) {
             // Same-origin popups stay in the app; other web links go to the system browser.
             contents.loadURL(url);
-        } else if (WEB_LINK.test(url)) {
-            openInBrowser(url);
+        } else {
+            openWebLinkExternally(parsed);
         }
 
         return { action: "deny" };
