@@ -104,6 +104,9 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
     const crpc = useCRPC();
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [searchQuery, setSearchQuery] = useState("");
+    // Until the field is typed in, the query is the @ trigger's; once it is, the field is the query, even when cleared.
+    const [searchEdited, setSearchEdited] = useState(false);
+    const activeQuery = searchEdited ? searchQuery : (match?.query ?? "");
 
     // Fetch vault files — once an @-mention opens the popup, not on first paint
     // (the editor mounts this popup permanently; see `e2e/first-paint.e2e.test.ts`).
@@ -111,23 +114,23 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
 
     // Filter files by query (from @ trigger or search input)
     const filteredFiles = useMemo(() => {
-        const query = (searchQuery || match?.query || "").toLowerCase();
+        const query = activeQuery.toLowerCase();
 
         if (!query) {
             return vaultFiles;
         }
 
         return vaultFiles.filter((f) => f.fileName.toLowerCase().includes(query) || f.fileType.toLowerCase().includes(query));
-    }, [vaultFiles, match?.query, searchQuery]);
+    }, [vaultFiles, activeQuery]);
 
     // Group chat: participants that can be @mentioned, filtered like the files.
     const groupChat = useRouteGroupChat();
     const filteredParticipants = useMemo(() => {
-        const query = (searchQuery || match?.query || "").toLowerCase();
+        const query = activeQuery.toLowerCase();
         const available = (groupChat?.participants ?? []).filter((p) => p.available && p.slug);
 
         return query ? available.filter((p) => p.slug.includes(query) || p.name.toLowerCase().includes(query)) : available;
-    }, [groupChat, match?.query, searchQuery]);
+    }, [groupChat, activeQuery]);
     const participantCount = filteredParticipants.length;
 
     const isOpen = match !== null;
@@ -135,9 +138,13 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
     // The sidebar already holds this list (same query key), so opening the menu costs no request. It is one page, so a typed
     // search goes to the server instead: a chat older than that page is still found by its title.
     const { lunora: threads } = useAllThreadsData(isOpen && onSelectChat !== undefined);
-    const chatSearch = (searchQuery || match?.query || "").trim();
+    const chatSearch = activeQuery.trim();
     // The previous result stays while a new keystroke's search loads. Until a search has answered, the loaded page is filtered by title here.
-    const { data: searchedThreads } = useQuery({
+    const {
+        data: searchedThreads,
+        isError: searchFailed,
+        isPlaceholderData,
+    } = useQuery({
         ...crpc.chat.functions.searchThreads.queryOptions(
             isOpen && onSelectChat !== undefined && chatSearch
                 ? { excludeTemporary: true, paginationOpts: { cursor: null, endCursor: null, numItems: SEARCHED_CHAT_ROWS }, searchQuery: chatSearch }
@@ -149,10 +156,12 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
     const filteredChats = useMemo(() => {
         const query = chatSearch.toLowerCase();
         const pending = threads.filter((thread) => thread.title?.toLowerCase().includes(query));
-        const chats = mentionableChats(chatSearch ? (searchedThreads?.page ?? pending) : threads, currentThreadId);
+        // Only the answer to the query now typed: the previous one (kept while this one loads) and a failed search do not count.
+        const answered = searchedThreads && !isPlaceholderData && !searchFailed ? searchedThreads.page : undefined;
+        const chats = mentionableChats(chatSearch ? (answered ?? pending) : threads, currentThreadId);
 
         return chats.slice(0, MAX_CHAT_SUGGESTIONS);
-    }, [threads, searchedThreads, chatSearch, currentThreadId]);
+    }, [threads, searchedThreads, isPlaceholderData, searchFailed, chatSearch, currentThreadId]);
 
     // Total items: participants + 1 for "Upload new file" + filtered files + chats
     const totalItems = participantCount + filteredFiles.length + filteredChats.length + 1;
@@ -167,8 +176,9 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
         setSelectedIndex(0);
     }
 
-    if (!match && searchQuery !== "") {
+    if (!match && (searchQuery !== "" || searchEdited)) {
         setSearchQuery("");
+        setSearchEdited(false);
     }
 
     // Handle vault file selection
@@ -316,7 +326,14 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                 {/* Filtering happens above (per list, on the title and the server search); the Command's own filter would hide a chat
                     matched by its summary while the keyboard index still counted it. */}
                 <Command filter={null}>
-                    <CommandInput onChange={(e) => setSearchQuery(e.target.value)} placeholder={t`Search files and chats...`} value={searchQuery} />
+                    <CommandInput
+                        onChange={(e) => {
+                            setSearchEdited(true);
+                            setSearchQuery(e.target.value);
+                        }}
+                        placeholder={t`Search files and chats...`}
+                        value={searchQuery}
+                    />
                     <CommandList className="max-h-[300px]">
                         {/* Group chat participants - first, when the thread has them */}
                         {participantCount > 0 && (
@@ -433,7 +450,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
                             </>
                         )}
 
-                        {filteredFiles.length === 0 && filteredChats.length === 0 && searchQuery && (
+                        {filteredFiles.length === 0 && filteredChats.length === 0 && activeQuery && (
                             <CommandEmpty>
                                 <div className="flex flex-col items-center gap-2 py-6">
                                     <FileIcon className="text-muted-foreground size-8" />
