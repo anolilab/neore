@@ -1303,7 +1303,7 @@ overrides:
   js-yaml@<3.14.2: '>=4.1.1'
   js-yaml@>=4.0.0 <4.3.2: '>=4.3.2 <5.0.0'
   jsondiffpatch@<0.7.2: '>=0.7.2'
-  launch-editor@<2.14.1: '>=2.14.1'
+  launch-editor@<2.14.2: '>=2.14.2'
   linkify-it@<5.0.2: '>=5.0.2'
   lodash-es@>=4.0.0 <=4.17.22: '>=4.17.23'
   lodash@>=4.0.0 <=4.17.22: '>=4.17.23'
@@ -17327,8 +17327,8 @@ packages:
     resolution: {integrity: sha512-MbjN408fEndfiQXbFQ1vnd+1NoLDsnQW41410oQBXiyXDMYH5z505juWa4KUE1LqxRC7DgOgZDbKLxHIwm27hA==}
     engines: {node: '>=0.10'}
 
-  launch-editor@2.14.1:
-    resolution: {integrity: sha512-QWBrQsMpH7gPr965dsKD/3cKWiNoTjpATQf++Xq63N6sKRGMwlVXz41O1IZTMfZQgBctD/K5Zt06+/I6pP6+HA==}
+  launch-editor@2.14.2:
+    resolution: {integrity: sha512-NHJEb30MGBCkmZXLZwz25t37QR4aY03ZzPYUJXOJaOa92uWwExI9SBQUuIznBYc1xkD7cJNGX7oc3Nl3sq2kQQ==}
 
   layout-base@1.0.2:
     resolution: {integrity: sha512-8h2oVEZNktL4BH2JCOI90iD1yXwL6iNW7KcCKT2QZgQJR2vbqDsldCTPRU9NifTCqHZci57XvQQ15YTu+sTYPg==}
@@ -31901,7 +31901,7 @@ snapshots:
       '@babel/parser': 8.0.7
       '@babel/traverse': 8.0.7
       '@floating-ui/dom': 1.8.0
-      launch-editor: 2.14.1
+      launch-editor: 2.14.2
       preact: 10.29.8
       vite: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
     optionalDependencies:
@@ -37369,7 +37369,7 @@ snapshots:
     dependencies:
       language-subtag-registry: 0.3.23
 
-  launch-editor@2.14.1:
+  launch-editor@2.14.2:
     dependencies:
       picocolors: 1.1.1
       shell-quote: 1.12.0
