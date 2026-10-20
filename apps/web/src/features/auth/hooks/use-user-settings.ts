@@ -56,8 +56,9 @@ export const useUpdateUserSettings = () => {
             return { previousSettings };
         },
         onError: (_error, _args, context: { previousSettings?: UserSettingsRow } | undefined) => {
-            // If the mutation fails, use the context returned from onMutate to roll back
-            if (context?.previousSettings) {
+            // If the mutation fails, use the context returned from onMutate to roll back. Not while a queued write is behind
+            // this one: the snapshot predates the edits it queued, so restoring it would drop them. The last write to settle refetches.
+            if (settingsWrites.pending <= 1 && context?.previousSettings) {
                 queryClient.setQueryData(queryOptions.queryKey, context.previousSettings);
             }
         },
@@ -102,15 +103,17 @@ export const useUpdateUserSettings = () => {
         });
 
         // The catch keeps a failed write from stalling the queue and marks `run` handled (`mutate` swallows errors too).
-        // The last write to finish refetches after a failure, so the cache matches the server again.
+        // The last write to settle refetches, after a success or a failure alike, so the cache matches the server again.
         settingsWrites.tail = run
             .catch(() => {
-                if (settingsWrites.pending === 1) {
-                    void queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-                }
+                // Handled by onError; the refetch below covers it.
             })
             .finally(() => {
                 settingsWrites.pending -= 1;
+
+                if (settingsWrites.pending === 0) {
+                    void queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+                }
             });
     };
 
