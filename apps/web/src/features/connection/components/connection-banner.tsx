@@ -31,7 +31,7 @@ const ConnectionBanner = () => {
         <motion.div
             animate={{ opacity: isShown ? 1 : 0, y: isShown ? 0 : "100%" }}
             aria-live="polite"
-            className="absolute inset-x-3 bottom-[calc(100%-0.75rem)] z-0 rounded-t-lg bg-amber-500 px-4 py-2 text-center text-sm font-medium text-amber-950"
+            className="absolute inset-x-3 bottom-[calc(100%-0.75rem)] z-0 rounded-t-lg bg-amber-500 px-4 pt-2 pb-5 text-center text-sm font-medium text-amber-950"
             initial={false}
             role="status"
             transition={{ duration: prefersReducedMotion ? 0 : 0.25, ease: "easeOut" }}
