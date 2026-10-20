@@ -57,10 +57,22 @@ const VimMode = Extension.create<VimModeOptions>({
 
                         const { $head } = state.selection;
 
-                        // The block cursor: the character the next command acts on.
-                        return $head.pos < $head.end()
-                            ? DecorationSet.create(state.doc, [Decoration.inline($head.pos, $head.pos + 1, { class: "vim-cursor" })])
-                            : null;
+                        // The block cursor: the character the next command acts on. At the end of a line there is none, so a
+                        // space stands in for it; otherwise an empty line or a caret after the last character shows no cursor at all.
+                        if ($head.pos < $head.end()) {
+                            return DecorationSet.create(state.doc, [Decoration.inline($head.pos, $head.pos + 1, { class: "vim-cursor" })]);
+                        }
+
+                        return DecorationSet.create(state.doc, [
+                            Decoration.widget($head.pos, () => {
+                                const cursor = document.createElement("span");
+
+                                cursor.className = "vim-cursor";
+                                cursor.textContent = "\u{A0}";
+
+                                return cursor;
+                            }),
+                        ]);
                     },
                     handleKeyDown: (view, event) => {
                         if (!options.isEnabled()) {
