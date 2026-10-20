@@ -44,6 +44,7 @@ import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { trackEvent } from "@/lib/analytics";
 import { showError } from "@/lib/toast";
 
+import CompletionSound from "./completion-sound";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
@@ -1057,6 +1058,7 @@ const ComposerInput = ({
             {isThreadComposer && <PromptHistorySource onEntries={promptHistory.setEntries} />}
             {isThreadComposer && <ComposerPromptQueue />}
             {isThreadComposer && <AutoReadReplies />}
+            {isThreadComposer && <CompletionSound />}
 
             <ComposerInputArea
                 afterTextarea={

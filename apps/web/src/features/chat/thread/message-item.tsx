@@ -20,6 +20,7 @@ import {
     CheckIcon,
     ChevronDownIcon,
     CopyIcon,
+    DownloadIcon,
     FileTextIcon,
     Gauge,
     GitBranch,
@@ -45,13 +46,16 @@ import { MessageSpeakerLabel } from "@/features/chat/group/speaker-label";
 import MessageTranslation from "@/features/chat/translation/message-translation";
 import TranslateAction from "@/features/chat/translation/translate-action";
 import SaveEvalCaseAction from "@/features/evals/components/save-eval-case-action";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
+import { saveBlob } from "@/lib/download";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 import ForkBranchDialog from "./fork-branch-dialog";
+import formatMessageTime from "./format-message-time";
 import GenerationModelMenu from "./generation-model-menu";
 import MemoryUsageAction from "./memory-usage-action";
 import MessageBranchSwitcher from "./message-branch-switcher";
@@ -227,6 +231,29 @@ const DefaultSystemMessage: FC<SystemMessageRendererProps> = ({ children }) => (
     </Message>
 );
 
+/** Seeded and local rows can lack a creation time, and formatting NaN throws during render. */
+const hasCreationTime = (message: UIMessage): boolean => Number.isFinite(message._creationTime) && message._creationTime > 0;
+
+/** The creation time, when Show Timestamps is on. Its own component, so a row without the action bar (a system message) shows it too. */
+const MessageTimestamp: FC<{ message: UIMessage }> = ({ message }) => {
+    const { i18n } = useLingui();
+    const showTimestamps = useUIStateStore((state) => state.preferences.showTimestamps);
+
+    if (!showTimestamps || !hasCreationTime(message)) {
+        return null;
+    }
+
+    return (
+        <time
+            className="text-muted-foreground ml-1 text-xs tabular-nums"
+            dateTime={new Date(message._creationTime).toISOString()}
+            title={new Date(message._creationTime).toLocaleString(i18n.locale)}
+        >
+            {formatMessageTime(message._creationTime, i18n.locale)}
+        </time>
+    );
+};
+
 /**
  * Default Action Bar - Full featured with image/video/voice generation
  * Uses MessageActions and MessageAction from AI elements
@@ -323,7 +350,8 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                     {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
                 </MessageAction>
 
-                {hasCopyableContent && (
+                {/* A page-only message has parts to copy but no visible text, so its download and copy would be empty. */}
+                {hasCopyableContent && messageText.length > 0 && (
                     <DropdownMenu>
                         <DropdownMenuTrigger
                             render={
@@ -336,6 +364,10 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                             <DropdownMenuItem onClick={onCopyPlain}>
                                 <FileTextIcon aria-hidden="true" className="size-4" />
                                 {t`Copy as plain text`}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => saveBlob(new Blob([messageText], { type: "text/markdown" }), "message.md")}>
+                                <DownloadIcon aria-hidden="true" className="size-4" />
+                                {t`Download as Markdown`}
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -415,6 +447,8 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                         <MessageModelBadge model={message.model} />
                     </>
                 )}
+
+                <MessageTimestamp message={message} />
             </MessageActions>
 
             {isAssistant && <ForkBranchDialog onCancel={() => setIsForkDialogOpen(false)} onCreate={handleCreateBranch} open={isForkDialogOpen} />}
@@ -538,6 +572,7 @@ const MessageItem: FC<MessageItemProps> = memo(
             return (
                 <div {...containerProps}>
                     <SystemMessage>{content}</SystemMessage>
+                    <MessageTimestamp message={message} />
                 </div>
             );
         }

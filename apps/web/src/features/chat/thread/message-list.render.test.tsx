@@ -28,7 +28,7 @@ vi.mock("@lingui/react/macro", () => {
     return {
         Trans: ({ children }: { children: unknown }) => children,
         useLingui: () => {
-            return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+            return { i18n: { locale: "en" }, t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
         },
     };
 });

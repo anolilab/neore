@@ -4,12 +4,13 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
+import { Button } from "@ui/components/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@ui/components/collapsible";
 import useStreamdownPlugins from "@ui/hooks/use-streamdown-plugins";
 import cn from "@ui/utils/cn";
-import { BrainIcon, ChevronDownIcon } from "lucide-react";
+import { BrainIcon, CheckIcon, ChevronDownIcon, ChevronUpIcon, CopyIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 
 import type { ReasoningContextValue } from "./reasoning-context";
@@ -27,6 +28,20 @@ export type ReasoningProps = ComponentProps<typeof Collapsible> & {
 
 const AUTO_CLOSE_DELAY = 1000;
 const MS_IN_S = 1000;
+const COPIED_FEEDBACK_MS = 2000;
+
+/**
+ * Moves focus to the trigger when focus is inside the block, before the block closes: a control in its content goes with it.
+ * The block is the trigger's nearest `not-prose` ancestor, the root this component renders.
+ */
+const focusTriggerIfInside = (triggerId: string): void => {
+    const trigger = document.querySelector<HTMLElement>(`[id="${CSS.escape(triggerId)}"]`);
+    const block = trigger?.closest(".not-prose");
+
+    if (trigger && block?.contains(document.activeElement)) {
+        trigger.focus();
+    }
+};
 
 export const Reasoning = memo(
     ({ children, className, defaultOpen = true, duration: durationProp, isStreaming = false, onOpenChange, open, ...props }: ReasoningProps) => {
@@ -41,6 +56,7 @@ export const Reasoning = memo(
         });
 
         const [hasAutoClosed, setHasAutoClosed] = useState(false);
+        const triggerId = useId();
         // A ref, not state: the start timestamp is never rendered, it only feeds the
         // duration computed when streaming stops.
         const startTimeRef = useRef<number | null>(null);
@@ -60,6 +76,7 @@ export const Reasoning = memo(
             if (defaultOpen && !isStreaming && isOpen && !hasAutoClosed) {
                 // Add a small delay before closing to allow user to see the content
                 const timer = setTimeout(() => {
+                    focusTriggerIfInside(triggerId);
                     setIsOpen(false);
                     setHasAutoClosed(true);
                 }, AUTO_CLOSE_DELAY);
@@ -68,15 +85,15 @@ export const Reasoning = memo(
             }
 
             return undefined;
-        }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosed]);
+        }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosed, triggerId]);
 
         const handleOpenChange = (newOpen: boolean) => {
             setIsOpen(newOpen);
         };
 
         const contextValue = useMemo<ReasoningContextValue>(() => {
-            return { duration, isOpen, isStreaming, setIsOpen };
-        }, [duration, isOpen, isStreaming, setIsOpen]);
+            return { duration, isOpen, isStreaming, setIsOpen, triggerId };
+        }, [duration, isOpen, isStreaming, setIsOpen, triggerId]);
 
         return (
             <ReasoningContext value={contextValue}>
@@ -122,13 +139,14 @@ const getTriggerLabel = (isStreaming: boolean, isOpen: boolean): MessageDescript
 
 export const ReasoningTrigger = memo(({ children, className, getThinkingMessage = defaultGetThinkingMessage, ...props }: ReasoningTriggerProps) => {
     const { i18n } = useLingui();
-    const { duration, isOpen, isStreaming } = useReasoning();
+    const { duration, isOpen, isStreaming, triggerId } = useReasoning();
 
     return (
         <CollapsibleTrigger
             aria-label={i18n._(getTriggerLabel(isStreaming, isOpen))}
             className={cn("text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors", className)}
             {...props}
+            id={triggerId}
         >
             {children ?? (
                 <>
@@ -148,7 +166,26 @@ export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & 
 };
 
 export const ReasoningContent = memo(({ children, className, ...props }: ReasoningContentProps) => {
+    const { t } = useLingui();
     const plugins = useStreamdownPlugins(children);
+    const { isStreaming, setIsOpen, triggerId } = useReasoning();
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(children);
+            setCopied(true);
+            setTimeout(setCopied, COPIED_FEEDBACK_MS, false);
+        } catch {
+            // The clipboard is refused outside a secure context or without permission; the text stays selectable.
+        }
+    };
+
+    // The button below the text disappears with it, so keyboard focus goes back up to the trigger.
+    const handleCollapse = () => {
+        setIsOpen(false);
+        document.querySelector<HTMLElement>(`[id="${CSS.escape(triggerId)}"]`)?.focus();
+    };
 
     return (
         <CollapsibleContent
@@ -160,6 +197,21 @@ export const ReasoningContent = memo(({ children, className, ...props }: Reasoni
             {...props}
         >
             <Streamdown plugins={plugins}>{children}</Streamdown>
+            {isStreaming ? null : (
+                <div className="mt-2 flex items-center gap-1">
+                    <Button onClick={handleCopy} size="sm" type="button" variant="ghost">
+                        {copied ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
+                        {t`Copy reasoning`}
+                    </Button>
+                    <Button onClick={handleCollapse} size="sm" type="button" variant="ghost">
+                        <ChevronUpIcon aria-hidden="true" />
+                        {t`Collapse`}
+                    </Button>
+                    <span className="sr-only" role="status">
+                        {copied ? t`Copied` : ""}
+                    </span>
+                </div>
+            )}
         </CollapsibleContent>
     );
 });

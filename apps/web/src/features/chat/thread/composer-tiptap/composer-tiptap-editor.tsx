@@ -222,6 +222,9 @@ const ComposerTiptapEditor = ({
                     "text-gray-900 dark:text-gray-100",
                     "focus:ring-0",
                 ),
+                // Hebrew or Arabic typed into an LTR app lays out right to left. One direction for the whole message (the
+                // first strong character decides), not per paragraph.
+                dir: "auto",
             },
         },
         extensions: [

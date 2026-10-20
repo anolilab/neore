@@ -44,23 +44,23 @@ msgstr "« {0} » contient des variables à renseigner."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "« {0} » démarrera une fois ses dépendances terminées"
 
-#: src/features/chat/thread/composer-input.tsx:481
+#: src/features/chat/thread/composer-input.tsx:482
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "Impossible de joindre « {fileName} » : ce type de fichier n’est pas pris en charge."
 
-#: src/features/chat/thread/composer-input.tsx:474
+#: src/features/chat/thread/composer-input.tsx:475
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "Impossible de joindre « {fileName} » : son contenu ne correspond pas à son type de fichier."
 
-#: src/features/chat/thread/composer-input.tsx:476
+#: src/features/chat/thread/composer-input.tsx:477
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "Impossible d’envoyer « {fileName} ». Vérifiez votre connexion et réessayez."
 
-#: src/features/chat/thread/composer-input.tsx:479
+#: src/features/chat/thread/composer-input.tsx:480
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "« {fileName} » est trop volumineux. Les documents ne peuvent pas dépasser {maxMegabytes} Mo."
 
-#: src/features/chat/thread/composer-input.tsx:480
+#: src/features/chat/thread/composer-input.tsx:481
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "« {fileName} » est trop volumineux. Les fichiers de ce type ne peuvent pas dépasser {maxMegabytes} Mo."
 
@@ -336,7 +336,7 @@ msgid "{0} (shared)"
 msgstr "{0} (partagée)"
 
 #. placeholder {0}: upload.files.length
-#: src/features/skills/components/skill-import-dialog.tsx:223
+#: src/features/skills/components/skill-import-dialog.tsx:232
 msgid "{0} additional file(s)"
 msgstr "{0} fichier(s) supplémentaire(s)"
 
@@ -710,7 +710,7 @@ msgstr "il y a {days} j"
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, one {# pièce jointe supprimée au rechargement} other {# pièces jointes supprimées au rechargement}}"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:108
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:112
 msgid "{duration, plural, one {Thought for # second} other {Thought for # seconds}}"
 msgstr "{duration, plural, one {Réflexion pendant # seconde} other {Réflexion pendant # secondes}}"
 
@@ -1082,7 +1082,7 @@ msgstr "+ Planification des tâches : ~2 500 jetons (+200)"
 
 #: src/features/chat/header/thread-stats-dialog.tsx:92
 msgid "+ unpriced replies, not counted in this total"
-msgstr ""
+msgstr "+ réponses sans prix, non comptées dans ce total"
 
 #. placeholder {0}: selectedVersion.content.length - prompt.content.length
 #: src/features/prompts/components/prompt-history-dialog.tsx:182
@@ -1371,7 +1371,7 @@ msgstr "Un éditeur de documents qui réfléchit avec vous."
 msgid "A few questions first"
 msgstr "Quelques questions d’abord"
 
-#: src/features/skills/components/skill-import-dialog.tsx:194
+#: src/features/skills/components/skill-import-dialog.tsx:203
 msgid "A GitHub link to a skill folder or its SKILL.md, or a skills.sh link. Only the SKILL.md is imported; scripts and other files in the skill are not."
 msgstr ""
 
@@ -2366,7 +2366,7 @@ msgstr "Tri des bugs assisté par IA avec le contexte d’enregistrement complet
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:339
 msgid "AI-generated"
-msgstr ""
+msgstr "Généré par IA"
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:74
 msgid "AI-optimized web search for real-time information retrieval"
@@ -3319,7 +3319,7 @@ msgstr "Assistant (aucune compétence)"
 msgid "Assistant replied:"
 msgstr "L’assistant a répondu :"
 
-#: src/features/chat/thread/message-item.tsx:197
+#: src/features/chat/thread/message-item.tsx:201
 #: src/features/chat/thread/streaming-placeholder.tsx:663
 #: src/features/chat/thread/streaming-placeholder.tsx:697
 msgid "Assistant Reply:"
@@ -4568,7 +4568,7 @@ msgstr "Canada"
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
-#: src/features/skills/components/skill-import-dialog.tsx:235
+#: src/features/skills/components/skill-import-dialog.tsx:244
 #: src/features/slides/components/slide-editor-dialog.tsx:113
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
@@ -5032,7 +5032,7 @@ msgstr "Chinois (simplifié)"
 msgid "Chinese (Traditional)"
 msgstr "Chinois (traditionnel)"
 
-#: src/features/skills/components/skill-import-dialog.tsx:156
+#: src/features/skills/components/skill-import-dialog.tsx:165
 msgid "Choose .md or .zip"
 msgstr "Choisir un .md ou un .zip"
 
@@ -5331,7 +5331,7 @@ msgstr "Cliquez sur l’icône d’épingle d’un message pour l’enregistrer 
 msgid "Click the star on any model in All models to add it here."
 msgstr "Cliquez sur l’étoile d’un modèle dans Tous les modèles pour l’ajouter ici."
 
-#: src/features/chat/thread/composer-input.tsx:248
+#: src/features/chat/thread/composer-input.tsx:249
 msgid "Click to edit"
 msgstr "Cliquer pour modifier"
 
@@ -5554,6 +5554,7 @@ msgstr "Le modèle Command le plus performant de Cohere"
 msgid "Collaborate with shared AI workflows."
 msgstr "Collaborez avec des workflows d’IA partagés."
 
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:195
 #: ../../packages/ui/src/components/sidebar.tsx:406
 #: src/features/workflow/components/canvas/workflow-toolbar.tsx:194
 #: src/features/workflow/components/nodes/group-node.tsx:216
@@ -5588,7 +5589,7 @@ msgstr "Réduire le groupe pour masquer ses éléments"
 msgid "Collapse textarea"
 msgstr "Réduire la zone de texte"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:120
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:124
 msgid "Collapse thinking"
 msgstr "Réduire la réflexion"
 
@@ -6498,8 +6499,8 @@ msgstr "Historique de la conversation"
 msgid "Conversation not available"
 msgstr "Conversation indisponible"
 
-#: src/features/chat/thread/composer-input.tsx:687
-#: src/features/chat/thread/composer-input.tsx:979
+#: src/features/chat/thread/composer-input.tsx:688
+#: src/features/chat/thread/composer-input.tsx:980
 msgid "Conversion failed"
 msgstr "Échec de la conversion"
 
@@ -6544,6 +6545,7 @@ msgstr "Convertir en TypeScript"
 msgid "Converting..."
 msgstr "Conversion..."
 
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:198
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -6560,7 +6562,7 @@ msgstr "Copié dans le presse-papiers"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:322
+#: src/features/chat/thread/message-item.tsx:330
 #: src/features/prompts/components/prompt-item.tsx:255
 msgid "Copied!"
 msgstr "Copié !"
@@ -6569,7 +6571,7 @@ msgstr "Copié !"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:322
+#: src/features/chat/thread/message-item.tsx:330
 #: src/features/chat/thread/text-selection-menu.tsx:384
 #: src/features/settings/components/chat/trigger-settings.tsx:680
 msgid "Copy"
@@ -6587,7 +6589,7 @@ msgstr "Copier"
 msgid "Copy as Markdown"
 msgstr "Copier en Markdown"
 
-#: src/features/chat/thread/message-item.tsx:338
+#: src/features/chat/thread/message-item.tsx:347
 msgid "Copy as plain text"
 msgstr ""
 
@@ -6631,6 +6633,10 @@ msgstr "Copier le prompt"
 #: src/features/pages/components/page-share-dialog.tsx:76
 msgid "Copy public link"
 msgstr "Copier le lien public"
+
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:191
+msgid "Copy reasoning"
+msgstr "Copier le raisonnement"
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:39
 msgid "Copy selected"
@@ -8845,6 +8851,10 @@ msgstr "Télécharger un modèle"
 msgid "Download as CSV"
 msgstr "Télécharger en CSV"
 
+#: src/features/chat/thread/message-item.tsx:351
+msgid "Download as Markdown"
+msgstr "Télécharger au format Markdown"
+
 #: src/features/canvas/canvas-panel.tsx:787
 msgid "Download as XLSX"
 msgstr "Télécharger en XLSX"
@@ -8866,7 +8876,7 @@ msgstr "Télécharger l’export"
 msgid "Download file"
 msgstr "Télécharger le fichier"
 
-#: src/features/chat/header/thread-download-button.tsx:128
+#: src/features/chat/header/thread-download-button.tsx:132
 msgid "Download JSON"
 msgstr "Télécharger en JSON"
 
@@ -8886,13 +8896,17 @@ msgstr "Télécharger en PNG"
 msgid "Download started"
 msgstr "Téléchargement lancé"
 
-#: src/features/chat/header/thread-download-button.tsx:124
+#: src/features/chat/header/thread-download-button.tsx:128
 msgid "Download Text"
 msgstr "Télécharger en texte"
 
 #: src/features/chat/thread-list/thread-node.tsx:748
 msgid "Download thread"
 msgstr "Télécharger la conversation"
+
+#: src/features/chat/header/thread-download-button.tsx:124
+msgid "Download Word document"
+msgstr "Télécharger le document Word"
 
 #: src/features/chat/thread-list/thread-node.tsx:748
 msgid "Downloading..."
@@ -8957,7 +8971,7 @@ msgstr "Déposez un fichier ou cliquez pour l’importer"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:2083
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:2162
-#: src/features/chat/thread/composer-input.tsx:1149
+#: src/features/chat/thread/composer-input.tsx:1151
 msgid "Drop files here"
 msgstr "Déposez les fichiers ici"
 
@@ -9185,7 +9199,7 @@ msgstr "Génération guidée par les contours"
 #: src/features/canvas/canvas-panel.tsx:748
 #: src/features/chat/thread-list/group-header.tsx:144
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:357
+#: src/features/chat/thread/message-item.tsx:370
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:206
 #: src/features/prompts/components/prompt-list-view.tsx:218
@@ -9223,7 +9237,7 @@ msgstr "Modifier le cas {0}"
 msgid "Edit collection"
 msgstr "Modifier la collection"
 
-#: src/features/chat/thread/composer-input.tsx:266
+#: src/features/chat/thread/composer-input.tsx:267
 msgid "Edit content"
 msgstr "Modifier le contenu"
 
@@ -10449,7 +10463,7 @@ msgstr "Étendez le canevas de l’image au-delà de ses bords d’origine"
 msgid "Expand textarea"
 msgstr "Agrandir la zone de texte"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:120
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:124
 msgid "Expand thinking"
 msgstr "Développer la réflexion"
 
@@ -10600,7 +10614,7 @@ msgid "Export cancelled"
 msgstr "Export annulé"
 
 #: src/features/chat/header/thread-download-button.tsx:103
-#: src/features/chat/header/thread-download-button.tsx:136
+#: src/features/chat/header/thread-download-button.tsx:140
 msgid "Export chat"
 msgstr "Exporter la conversation"
 
@@ -10810,7 +10824,7 @@ msgid "Failed to attach collection"
 msgstr "Impossible de joindre la collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:886
+#: src/features/chat/thread/composer-input.tsx:887
 msgid "Failed to attach file"
 msgstr "Impossible de joindre le fichier"
 
@@ -11214,7 +11228,7 @@ msgstr "Impossible de demander l’export"
 msgid "Failed to reset to defaults"
 msgstr "Impossible de rétablir les valeurs par défaut"
 
-#: src/features/chat/thread/composer-input.tsx:918
+#: src/features/chat/thread/composer-input.tsx:919
 msgid "Failed to restore attachment"
 msgstr "Impossible de restaurer la pièce jointe"
 
@@ -11901,7 +11915,7 @@ msgstr "Feishu Encrypt Key"
 msgid "Feishu Verification Token"
 msgstr "Feishu Verification Token"
 
-#: src/features/skills/components/skill-import-dialog.tsx:187
+#: src/features/skills/components/skill-import-dialog.tsx:196
 msgid "Fetch"
 msgstr ""
 
@@ -11910,7 +11924,7 @@ msgstr ""
 msgid "Fetch models"
 msgstr "Récupérer les modèles"
 
-#: src/features/skills/components/skill-import-dialog.tsx:190
+#: src/features/skills/components/skill-import-dialog.tsx:199
 msgid "Fetching link…"
 msgstr ""
 
@@ -12328,7 +12342,7 @@ msgstr "Dupliquer"
 msgid "Fork {0} to edit a copy"
 msgstr "Dupliquer {0} pour modifier une copie"
 
-#: src/features/chat/thread/message-item.tsx:367
+#: src/features/chat/thread/message-item.tsx:380
 msgid "Fork conversation"
 msgstr "Dupliquer la conversation"
 
@@ -12839,7 +12853,7 @@ msgstr "Générer à partir d’une description"
 msgid "Generate ideas for a creative writing story"
 msgstr "Trouver des idées pour une histoire créative"
 
-#: src/features/chat/thread/message-item.tsx:386
+#: src/features/chat/thread/message-item.tsx:399
 msgid "Generate image"
 msgstr "Générer une image"
 
@@ -12865,7 +12879,7 @@ msgstr "Générer une graine aléatoire"
 msgid "Generate unique business ideas for 2025"
 msgstr "Trouver des idées d’entreprise originales pour 2025"
 
-#: src/features/chat/thread/message-item.tsx:396
+#: src/features/chat/thread/message-item.tsx:409
 msgid "Generate video"
 msgstr "Générer une vidéo"
 
@@ -12878,7 +12892,7 @@ msgstr "Générer une vidéo"
 msgid "Generate videos from text or images"
 msgstr "Générez des vidéos à partir de texte ou d’images"
 
-#: src/features/chat/thread/message-item.tsx:406
+#: src/features/chat/thread/message-item.tsx:419
 msgid "Generate voice"
 msgstr "Générer une voix"
 
@@ -14273,7 +14287,7 @@ msgstr "Emprunt d’identité arrêté"
 
 #: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
-#: src/features/skills/components/skill-import-dialog.tsx:239
+#: src/features/skills/components/skill-import-dialog.tsx:248
 #: src/features/skills/components/skill-list.tsx:331
 msgid "Import"
 msgstr "Importer"
@@ -14327,7 +14341,7 @@ msgstr "Importer un export Notion (.zip)"
 msgid "Import one kind of export at a time."
 msgstr ""
 
-#: src/features/skills/components/skill-import-dialog.tsx:149
+#: src/features/skills/components/skill-import-dialog.tsx:158
 msgid "Import skill"
 msgstr "Importer une compétence"
 
@@ -14369,7 +14383,7 @@ msgid "Imported {added} Notion page(s)."
 msgstr "{added} page(s) Notion importée(s)."
 
 #. placeholder {0}: result.slug
-#: src/features/skills/components/skill-import-dialog.tsx:138
+#: src/features/skills/components/skill-import-dialog.tsx:147
 msgid "Imported skill \"{0}\""
 msgstr "Compétence « {0} » importée"
 
@@ -17393,7 +17407,7 @@ msgstr "Plus"
 msgid "More About You"
 msgstr "Plus d’informations sur vous"
 
-#: src/features/chat/thread/message-item.tsx:330
+#: src/features/chat/thread/message-item.tsx:339
 msgid "More copy options"
 msgstr ""
 
@@ -19952,7 +19966,7 @@ msgstr "Ou connectez un nœud Texte pour fournir le prompt"
 msgid "or continue with"
 msgstr "ou continuer avec"
 
-#: src/features/skills/components/skill-import-dialog.tsx:170
+#: src/features/skills/components/skill-import-dialog.tsx:179
 msgid "Or fetch from a link"
 msgstr ""
 
@@ -20716,7 +20730,7 @@ msgstr "Épingler le souvenir"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:142
 #: ../../packages/chat-ui/src/chat/message-item.tsx:191
-#: src/features/chat/thread/message-item.tsx:345
+#: src/features/chat/thread/message-item.tsx:358
 msgid "Pin message"
 msgstr "Épingler le message"
 
@@ -20789,8 +20803,12 @@ msgid "Play"
 msgstr "Lire"
 
 #: src/features/settings/components/account/account-settings.tsx:576
-msgid "Play sound effects for UI interactions."
-msgstr "Jouer des effets sonores lors des interactions avec l’interface."
+msgid "Play a short sound when a reply finishes. Applies to this browser only."
+msgstr "Jouer un bref son lorsqu'une réponse est terminée. S'applique à ce navigateur uniquement."
+
+#: src/features/settings/components/account/account-settings.tsx:576
+#~ msgid "Play sound effects for UI interactions."
+#~ msgstr "Jouer des effets sonores lors des interactions avec l’interface."
 
 #: src/features/auth/components/auth/auth-card.tsx:373
 msgid "Please authenticate to continue"
@@ -22058,7 +22076,7 @@ msgstr "Aperçu en lecture seule - Dupliquez pour modifier"
 msgid "Read-only shared conversation"
 msgstr "Conversation partagée en lecture seule"
 
-#: src/features/chat/thread/composer-input.tsx:212
+#: src/features/chat/thread/composer-input.tsx:213
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Lecture de « {attachmentName} »…"
 
@@ -22449,7 +22467,7 @@ msgid "Refresh installed models"
 msgstr "Actualiser les modèles installés"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:196
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:364
 msgid "Regenerate"
 msgstr "Régénérer"
 
@@ -22594,8 +22612,8 @@ msgstr "Se souvenir de moi"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:284
-#: src/features/chat/thread/composer-input.tsx:346
+#: src/features/chat/thread/composer-input.tsx:285
+#: src/features/chat/thread/composer-input.tsx:347
 #: src/features/devices/components/devices-settings.tsx:85
 #: src/features/devices/components/devices-settings.tsx:89
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -23823,7 +23841,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Note chaque réponse de 0 à 100 % par rapport à la réponse attendue ou à la grille d’évaluation. Ajoute un petit appel de modèle par cas."
 
-#: src/features/chat/thread/composer-input.tsx:843
+#: src/features/chat/thread/composer-input.tsx:844
 msgid "Screen capture failed. Please try again."
 msgstr "La capture d’écran a échoué. Veuillez réessayer."
 
@@ -25030,7 +25048,7 @@ msgstr "Compétence mise à jour"
 msgid "Skill: {skillName}"
 msgstr "Compétence : {skillName}"
 
-#: src/features/skills/components/skill-import-dialog.tsx:198
+#: src/features/skills/components/skill-import-dialog.tsx:207
 msgid "SKILL.md"
 msgstr "SKILL.md"
 
@@ -26361,7 +26379,7 @@ msgstr "Suggéré"
 msgid "Suggested answers"
 msgstr "Réponses suggérées"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:409
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:412
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggestion disponible, appuyez sur Flèche droite pour l’accepter"
 
@@ -26562,7 +26580,7 @@ msgstr "Synthétiseur (pèse les deux camps)"
 msgid "System default"
 msgstr "Valeur par défaut du système"
 
-#: src/features/chat/thread/message-item.tsx:224
+#: src/features/chat/thread/message-item.tsx:228
 msgid "System message:"
 msgstr "Message système :"
 
@@ -27016,7 +27034,7 @@ msgstr "Sens du texte défini sur LTR"
 msgid "Text direction set to RTL"
 msgstr "Sens du texte défini sur RTL"
 
-#: src/features/chat/thread/composer-input.tsx:248
+#: src/features/chat/thread/composer-input.tsx:249
 msgid "Text document"
 msgstr "Document texte"
 
@@ -27115,7 +27133,7 @@ msgstr "Thaïlande"
 msgid "Thanks for rating"
 msgstr "Merci pour votre note"
 
-#: src/features/skills/components/skill-import-dialog.tsx:106
+#: src/features/skills/components/skill-import-dialog.tsx:115
 msgid "That link could not be read."
 msgstr ""
 
@@ -27250,7 +27268,7 @@ msgstr "L’extension n’a pas pu être connectée."
 msgid "The extension will be able to read and send chats as {0}. You can disconnect it at any time by signing out in the extension or ending its session in your account settings."
 msgstr "L’extension pourra lire et envoyer des conversations en tant que {0}. Vous pouvez la déconnecter à tout moment en vous déconnectant dans l’extension ou en mettant fin à sa session dans les paramètres de votre compte."
 
-#: src/features/skills/components/skill-import-dialog.tsx:86
+#: src/features/skills/components/skill-import-dialog.tsx:91
 msgid "The file is larger than {megabytes} MB."
 msgstr "Le fichier dépasse {megabytes} Mo."
 
@@ -27437,7 +27455,7 @@ msgstr "Le bon modèle, à chaque fois."
 msgid "The server lists no models yet — pull or load one first"
 msgstr "Le serveur ne liste encore aucun modèle — téléchargez-en ou chargez-en un d’abord"
 
-#: src/features/skills/components/skill-import-dialog.tsx:142
+#: src/features/skills/components/skill-import-dialog.tsx:151
 msgid "The skill could not be imported."
 msgstr "La compétence n’a pas pu être importée."
 
@@ -27486,7 +27504,7 @@ msgstr "La passerelle LLM unifiée pour les applications d’IA modernes."
 #~ msgid "The unique identifier of the user to add"
 #~ msgstr "L’identifiant unique de l’utilisateur à ajouter"
 
-#: src/features/chat/thread/composer-input.tsx:475
+#: src/features/chat/thread/composer-input.tsx:476
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "L’envoi de « {fileName} » a expiré. Veuillez le joindre à nouveau."
 
@@ -27559,7 +27577,7 @@ msgstr "Épais"
 msgid "Thin"
 msgstr "Fin"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:117
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:121
 msgid "Thinking in progress, collapse to hide"
 msgstr "Réflexion en cours, réduire pour masquer"
 
@@ -27609,7 +27627,7 @@ msgstr "Modèle vision-langage doté de la réflexion"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1063
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:99
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:103
 #: src/features/chat/thread/streaming-placeholder.tsx:701
 msgid "Thinking..."
 msgstr "Réflexion..."
@@ -27702,7 +27720,7 @@ msgstr "Ce fichier CSV semble vide ou invalide."
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "Ce point de terminaison n’est pas Ollama. La gestion des modèles n’est disponible que pour Ollama — dans LM Studio, téléchargez les modèles dans l’application."
 
-#: src/features/skills/components/skill-import-dialog.tsx:86
+#: src/features/skills/components/skill-import-dialog.tsx:91
 msgid "This file could not be read."
 msgstr "Ce fichier n’a pas pu être lu."
 
@@ -27969,7 +27987,7 @@ msgstr "Ce workflow a peut-être été dépublié ou supprimé."
 msgid "Thorough"
 msgstr "Approfondie"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:103
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:107
 msgid "Thought for a few seconds"
 msgstr "A réfléchi quelques secondes"
 
@@ -28023,7 +28041,7 @@ msgstr "Conversation épinglée"
 msgid "Thread restored"
 msgstr "Conversation restaurée"
 
-#: src/features/chat/header/thread-download-button.tsx:132
+#: src/features/chat/header/thread-download-button.tsx:136
 #: src/features/chat/header/thread-stats-dialog.tsx:56
 msgid "Thread statistics"
 msgstr ""
@@ -28726,7 +28744,7 @@ msgstr "Tapez pour rechercher"
 msgid "Type your answer…"
 msgstr "Saisissez votre réponse…"
 
-#: src/features/chat/thread/composer-input.tsx:1140
+#: src/features/chat/thread/composer-input.tsx:1142
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:151
 msgid "Type your message..."
 msgstr "Saisissez votre message..."
@@ -29093,7 +29111,7 @@ msgstr "Documentation à jour pour n’importe quelle bibliothèque ou framework
 msgid "Update Duration"
 msgstr "Modifier la durée"
 
-#: src/features/chat/thread/composer-input.tsx:1012
+#: src/features/chat/thread/composer-input.tsx:1013
 msgid "Update failed"
 msgstr "Échec de la mise à jour"
 
@@ -29240,7 +29258,7 @@ msgstr "Importez une photo de profil pour votre compte"
 #~ msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown."
 #~ msgstr "Importez un SKILL.md ou un .zip de compétence (comme ceux utilisés par Claude et d’autres outils Agent Skills), ou collez le markdown."
 
-#: src/features/skills/components/skill-import-dialog.tsx:150
+#: src/features/skills/components/skill-import-dialog.tsx:159
 msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), paste the markdown, or fetch it from a link."
 msgstr ""
 
@@ -29269,7 +29287,7 @@ msgstr "Importez des CSV, lancez des analyses Python et exportez des graphiques 
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Importez des documents dans votre base de connaissances et regroupez-les en collections. L’IA y recherche le contexte pertinent et cite les passages utilisés."
 
-#: src/features/chat/thread/composer-input.tsx:522
+#: src/features/chat/thread/composer-input.tsx:523
 msgid "Upload failed"
 msgstr "Échec de l’importation"
 
@@ -29323,7 +29341,7 @@ msgstr "Importée"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} importé"
 
-#: src/features/chat/thread/composer-input.tsx:290
+#: src/features/chat/thread/composer-input.tsx:291
 msgid "Uploading {attachmentName}"
 msgstr "Envoi de {attachmentName}"
 
@@ -31205,12 +31223,12 @@ msgid "Your First Chat"
 msgstr "Votre premier chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:568
+#: src/features/chat/thread/composer-input.tsx:569
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Votre saisie est volumineuse (~{0} tokens) et occupera une part importante de la fenêtre de contexte du modèle."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:561
+#: src/features/chat/thread/composer-input.tsx:562
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Votre saisie est trop volumineuse (~{0} tokens) et dépasse la fenêtre de contexte du modèle. Veuillez raccourcir le message ou retirer des pièces jointes pour l’envoyer."
 
@@ -31239,7 +31257,7 @@ msgstr "Votre localisation (ex. : « Paris, France », « Berlin, Allemagne »).
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Votre message contient du contenu inapproprié et ne peut pas être envoyé."
 
-#: src/features/chat/thread/message-item.tsx:171
+#: src/features/chat/thread/message-item.tsx:175
 msgid "Your message:"
 msgstr "Votre message :"
 

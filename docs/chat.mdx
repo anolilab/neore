@@ -293,6 +293,7 @@ under **Settings → Keyboard**.
 - Some models (Claude Opus, Claude Sonnet, DeepSeek R1) support extended thinking mode
 - The model shows its reasoning process before the final answer
 - Enable via model variants with the `:thinking` suffix
+- When a model has finished thinking, **Copy reasoning** and **Collapse** appear below the reasoning text, so a long block can be copied or closed from its end without scrolling back up
 
 **Bring Your Own Key (BYOK):**
 - Use your own API keys for any supported provider
@@ -413,6 +414,17 @@ Edit your messages after sending:
 4. AI can respond to edited message
 
 You can also edit an AI reply: click the edit icon under it and change the text. The reply is updated in place. Tool calls, reasoning and images are kept, and no credits are used. The text is saved as one block, so any separate text paragraphs in the reply are merged into the last one.
+
+### Timestamps, Text Direction and Downloads
+
+- **Timestamps**: each message shows its date and time next to its actions when you hover or focus it. Turn this off with **Show Timestamps** in **Settings → Account**.
+- **Text direction**: every paragraph, heading, list and quote picks its direction from its own first letter, so a reply that mixes Hebrew or Arabic with English reads correctly. The composer does the same for what you type, as one direction for the whole message. Code blocks stay left to right.
+- **Download a message**: the arrow beside **Copy** has **Download as Markdown** next to **Copy as plain text**.
+- **Download a chat**: the export button in the chat header offers Markdown, PDF, Word (`.docx`), plain text and JSON. The Word file holds the title, the date and each message with its sender in bold, and tool results as `Tool Output` entries; images are not included.
+
+### Completion Sound
+
+Turn on **Sound Effects** in **Settings → Account** to hear a short two-note ping when a reply finishes streaming in the chat you have open. Replies that fail stay silent, and so does opening a chat with history. The setting is stored in this browser only, and is off by default. Push notifications for runs that finish while you are away are separate.
 
 ### Prompt Improvement
 
