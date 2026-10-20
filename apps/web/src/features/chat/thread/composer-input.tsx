@@ -16,6 +16,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { formatNumber } from "@neore/ui/utils/locale-format";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -42,6 +43,7 @@ import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { trackEvent } from "@/lib/analytics";
+import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 import type { ChatReference } from "./chat-reference";
@@ -404,6 +406,8 @@ const ComposerInput = ({
     const { cancelStream, jwtToken, sendMessage } = useChatActions();
     const { isStreaming, sseStreamState } = useChatIsStreaming();
     const lunora = useChatLunora();
+    const crpc = useCRPC();
+    const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
     const requestCompletion = useComposerAutocomplete();
@@ -1012,7 +1016,11 @@ const ComposerInput = ({
             updateAttachment(attachmentId, { status: "uploading" });
 
             try {
-                const messages = await readChatMessages(lunora, chat.id);
+                // The thread view's query, through the cRPC factory: the unlock proof and shard routing apply to this read too.
+                const messages = await readChatMessages(
+                    (args) => queryClient.fetchQuery({ ...crpc.chat.functions.getThreadUIMessages.queryOptions(args, { live: false }), staleTime: 0 }),
+                    chat.id,
+                );
                 const transcript = buildChatTranscript(chat.title, messages);
 
                 await uploadGeneratedFile(attachmentId, new File([transcript], fileName, { type: "text/plain" }), t`Could not attach the chat`);
@@ -1022,7 +1030,7 @@ const ComposerInput = ({
                 showError(t`Could not read that chat. If it is locked, unlock it first.`);
             }
         },
-        [lunora, addAttachment, updateAttachment, uploadGeneratedFile, t],
+        [crpc, queryClient, addAttachment, updateAttachment, uploadGeneratedFile, t],
     );
 
     // Handle attachment file update (for editing)
