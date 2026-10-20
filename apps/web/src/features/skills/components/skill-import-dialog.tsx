@@ -86,7 +86,10 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                 return { ok: true as const, next };
             })
             .catch((error: unknown) => {
-                return { ok: false as const, message: describeReadError(error, t`This file could not be read.`, (megabytes) => t`The file is larger than ${megabytes} MB.`) };
+                return {
+                    ok: false as const,
+                    message: describeReadError(error, t`This file could not be read.`, (megabytes) => t`The file is larger than ${megabytes} MB.`),
+                };
             });
 
         if (revision !== uploadRevision.current) {
