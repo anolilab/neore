@@ -9,6 +9,7 @@ import { pathToFileURL } from "node:url";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { isTrustedUrl } from "../trust.js";
 import type { DeviceIpcOptions } from "./index";
 
 type Frame = { url: string };
@@ -115,8 +116,9 @@ vi.mock("./addon", () => {
 const { registerDeviceIpc } = await import("./index");
 const { DEVICE_CHANNEL, LOCAL_CHANNEL } = await import("./channels");
 
+const SITE_ORIGIN = new URL("https://neore.example");
 const options: DeviceIpcOptions = {
-    isTrusted: (event) => (event as unknown as IpcEvent).senderFrame?.url.startsWith("https://neore.example") === true,
+    isTrusted: (event) => isTrustedUrl(SITE_ORIGIN, (event as unknown as IpcEvent).senderFrame?.url),
 };
 
 let siteContents: WebContents;
