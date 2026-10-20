@@ -218,3 +218,17 @@ describe("parseGemini", () => {
         expect((result[0] as NormalizedConversation).title).toBe("Has messages");
     });
 });
+
+describe("parseGemini with a malformed conversation", () => {
+    it("keeps the first conversation when a later message has a null role", () => {
+        const data = [
+            { messages: [{ role: "USER", text: "Hello" }], title: "Good" },
+            { messages: [{ role: null, text: "odd" }, null], title: "Bad" },
+        ];
+
+        const result = parseGemini(data);
+
+        expect(result).toHaveLength(1);
+        expect((result[0] as NormalizedConversation).title).toBe("Good");
+    });
+});

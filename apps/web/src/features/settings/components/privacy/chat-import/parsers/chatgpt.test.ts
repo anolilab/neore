@@ -405,3 +405,29 @@ describe("parseChatGPT", () => {
         expect(((result[0] as NormalizedConversation).messages[0] as NormalizedMessage).createdAt).toBe(1_700_000_001_456);
     });
 });
+
+describe("parseChatGPT with a malformed conversation", () => {
+    it("keeps the first conversation when a later one has a null message and a node without parts", () => {
+        const node = (id: string, parent: string | undefined, message: unknown) => [id, { children: [], id, message, parent }] as const;
+        const data = [
+            {
+                current_node: "b",
+                mapping: Object.fromEntries([
+                    node("a", undefined, null),
+                    node("b", "a", { author: { role: "user" }, content: { content_type: "text", parts: ["Hello"] }, id: "b" }),
+                ]),
+                title: "Good",
+            },
+            {
+                current_node: "d",
+                mapping: Object.fromEntries([node("c", undefined, null), node("d", "c", { author: { role: "user" }, content: {}, id: "d" })]),
+                title: "Bad",
+            },
+        ];
+
+        const result = parseChatGPT(data);
+
+        expect(result).toHaveLength(1);
+        expect((result[0] as NormalizedConversation).title).toBe("Good");
+    });
+});
