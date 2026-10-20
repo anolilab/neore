@@ -8,10 +8,10 @@
     "scripts": {
         "build": "node scripts/build.mjs",
         "dist": "NEORE_RELEASE=1 node scripts/build.mjs && electron-builder --config electron-builder.yml --publish never",
+        "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "pack": "NEORE_RELEASE=1 node scripts/build.mjs && electron-builder --dir --config electron-builder.yml",
         "smoke": "node scripts/smoke.mjs",
         "smoke:artifacts": "node scripts/smoke-artifacts.mjs",
-        "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "start": "pnpm run build && electron .",
         "test": "vitest run",
         "test:e2e": "playwright test",
