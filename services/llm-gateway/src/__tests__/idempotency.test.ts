@@ -50,7 +50,7 @@ interface AppSetup {
     cacheKv: MockKVNamespace;
     callCount: { value: number };
     fetch: (
-        requestInit: { idempotencyKey?: string; isStreaming?: boolean; userId?: string },
+        requestInit: { forceStatus?: number; idempotencyKey?: string; isStreaming?: boolean; userId?: string },
         context?: ReturnType<typeof createAwaitingContext>,
     ) => Promise<Response>;
 }
@@ -76,6 +76,10 @@ function buildApp(options: { cacheKv?: MockKVNamespace; env?: Partial<AppEnv>; u
 
         callCount.value++;
 
+        if (body.forceStatus) {
+            return c.json({ error: { message: "forced" } }, body.forceStatus);
+        }
+
         if (body.stream) {
             return new Response("data: [DONE]\n\n", {
                 headers: { "Cache-Control": "no-cache", "Content-Type": "text/event-stream" },
@@ -93,13 +97,14 @@ function buildApp(options: { cacheKv?: MockKVNamespace; env?: Partial<AppEnv>; u
     const mockEnv = createMockEnv({ cacheKv: cacheKv as unknown as MockKVNamespace });
 
     async function fetchApp(
-        requestInit: { idempotencyKey?: string; isStreaming?: boolean; userId?: string },
+        requestInit: { forceStatus?: number; idempotencyKey?: string; isStreaming?: boolean; userId?: string },
         context?: ReturnType<typeof createAwaitingContext>,
     ): Promise<Response> {
         const body = JSON.stringify({
             messages: [{ content: "hi", role: "user" }],
             model: "gpt-4o",
             ...(requestInit.isStreaming && { stream: true }),
+            ...(requestInit.forceStatus && { forceStatus: requestInit.forceStatus }),
         });
 
         const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -337,6 +342,32 @@ describe("idempotencyMiddleware", () => {
 
             expect(callCount.value).toBe(2);
             expect(res2.headers.get("X-Idempotency-Replayed")).toBeNull();
+        });
+    });
+
+    describe("error statuses", () => {
+        it("does not cache a 422 (sample-dependent structured-output failure)", async () => {
+            const { callCount, fetch } = buildApp({});
+            const context = createAwaitingContext();
+
+            await fetch({ forceStatus: 422, idempotencyKey: "k422" }, context);
+            await context.flush();
+            const second = await fetch({ forceStatus: 422, idempotencyKey: "k422" }, context);
+
+            expect(second.status).toBe(422);
+            expect(callCount.value).toBe(2);
+        });
+
+        it("still replays a 400 from cache", async () => {
+            const { callCount, fetch } = buildApp({});
+            const context = createAwaitingContext();
+
+            await fetch({ forceStatus: 400, idempotencyKey: "k400" }, context);
+            await context.flush();
+            const second = await fetch({ forceStatus: 400, idempotencyKey: "k400" }, context);
+
+            expect(second.status).toBe(400);
+            expect(callCount.value).toBe(1);
         });
     });
 });

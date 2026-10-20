@@ -52,11 +52,15 @@ export async function* streamToSSE(
      * only needs to know a tool call went out.
      */
     onToolCall?: () => void,
+
+    /** Fired when an `error` part is serialised, so callers need not sniff the serialised text. */
+    onError?: () => void,
 ): AsyncGenerator<string> {
     try {
         for await (const part of result.fullStream) {
             switch (part.type) {
                 case "error": {
+                    onError?.();
                     yield formatSSE({
                         error: { code: "PROVIDER_ERROR", message: String(part.error) },
                         type: "error",
@@ -120,6 +124,7 @@ export async function* streamToSSE(
             }
         }
     } catch (error) {
+        onError?.();
         yield formatSSE({
             error: { code: "STREAM_ERROR", message: error instanceof Error ? error.message : "Unknown stream error" },
             type: "error",

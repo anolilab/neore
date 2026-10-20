@@ -335,7 +335,10 @@ streamRouter.openapi(
             // surfaces as a structured 502 the routing layer can fall back
             // on. `warmupTimeoutMs === 0` disables the peek entirely.
             const warmupTimeoutMs = body.warmupTimeoutMs ?? DEFAULT_PEEK_TIMEOUT_MS;
-            const sseIterable = streamToSSE(result);
+            let isErrored = false;
+            const sseIterable = streamToSSE(result, undefined, () => {
+                isErrored = true;
+            });
             const sseIterator = sseIterable[Symbol.asyncIterator]();
 
             let firstChunk: string | undefined;
@@ -440,15 +443,9 @@ streamRouter.openapi(
                         // plain `for-await` covers the remaining stream.
                         const remainingChunks = { [Symbol.asyncIterator]: () => sseIterator };
 
-                        let isErrored = false;
-
                         for await (const chunk of remainingChunks) {
                             if (ttftMs === undefined) {
                                 ttftMs = Date.now() - startTime;
-                            }
-
-                            if (chunk.includes('"type":"error"')) {
-                                isErrored = true;
                             }
 
                             send(chunk);

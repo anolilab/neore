@@ -190,7 +190,7 @@
             "vars": {
                 "APP_NAME": "llm-gateway",
                 "APP_VERSION": "1.0.0",
-                "NODE_ENV": "development"
+                "NODE_ENV": "production"
             }
         }
     }
