@@ -80,11 +80,11 @@
         .text-muted-foreground\/70,
         .text-muted-foreground\/72,
         .text-muted-foreground\/80
-    ):not([class*=":"]) {
+    ):not([class*=":text-"]) {
     color: var(--muted-foreground);
 }
 
-:root[data-contrast="high"] :is(.border-border\/30, .border-border\/40, .border-border\/50, .border-border\/60, .border-border\/70):not([class*=":"]) {
+:root[data-contrast="high"] :is(.border-border\/30, .border-border\/40, .border-border\/50, .border-border\/60, .border-border\/70):not([class*=":border-"]) {
     border-color: var(--border);
 }
 

@@ -113,7 +113,8 @@ describe("dimmed theme colours", () => {
     it("are restored to the full token", () => {
         expect(CSS).toContain(String.raw`.text-muted-foreground\/50`);
         expect(CSS).toContain(String.raw`.border-border\/40`);
-        expect(CSS).toContain(':not([class*=":"])');
+        expect(CSS).toContain(':not([class*=":text-"])');
+        expect(CSS).toContain(':not([class*=":border-"])');
     });
 });
 
