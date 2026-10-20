@@ -183,17 +183,23 @@ describe("shareLinkBucket", () => {
 });
 
 describe("checkRateLimit", () => {
-    it("fails open when the limiter itself fails", async () => {
+    const failing = {
+        runMutation: async () => {
+            throw new Error("D1 unavailable");
+        },
+    };
+
+    it("fails closed by default when the limiter itself fails", async () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-        const failing = {
-            runMutation: async () => {
-                throw new Error("D1 unavailable");
-            },
-        };
+        await expect(checkRateLimit(failing as never, "messenger/connection:free")).resolves.toEqual({ ok: false });
+        await expect(checkRateLimit(failing as never, "messenger/connection:free", { throws: true })).resolves.toEqual({ ok: false });
+    });
 
-        await expect(checkRateLimit(failing as never, "messenger/connection:free", { throws: true })).resolves.toEqual({ ok: true });
-        await expect(checkRateLimit(failing as never, "messenger/connection:free")).resolves.toEqual({ ok: true });
+    it("fails open when asked to", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        await expect(checkRateLimit(failing as never, "messenger/connection:free", { failMode: "open", throws: false })).resolves.toEqual({ ok: true });
     });
 
     it("still rejects a request that is over the limit", async () => {

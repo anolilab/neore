@@ -825,23 +825,30 @@ export type RateLimitContext = { db: RateLimitDb } | { runMutation?: ActionConte
  * Check rate limit for a given operation (consumes a token).
  * For mutation/query contexts, uses ctx.db directly.
  * For action contexts, delegates to an internal mutation.
+ *
+ * `failMode` decides what a failure of the limiter itself (not an exceeded limit)
+ * answers: `"closed"` (default) reports it as limited, `"open"` lets the request
+ * through. Only availability throttles in front of input that is never
+ * redelivered (messenger and trigger webhooks) opt into `"open"`.
  */
 export const checkRateLimit = async (
     context: RateLimitContext,
     operation: RateLimitKey,
     options: {
         count?: number;
+        failMode?: "open" | "closed";
         key?: string;
         throws?: boolean;
     } = {},
 ): Promise<RateLimitResponse> => {
     const identifier = options.key ?? "global";
     const count = options.count ?? 1;
+    const failMode = options.failMode ?? "closed";
 
     try {
         if ("db" in context) {
             // Mutation/query context — use db directly
-            const limiter = createRatelimit(operation, context.db, options.throws ? "closed" : "open");
+            const limiter = createRatelimit(operation, context.db, failMode);
             const result = await limiter.limit(identifier, { count });
 
             if (!result.ok && options.throws) {
@@ -891,17 +898,20 @@ export const checkRateLimit = async (
     } catch (error: any) {
         // Scoped to the code, not to `instanceof LunoraError`. Only the rate-limit
         // error this function throws itself is meant to propagate; anything else
-        // (a failed internal mutation, an infra error) fails OPEN below: every
-        // caller reads `ok: false` as "limited" and drops the request (a messenger
-        // or trigger webhook is not redelivered). Widening it to any LunoraError
-        // would turn those into request rejections.
+        // (a failed internal mutation, an infra error) is answered by `failMode`.
         if (error instanceof LunoraError && error.code === "TOO_MANY_REQUESTS") {
             throw error;
         }
 
-        console.error("[rate-limit] check failed open", { error, operation });
+        if (failMode === "open") {
+            console.error("[rate-limit] check failed open", { error, operation });
 
-        return { ok: true };
+            return { ok: true };
+        }
+
+        console.error("[rate-limit] check failed closed", { error, operation });
+
+        return { ok: false };
     }
 };
 

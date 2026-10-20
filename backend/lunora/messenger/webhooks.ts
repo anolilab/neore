@@ -153,9 +153,9 @@ export const acceptInbound = async (
     }
 
     const tier = await context.runQuery(internal.messenger.functions.getOwnerRateLimitTier, { userId: connection.userId });
-    const perConnection = await checkRateLimit(context, `messenger/connection:${tier}`, { key: connection._id, throws: false });
+    const perConnection = await checkRateLimit(context, `messenger/connection:${tier}`, { failMode: "open", key: connection._id, throws: false });
     const perSender = perConnection.ok
-        ? await checkRateLimit(context, `messenger/inbound:${tier}`, { key: `${connection._id}:${message.senderId}`, throws: false })
+        ? await checkRateLimit(context, `messenger/inbound:${tier}`, { failMode: "open", key: `${connection._id}:${message.senderId}`, throws: false })
         : perConnection;
 
     if (!perSender.ok) {

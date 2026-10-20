@@ -156,7 +156,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         // Capped per trigger only once the sender is proven. Charged before the
         // signature check, anyone who knew the trigger id could spend the quota
         // with junk and lock the owner's real deliveries out.
-        const limited = await checkRateLimit(context, "triggers/webhook", { key: triggerId, throws: false });
+        const limited = await checkRateLimit(context, "triggers/webhook", { failMode: "open", key: triggerId, throws: false });
 
         if (!limited.ok) {
             return Response.json({ error: "Too many requests" }, { headers: { "Content-Type": "application/json" }, status: 429 });

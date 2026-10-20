@@ -46,7 +46,7 @@ const sendNotice = async (context: HttpActionCtx, connection: Doc<"messengerConn
 const refuse = async (context: HttpActionCtx, connection: Doc<"messengerConnections">, sender: PairingSender, delivery: NoticeDelivery): Promise<"refused"> => {
     // One private-bot reply per stranger per hour: enough to tell a lost user
     // what is going on, never a way to make the bot spam on the owner's quota.
-    const notice = await checkRateLimit(context, "messenger/privateNotice", { key: `${connection._id}:${sender.senderId}`, throws: false });
+    const notice = await checkRateLimit(context, "messenger/privateNotice", { failMode: "open", key: `${connection._id}:${sender.senderId}`, throws: false });
 
     if (notice.ok) {
         await sendNotice(context, connection, delivery, PRIVATE_BOT_NOTICE);
