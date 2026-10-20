@@ -16,6 +16,7 @@ import {
     getModelSearchText,
     moveFavorite,
     sortModels,
+    swapFavorites,
 } from "./utilities";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -167,6 +168,19 @@ describe(formatPricePerMillion, () => {
         [1.5, "$1.50"],
     ])("formats %d as %s", (value, expected) => {
         expect(formatPricePerMillion(value)).toBe(expected);
+    });
+});
+
+describe(swapFavorites, () => {
+    it("exchanges two stored slots and leaves a favorite between them in place", () => {
+        expect(swapFavorites(["textA", "imageH", "textB"], "textA", "textB")).toStrictEqual(["textB", "imageH", "textA"]);
+    });
+
+    it("changes nothing for an unknown id or the same id twice", () => {
+        const favorites = ["a", "b"];
+
+        expect(swapFavorites(favorites, "x", "a")).toStrictEqual(favorites);
+        expect(swapFavorites(favorites, "a", "a")).toStrictEqual(favorites);
     });
 });
 

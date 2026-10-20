@@ -104,7 +104,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
     // one (its label comes from that list) — not on every first paint.
     const customModels = useCustomModels(includeCustomModels && (open || Boolean(modelId?.startsWith("custom:"))));
     const featureFlaggedModels = useMemo(() => (customModels.length > 0 ? [...gatewayModels, ...customModels] : gatewayModels), [gatewayModels, customModels]);
-    const { favoriteModelIds, reorderFavorites, toggleFavorite } = useFavoriteModels();
+    const { favoriteModelIds, swapFavorites, toggleFavorite } = useFavoriteModels();
     const { nicknames } = useModelNicknames();
 
     useEffect(() => {
@@ -203,7 +203,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
                             initialModelIds={isComparisonMode ? selectedModelIds : undefined}
                             isAnonymous={isAnonymous}
                             models={featureFlaggedModels}
-                            onMoveFavorite={reorderFavorites}
+                            onMoveFavorite={swapFavorites}
                             onSelect={handleSelect}
                             onSelectMultiple={handleSelectMultiple}
                             onToggleFavorite={toggleFavorite}
@@ -223,7 +223,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
             initialModelIds={isComparisonMode ? selectedModelIds : undefined}
             isAnonymous={isAnonymous}
             models={featureFlaggedModels}
-            onMoveFavorite={reorderFavorites}
+            onMoveFavorite={swapFavorites}
             onSelect={handleSelect}
             onSelectMultiple={handleSelectMultiple}
             onToggleFavorite={toggleFavorite}
