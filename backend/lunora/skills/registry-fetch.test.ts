@@ -33,6 +33,16 @@ describe(fetchSkillMarkdown, () => {
         expect(fetcher).toHaveBeenCalledTimes(1);
     });
 
+    it("reports a body whose stream fails mid-read as unreachable, rather than leaking the error", async () => {
+        const body = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                controller.error(new TypeError("connection reset"));
+            },
+        });
+
+        await expect(fetchSkillMarkdown(URLS, respond(new Response(body, { status: 200 })))).rejects.toThrow("could not be reached");
+    });
+
     it("says a deadline or a failed connection is worth retrying, not an internal error", async () => {
         const timedOut = vi.fn(async () => {
             throw new DOMException("The operation timed out.", "TimeoutError");

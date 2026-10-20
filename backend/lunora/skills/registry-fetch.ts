@@ -61,22 +61,29 @@ const readCapped = async (response: Response, limit: number): Promise<string> =>
     const chunks: Uint8Array[] = [];
     let total = 0;
 
-    for (;;) {
-        const { done, value } = await reader.read();
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
 
-        if (done) {
-            break;
+            if (done) {
+                break;
+            }
+
+            total += value.byteLength;
+
+            if (total > limit) {
+                throw new SkillSourceError(`That SKILL.md is larger than ${Math.round(limit / 1024)} KB.`);
+            }
+
+            chunks.push(value);
         }
+    } catch (error) {
+        // Any failure before the end (the size cap, a stream error, a deadline) releases the connection; the original error is what the caller sees.
+        await reader.cancel().catch(() => {
+            // The stream is already errored or closed, so there is nothing left to release.
+        });
 
-        total += value.byteLength;
-
-        if (total > limit) {
-            await reader.cancel();
-
-            throw new SkillSourceError(`That SKILL.md is larger than ${Math.round(limit / 1024)} KB.`);
-        }
-
-        chunks.push(value);
+        throw error;
     }
 
     try {
