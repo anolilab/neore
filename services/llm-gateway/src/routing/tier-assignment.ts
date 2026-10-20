@@ -215,7 +215,7 @@ export const computeTierPools = async (
     await Promise.all(
         candidates.map(async (c) => {
             try {
-                const p = await pricingService.getPricing(c.modelApiId);
+                const p = await pricingService.getPricing(c.modelApiId, c.provider);
 
                 pricingByCandidate.set(c.modelId, p);
             } catch {

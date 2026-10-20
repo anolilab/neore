@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import type { AppEnv } from "../env.js";
 import type { ModelPricing, ModelsDevelopmentData, TokenUsage } from "../providers/pricing.js";
-import { calculateCost, extractPricing } from "../providers/pricing.js";
+import { calculateCost, extractPricing, PricingService } from "../providers/pricing.js";
 import sample from "./fixtures/models-dev.sample.json";
+import { createMockEnv, MockKVNamespace } from "./helpers/mock-env.js";
 
 const fixture = sample as ModelsDevelopmentData;
 
@@ -164,5 +166,31 @@ describe("extractPricing (provider-keyed models.dev document)", () => {
 
         // 1M prompt tokens at $1.25 / M = $1.25 = 1,250,000 µ$
         expect(calculateCost(pricing, { completionTokens: 0, promptTokens: 1_000_000 })).toBe(Math.round(1.25 * 1_000_000));
+    });
+});
+
+describe("PricingService.getPricing cache", () => {
+    it("keys the per-model cache by provider, so one provider's price never pins another's", async () => {
+        expect.assertions(3);
+
+        const pricingKv = new MockKVNamespace();
+        const document: ModelsDevelopmentData = {
+            "provider-a": { models: { "same-model": { cost: { input: 1, output: 2 } } } },
+            "provider-b": { models: { "same-model": { cost: { input: 5, output: 10 } } } },
+        };
+
+        await pricingKv.put("models_dev_full", JSON.stringify(document));
+
+        const service = new PricingService(createMockEnv({ pricingKv }) as unknown as AppEnv);
+
+        await expect(service.getPricing("same-model", "provider-a")).resolves.toStrictEqual({ inputPerMillion: 1, outputPerMillion: 2 });
+        await expect(service.getPricing("same-model", "provider-b")).resolves.toStrictEqual({ inputPerMillion: 5, outputPerMillion: 10 });
+
+        const { keys } = await pricingKv.list({ prefix: "pricing:" });
+
+        expect(keys.map((key) => key.name).toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
+            "pricing:v2:provider-a:same-model",
+            "pricing:v2:provider-b:same-model",
+        ]);
     });
 });

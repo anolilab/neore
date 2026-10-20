@@ -41,7 +41,9 @@ const MODELS_DEV_URL = "https://models.dev/api.json";
 /** The whole models.dev document, provider-keyed (`data[provider].models[model]`). */
 const FULL_CACHE_KEY = "models_dev_full";
 const FULL_CACHE_TTL = 86_400; // 24 hours
-// v2: entries written before the provider-keyed lookup may carry the old (x 1e6) scale.
+// Keys are `pricing:v2:<providerHint | _>:<modelApiId>`: one model id can be hosted
+// by several providers at different prices. v2 also drops entries written before
+// the provider-keyed lookup, which may carry the old (x 1e6) scale.
 const PRICING_KEY_PREFIX = "pricing:v2:";
 const PRICING_TTL = 86_400;
 
@@ -211,7 +213,7 @@ export class PricingService {
         }
 
         // Check per-model KV cache
-        const cacheKey = `${PRICING_KEY_PREFIX}${modelApiId}`;
+        const cacheKey = `${PRICING_KEY_PREFIX}${providerHint ?? "_"}:${modelApiId}`;
         const cached = await this.kv.get(cacheKey, "json");
 
         if (cached) {
