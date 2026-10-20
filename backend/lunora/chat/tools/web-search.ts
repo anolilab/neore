@@ -58,6 +58,13 @@ interface ExaSearchResponse {
     results: ExaSearchResult[];
 }
 
+interface ParallelSearchResponse {
+    results?: null | { excerpts?: null | string[]; publish_date?: null | string; title?: null | string; url: string }[];
+}
+
+/** `include_domains` and `exclude_domains` together may not exceed 200 entries. */
+const PARALLEL_MAX_DOMAINS = 200;
+
 /**
  * Search using Tavily API.
  */
@@ -167,36 +174,59 @@ const searchWithExa = async (
     });
 };
 
+const parallelSourcePolicy = (domainFilter?: { excludeDomains?: string[]; includeDomains?: string[] }) => {
+    if (domainFilter?.includeDomains?.length) {
+        return { include_domains: domainFilter.includeDomains.slice(0, PARALLEL_MAX_DOMAINS) };
+    }
+
+    return domainFilter?.excludeDomains?.length ? { exclude_domains: domainFilter.excludeDomains.slice(0, PARALLEL_MAX_DOMAINS) } : undefined;
+};
+
 /**
- * Search using Parallel API (Reddit-focused search).
+ * Search using the Parallel Search API (https://docs.parallel.ai/api-reference/search-beta/search).
+ *
+ * The request body is closed (`additionalProperties: false`), so an extra key is a 422:
+ * `search_queries` is required, the result cap lives under `advanced_settings`, and there
+ * is no topic or source selector. The key goes in `x-api-key`. Domains go in
+ * `source_policy`, where a non-empty include list makes the exclude list ignored, so only
+ * one of the two is sent (as with Exa); the caller's post-filter enforces the excludes either way.
  */
-const searchWithParallel = async (query: string, maxResults: number, sources: ("web" | "news" | "reddit")[] = ["web"]): Promise<WebSearchResult[]> => {
+const searchWithParallel = async (
+    query: string,
+    maxResults: number,
+    domainFilter?: { excludeDomains?: string[]; includeDomains?: string[] },
+): Promise<WebSearchResult[]> => {
     if (!PARALLEL_API_KEY) {
         throw new Error("PARALLEL_API_KEY is not configured");
     }
 
+    const sourcePolicy = parallelSourcePolicy(domainFilter);
+
     const response = await fetchWithTimeout("https://api.parallel.ai/v1/search", {
         body: JSON.stringify({
-            max_results: maxResults,
-            query,
-            sources,
+            advanced_settings: {
+                max_results: maxResults,
+                ...(sourcePolicy && { source_policy: sourcePolicy }),
+            },
+            search_queries: [query],
         }),
         headers: {
-            Authorization: `Bearer ${PARALLEL_API_KEY}`,
             "Content-Type": "application/json",
+            "x-api-key": PARALLEL_API_KEY,
         },
         method: "POST",
     });
 
     await assertOk(response, "Parallel API error");
 
-    const data = (await response.json()) as { results: { excerpt?: string; published_date?: string; title: string; url: string }[] };
+    const data = (await response.json()) as ParallelSearchResponse;
 
-    return data.results.map((result) => {
+    // A result without excerpts keeps its title and link; the whole query must not fail on one missing field.
+    return (data.results ?? []).map((result) => {
         return {
-            content: result.excerpt ?? "",
-            publishedDate: result.published_date,
-            title: result.title,
+            content: (result.excerpts ?? []).join("\n\n"),
+            publishedDate: result.publish_date ?? undefined,
+            title: result.title ?? result.url,
             url: result.url,
         };
     });
@@ -289,12 +319,20 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
 
         // Determine which provider to use
         const getSearchFunction = (): ((query: string, max: number) => Promise<WebSearchResult[]>) => {
+            // Only Tavily applies the news topic. Exa and Parallel would run a news query as a general search, so refuse it
+            // instead of returning results of the wrong kind.
+            const tavilyAvailable = Boolean(userTavilyKey || TAVILY_API_KEY);
+
+            if (topic === "news" && (provider === "exa" || provider === "parallel" || (provider === "auto" && !tavilyAvailable))) {
+                throw new Error("News search needs Tavily: Exa and Parallel have no news topic. Add a Tavily key, or search with the general topic.");
+            }
+
             switch (provider) {
                 case "exa": {
                     return (q, max) => searchWithExa(q, max, domainFilter);
                 }
                 case "parallel": {
-                    return (q, max) => searchWithParallel(q, max, topic === "news" ? ["news", "web"] : ["web"]);
+                    return (q, max) => searchWithParallel(q, max, domainFilter);
                 }
                 case "tavily": {
                     return (q, max) => searchWithTavily(q, max, topic, userTavilyKey, domainFilter);
@@ -310,7 +348,7 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
                     }
 
                     if (PARALLEL_API_KEY) {
-                        return (q, max) => searchWithParallel(q, max, topic === "news" ? ["news", "web"] : ["web"]);
+                        return (q, max) => searchWithParallel(q, max, domainFilter);
                     }
 
                     throw new Error("No search provider API key configured. Please set TAVILY_API_KEY, EXA_API_KEY, or PARALLEL_API_KEY.");
@@ -329,7 +367,7 @@ Returns relevant web pages with titles, URLs, and content snippets.`,
                     shouldRetry: isPaidSearchRetryable,
                 });
 
-                // Post-filter too: a provider may ignore `exclude_domains`, and `parallel` takes none.
+                // Post-filter too: a provider may ignore `exclude_domains`, or drop it beside an include list.
                 return { query, results: deduplicateByDomainAndUrl(filterBlockedResults(results, enforcedExcludes)) };
             } catch (error) {
                 toolsLogger.error(`Search failed for query "${query}":`, formatError(error));

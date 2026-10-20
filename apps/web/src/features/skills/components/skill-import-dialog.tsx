@@ -4,12 +4,13 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import { parseSkillMarkdown, validateSkillFiles } from "@neore/backend/skills/markdown";
 import { Button } from "@neore/ui/components/button";
+import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
 import { FileUpIcon, Loader2Icon } from "lucide-react";
-import type { ChangeEvent, FC } from "react";
+import type { ChangeEvent, FC, KeyboardEvent } from "react";
 import { useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -43,10 +44,19 @@ interface SkillImportDialogProps {
 const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClose, onImported }) => {
     const { t } = useLingui();
     const [upload, setUpload] = useState<SkillUpload>({ filename: "SKILL.md", files: [], markdown: "" });
+    // Bumped by every edit of the upload and of the link. A file read or link fetch started before a later edit is stale and must not replace it.
+    const uploadRevision = useRef(0);
+    const replaceUpload = (next: SkillUpload) => {
+        uploadRevision.current += 1;
+        setUpload(next);
+    };
     const [readError, setReadError] = useState<string | null>(null);
     const fileInput = useRef<HTMLInputElement>(null);
     const markdownId = useId();
+    const linkId = useId();
+    const [link, setLink] = useState("");
     const { isPending, mutateAsync: importSkill } = useMutation(useLunoraActionOptions(api.skills.io.importSkill));
+    const { isPending: isFetching, mutateAsync: fetchSkill } = useMutation(useLunoraActionOptions(api.skills.io.fetchSkillFromUrl));
 
     const preview = useMemo(() => {
         if (!upload.markdown.trim()) {
@@ -69,12 +79,61 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
             return;
         }
 
-        try {
-            setUpload(await readSkillUpload(file, loadJsZip));
-            setReadError(null);
-        } catch (error) {
-            setReadError(describeReadError(error, t`This file could not be read.`, (megabytes) => t`The file is larger than ${megabytes} MB.`));
+        const revision = uploadRevision.current;
+        // Settled before the check below, so a read that was superseded never reports its error either.
+        const outcome = await readSkillUpload(file, loadJsZip)
+            .then((next) => {
+                return { ok: true as const, next };
+            })
+            .catch((error: unknown) => {
+                return {
+                    ok: false as const,
+                    message: describeReadError(error, t`This file could not be read.`, (megabytes) => t`The file is larger than ${megabytes} MB.`),
+                };
+            });
+
+        if (revision !== uploadRevision.current) {
+            return;
         }
+
+        if (outcome.ok) {
+            replaceUpload(outcome.next);
+            setReadError(null);
+        } else {
+            setReadError(outcome.message);
+        }
+    };
+
+    // The server reads the SKILL.md (GitHub links only); it lands in the box below for the same preview and checks as pasted text.
+    const handleFetchLink = async () => {
+        const revision = uploadRevision.current;
+        const outcome = await fetchSkill({ url: link })
+            .then((fetched) => {
+                return { ok: true as const, fetched };
+            })
+            .catch((error: unknown) => {
+                return { ok: false as const, message: error instanceof Error && error.message ? error.message : t`That link could not be read.` };
+            });
+
+        if (revision !== uploadRevision.current) {
+            return;
+        }
+
+        if (outcome.ok) {
+            replaceUpload({ filename: outcome.fetched.filename, files: [], markdown: outcome.fetched.markdown });
+            setReadError(null);
+        } else {
+            setReadError(outcome.message);
+        }
+    };
+
+    const handleLinkKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key !== "Enter" || !link.trim() || isFetching) {
+            return;
+        }
+
+        event.preventDefault();
+        handleFetchLink();
     };
 
     const handleImport = async () => {
@@ -97,7 +156,7 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
         <>
             <DialogHeader>
                 <DialogTitle>{t`Import skill`}</DialogTitle>
-                <DialogDescription>{t`Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown.`}</DialogDescription>
+                <DialogDescription>{t`Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), paste the markdown, or fetch it from a link.`}</DialogDescription>
             </DialogHeader>
             <DialogPanel className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -117,11 +176,39 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                     />
                 </div>
                 <div className="space-y-1.5">
+                    <Label htmlFor={linkId}>{t`Or fetch from a link`}</Label>
+                    <div className="flex gap-2">
+                        <Input
+                            id={linkId}
+                            inputMode="url"
+                            onChange={(event) => {
+                                // A fetch in flight is for the link the user just replaced: its result must not land.
+                                uploadRevision.current += 1;
+                                setLink(event.target.value);
+                            }}
+                            onKeyDown={handleLinkKeyDown}
+                            placeholder="https://github.com/owner/repo/tree/main/skills/my-skill"
+                            type="url"
+                            value={link}
+                        />
+                        <Button disabled={!link.trim() || isFetching} onClick={handleFetchLink} type="button" variant="outline">
+                            {isFetching && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
+                            {t`Fetch`}
+                        </Button>
+                        <span aria-live="polite" className="sr-only" role="status">
+                            {isFetching ? t`Fetching link…` : ""}
+                        </span>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                        {t`A GitHub link to a skill folder or its SKILL.md, or a skills.sh link. Only the SKILL.md is imported; scripts and other files in the skill are not.`}
+                    </p>
+                </div>
+                <div className="space-y-1.5">
                     <Label htmlFor={markdownId}>{t`SKILL.md`}</Label>
                     <Textarea
                         className="max-h-72 font-mono text-xs"
                         id={markdownId}
-                        onChange={(event) => setUpload({ filename: "SKILL.md", files: [], markdown: event.target.value })}
+                        onChange={(event) => replaceUpload({ filename: "SKILL.md", files: [], markdown: event.target.value })}
                         placeholder={"---\nname: my-skill\ndescription: What it does and when to use it.\n---\n\nInstructions…"}
                         rows={10}
                         value={upload.markdown}
@@ -156,7 +243,7 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                 <Button onClick={onClose} type="button" variant="outline">
                     {t`Cancel`}
                 </Button>
-                <Button disabled={!preview?.ok || isPending} onClick={handleImport} type="button">
+                <Button disabled={!preview?.ok || isPending || isFetching} onClick={handleImport} type="button">
                     {isPending && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
                     {t`Import`}
                 </Button>

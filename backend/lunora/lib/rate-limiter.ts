@@ -456,6 +456,10 @@ export const RATE_LIMIT_CONFIGS = {
 
     "skills/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "skills/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
+    // Reading a SKILL.md from a pasted link (`skills/io.ts#fetchSkillFromUrl`): one outbound request per
+    // call, and a miss costs one too, so it must not eat the budget of the import that follows.
+    "skills/fetch:free": Ratelimit.fixedWindow(10, MINUTE),
+    "skills/fetch:premium": Ratelimit.fixedWindow(30, MINUTE),
     "skills/invoke:free": Ratelimit.tokenBucket(30, MINUTE, 50),
 
     "skills/invoke:premium": Ratelimit.tokenBucket(100, MINUTE, 200),

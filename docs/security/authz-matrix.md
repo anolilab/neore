@@ -566,6 +566,7 @@ for a schema table that is neither policed nor listed:
 | `skills_functions.updateSkill` | mutation | authMutation + RL | skillHistory, skills | skill access; row.userId == caller | ok |
 | `skills_generate.generateSkillDraft` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `skills_io.exportSkill` | action | authAction + RL | skillFiles, skills | skill access (`getSkill` decides) | ok |
+| `skills_io.fetchSkillFromUrl` | action | authAction + RL | — | caller-scoped (ctx.user); reads public GitHub only, on a host fixed in code (`source-url.ts`); size-capped, no redirects, creates nothing | ok |
 | `skills_io.importSkill` | action | authAction + RL | skillFiles, skills | caller-scoped (ctx.user); created through `createSkill`; parsed and size-capped server-side | ok |
 | `skills_marketplace.browseSkills` | query | authQuery | skillStats, skills | public skills only, projected | ok |
 | `skills_marketplace.forkSkill` | mutation | authMutation + RL | skillHistory, skillStats, skills, userSkills | skill access | ok |

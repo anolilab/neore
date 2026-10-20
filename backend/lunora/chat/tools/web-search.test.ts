@@ -26,10 +26,12 @@ const { default: webSearchTool } = await import("./web-search");
 const tool = webSearchTool as unknown as SearchTool;
 
 const sent: { body: Record<string, unknown>; url: string }[] = [];
+const sentHeaders: Record<string, string>[] = [];
 
 const stubProvider = (results: unknown) => {
     vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
         sent.push({ body: JSON.parse(String(init.body)) as Record<string, unknown>, url });
+        sentHeaders.push(init.headers as Record<string, string>);
 
         return Response.json(results, { headers: { "content-type": "application/json" } });
     });
@@ -48,6 +50,7 @@ const run = (blocklist: string[], input: Record<string, unknown>) => {
 afterEach(() => {
     vi.unstubAllGlobals();
     sent.length = 0;
+    sentHeaders.length = 0;
 });
 
 describe("web search provider requests", () => {
@@ -142,5 +145,86 @@ describe("web search provider requests", () => {
 
         expect(excludes).toHaveLength(150);
         expect(excludes).toStrictEqual([...modelExcludes, ...blocklist].slice(0, 150));
+    });
+
+    // https://docs.parallel.ai/api-reference/search-beta/search: the request body is closed, so a stray key is a 422.
+    it("Parallel sends exactly the documented body, with the key in x-api-key", async () => {
+        stubProvider({ results: [] });
+
+        await run([], { maxResults: 7, provider: "parallel" });
+
+        expect(sent).toStrictEqual([{ body: { advanced_settings: { max_results: 7 }, search_queries: ["q"] }, url: "https://api.parallel.ai/v1/search" }]);
+        expect(sentHeaders[0]).toStrictEqual({ "Content-Type": "application/json", "x-api-key": "par-key" });
+    });
+
+    it("Parallel gets the merged blocklist as source_policy.exclude_domains", async () => {
+        stubProvider({ results: [] });
+
+        await run(["example.com", "ads.net"], { excludeDomains: ["spam.io", "example.com"], maxResults: 7, provider: "parallel" });
+
+        expect(sent[0]?.body).toStrictEqual({
+            advanced_settings: { max_results: 7, source_policy: { exclude_domains: ["spam.io", "example.com", "ads.net"] } },
+            search_queries: ["q"],
+        });
+    });
+
+    it("Parallel sends only the include list when there is one, since it makes the exclude list moot", async () => {
+        stubProvider({ results: [] });
+
+        await run(["example.com"], { includeDomains: ["docs.example.com", "python.org"], maxResults: 7, provider: "parallel" });
+
+        expect(sent[0]?.body.advanced_settings).toStrictEqual({ max_results: 7, source_policy: { include_domains: ["python.org"] } });
+    });
+
+    it("Parallel caps the domain list at its documented 200", async () => {
+        stubProvider({ results: [] });
+
+        const blocklist = Array.from({ length: 250 }, (_, i) => `blocked${i}.org`);
+
+        await run(blocklist, { maxResults: 7, provider: "parallel" });
+
+        const policy = (sent[0]?.body.advanced_settings as { source_policy: { exclude_domains: string[] } }).source_policy;
+
+        expect(policy.exclude_domains).toStrictEqual(blocklist.slice(0, 200));
+    });
+
+    it("Parallel results use excerpts and publish_date, fall back to the url for a missing title, and still honour the blocklist", async () => {
+        stubProvider({
+            results: [
+                { excerpts: ["first", "second"], publish_date: "2025-11-19", title: "Doc", url: "https://ok.org/a" },
+                { excerpts: ["only"], publish_date: null, title: null, url: "https://ok.org/b" },
+                { excerpts: ["x"], publish_date: null, title: "Blocked", url: "https://spam.io/c" },
+            ],
+        });
+
+        const output = await run(["spam.io"], { maxResults: 7, provider: "parallel" });
+
+        expect(output.results[0]?.results).toStrictEqual([
+            { content: "first\n\nsecond", publishedDate: "2025-11-19", title: "Doc", url: "https://ok.org/a" },
+            { content: "only", publishedDate: undefined, title: "https://ok.org/b", url: "https://ok.org/b" },
+        ]);
+    });
+
+    it("refuses a news search that Parallel would run as a general one, and sends nothing", async () => {
+        stubProvider({ results: [] });
+
+        await expect(run([], { provider: "parallel", topic: "news" })).rejects.toThrow("News search needs Tavily");
+        expect(sent).toHaveLength(0);
+    });
+
+    it("Parallel keeps the other results when one has no excerpts, and reads a missing results list as none", async () => {
+        stubProvider({
+            results: [
+                { excerpts: null, title: "Bare", url: "https://ok.org/a" },
+                { excerpts: ["kept"], title: "Kept", url: "https://ok.org/b" },
+            ],
+        });
+
+        const output = await run([], { maxResults: 7, provider: "parallel" });
+
+        expect(output.results[0]?.results).toStrictEqual([
+            { content: "", publishedDate: undefined, title: "Bare", url: "https://ok.org/a" },
+            { content: "kept", publishedDate: undefined, title: "Kept", url: "https://ok.org/b" },
+        ]);
     });
 });
