@@ -2282,7 +2282,6 @@ msgid "AI"
 msgstr "AI"
 
 #: src/routes/admin/route.tsx:67
-#: src/routes/dashboard/route.tsx:53
 msgid "AI Chat"
 msgstr "AI Chat"
 
@@ -3337,7 +3336,7 @@ msgstr "Attachment"
 msgid "Attachment (hidden)"
 msgstr "Attachment (hidden)"
 
-#: src/features/chat/thread/thread-minimap.tsx:55
+#: src/features/chat/thread/thread-minimap.tsx:105
 msgid "Attachment only"
 msgstr "Attachment only"
 
@@ -7623,7 +7622,6 @@ msgstr "Darken"
 
 #: src/features/layout/lib/dashboard-page-names.ts:13
 #: src/routes/admin/route.tsx:24
-#: src/routes/dashboard/route.tsx:56
 msgid "Dashboard"
 msgstr "Dashboard"
 
@@ -11831,7 +11829,7 @@ msgstr "Fastest, most affordable Claude model"
 msgid "Favicon"
 msgstr "Favicon"
 
-#: src/features/settings/components/chat/favorite-models-settings.tsx:113
+#: src/features/settings/components/chat/favorite-models-settings.tsx:118
 msgid "Favorite models"
 msgstr "Favorite models"
 
@@ -15031,7 +15029,7 @@ msgstr "Judge score"
 msgid "Judge: {0}"
 msgstr "Judge: {0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:63
+#: src/features/chat/thread/thread-minimap.tsx:113
 msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr "Jump to prompt {promptNumber}: {preview}"
 
@@ -16865,7 +16863,7 @@ msgstr "Message input"
 msgid "Message selection"
 msgstr "Message selection"
 
-#: src/features/chat/thread/message-branch-switcher.tsx:47
+#: src/features/chat/thread/message-branch-switcher.tsx:55
 msgid "Message versions"
 msgstr "Message versions"
 
@@ -18181,8 +18179,8 @@ msgid "Next slide"
 msgstr "Next slide"
 
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:309
-#: src/features/chat/thread/message-branch-switcher.tsx:62
-#: src/features/chat/thread/message-branch-switcher.tsx:62
+#: src/features/chat/thread/message-branch-switcher.tsx:70
+#: src/features/chat/thread/message-branch-switcher.tsx:70
 msgid "Next version"
 msgstr "Next version"
 
@@ -19955,7 +19953,7 @@ msgstr "Or type your own answer…"
 msgid "Orange"
 msgstr "Orange"
 
-#: src/features/settings/components/chat/favorite-models-settings.tsx:115
+#: src/features/settings/components/chat/favorite-models-settings.tsx:120
 msgid "Order the models you starred in the model picker and give them your own names. A nickname shows in the picker, the composer and on replies."
 msgstr "Order the models you starred in the model picker and give them your own names. A nickname shows in the picker, the composer and on replies."
 
@@ -20060,7 +20058,7 @@ msgstr "Other file names"
 msgid "Other image models"
 msgstr "Other image models"
 
-#: src/features/settings/components/chat/favorite-models-settings.tsx:166
+#: src/features/settings/components/chat/favorite-models-settings.tsx:171
 msgid "Other models with a nickname"
 msgstr "Other models with a nickname"
 
@@ -21265,8 +21263,8 @@ msgid "Previous slide"
 msgstr "Previous slide"
 
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:293
-#: src/features/chat/thread/message-branch-switcher.tsx:50
-#: src/features/chat/thread/message-branch-switcher.tsx:52
+#: src/features/chat/thread/message-branch-switcher.tsx:58
+#: src/features/chat/thread/message-branch-switcher.tsx:60
 msgid "Previous version"
 msgstr "Previous version"
 
@@ -21649,7 +21647,7 @@ msgstr "Prompt Variables"
 msgid "Prompts"
 msgstr "Prompts"
 
-#: src/features/chat/thread/thread-minimap.tsx:50
+#: src/features/chat/thread/thread-minimap.tsx:100
 msgid "Prompts in this conversation"
 msgstr "Prompts in this conversation"
 
@@ -22586,7 +22584,7 @@ msgstr "Remember me"
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
-#: src/features/settings/components/chat/favorite-models-settings.tsx:181
+#: src/features/settings/components/chat/favorite-models-settings.tsx:186
 #: src/features/settings/components/chat/native-providers-settings.tsx:723
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:203
 msgid "Remove"
@@ -22727,7 +22725,7 @@ msgstr "Remove Member"
 msgid "Remove model"
 msgstr "Remove model"
 
-#: src/features/settings/components/chat/favorite-models-settings.tsx:180
+#: src/features/settings/components/chat/favorite-models-settings.tsx:185
 msgid "Remove nickname for {id}"
 msgstr "Remove nickname for {id}"
 
@@ -22795,7 +22793,7 @@ msgid "Reopen"
 msgstr "Reopen"
 
 #. placeholder {0}: getModelLabel(model, nicknames)
-#: src/features/settings/components/chat/favorite-models-settings.tsx:144
+#: src/features/settings/components/chat/favorite-models-settings.tsx:149
 msgid "Reorder {0}"
 msgstr "Reorder {0}"
 
@@ -25605,7 +25603,7 @@ msgstr "Standard search depth"
 msgid "Star"
 msgstr "Star"
 
-#: src/features/settings/components/chat/favorite-models-settings.tsx:120
+#: src/features/settings/components/chat/favorite-models-settings.tsx:125
 msgid "Star a model in the model picker and it shows up here."
 msgstr "Star a model in the model picker and it shows up here."
 
@@ -29858,7 +29856,7 @@ msgstr "Versatile image generation with strong prompt-following from Alibaba's A
 msgid "Version {0} Content"
 msgstr "Version {0} Content"
 
-#: src/features/chat/thread/message-branch-switcher.tsx:60
+#: src/features/chat/thread/message-branch-switcher.tsx:68
 msgid "Version {position} of {total}"
 msgstr "Version {position} of {total}"
 
