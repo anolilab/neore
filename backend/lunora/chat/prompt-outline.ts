@@ -13,6 +13,7 @@ import { v } from "lunorash/server";
 
 import { listActivePathPage } from "../agent/branches";
 import { listMessagesByThreadIdHandler } from "../agent/client";
+import { extractText } from "../agent/shared";
 import { resolveThreadReadAccess } from "../agent/thread-read-access";
 import { throwThreadLocked } from "../lib/thread-lock";
 import { liteAuthQuery } from "../lib/crpc";
@@ -45,6 +46,13 @@ interface OutlineRow {
     text?: string;
     tool: boolean;
 }
+
+/** The text the message view shows: the stored model message first, the `text` column for a row without one. */
+const promptText = (row: OutlineRow): string | undefined => {
+    const fromMessage = row.message ? extractText(row.message as Parameters<typeof extractText>[0]) : "";
+
+    return fromMessage || row.text;
+};
 
 /** `message` is the stored model message; a user prompt is a non-tool row with role `user`. */
 export const isUserPromptRow = (row: OutlineRow): boolean => !row.tool && (row.message as { role?: string } | undefined)?.role === "user";
@@ -95,7 +103,7 @@ export const getThreadPromptOutline = liteAuthQuery
 
             for (const row of page.rows) {
                 if (isUserPromptRow(row)) {
-                    newestFirst.push({ id: row._id, text: outlineText(row.text) });
+                    newestFirst.push({ id: row._id, text: outlineText(promptText(row)) });
                 }
             }
 
