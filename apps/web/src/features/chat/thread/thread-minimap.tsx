@@ -18,8 +18,9 @@ import { useChatMessages, useChatThread } from "@/features/chat/core/context/cha
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import formatMessageTime from "./format-message-time";
 import { scrollToMessage } from "./message-list";
-import { buildMinimapItems, isProvisionalId, mergeOutline, promptsDropped, shouldShowMinimap } from "./minimap-items";
+import { buildMinimapItems, isProvisionalId, mergeOutline, minimapGapLabel, promptsDropped, shouldShowMinimap } from "./minimap-items";
 
 /** The outline is cheap to keep: it changes only when the active path does, which the effect below watches. */
 const OUTLINE_STALE_MS = 5 * 60_000;
@@ -29,7 +30,7 @@ interface ThreadMinimapProps {
 }
 
 const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const { isStreaming, messages, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
     const crpc = useCRPC();
@@ -97,15 +98,22 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
 
     return (
         // not-prose: the rail sits inside the `prose` message column, whose list typography would otherwise apply.
-        <nav aria-label={t`Prompts in this conversation`} className={cn("not-prose max-h-[60vh] w-6 shrink-0 overflow-y-auto", className)}>
+        <nav aria-label={t`Prompts in this conversation`} className={cn("not-prose max-h-[60vh] w-9 shrink-0 overflow-y-auto", className)}>
             <TooltipProvider>
                 <ol className="m-0 flex list-none flex-col items-center gap-1 py-1">
                     {items.map((item, index) => {
                         const promptNumber = index + 1;
                         const preview = item.preview || t`Attachment only`;
+                        // Labels the time since the previous prompt, so a long pause between sends is visible on the rail.
+                        const gap = minimapGapLabel(items[index - 1]?.createdAt, item.createdAt);
 
                         return (
-                            <li key={item.id}>
+                            <li className="flex w-full items-center justify-end gap-0.5" key={item.id}>
+                                {gap && (
+                                    <span aria-hidden="true" className="text-muted-foreground pointer-events-none text-[10px] tabular-nums">
+                                        {gap}
+                                    </span>
+                                )}
                                 <Tooltip>
                                     <TooltipTrigger
                                         render={
@@ -123,6 +131,11 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
                                         }
                                     />
                                     <TooltipContent className="max-w-xs" side="left">
+                                        {item.createdAt !== undefined && (
+                                            <time className="text-muted-foreground block text-[10px] tabular-nums" dateTime={new Date(item.createdAt).toISOString()}>
+                                                {formatMessageTime(item.createdAt, i18n.locale)}
+                                            </time>
+                                        )}
                                         <p className="break-words">{preview}</p>
                                     </TooltipContent>
                                 </Tooltip>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMinimapItems, isProvisionalId, mergeOutline, MINIMAP_PREVIEW_CHARS, promptsDropped, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
+import { buildMinimapItems, isProvisionalId, mergeOutline, MINIMAP_PREVIEW_CHARS, minimapGapLabel, promptsDropped, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
 
 describe("toMinimapPreview", () => {
     it("collapses whitespace and newlines to one line", () => {
@@ -138,5 +138,33 @@ describe("promptsDropped", () => {
 
     it("has nothing to compare on the first read", () => {
         expect(promptsDropped(new Set(), new Set(["p1"]))).toBe(false);
+    });
+});
+
+describe("minimapGapLabel", () => {
+    const T0 = Date.UTC(2026, 9, 19, 9, 0);
+    const HOUR = 60 * 60 * 1000;
+
+    it("labels a gap of an hour or more in whole hours, and a day or more in days", () => {
+        expect(minimapGapLabel(T0, T0 + 3 * HOUR + 20 * 60 * 1000)).toBe("3h");
+        expect(minimapGapLabel(T0, T0 + 25 * HOUR)).toBe("1d");
+    });
+
+    it("has no label for a shorter gap, a first prompt, or a missing time", () => {
+        expect(minimapGapLabel(T0, T0 + 59 * 60 * 1000)).toBeUndefined();
+        expect(minimapGapLabel(undefined, T0)).toBeUndefined();
+        expect(minimapGapLabel(T0, undefined)).toBeUndefined();
+    });
+});
+
+describe("buildMinimapItems send times", () => {
+    it("carries the creation time, and drops a missing or zero one", () => {
+        const items = buildMinimapItems([
+            { id: "u1", role: "user", text: "a", _creationTime: 1_700_000_000_000 },
+            { id: "u2", role: "user", text: "b", _creationTime: 0 },
+        ]);
+
+        expect(items[0]?.createdAt).toBe(1_700_000_000_000);
+        expect(items[1]?.createdAt).toBeUndefined();
     });
 });

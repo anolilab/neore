@@ -10,10 +10,30 @@ export const MINIMAP_MIN_PROMPTS = 3;
 export const MINIMAP_PREVIEW_CHARS = 80;
 
 export interface MinimapItem {
+    /** When the prompt was sent. Absent for outline entries (the server outline carries no time) and for rows without one. */
+    createdAt?: number;
     id: string;
     /** Single-line prompt text, cut to {@link MINIMAP_PREVIEW_CHARS}. Empty for an attachment-only prompt. */
     preview: string;
 }
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+/** The gap before a prompt, `3h` or (from a day up) `2d`. Only gaps of an hour or more get a label. */
+export const minimapGapLabel = (previousAt: number | undefined, at: number | undefined): string | undefined => {
+    if (previousAt === undefined || at === undefined) {
+        return undefined;
+    }
+
+    const gap = at - previousAt;
+
+    if (gap < HOUR_MS) {
+        return undefined;
+    }
+
+    return gap >= DAY_MS ? `${Math.floor(gap / DAY_MS)}d` : `${Math.floor(gap / HOUR_MS)}h`;
+};
 
 const WHITESPACE_RE = /\s+/g;
 
@@ -24,11 +44,14 @@ export const toMinimapPreview = (text: string, maxChars: number = MINIMAP_PREVIE
 };
 
 /** The user prompts of a message list, in order. Callers pass the active branch path, so each prompt appears once. */
-export const buildMinimapItems = (messages: ReadonlyArray<{ id: string; role: string; text: string }>): MinimapItem[] =>
+export const buildMinimapItems = (messages: ReadonlyArray<{ _creationTime?: number; id: string; role: string; text: string }>): MinimapItem[] =>
     messages
         .filter((message) => message.role === "user")
         .map((message) => {
-            return { id: message.id, preview: toMinimapPreview(message.text) };
+            // Seeded and local rows can lack a creation time (see MessageTimestamp); formatting NaN would print "Invalid Date".
+            const hasTime = Number.isFinite(message._creationTime) && (message._creationTime ?? 0) > 0;
+
+            return { id: message.id, preview: toMinimapPreview(message.text), createdAt: hasTime ? message._creationTime : undefined };
         });
 
 /**
