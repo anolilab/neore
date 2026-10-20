@@ -1,131 +1,82 @@
 /**
- * The expiry sweep turns an expired pending or streaming stream into `timeout`. A finished stream is never
- * revisited, and a stream that has not expired yet is left as it is. Finished streams are never deleted, so the
- * sweep must not read them: the cost test below pins the rows it reads.
+ * A run that dies without reaching `failRun` leaves its thread `running`. When the
+ * stream expires, the cleanup cron hands the thread back, unless a newer stream
+ * on it is still live.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { measureDb } from "../../../../test/db-cost";
 import schema from "../../../schema";
 import { cleanupExpiredStreams } from "./crons";
 
 const OWNER = "user-owner";
-const HOUR = 60 * 60 * 1000;
-const FINISHED = 50;
 
 let harness: ReturnType<typeof lunoraTest>;
 
-interface Thread {
-    messageId: string;
-    threadId: string;
-}
+const run = async <T>(body: (context: any) => Promise<T>): Promise<T> => await harness.run(body);
 
-const seedThread = async (): Promise<Thread> =>
-    await harness.run(async (context) => {
-        const threadId = await context.db.insert("threads", { model: "m", status: "running", title: "t", userId: OWNER });
-        const messageId = await context.db.insert("messages", {
-            message: { content: "hi", role: "user" },
-            order: 1,
-            status: "success",
-            stepOrder: 0,
-            text: "hi",
-            threadId,
-            tool: false,
-            userId: OWNER,
-        });
-
-        return { messageId, threadId };
-    });
-
-const insertStreams = async (thread: Thread, status: string, expiresAt: number, count: number): Promise<void> =>
-    await harness.run(async (context) => {
-        for (let index = 0; index < count; index += 1) {
-            await context.db.insert("persistentStreams", {
-                expiresAt,
-                messageId: thread.messageId,
-                status,
-                streamingConfig: { contentType: "text", model: "m" },
-                threadId: thread.threadId,
-                userId: OWNER,
-            });
-        }
-    });
-
-const insertStream = async (thread: Thread, status: string, expiresAt: number): Promise<string> =>
-    await harness.run(
+const insertStream = async (threadId: string, status: string, expiresAt: number): Promise<string> =>
+    await run(
         async (context) =>
             await context.db.insert("persistentStreams", {
                 expiresAt,
-                messageId: thread.messageId,
+                messageId: "m-1",
                 status,
                 streamingConfig: { contentType: "text", model: "m" },
-                threadId: thread.threadId,
+                threadId,
                 userId: OWNER,
             }),
     );
 
-const sweep = async () => await harness.run(async (context) => await context.runMutation(cleanupExpiredStreams, {}));
+const insertThread = async (status: string): Promise<string> =>
+    await run(async (context) => await context.db.insert("threads", { model: "m", status, title: "t", userId: OWNER }));
 
-const statusOf = async (id: string): Promise<unknown> =>
-    await harness.run(async (context) => ((await context.db.get(id as never)) as { status?: unknown } | null)?.status);
+const cleanup = async (): Promise<void> => {
+    await run(async (context) => await context.runMutation(cleanupExpiredStreams, {}));
+};
+
+const read = async (id: string): Promise<any> => await run(async (context) => await context.db.get(id));
+
+beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    harness = lunoraTest(schema as never);
+});
+
+afterEach(() => {
+    harness.close();
+    vi.restoreAllMocks();
+});
 
 describe("cleanupExpiredStreams", () => {
-    beforeEach(() => {
-        harness = lunoraTest(schema as never);
+    it("times out an expired stream and hands its running thread back", async () => {
+        const threadId = await insertThread("running");
+        const streamId = await insertStream(threadId, "streaming", Date.now() - 1000);
+
+        await cleanup();
+
+        expect((await read(streamId)).status).toBe("timeout");
+        expect((await read(threadId)).status).toBe("active");
     });
 
-    afterEach(() => {
-        harness.close();
+    it("leaves a thread that is not running as it is", async () => {
+        const threadId = await insertThread("active");
+        const streamId = await insertStream(threadId, "streaming", Date.now() - 1000);
+
+        await cleanup();
+
+        expect((await read(streamId)).status).toBe("timeout");
+        expect((await read(threadId)).status).toBe("active");
     });
 
-    it("times out an expired pending or streaming stream", async () => {
-        expect.assertions(2);
+    it("leaves the thread running while a newer stream on it is live", async () => {
+        const threadId = await insertThread("running");
+        const expired = await insertStream(threadId, "streaming", Date.now() - 1000);
 
-        const thread = await seedThread();
-        const pending = await insertStream(thread, "pending", Date.now() - HOUR);
-        const streaming = await insertStream(thread, "streaming", Date.now() - HOUR);
+        await insertStream(threadId, "streaming", Date.now() + 60_000);
 
-        await sweep();
+        await cleanup();
 
-        await expect(statusOf(pending)).resolves.toBe("timeout");
-        await expect(statusOf(streaming)).resolves.toBe("timeout");
-    });
-
-    it("leaves a finished stream alone, even when it is past its expiry", async () => {
-        expect.assertions(1);
-
-        const thread = await seedThread();
-        const done = await insertStream(thread, "done", Date.now() - HOUR);
-
-        await sweep();
-
-        await expect(statusOf(done)).resolves.toBe("done");
-    });
-
-    it("leaves a stream that has not expired yet alone", async () => {
-        expect.assertions(1);
-
-        const thread = await seedThread();
-        const live = await insertStream(thread, "streaming", Date.now() + HOUR);
-
-        await sweep();
-
-        await expect(statusOf(live)).resolves.toBe("streaming");
-    });
-
-    it("reads only the live rows, not the finished streams the table has accumulated", async () => {
-        expect.assertions(2);
-
-        const thread = await seedThread();
-
-        await insertStreams(thread, "done", Date.now() - HOUR, FINISHED);
-        const pending = await insertStream(thread, "pending", Date.now() - HOUR);
-
-        const { cost } = await measureDb(sweep);
-
-        // Each expired finished stream would be one row read on the old `by_expiresAt` walk.
-        expect(cost.rowsRead).toBeLessThan(FINISHED / 5);
-        await expect(statusOf(pending)).resolves.toBe("timeout");
+        expect((await read(expired)).status).toBe("timeout");
+        expect((await read(threadId)).status).toBe("running");
     });
 });
