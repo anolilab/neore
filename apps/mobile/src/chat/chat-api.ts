@@ -22,19 +22,36 @@ export class ChatError extends Error {
     }
 }
 
+/** Same bound as the web app's default third-party deadline (backend fetch-timeout). The reply stream is not bounded. */
+export const CHAT_START_TIMEOUT_MS = 15_000;
+
 /** POST /v1/chat on the gateway. The gateway forwards the bearer to the backend's /chat/start. */
 export const startChat = async (input: { body: StartChatBody; fetch: Fetch; gatewayUrl: string; jwt: string }): Promise<StartedChat> => {
-    const response = await input.fetch(`${input.gatewayUrl}/v1/chat`, {
-        body: JSON.stringify(input.body),
-        headers: { Authorization: `Bearer ${input.jwt}`, "Content-Type": "application/json" },
-        method: "POST",
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CHAT_START_TIMEOUT_MS);
 
-    if (!response.ok) {
-        const body = (await response.json().catch(() => { return {}; })) as { error?: string };
+    try {
+        const response = await input.fetch(`${input.gatewayUrl}/v1/chat`, {
+            body: JSON.stringify(input.body),
+            headers: { Authorization: `Bearer ${input.jwt}`, "Content-Type": "application/json" },
+            method: "POST",
+            signal: controller.signal,
+        });
 
-        throw new ChatError(body.error ?? `Could not send (${response.status}).`);
+        if (!response.ok) {
+            const body = (await response.json().catch(() => { return {}; })) as { error?: string };
+
+            throw new ChatError(body.error ?? `Could not send (${response.status}).`);
+        }
+
+        return (await response.json()) as StartedChat;
+    } catch (error) {
+        if (controller.signal.aborted) {
+            throw new ChatError("The gateway did not answer in time. Try again.");
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timer);
     }
-
-    return (await response.json()) as StartedChat;
 };

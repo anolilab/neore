@@ -1,6 +1,6 @@
 import { tokenRefreshDelayMs } from "@neore/client-runtime";
 import type { ReactNode } from "react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
@@ -31,17 +31,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [status, setStatus] = useState<AuthStatus>("loading");
     const [user, setUser] = useState<GrantUser | null>(null);
     const [refreshTick, setRefreshTick] = useState(0);
+    const signOutCount = useRef(0);
     const config = useMemo(() => loadConfig(), []);
     const client = useMemo(() => getClient(), []);
 
     useEffect(() => {
         let isCancelled = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
+        const signOutsAtStart = signOutCount.current;
+        const isStale = () => isCancelled || signOutsAtStart !== signOutCount.current;
 
         const run = async () => {
             const jwt = await fetchAccessToken({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
 
-            if (isCancelled) {
+            if (isStale()) {
                 return;
             }
 
@@ -54,7 +57,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
-            setUser((await secureGrantStore.get())?.user ?? null);
+            const stored = await secureGrantStore.get();
+
+            if (isStale()) {
+                return;
+            }
+
+            setUser(stored?.user ?? null);
             setStatus("signed-in");
             timer = setTimeout(() => setRefreshTick((tick) => tick + 1), tokenRefreshDelayMs(jwt) ?? FALLBACK_REFRESH_MS);
         };
@@ -74,6 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const signOut = useCallback(async () => {
         await signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore });
+        signOutCount.current += 1;
         client.setAuthToken(null);
         setUser(null);
         setStatus("signed-out");
