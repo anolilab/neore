@@ -59,7 +59,7 @@ interface ExaSearchResponse {
 }
 
 interface ParallelSearchResponse {
-    results: { excerpts: string[]; publish_date?: null | string; title?: null | string; url: string }[];
+    results?: null | { excerpts?: null | string[]; publish_date?: null | string; title?: null | string; url: string }[];
 }
 
 /** `include_domains` and `exclude_domains` together may not exceed 200 entries. */
@@ -221,9 +221,10 @@ const searchWithParallel = async (
 
     const data = (await response.json()) as ParallelSearchResponse;
 
-    return data.results.map((result) => {
+    // A result without excerpts keeps its title and link; the whole query must not fail on one missing field.
+    return (data.results ?? []).map((result) => {
         return {
-            content: result.excerpts.join("\n\n"),
+            content: (result.excerpts ?? []).join("\n\n"),
             publishedDate: result.publish_date ?? undefined,
             title: result.title ?? result.url,
             url: result.url,

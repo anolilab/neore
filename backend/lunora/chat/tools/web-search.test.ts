@@ -204,4 +204,20 @@ describe("web search provider requests", () => {
             { content: "only", publishedDate: undefined, title: "https://ok.org/b", url: "https://ok.org/b" },
         ]);
     });
+
+    it("Parallel keeps the other results when one has no excerpts, and reads a missing results list as none", async () => {
+        stubProvider({
+            results: [
+                { excerpts: null, title: "Bare", url: "https://ok.org/a" },
+                { excerpts: ["kept"], title: "Kept", url: "https://ok.org/b" },
+            ],
+        });
+
+        const output = await run([], { maxResults: 7, provider: "parallel" });
+
+        expect(output.results[0]?.results).toStrictEqual([
+            { content: "", publishedDate: undefined, title: "Bare", url: "https://ok.org/a" },
+            { content: "kept", publishedDate: undefined, title: "Kept", url: "https://ok.org/b" },
+        ]);
+    });
 });
