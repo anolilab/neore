@@ -441,7 +441,10 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
             numItems: args.limit ?? 100,
         });
 
-    await Promise.all((messages.page as unknown as Doc<"messages">[]).map((m) => deleteMessage(context, m)));
+    // One at a time: parallel deletes lose `chatFiles` refcount decrements.
+    for (const m of messages.page as unknown as Doc<"messages">[]) {
+        await deleteMessage(context, m);
+    }
 
     if (messages.isDone) {
         // Approval snapshots hold the run's system prompt; they go with the thread.
