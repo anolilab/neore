@@ -17875,13 +17875,13 @@
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 278,
+      "line": 279,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "chat/tools/web-search",
       "kind": "call",
-      "line": 309,
+      "line": 310,
       "reason": "the default export is not a registered function"
     },
     {
