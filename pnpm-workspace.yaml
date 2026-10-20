@@ -18,6 +18,10 @@ auditConfig:
     # braces <=3.0.3, via micromatch/fast-glob (28 paths). No patched release exists.
     - GHSA-vfj7-8cjw-p6xm
     # sprintf-js <=1.1.3, via argparse 1 under `mammoth`. No patched release exists.
+    # node-forge <=1.4.0, reached only through apps/mobile's expo-auth-session chain
+    # (@expo/code-signing-certificates). No patched release exists; revisit when Expo
+    # moves off it.
+    - GHSA-86w9-cpqp-85rv
     - GHSA-hp3w-g68c-fv3c
 
 # OFF: auto-installing peers materialised Next.js — which nothing here uses — as
@@ -766,6 +770,7 @@ overrides:
   undici@<6.24.0: ">=6.24.0"
   undici@>=7.0.0 <7.24.0: ">=7.24.0"
   undici@>=7.0.0 <7.29.0: ">=7.29.0"
+  uuid@<11.1.1: ">=11.1.1"
   uuid@>=13.0.0 <13.0.1: ">=13.0.1"
   valibot@<1.4.2: ">=1.4.2"
   vite@>=8.0.0 <8.0.16: ">=8.0.16"
