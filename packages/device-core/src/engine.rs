@@ -69,11 +69,11 @@ impl DeviceState {
         let settings_path = data_dir.join("device.json");
         let mut settings = store::load(&settings_path);
 
-        // Roots the home guard refuses are dropped here; the next save writes the list without them.
-        let home = canonical_home();
-        settings
-            .roots
-            .retain(|root| refused_root(Path::new(root), home.as_deref()).is_none());
+        // Stored roots are kept only in the canonical form the planner uses; the next save writes that list.
+        settings.roots = shareable_roots(&settings.roots)
+            .into_iter()
+            .map(|root| root.to_string_lossy().into_owned())
+            .collect();
 
         DeviceState {
             audit_path: data_dir.join("device-audit.jsonl"),
@@ -437,7 +437,7 @@ impl DeviceState {
             .pairing
             .clone()
             .ok_or("this computer is not paired")?;
-        let mut tools = builtin_tools(&fs::canonical_roots(&settings.roots));
+        let mut tools = builtin_tools(&shareable_roots(&settings.roots));
         let mut mcp_tools = HashMap::new();
 
         for server in &settings.mcp_servers {
@@ -649,7 +649,7 @@ fn plan(
     settings: &Settings,
     mcp_tools: &HashMap<String, (String, String, bool)>,
 ) -> Result<Action, String> {
-    let roots = fs::canonical_roots(&settings.roots);
+    let roots = shareable_roots(&settings.roots);
 
     match tool {
         "fs_list" => Ok(Action::List(fs::resolve_existing(
@@ -948,6 +948,16 @@ fn canonical_home() -> Option<PathBuf> {
     sandbox::home().and_then(|home| stdfs::canonicalize(home).ok())
 }
 
+/// The shared roots that still exist, canonicalised, and that the home guard allows.
+fn shareable_roots(roots: &[String]) -> Vec<PathBuf> {
+    let home = canonical_home();
+
+    fs::canonical_roots(roots)
+        .into_iter()
+        .filter(|root| refused_root(root, home.as_deref()).is_none())
+        .collect()
+}
+
 /// Validates a new folder list: existing folders, canonical, never a filesystem root
 /// or a folder holding the home folder.
 pub fn validate_roots(roots: &[String]) -> Result<Vec<String>, String> {
@@ -1114,6 +1124,31 @@ mod tests {
         // No home to protect: only the drive check applies.
         assert!(refused_root(home, None).is_none());
         assert!(refused_root(Path::new("/"), None).is_some());
+    }
+
+    #[test]
+    fn shares_no_root_that_resolves_to_home_or_its_parent() {
+        let home = canonical_home().expect("a home folder");
+        let dir =
+            std::env::temp_dir().join(format!("neore-device-shareable-{}", std::process::id()));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+
+        let mut roots = vec![
+            dir.to_string_lossy().into_owned(),
+            format!("{}/..", home.display()),
+        ];
+
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&home, dir.join("home-link")).unwrap();
+            roots.push(dir.join("home-link").to_string_lossy().into_owned());
+        }
+
+        assert_eq!(
+            shareable_roots(&roots),
+            vec![stdfs::canonicalize(&dir).unwrap()]
+        );
     }
 
     #[test]

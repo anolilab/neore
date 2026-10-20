@@ -99,18 +99,16 @@ pub fn load(path: &Path) -> Settings {
 }
 
 pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
-    // A replaced or removed pairing takes its keychain entry with it.
-    let previous = read_file(path)
-        .and_then(|stored| stored.pairing)
-        .map(|pairing| pairing.device_id);
-    let current = settings
-        .pairing
-        .as_ref()
-        .map(|pairing| pairing.device_id.as_str());
+    let previous = read_file(path).and_then(|stored| stored.pairing);
+    let current = settings.pairing.as_ref();
 
-    if let Some(previous) = previous.filter(|previous| Some(previous.as_str()) != current) {
-        keychain_delete(&previous);
-    }
+    // Re-pairing the same device overwrites its keychain entry; keep the old one to restore on failure.
+    let overwritten = match (&previous, current) {
+        (Some(old), Some(new)) if old.device_id == new.device_id => keychain_get(&old.device_id)
+            .ok()
+            .map(|secret| (old.device_id.clone(), secret)),
+        _ => None,
+    };
 
     let mut stored = settings.clone();
 
@@ -125,9 +123,26 @@ pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
         }
     }
 
-    let text = serde_json::to_string_pretty(&stored).map_err(|error| error.to_string())?;
+    let saved = serde_json::to_string_pretty(&stored)
+        .map_err(|error| error.to_string())
+        .and_then(|text| write_owner_only(path, &text));
 
-    write_owner_only(path, &text)
+    if let Err(error) = saved {
+        if let Some((device_id, secret)) = overwritten {
+            let _ = keychain_set(&device_id, &secret);
+        }
+
+        return Err(error);
+    }
+
+    // A replaced or removed pairing takes its keychain entry with it, once the new settings are on disk.
+    if let Some(previous) =
+        previous.filter(|previous| current.map(|c| &c.device_id) != Some(&previous.device_id))
+    {
+        keychain_delete(&previous.device_id);
+    }
+
+    Ok(())
 }
 
 /// The envelope nonces seen so far, as `nonce → expiresAt`. Unreadable reads as none.
@@ -327,6 +342,19 @@ mod tests {
 
         assert!(!holds("old-1"));
         assert!(holds("new-1"));
+    }
+
+    #[test]
+    fn a_failed_save_keeps_the_previous_secret() {
+        test_keychain::install();
+        let path = temp_file("rollback");
+
+        save(&path, &pairing("rb-1", "old-secret")).unwrap();
+        fs::create_dir(path.with_extension("json.tmp")).unwrap();
+
+        assert!(save(&path, &pairing("rb-1", "new-secret")).is_err());
+        assert_eq!(keychain_get("rb-1").unwrap(), "old-secret");
+        assert_eq!(load(&path), pairing("rb-1", "old-secret"));
     }
 
     #[test]
