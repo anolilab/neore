@@ -7444,26 +7444,40 @@ if (typeof source !== "object" || source === null || Array.isArray(source)) retu
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
 let __val1;
-if (source["payload"] !== undefined) {
-if (typeof source["payload"] !== "string") return DEFER;
-__val1 = source["payload"];
+if (source["ignoreDisabled"] !== undefined) {
+if (typeof source["ignoreDisabled"] !== "boolean") return DEFER;
+__val1 = source["ignoreDisabled"];
 __has1 = true;
 }
+let __has2 = false;
+let __val2;
+if (source["payload"] !== undefined) {
+if (typeof source["payload"] !== "string") return DEFER;
+__val2 = source["payload"];
+__has2 = true;
+}
 if (typeof source["triggerId"] !== "string") return DEFER;
-return { ...(__has1 ? { "payload": __val1 } : {}), "triggerId": source["triggerId"] };
+return { ...(__has1 ? { "ignoreDisabled": __val1 } : {}), ...(__has2 ? { "payload": __val2 } : {}), "triggerId": source["triggerId"] };
 });
 installCompiledValidatorMap(lunora_triggers_execute_167.executeTrigger.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
 let __val1;
-if (source["payload"] !== undefined) {
-if (typeof source["payload"] !== "string") return DEFER;
-__val1 = source["payload"];
+if (source["ignoreDisabled"] !== undefined) {
+if (typeof source["ignoreDisabled"] !== "boolean") return DEFER;
+__val1 = source["ignoreDisabled"];
 __has1 = true;
 }
+let __has2 = false;
+let __val2;
+if (source["payload"] !== undefined) {
+if (typeof source["payload"] !== "string") return DEFER;
+__val2 = source["payload"];
+__has2 = true;
+}
 if (typeof source["triggerId"] !== "string") return DEFER;
-return { ...(__has1 ? { "payload": __val1 } : {}), "triggerId": source["triggerId"] };
+return { ...(__has1 ? { "ignoreDisabled": __val1 } : {}), ...(__has2 ? { "payload": __val2 } : {}), "triggerId": source["triggerId"] };
 });
 installCompiledValidatorMap(lunora_triggers_functions_168.admitTriggerRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -9285,8 +9299,8 @@ export interface Caller {
     };
     triggers: {
         execute: {
-            default: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
-            executeTrigger: (args: { payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
+            default: (args: { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
+            executeTrigger: (args: { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }) => Promise<void>;
         };
         functions: {
             admitTriggerRun: (args: { triggerId: Id<"triggers"> }) => Promise<null | string>;

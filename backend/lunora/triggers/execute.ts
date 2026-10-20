@@ -15,10 +15,12 @@ import { toUserFacingError } from "../chat/lib/user-facing-error";
 
 export const executeTrigger = internalAction
     .input({
+        // A manual test run ("Run now") fires a disabled trigger too.
+        ignoreDisabled: v.optional(v.boolean()),
         payload: v.optional(v.string()), // Webhook payload or scheduled input
         triggerId: v.id("triggers"),
     })
-    .action(async ({ args: { payload, triggerId }, ctx }) => {
+    .action(async ({ args: { ignoreDisabled, payload, triggerId }, ctx }) => {
         // 1. Fetch trigger config
         const trigger = await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId });
 
@@ -28,7 +30,7 @@ export const executeTrigger = internalAction
             return;
         }
 
-        if (trigger.enabled !== true) {
+        if (trigger.enabled !== true && ignoreDisabled !== true) {
             console.warn(`[Triggers] Trigger ${triggerId} is disabled, skipping`);
 
             return;

@@ -432,32 +432,16 @@ export const testRunTrigger = authAction
             throw new LunoraError("NOT_FOUND", "Trigger not found");
         }
 
-        // Temporarily enable the trigger so executeTrigger doesn't bail
         const wasEnabled = trigger.enabled === true;
+        const payload = args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
 
-        if (!wasEnabled) {
-            await context.runMutation(internal.triggers.functions.setTriggerEnabledInternal, {
-                enabled: true,
-                triggerId: args.triggerId as Id<"triggers">,
-            });
-        }
-
-        try {
-            const payload = args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
-
-            await context.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
-                payload,
-                triggerId: args.triggerId as Id<"triggers">,
-            });
-        } finally {
-            // Restore original enabled state
-            if (!wasEnabled) {
-                await context.runMutation(internal.triggers.functions.setTriggerEnabledInternal, {
-                    enabled: false,
-                    triggerId: args.triggerId as Id<"triggers">,
-                });
-            }
-        }
+        // The run reads the trigger only when it starts, so it is told to run a disabled
+        // one; enabling the trigger for the length of this action was undone before then.
+        await context.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
+            ignoreDisabled: true,
+            payload,
+            triggerId: args.triggerId as Id<"triggers">,
+        });
 
         context.log.event("triggers.test_run_trigger", { wasEnabled });
     });

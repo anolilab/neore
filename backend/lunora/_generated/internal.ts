@@ -950,8 +950,8 @@ export interface InternalApiTypes {
     };
     triggers: {
         execute: {
-            default: FunctionReference<"action", { payload?: string; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { payload?: string; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            executeTrigger: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
             admitTriggerRun: FunctionReference<"mutation", { triggerId: Id<"triggers"> }, null | string>;

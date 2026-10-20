@@ -6282,11 +6282,6 @@
     },
     {
       "from": "function:triggers_functions:testRunTrigger",
-      "kind": "call",
-      "to": "function:triggers_functions:setTriggerEnabledInternal"
-    },
-    {
-      "from": "function:triggers_functions:testRunTrigger",
       "kind": "schedule",
       "to": "function:triggers_execute:executeTrigger"
     },

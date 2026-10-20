@@ -7,18 +7,27 @@
  * a wildcard, so an unchecked expression fires every minute.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { assertComputerRoutine, createTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import { assertComputerRoutine, createTrigger, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
 // session is read straight off the harness identity.
-const { sessionFrom } = vi.hoisted(() => {
+const { registry, sessionFrom } = vi.hoisted(() => {
     return {
+        registry: new Map<string, unknown>(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
     };
+});
+
+// `testRunTrigger` reads the trigger through `ctx.runQuery(internal.…)`.
+vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+beforeAll(async () => {
+    registerModule(registry, "triggers_functions", await import("./functions"));
 });
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
@@ -148,5 +157,26 @@ describe("a routine's bot computer", () => {
 
         expect(cleared.botId).toBeUndefined();
         expect(cleared.botComputer).toBeUndefined();
+    });
+});
+
+describe("testRunTrigger", () => {
+    // The run reads the trigger when it starts, after this action returned. Enabling the
+    // trigger only for the action's length meant a disabled trigger never ran.
+    it("runs a disabled trigger without enabling it", async () => {
+        const as = harness.withIdentity({ userId: "user-a" } as never);
+        const { triggerId } = (await as.mutation(createTrigger as never, { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" } as never)) as {
+            triggerId: string;
+        };
+        const before = await readTrigger(triggerId);
+
+        await as.action(testRunTrigger as never, { triggerId } as never);
+
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, payload: "Manual test run triggered.", triggerId }]);
+
+        const after = await readTrigger(triggerId);
+
+        expect(after.enabled).toBe(false);
+        expect(after.updatedAt).toBe(before.updatedAt);
     });
 });
