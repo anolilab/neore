@@ -180,6 +180,7 @@
  * The documentation sidebar sets its colours with !important, so its high-contrast rules are more specific and
  * also !important. The dark rule carries the extra `.dark`, as the layout's does.
  */
+/* eslint-disable css/no-important -- the sidebar's own colours are !important; overriding them needs !important too */
 :root[data-contrast="high"] #nd-sidebar {
     --color-fd-muted: #f2f2f2;
     --color-fd-muted-foreground: #333333;
@@ -195,6 +196,7 @@
     border-color: #a6a6a6 !important;
     color: #ffffff !important;
 }
+/* eslint-enable css/no-important */
 
 /*
  * The documentation layout sets its own --color-fd-* tokens and fixed border and background colours, so the root
