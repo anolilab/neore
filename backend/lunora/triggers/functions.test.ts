@@ -12,6 +12,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { assertComputerRoutine, createTrigger, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import { findNextCronTime } from "./schedule";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
 // session is read straight off the harness identity.
@@ -178,5 +179,55 @@ describe("testRunTrigger", () => {
 
         expect(after.enabled).toBe(false);
         expect(after.updatedAt).toBe(before.updatedAt);
+    });
+});
+
+describe("updateTrigger on a new schedule", () => {
+    const NOW = Date.parse("2026-03-12T10:30:00Z");
+
+    const insertSchedule = async (enabled: boolean): Promise<string> =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("triggers", {
+                    createdAt: NOW,
+                    cronExpression: "0 9 * * 1",
+                    enabled,
+                    model: "m",
+                    name: "Weekly",
+                    nextTriggerAt: findNextCronTime("0 9 * * 1", NOW),
+                    triggerCount: 0,
+                    type: "schedule",
+                    updatedAt: NOW,
+                    userId: "user-a",
+                }),
+        );
+
+    beforeEach(() => {
+        harness.close();
+        harness = lunoraTest(schema as never, { now: NOW } as never);
+    });
+
+    it("moves the next run to the new schedule", async () => {
+        const triggerId = await insertSchedule(true);
+
+        await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { cronExpression: "0 12 * * *", triggerId } as never);
+
+        const updated = await readTrigger(triggerId);
+
+        expect(updated.nextTriggerAt).toBe(findNextCronTime("0 12 * * *", NOW));
+        expect(updated.nextTriggerAt).toBe(Date.parse("2026-03-12T12:00:00Z"));
+    });
+
+    it("refuses a schedule that never fires on an enabled trigger, and clears the time on a disabled one", async () => {
+        const as = harness.withIdentity({ userId: "user-a" } as never);
+        const enabledId = await insertSchedule(true);
+
+        await expect(as.mutation(updateTrigger as never, { cronExpression: "0 9 30 2 *", triggerId: enabledId } as never)).rejects.toThrow("never fires");
+
+        const disabledId = await insertSchedule(false);
+
+        await as.mutation(updateTrigger as never, { cronExpression: "0 9 30 2 *", triggerId: disabledId } as never);
+
+        expect("nextTriggerAt" in (await readTrigger(disabledId))).toBe(false);
     });
 });

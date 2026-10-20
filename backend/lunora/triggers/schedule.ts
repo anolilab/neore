@@ -67,7 +67,7 @@ export const checkDueTriggers = internalMutation
             }
 
             // Schedule the execution as a background action
-            void ctx.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
+            await ctx.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
                 payload: trigger.inputTemplate ?? undefined,
                 triggerId,
             });
@@ -83,7 +83,7 @@ export const checkDueTriggers = internalMutation
 
         // If more triggers remain, schedule a follow-up run
         if (dueTriggers.length > TRIGGER_BATCH_SIZE) {
-            void ctx.scheduler.runAfter(100, internal.triggers.schedule.checkDueTriggers, {});
+            await ctx.scheduler.runAfter(100, internal.triggers.schedule.checkDueTriggers, {});
         }
 
         return null;

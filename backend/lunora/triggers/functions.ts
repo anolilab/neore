@@ -258,9 +258,16 @@ export const updateTrigger = authMutation
 
         if (args.searchMode !== undefined) patch.searchMode = args.searchMode;
 
+        // A new schedule moves the next run; the old time would fire once more on the old schedule.
+        const nextTriggerAt = args.cronExpression === undefined ? trigger.nextTriggerAt : findNextCronTime(args.cronExpression, context.now);
+
         if (args.cronExpression !== undefined) {
             assertCronExpression(args.cronExpression);
             patch.cronExpression = args.cronExpression;
+
+            if (trigger.enabled === true && trigger.type === "schedule" && nextTriggerAt === undefined) {
+                throw new LunoraError("BAD_REQUEST", "This schedule never fires within the next 28 years. Check its day and month.");
+            }
         }
 
         if (args.timezone !== undefined) patch.timezone = args.timezone;
@@ -284,13 +291,15 @@ export const updateTrigger = authMutation
         // `patchRow` removes a field set to `undefined`, which a plain patch cannot do.
         await patchRow(context.db, trigger, {
             ...withoutUndefined(patch),
+            // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
+            ...(args.cronExpression !== undefined && { nextTriggerAt }),
             ...(args.botId !== undefined && { botId: nextBotId }),
             ...((args.botId !== undefined || args.botComputer !== undefined) && { botComputer: nextComputer === true ? true : undefined }),
         });
 
         if (trigger.enabled === true) {
             // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
-            await noteShardDue(context, context.now, userId);
+            await noteShardDue(context, nextTriggerAt ?? context.now, userId);
         }
 
         context.log.event("triggers.update_trigger", { enabled: trigger.enabled === true });
