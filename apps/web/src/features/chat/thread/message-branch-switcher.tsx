@@ -11,7 +11,7 @@ import { useLingui } from "@lingui/react/macro";
 import type { MessageBranch } from "@neore/backend/agent/ui-messages";
 import type { Id } from "@neore/backend/dataModel";
 import { MessageAction } from "@neore/ui/components/ai-elements/message";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { FC } from "react";
 
@@ -26,6 +26,7 @@ interface MessageBranchSwitcherProps {
 const MessageBranchSwitcher: FC<MessageBranchSwitcherProps> = ({ branch, threadId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
     const { isPending, mutate } = useMutation(crpc.agent.branches.switchBranch.mutationOptions());
 
     const position = branch.index + 1;
@@ -40,7 +41,14 @@ const MessageBranchSwitcher: FC<MessageBranchSwitcherProps> = ({ branch, threadI
             return;
         }
 
-        mutate({ messageId, threadId }, { onError: (error) => showError(error as Error) });
+        mutate(
+            { messageId, threadId },
+            {
+                onError: (error) => showError(error as Error),
+                // The active path changed, possibly in history the minimap has not loaded: read its prompt outline again.
+                onSuccess: () => queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId }) }),
+            },
+        );
     };
 
     return (

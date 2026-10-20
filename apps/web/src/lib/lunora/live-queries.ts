@@ -78,6 +78,9 @@ export const LIVE_ARGS_META_KEY = "lunoraArgs";
 /** `{ shardKey }` from a Lunora query key's shard slot (`["lunora", fn, args, shardKey | null]`), or `{}`. */
 const shardOptionsOfKey = (queryKey: QueryKey): { shardKey?: string } => (typeof queryKey[3] === "string" ? { shardKey: queryKey[3] } : {});
 
+/** The `__lunoraRef` of `chat.prompt_outline.getThreadPromptOutline`, the key's function slot. */
+const PROMPT_OUTLINE_REF = "chat_prompt_outline:getThreadPromptOutline";
+
 const isLunoraKey = (queryKey: QueryKey): queryKey is readonly ["lunora", string, unknown, string | null] =>
     queryKey[0] === "lunora" && typeof queryKey[1] === "string";
 
@@ -186,6 +189,9 @@ export class LiveQueryManager {
             resetShardRegistry();
             // Nor are another user's unlocked chats (`unlock-proofs.ts`).
             forgetAllUnlockProofs();
+            // Nor another user's prompt outline. Remove it rather than invalidate: an invalidated query keeps its old data
+            // while the new account's read runs or fails, and that would show the previous account's prompts.
+            this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && query.queryKey[1] === PROMPT_OUTLINE_REF });
             // A NEW function identity is what makes `setWsToken` close the open
             // sockets; the client resends every subscription on reconnect.
             this.client.setWsToken(this.wsTokenProvider());

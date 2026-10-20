@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { getThreadUIMessages } from "./functions";
-import { getThreadPromptOutline, isUserPromptRow, outlineText } from "./prompt-outline";
+import { getThreadPromptOutline, isUserPromptRow, MAX_OUTLINE_ROWS, outlineText } from "./prompt-outline";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -36,11 +36,11 @@ const OWNER = "user-owner";
 const OTHER = "user-other";
 const TURNS = 150;
 
-const seed = async (harness: ReturnType<typeof lunoraTest>, extra: Record<string, unknown> = {}) =>
+const seed = async (harness: ReturnType<typeof lunoraTest>, extra: Record<string, unknown> = {}, turns = TURNS) =>
     await harness.run(async (context: any) => {
         const threadId = await context.db.insert("threads", { model: "m", status: "active", title: "t", userId: OWNER, ...extra });
 
-        for (let turn = 0; turn < TURNS; turn += 1) {
+        for (let turn = 0; turn < turns; turn += 1) {
             await context.db.insert("messages", {
                 message: { content: `question ${String(turn)}`, role: "user" },
                 order: turn,
@@ -85,6 +85,23 @@ describe("getThreadPromptOutline", () => {
             expect(outline.items[0]?.text).toBe("question 0");
             expect(outline.items.at(-1)?.text).toBe(`question ${String(TURNS - 1)}`);
             expect(outline.items.some((item) => item.text.startsWith("answer"))).toBe(false);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("stops at the jump's reach and says so, keeping the newest prompts", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            // 300 prompts are 600 rows; the scan reads the newest 520, which is 260 prompts.
+            const threadId = await seed(harness, {}, 300);
+            const outline = await outlineFor(harness, OWNER, threadId);
+
+            expect(outline.truncated).toBe(true);
+            expect(outline.items).toHaveLength(MAX_OUTLINE_ROWS / 2);
+            expect(outline.items[0]?.text).toBe("question 40");
+            expect(outline.items.at(-1)?.text).toBe("question 299");
         } finally {
             harness.close();
         }

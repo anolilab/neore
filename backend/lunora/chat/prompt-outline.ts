@@ -22,8 +22,12 @@ import { MAX_LENGTH } from "../lib/validators";
 
 const PAGE_ROWS = 100;
 
-/** Rows scanned, newest first. Past this an outline would cost more than the page loads it saves. */
-export const MAX_OUTLINE_ROWS = 2000;
+/**
+ * Rows scanned, newest first: exactly the minimap jump's reach. The jump starts from a first page of 20 rows and loads
+ * up to `JUMP_MAX_PAGES` (10) pages of `JUMP_PAGE_SIZE` (50) more (`message-list.tsx`, `initialNumItems` in
+ * `use-hydrated-messages.ts`). A prompt the outline lists past this could not be jumped to. Keep the two in step.
+ */
+export const MAX_OUTLINE_ROWS = 20 + 10 * 50;
 /** Prompts returned; the oldest beyond this are dropped. */
 export const MAX_OUTLINE_PROMPTS = 500;
 /** The client shortens this further for the tooltip. */
@@ -86,15 +90,17 @@ export const getThreadPromptOutline = liteAuthQuery
         let truncated = false;
 
         while (scanned < MAX_OUTLINE_ROWS) {
+            // The last page is clamped so the scan stops at the jump's reach, not a page past it.
+            const numberItems = Math.min(PAGE_ROWS, MAX_OUTLINE_ROWS - scanned);
             // A branched thread lists its active path; `null` keeps every other thread on the direct index scan.
-            const pathPage = await listActivePathPage(context, access.thread, { cursor, numItems: PAGE_ROWS }, unlockProof, false);
+            const pathPage = await listActivePathPage(context, access.thread, { cursor, numItems: numberItems }, unlockProof, false);
+            // No tool or status filter here: with both unset the reader is one index scan. Filtered, it merges one
+            // stream per status and tool flag, and each stops at 1,024 rows. `isUserPromptRow` drops the tool rows.
             const page: OutlinePage = pathPage
                 ? { continueCursor: pathPage.continueCursor, isDone: pathPage.isDone, rows: pathPage.page }
                 : await listMessagesByThreadIdHandler(context, {
-                      excludeToolMessages: true,
                       order: "desc",
-                      paginationOpts: { cursor, numItems: PAGE_ROWS },
-                      statuses: ["success", "pending", "failed"],
+                      paginationOpts: { cursor, numItems: numberItems },
                       threadId,
                       unlockProof,
                   }).then((result) => {

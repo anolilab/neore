@@ -43,7 +43,8 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
         afterFirstPaint && hasUnloadedHistory && threadId ? { threadId: threadId as Id<"threads"> } : skipToken,
         { live: false },
     );
-    const { data: outline } = useQuery({ ...outlineOptions, staleTime: OUTLINE_STALE_MS });
+    // Refetched on mount: a reopened chat may have changed while it was closed, and the stale time would hide that.
+    const { data: outline } = useQuery({ ...outlineOptions, refetchOnMount: "always", staleTime: OUTLINE_STALE_MS });
 
     const loadedItems = useMemo(() => buildMinimapItems(messages), [messages]);
     const items = useMemo(() => mergeOutline(outline?.items, loadedItems), [outline, loadedItems]);
@@ -52,7 +53,8 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
     // leaves it listing prompts that are off the active path. Read it again then.
     // The key is built from the thread, not from `outlineOptions`: that one is the skipped key while the outline is not read.
     const queryClient = useQueryClient();
-    const reReadWhenIdle = useRef(false);
+    // The thread the flag is for: a re-read after a stream belongs to that chat's outline, not whichever one is open then.
+    const reReadWhenIdle = useRef<string | undefined>(undefined);
     const previousPrompts = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined }>({ ids: new Set(), threadId: undefined });
 
     useEffect(() => {
@@ -63,18 +65,29 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
         previousPrompts.current = { ids, threadId };
 
         if (previous.threadId === threadId && promptsDropped(previous.ids, ids)) {
-            // A regenerate hides prompts before the server moves the path, so this read can be stale: read again once streaming settles.
-            reReadWhenIdle.current = true;
+            // A regenerate hides prompts before the server moves the path, so a read made while streaming can be stale:
+            // read again once streaming settles. Outside a stream the immediate read is already the current path.
+            if (isStreaming) {
+                reReadWhenIdle.current = threadId;
+            }
+
             queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId: threadId as Id<"threads"> }) });
         }
-    }, [loadedItems, threadId, queryClient, crpc]);
+    }, [loadedItems, threadId, isStreaming, queryClient, crpc]);
 
     useEffect(() => {
-        if (isStreaming || !reReadWhenIdle.current) {
+        const pendingThreadId = reReadWhenIdle.current;
+
+        if (isStreaming || pendingThreadId === undefined) {
             return;
         }
 
-        reReadWhenIdle.current = false;
+        reReadWhenIdle.current = undefined;
+
+        if (pendingThreadId !== threadId) {
+            return;
+        }
+
         queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId: threadId as Id<"threads"> }) });
     }, [isStreaming, threadId, queryClient, crpc]);
 
