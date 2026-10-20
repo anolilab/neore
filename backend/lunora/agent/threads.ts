@@ -521,12 +521,14 @@ export const listPinnedThreads = query
             return [];
         }
 
-        const threads = await ctx.db
-            .query("threads")
-            .withIndex("by_user_and_pinned_deleted", (q: any) => q.eq("userId", args.userId).eq("deleted", false).gte("pinnedAt", 0))
-            .take(100);
+        // A never-trashed thread has `deleted` unset, not `false`.
+        const threads = await ctx.db.threads.findMany({
+            limit: 100,
+            orderBy: [{ pinnedAt: "asc" }, { _creationTime: "asc" }],
+            where: { OR: [{ deleted: { isNull: true } }, { deleted: false }], pinnedAt: { gte: 0 }, userId: args.userId },
+        });
 
-        return threads.filter((t) => t.pinnedAt !== undefined).map((item) => listThreadItem(item));
+        return threads.page.filter((t) => t.pinnedAt !== undefined).map((item) => listThreadItem(item));
     });
 
 // Thread order functions
@@ -926,7 +928,8 @@ export const getThreadListDataBatchHandler = async (
         context.db.threads.findMany({
             limit: 100,
             orderBy: [{ pinnedAt: "asc" }, { _creationTime: "asc" }],
-            where: { deleted: false, pinnedAt: { gte: 0 }, userId },
+            // A never-trashed thread has `deleted` unset, not `false`.
+            where: { OR: [{ deleted: { isNull: true } }, { deleted: false }], pinnedAt: { gte: 0 }, userId },
         }),
         // 4. Manual order (`by_user_and_order`), ordered threads only. The old
         //    walk also took the never-ordered rows (NULL sorts first) and dropped
