@@ -376,6 +376,8 @@ const ComposerTiptapEditor = ({
                 editor.commands.setContent(plainTextToHtml(value), { emitUpdate: false });
             } else {
                 editor.commands.clearContent();
+                // A prompt sent from normal mode must not leave the next one in normal mode, where typed letters are commands.
+                refreshVimMode(editor.view);
             }
         }
     }, [value, editor]);
