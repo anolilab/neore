@@ -14,6 +14,10 @@ describe("toMinimapPreview", () => {
         expect(preview.endsWith("…")).toBe(true);
     });
 
+    it("keeps a markdown link's label and drops its target", () => {
+        expect(toMinimapPreview("check and fix [pasted-text.txt](t3-context:abc123) please")).toBe("check and fix pasted-text.txt please");
+    });
+
     it("leaves text at the limit untouched", () => {
         const exact = "b".repeat(MINIMAP_PREVIEW_CHARS);
 

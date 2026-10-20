@@ -20,6 +20,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 import formatMessageTime from "./format-message-time";
 import { scrollToMessage } from "./message-list";
+import { useActivePromptId } from "./minimap-active";
 import { buildMinimapItems, isProvisionalId, mergeOutline, minimapGapLabel, promptsDropped, shouldShowMinimap } from "./minimap-items";
 
 /** The outline is cheap to keep: it changes only when the active path does, which the effect below watches. */
@@ -49,6 +50,8 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
 
     const loadedItems = useMemo(() => buildMinimapItems(messages), [messages]);
     const items = useMemo(() => mergeOutline(outline?.items, loadedItems), [outline, loadedItems]);
+    // The prompt being read: its tick turns white, so the rail shows where the reader is.
+    const activeId = useActivePromptId(useMemo(() => items.map((item) => item.id), [items]));
 
     // The outline is read once, so a branch switch, an edit or a delete (a loaded prompt that is no longer there)
     // leaves it listing prompts that are off the active path. Read it again then.
@@ -106,6 +109,7 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
                         const preview = item.preview || t`Attachment only`;
                         // Labels the time since the previous prompt, so a long pause between sends is visible on the rail.
                         const gap = minimapGapLabel(items[index - 1]?.createdAt, item.createdAt);
+                        const isActive = item.id === activeId;
 
                         return (
                             <li className="flex w-full items-center justify-end gap-0.5" key={item.id}>
@@ -118,15 +122,17 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
                                     <TooltipTrigger
                                         render={
                                             <button
+                                                aria-current={isActive ? "location" : undefined}
                                                 aria-label={t`Jump to prompt ${promptNumber}: ${preview}`}
                                                 className="group focus-visible:ring-ring flex h-4 w-6 items-center justify-center rounded-sm outline-none focus-visible:ring-2"
+                                                data-active={isActive}
                                                 onClick={() => scrollToMessage(item.id, { threadId })}
                                                 type="button"
                                             >
-                                                <span
-                                                    aria-hidden="true"
-                                                    className="bg-muted-foreground/40 group-hover:bg-foreground h-0.5 w-4 rounded-full motion-safe:transition-colors"
-                                                />
+                                                <span aria-hidden="true" className="relative h-0.5 w-4 rounded-full">
+                                                    <span className="bg-muted-foreground/40 group-hover:bg-foreground absolute inset-0 rounded-full motion-safe:transition-colors" />
+                                                    <span className="bg-foreground absolute inset-0 rounded-full opacity-0 motion-safe:transition-opacity motion-safe:duration-150 group-data-[active=true]:opacity-100" />
+                                                </span>
                                             </button>
                                         }
                                     />
