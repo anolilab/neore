@@ -355,7 +355,8 @@ const RootComponent = () => {
     // in the browser, so this is the only place the SSR token reaches the
     // browser's client. See `seedHydratedAuthToken`.
     seedHydratedAuthToken(context.lunoraClient, context.token);
-    // The native bridge exists only in the browser, so it is read after mount: the server and the first client render must match.
+    // The native bridge exists only in the browser, so it is read after mount: the
+    // server and the first client render must match.
     const [isNative, setIsNative] = useState(false);
 
     useEffect(() => {
