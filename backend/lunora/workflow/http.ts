@@ -35,6 +35,7 @@ import {
     type WorkflowNode,
 } from "./core";
 import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext } from "./media-args";
+import { withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
 
@@ -231,14 +232,26 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "audio": {
-                            const result = await executeAudioNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeAudioNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
                         }
 
                         case "background-removal": {
-                            const result = await executeBackgroundRemovalNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeBackgroundRemovalNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
@@ -252,7 +265,13 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "character-ref": {
-                            const result = await executeCharacterRefNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeCharacterRefNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
@@ -270,7 +289,13 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "controlnet": {
-                            const result = await executeControlNetNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeControlNetNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
@@ -288,7 +313,13 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "image": {
-                            const result = await executeImageNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeImageNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
@@ -303,28 +334,52 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "img2img": {
-                            const result = await executeImg2ImgNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeImg2ImgNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
                         }
 
                         case "inpaint": {
-                            const result = await executeInpaintNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeInpaintNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
                         }
 
                         case "object-editor": {
-                            const result = await executeObjectEditorNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeObjectEditorNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
                         }
 
                         case "outpaint": {
-                            const result = await executeOutpaintNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeOutpaintNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
@@ -338,14 +393,26 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "parallel-compare": {
-                            const result = await executeParallelCompareNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeParallelCompareNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
                         }
 
                         case "style-ref": {
-                            const result = await executeStyleRefNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeStyleRefNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
@@ -359,14 +426,26 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "transcription": {
-                            const result = await executeTranscriptionNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeTranscriptionNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;
                         }
 
                         case "upscale": {
-                            const result = await executeUpscaleNodeStreaming(node, executionContext, context, userId);
+                            const result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeUpscaleNodeStreaming(node, executionContext, context, userId),
+                            );
 
                             output = result.output;
                             break;

@@ -34,6 +34,7 @@ import {
     type WorkflowNode,
 } from "./core";
 import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext } from "./media-args";
+import { withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
 import { videoKindOf } from "./video-inputs";
@@ -930,11 +931,23 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "audio": {
-                            result = await executeAudioNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeAudioNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "background-removal": {
-                            result = await executeBackgroundRemovalNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeBackgroundRemovalNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "branch": {
@@ -942,7 +955,13 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "character-ref": {
-                            result = await executeCharacterRefNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeCharacterRefNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "code": {
@@ -950,7 +969,13 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "controlnet": {
-                            result = await executeControlNetNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeControlNetNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "file": {
@@ -958,7 +983,13 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "image": {
-                            result = await executeImageNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeImageNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "image-to-video": {
@@ -966,19 +997,43 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "img2img": {
-                            result = await executeImg2ImgNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeImg2ImgNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "inpaint": {
-                            result = await executeInpaintNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeInpaintNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "object-editor": {
-                            result = await executeObjectEditorNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeObjectEditorNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "outpaint": {
-                            result = await executeOutpaintNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeOutpaintNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "output": {
@@ -986,11 +1041,23 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "parallel-compare": {
-                            result = await executeParallelCompareNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeParallelCompareNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "style-ref": {
-                            result = await executeStyleRefNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeStyleRefNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "text": {
@@ -998,11 +1065,23 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "transcription": {
-                            result = await executeTranscriptionNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeTranscriptionNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "upscale": {
-                            result = await executeUpscaleNode(node, executionContext, context, userId);
+                            result = await withMediaCharge(
+                                context,
+                                executionContext,
+                                node,
+                                userId,
+                                async () => await executeUpscaleNode(node, executionContext, context, userId),
+                            );
                             break;
                         }
                         case "video": {
