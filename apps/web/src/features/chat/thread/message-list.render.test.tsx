@@ -80,6 +80,14 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
     return { default: () => [] };
 });
 
+vi.mock("@/features/auth/hooks/use-user-settings", () => {
+    return {
+        useUserSettings: () => {
+            return { data: undefined };
+        },
+    };
+});
+
 vi.mock("@/lib/lunora/crpc", () => {
     const leaf = {
         mutationOptions: () => {

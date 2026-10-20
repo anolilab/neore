@@ -74,6 +74,7 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
                 className={baseClassName}
                 disabled={isBotThread}
                 includeCustomModels
+                listenForShortcut
                 modelId={effectiveModelId}
                 onSelect={handleSelect}
                 onSelectMultiple={handleSelectMultiple}

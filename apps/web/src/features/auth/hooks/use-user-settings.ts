@@ -19,14 +19,23 @@ export const useUserSettings = () => {
 };
 
 /**
+ * The settings writes `updateLatest` has queued in this tab. Each waits for the one before it;
+ * `pending` counts the ones not yet finished.
+ */
+const settingsWrites = { pending: 0, tail: Promise.resolve() as Promise<unknown> };
+
+/**
  * Hook to update user settings with optimistic updates.
+ *
+ * `updateLatest` is for a patch that depends on the current value (a list reorder, a map entry):
+ * it is built from the cache when its turn comes, so two quick edits cannot overwrite each other.
  */
 export const useUpdateUserSettings = () => {
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const queryOptions = crpc.auth.functions.getUserSettings.queryOptions({});
 
-    return useMutation({
+    const mutation = useMutation({
         ...crpc.auth.functions.updateUserSettings.mutationOptions(),
         onMutate: async (args) => {
             // Cancel any outgoing refetches
@@ -47,8 +56,9 @@ export const useUpdateUserSettings = () => {
             return { previousSettings };
         },
         onError: (_error, _args, context: { previousSettings?: UserSettingsRow } | undefined) => {
-            // If the mutation fails, use the context returned from onMutate to roll back
-            if (context?.previousSettings) {
+            // If the mutation fails, use the context returned from onMutate to roll back. Not while a queued write is behind
+            // this one: the snapshot predates the edits it queued, so restoring it would drop them. The last write to settle refetches.
+            if (settingsWrites.pending <= 1 && context?.previousSettings) {
                 queryClient.setQueryData(queryOptions.queryKey, context.previousSettings);
             }
         },
@@ -57,7 +67,55 @@ export const useUpdateUserSettings = () => {
         // setting read from it (e.g. `onboardingCompleted` behind "Skip tour")
         // never changed on screen. Re-read the server's row either way.
         onSettled: async () => {
+            // A queued write is still behind this one: a refetch now would bring back the server row and hide the edits queued after it.
+            if (settingsWrites.pending > 0) {
+                return;
+            }
+
             await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
         },
     });
+
+    type Patch = Parameters<typeof mutation.mutateAsync>[0];
+
+    /**
+     * Applies `build` to the cached settings at once, so the UI updates now, then queues the write.
+     * When its turn comes the write sends the fields' values as the cache holds them then, which
+     * include every edit queued before it. A patch that depends on the current value (a list
+     * reorder, a map entry) therefore never overwrites another edit made meanwhile.
+     */
+    const updateLatest = (build: (current: UserSettingsRow | undefined) => Patch) => {
+        const before = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
+        const patch = build(before);
+        const fields = Object.keys(patch) as (keyof UserSettingsRow)[];
+
+        if (before !== undefined) {
+            queryClient.setQueryData(queryOptions.queryKey, { ...before, ...patch });
+        }
+
+        settingsWrites.pending += 1;
+
+        const run = settingsWrites.tail.then(() => {
+            const latest = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
+            const body = latest ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
+
+            return mutation.mutateAsync(body as Patch);
+        });
+
+        // The catch keeps a failed write from stalling the queue and marks `run` handled (`mutate` swallows errors too).
+        // The last write to settle refetches, after a success or a failure alike, so the cache matches the server again.
+        settingsWrites.tail = run
+            .catch(() => {
+                // Handled by onError; the refetch below covers it.
+            })
+            .finally(() => {
+                settingsWrites.pending -= 1;
+
+                if (settingsWrites.pending === 0) {
+                    void queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+                }
+            });
+    };
+
+    return { ...mutation, updateLatest };
 };

@@ -25,22 +25,26 @@ import React, { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } 
 import { toast } from "sonner";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useBlockedCreators, withCreatorHidden, withoutCreator } from "@/hooks/use-model-filter-rules";
 import { trackEvent } from "@/lib/analytics";
 import { localizeModelDescription } from "@/lib/model-descriptions";
 
+import type { ModelSort } from "./utilities";
 import {
     filterModelsByBlockedCreators,
     filterModelsByQuery,
+    formatPricePerMillion,
     getCreatorDisplayName,
     getCreatorSlug,
     getModelCapabilities,
+    getModelLabel,
     getModelMode,
     getModelModeName,
     getModelSearchText,
     groupModelsByCreator,
-    stripProviderPrefix,
+    sortModels,
 } from "./utilities";
 
 const getCostMultiplier = (costPer1M: number | null | undefined): string | null => {
@@ -120,7 +124,7 @@ interface ModelGroup {
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
-const ModelDetailPanel = memo<{ model: GatewayModel }>(({ model }) => {
+const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ displayName, model }) => {
     const { i18n } = useLingui();
     const displayCapability = (label: string): string => {
         const descriptor = CAPABILITY_DISPLAY[label];
@@ -142,7 +146,7 @@ const ModelDetailPanel = memo<{ model: GatewayModel }>(({ model }) => {
             <div className="flex items-center gap-3 p-4 pb-3">
                 <ProviderIcon className="size-8 shrink-0" provider={model.provider || model.displayProvider || ""} providerIcon={creatorSlug} />
                 <div className="min-w-0">
-                    <p className="text-foreground truncate text-[13px] leading-snug font-semibold">{stripProviderPrefix(model.name ?? model.id)}</p>
+                    <p className="text-foreground truncate text-[13px] leading-snug font-semibold">{displayName}</p>
                     <p className="text-muted-foreground/50 text-[11px]">{developerDisplay}</p>
                 </div>
             </div>
@@ -175,6 +179,35 @@ const ModelDetailPanel = memo<{ model: GatewayModel }>(({ model }) => {
                             </span>
                         ))}
                     </div>
+                </div>
+            ) : null}
+
+            {/* Pricing — absent means unknown, not free */}
+            {model.pricing ? (
+                <div className="border-border/40 border-t px-4 py-3">
+                    <p className="text-muted-foreground/40 mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                        <Trans>Price per 1M tokens</Trans>
+                    </p>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11.5px]">
+                        <dt className="text-muted-foreground">
+                            <Trans>Input</Trans>
+                        </dt>
+                        <dd className="text-foreground text-right font-medium tabular-nums">{formatPricePerMillion(model.pricing.input_per_million)}</dd>
+                        <dt className="text-muted-foreground">
+                            <Trans>Output</Trans>
+                        </dt>
+                        <dd className="text-foreground text-right font-medium tabular-nums">{formatPricePerMillion(model.pricing.output_per_million)}</dd>
+                        {model.pricing.cached_input_per_million === undefined ? null : (
+                            <>
+                                <dt className="text-muted-foreground">
+                                    <Trans>Cached input</Trans>
+                                </dt>
+                                <dd className="text-foreground text-right font-medium tabular-nums">
+                                    {formatPricePerMillion(model.pricing.cached_input_per_million)}
+                                </dd>
+                            </>
+                        )}
+                    </dl>
                 </div>
             ) : null}
 
@@ -248,12 +281,13 @@ const ModelItemContent = memo<{
     isFavorite: boolean;
     isInfoActive: boolean;
     isSelected: boolean;
+    label: string;
     model: GatewayModel;
     onInfo: (modelId: string) => void;
     onInfoLeave: () => void;
     onToggleFavorite: (modelId: string, setFavorite: boolean) => void;
     selectionMode: ModelPickerSelectionMode;
-}>(({ isFavorite, isInfoActive, isSelected, model, onInfo, onInfoLeave, onToggleFavorite, selectionMode }) => {
+}>(({ isFavorite, isInfoActive, isSelected, label, model, onInfo, onInfoLeave, onToggleFavorite, selectionMode }) => {
     const { i18n, t } = useLingui();
     const costMultiplier = getCostMultiplier(model.pricing?.input_per_million);
 
@@ -262,13 +296,20 @@ const ModelItemContent = memo<{
             {/* Name + badges */}
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <div className="flex min-w-0 items-baseline gap-1.5">
-                    <span className="truncate text-[13px] leading-none font-medium">{stripProviderPrefix(model.name ?? model.id)}</span>
+                    <span className="truncate text-[13px] leading-none font-medium">{label}</span>
                     {model.isPremium ? (
                         <span className="shrink-0 rounded-[3px] bg-amber-500/15 px-1 py-0 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:bg-amber-400/15 dark:text-amber-400">
                             <Trans>Pro</Trans>
                         </span>
                     ) : null}
-                    {costMultiplier ? <span className="text-muted-foreground/40 shrink-0 text-[10px] tabular-nums">{costMultiplier}</span> : null}
+                    {costMultiplier && model.pricing ? (
+                        <span
+                            className="text-muted-foreground/40 shrink-0 text-[10px] tabular-nums"
+                            title={t`${formatPricePerMillion(model.pricing.input_per_million)} input, ${formatPricePerMillion(model.pricing.output_per_million)} output per 1M tokens`}
+                        >
+                            {costMultiplier}
+                        </span>
+                    ) : null}
                     {model.isNew ? (
                         <span className="shrink-0 rounded-[3px] bg-emerald-500/12 px-1 py-0 text-[9px] font-semibold tracking-wide text-emerald-600 uppercase dark:bg-emerald-400/15 dark:text-emerald-400">
                             <Trans>New</Trans>
@@ -453,6 +494,7 @@ const ModelGroupRenderer = memo<{
                                     isFavorite={isFavorite(item.model.id)}
                                     isInfoActive={infoModelId === item.model.id}
                                     isSelected={isSelected}
+                                    label={item.label}
                                     model={item.model}
                                     onInfo={onInfo}
                                     onInfoLeave={onInfoLeave}
@@ -499,6 +541,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     // Use provided models list or fall back to the feature-flagged gateway models
     const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
     const { blockedCreators, isLoaded: isRulesLoaded, setBlockedCreators } = useBlockedCreators();
+    const { nicknames } = useModelNicknames();
     const { hooks } = useAuth();
     const { data: sessionData } = hooks.useSession();
     // Hiding writes the account's filter rules, so it is offered to signed-in users only.
@@ -532,6 +575,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const [selectionMode, setSelectionMode] = useState<ModelPickerSelectionMode>(() => ((initialModelIds?.length ?? 0) > 0 ? "parallel" : "single"));
     const [infoModelId, setInfoModelId] = useState<string | undefined>();
     const [modeFilter, setModeFilter] = useState<ModelModeFilter>(defaultModeFilter);
+    const [sort, setSort] = useState<ModelSort>("default");
 
     const pickerRef = useRef<HTMLDivElement>(null);
     const onSelectRef = useRef(onSelect);
@@ -687,7 +731,13 @@ const ModelPicker: FC<ModelPickerProps> = ({
             }
         }
 
-        return { favoriteModels: favoriteEntries, regularModels: regulars };
+        // The user's own order (set in settings), not the catalog's.
+        const favoritePosition = new Map(favoriteModelIds.map((id, index) => [id, index]));
+
+        return {
+            favoriteModels: favoriteEntries.toSorted((a, b) => (favoritePosition.get(a.id) ?? 0) - (favoritePosition.get(b.id) ?? 0)),
+            regularModels: regulars,
+        };
     }, [favoriteModelIds, selectedProvider, searchQuery, activeTab, sourceModels, modeFilter]);
 
     const createModelItems = useCallback(
@@ -695,35 +745,37 @@ const ModelPicker: FC<ModelPickerProps> = ({
             models.map((model) => {
                 return {
                     icon: undefined,
-                    label: model.name ?? model.id,
+                    label: getModelLabel(model, nicknames),
                     model,
                     onSelect: () => handleModelSelect(model.id),
                     value: model.id,
                 };
             }),
-        [handleModelSelect],
+        [handleModelSelect, nicknames],
     );
 
     const groupedItems = useMemo(() => {
-        const groups: ModelGroup[] = [];
+        if (sort !== "default") {
+            const listed = activeTab === "starred" ? favoriteModels : [...favoriteModels, ...regularModels];
+
+            return [{ items: createModelItems(sortModels(listed, sort, nicknames)), value: sort }];
+        }
 
         if (activeTab === "starred") {
-            const grouped = groupModelsByCreator(favoriteModels);
+            // One group in the user's own order; grouping by creator would split it.
+            return [{ isFavorite: true, items: createModelItems(favoriteModels), value: "starred" }];
+        }
 
-            for (const [creator, creatorModels] of grouped.entries()) {
-                groups.push({ isFavorite: true, items: createModelItems(creatorModels), value: creator });
-            }
-        } else {
-            const allModels = [...favoriteModels, ...regularModels];
-            const grouped = groupModelsByCreator(allModels);
+        const groups: ModelGroup[] = [];
+        const allModels = [...favoriteModels, ...regularModels];
+        const grouped = groupModelsByCreator(allModels);
 
-            for (const [creator, creatorModels] of grouped.entries()) {
-                groups.push({ items: createModelItems(creatorModels), value: creator });
-            }
+        for (const [creator, creatorModels] of grouped.entries()) {
+            groups.push({ items: createModelItems(creatorModels), value: creator });
         }
 
         return groups;
-    }, [favoriteModels, regularModels, activeTab, createModelItems]);
+    }, [favoriteModels, regularModels, activeTab, createModelItems, sort, nicknames]);
 
     // One search text per model per locale (`i18n` is a new object on every
     // locale change), so a keystroke only runs `includes` over prebuilt strings.
@@ -735,10 +787,11 @@ const ModelPicker: FC<ModelPickerProps> = ({
                     getModelSearchText(
                         model,
                         localizeModelDescription(model.desc, (descriptor) => i18n._(descriptor)),
+                        nicknames[model.id],
                     ),
                 ]),
             ),
-        [sourceModels, i18n],
+        [sourceModels, i18n, nicknames],
     );
 
     const filteredGroupedItems = useMemo(() => {
@@ -770,7 +823,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const isParallelMaxReached = parallelSelectedIds.size >= MAX_PARALLEL;
     const isShowProviderSidebar = activeTab === "all" && !searchQuery.trim();
     const isStarredEmpty = activeTab === "starred" && favoriteModels.length === 0 && !searchQuery.trim();
-    const isShowGroupLabels = activeTab !== "starred";
+    const isShowGroupLabels = activeTab !== "starred" && sort === "default";
 
     // Derive the "anchor" mode from the first selected model in parallel mode.
     // All other types are locked out once a selection is made.
@@ -873,68 +926,89 @@ const ModelPicker: FC<ModelPickerProps> = ({
                         )}
                     </div>
 
-                    {/* Mode filter row */}
-                    {!hideModeFilter && (
-                        <div className="flex items-center gap-1 border-t px-2 py-1.5">
-                            <span className="text-muted-foreground/50 mr-1 text-[10px] font-medium tracking-wider uppercase">{t`Type`}</span>
-                            <button
-                                className={cn(
-                                    "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                    modeFilter === null ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
-                                )}
-                                onClick={() => setModeFilter(null)}
-                                type="button"
-                            >
-                                {t`All`}
-                            </button>
-                            <button
-                                className={cn(
-                                    "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                    modeFilter === "text" ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
-                                )}
-                                onClick={() => setModeFilter("text")}
-                                type="button"
-                            >
-                                <Type className="size-3" />
-                                {t`Text`}
-                            </button>
-                            <button
-                                className={cn(
-                                    "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                    modeFilter === "image" ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
-                                )}
-                                onClick={() => setModeFilter("image")}
-                                type="button"
-                            >
-                                <Image className="size-3" />
-                                {t`Image`}
-                            </button>
-                            <button
-                                className={cn(
-                                    "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                    modeFilter === "video" ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
-                                )}
-                                onClick={() => setModeFilter("video")}
-                                type="button"
-                            >
-                                <Video className="size-3" />
-                                {t`Video`}
-                            </button>
-                            <button
-                                className={cn(
-                                    "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                    modeFilter === "speech-to-text"
-                                        ? "bg-primary/10 text-primary"
-                                        : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
-                                )}
-                                onClick={() => setModeFilter("speech-to-text")}
-                                type="button"
-                            >
-                                <Mic className="size-3" />
-                                {t`Audio`}
-                            </button>
-                        </div>
-                    )}
+                    {/* Mode filter + sort row */}
+                    <div className="flex items-center gap-1 border-t px-2 py-1.5">
+                        {!hideModeFilter && (
+                            <>
+                                <span className="text-muted-foreground/50 mr-1 text-[10px] font-medium tracking-wider uppercase">{t`Type`}</span>
+                                <button
+                                    className={cn(
+                                        "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
+                                        modeFilter === null ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                    )}
+                                    onClick={() => setModeFilter(null)}
+                                    type="button"
+                                >
+                                    {t`All`}
+                                </button>
+                                <button
+                                    className={cn(
+                                        "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
+                                        modeFilter === "text"
+                                            ? "bg-primary/10 text-primary"
+                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                    )}
+                                    onClick={() => setModeFilter("text")}
+                                    type="button"
+                                >
+                                    <Type className="size-3" />
+                                    {t`Text`}
+                                </button>
+                                <button
+                                    className={cn(
+                                        "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
+                                        modeFilter === "image"
+                                            ? "bg-primary/10 text-primary"
+                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                    )}
+                                    onClick={() => setModeFilter("image")}
+                                    type="button"
+                                >
+                                    <Image className="size-3" />
+                                    {t`Image`}
+                                </button>
+                                <button
+                                    className={cn(
+                                        "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
+                                        modeFilter === "video"
+                                            ? "bg-primary/10 text-primary"
+                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                    )}
+                                    onClick={() => setModeFilter("video")}
+                                    type="button"
+                                >
+                                    <Video className="size-3" />
+                                    {t`Video`}
+                                </button>
+                                <button
+                                    className={cn(
+                                        "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
+                                        modeFilter === "speech-to-text"
+                                            ? "bg-primary/10 text-primary"
+                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                    )}
+                                    onClick={() => setModeFilter("speech-to-text")}
+                                    type="button"
+                                >
+                                    <Mic className="size-3" />
+                                    {t`Audio`}
+                                </button>
+                            </>
+                        )}
+                        <select
+                            aria-label={t`Sort models`}
+                            className="text-muted-foreground hover:text-foreground focus-visible:outline-ring bg-background ml-auto rounded-md border px-1.5 py-1 text-[11px] font-medium focus-visible:outline-2"
+                            onChange={(event) => setSort(event.target.value as ModelSort)}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            value={sort}
+                        >
+                            <option value="default">{t`Default order`}</option>
+                            <option value="name">{t`Name (A to Z)`}</option>
+                            <option value="new">{t`New first`}</option>
+                            <option value="price-asc">{t`Price: low to high`}</option>
+                            <option value="price-desc">{t`Price: high to low`}</option>
+                        </select>
+                    </div>
 
                     <CommandPanel className={cn("flex h-60 flex-row overflow-hidden rounded-none", panelClassName)}>
                         {/* Provider sidebar */}
@@ -998,7 +1072,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                                 selectedModelId={selectedModelId}
                                                 selectionMode={selectionMode}
                                                 showGroupLabel={isShowGroupLabels}
-                                                showProviderIcon={activeTab === "starred"}
+                                                showProviderIcon={activeTab === "starred" || sort !== "default"}
                                                 toggleFavorite={toggleFavorite}
                                             />
                                         ))}
@@ -1054,7 +1128,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                         onMouseEnter={cancelInfoClose}
                         onMouseLeave={scheduleInfoClose}
                     >
-                        {infoModel ? <ModelDetailPanel model={infoModel} /> : null}
+                        {infoModel ? <ModelDetailPanel displayName={getModelLabel(infoModel, nicknames)} model={infoModel} /> : null}
                     </PopoverPrimitive.Popup>
                 </PopoverPrimitive.Positioner>
             </PopoverPrimitive.Portal>

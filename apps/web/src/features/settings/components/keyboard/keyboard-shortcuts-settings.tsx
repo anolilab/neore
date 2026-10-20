@@ -24,6 +24,7 @@ const keyboardShortcutSchema = z.strictObject({
     help: z.string().optional(),
     newChat: z.string().optional(),
     newTemporaryChat: z.string().optional(),
+    openModelPicker: z.string().optional(),
     search: z.string().optional(),
     sidebarLeft: z.string().optional(),
     sidebarRight: z.string().optional(),
@@ -45,6 +46,9 @@ const getDefaultShortcut = (key: string): string => {
         }
         case "newTemporaryChat": {
             return `ctrl+shift+n`;
+        }
+        case "openModelPicker": {
+            return `ctrl+shift+m`;
         }
         case "search": {
             return `ctrl+k`;
@@ -70,6 +74,7 @@ const KeyboardShortcutsSettings: FC = () => {
         help: t`Help`,
         newChat: t`New Chat`,
         newTemporaryChat: t`New Temporary Chat`,
+        openModelPicker: t`Open Model Picker`,
         search: t`Search`,
         sidebarLeft: t`Sidebar Left`,
         sidebarRight: t`Sidebar Right`,
@@ -81,6 +86,7 @@ const KeyboardShortcutsSettings: FC = () => {
         help: t`Show help dialog (${formatShortcutForDisplay(getDefaultShortcut("help"))})`,
         newChat: t`Start a new chat (${formatShortcutForDisplay(getDefaultShortcut("newChat"))})`,
         newTemporaryChat: t`Start a new temporary chat (${formatShortcutForDisplay(getDefaultShortcut("newTemporaryChat"))})`,
+        openModelPicker: t`Open the model picker in the composer (${formatShortcutForDisplay(getDefaultShortcut("openModelPicker"))})`,
         search: t`Open search (${formatShortcutForDisplay(getDefaultShortcut("search"))})`,
         sidebarLeft: t`Toggle left sidebar (${formatShortcutForDisplay(getDefaultShortcut("sidebarLeft"))})`,
         sidebarRight: t`Toggle right sidebar (${formatShortcutForDisplay(getDefaultShortcut("sidebarRight"))})`,

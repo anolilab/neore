@@ -2901,6 +2901,8 @@ export const schema = defineSchema({
         mainFont: v.optional(v.string()),
         memoryEnabled: v.optional(v.boolean()),
         mermaidTheme: v.optional(v.string()),
+        // The user's own names for models, model id → nickname (`auth/lib/model-nicknames.ts`). Absent = none.
+        modelNicknames: v.optional(v.record(v.string(), v.string())),
         // New composer chats are temporary by default. Absent = off.
         newChatsTemporary: v.optional(v.boolean()),
         nickname: v.optional(v.string()),

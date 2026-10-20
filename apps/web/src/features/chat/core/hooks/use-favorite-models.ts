@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef } from "react";
 
+import { moveFavorite } from "@/components/model-picker/utilities";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 
 const FAVORITE_MODELS_STORAGE_KEY = "neore-favorite-models";
 
 const useFavoriteModels = () => {
     const { data: userSettings } = useUserSettings();
-    const { mutate: updateUserSettings } = useUpdateUserSettings();
+    const { mutate: updateUserSettings, updateLatest } = useUpdateUserSettings();
     const hasMigratedRef = useRef(false);
 
     const favoriteModelIds = useMemo<string[]>(() => userSettings?.favoriteModels ?? [], [userSettings?.favoriteModels]);
@@ -40,15 +41,22 @@ const useFavoriteModels = () => {
     }, [userSettings, updateUserSettings]);
 
     const toggleFavorite = (modelId: string, isFavorite: boolean) => {
-        let newFavorites: string[];
+        updateLatest((current) => {
+            const favorites = current?.favoriteModels ?? [];
 
-        if (isFavorite) {
-            newFavorites = favoriteModelIds.includes(modelId) ? favoriteModelIds : [...favoriteModelIds, modelId];
-        } else {
-            newFavorites = favoriteModelIds.filter((id: string) => id !== modelId);
-        }
+            if (!isFavorite) {
+                return { favoriteModels: favorites.filter((id: string) => id !== modelId) };
+            }
 
-        updateUserSettings({ favoriteModels: newFavorites });
+            return { favoriteModels: favorites.includes(modelId) ? favorites : [...favorites, modelId] };
+        });
+    };
+
+    /** Moves `movedId` onto `targetId`'s place in the stored list, not in a list read when the drag began. */
+    const reorderFavorites = (movedId: string, targetId: string) => {
+        updateLatest((current) => {
+            return { favoriteModels: moveFavorite(current?.favoriteModels ?? [], movedId, targetId) };
+        });
     };
 
     const addFavorite = (modelId: string) => {
@@ -66,6 +74,7 @@ const useFavoriteModels = () => {
         favoriteModelIds,
         isFavorite,
         removeFavorite,
+        reorderFavorites,
         toggleFavorite,
     };
 };

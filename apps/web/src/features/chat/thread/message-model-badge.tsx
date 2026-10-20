@@ -3,6 +3,7 @@
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import type { FC } from "react";
 
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
 interface MessageModelBadgeProps {
@@ -11,10 +12,11 @@ interface MessageModelBadgeProps {
 
 const MessageModelBadge: FC<MessageModelBadgeProps> = ({ model }) => {
     const models = useFeatureFlaggedModels();
+    const { data: userSettings } = useUserSettings();
     const modelDefinition = model ? (models.find((m) => m.id === model) ?? null) : null;
     const modelInfo = model
         ? {
-              displayName: modelDefinition ? (modelDefinition.name ?? modelDefinition.id) : model,
+              displayName: userSettings?.modelNicknames?.[model] || (modelDefinition ? (modelDefinition.name ?? modelDefinition.id) : model),
               modelDefinition,
           }
         : null;

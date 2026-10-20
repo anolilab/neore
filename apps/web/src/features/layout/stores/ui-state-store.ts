@@ -58,6 +58,7 @@ export type KeyboardShortcuts = {
     newChat: string;
     newTemporaryChat: string;
     nextItem: string;
+    openModelPicker: string;
     pinThread: string;
     prevItem: string;
     search: string;
@@ -102,6 +103,7 @@ const defaultKeyboardShortcuts: KeyboardShortcuts = {
     newChat: `${platformModifier}+n`,
     newTemporaryChat: `${platformModifier}+shift+n`,
     nextItem: "arrowdown",
+    openModelPicker: `${platformModifier}+shift+m`,
     pinThread: `${platformModifier}+p`,
     prevItem: "arrowup",
     search: `${platformModifier}+k`,

@@ -10,16 +10,17 @@ import MOBILE_BREAKPOINT_QUERY from "@neore/ui/utils/breakpoints";
 import cn from "@neore/ui/utils/cn";
 import { ChevronsUpDown } from "lucide-react";
 import type { FC } from "react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMediaMatch } from "rooks";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
+import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
 import useCustomModels from "@/features/settings/hooks/use-custom-models";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
 import ModelPicker from "./model-picker";
-import { findModelById } from "./utilities";
+import { findModelById, getModelLabel } from "./utilities";
 
 interface ModelPickerButtonProps {
     className?: string;
@@ -30,6 +31,9 @@ interface ModelPickerButtonProps {
      * path (`chat/execute.ts`) knows how to run a `custom:` id.
      */
     includeCustomModels?: boolean;
+
+    /** Open on the `openModelPicker` keyboard shortcut. Only the composer's picker opts in. */
+    listenForShortcut?: boolean;
     model?: GatewayModel;
     modelId?: string;
     onSelect?: (modelId: string) => void;
@@ -79,6 +83,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
     className,
     disabled,
     includeCustomModels = false,
+    listenForShortcut = false,
     model: modelProp,
     modelId,
     onSelect,
@@ -100,6 +105,20 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
     const customModels = useCustomModels(includeCustomModels && (open || Boolean(modelId?.startsWith("custom:"))));
     const featureFlaggedModels = useMemo(() => (customModels.length > 0 ? [...gatewayModels, ...customModels] : gatewayModels), [gatewayModels, customModels]);
     const { favoriteModelIds, toggleFavorite } = useFavoriteModels();
+    const { nicknames } = useModelNicknames();
+
+    useEffect(() => {
+        if (!listenForShortcut || disabled) {
+            return undefined;
+        }
+
+        const openPicker = () => setOpen(true);
+
+        // Dispatched by the `openModelPicker` shortcut (`use-keyboard-shortcut-handler.ts`).
+        globalThis.addEventListener("openModelPicker", openPicker);
+
+        return () => globalThis.removeEventListener("openModelPicker", openPicker);
+    }, [listenForShortcut, disabled]);
 
     const isComparisonMode = (selectedModelIds?.length ?? 0) >= 2;
 
@@ -162,7 +181,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
                         providerIcon={model.id.split("/", 1)[0] || model.displayProvider || ""}
                     />
                 )}
-                <span className="truncate">{model?.name || placeholder || defaultPlaceholder}</span>
+                <span className="truncate">{model ? getModelLabel(model, nicknames) : placeholder || defaultPlaceholder}</span>
             </div>
             <ChevronsUpDown aria-hidden="true" className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

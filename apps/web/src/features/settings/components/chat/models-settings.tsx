@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import FavoriteModelsSettings from "./favorite-models-settings";
+
 const FILTER_CAPABILITIES: { key: ModelFilterCapability; label: MessageDescriptor }[] = [
     { key: "fast", label: msg`Fast` },
     { key: "vision", label: msg`Vision` },
@@ -355,6 +357,7 @@ const ModelsSettings: FC = () => {
 
     return (
         <div className="space-y-6">
+            <FavoriteModelsSettings />
             <Card>
                 <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
