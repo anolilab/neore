@@ -263,6 +263,7 @@ impl DeviceState {
         }
 
         if update.unpair {
+            self.prompts.deny_all();
             settings.pairing = None;
             settings.allow_rules.clear();
         }
@@ -362,8 +363,16 @@ impl DeviceState {
 
                 let remaining = call.expires_at.saturating_sub(now_ms());
 
+                let still_paired = self
+                    .settings()
+                    .pairing
+                    .is_some_and(|current| current.device_id == pairing.device_id);
+
                 match answer {
                     Answer::Deny | Answer::Timeout => Outcome::denied(decision),
+                    _ if !still_paired => {
+                        Outcome::failed(decision, "the computer was unpaired while waiting")
+                    }
                     _ if remaining == 0 => {
                         Outcome::failed(decision, "approved after the request expired")
                     }

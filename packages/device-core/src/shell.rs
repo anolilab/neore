@@ -337,6 +337,10 @@ pub fn run(
         }
     };
 
+    // Whatever the command started and left running dies with it; output it already
+    // wrote stays readable in the pipe.
+    kill_tree(&mut child);
+
     // A background child can inherit stdout and hold the pipe open after the
     // shell exits, so wait for the readers only up to a deadline. Unfinished
     // readers are left to end on their own; they write only into the capped buffer.
@@ -381,6 +385,25 @@ mod tests {
         assert!(result.output.contains("done"));
         assert!(!result.timed_out);
         assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn kills_background_children_when_the_command_finishes() {
+        let marker = std::env::temp_dir().join(format!("neore-shell-bg-{}", std::process::id()));
+        let _ = std::fs::remove_file(&marker);
+        let result = run(
+            &format!("(sleep 1; touch '{}') & echo done", marker.display()),
+            Path::new("/"),
+            Duration::from_secs(10),
+            1024,
+            None,
+        )
+        .unwrap();
+
+        thread::sleep(Duration::from_millis(1500));
+
+        assert!(result.output.contains("done"));
+        assert!(!marker.exists());
     }
 
     #[test]

@@ -237,6 +237,24 @@ mod tests {
     }
 
     #[test]
+    fn deny_all_releases_a_waiting_prompt_as_a_denial() {
+        let prompts = Arc::new(Prompts::default());
+        let waiting = {
+            let prompts = prompts.clone();
+
+            thread::spawn(move || prompts.ask(call(true), 0, Duration::from_secs(5), |_| {}))
+        };
+
+        while prompts.current().is_none() {
+            thread::sleep(Duration::from_millis(5));
+        }
+
+        prompts.deny_all();
+
+        assert_eq!(waiting.join().unwrap(), Answer::Deny);
+    }
+
+    #[test]
     fn times_out_to_a_denial() {
         let prompts = Prompts::default();
 
