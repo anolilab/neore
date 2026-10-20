@@ -67,6 +67,8 @@ const MENU_WIDTH = 340;
 
 /** Chats shown in the menu; typing narrows them. */
 const MAX_CHAT_SUGGESTIONS = 5;
+/** Rows a typed chat search asks the server for: well past the suggestions shown, so a title match is not cut off by a busier one. */
+const SEARCHED_CHAT_ROWS = 50;
 
 // ============================================================================
 // Helpers
@@ -130,14 +132,24 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
 
     const isOpen = match !== null;
 
-    // The sidebar already holds this list (same query key), so opening the menu costs no request.
+    // The sidebar already holds this list (same query key), so opening the menu costs no request. It is one page, so a typed
+    // search goes to the server instead: a chat older than that page is still found by its title.
     const { lunora: threads } = useAllThreadsData(isOpen && onSelectChat !== undefined);
+    const chatSearch = (searchQuery || match?.query || "").trim();
+    const crpc = useCRPC();
+    const { data: searchedThreads } = useQuery(
+        crpc.chat.functions.searchThreads.queryOptions(
+            isOpen && onSelectChat !== undefined && chatSearch
+                ? { excludeTemporary: true, paginationOpts: { cursor: null, endCursor: null, numItems: SEARCHED_CHAT_ROWS }, searchQuery: chatSearch }
+                : skipToken,
+            { live: false },
+        ),
+    );
     const filteredChats = useMemo(() => {
-        const query = (searchQuery || match?.query || "").toLowerCase();
-        const chats = mentionableChats(threads, currentThreadId);
+        const chats = mentionableChats(chatSearch && searchedThreads ? searchedThreads.page : threads, currentThreadId);
 
-        return (query ? chats.filter((chat) => chat.title.toLowerCase().includes(query)) : chats).slice(0, MAX_CHAT_SUGGESTIONS);
-    }, [threads, currentThreadId, match?.query, searchQuery]);
+        return chats.slice(0, MAX_CHAT_SUGGESTIONS);
+    }, [threads, searchedThreads, chatSearch, currentThreadId]);
 
     // Total items: participants + 1 for "Upload new file" + filtered files + chats
     const totalItems = participantCount + filteredFiles.length + filteredChats.length + 1;
