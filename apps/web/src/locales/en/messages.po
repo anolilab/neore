@@ -9824,7 +9824,6 @@ msgstr "Enhanced visual style adaptation"
 msgid "enhancement"
 msgstr "enhancement"
 
-#: ../../packages/ui/src/components/chat-markdown.tsx:129
 #: ../../packages/ui/src/components/chat-markdown.tsx:110
 msgid "Enlarge table"
 msgstr "Enlarge table"
@@ -24687,7 +24686,6 @@ msgstr "Show {name} in model picker"
 msgid "Show {remainingCount} more"
 msgstr "Show {remainingCount} more"
 
-#: ../../packages/ui/src/components/chat-markdown.tsx:102
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"
 msgstr "Show all {lines} lines"
@@ -24727,7 +24725,6 @@ msgstr "Show keyboard shortcuts"
 msgid "Show Labels"
 msgstr "Show Labels"
 
-#: ../../packages/ui/src/components/chat-markdown.tsx:102
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:196
 msgid "Show less"
@@ -26617,8 +26614,6 @@ msgstr "System Prompts"
 msgid "System UI"
 msgstr "System UI"
 
-#: ../../packages/ui/src/components/chat-markdown.tsx:134
-#: ../../packages/ui/src/components/chat-markdown.tsx:135
 #: ../../packages/ui/src/components/chat-markdown.tsx:115
 #: ../../packages/ui/src/components/chat-markdown.tsx:116
 msgid "Table"

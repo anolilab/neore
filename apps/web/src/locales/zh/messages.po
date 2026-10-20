@@ -9825,7 +9825,6 @@ msgstr "增强的视觉风格适配"
 msgid "enhancement"
 msgstr "增强"
 
-#: ../../packages/ui/src/components/chat-markdown.tsx:129
 #: ../../packages/ui/src/components/chat-markdown.tsx:110
 msgid "Enlarge table"
 msgstr ""
@@ -24688,7 +24687,6 @@ msgstr ""
 msgid "Show {remainingCount} more"
 msgstr "再显示 {remainingCount} 个"
 
-#: ../../packages/ui/src/components/chat-markdown.tsx:102
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"
 msgstr ""
@@ -24728,7 +24726,6 @@ msgstr "显示键盘快捷键"
 msgid "Show Labels"
 msgstr "显示标签"
 
-#: ../../packages/ui/src/components/chat-markdown.tsx:102
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:196
 msgid "Show less"
@@ -26618,8 +26615,6 @@ msgstr "系统提示词"
 msgid "System UI"
 msgstr ""
 
-#: ../../packages/ui/src/components/chat-markdown.tsx:134
-#: ../../packages/ui/src/components/chat-markdown.tsx:135
 #: ../../packages/ui/src/components/chat-markdown.tsx:115
 #: ../../packages/ui/src/components/chat-markdown.tsx:116
 msgid "Table"
