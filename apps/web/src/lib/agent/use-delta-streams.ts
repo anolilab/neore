@@ -8,7 +8,6 @@ import { useState } from "react";
 import { shardOptionsFor } from "@/lib/lunora/shard-routing";
 import { withUnlockProof } from "@/lib/lunora/unlock-proofs";
 
-import { assert } from "./type-utilities";
 import type { StreamQuery, StreamQueryArgs } from "./types";
 
 ("use client");
@@ -131,26 +130,31 @@ const useDeltaStreams = <Query extends StreamQuery<any> = StreamQuery<object>>(
 
     if (streamMessages) {
         const newDeltasByStreamId = new Map<string, StreamDelta[]>();
+        // Streams whose deltas left a hole: drop what we hold and re-fetch from the start.
+        const resetStreamIds = new Set<string>();
 
         if (newDeltas?.length) {
             for (const delta of newDeltas) {
                 const oldCursor = cursors[delta.streamId];
 
-                if (oldCursor && delta.start < oldCursor) continue;
+                if (resetStreamIds.has(delta.streamId) || (oldCursor && delta.start < oldCursor)) {
+                    continue;
+                }
 
                 const existing = newDeltasByStreamId.get(delta.streamId);
+                const expectedStart = existing ? existing.at(-1)?.end : oldCursor;
+                const isGap = existing ? expectedStart !== delta.start : Boolean(oldCursor) && oldCursor !== delta.start;
 
-                if (existing) {
-                    const lastDelta = existing.at(-1);
-                    const previousEnd = lastDelta?.end;
+                if (isGap) {
+                    if (import.meta.env.DEV) {
+                        console.warn(`Gap found in deltas for ${delta.streamId}: expected ${expectedStart}, got ${delta.start}; refetching`);
+                    }
 
-                    assert(previousEnd === delta.start, `Gap found in deltas for ${delta.streamId} jumping to ${delta.start} from ${previousEnd}`);
+                    newDeltasByStreamId.delete(delta.streamId);
+                    resetStreamIds.add(delta.streamId);
+                } else if (existing) {
                     existing.push(delta);
                 } else {
-                    assert(
-                        !oldCursor || oldCursor === delta.start,
-                        `Gap found - first delta after ${oldCursor} is ${delta.start} for stream ${delta.streamId}`,
-                    );
                     newDeltasByStreamId.set(delta.streamId, [delta]);
                 }
             }
@@ -160,7 +164,7 @@ const useDeltaStreams = <Query extends StreamQuery<any> = StreamQuery<object>>(
         let isCursorsChanged = false;
 
         for (const { streamId } of streamMessages) {
-            const cursor = newDeltasByStreamId.get(streamId)?.at(-1)?.end ?? cursors[streamId];
+            const cursor = resetStreamIds.has(streamId) ? 0 : (newDeltasByStreamId.get(streamId)?.at(-1)?.end ?? cursors[streamId]);
 
             if (cursor !== undefined) {
                 newCursors[streamId] = cursor;
@@ -188,6 +192,11 @@ const useDeltaStreams = <Query extends StreamQuery<any> = StreamQuery<object>>(
             const { streamId } = streamMessage;
             const old = state.deltaStreams?.find((ds) => ds.streamMessage.streamId === streamId);
             const streamDeltas = newDeltasByStreamId.get(streamId);
+            const isReset = resetStreamIds.has(streamId);
+
+            if (isReset) {
+                return { deltas: [], streamMessage };
+            }
 
             if (!streamDeltas && streamMessage === old?.streamMessage) {
                 return old;
