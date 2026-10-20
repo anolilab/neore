@@ -27,11 +27,11 @@ msgstr "- {0, plural, one {# linha} other {# linhas}}, {1, plural, one {# coluna
 
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:557
 msgid "-- INSERT --"
-msgstr ""
+msgstr "-- INSERIR --"
 
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:557
 msgid "-- NORMAL --"
-msgstr ""
+msgstr "-- NORMAL --"
 
 #: src/features/notifications/components/notification-list.tsx:107
 msgid ", unread"
@@ -4967,7 +4967,7 @@ msgstr "O ChatGPT oferece uma família de modelos. O Neore oferece mais de 30 mo
 
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:390
 msgid "Chats"
-msgstr ""
+msgstr "Conversas"
 
 #: src/features/knowledge/components/project-knowledge-collections.tsx:49
 msgid "Chats in this project search these collections and cite them."
@@ -6468,7 +6468,7 @@ msgstr "Taxa de contraste"
 #: src/features/settings/components/chat/model-filter-settings.tsx:364
 #: src/features/appearance/components/appearance-controls.tsx:211
 msgid "Contrast updated"
-msgstr ""
+msgstr "Contraste atualizado"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:385
 msgid "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
@@ -6796,7 +6796,7 @@ msgstr "Não foi possível aplicar as alterações"
 
 #: src/features/chat/thread/composer-input.tsx:1006
 msgid "Could not attach the chat"
-msgstr ""
+msgstr "Não foi possível anexar a conversa"
 
 #: src/features/chat/thread/sandbox-files.tsx:294
 msgid "could not be saved"
@@ -6943,7 +6943,7 @@ msgstr "Não foi possível baixar {0}: {1}"
 
 #: src/features/chat/thread/composer-input.tsx:1009
 msgid "Could not read that chat. If it is locked, unlock it first."
-msgstr ""
+msgstr "Não foi possível ler essa conversa. Se estiver bloqueada, desbloqueie-a primeiro."
 
 #: src/features/skills/components/skill-builder-dialog.tsx:132
 msgid "Could not refine the draft. Try again."
@@ -12302,7 +12302,7 @@ msgstr "Distância focal"
 
 #: src/features/appearance/components/appearance-controls.tsx:97
 msgid "Follow my system (default)"
-msgstr ""
+msgstr "Seguir o sistema (padrão)"
 
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:130
 msgid "Follow these steps to connect your {platform} account."
@@ -13791,11 +13791,11 @@ msgstr "Alta qualidade de código graças ao treinamento especializado da Alibab
 
 #: src/features/appearance/components/appearance-controls.tsx:99
 msgid "High contrast"
-msgstr ""
+msgstr "Alto contraste"
 
 #: src/features/appearance/components/appearance-controls.tsx:201
 msgid "High contrast uses black and white text, stronger borders and a heavier focus ring. By default it follows your system's contrast setting."
-msgstr ""
+msgstr "O alto contraste usa texto preto e branco, bordas mais fortes e um anel de foco mais grosso. Por padrão, segue a configuração de contraste do sistema."
 
 #: src/features/marketing/data/models-data.ts:249
 msgid "High level of creative control"
@@ -19075,7 +19075,7 @@ msgstr "Observação: os módulos são aplicados por conversa, não por mensagem
 
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:418
 msgid "Nothing found"
-msgstr ""
+msgstr "Nada encontrado"
 
 #: src/features/devices/components/devices-settings.tsx:127
 msgid "Nothing has run on a device yet."
@@ -21250,7 +21250,7 @@ msgstr "Pressione Enter para enviar, Shift+Enter para nova linha"
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:229
 #: src/features/settings/components/account/account-settings.tsx:455
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
-msgstr ""
+msgstr "Pressione Escape para sair do modo de digitação e editar com h j k l, w b, 0 $, i a I A, o O, x, dd, D e u. Enter continua enviando. Desativado por padrão."
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:223
 msgid "Press keys..."
@@ -24005,7 +24005,7 @@ msgstr "Pesquisar campos..."
 
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:302
 msgid "Search files and chats..."
-msgstr ""
+msgstr "Pesquisar arquivos e conversas..."
 
 #: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:251
 #~ msgid "Search files..."
@@ -30257,15 +30257,15 @@ msgstr "Visualizando: {selectedNodeId}"
 
 #: src/features/settings/components/account/account-settings.tsx:463
 msgid "Vim keys disabled"
-msgstr ""
+msgstr "Teclas do Vim desativadas"
 
 #: src/features/settings/components/account/account-settings.tsx:463
 msgid "Vim keys enabled"
-msgstr ""
+msgstr "Teclas do Vim ativadas"
 
 #: src/features/settings/components/account/account-settings.tsx:452
 msgid "Vim keys in the composer"
-msgstr ""
+msgstr "Teclas do Vim no compositor"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:35
 msgid "Vintage indie, chunky grain"
