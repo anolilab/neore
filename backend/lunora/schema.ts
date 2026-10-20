@@ -2883,6 +2883,10 @@ export const schema = defineSchema({
         codeLineNumbers: v.optional(v.boolean()),
         // Opt-in composer ghost-text completions (`chat/autocomplete.ts`). Absent = off.
         composerAutocompleteEnabled: v.optional(v.boolean()),
+        // Opt-in Vim keys in the chat composer. Absent = off.
+        composerVimMode: v.optional(v.boolean()),
+        // Appearance: contrast mode (accepted values: `auth/fields.ts`). Absent = follow the system.
+        contrast: v.optional(v.string()),
         customInstructions: v.optional(v.string()),
         // Opt-in morning summary (`notifications/daily-brief.ts`). Absent = off.
         dailyBriefEnabled: v.optional(v.boolean()),

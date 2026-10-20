@@ -7,24 +7,30 @@
  * Selecting a vault file attaches it to the message. Also offers an
  * "Upload new file" option that opens the file picker.
  *
+ * Also offers your recent chats (never a locked one): picking one attaches
+ * its text, so you can ask about it here.
+ *
  * In a group-chat thread the participants come first: picking one inserts
  * `@<slug> `, which makes that participant answer (`chat/group/` backend).
  */
 
 import { useLingui } from "@lingui/react/macro";
 import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandInput, CommandItem, CommandList, CommandSeparator } from "@neore/ui/components/command";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { FileIcon, FileImage, FileText, UploadIcon } from "lucide-react";
+import { FileIcon, FileImage, FileText, MessageSquareIcon, UploadIcon } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
+import useAllThreadsData from "@/features/chat/core/hooks/use-all-threads-data";
 import { SpeakerAvatar } from "@/features/chat/group/speaker-label";
 import { useRouteGroupChat } from "@/features/chat/group/use-group-chat";
 import { formatFileSize } from "@/features/vault/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import type { ChatReference } from "../chat-reference";
+import { mentionableChats } from "../chat-reference";
 import type { FileMentionMatch } from "./extensions/file-mention";
 
 // ============================================================================
@@ -40,6 +46,8 @@ export interface VaultFileRef {
 }
 
 interface FileMentionPopupProps {
+    /** The chat being typed into; it is not offered as a reference */
+    currentThreadId?: string;
     /** Rect of the editor element for positioning */
     editorRect: DOMRect | null;
     match: FileMentionMatch | null;
@@ -47,6 +55,8 @@ interface FileMentionPopupProps {
     onDismiss: () => void;
     /** Called to replace the @ text range in the editor */
     onReplace: (from: number, to: number, replacement: string) => void;
+    /** Called when a chat is selected, to attach its text */
+    onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected */
     onSelectFileUpload?: () => void;
     /** Called when a vault file is selected for attachment */
@@ -54,6 +64,11 @@ interface FileMentionPopupProps {
 }
 
 const MENU_WIDTH = 340;
+
+/** Chats shown in the menu; typing narrows them. */
+const MAX_CHAT_SUGGESTIONS = 5;
+/** Rows a typed chat search asks the server for: well past the suggestions shown, so a title match is not cut off by a busier one. */
+const SEARCHED_CHAT_ROWS = 50;
 
 // ============================================================================
 // Helpers
@@ -75,11 +90,23 @@ const getFileTypeIcon = (fileType: string) => {
 // Main Component
 // ============================================================================
 
-const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDismiss, onReplace, onSelectFileUpload, onSelectVaultFile }) => {
+const FileMentionPopup: FC<FileMentionPopupProps> = ({
+    currentThreadId,
+    editorRect,
+    match,
+    onDismiss,
+    onReplace,
+    onSelectChat,
+    onSelectFileUpload,
+    onSelectVaultFile,
+}) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [searchQuery, setSearchQuery] = useState("");
+    // Until the field is typed in, the query is the @ trigger's; once it is, the field is the query, even when cleared.
+    const [searchEdited, setSearchEdited] = useState(false);
+    const activeQuery = searchEdited ? searchQuery : (match?.query ?? "");
 
     // Fetch vault files — once an @-mention opens the popup, not on first paint
     // (the editor mounts this popup permanently; see `e2e/first-paint.e2e.test.ts`).
@@ -87,29 +114,57 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDism
 
     // Filter files by query (from @ trigger or search input)
     const filteredFiles = useMemo(() => {
-        const query = (searchQuery || match?.query || "").toLowerCase();
+        const query = activeQuery.toLowerCase();
 
         if (!query) {
             return vaultFiles;
         }
 
         return vaultFiles.filter((f) => f.fileName.toLowerCase().includes(query) || f.fileType.toLowerCase().includes(query));
-    }, [vaultFiles, match?.query, searchQuery]);
+    }, [vaultFiles, activeQuery]);
 
     // Group chat: participants that can be @mentioned, filtered like the files.
     const groupChat = useRouteGroupChat();
     const filteredParticipants = useMemo(() => {
-        const query = (searchQuery || match?.query || "").toLowerCase();
+        const query = activeQuery.toLowerCase();
         const available = (groupChat?.participants ?? []).filter((p) => p.available && p.slug);
 
         return query ? available.filter((p) => p.slug.includes(query) || p.name.toLowerCase().includes(query)) : available;
-    }, [groupChat, match?.query, searchQuery]);
+    }, [groupChat, activeQuery]);
     const participantCount = filteredParticipants.length;
 
-    // Total items: participants + 1 for "Upload new file" + filtered files
-    const totalItems = participantCount + filteredFiles.length + 1;
-
     const isOpen = match !== null;
+
+    // The sidebar already holds this list (same query key), so opening the menu costs no request. It is one page, so a typed
+    // search goes to the server instead: a chat older than that page is still found by its title.
+    const { lunora: threads } = useAllThreadsData(isOpen && onSelectChat !== undefined);
+    const chatSearch = activeQuery.trim();
+    // The previous result stays while a new keystroke's search loads. Until a search has answered, the loaded page is filtered by title here.
+    const {
+        data: searchedThreads,
+        isError: searchFailed,
+        isPlaceholderData,
+    } = useQuery({
+        ...crpc.chat.functions.searchThreads.queryOptions(
+            isOpen && onSelectChat !== undefined && chatSearch
+                ? { excludeTemporary: true, paginationOpts: { cursor: null, endCursor: null, numItems: SEARCHED_CHAT_ROWS }, searchQuery: chatSearch }
+                : skipToken,
+            { live: false },
+        ),
+        placeholderData: keepPreviousData,
+    });
+    const filteredChats = useMemo(() => {
+        const query = chatSearch.toLowerCase();
+        const pending = threads.filter((thread) => thread.title?.toLowerCase().includes(query));
+        // Only the answer to the query now typed: the previous one (kept while this one loads) and a failed search do not count.
+        const answered = searchedThreads && !isPlaceholderData && !searchFailed ? searchedThreads.page : undefined;
+        const chats = mentionableChats(chatSearch ? (answered ?? pending) : threads, currentThreadId);
+
+        return chats.slice(0, MAX_CHAT_SUGGESTIONS);
+    }, [threads, searchedThreads, isPlaceholderData, searchFailed, chatSearch, currentThreadId]);
+
+    // Total items: participants + 1 for "Upload new file" + filtered files + chats
+    const totalItems = participantCount + filteredFiles.length + filteredChats.length + 1;
 
     // Reset the highlighted row whenever the list length changes, and clear the search once the
     // popup closes. Adjusting during render (rather than in an effect) avoids painting a frame
@@ -121,8 +176,9 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDism
         setSelectedIndex(0);
     }
 
-    if (!match && searchQuery !== "") {
+    if (!match && (searchQuery !== "" || searchEdited)) {
         setSearchQuery("");
+        setSearchEdited(false);
     }
 
     // Handle vault file selection
@@ -139,6 +195,20 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDism
             onDismiss();
         },
         [match, onReplace, onSelectVaultFile, onDismiss],
+    );
+
+    const handleSelectChat = useCallback(
+        (chat: ChatReference) => {
+            if (!match) {
+                return;
+            }
+
+            onReplace(match.from, match.to, "");
+            onSelectChat?.(chat);
+            setSearchQuery("");
+            onDismiss();
+        },
+        [match, onReplace, onSelectChat, onDismiss],
     );
 
     // Insert the participant's handle in place of the typed `@query`.
@@ -190,11 +260,17 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDism
             } else if (selectedIndex === participantCount) {
                 // "Upload new file" follows the participants
                 handleUploadNew();
-            } else {
+            } else if (selectedIndex <= participantCount + filteredFiles.length) {
                 const file = filteredFiles[selectedIndex - participantCount - 1];
 
                 if (file) {
                     handleSelectFile(file);
+                }
+            } else {
+                const chat = filteredChats[selectedIndex - participantCount - filteredFiles.length - 1];
+
+                if (chat) {
+                    handleSelectChat(chat);
                 }
             }
         } else if (event.key === "Escape") {
@@ -247,8 +323,17 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDism
                 )}
                 style={{ width: MENU_WIDTH }}
             >
-                <Command>
-                    <CommandInput onChange={(e) => setSearchQuery(e.target.value)} placeholder={t`Search files...`} value={searchQuery} />
+                {/* Filtering happens above (per list, on the title and the server search); the Command's own filter would hide a chat
+                    matched by its summary while the keyboard index still counted it. */}
+                <Command filter={null}>
+                    <CommandInput
+                        onChange={(e) => {
+                            setSearchEdited(true);
+                            setSearchQuery(e.target.value);
+                        }}
+                        placeholder={t`Search files and chats...`}
+                        value={searchQuery}
+                    />
                     <CommandList className="max-h-[300px]">
                         {/* Group chat participants - first, when the thread has them */}
                         {participantCount > 0 && (
@@ -257,6 +342,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDism
                                     <CommandGroupLabel>{t`Participants`}</CommandGroupLabel>
                                     {filteredParticipants.map((participant, index) => (
                                         <CommandItem
+                                            aria-selected={index === selectedIndex}
                                             className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={participant.skillId}
                                             onClick={(e) => {
@@ -283,6 +369,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDism
                         <CommandGroup>
                             <CommandGroupLabel>{t`Actions`}</CommandGroupLabel>
                             <CommandItem
+                                aria-selected={selectedIndex === participantCount}
                                 className={clsx("transition-colors", selectedIndex === participantCount && "bg-accent text-accent-foreground")}
                                 onClick={(e) => {
                                     e.preventDefault();
@@ -308,6 +395,7 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDism
 
                                     return (
                                         <CommandItem
+                                            aria-selected={participantCount + index + 1 === selectedIndex}
                                             className={clsx(
                                                 "transition-colors",
                                                 participantCount + index + 1 === selectedIndex && "bg-accent text-accent-foreground",
@@ -332,11 +420,41 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({ editorRect, match, onDism
                             </CommandGroup>
                         )}
 
-                        {filteredFiles.length === 0 && searchQuery && (
+                        {filteredChats.length > 0 && (
+                            <>
+                                {filteredFiles.length > 0 && <CommandSeparator />}
+                                <CommandGroup>
+                                    <CommandGroupLabel>{t`Chats`}</CommandGroupLabel>
+                                    {filteredChats.map((chat, index) => (
+                                        <CommandItem
+                                            aria-selected={participantCount + filteredFiles.length + index + 1 === selectedIndex}
+                                            className={clsx(
+                                                "transition-colors",
+                                                participantCount + filteredFiles.length + index + 1 === selectedIndex && "bg-accent text-accent-foreground",
+                                            )}
+                                            key={chat.id}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                handleSelectChat(chat);
+                                            }}
+                                            // The title is in the value so the popup's own search matches it; the id keeps it unique.
+                                            value={`${chat.title} chat:${chat.id}`}
+                                        >
+                                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                                                <MessageSquareIcon aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
+                                                <span className="block truncate text-sm font-medium">{chat.title}</span>
+                                            </div>
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </>
+                        )}
+
+                        {filteredFiles.length === 0 && filteredChats.length === 0 && activeQuery && (
                             <CommandEmpty>
                                 <div className="flex flex-col items-center gap-2 py-6">
                                     <FileIcon className="text-muted-foreground size-8" />
-                                    <p className="text-muted-foreground text-sm">{t`No files found`}</p>
+                                    <p className="text-muted-foreground text-sm">{t`Nothing found`}</p>
                                 </div>
                             </CommandEmpty>
                         )}

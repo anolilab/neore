@@ -5,7 +5,7 @@ import { persist } from "zustand/middleware";
 
 import type { AccentId } from "@/features/appearance/lib/accent-presets";
 import type { CodeHighlightThemeId, MermaidThemeId } from "@/features/appearance/lib/code-themes";
-import type { DensityId, MainFontId } from "@/features/appearance/lib/display-preferences";
+import type { ContrastId, DensityId, MainFontId } from "@/features/appearance/lib/display-preferences";
 
 const platformModifier = "ctrl";
 
@@ -38,6 +38,8 @@ export type AppearanceSettings = {
     codeHighlightTheme: CodeHighlightThemeId;
     /** Absent means off. */
     codeLineNumbers?: boolean;
+    /** Absent means `system`: follow the OS `prefers-contrast: more` setting. */
+    contrast?: ContrastId;
     density: DensityId;
     mainFont: MainFontId;
     mermaidTheme: MermaidThemeId;

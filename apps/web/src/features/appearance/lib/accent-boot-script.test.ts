@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ACCENT_ATTRIBUTE, ACCENT_BOOT_SCRIPT, applyAccentAttribute, UI_STATE_STORAGE_KEY } from "./accent-boot-script";
-import { DENSITY_ATTRIBUTE, FONT_ATTRIBUTE } from "./display-preferences";
+import { CONTRAST_ATTRIBUTE, DENSITY_ATTRIBUTE, FONT_ATTRIBUTE, PREFERS_MORE_CONTRAST_QUERY } from "./display-preferences";
 
 const runBootScript = (): void => {
     // eslint-disable-next-line sonarjs/code-eval -- runs the inline script exactly as the browser would
@@ -18,6 +18,55 @@ describe("accent boot script", () => {
         document.documentElement.removeAttribute(ACCENT_ATTRIBUTE);
         document.documentElement.removeAttribute(DENSITY_ATTRIBUTE);
         document.documentElement.removeAttribute(FONT_ATTRIBUTE);
+        document.documentElement.removeAttribute(CONTRAST_ATTRIBUTE);
+        vi.unstubAllGlobals();
+    });
+
+    describe("contrast", () => {
+        const systemPrefersMore = (matches: boolean) => {
+            vi.stubGlobal("matchMedia", (query: string) => {
+                return { matches: matches && query.includes("prefers-contrast: more") };
+            });
+        };
+
+        it("hard-codes the contrast literals the script writes, so they cannot drift from the constants", () => {
+            expect(ACCENT_BOOT_SCRIPT).toContain(`matchMedia("${PREFERS_MORE_CONTRAST_QUERY}")`);
+            expect(ACCENT_BOOT_SCRIPT).toContain(`setAttribute("${CONTRAST_ATTRIBUTE}","high")`);
+        });
+
+        it("applies a stored high choice whatever the system says", () => {
+            systemPrefersMore(false);
+            store({ contrast: "high" });
+            runBootScript();
+
+            expect(document.documentElement.getAttribute(CONTRAST_ATTRIBUTE)).toBe("high");
+        });
+
+        it("follows the system when nothing is stored or `system` is", () => {
+            systemPrefersMore(true);
+            runBootScript();
+            expect(document.documentElement.getAttribute(CONTRAST_ATTRIBUTE)).toBe("high");
+
+            document.documentElement.removeAttribute(CONTRAST_ATTRIBUTE);
+            store({ contrast: "system" });
+            runBootScript();
+            expect(document.documentElement.getAttribute(CONTRAST_ATTRIBUTE)).toBe("high");
+        });
+
+        it("lets an explicit standard choice beat the system", () => {
+            systemPrefersMore(true);
+            store({ contrast: "standard" });
+            runBootScript();
+
+            expect(document.documentElement.hasAttribute(CONTRAST_ATTRIBUTE)).toBe(false);
+        });
+
+        it("stays off without the system preference or a choice", () => {
+            systemPrefersMore(false);
+            runBootScript();
+
+            expect(document.documentElement.hasAttribute(CONTRAST_ATTRIBUTE)).toBe(false);
+        });
     });
 
     it("applies stored density and font before hydration, and skips the defaults", () => {

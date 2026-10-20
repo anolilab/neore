@@ -17,10 +17,11 @@ import type { AccentId } from "../lib/accent-presets";
 import { ACCENT_PRESETS, isAccentId } from "../lib/accent-presets";
 import type { CodeHighlightThemeId, MermaidThemeId } from "../lib/code-themes";
 import { CODE_HIGHLIGHT_THEME_IDS, isCodeHighlightThemeId, isMermaidThemeId, MERMAID_THEME_IDS } from "../lib/code-themes";
-import type { DensityId, MainFontId } from "../lib/display-preferences";
-import { isDensityId, isMainFontId } from "../lib/display-preferences";
+import type { ContrastId, DensityId, MainFontId } from "../lib/display-preferences";
+import { DEFAULT_CONTRAST, isContrastId, isDensityId, isMainFontId } from "../lib/display-preferences";
 
 const ACCENT_LABEL_ID = "accent-color-label";
+const CONTRAST_LABEL_ID = "ui-contrast-label";
 const DENSITY_LABEL_ID = "ui-density-label";
 const FONT_LABEL_ID = "ui-font-label";
 
@@ -77,6 +78,7 @@ const AppearanceControls: FC = () => {
         capLongCodeBlocks,
         codeHighlightTheme,
         codeLineNumbers,
+        contrast,
         density,
         mainFont,
         mermaidTheme,
@@ -84,10 +86,20 @@ const AppearanceControls: FC = () => {
         setCapLongCodeBlocks,
         setCodeHighlightTheme,
         setCodeLineNumbers,
+        setContrast,
         setDensity,
         setMainFont,
         setMermaidTheme,
     } = useAppearanceSettings();
+
+    const contrastOptions = useMemo<{ id: ContrastId; label: string }[]>(
+        () => [
+            { id: "system", label: t`Follow my system (default)` },
+            { id: "standard", label: t`Standard` },
+            { id: "high", label: t`High contrast` },
+        ],
+        [t],
+    );
 
     const densityOptions = useMemo<{ id: DensityId; label: string }[]>(
         () => [
@@ -180,6 +192,27 @@ const AppearanceControls: FC = () => {
                         </label>
                     ))}
                 </RadioGroup>
+            </div>
+            <div className="space-y-2">
+                <Label className="text-base font-medium" id={CONTRAST_LABEL_ID}>
+                    {t`Contrast`}
+                </Label>
+                <p className="text-muted-foreground text-sm">
+                    {t`High contrast uses black and white text, stronger borders and a heavier focus ring. By default it follows your system's contrast setting.`}
+                </p>
+                <ChoiceRadioGroup
+                    labelId={CONTRAST_LABEL_ID}
+                    onChange={(value) => {
+                        if (!isContrastId(value)) {
+                            return;
+                        }
+
+                        setContrast(value);
+                        toast.success(t`Contrast updated`);
+                    }}
+                    options={contrastOptions}
+                    value={contrast ?? DEFAULT_CONTRAST}
+                />
             </div>
             <div className="space-y-2">
                 <Label className="text-base font-medium" id={DENSITY_LABEL_ID}>

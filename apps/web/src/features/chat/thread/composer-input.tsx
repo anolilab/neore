@@ -16,6 +16,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { formatNumber } from "@neore/ui/utils/locale-format";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -42,8 +43,11 @@ import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { trackEvent } from "@/lib/analytics";
+import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
+import type { ChatReference } from "./chat-reference";
+import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
@@ -51,6 +55,7 @@ import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
+import { readChatMessages } from "./read-chat-messages";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
 
@@ -401,6 +406,8 @@ const ComposerInput = ({
     const { cancelStream, jwtToken, sendMessage } = useChatActions();
     const { isStreaming, sseStreamState } = useChatIsStreaming();
     const lunora = useChatLunora();
+    const crpc = useCRPC();
+    const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
     const requestCompletion = useComposerAutocomplete();
@@ -940,6 +947,48 @@ const ComposerInput = ({
         mentionFileInputRef.current?.click();
     }, []);
 
+    // Attach a file the composer generated (converted text, a referenced chat) and upload it like any other.
+    // Uploads `file` into an attachment that already exists, so it is pending (and blocks sending) from the moment it is added.
+    const uploadGeneratedFile = useCallback(
+        async (attachmentId: string, file: File, failureLabel: string): Promise<boolean> => {
+            try {
+                // Store the bytes with the status so the chip and the context-size estimate see the content, not a placeholder.
+                updateAttachment(attachmentId, { file, status: "uploading" });
+
+                const result = await attachmentAdapter.upload({
+                    file,
+                    onProgress: (progress) => {
+                        updateAttachment(attachmentId, { progress });
+                    },
+                });
+
+                const fileId = getAttachmentFileId(result);
+
+                updateAttachment(attachmentId, {
+                    fileId,
+                    progress: 100,
+                    status: "complete",
+                });
+
+                return true;
+            } catch (error) {
+                console.error("Failed to attach generated file:", error);
+                updateAttachment(attachmentId, {
+                    error: errorMessage(error, failureLabel, describeUploadError),
+                    status: "error",
+                });
+
+                return false;
+            }
+        },
+        [attachmentAdapter, updateAttachment, describeUploadError],
+    );
+
+    const attachGeneratedFile = useCallback(
+        async (file: File, failureLabel: string): Promise<boolean> => await uploadGeneratedFile(addAttachment(file), file, failureLabel),
+        [addAttachment, uploadGeneratedFile],
+    );
+
     // Convert long text to attachment
     const handleConvertToAttachment = useCallback(async () => {
         if (!text.trim()) {
@@ -951,37 +1000,38 @@ const ComposerInput = ({
         const timestamp = new Date().toISOString().split("T", 1)[0];
         const file = new File([blob], `text-input-${timestamp}.txt`, { type: "text/plain" });
 
-        // Add as attachment
-        const attachmentId = addAttachment(file);
+        // Clear the text after successful conversion
+        if (await attachGeneratedFile(file, t`Conversion failed`)) {
+            setText("");
+        }
+    }, [text, attachGeneratedFile, setText, t]);
 
-        try {
+    // "@" a chat: read it through the thread view's own query (so the usual access and lock checks apply), then attach its text.
+    // The attachment is added and pending before the read, so a message sent meanwhile waits for it instead of leaving the chat out.
+    const handleSelectChat = useCallback(
+        async (chat: ChatReference) => {
+            const fileName = chatReferenceFileName(chat.title);
+            const attachmentId = addAttachment(new File([], fileName, { type: "text/plain" }));
+
             updateAttachment(attachmentId, { status: "uploading" });
 
-            const result = await attachmentAdapter.upload({
-                file,
-                onProgress: (progress) => {
-                    updateAttachment(attachmentId, { progress });
-                },
-            });
+            try {
+                // The thread view's query, through the cRPC factory: the unlock proof and shard routing apply to this read too.
+                const messages = await readChatMessages(
+                    (args) => queryClient.fetchQuery({ ...crpc.chat.functions.getThreadUIMessages.queryOptions(args, { live: false }), staleTime: 0 }),
+                    chat.id,
+                );
+                const transcript = buildChatTranscript(chat.title, messages);
 
-            const fileId = getAttachmentFileId(result);
-
-            updateAttachment(attachmentId, {
-                fileId,
-                progress: 100,
-                status: "complete",
-            });
-
-            // Clear the text after successful conversion
-            setText("");
-        } catch (error) {
-            console.error("Failed to convert text to attachment:", error);
-            updateAttachment(attachmentId, {
-                error: errorMessage(error, t`Conversion failed`, describeUploadError),
-                status: "error",
-            });
-        }
-    }, [text, addAttachment, attachmentAdapter, updateAttachment, setText, t, describeUploadError]);
+                await uploadGeneratedFile(attachmentId, new File([transcript], fileName, { type: "text/plain" }), t`Could not attach the chat`);
+            } catch (error) {
+                console.error("Failed to read the referenced chat:", error);
+                updateAttachment(attachmentId, { error: t`Could not read that chat`, status: "error" });
+                showError(t`Could not read that chat. If it is locked, unlock it first.`);
+            }
+        },
+        [crpc, queryClient, addAttachment, updateAttachment, uploadGeneratedFile, t],
+    );
 
     // Handle attachment file update (for editing)
     const handleAttachmentUpdate = useCallback(
@@ -1125,7 +1175,9 @@ const ComposerInput = ({
                     )
                 }
                 canQueueWhileStreaming={isThreadComposer && !isComparisonValid}
+                currentThreadId={threadId}
                 disabled={disabled || isComparisonLoading}
+                isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}
                 maxRows={maxRows}
@@ -1136,6 +1188,7 @@ const ComposerInput = ({
                 onDraw={compact ? undefined : onOpenDraw}
                 onHistoryNavigate={isThreadComposer ? promptHistory.navigate : undefined}
                 onPaste={compact ? undefined : handlePaste}
+                onSelectChat={compact ? undefined : handleSelectChat}
                 onSelectFileUpload={compact ? undefined : handleSelectFileUpload}
                 onSelectVaultFile={compact ? undefined : handleSelectVaultFile}
                 onSubmit={handleSubmit}

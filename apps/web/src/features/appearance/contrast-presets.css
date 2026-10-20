@@ -1,0 +1,223 @@
+/* Unlayered on purpose: these must beat the theme tokens and the accent presets, as accent-presets.css does. */
+/* eslint-disable css/use-layers */
+
+/*
+ * High contrast (`data-contrast="high"` on <html>, see features/appearance/lib/display-preferences.ts).
+ * Text pairs reach WCAG 7:1 (AAA) and borders, inputs and focus rings 4.5:1 (1.4.11 asks for 3:1);
+ * contrast-presets.test.ts computes every pair below. Imported after accent-presets.css so the
+ * ring colour wins over an accent's; the accent's own --primary is left alone.
+ */
+
+:root[data-contrast="high"] {
+    --background: #ffffff;
+    --foreground: #000000;
+    --card: #ffffff;
+    --card-foreground: #000000;
+    --popover: #ffffff;
+    --popover-foreground: #000000;
+    --secondary: #f2f2f2;
+    --secondary-foreground: #000000;
+    --muted: #f2f2f2;
+    --muted-foreground: #333333;
+    --accent: #e6e6e6;
+    --accent-foreground: #000000;
+    --destructive: #b3001b;
+    --destructive-foreground: #ffffff;
+    --border: #595959;
+    --input: #595959;
+    --ring: #000000;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #1a1a1a;
+    --sidebar-accent: #e6e6e6;
+    --sidebar-accent-foreground: #000000;
+    --sidebar-border: #595959;
+    --sidebar-ring: #000000;
+}
+
+:root.dark[data-contrast="high"] {
+    --background: #000000;
+    --foreground: #ffffff;
+    --card: #000000;
+    --card-foreground: #ffffff;
+    --popover: #000000;
+    --popover-foreground: #ffffff;
+    --secondary: #262626;
+    --secondary-foreground: #ffffff;
+    --muted: #262626;
+    --muted-foreground: #d9d9d9;
+    --accent: #333333;
+    --accent-foreground: #ffffff;
+    --destructive: #ff8a8a;
+    --destructive-foreground: #000000;
+    --border: #a6a6a6;
+    --input: #a6a6a6;
+    --ring: #ffffff;
+    --sidebar: #000000;
+    --sidebar-foreground: #f2f2f2;
+    --sidebar-accent: #333333;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #a6a6a6;
+    --sidebar-ring: #ffffff;
+}
+
+/*
+ * Much of the UI dims the theme colours with an opacity modifier (`text-muted-foreground/50`,
+ * `border-border/40`), which mixes them with transparency and undoes the tokens above.
+ * In high contrast the full token wins. Each opacity class is named in full: a substring
+ * selector also matched variants such as `placeholder:text-muted-foreground/50`, and so
+ * recoloured typed text. An element that also carries a variant (`hover:…`, `placeholder:…`)
+ * keeps its own dimming, because that variant may be the only cue it has. Hard-coded palette
+ * colours (some badges) are not adjusted.
+ */
+:root[data-contrast="high"]
+    :is(
+        .text-muted-foreground\/20,
+        .text-muted-foreground\/25,
+        .text-muted-foreground\/30,
+        .text-muted-foreground\/40,
+        .text-muted-foreground\/50,
+        .text-muted-foreground\/60,
+        .text-muted-foreground\/70,
+        .text-muted-foreground\/72,
+        .text-muted-foreground\/80
+    ):not([class*="placeholder:text-"]):not([class*="hover:text-"]):not([class*="focus:text-"]):not([class*="focus-visible:text-"]):not(
+        [class*="active:text-"]
+    ) {
+    color: var(--muted-foreground);
+}
+
+:root[data-contrast="high"]
+    :is(.border-border\/30, .border-border\/40, .border-border\/50, .border-border\/60, .border-border\/70):not([class*="hover:border-"]):not(
+        [class*="focus:border-"]
+    ):not([class*="focus-visible:border-"]):not([class*="active:border-"]) {
+    border-color: var(--border);
+}
+
+/*
+ * Windows High Contrast / forced colours: the browser replaces colours and drops
+ * box-shadow, which is how the ring focus styles draw, so keyboard focus would vanish.
+ */
+@media (forced-colors: active) {
+    /* !important: the components' own outline utilities (outline-none, outline-hidden) must not win here. */
+    :focus-visible {
+        /* eslint-disable-next-line css/no-important */
+        outline: 2px solid Highlight !important;
+        outline-offset: 2px;
+    }
+
+    /* The code editor's `outline: none !important` is more specific than the rule above: its focused editor needs this one. */
+    .cm-editor.cm-focused:focus-within {
+        /* eslint-disable-next-line css/no-important */
+        outline: 2px solid Highlight !important;
+    }
+}
+
+/*
+ * Primary buttons. An accent's own --primary can miss 7:1 against its label, so each accent gets a darker
+ * (light) or lighter (dark) shade of the same hue that reaches it. contrast-presets.test.ts computes every pair.
+ */
+:root[data-contrast="high"][data-accent="blue"] {
+    --primary: #1c4bcf;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="blue"] {
+    --primary: #63a7fa;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="violet"] {
+    --primary: #6d28d9;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="violet"] {
+    --primary: #ae94fa;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="green"] {
+    --primary: #116631;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="green"] {
+    --primary: #4ade80;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="orange"] {
+    --primary: #9f350a;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="orange"] {
+    --primary: #fb923c;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="rose"] {
+    --primary: #af1137;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="rose"] {
+    --primary: #fb7c8f;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="teal"] {
+    --primary: #0d635c;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="teal"] {
+    --primary: #2dd4bf;
+    --primary-foreground: #191919;
+}
+
+/*
+ * The documentation sidebar sets its colours with !important, so its high-contrast rules are more specific and
+ * also !important. The dark rule carries the extra `.dark`, as the layout's does.
+ */
+:root[data-contrast="high"] #nd-sidebar {
+    --color-fd-muted: #f2f2f2;
+    --color-fd-muted-foreground: #333333;
+    background-color: #ffffff !important;
+    border-color: #595959 !important;
+    color: #000000 !important;
+}
+
+:root.dark[data-contrast="high"] #nd-sidebar {
+    --color-fd-muted: #262626;
+    --color-fd-muted-foreground: #d9d9d9;
+    background-color: #000000 !important;
+    border-color: #a6a6a6 !important;
+    color: #ffffff !important;
+}
+
+/*
+ * The documentation layout sets its own --color-fd-* tokens and fixed border and background colours, so the root
+ * overrides above do not reach it. Its dark rule carries the extra `.dark`, which keeps the light values out of dark mode.
+ */
+:root[data-contrast="high"] #nd-docs-layout {
+    --color-fd-background: #ffffff;
+    --color-fd-foreground: #000000;
+    --color-fd-muted-foreground: #333333;
+    --color-fd-border: #595959;
+    --color-fd-primary: #000000;
+    --color-fd-primary-foreground: #ffffff;
+    background-color: #ffffff;
+    border-color: #595959;
+}
+
+:root.dark[data-contrast="high"] #nd-docs-layout {
+    --color-fd-background: #000000;
+    --color-fd-foreground: #ffffff;
+    --color-fd-muted-foreground: #d9d9d9;
+    --color-fd-border: #a6a6a6;
+    --color-fd-primary: #ffffff;
+    --color-fd-primary-foreground: #000000;
+    background-color: #000000;
+    border-color: #a6a6a6;
+}

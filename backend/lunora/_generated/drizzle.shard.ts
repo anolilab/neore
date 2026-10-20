@@ -1600,6 +1600,8 @@ export const userSettings = sqliteTable("userSettings", {
     codeHighlightTheme: text("codeHighlightTheme"),
     codeLineNumbers: integer("codeLineNumbers", { mode: "boolean" }),
     composerAutocompleteEnabled: integer("composerAutocompleteEnabled", { mode: "boolean" }),
+    composerVimMode: integer("composerVimMode", { mode: "boolean" }),
+    contrast: text("contrast"),
     customInstructions: text("customInstructions"),
     dailyBriefEnabled: integer("dailyBriefEnabled", { mode: "boolean" }),
     density: text("density"),

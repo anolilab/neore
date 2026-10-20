@@ -25,11 +25,13 @@ import StarterKitExtension from "@tiptap/starter-kit";
 import clsx from "clsx";
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
+import type { ChatReference } from "../chat-reference";
 import type { BannedWordMatch } from "./extensions/banned-word-decoration";
 import BannedWordDecoration from "./extensions/banned-word-decoration";
 import type { FileMentionMatch } from "./extensions/file-mention";
@@ -41,6 +43,7 @@ import SlashCommand from "./extensions/slash-command";
 import SubmitOnEnter from "./extensions/submit-on-enter";
 import type { VariableAutocompleteMatch } from "./extensions/variable-autocomplete";
 import VariableAutocomplete from "./extensions/variable-autocomplete";
+import VimMode, { refreshVimMode } from "./extensions/vim-mode";
 import type { VaultFileRef } from "./file-mention-popup";
 import FileMentionPopup from "./file-mention-popup";
 import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-completion-controller";
@@ -48,6 +51,7 @@ import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-c
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
+import type { VimMode as VimModeName } from "./vim-keys";
 
 // ============================================================================
 // Types
@@ -58,16 +62,22 @@ export interface ComposerTiptapEditorProps {
     autoFocus?: boolean;
     /** Banned word matches for highlighting */
     bannedWordMatches?: BannedWordMatch[];
+    /** The chat being typed into; the @ popup does not offer it as a reference */
+    currentThreadId?: string;
     /** Custom variables for {{variable}} autocomplete */
     customVariables?: PromptVariable[];
     /** Whether input is disabled */
     disabled?: boolean;
+    /** Whether a recalled prompt is showing; insert-mode Escape then restores the draft instead of leaving insert mode. */
+    isHistoryRecalled?: () => boolean;
     /** Whether streaming is active */
     isStreaming?: boolean;
     /** Max height in rows (approximate) */
     maxRows?: number;
+
     /** Called when cancel/stop is clicked */
     onCancel?: () => void;
+
     /** Called when text changes */
     onChange: (value: string) => void;
 
@@ -78,6 +88,8 @@ export interface ComposerTiptapEditorProps {
     onHistoryNavigate?: (direction: PromptHistoryDirection) => string | null;
     /** Called on paste (for file and long text handling) */
     onPaste?: (e: React.ClipboardEvent) => void;
+    /** Called when a chat is selected from the @ popup, to attach its text */
+    onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected from the @ popup */
     onSelectFileUpload?: () => void;
     /** Called when a vault file is selected from the @ popup */
@@ -130,6 +142,7 @@ const editorGhostState = (editor: Editor, focused: boolean): Pick<GhostEligibili
 
 const ComposerTiptapEditor = ({
     autoFocus = true,
+    currentThreadId,
     bannedWordMatches = EMPTY_BANNED_MATCHES,
     customVariables = EMPTY_VARIABLES,
     disabled = false,
@@ -138,7 +151,9 @@ const ComposerTiptapEditor = ({
     onCancel,
     onChange,
     onHistoryNavigate,
+    isHistoryRecalled,
     onPaste,
+    onSelectChat,
     onSelectFileUpload,
     onSelectVaultFile,
     onSubmit,
@@ -211,6 +226,18 @@ const ComposerTiptapEditor = ({
     // without recreating the editor on every cycle.
     const placeholderRef = useRef(placeholder);
 
+    // Opt-in Vim keys (`userSettings.composerVimMode`; `getUserSettings` is already a first-paint query).
+    const { data: userSettings } = useUserSettings();
+    const isVimEnabled = userSettings?.composerVimMode === true;
+    const vimEnabledRef = useRef(isVimEnabled);
+    const historyRecalledRef = useRef(isHistoryRecalled);
+    const [vimMode, setVimMode] = useState<VimModeName>("insert");
+
+    useEffect(() => {
+        vimEnabledRef.current = isVimEnabled;
+        historyRecalledRef.current = isHistoryRecalled;
+    }, [isVimEnabled, isHistoryRecalled]);
+
     // Create editor
     const editor = useEditor({
         autofocus: autoFocus ? "end" : false,
@@ -274,6 +301,12 @@ const ComposerTiptapEditor = ({
             }),
             // Inert until `requestCompletion` is set: it only draws what it is handed.
             GhostCompletion,
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
+            VimMode.configure({
+                isEnabled: () => vimEnabledRef.current,
+                isHistoryRecalled: () => historyRecalledRef.current?.() ?? false,
+                onModeChange: setVimMode,
+            }),
         ],
         immediatelyRender: false,
         onUpdate: ({ editor: ed }) => {
@@ -343,6 +376,8 @@ const ComposerTiptapEditor = ({
                 editor.commands.setContent(plainTextToHtml(value), { emitUpdate: false });
             } else {
                 editor.commands.clearContent();
+                // A prompt sent from normal mode must not leave the next one in normal mode, where typed letters are commands.
+                refreshVimMode(editor.view);
             }
         }
     }, [value, editor]);
@@ -353,6 +388,13 @@ const ComposerTiptapEditor = ({
             editor.setEditable(!disabled);
         }
     }, [disabled, editor]);
+
+    // Turning Vim on or off while the editor is open: the caret class and the mode label follow at once, not at the next keystroke.
+    useEffect(() => {
+        if (editor && !editor.isDestroyed) {
+            refreshVimMode(editor.view);
+        }
+    }, [isVimEnabled, editor]);
 
     // Update banned word decorations when matches change
     useEffect(() => {
@@ -520,12 +562,20 @@ const ComposerTiptapEditor = ({
                         "[&_.tiptap]:min-h-10 [&_.tiptap]:w-full [&_.tiptap]:border-none [&_.tiptap]:bg-transparent [&_.tiptap]:py-2.5 [&_.tiptap]:text-base [&_.tiptap]:outline-none",
                         "[&_.tiptap]:text-gray-900 dark:[&_.tiptap]:text-gray-100",
                         "[&_.tiptap_p]:m-0",
+                        // Vim normal mode: a block cursor on the character the next command acts on, instead of the caret.
+                        "[&_.vim-cursor]:bg-primary/50 [&_.tiptap.vim-normal]:caret-transparent",
                         "[&_.tiptap.is-editor-empty_.is-empty]:before:pointer-events-none [&_.tiptap.is-editor-empty_.is-empty]:before:float-left [&_.tiptap.is-editor-empty_.is-empty]:before:h-0 [&_.tiptap.is-editor-empty_.is-empty]:before:text-gray-500 [&_.tiptap.is-editor-empty_.is-empty]:before:content-[attr(data-placeholder)]",
                         disabled && "cursor-not-allowed opacity-50",
                     )}
                     editor={editor}
                 />
             </div>
+
+            {isVimEnabled && (
+                <span aria-live="polite" className="text-muted-foreground pointer-events-none absolute right-1 bottom-0 font-mono text-[10px]" role="status">
+                    {vimMode === "normal" ? t`-- NORMAL --` : t`-- INSERT --`}
+                </span>
+            )}
 
             {/* The ghost itself is aria-hidden; this says once in a while that Right Arrow would accept one. */}
             {hasCompletionSource && (
@@ -546,10 +596,12 @@ const ComposerTiptapEditor = ({
 
             {/* File mention popup */}
             <FileMentionPopup
+                currentThreadId={currentThreadId}
                 editorRect={editorRect}
                 match={fileMentionMatch}
                 onDismiss={handleDismissFileMention}
                 onReplace={handleReplace}
+                onSelectChat={onSelectChat}
                 onSelectFileUpload={onSelectFileUpload}
                 onSelectVaultFile={onSelectVaultFile}
             />

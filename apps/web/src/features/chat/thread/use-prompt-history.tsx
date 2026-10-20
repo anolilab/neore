@@ -52,6 +52,8 @@ export const usePromptHistory = (getCurrentText: () => string) => {
         }
     }, []);
 
+    const isRecalled = useCallback(() => stateRef.current !== null, []);
+
     const setEntries = useCallback((entries: string[]) => {
         entriesRef.current = entries;
     }, []);
@@ -61,6 +63,6 @@ export const usePromptHistory = (getCurrentText: () => string) => {
     }, []);
 
     return useMemo(() => {
-        return { navigate, onTextChange, reset, setEntries };
-    }, [navigate, onTextChange, reset, setEntries]);
+        return { isRecalled, navigate, onTextChange, reset, setEntries };
+    }, [isRecalled, navigate, onTextChange, reset, setEntries]);
 };
