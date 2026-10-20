@@ -66,7 +66,7 @@ const resolveProviderPolicy = (env: AppEnv, provider: string, modelApiId: string
 
     return {
         applyFilters: true,
-        pricing: async () => await pricingService.getPricing(modelApiId),
+        pricing: async () => await pricingService.getPricing(modelApiId, provider),
         recordHealth: {
             failure: async () => await healthService.recordFailure(provider, modelApiId),
             success: async (latencyMs) => await healthService.recordSuccess(provider, modelApiId, latencyMs),

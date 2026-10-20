@@ -458,7 +458,7 @@ streamRouter.openapi(
                         const tokens = extractTokenCounts(finalUsage);
 
                         // Calculate cost
-                        const pricing = await pricingService.getPricing(body.modelApiId);
+                        const pricing = await pricingService.getPricing(body.modelApiId, body.provider);
                         const costMicrodollars = pricing
                             ? calculateCost(pricing, {
                                   cachedTokens: tokens.cachedTokens,

@@ -202,7 +202,7 @@ const filterModels = (models: GatewayModelDefinition[], filters: ModelFilters): 
 
 const enrichModel = async (model: GatewayModelDefinition, pricingService: PricingService) => {
     // Only fetch pricing for text models (image/video use per-generation pricing)
-    const pricing = model.mode === "text" ? await pricingService.getPricing(model.modelApiId) : null;
+    const pricing = model.mode === "text" ? await pricingService.getPricing(model.modelApiId, model.provider) : null;
 
     return {
         // Identity

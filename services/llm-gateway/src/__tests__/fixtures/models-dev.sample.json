@@ -1,0 +1,64 @@
+{
+    "snowflake-cortex": {
+        "id": "snowflake-cortex",
+        "name": "Snowflake Cortex",
+        "models": {
+            "claude-sonnet-4-5": { "id": "claude-sonnet-4-5", "limit": { "context": 200000, "output": 16384 } }
+        }
+    },
+    "anthropic": {
+        "id": "anthropic",
+        "name": "Anthropic",
+        "models": {
+            "claude-sonnet-4-5": {
+                "id": "claude-sonnet-4-5",
+                "cost": { "input": 3, "output": 15, "cache_read": 0.3, "cache_write": 3.75 },
+                "limit": { "context": 200000, "output": 64000 }
+            },
+            "claude-haiku-4-5": {
+                "id": "claude-haiku-4-5",
+                "cost": { "input": 1, "output": 5, "cache_read": 0.1, "cache_write": 1.25 },
+                "limit": { "context": 200000, "output": 64000 }
+            }
+        }
+    },
+    "openai": {
+        "id": "openai",
+        "name": "OpenAI",
+        "models": {
+            "gpt-5": {
+                "id": "gpt-5",
+                "cost": { "input": 1.25, "output": 10, "cache_read": 0.125 },
+                "limit": { "context": 400000, "input": 272000, "output": 128000 }
+            },
+            "gpt-5-mini": {
+                "id": "gpt-5-mini",
+                "cost": { "input": 0.25, "output": 2, "cache_read": 0.025 },
+                "limit": { "context": 400000, "input": 272000, "output": 128000 }
+            }
+        }
+    },
+    "openrouter": {
+        "id": "openrouter",
+        "name": "OpenRouter",
+        "models": {
+            "meta-llama/llama-4-scout": {
+                "id": "meta-llama/llama-4-scout",
+                "cost": { "input": 0.1, "output": 0.3 },
+                "limit": { "context": 1310720, "output": 16384 }
+            },
+            "openrouter/auto": { "id": "openrouter/auto", "limit": { "context": 2000000, "output": 2000000 } }
+        }
+    },
+    "tempr": {
+        "id": "tempr",
+        "name": "Tempr",
+        "models": {
+            "deepseek/deepseek-v4-pro": {
+                "id": "deepseek/deepseek-v4-pro",
+                "cost": { "input": 0.66, "output": 1.98, "reasoning": 1.98, "cache_read": 0.022 },
+                "limit": { "context": 1000000, "output": 384000 }
+            }
+        }
+    }
+}
