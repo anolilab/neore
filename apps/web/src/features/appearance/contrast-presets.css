@@ -99,4 +99,100 @@
         outline: 2px solid Highlight !important;
         outline-offset: 2px;
     }
+
+    /* The code editor's `outline: none !important` is more specific than the rule above: its focused editor needs this one. */
+    .cm-editor.cm-focused:focus-within {
+        /* eslint-disable-next-line css/no-important */
+        outline: 2px solid Highlight !important;
+    }
+}
+
+/*
+ * Primary buttons. An accent's own --primary can miss 7:1 against its label, so each accent gets a darker
+ * (light) or lighter (dark) shade of the same hue that reaches it. contrast-presets.test.ts computes every pair.
+ */
+:root[data-contrast="high"][data-accent="blue"] {
+    --primary: #1c4bcf;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="blue"] {
+    --primary: #63a7fa;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="violet"] {
+    --primary: #6d28d9;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="violet"] {
+    --primary: #ae94fa;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="green"] {
+    --primary: #116631;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="green"] {
+    --primary: #4ade80;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="orange"] {
+    --primary: #9f350a;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="orange"] {
+    --primary: #fb923c;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="rose"] {
+    --primary: #af1137;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="rose"] {
+    --primary: #fb7c8f;
+    --primary-foreground: #191919;
+}
+
+:root[data-contrast="high"][data-accent="teal"] {
+    --primary: #0d635c;
+    --primary-foreground: #ffffff;
+}
+
+:root.dark[data-contrast="high"][data-accent="teal"] {
+    --primary: #2dd4bf;
+    --primary-foreground: #191919;
+}
+
+/*
+ * The documentation layout sets its own --color-fd-* tokens and fixed border and background colours, so the root
+ * overrides above do not reach it. Its dark rule carries the extra `.dark`, which keeps the light values out of dark mode.
+ */
+:root[data-contrast="high"] #nd-docs-layout {
+    --color-fd-background: #ffffff;
+    --color-fd-foreground: #000000;
+    --color-fd-muted-foreground: #333333;
+    --color-fd-border: #595959;
+    --color-fd-primary: #000000;
+    --color-fd-primary-foreground: #ffffff;
+    background-color: #ffffff;
+    border-color: #595959;
+}
+
+:root.dark[data-contrast="high"] #nd-docs-layout {
+    --color-fd-background: #000000;
+    --color-fd-foreground: #ffffff;
+    --color-fd-muted-foreground: #d9d9d9;
+    --color-fd-border: #a6a6a6;
+    --color-fd-primary: #ffffff;
+    --color-fd-primary-foreground: #000000;
+    background-color: #000000;
+    border-color: #a6a6a6;
 }

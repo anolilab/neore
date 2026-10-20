@@ -65,6 +65,35 @@ describe.each([
     });
 });
 
+describe.each(["blue", "violet", "green", "orange", "rose", "teal"])("high contrast primary button (%s)", (accent) => {
+    it("reaches 7:1 in light mode", () => {
+        const values = tokens(`:root[data-contrast="high"][data-accent="${accent}"]`);
+
+        expect(contrastRatio(values["--primary-foreground"]!, values["--primary"]!)).toBeGreaterThanOrEqual(AAA_TEXT);
+    });
+
+    it("reaches 7:1 in dark mode", () => {
+        const values = tokens(`:root.dark[data-contrast="high"][data-accent="${accent}"]`);
+
+        expect(contrastRatio(values["--primary-foreground"]!, values["--primary"]!)).toBeGreaterThanOrEqual(AAA_TEXT);
+    });
+});
+
+describe.each([
+    ["light", ':root[data-contrast="high"] #nd-docs-layout'],
+    ["dark", ':root.dark[data-contrast="high"] #nd-docs-layout'],
+])("high contrast documentation layout (%s)", (_mode, selector) => {
+    const values = tokens(selector);
+
+    it.each([
+        ["--color-fd-foreground", "--color-fd-background"],
+        ["--color-fd-muted-foreground", "--color-fd-background"],
+        ["--color-fd-primary-foreground", "--color-fd-primary"],
+    ])("%s on %s reaches 7:1", (foreground, background) => {
+        expect(contrastRatio(values[foreground]!, values[background]!)).toBeGreaterThanOrEqual(AAA_TEXT);
+    });
+});
+
 describe("contrast setting", () => {
     it("follows the system unless the user chose", () => {
         expect(effectiveContrast("system", true)).toBe("high");
@@ -92,5 +121,9 @@ describe("forced colours", () => {
     it("restores a visible keyboard focus where box-shadow rings are dropped", () => {
         expect(CSS).toContain("@media (forced-colors: active)");
         expect(CSS).toContain("outline: 2px solid Highlight");
+    });
+
+    it("restores the code editor's focus ring, which its own rule hides", () => {
+        expect(CSS).toContain(".cm-editor.cm-focused:focus-within");
     });
 });
