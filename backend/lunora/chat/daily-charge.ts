@@ -36,7 +36,7 @@ const DAILY_CHARGE_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
  */
 export const chargeDailyUnit = internalMutation
     .input({
-        kind: v.union(v.literal("Audio"), v.literal("Text"), v.literal("Video")),
+        kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Text"), v.literal("Video")),
         organizationId: v.optional(v.string()),
         requestId: v.optional(v.string().max(MAX_LENGTH.long)),
         userId: v.string(),
