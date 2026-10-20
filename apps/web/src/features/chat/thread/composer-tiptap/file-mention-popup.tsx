@@ -16,7 +16,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandInput, CommandItem, CommandList, CommandSeparator } from "@neore/ui/components/command";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { FileIcon, FileImage, FileText, MessageSquareIcon, UploadIcon } from "lucide-react";
 import type { FC } from "react";
@@ -136,16 +136,20 @@ const FileMentionPopup: FC<FileMentionPopupProps> = ({
     // search goes to the server instead: a chat older than that page is still found by its title.
     const { lunora: threads } = useAllThreadsData(isOpen && onSelectChat !== undefined);
     const chatSearch = (searchQuery || match?.query || "").trim();
-    const { data: searchedThreads } = useQuery(
-        crpc.chat.functions.searchThreads.queryOptions(
+    // The previous result stays while a new keystroke's search loads. Until a search has answered, the loaded page is filtered by title here.
+    const { data: searchedThreads } = useQuery({
+        ...crpc.chat.functions.searchThreads.queryOptions(
             isOpen && onSelectChat !== undefined && chatSearch
                 ? { excludeTemporary: true, paginationOpts: { cursor: null, endCursor: null, numItems: SEARCHED_CHAT_ROWS }, searchQuery: chatSearch }
                 : skipToken,
             { live: false },
         ),
-    );
+        placeholderData: keepPreviousData,
+    });
     const filteredChats = useMemo(() => {
-        const chats = mentionableChats(chatSearch && searchedThreads ? searchedThreads.page : threads, currentThreadId);
+        const query = chatSearch.toLowerCase();
+        const pending = threads.filter((thread) => thread.title?.toLowerCase().includes(query));
+        const chats = mentionableChats(chatSearch ? (searchedThreads?.page ?? pending) : threads, currentThreadId);
 
         return chats.slice(0, MAX_CHAT_SUGGESTIONS);
     }, [threads, searchedThreads, chatSearch, currentThreadId]);
