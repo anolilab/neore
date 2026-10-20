@@ -24,11 +24,11 @@ msgstr " · model: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:557
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
 msgid "-- INSERT --"
 msgstr "-- INSERT --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:557
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
@@ -51,40 +51,23 @@ msgstr "\"{0}\" has variables that need values."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" will start once its dependencies are done"
 
-#: src/features/chat/thread/composer-input.tsx:482
+#: src/features/chat/thread/composer-input.tsx:489
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "\"{fileName}\" cannot be attached: this file type is not supported."
 
-#: src/features/chat/thread/composer-input.tsx:475
+#: src/features/chat/thread/composer-input.tsx:482
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "\"{fileName}\" could not be attached: its contents do not match its file type."
 
-#: src/features/chat/thread/composer-input.tsx:477
-msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
-msgstr "\"{fileName}\" could not be uploaded. Check your connection and try again."
-
-#: src/features/chat/thread/composer-input.tsx:480
-msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
-msgstr "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
-
-#: src/features/chat/thread/composer-input.tsx:481
 #: src/features/chat/thread/composer-input.tsx:484
-msgid "\"{fileName}\" cannot be attached: this file type is not supported."
-msgstr "\"{fileName}\" cannot be attached: this file type is not supported."
-
-#: src/features/chat/thread/composer-input.tsx:477
-msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
-msgstr "\"{fileName}\" could not be attached: its contents do not match its file type."
-
-#: src/features/chat/thread/composer-input.tsx:479
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "\"{fileName}\" could not be uploaded. Check your connection and try again."
 
-#: src/features/chat/thread/composer-input.tsx:482
+#: src/features/chat/thread/composer-input.tsx:487
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 
-#: src/features/chat/thread/composer-input.tsx:483
+#: src/features/chat/thread/composer-input.tsx:488
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 
@@ -734,7 +717,7 @@ msgstr "{days}d ago"
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:112
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:125
 msgid "{duration, plural, one {Thought for # second} other {Thought for # seconds}}"
 msgstr "{duration, plural, one {Thought for # second} other {Thought for # seconds}}"
 
@@ -1627,7 +1610,7 @@ msgstr "Action"
 msgid "Action Log"
 msgstr "Action Log"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:335
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:370
 #: src/features/evals/components/dataset-panel.tsx:149
 msgid "Actions"
 msgstr "Actions"
@@ -1760,9 +1743,9 @@ msgstr "Add at least one model — use \"Fetch models\" or type the ids"
 msgid "Add at least one model id"
 msgstr "Add at least one model id"
 
-#: src/features/chat/thread/composer-input-area.tsx:170
-#: src/features/chat/thread/composer-input-area.tsx:204
-#: src/features/chat/thread/composer-input-area.tsx:224
+#: src/features/chat/thread/composer-input-area.tsx:173
+#: src/features/chat/thread/composer-input-area.tsx:207
+#: src/features/chat/thread/composer-input-area.tsx:227
 #: src/features/chat/thread/edit-composer.tsx:125
 msgid "Add attachment"
 msgstr "Add attachment"
@@ -4715,7 +4698,7 @@ msgstr "Caption text"
 #~ msgid "Capture {label}"
 #~ msgstr "Capture {label}"
 
-#: src/features/chat/thread/composer-input-area.tsx:199
+#: src/features/chat/thread/composer-input-area.tsx:202
 msgid "Capture screen"
 msgstr "Capture screen"
 
@@ -4964,7 +4947,7 @@ msgstr "ChatGPT ($20), Midjourney ($10–30), Runway ($15), Claude ($20) — tha
 msgid "ChatGPT gives you one model family. Neore gives you 30+ models from 12 providers — chat, image generation, video creation, a canvas editor, code execution, and deep research. Same $20/month, but you get GPT-4 plus Claude, Gemini, FLUX, Runway, and 25 more."
 msgstr "ChatGPT gives you one model family. Neore gives you 30+ models from 12 providers — chat, image generation, video creation, a canvas editor, code execution, and deep research. Same $20/month, but you get GPT-4 plus Claude, Gemini, FLUX, Runway, and 25 more."
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:390
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:427
 msgid "Chats"
 msgstr "Chats"
 
@@ -5359,8 +5342,7 @@ msgstr "Click the pin icon on any message to save it here."
 msgid "Click the star on any model in All models to add it here."
 msgstr "Click the star on any model in All models to add it here."
 
-#: src/features/chat/thread/composer-input.tsx:249
-#: src/features/chat/thread/composer-input.tsx:251
+#: src/features/chat/thread/composer-input.tsx:254
 msgid "Click to edit"
 msgstr "Click to edit"
 
@@ -5433,7 +5415,7 @@ msgstr "Close prompt improvement"
 msgid "Close search"
 msgstr "Close search"
 
-#: src/features/chat/translation/message-translation.tsx:130
+#: src/features/chat/translation/message-translation.tsx:133
 msgid "Close translation"
 msgstr "Close translation"
 
@@ -5583,7 +5565,7 @@ msgstr "Cohere's most capable command model"
 msgid "Collaborate with shared AI workflows."
 msgstr "Collaborate with shared AI workflows."
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:195
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:208
 #: ../../packages/ui/src/components/sidebar.tsx:406
 #: src/features/workflow/components/canvas/workflow-toolbar.tsx:194
 #: src/features/workflow/components/nodes/group-node.tsx:216
@@ -5618,7 +5600,7 @@ msgstr "Collapse group to hide children"
 msgid "Collapse textarea"
 msgstr "Collapse textarea"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:124
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:137
 msgid "Collapse thinking"
 msgstr "Collapse thinking"
 
@@ -6464,12 +6446,11 @@ msgstr "Contrast"
 msgid "Contrast Ratio"
 msgstr "Contrast Ratio"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:364
 #: src/features/appearance/components/appearance-controls.tsx:211
 msgid "Contrast updated"
 msgstr "Contrast updated"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:385
+#: src/features/settings/components/chat/model-filter-settings.tsx:364
 msgid "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 msgstr "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 
@@ -6534,10 +6515,8 @@ msgstr "Conversation history"
 msgid "Conversation not available"
 msgstr "Conversation not available"
 
-#: src/features/chat/thread/composer-input.tsx:688
-#: src/features/chat/thread/composer-input.tsx:980
-#: src/features/chat/thread/composer-input.tsx:690
-#: src/features/chat/thread/composer-input.tsx:994
+#: src/features/chat/thread/composer-input.tsx:695
+#: src/features/chat/thread/composer-input.tsx:1004
 msgid "Conversion failed"
 msgstr "Conversion failed"
 
@@ -6582,7 +6561,7 @@ msgstr "Convert to TypeScript"
 msgid "Converting..."
 msgstr "Converting..."
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:198
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:211
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -6599,7 +6578,7 @@ msgstr "Copied to clipboard"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:330
+#: src/features/chat/thread/message-item.tsx:349
 #: src/features/prompts/components/prompt-item.tsx:255
 msgid "Copied!"
 msgstr "Copied!"
@@ -6608,7 +6587,7 @@ msgstr "Copied!"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:330
+#: src/features/chat/thread/message-item.tsx:349
 #: src/features/chat/thread/text-selection-menu.tsx:384
 #: src/features/settings/components/chat/trigger-settings.tsx:680
 msgid "Copy"
@@ -6626,7 +6605,7 @@ msgstr "Copy"
 msgid "Copy as Markdown"
 msgstr "Copy as Markdown"
 
-#: src/features/chat/thread/message-item.tsx:347
+#: src/features/chat/thread/message-item.tsx:366
 msgid "Copy as plain text"
 msgstr "Copy as plain text"
 
@@ -6671,7 +6650,7 @@ msgstr "Copy Prompt"
 msgid "Copy public link"
 msgstr "Copy public link"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:191
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:204
 msgid "Copy reasoning"
 msgstr "Copy reasoning"
 
@@ -6793,7 +6772,7 @@ msgstr "Costa Rica"
 msgid "Could not apply the changes"
 msgstr "Could not apply the changes"
 
-#: src/features/chat/thread/composer-input.tsx:1006
+#: src/features/chat/thread/composer-input.tsx:1026
 msgid "Could not attach the chat"
 msgstr "Could not attach the chat"
 
@@ -6940,7 +6919,11 @@ msgstr "Could not preview · Click to download"
 msgid "Could not pull {0}: {1}"
 msgstr "Could not pull {0}: {1}"
 
-#: src/features/chat/thread/composer-input.tsx:1009
+#: src/features/chat/thread/composer-input.tsx:1029
+msgid "Could not read that chat"
+msgstr "Could not read that chat"
+
+#: src/features/chat/thread/composer-input.tsx:1030
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Could not read that chat. If it is locked, unlock it first."
 
@@ -7118,7 +7101,7 @@ msgstr "Create a task, give it success criteria, and run it. You can chain tasks
 msgid "Create an account"
 msgstr "Create an account"
 
-#: src/features/chat/translation/message-translation.tsx:75
+#: src/features/chat/translation/message-translation.tsx:78
 msgid "Create an account to translate messages."
 msgstr "Create an account to translate messages."
 
@@ -8896,7 +8879,7 @@ msgstr "Download a model"
 msgid "Download as CSV"
 msgstr "Download as CSV"
 
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:370
 msgid "Download as Markdown"
 msgstr "Download as Markdown"
 
@@ -8994,7 +8977,7 @@ msgstr "Drag files here"
 msgid "Draw an image"
 msgstr "Draw an image"
 
-#: src/features/chat/thread/composer-input-area.tsx:193
+#: src/features/chat/thread/composer-input-area.tsx:196
 msgid "Draw image"
 msgstr "Draw image"
 
@@ -9016,8 +8999,7 @@ msgstr "Drop file or click to upload"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:2083
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:2162
-#: src/features/chat/thread/composer-input.tsx:1151
-#: src/features/chat/thread/composer-input.tsx:1181
+#: src/features/chat/thread/composer-input.tsx:1204
 msgid "Drop files here"
 msgstr "Drop files here"
 
@@ -9245,7 +9227,7 @@ msgstr "Edge-guided generation"
 #: src/features/canvas/canvas-panel.tsx:748
 #: src/features/chat/thread-list/group-header.tsx:144
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:370
+#: src/features/chat/thread/message-item.tsx:389
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:206
 #: src/features/prompts/components/prompt-list-view.tsx:218
@@ -9283,8 +9265,7 @@ msgstr "Edit case {0}"
 msgid "Edit collection"
 msgstr "Edit collection"
 
-#: src/features/chat/thread/composer-input.tsx:267
-#: src/features/chat/thread/composer-input.tsx:269
+#: src/features/chat/thread/composer-input.tsx:272
 msgid "Edit content"
 msgstr "Edit content"
 
@@ -10510,7 +10491,7 @@ msgstr "Expand image canvas beyond original borders"
 msgid "Expand textarea"
 msgstr "Expand textarea"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:124
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:137
 msgid "Expand thinking"
 msgstr "Expand thinking"
 
@@ -10871,8 +10852,7 @@ msgid "Failed to attach collection"
 msgstr "Failed to attach collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:887
-#: src/features/chat/thread/composer-input.tsx:889
+#: src/features/chat/thread/composer-input.tsx:894
 msgid "Failed to attach file"
 msgstr "Failed to attach file"
 
@@ -11276,8 +11256,7 @@ msgstr "Failed to request export"
 msgid "Failed to reset to defaults"
 msgstr "Failed to reset to defaults"
 
-#: src/features/chat/thread/composer-input.tsx:919
-#: src/features/chat/thread/composer-input.tsx:921
+#: src/features/chat/thread/composer-input.tsx:926
 msgid "Failed to restore attachment"
 msgstr "Failed to restore attachment"
 
@@ -12395,7 +12374,7 @@ msgstr "Fork"
 msgid "Fork {0} to edit a copy"
 msgstr "Fork {0} to edit a copy"
 
-#: src/features/chat/thread/message-item.tsx:380
+#: src/features/chat/thread/message-item.tsx:399
 msgid "Fork conversation"
 msgstr "Fork conversation"
 
@@ -12906,7 +12885,7 @@ msgstr "Generate from a description"
 msgid "Generate ideas for a creative writing story"
 msgstr "Generate ideas for a creative writing story"
 
-#: src/features/chat/thread/message-item.tsx:399
+#: src/features/chat/thread/message-item.tsx:418
 msgid "Generate image"
 msgstr "Generate image"
 
@@ -12932,7 +12911,7 @@ msgstr "Generate random seed"
 msgid "Generate unique business ideas for 2025"
 msgstr "Generate unique business ideas for 2025"
 
-#: src/features/chat/thread/message-item.tsx:409
+#: src/features/chat/thread/message-item.tsx:428
 msgid "Generate video"
 msgstr "Generate video"
 
@@ -12945,7 +12924,7 @@ msgstr "Generate Video"
 msgid "Generate videos from text or images"
 msgstr "Generate videos from text or images"
 
-#: src/features/chat/thread/message-item.tsx:419
+#: src/features/chat/thread/message-item.tsx:438
 msgid "Generate voice"
 msgstr "Generate voice"
 
@@ -17468,7 +17447,7 @@ msgstr "More"
 msgid "More About You"
 msgstr "More About You"
 
-#: src/features/chat/thread/message-item.tsx:339
+#: src/features/chat/thread/message-item.tsx:358
 msgid "More copy options"
 msgstr "More copy options"
 
@@ -19072,7 +19051,7 @@ msgstr "Note for the next run (optional)"
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:418
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:457
 msgid "Nothing found"
 msgstr "Nothing found"
 
@@ -20372,7 +20351,7 @@ msgstr "Part of a circular dependency"
 
 #: src/features/chat/group/create-group-chat-button.tsx:175
 #: src/features/chat/group/group-participant-bar.tsx:138
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:308
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:342
 msgid "Participants"
 msgstr "Participants"
 
@@ -20795,7 +20774,7 @@ msgstr "Pin memory"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:142
 #: ../../packages/chat-ui/src/chat/message-item.tsx:191
-#: src/features/chat/thread/message-item.tsx:358
+#: src/features/chat/thread/message-item.tsx:377
 msgid "Pin message"
 msgstr "Pin message"
 
@@ -20867,16 +20846,13 @@ msgstr "Platform"
 msgid "Play"
 msgstr "Play"
 
-#: src/features/settings/components/account/account-settings.tsx:576
+#: src/features/settings/components/account/account-settings.tsx:596
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "Play a short sound when a reply finishes. Applies to this browser only."
 
-#: src/features/settings/components/account/account-settings.tsx:576
+#: src/features/settings/components/account/account-settings.tsx:596
 #~ msgid "Play sound effects for UI interactions."
 #~ msgstr "Play sound effects for UI interactions."
-#: src/features/settings/components/account/account-settings.tsx:596
-msgid "Play sound effects for UI interactions."
-msgstr "Play sound effects for UI interactions."
 
 #: src/features/auth/components/auth/auth-card.tsx:373
 msgid "Please authenticate to continue"
@@ -21246,12 +21222,11 @@ msgstr "Press Enter to send"
 msgid "Press Enter to send, Shift+Enter for new line"
 msgstr "Press Enter to send, Shift+Enter for new line"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:229
 #: src/features/settings/components/account/account-settings.tsx:455
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:223
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:229
 msgid "Press keys..."
 msgstr "Press keys..."
 
@@ -21425,10 +21400,8 @@ msgstr "Priority support"
 #: src/features/marketing/components/gateway-footer.tsx:139
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
-#: src/features/settings/components/account/account-settings.tsx:136
-#: src/features/settings/components/chat/model-filter-settings.tsx:361
 #: src/features/settings/components/account/account-settings.tsx:138
-#: src/features/settings/components/chat/model-filter-settings.tsx:382
+#: src/features/settings/components/chat/model-filter-settings.tsx:361
 msgid "Privacy"
 msgstr "Privacy"
 
@@ -21952,11 +21925,11 @@ msgstr "Query complexity tiers assigned by the routing engine"
 msgid "Query usage analytics and costs"
 msgstr "Query usage analytics and costs"
 
-#: src/features/chat/thread/composer-input-area.tsx:280
+#: src/features/chat/thread/composer-input-area.tsx:284
 msgid "Queue message"
 msgstr "Queue message"
 
-#: src/features/chat/thread/composer-input-area.tsx:299
+#: src/features/chat/thread/composer-input-area.tsx:303
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Queue message — sends when the current reply finishes"
 
@@ -22151,8 +22124,7 @@ msgstr "Read-only preview - Fork to edit"
 msgid "Read-only shared conversation"
 msgstr "Read-only shared conversation"
 
-#: src/features/chat/thread/composer-input.tsx:213
-#: src/features/chat/thread/composer-input.tsx:215
+#: src/features/chat/thread/composer-input.tsx:218
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Reading \"{attachmentName}\"…"
 
@@ -22543,7 +22515,7 @@ msgid "Refresh installed models"
 msgstr "Refresh installed models"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:196
-#: src/features/chat/thread/message-item.tsx:364
+#: src/features/chat/thread/message-item.tsx:383
 msgid "Regenerate"
 msgstr "Regenerate"
 
@@ -22688,10 +22660,8 @@ msgstr "Remember me"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:285
-#: src/features/chat/thread/composer-input.tsx:347
-#: src/features/chat/thread/composer-input.tsx:287
-#: src/features/chat/thread/composer-input.tsx:349
+#: src/features/chat/thread/composer-input.tsx:290
+#: src/features/chat/thread/composer-input.tsx:352
 #: src/features/devices/components/devices-settings.tsx:85
 #: src/features/devices/components/devices-settings.tsx:89
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -23260,7 +23230,7 @@ msgid "Retrieval: hit {0} · MRR {1} · precision {2} · recall {3}"
 msgstr "Retrieval: hit {0} · MRR {1} · precision {2} · recall {3}"
 
 #: src/features/chat/thread/chat-error.tsx:56
-#: src/features/chat/translation/message-translation.tsx:85
+#: src/features/chat/translation/message-translation.tsx:88
 #: src/features/local-models/components/ollama-model-manager.tsx:187
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -23919,8 +23889,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 
-#: src/features/chat/thread/composer-input.tsx:844
-#: src/features/chat/thread/composer-input.tsx:846
+#: src/features/chat/thread/composer-input.tsx:851
 msgid "Screen capture failed. Please try again."
 msgstr "Screen capture failed. Please try again."
 
@@ -24002,7 +23971,7 @@ msgstr "Search depth: {0}"
 msgid "Search fields..."
 msgstr "Search fields..."
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:302
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:334
 msgid "Search files and chats..."
 msgstr "Search files and chats..."
 
@@ -24479,8 +24448,8 @@ msgid "Send Magic Link"
 msgstr "Send Magic Link"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:333
-#: src/features/chat/thread/composer-input-area.tsx:347
+#: src/features/chat/thread/composer-input-area.tsx:337
+#: src/features/chat/thread/composer-input-area.tsx:351
 msgid "Send message"
 msgstr "Send message"
 
@@ -25987,12 +25956,8 @@ msgstr "Stop after the current speaker"
 
 #: src/features/chat/thread-list/thread-node.tsx:511
 #: src/features/chat/thread-list/thread-node.tsx:533
-#: src/features/chat/thread/composer-input-area.tsx:298
 #: src/features/chat/thread/composer-input-area.tsx:311
-#: src/features/chat/thread-list/thread-node.tsx:510
-#: src/features/chat/thread-list/thread-node.tsx:532
-#: src/features/chat/thread/composer-input-area.tsx:307
-#: src/features/chat/thread/composer-input-area.tsx:320
+#: src/features/chat/thread/composer-input-area.tsx:324
 msgid "Stop generating"
 msgstr "Stop generating"
 
@@ -26467,8 +26432,7 @@ msgstr "Suggested"
 msgid "Suggested answers"
 msgstr "Suggested answers"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:412
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:435
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:454
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggestion available, press Right Arrow to accept"
 
@@ -26779,7 +26743,7 @@ msgstr "Tamil"
 msgid "Tamil (India)"
 msgstr "Tamil (India)"
 
-#: src/features/chat/translation/message-translation.tsx:115
+#: src/features/chat/translation/message-translation.tsx:118
 msgid "Target language"
 msgstr "Target language"
 
@@ -27123,8 +27087,7 @@ msgstr "Text direction set to LTR"
 msgid "Text direction set to RTL"
 msgstr "Text direction set to RTL"
 
-#: src/features/chat/thread/composer-input.tsx:249
-#: src/features/chat/thread/composer-input.tsx:251
+#: src/features/chat/thread/composer-input.tsx:254
 msgid "Text document"
 msgstr "Text document"
 
@@ -27594,8 +27557,7 @@ msgstr "The unified LLM gateway for modern AI applications."
 #~ msgid "The unique identifier of the user to add"
 #~ msgstr "The unique identifier of the user to add"
 
-#: src/features/chat/thread/composer-input.tsx:476
-#: src/features/chat/thread/composer-input.tsx:478
+#: src/features/chat/thread/composer-input.tsx:483
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "The upload of \"{fileName}\" expired. Please attach it again."
 
@@ -27668,7 +27630,7 @@ msgstr "Thick"
 msgid "Thin"
 msgstr "Thin"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:121
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:134
 msgid "Thinking in progress, collapse to hide"
 msgstr "Thinking in progress, collapse to hide"
 
@@ -27718,7 +27680,7 @@ msgstr "Thinking-enabled vision-language model"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1063
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:103
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
 #: src/features/chat/thread/streaming-placeholder.tsx:701
 msgid "Thinking..."
 msgstr "Thinking..."
@@ -28078,7 +28040,7 @@ msgstr "This workflow may have been unpublished or deleted."
 msgid "Thorough"
 msgstr "Thorough"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:107
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:120
 msgid "Thought for a few seconds"
 msgstr "Thought for a few seconds"
 
@@ -28537,19 +28499,19 @@ msgstr "Translate"
 msgid "Translate text to another language..."
 msgstr "Translate text to another language..."
 
-#: src/features/chat/translation/message-translation.tsx:92
+#: src/features/chat/translation/message-translation.tsx:95
 msgid "Translating…"
 msgstr "Translating…"
 
-#: src/features/chat/translation/message-translation.tsx:113
+#: src/features/chat/translation/message-translation.tsx:116
 msgid "Translation"
 msgstr "Translation"
 
-#: src/features/chat/translation/message-translation.tsx:76
+#: src/features/chat/translation/message-translation.tsx:79
 msgid "Translation failed."
 msgstr "Translation failed."
 
-#: src/features/chat/translation/message-translation.tsx:98
+#: src/features/chat/translation/message-translation.tsx:101
 msgid "Translation to {languageName}"
 msgstr "Translation to {languageName}"
 
@@ -28835,10 +28797,8 @@ msgstr "Type to search"
 msgid "Type your answer…"
 msgstr "Type your answer…"
 
-#: src/features/chat/thread/composer-input.tsx:1142
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:151
-#: src/features/chat/thread/composer-input.tsx:1172
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:162
+#: src/features/chat/thread/composer-input.tsx:1195
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
 msgid "Type your message..."
 msgstr "Type your message..."
 
@@ -29204,8 +29164,7 @@ msgstr "Up-to-date docs for any library or framework"
 msgid "Update Duration"
 msgstr "Update Duration"
 
-#: src/features/chat/thread/composer-input.tsx:1013
-#: src/features/chat/thread/composer-input.tsx:1042
+#: src/features/chat/thread/composer-input.tsx:1063
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -29381,8 +29340,7 @@ msgstr "Upload CSVs, run Python analysis, and export charts — no Jupyter setup
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 
-#: src/features/chat/thread/composer-input.tsx:523
-#: src/features/chat/thread/composer-input.tsx:525
+#: src/features/chat/thread/composer-input.tsx:530
 msgid "Upload failed"
 msgstr "Upload failed"
 
@@ -29390,7 +29348,7 @@ msgstr "Upload failed"
 #~ msgid "Upload failed: {statusText}"
 #~ msgstr "Upload failed: {statusText}"
 
-#: src/features/chat/thread/composer-input-area.tsx:188
+#: src/features/chat/thread/composer-input-area.tsx:191
 msgid "Upload file"
 msgstr "Upload file"
 
@@ -29415,7 +29373,7 @@ msgstr "Upload image / video"
 msgid "Upload Logo"
 msgstr "Upload Logo"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:346
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:382
 msgid "Upload new file"
 msgstr "Upload new file"
 
@@ -29436,8 +29394,7 @@ msgstr "Uploaded"
 msgid "Uploaded {fileName}"
 msgstr "Uploaded {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:291
-#: src/features/chat/thread/composer-input.tsx:293
+#: src/features/chat/thread/composer-input.tsx:296
 msgid "Uploading {attachmentName}"
 msgstr "Uploading {attachmentName}"
 
@@ -29853,7 +29810,7 @@ msgstr "Variables starting with \"context.\" or \"user.\" are system-managed and
 msgid "Variables:"
 msgstr "Variables:"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:356
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "Vault files"
 
@@ -30491,10 +30448,10 @@ msgstr "Waiting for the owner to answer"
 msgid "Waiting for the owner to approve"
 msgstr "Waiting for the owner to approve"
 
-#: src/features/chat/thread/composer-input-area.tsx:280
-#: src/features/chat/thread/composer-input-area.tsx:299
-#: src/features/chat/thread/composer-input-area.tsx:333
-#: src/features/chat/thread/composer-input-area.tsx:347
+#: src/features/chat/thread/composer-input-area.tsx:284
+#: src/features/chat/thread/composer-input-area.tsx:303
+#: src/features/chat/thread/composer-input-area.tsx:337
+#: src/features/chat/thread/composer-input-area.tsx:351
 msgid "Waiting for uploads to complete…"
 msgstr "Waiting for uploads to complete…"
 
@@ -31169,7 +31126,7 @@ msgstr "You have no tags yet."
 msgid "You have returned to your admin account"
 msgstr "You have returned to your admin account"
 
-#: src/features/chat/translation/message-translation.tsx:77
+#: src/features/chat/translation/message-translation.tsx:80
 msgid "You have used today's translations. Try again later."
 msgstr "You have used today's translations. Try again later."
 
@@ -31331,14 +31288,12 @@ msgid "Your First Chat"
 msgstr "Your First Chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:569
-#: src/features/chat/thread/composer-input.tsx:571
+#: src/features/chat/thread/composer-input.tsx:576
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:562
-#: src/features/chat/thread/composer-input.tsx:564
+#: src/features/chat/thread/composer-input.tsx:569
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 

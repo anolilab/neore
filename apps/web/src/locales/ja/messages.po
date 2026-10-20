@@ -25,11 +25,11 @@ msgstr " · モデル: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}、{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:557
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
 msgid "-- INSERT --"
 msgstr "-- 挿入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:557
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:576
 msgid "-- NORMAL --"
 msgstr "-- ノーマル --"
 
@@ -52,40 +52,23 @@ msgstr "「{0}」には値の入力が必要な変数があります。"
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "「{0}」は依存タスクの完了後に開始されます"
 
-#: src/features/chat/thread/composer-input.tsx:482
+#: src/features/chat/thread/composer-input.tsx:489
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "「{fileName}」は添付できません。このファイル形式はサポートされていません。"
 
-#: src/features/chat/thread/composer-input.tsx:475
+#: src/features/chat/thread/composer-input.tsx:482
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "「{fileName}」を添付できませんでした。内容がファイル形式と一致しません。"
 
-#: src/features/chat/thread/composer-input.tsx:477
-msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
-msgstr "「{fileName}」をアップロードできませんでした。接続を確認して、もう一度お試しください。"
-
-#: src/features/chat/thread/composer-input.tsx:480
-msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
-msgstr "「{fileName}」は大きすぎます。ドキュメントは最大 {maxMegabytes} MB までです。"
-
-#: src/features/chat/thread/composer-input.tsx:481
 #: src/features/chat/thread/composer-input.tsx:484
-msgid "\"{fileName}\" cannot be attached: this file type is not supported."
-msgstr "「{fileName}」は添付できません。このファイル形式はサポートされていません。"
-
-#: src/features/chat/thread/composer-input.tsx:477
-msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
-msgstr "「{fileName}」を添付できませんでした。内容がファイル形式と一致しません。"
-
-#: src/features/chat/thread/composer-input.tsx:479
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "「{fileName}」をアップロードできませんでした。接続を確認して、もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:482
+#: src/features/chat/thread/composer-input.tsx:487
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。ドキュメントは最大 {maxMegabytes} MB までです。"
 
-#: src/features/chat/thread/composer-input.tsx:483
+#: src/features/chat/thread/composer-input.tsx:488
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。この種類のファイルは最大 {maxMegabytes} MB までです。"
 
@@ -735,7 +718,7 @@ msgstr "{days} 日前"
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, other {再読み込み時に # 個の添付ファイルが削除されました}}"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:112
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:125
 msgid "{duration, plural, one {Thought for # second} other {Thought for # seconds}}"
 msgstr "{duration, plural, other {# 秒間思考しました}}"
 
@@ -1628,7 +1611,7 @@ msgstr "アクション"
 msgid "Action Log"
 msgstr "アクションログ"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:335
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:370
 #: src/features/evals/components/dataset-panel.tsx:149
 msgid "Actions"
 msgstr "操作"
@@ -1761,9 +1744,9 @@ msgstr "モデルを 1 つ以上追加してください（「モデルを取得
 msgid "Add at least one model id"
 msgstr "モデル ID を 1 つ以上追加してください"
 
-#: src/features/chat/thread/composer-input-area.tsx:170
-#: src/features/chat/thread/composer-input-area.tsx:204
-#: src/features/chat/thread/composer-input-area.tsx:224
+#: src/features/chat/thread/composer-input-area.tsx:173
+#: src/features/chat/thread/composer-input-area.tsx:207
+#: src/features/chat/thread/composer-input-area.tsx:227
 #: src/features/chat/thread/edit-composer.tsx:125
 msgid "Add attachment"
 msgstr "添付ファイルを追加"
@@ -4716,7 +4699,7 @@ msgstr "キャプションテキスト"
 #~ msgid "Capture {label}"
 #~ msgstr "{label} をキャプチャ"
 
-#: src/features/chat/thread/composer-input-area.tsx:199
+#: src/features/chat/thread/composer-input-area.tsx:202
 msgid "Capture screen"
 msgstr "画面をキャプチャ"
 
@@ -4965,7 +4948,7 @@ msgstr "ChatGPT（$20）、Midjourney（$10〜30）、Runway（$15）、Claude�
 msgid "ChatGPT gives you one model family. Neore gives you 30+ models from 12 providers — chat, image generation, video creation, a canvas editor, code execution, and deep research. Same $20/month, but you get GPT-4 plus Claude, Gemini, FLUX, Runway, and 25 more."
 msgstr "ChatGPT で使えるのは 1 つのモデルファミリーだけ。Neore なら 12 のプロバイダーの 30 以上のモデルに加え、チャット、画像生成、動画作成、キャンバスエディター、コード実行、ディープリサーチが使えます。同じ月額 $20 で、GPT-4 に加えて Claude、Gemini、FLUX、Runway など 25 以上のモデルが利用できます。"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:390
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:427
 msgid "Chats"
 msgstr "チャット"
 
@@ -5360,8 +5343,7 @@ msgstr "メッセージのピンアイコンをクリックすると、ここに
 msgid "Click the star on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの星をクリックすると、ここに追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:249
-#: src/features/chat/thread/composer-input.tsx:251
+#: src/features/chat/thread/composer-input.tsx:254
 msgid "Click to edit"
 msgstr "クリックして編集"
 
@@ -5434,7 +5416,7 @@ msgstr "プロンプト改善を閉じる"
 msgid "Close search"
 msgstr "検索を閉じる"
 
-#: src/features/chat/translation/message-translation.tsx:130
+#: src/features/chat/translation/message-translation.tsx:133
 msgid "Close translation"
 msgstr "翻訳を閉じる"
 
@@ -5584,7 +5566,7 @@ msgstr "Cohere で最も高性能な Command モデル"
 msgid "Collaborate with shared AI workflows."
 msgstr "共有された AI ワークフローで共同作業。"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:195
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:208
 #: ../../packages/ui/src/components/sidebar.tsx:406
 #: src/features/workflow/components/canvas/workflow-toolbar.tsx:194
 #: src/features/workflow/components/nodes/group-node.tsx:216
@@ -5619,7 +5601,7 @@ msgstr "グループを折りたたんで子要素を非表示にする"
 msgid "Collapse textarea"
 msgstr "テキストエリアを折りたたむ"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:124
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:137
 msgid "Collapse thinking"
 msgstr "思考を折りたたむ"
 
@@ -6465,12 +6447,11 @@ msgstr "コントラスト"
 msgid "Contrast Ratio"
 msgstr "コントラスト比"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:364
 #: src/features/appearance/components/appearance-controls.tsx:211
 msgid "Contrast updated"
 msgstr "コントラストを更新しました"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:385
+#: src/features/settings/components/chat/model-filter-settings.tsx:364
 msgid "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 msgstr "AI プロバイダーのデータ取り扱いと保持ポリシーを管理します。プライバシー設定は現在、OpenRouter 経由のモデルに適用されます。"
 
@@ -6535,10 +6516,8 @@ msgstr "会話履歴"
 msgid "Conversation not available"
 msgstr "会話を利用できません"
 
-#: src/features/chat/thread/composer-input.tsx:688
-#: src/features/chat/thread/composer-input.tsx:980
-#: src/features/chat/thread/composer-input.tsx:690
-#: src/features/chat/thread/composer-input.tsx:994
+#: src/features/chat/thread/composer-input.tsx:695
+#: src/features/chat/thread/composer-input.tsx:1004
 msgid "Conversion failed"
 msgstr "変換に失敗しました"
 
@@ -6583,7 +6562,7 @@ msgstr "TypeScript に変換"
 msgid "Converting..."
 msgstr "変換しています..."
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:198
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:211
 #: src/features/local-models/components/local-setup-guide.tsx:44
 #: src/features/pages/components/page-kept-draft.tsx:30
 msgid "Copied"
@@ -6600,7 +6579,7 @@ msgstr "クリップボードにコピーしました"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:330
+#: src/features/chat/thread/message-item.tsx:349
 #: src/features/prompts/components/prompt-item.tsx:255
 msgid "Copied!"
 msgstr "コピーしました！"
@@ -6609,7 +6588,7 @@ msgstr "コピーしました！"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:225
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/sharing/thread-share-button.tsx:366
-#: src/features/chat/thread/message-item.tsx:330
+#: src/features/chat/thread/message-item.tsx:349
 #: src/features/chat/thread/text-selection-menu.tsx:384
 #: src/features/settings/components/chat/trigger-settings.tsx:680
 msgid "Copy"
@@ -6627,7 +6606,7 @@ msgstr "コピー"
 msgid "Copy as Markdown"
 msgstr "Markdown としてコピー"
 
-#: src/features/chat/thread/message-item.tsx:347
+#: src/features/chat/thread/message-item.tsx:366
 msgid "Copy as plain text"
 msgstr ""
 
@@ -6672,7 +6651,7 @@ msgstr "プロンプトをコピー"
 msgid "Copy public link"
 msgstr "公開リンクをコピー"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:191
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:204
 msgid "Copy reasoning"
 msgstr "推論をコピー"
 
@@ -6794,7 +6773,7 @@ msgstr "コスタリカ"
 msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1006
+#: src/features/chat/thread/composer-input.tsx:1026
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
 
@@ -6941,7 +6920,11 @@ msgstr "プレビューできません · クリックしてダウンロード"
 msgid "Could not pull {0}: {1}"
 msgstr "{0} を取得できませんでした：{1}"
 
-#: src/features/chat/thread/composer-input.tsx:1009
+#: src/features/chat/thread/composer-input.tsx:1029
+msgid "Could not read that chat"
+msgstr "そのチャットを読み込めませんでした"
+
+#: src/features/chat/thread/composer-input.tsx:1030
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
 
@@ -7119,7 +7102,7 @@ msgstr "タスクを作成し、成功基準を設定して実行します。依
 msgid "Create an account"
 msgstr "アカウントを作成"
 
-#: src/features/chat/translation/message-translation.tsx:75
+#: src/features/chat/translation/message-translation.tsx:78
 msgid "Create an account to translate messages."
 msgstr "メッセージを翻訳するにはアカウントを作成してください。"
 
@@ -8897,7 +8880,7 @@ msgstr "モデルをダウンロード"
 msgid "Download as CSV"
 msgstr "CSV としてダウンロード"
 
-#: src/features/chat/thread/message-item.tsx:351
+#: src/features/chat/thread/message-item.tsx:370
 msgid "Download as Markdown"
 msgstr "Markdownとしてダウンロード"
 
@@ -8995,7 +8978,7 @@ msgstr "ここにファイルをドラッグ"
 msgid "Draw an image"
 msgstr "画像を描く"
 
-#: src/features/chat/thread/composer-input-area.tsx:193
+#: src/features/chat/thread/composer-input-area.tsx:196
 msgid "Draw image"
 msgstr "画像を描く"
 
@@ -9017,8 +9000,7 @@ msgstr "ファイルをドロップするか、クリックしてアップロー
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:2083
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-variants.tsx:2162
-#: src/features/chat/thread/composer-input.tsx:1151
-#: src/features/chat/thread/composer-input.tsx:1181
+#: src/features/chat/thread/composer-input.tsx:1204
 msgid "Drop files here"
 msgstr "ここにファイルをドロップ"
 
@@ -9246,7 +9228,7 @@ msgstr "エッジに沿った生成"
 #: src/features/canvas/canvas-panel.tsx:748
 #: src/features/chat/thread-list/group-header.tsx:144
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:370
+#: src/features/chat/thread/message-item.tsx:389
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:206
 #: src/features/prompts/components/prompt-list-view.tsx:218
@@ -9284,8 +9266,7 @@ msgstr "ケース {0} を編集"
 msgid "Edit collection"
 msgstr "コレクションを編集"
 
-#: src/features/chat/thread/composer-input.tsx:267
-#: src/features/chat/thread/composer-input.tsx:269
+#: src/features/chat/thread/composer-input.tsx:272
 msgid "Edit content"
 msgstr "内容を編集"
 
@@ -10511,7 +10492,7 @@ msgstr "画像のキャンバスを元の境界を超えて拡張"
 msgid "Expand textarea"
 msgstr "テキストエリアを展開"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:124
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:137
 msgid "Expand thinking"
 msgstr "思考を展開"
 
@@ -10872,8 +10853,7 @@ msgid "Failed to attach collection"
 msgstr "コレクションを添付できませんでした"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:887
-#: src/features/chat/thread/composer-input.tsx:889
+#: src/features/chat/thread/composer-input.tsx:894
 msgid "Failed to attach file"
 msgstr "ファイルを添付できませんでした"
 
@@ -11277,8 +11257,7 @@ msgstr "エクスポートをリクエストできませんでした"
 msgid "Failed to reset to defaults"
 msgstr "既定にリセットできませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:919
-#: src/features/chat/thread/composer-input.tsx:921
+#: src/features/chat/thread/composer-input.tsx:926
 msgid "Failed to restore attachment"
 msgstr "添付ファイルを復元できませんでした"
 
@@ -12396,7 +12375,7 @@ msgstr "フォーク"
 msgid "Fork {0} to edit a copy"
 msgstr "{0} をフォークしてコピーを編集"
 
-#: src/features/chat/thread/message-item.tsx:380
+#: src/features/chat/thread/message-item.tsx:399
 msgid "Fork conversation"
 msgstr "会話をフォーク"
 
@@ -12907,7 +12886,7 @@ msgstr "説明から生成"
 msgid "Generate ideas for a creative writing story"
 msgstr "創作ストーリーのアイデアを出す"
 
-#: src/features/chat/thread/message-item.tsx:399
+#: src/features/chat/thread/message-item.tsx:418
 msgid "Generate image"
 msgstr "画像を生成"
 
@@ -12933,7 +12912,7 @@ msgstr "ランダムなシードを生成"
 msgid "Generate unique business ideas for 2025"
 msgstr "2025 年向けのユニークなビジネスアイデアを考える"
 
-#: src/features/chat/thread/message-item.tsx:409
+#: src/features/chat/thread/message-item.tsx:428
 msgid "Generate video"
 msgstr "動画を生成"
 
@@ -12946,7 +12925,7 @@ msgstr "動画を生成"
 msgid "Generate videos from text or images"
 msgstr "テキストや画像から動画を生成"
 
-#: src/features/chat/thread/message-item.tsx:419
+#: src/features/chat/thread/message-item.tsx:438
 msgid "Generate voice"
 msgstr "音声を生成"
 
@@ -17469,7 +17448,7 @@ msgstr "多い"
 msgid "More About You"
 msgstr "あなたについての詳細"
 
-#: src/features/chat/thread/message-item.tsx:339
+#: src/features/chat/thread/message-item.tsx:358
 msgid "More copy options"
 msgstr ""
 
@@ -19073,7 +19052,7 @@ msgstr "次回の実行へのメモ（任意）"
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注: モジュールはメッセージ単位ではなく会話単位で適用されます。トークン使用量を最適化するため、必要なモジュールだけを有効にしてください。"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:418
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:457
 msgid "Nothing found"
 msgstr "見つかりません"
 
@@ -20373,7 +20352,7 @@ msgstr "循環依存の一部です"
 
 #: src/features/chat/group/create-group-chat-button.tsx:175
 #: src/features/chat/group/group-participant-bar.tsx:138
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:308
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:342
 msgid "Participants"
 msgstr "参加者"
 
@@ -20796,7 +20775,7 @@ msgstr "メモリをピン留め"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:142
 #: ../../packages/chat-ui/src/chat/message-item.tsx:191
-#: src/features/chat/thread/message-item.tsx:358
+#: src/features/chat/thread/message-item.tsx:377
 msgid "Pin message"
 msgstr "メッセージをピン留め"
 
@@ -20868,16 +20847,13 @@ msgstr "プラットフォーム"
 msgid "Play"
 msgstr "再生"
 
-#: src/features/settings/components/account/account-settings.tsx:576
+#: src/features/settings/components/account/account-settings.tsx:596
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "返信が完了したら短い音を鳴らします。このブラウザーのみに適用されます。"
 
-#: src/features/settings/components/account/account-settings.tsx:576
+#: src/features/settings/components/account/account-settings.tsx:596
 #~ msgid "Play sound effects for UI interactions."
 #~ msgstr "UI 操作時に効果音を再生します。"
-#: src/features/settings/components/account/account-settings.tsx:596
-msgid "Play sound effects for UI interactions."
-msgstr "UI 操作時に効果音を再生します。"
 
 #: src/features/auth/components/auth/auth-card.tsx:373
 msgid "Please authenticate to continue"
@@ -21247,12 +21223,11 @@ msgstr "Enter キーで送信"
 msgid "Press Enter to send, Shift+Enter for new line"
 msgstr "Enter で送信、Shift+Enter で改行"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:229
 #: src/features/settings/components/account/account-settings.tsx:455
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "Escape で入力モードを終えると、h j k l、w b、0 $、i a I A、o O、x、dd、D、u で編集できます。Enter は引き続き送信します。既定では無効です。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:223
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:229
 msgid "Press keys..."
 msgstr "キーを押してください..."
 
@@ -21426,10 +21401,8 @@ msgstr "優先サポート"
 #: src/features/marketing/components/gateway-footer.tsx:139
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
-#: src/features/settings/components/account/account-settings.tsx:136
-#: src/features/settings/components/chat/model-filter-settings.tsx:361
 #: src/features/settings/components/account/account-settings.tsx:138
-#: src/features/settings/components/chat/model-filter-settings.tsx:382
+#: src/features/settings/components/chat/model-filter-settings.tsx:361
 msgid "Privacy"
 msgstr "プライバシー"
 
@@ -21953,11 +21926,11 @@ msgstr "ルーティングエンジンが割り当てたクエリの複雑度テ
 msgid "Query usage analytics and costs"
 msgstr "使用状況の分析とコストを照会"
 
-#: src/features/chat/thread/composer-input-area.tsx:280
+#: src/features/chat/thread/composer-input-area.tsx:284
 msgid "Queue message"
 msgstr "メッセージを待機列に追加"
 
-#: src/features/chat/thread/composer-input-area.tsx:299
+#: src/features/chat/thread/composer-input-area.tsx:303
 msgid "Queue message — sends when the current reply finishes"
 msgstr "メッセージを待機列に追加 — 現在の返信が終わると送信されます"
 
@@ -22152,8 +22125,7 @@ msgstr "読み取り専用プレビュー - 編集するにはフォークして
 msgid "Read-only shared conversation"
 msgstr "読み取り専用の共有会話"
 
-#: src/features/chat/thread/composer-input.tsx:213
-#: src/features/chat/thread/composer-input.tsx:215
+#: src/features/chat/thread/composer-input.tsx:218
 msgid "Reading \"{attachmentName}\"…"
 msgstr "「{attachmentName}」を読み込んでいます…"
 
@@ -22544,7 +22516,7 @@ msgid "Refresh installed models"
 msgstr "インストール済みのモデルを更新"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:196
-#: src/features/chat/thread/message-item.tsx:364
+#: src/features/chat/thread/message-item.tsx:383
 msgid "Regenerate"
 msgstr "再生成"
 
@@ -22689,10 +22661,8 @@ msgstr "サインイン状態を保持"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:285
-#: src/features/chat/thread/composer-input.tsx:347
-#: src/features/chat/thread/composer-input.tsx:287
-#: src/features/chat/thread/composer-input.tsx:349
+#: src/features/chat/thread/composer-input.tsx:290
+#: src/features/chat/thread/composer-input.tsx:352
 #: src/features/devices/components/devices-settings.tsx:85
 #: src/features/devices/components/devices-settings.tsx:89
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -23261,7 +23231,7 @@ msgid "Retrieval: hit {0} · MRR {1} · precision {2} · recall {3}"
 msgstr "検索：ヒット {0} · MRR {1} · 適合率 {2} · 再現率 {3}"
 
 #: src/features/chat/thread/chat-error.tsx:56
-#: src/features/chat/translation/message-translation.tsx:85
+#: src/features/chat/translation/message-translation.tsx:88
 #: src/features/local-models/components/ollama-model-manager.tsx:187
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -23920,8 +23890,7 @@ msgstr "スコア"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "期待される回答またはルーブリックに照らして、各回答を 0〜100% で採点します。ケースごとに小規模なモデル呼び出しが追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:844
-#: src/features/chat/thread/composer-input.tsx:846
+#: src/features/chat/thread/composer-input.tsx:851
 msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
@@ -24003,7 +23972,7 @@ msgstr "検索の深さ：{0}"
 msgid "Search fields..."
 msgstr "フィールドを検索..."
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:302
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:334
 msgid "Search files and chats..."
 msgstr "ファイルとチャットを検索..."
 
@@ -24480,8 +24449,8 @@ msgid "Send Magic Link"
 msgstr "マジックリンクを送信"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:333
-#: src/features/chat/thread/composer-input-area.tsx:347
+#: src/features/chat/thread/composer-input-area.tsx:337
+#: src/features/chat/thread/composer-input-area.tsx:351
 msgid "Send message"
 msgstr "メッセージを送信"
 
@@ -25988,12 +25957,8 @@ msgstr "現在の話者の後に停止"
 
 #: src/features/chat/thread-list/thread-node.tsx:511
 #: src/features/chat/thread-list/thread-node.tsx:533
-#: src/features/chat/thread/composer-input-area.tsx:298
 #: src/features/chat/thread/composer-input-area.tsx:311
-#: src/features/chat/thread-list/thread-node.tsx:510
-#: src/features/chat/thread-list/thread-node.tsx:532
-#: src/features/chat/thread/composer-input-area.tsx:307
-#: src/features/chat/thread/composer-input-area.tsx:320
+#: src/features/chat/thread/composer-input-area.tsx:324
 msgid "Stop generating"
 msgstr "生成を停止"
 
@@ -26468,8 +26433,7 @@ msgstr "おすすめ"
 msgid "Suggested answers"
 msgstr "回答の候補"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:412
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:435
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:454
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
 
@@ -26780,7 +26744,7 @@ msgstr "タミル語"
 msgid "Tamil (India)"
 msgstr "タミル語（インド）"
 
-#: src/features/chat/translation/message-translation.tsx:115
+#: src/features/chat/translation/message-translation.tsx:118
 msgid "Target language"
 msgstr "翻訳先の言語"
 
@@ -27124,8 +27088,7 @@ msgstr "テキストの方向を LTR に設定しました"
 msgid "Text direction set to RTL"
 msgstr "テキストの方向を RTL に設定しました"
 
-#: src/features/chat/thread/composer-input.tsx:249
-#: src/features/chat/thread/composer-input.tsx:251
+#: src/features/chat/thread/composer-input.tsx:254
 msgid "Text document"
 msgstr "テキストドキュメント"
 
@@ -27595,8 +27558,7 @@ msgstr "モダンな AI アプリケーションのための統合 LLM ゲート
 #~ msgid "The unique identifier of the user to add"
 #~ msgstr "追加するユーザーの一意の識別子"
 
-#: src/features/chat/thread/composer-input.tsx:476
-#: src/features/chat/thread/composer-input.tsx:478
+#: src/features/chat/thread/composer-input.tsx:483
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "「{fileName}」のアップロードの有効期限が切れました。もう一度添付してください。"
 
@@ -27669,7 +27631,7 @@ msgstr "太い"
 msgid "Thin"
 msgstr "細い"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:121
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:134
 msgid "Thinking in progress, collapse to hide"
 msgstr "思考中です。折りたたむと非表示になります"
 
@@ -27719,7 +27681,7 @@ msgstr "思考機能を備えた視覚言語モデル"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1063
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:103
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:116
 #: src/features/chat/thread/streaming-placeholder.tsx:701
 msgid "Thinking..."
 msgstr "考えています..."
@@ -28079,7 +28041,7 @@ msgstr "このワークフローは非公開にされたか、削除された可
 msgid "Thorough"
 msgstr "徹底的"
 
-#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:107
+#: ../../packages/ui/src/components/ai-elements/reasoning.tsx:120
 msgid "Thought for a few seconds"
 msgstr "数秒間思考しました"
 
@@ -28538,19 +28500,19 @@ msgstr "翻訳"
 msgid "Translate text to another language..."
 msgstr "テキストを別の言語に翻訳..."
 
-#: src/features/chat/translation/message-translation.tsx:92
+#: src/features/chat/translation/message-translation.tsx:95
 msgid "Translating…"
 msgstr "翻訳中…"
 
-#: src/features/chat/translation/message-translation.tsx:113
+#: src/features/chat/translation/message-translation.tsx:116
 msgid "Translation"
 msgstr "翻訳"
 
-#: src/features/chat/translation/message-translation.tsx:76
+#: src/features/chat/translation/message-translation.tsx:79
 msgid "Translation failed."
 msgstr "翻訳に失敗しました。"
 
-#: src/features/chat/translation/message-translation.tsx:98
+#: src/features/chat/translation/message-translation.tsx:101
 msgid "Translation to {languageName}"
 msgstr "{languageName}への翻訳"
 
@@ -28836,10 +28798,8 @@ msgstr "入力して検索"
 msgid "Type your answer…"
 msgstr "回答を入力…"
 
-#: src/features/chat/thread/composer-input.tsx:1142
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:151
-#: src/features/chat/thread/composer-input.tsx:1172
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:162
+#: src/features/chat/thread/composer-input.tsx:1195
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:166
 msgid "Type your message..."
 msgstr "メッセージを入力..."
 
@@ -29205,8 +29165,7 @@ msgstr "あらゆるライブラリやフレームワークの最新ドキュメ
 msgid "Update Duration"
 msgstr "期間を更新"
 
-#: src/features/chat/thread/composer-input.tsx:1013
-#: src/features/chat/thread/composer-input.tsx:1042
+#: src/features/chat/thread/composer-input.tsx:1063
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
@@ -29382,8 +29341,7 @@ msgstr "CSV をアップロードし、Python で分析してグラフをエク�
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "ドキュメントをナレッジベースにアップロードし、コレクションにまとめます。AI は関連するコンテキストを検索し、使用したパッセージを引用します。"
 
-#: src/features/chat/thread/composer-input.tsx:523
-#: src/features/chat/thread/composer-input.tsx:525
+#: src/features/chat/thread/composer-input.tsx:530
 msgid "Upload failed"
 msgstr "アップロードに失敗しました"
 
@@ -29391,7 +29349,7 @@ msgstr "アップロードに失敗しました"
 #~ msgid "Upload failed: {statusText}"
 #~ msgstr "アップロードに失敗しました: {statusText}"
 
-#: src/features/chat/thread/composer-input-area.tsx:188
+#: src/features/chat/thread/composer-input-area.tsx:191
 msgid "Upload file"
 msgstr "ファイルをアップロード"
 
@@ -29416,7 +29374,7 @@ msgstr "画像 / 動画をアップロード"
 msgid "Upload Logo"
 msgstr "ロゴをアップロード"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:346
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:382
 msgid "Upload new file"
 msgstr "新しいファイルをアップロード"
 
@@ -29437,8 +29395,7 @@ msgstr "アップロード済み"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} をアップロードしました"
 
-#: src/features/chat/thread/composer-input.tsx:291
-#: src/features/chat/thread/composer-input.tsx:293
+#: src/features/chat/thread/composer-input.tsx:296
 msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} をアップロードしています"
 
@@ -29854,7 +29811,7 @@ msgstr "「context.」または「user.」で始まる変数はシステムで�
 msgid "Variables:"
 msgstr "変数："
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:356
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Vault files"
 msgstr "ボールトのファイル"
 
@@ -30492,10 +30449,10 @@ msgstr "オーナーの回答を待っています"
 msgid "Waiting for the owner to approve"
 msgstr "オーナーの承認を待っています"
 
-#: src/features/chat/thread/composer-input-area.tsx:280
-#: src/features/chat/thread/composer-input-area.tsx:299
-#: src/features/chat/thread/composer-input-area.tsx:333
-#: src/features/chat/thread/composer-input-area.tsx:347
+#: src/features/chat/thread/composer-input-area.tsx:284
+#: src/features/chat/thread/composer-input-area.tsx:303
+#: src/features/chat/thread/composer-input-area.tsx:337
+#: src/features/chat/thread/composer-input-area.tsx:351
 msgid "Waiting for uploads to complete…"
 msgstr "アップロードの完了を待っています…"
 
@@ -31170,7 +31127,7 @@ msgstr "タグはまだありません。"
 msgid "You have returned to your admin account"
 msgstr "管理者アカウントに戻りました"
 
-#: src/features/chat/translation/message-translation.tsx:77
+#: src/features/chat/translation/message-translation.tsx:80
 msgid "You have used today's translations. Try again later."
 msgstr "本日の翻訳の上限に達しました。後でもう一度お試しください。"
 
@@ -31332,14 +31289,12 @@ msgid "Your First Chat"
 msgstr "はじめてのチャット"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:569
-#: src/features/chat/thread/composer-input.tsx:571
+#: src/features/chat/thread/composer-input.tsx:576
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "入力が大きく（約 {0} トークン）、モデルのコンテキストウィンドウのかなりの部分を消費します。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:562
-#: src/features/chat/thread/composer-input.tsx:564
+#: src/features/chat/thread/composer-input.tsx:569
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "入力が大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。送信するには、メッセージを短くするか添付ファイルを削除してください。"
 
