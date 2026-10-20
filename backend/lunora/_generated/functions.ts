@@ -1246,6 +1246,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "skills_functions:updateSkill": lunora_skills_functions_155.updateSkill as unknown as RegisteredLunoraFunction,
     "skills_generate:generateSkillDraft": lunora_skills_generate_156.generateSkillDraft as unknown as RegisteredLunoraFunction,
     "skills_io:exportSkill": lunora_skills_io_157.exportSkill as unknown as RegisteredLunoraFunction,
+    "skills_io:fetchSkillFromUrl": lunora_skills_io_157.fetchSkillFromUrl as unknown as RegisteredLunoraFunction,
     "skills_io:findFreeSkillSlug": lunora_skills_io_157.findFreeSkillSlug as unknown as RegisteredLunoraFunction,
     "skills_io:importSkill": lunora_skills_io_157.importSkill as unknown as RegisteredLunoraFunction,
     "skills_io:listSkillFilesInternal": lunora_skills_io_157.listSkillFilesInternal as unknown as RegisteredLunoraFunction,
@@ -9204,6 +9205,7 @@ export interface Caller {
         };
         io: {
             exportSkill: (args: { skillId: Id<"skills"> }) => Promise<{ files: Array<{ content: string; encoding: "utf8" | "base64"; path: string }>; markdown: string; slug: string }>;
+            fetchSkillFromUrl: (args: { url: string }) => Promise<{ filename: string; markdown: string; sourceUrl: string }>;
             findFreeSkillSlug: (args: { slug: string; userId: string }) => Promise<string>;
             importSkill: (args: { filename?: string; files?: Array<{ content: string; encoding: "utf8" | "base64"; path: string }>; markdown: string; visibility?: "private" | "organization" }) => Promise<{ skillId: Id<"skills">; slug: string; warnings: Array<string> }>;
             listSkillFilesInternal: (args: { skillId: Id<"skills"> }) => Promise<Array<{ name: string; sizeBytes: number; storageId: string }>>;
@@ -10823,6 +10825,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         io: {
             exportSkill: (args) => callRegistered(context, "skills_io:exportSkill", args),
+            fetchSkillFromUrl: (args) => callRegistered(context, "skills_io:fetchSkillFromUrl", args),
             findFreeSkillSlug: (args) => callRegistered(context, "skills_io:findFreeSkillSlug", args),
             importSkill: (args) => callRegistered(context, "skills_io:importSkill", args),
             listSkillFilesInternal: (args) => callRegistered(context, "skills_io:listSkillFilesInternal", args),

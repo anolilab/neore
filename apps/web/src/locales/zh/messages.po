@@ -336,7 +336,7 @@ msgid "{0} (shared)"
 msgstr "{0}（共享）"
 
 #. placeholder {0}: upload.files.length
-#: src/features/skills/components/skill-import-dialog.tsx:191
+#: src/features/skills/components/skill-import-dialog.tsx:223
 msgid "{0} additional file(s)"
 msgstr "{0} 个附加文件"
 
@@ -1371,7 +1371,7 @@ msgstr "与你一起思考的文档编辑器。"
 msgid "A few questions first"
 msgstr "先回答几个问题"
 
-#: src/features/skills/components/skill-import-dialog.tsx:162
+#: src/features/skills/components/skill-import-dialog.tsx:194
 msgid "A GitHub link to a skill folder or its SKILL.md, or a skills.sh link. Only the SKILL.md is imported; scripts and other files in the skill are not."
 msgstr ""
 
@@ -4568,7 +4568,7 @@ msgstr "加拿大"
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
-#: src/features/skills/components/skill-import-dialog.tsx:203
+#: src/features/skills/components/skill-import-dialog.tsx:235
 #: src/features/slides/components/slide-editor-dialog.tsx:113
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
@@ -5032,7 +5032,7 @@ msgstr "中文（简体）"
 msgid "Chinese (Traditional)"
 msgstr "中文（繁体）"
 
-#: src/features/skills/components/skill-import-dialog.tsx:131
+#: src/features/skills/components/skill-import-dialog.tsx:156
 msgid "Choose .md or .zip"
 msgstr "选择 .md 或 .zip"
 
@@ -11901,7 +11901,7 @@ msgstr "Feishu Encrypt Key"
 msgid "Feishu Verification Token"
 msgstr "Feishu Verification Token"
 
-#: src/features/skills/components/skill-import-dialog.tsx:158
+#: src/features/skills/components/skill-import-dialog.tsx:187
 msgid "Fetch"
 msgstr ""
 
@@ -11909,6 +11909,10 @@ msgstr ""
 #: src/features/settings/components/chat/native-providers-settings.tsx:646
 msgid "Fetch models"
 msgstr "获取模型"
+
+#: src/features/skills/components/skill-import-dialog.tsx:190
+msgid "Fetching link…"
+msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:26
 #: src/features/evals/components/import-cases-dialog.tsx:81
@@ -14269,7 +14273,7 @@ msgstr "已停止模拟登录"
 
 #: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
-#: src/features/skills/components/skill-import-dialog.tsx:207
+#: src/features/skills/components/skill-import-dialog.tsx:239
 #: src/features/skills/components/skill-list.tsx:331
 msgid "Import"
 msgstr "导入"
@@ -14323,7 +14327,7 @@ msgstr "导入 Notion 导出文件（.zip）"
 msgid "Import one kind of export at a time."
 msgstr ""
 
-#: src/features/skills/components/skill-import-dialog.tsx:124
+#: src/features/skills/components/skill-import-dialog.tsx:149
 msgid "Import skill"
 msgstr "导入技能"
 
@@ -14365,7 +14369,7 @@ msgid "Imported {added} Notion page(s)."
 msgstr "已导入 {added} 个 Notion 页面。"
 
 #. placeholder {0}: result.slug
-#: src/features/skills/components/skill-import-dialog.tsx:113
+#: src/features/skills/components/skill-import-dialog.tsx:138
 msgid "Imported skill \"{0}\""
 msgstr "已导入技能“{0}”"
 
@@ -19948,7 +19952,7 @@ msgstr "或连接一个文本节点来提供提示词"
 msgid "or continue with"
 msgstr "或使用以下方式继续"
 
-#: src/features/skills/components/skill-import-dialog.tsx:145
+#: src/features/skills/components/skill-import-dialog.tsx:170
 msgid "Or fetch from a link"
 msgstr ""
 
@@ -25026,7 +25030,7 @@ msgstr "技能已更新"
 msgid "Skill: {skillName}"
 msgstr "技能：{skillName}"
 
-#: src/features/skills/components/skill-import-dialog.tsx:166
+#: src/features/skills/components/skill-import-dialog.tsx:198
 msgid "SKILL.md"
 msgstr "SKILL.md"
 
@@ -27111,7 +27115,7 @@ msgstr "泰国"
 msgid "Thanks for rating"
 msgstr "感谢你的评分"
 
-#: src/features/skills/components/skill-import-dialog.tsx:92
+#: src/features/skills/components/skill-import-dialog.tsx:106
 msgid "That link could not be read."
 msgstr ""
 
@@ -27246,7 +27250,7 @@ msgstr "无法连接扩展。"
 msgid "The extension will be able to read and send chats as {0}. You can disconnect it at any time by signing out in the extension or ending its session in your account settings."
 msgstr "该扩展将能够以 {0} 的身份读取和发送聊天。你可以随时在扩展中退出登录，或在账号设置中结束其会话来断开连接。"
 
-#: src/features/skills/components/skill-import-dialog.tsx:80
+#: src/features/skills/components/skill-import-dialog.tsx:86
 msgid "The file is larger than {megabytes} MB."
 msgstr "文件大于 {megabytes} MB。"
 
@@ -27433,7 +27437,7 @@ msgstr "每次都用对模型。"
 msgid "The server lists no models yet — pull or load one first"
 msgstr "服务器尚未列出任何模型——请先拉取或加载一个"
 
-#: src/features/skills/components/skill-import-dialog.tsx:117
+#: src/features/skills/components/skill-import-dialog.tsx:142
 msgid "The skill could not be imported."
 msgstr "无法导入该技能。"
 
@@ -27698,7 +27702,7 @@ msgstr "此 CSV 文件似乎为空或无效。"
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "此端点不是 Ollama。模型管理仅适用于 Ollama——在 LM Studio 中请在应用内下载模型。"
 
-#: src/features/skills/components/skill-import-dialog.tsx:80
+#: src/features/skills/components/skill-import-dialog.tsx:86
 msgid "This file could not be read."
 msgstr "无法读取此文件。"
 
@@ -29236,7 +29240,7 @@ msgstr "为你的账号上传头像"
 #~ msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), or paste the markdown."
 #~ msgstr "上传 SKILL.md 或技能 .zip（Claude 及其他 Agent Skills 工具所用格式），或粘贴 Markdown。"
 
-#: src/features/skills/components/skill-import-dialog.tsx:125
+#: src/features/skills/components/skill-import-dialog.tsx:150
 msgid "Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), paste the markdown, or fetch it from a link."
 msgstr ""
 
