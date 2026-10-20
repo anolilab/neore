@@ -69,7 +69,9 @@ nearest scoped `AGENTS.md` (`apps/web/src/`, `backend/lunora/`).
 - Never run `lunora deploy` or `pnpm run deploy` unless explicitly instructed —
   CI owns deployment.
 - Never run git commands unless explicitly instructed.
-- Never run `dev:*` unless explicitly instructed.
+- Before running `dev:*` to test a change, check whether a dev run is already up
+  (`ss -lntp` for 5173 app, 8787 gateway, 8788 backend, 9235 inspector). If one is,
+  ask before killing it. If none is, start the dev command the test needs.
 - Use `internal*` Lunora functions for sensitive operations.
 - All external API calls belong in actions, never queries/mutations.
 
