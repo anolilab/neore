@@ -18,8 +18,11 @@ import { useChatMessages, useChatThread } from "@/features/chat/core/context/cha
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import formatMessageTime from "./format-message-time";
 import { scrollToMessage } from "./message-list";
-import { buildMinimapItems, isProvisionalId, mergeOutline, promptsDropped, shouldShowMinimap } from "./minimap-items";
+import { useActivePromptId } from "./minimap-active";
+import type { MinimapItem } from "./minimap-items";
+import { buildMinimapItems, isProvisionalId, mergeOutline, minimapGapLabel, promptsDropped, shouldShowMinimap } from "./minimap-items";
 
 /** The outline is cheap to keep: it changes only when the active path does, which the effect below watches. */
 const OUTLINE_STALE_MS = 5 * 60_000;
@@ -28,8 +31,101 @@ interface ThreadMinimapProps {
     className?: string;
 }
 
+type ThreadId = ReturnType<typeof useChatThread>["threadId"];
+
+interface MinimapRailProps {
+    className?: string;
+    items: MinimapItem[];
+    threadId: ThreadId;
+}
+
+/** Gap units in the reader's language, narrow so a label stays short: `3h` in English, a locale's own form elsewhere. */
+const gapUnitFormatters = (locale: string) => {
+    return {
+        day: new Intl.NumberFormat(locale, { style: "unit", unit: "day", unitDisplay: "narrow" }),
+        hour: new Intl.NumberFormat(locale, { style: "unit", unit: "hour", unitDisplay: "narrow" }),
+    };
+};
+
+/**
+ * The rail itself. It mounts only while the rail is shown, so the position tracking it starts does not run
+ * for a hidden rail.
+ */
+const MinimapRail: FC<MinimapRailProps> = ({ className, items, threadId }) => {
+    const { i18n, t } = useLingui();
+    // The prompt being read: its tick turns white, so the rail shows where the reader is.
+    const activeId = useActivePromptId(useMemo(() => items.map((item) => item.id), [items]));
+    const formatters = useMemo(() => gapUnitFormatters(i18n.locale), [i18n.locale]);
+    const navRef = useRef<HTMLElement>(null);
+
+    // A long chat can put the current prompt's tick below the rail's visible area, so keep it in view as the reader moves.
+    useEffect(() => {
+        navRef.current?.querySelector<HTMLElement>('button[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+    }, [activeId]);
+
+    return (
+        // not-prose: the rail sits inside the `prose` message column, whose list typography would otherwise apply.
+        <nav aria-label={t`Prompts in this conversation`} className={cn("not-prose max-h-[60vh] w-14 shrink-0 overflow-y-auto", className)} ref={navRef}>
+            <TooltipProvider>
+                <ol className="m-0 flex list-none flex-col items-center gap-1 py-1">
+                    {items.map((item, index) => {
+                        const promptNumber = index + 1;
+                        const preview = item.preview || t`Attachment only`;
+                        // Labels the time since the previous prompt, so a long pause between sends is visible on the rail.
+                        const gap = minimapGapLabel(items[index - 1]?.createdAt, item.createdAt, (value, unit) => formatters[unit].format(value));
+                        const isActive = item.id === activeId;
+
+                        return (
+                            <li className="flex w-full items-center justify-end gap-0.5" key={item.id}>
+                                {gap && (
+                                    <span
+                                        aria-hidden="true"
+                                        className="text-muted-foreground pointer-events-none shrink-0 text-[10px] whitespace-nowrap tabular-nums"
+                                    >
+                                        {gap}
+                                    </span>
+                                )}
+                                <Tooltip>
+                                    <TooltipTrigger
+                                        render={
+                                            <button
+                                                aria-current={isActive ? "location" : undefined}
+                                                aria-label={
+                                                    gap
+                                                        ? t`Jump to prompt ${promptNumber}, ${gap} after the previous prompt: ${preview}`
+                                                        : t`Jump to prompt ${promptNumber}: ${preview}`
+                                                }
+                                                className="group focus-visible:ring-ring flex h-4 w-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2"
+                                                data-active={isActive}
+                                                onClick={() => scrollToMessage(item.id, { threadId })}
+                                                type="button"
+                                            >
+                                                <span aria-hidden="true" className="relative h-0.5 w-4 rounded-full">
+                                                    <span className="bg-muted-foreground/40 group-hover:bg-foreground absolute inset-0 rounded-full motion-safe:transition-colors" />
+                                                    <span className="bg-foreground absolute inset-0 rounded-full opacity-0 group-data-[active=true]:opacity-100 motion-safe:transition-opacity motion-safe:duration-150" />
+                                                </span>
+                                            </button>
+                                        }
+                                    />
+                                    <TooltipContent className="max-w-xs" side="left">
+                                        {item.createdAt !== undefined && (
+                                            <time className="block text-[10px] tabular-nums" dateTime={new Date(item.createdAt).toISOString()}>
+                                                {formatMessageTime(item.createdAt, i18n.locale)}
+                                            </time>
+                                        )}
+                                        <p className="break-words">{preview}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </li>
+                        );
+                    })}
+                </ol>
+            </TooltipProvider>
+        </nav>
+    );
+};
+
 const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
-    const { t } = useLingui();
     const { isStreaming, messages, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
     const crpc = useCRPC();
@@ -95,44 +191,7 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
         return null;
     }
 
-    return (
-        // not-prose: the rail sits inside the `prose` message column, whose list typography would otherwise apply.
-        <nav aria-label={t`Prompts in this conversation`} className={cn("not-prose max-h-[60vh] w-6 shrink-0 overflow-y-auto", className)}>
-            <TooltipProvider>
-                <ol className="m-0 flex list-none flex-col items-center gap-1 py-1">
-                    {items.map((item, index) => {
-                        const promptNumber = index + 1;
-                        const preview = item.preview || t`Attachment only`;
-
-                        return (
-                            <li key={item.id}>
-                                <Tooltip>
-                                    <TooltipTrigger
-                                        render={
-                                            <button
-                                                aria-label={t`Jump to prompt ${promptNumber}: ${preview}`}
-                                                className="group focus-visible:ring-ring flex h-4 w-6 items-center justify-center rounded-sm outline-none focus-visible:ring-2"
-                                                onClick={() => scrollToMessage(item.id, { threadId })}
-                                                type="button"
-                                            >
-                                                <span
-                                                    aria-hidden="true"
-                                                    className="bg-muted-foreground/40 group-hover:bg-foreground h-0.5 w-4 rounded-full motion-safe:transition-colors"
-                                                />
-                                            </button>
-                                        }
-                                    />
-                                    <TooltipContent className="max-w-xs" side="left">
-                                        <p className="break-words">{preview}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </li>
-                        );
-                    })}
-                </ol>
-            </TooltipProvider>
-        </nav>
-    );
+    return <MinimapRail className={className} items={items} threadId={threadId} />;
 };
 
 export default ThreadMinimap;

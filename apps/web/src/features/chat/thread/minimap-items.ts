@@ -10,32 +10,76 @@ export const MINIMAP_MIN_PROMPTS = 3;
 export const MINIMAP_PREVIEW_CHARS = 80;
 
 export interface MinimapItem {
+    /** When the prompt was sent. Absent for outline entries (the server outline carries no time) and for rows without one. */
+    createdAt?: number;
     id: string;
     /** Single-line prompt text, cut to {@link MINIMAP_PREVIEW_CHARS}. Empty for an attachment-only prompt. */
     preview: string;
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+const defaultGapUnit = (value: number, unit: "day" | "hour"): string => `${value}${unit === "day" ? "d" : "h"}`;
+
+/**
+ * The gap before a prompt, `3h` or (from a day up) `2d`. Only gaps of an hour or more get a label.
+ * `formatUnit` writes the number and its unit, so the rail can use the reader's language.
+ */
+export const minimapGapLabel = (
+    previousAt: number | undefined,
+    at: number | undefined,
+    formatUnit: (value: number, unit: "day" | "hour") => string = defaultGapUnit,
+): string | undefined => {
+    if (previousAt === undefined || at === undefined) {
+        return undefined;
+    }
+
+    const gap = at - previousAt;
+
+    if (gap < HOUR_MS) {
+        return undefined;
+    }
+
+    return gap >= DAY_MS ? formatUnit(Math.floor(gap / DAY_MS), "day") : formatUnit(Math.floor(gap / HOUR_MS), "hour");
+};
+
 const WHITESPACE_RE = /\s+/g;
+// `[label](target)`: a prompt's attachment links keep their label and drop the target, which is markup to a reader.
+// The label excludes `[` as well as `]`, so a failed match ends at the next opening bracket and a run of
+// unmatched brackets is scanned once, not once per bracket.
+// A target may hold balanced parentheses (`Function_(mathematics)`). Each alternative starts on a different character,
+// so the target scan has no overlapping paths.
+const MARKDOWN_LINK_RE = /\[((?:\\.|[^[\]\\\n])+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+["'][^"'\n]*["'])?\)/g;
+// A label may escape its brackets (`[report \[v2\].pdf]`); the preview shows the character, not the escape.
+const LABEL_ESCAPE_RE = /\\(.)/g;
 
 export const toMinimapPreview = (text: string, maxChars: number = MINIMAP_PREVIEW_CHARS): string => {
-    const flat = text.replaceAll(WHITESPACE_RE, " ").trim();
+    const flat = text
+        .replaceAll(MARKDOWN_LINK_RE, (_match, label: string) => label.replaceAll(LABEL_ESCAPE_RE, "$1"))
+        .replaceAll(WHITESPACE_RE, " ")
+        .trim();
 
     return flat.length > maxChars ? `${flat.slice(0, maxChars - 1).trimEnd()}…` : flat;
 };
-
-/** The user prompts of a message list, in order. Callers pass the active branch path, so each prompt appears once. */
-export const buildMinimapItems = (messages: ReadonlyArray<{ id: string; role: string; text: string }>): MinimapItem[] =>
-    messages
-        .filter((message) => message.role === "user")
-        .map((message) => {
-            return { id: message.id, preview: toMinimapPreview(message.text) };
-        });
 
 /**
  * Ids a prompt carries before the server names it. Sending replaces them, so they are
  * not a prompt that went missing.
  */
 export const isProvisionalId = (id: string): boolean => id.startsWith("optimistic-") || id.startsWith("transitioning-");
+
+/** The user prompts of a message list, in order. Callers pass the active branch path, so each prompt appears once. */
+export const buildMinimapItems = (messages: ReadonlyArray<{ _creationTime?: number; id: string; role: string; text: string }>): MinimapItem[] =>
+    messages
+        .filter((message) => message.role === "user")
+        .map((message) => {
+            // Seeded and local rows can lack a creation time (see MessageTimestamp); formatting NaN would print "Invalid Date".
+            // A prompt still sending carries this device's clock; its time is the server's once it is stored, so it shows none until then.
+            const hasTime = !isProvisionalId(message.id) && Number.isFinite(message._creationTime) && (message._creationTime ?? 0) > 0;
+
+            return { id: message.id, preview: toMinimapPreview(message.text), createdAt: hasTime ? message._creationTime : undefined };
+        });
 
 /**
  * The loaded prompts, merged with the server outline. The outline is the newest run of
@@ -50,9 +94,9 @@ export const mergeOutline = (outline: ReadonlyArray<{ id: string; text: string }
     }
 
     const known = new Set(outline.map((entry) => entry.id));
-    const older = outline.map((entry) => {
-        return { id: entry.id, preview: toMinimapPreview(entry.text) };
-    });
+    const loadedById = new Map(loaded.map((item) => [item.id, item]));
+    // A prompt that is also loaded keeps its loaded copy: the outline text is cut short, and the copy has the send time.
+    const older = outline.map((entry) => loadedById.get(entry.id) ?? { id: entry.id, preview: toMinimapPreview(entry.text), createdAt: undefined });
     const cut = loaded.findIndex((item) => known.has(item.id));
 
     if (cut === -1) {

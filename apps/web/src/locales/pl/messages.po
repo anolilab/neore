@@ -3354,9 +3354,9 @@ msgstr "Załącznik"
 msgid "Attachment (hidden)"
 msgstr "Załącznik (ukryty)"
 
-#: src/features/chat/thread/thread-minimap.tsx:105
+#: src/features/chat/thread/thread-minimap.tsx:109
 msgid "Attachment only"
-msgstr ""
+msgstr "Tylko załącznik"
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:70
 msgid "Attachments:"
@@ -15106,9 +15106,13 @@ msgstr "Ocena sędziego"
 msgid "Judge: {0}"
 msgstr "Sędzia: {0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:113
+#: src/features/chat/thread/thread-minimap.tsx:131
+msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
+msgstr "Przejdź do promptu {promptNumber}, {gap} po poprzednim: {preview}"
+
+#: src/features/chat/thread/thread-minimap.tsx:132
 msgid "Jump to prompt {promptNumber}: {preview}"
-msgstr ""
+msgstr "Przejdź do promptu {promptNumber}: {preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
 #: src/features/chat/pins/pin-item.tsx:40
@@ -21748,9 +21752,9 @@ msgstr "Zmienne promptu"
 msgid "Prompts"
 msgstr "Prompty"
 
-#: src/features/chat/thread/thread-minimap.tsx:100
+#: src/features/chat/thread/thread-minimap.tsx:104
 msgid "Prompts in this conversation"
-msgstr ""
+msgstr "Prompty w tej rozmowie"
 
 #: src/features/settings/components/privacy/data-access.tsx:55
 msgid "Prompts:"

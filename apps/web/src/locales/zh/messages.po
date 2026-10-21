@@ -3354,9 +3354,9 @@ msgstr "附件"
 msgid "Attachment (hidden)"
 msgstr "附件（已隐藏）"
 
-#: src/features/chat/thread/thread-minimap.tsx:105
+#: src/features/chat/thread/thread-minimap.tsx:109
 msgid "Attachment only"
-msgstr ""
+msgstr "仅附件"
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:70
 msgid "Attachments:"
@@ -15106,9 +15106,13 @@ msgstr "评委得分"
 msgid "Judge: {0}"
 msgstr "评委：{0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:113
+#: src/features/chat/thread/thread-minimap.tsx:131
+msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
+msgstr "跳转到提示 {promptNumber}，距上一条 {gap}：{preview}"
+
+#: src/features/chat/thread/thread-minimap.tsx:132
 msgid "Jump to prompt {promptNumber}: {preview}"
-msgstr ""
+msgstr "跳转到提示 {promptNumber}：{preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
 #: src/features/chat/pins/pin-item.tsx:40
@@ -21748,9 +21752,9 @@ msgstr "提示词变量"
 msgid "Prompts"
 msgstr "提示词"
 
-#: src/features/chat/thread/thread-minimap.tsx:100
+#: src/features/chat/thread/thread-minimap.tsx:104
 msgid "Prompts in this conversation"
-msgstr ""
+msgstr "本对话中的提示"
 
 #: src/features/settings/components/privacy/data-access.tsx:55
 msgid "Prompts:"

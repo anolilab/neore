@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMinimapItems, isProvisionalId, mergeOutline, MINIMAP_PREVIEW_CHARS, promptsDropped, shouldShowMinimap, toMinimapPreview } from "./minimap-items";
+import {
+    buildMinimapItems,
+    isProvisionalId,
+    mergeOutline,
+    MINIMAP_PREVIEW_CHARS,
+    minimapGapLabel,
+    promptsDropped,
+    shouldShowMinimap,
+    toMinimapPreview,
+} from "./minimap-items";
 
 describe("toMinimapPreview", () => {
     it("collapses whitespace and newlines to one line", () => {
@@ -12,6 +21,27 @@ describe("toMinimapPreview", () => {
 
         expect(preview).toHaveLength(MINIMAP_PREVIEW_CHARS);
         expect(preview.endsWith("…")).toBe(true);
+    });
+
+    it("keeps a markdown link's label and drops its target", () => {
+        expect(toMinimapPreview("check and fix [pasted-text.txt](t3-context:abc123) please")).toBe("check and fix pasted-text.txt please");
+    });
+
+    it("shows an escaped bracket in a link label as the bracket", () => {
+        expect(toMinimapPreview(String.raw`see [report \[v2\].pdf](https://example.com/file) now`)).toBe("see report [v2].pdf now");
+    });
+
+    it("keeps the label of a link with a title, in double or single quotes", () => {
+        expect(toMinimapPreview('see [spec](https://example.com/a "Title here") now')).toBe("see spec now");
+        expect(toMinimapPreview("see [spec](https://example.com/a 'Title') now")).toBe("see spec now");
+    });
+
+    it("keeps the label of a link whose target has balanced parentheses", () => {
+        expect(toMinimapPreview("read [Function](https://en.wikipedia.org/wiki/Function_(mathematics)) first")).toBe("read Function first");
+    });
+
+    it("handles a long run of unmatched opening brackets without rescanning it", () => {
+        expect(toMinimapPreview("[".repeat(50_000))).toBe(`${"[".repeat(MINIMAP_PREVIEW_CHARS - 1)}…`);
     });
 
     it("leaves text at the limit untouched", () => {
@@ -114,6 +144,31 @@ describe("mergeOutline", () => {
         expect(shouldShowMinimap([{ id: "x", preview: "only one loaded" }])).toBe(false);
         expect(shouldShowMinimap(mergeOutline(outline, [{ id: "x", preview: "only one loaded" }]))).toBe(true);
     });
+
+    it("keeps the loaded copy of a prompt the outline also lists, not its cut text", () => {
+        const merged = mergeOutline(
+            [{ id: "p1", text: "see [docs](https://example.com/" }],
+            [{ id: "p1", preview: "see docs and the full rest of the prompt", createdAt: 1000 }],
+        );
+
+        expect(merged).toStrictEqual([{ id: "p1", preview: "see docs and the full rest of the prompt", createdAt: 1000 }]);
+    });
+
+    it("keeps the send time of a loaded prompt that the outline also lists", () => {
+        const prompts = [
+            { id: "p1", preview: "first", createdAt: 1000 },
+            { id: "p2", preview: "second", createdAt: 2000 },
+        ];
+        const merged = mergeOutline(
+            [
+                { id: "p1", text: "first" },
+                { id: "p2", text: "second" },
+            ],
+            prompts,
+        );
+
+        expect(merged.map((item) => item.createdAt)).toStrictEqual([1000, 2000]);
+    });
 });
 
 describe("isProvisionalId", () => {
@@ -138,5 +193,43 @@ describe("promptsDropped", () => {
 
     it("has nothing to compare on the first read", () => {
         expect(promptsDropped(new Set(), new Set(["p1"]))).toBe(false);
+    });
+});
+
+describe("minimapGapLabel", () => {
+    const T0 = Date.UTC(2026, 9, 19, 9, 0);
+    const HOUR = 60 * 60 * 1000;
+
+    it("labels a gap of an hour or more in whole hours, and a day or more in days", () => {
+        expect(minimapGapLabel(T0, T0 + 3 * HOUR + 20 * 60 * 1000)).toBe("3h");
+        expect(minimapGapLabel(T0, T0 + 25 * HOUR)).toBe("1d");
+    });
+
+    it("writes the unit with the formatter it is given", () => {
+        expect(minimapGapLabel(T0, T0 + 3 * HOUR, (value, unit) => `${value} ${unit}`)).toBe("3 hour");
+    });
+
+    it("has no label for a shorter gap, a first prompt, or a missing time", () => {
+        expect(minimapGapLabel(T0, T0 + 59 * 60 * 1000)).toBeUndefined();
+        expect(minimapGapLabel(undefined, T0)).toBeUndefined();
+        expect(minimapGapLabel(T0, undefined)).toBeUndefined();
+    });
+});
+
+describe("buildMinimapItems send times", () => {
+    it("shows no time for a prompt still sending, whose clock is this device's", () => {
+        const items = buildMinimapItems([{ id: "optimistic-1700000000", role: "user", text: "a", _creationTime: 1_700_000_000_000 }]);
+
+        expect(items[0]?.createdAt).toBeUndefined();
+    });
+
+    it("carries the creation time, and drops a missing or zero one", () => {
+        const items = buildMinimapItems([
+            { id: "u1", role: "user", text: "a", _creationTime: 1_700_000_000_000 },
+            { id: "u2", role: "user", text: "b", _creationTime: 0 },
+        ]);
+
+        expect(items[0]?.createdAt).toBe(1_700_000_000_000);
+        expect(items[1]?.createdAt).toBeUndefined();
     });
 });

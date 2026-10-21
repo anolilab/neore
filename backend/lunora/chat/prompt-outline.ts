@@ -34,9 +34,18 @@ export const MAX_OUTLINE_PROMPTS = 500;
 export const OUTLINE_TEXT_CHARS = 200;
 
 const WHITESPACE = /\s+/g;
+// `[label](target)` keeps its label, as the rail's preview shows it. Stripped before the cut: a cut inside a target leaves
+// an open link that no later step can recognise. Same shape as the rail's own pattern (`minimap-items.ts`).
+const MARKDOWN_LINK_RE = /\[((?:\\.|[^[\]\\\n])+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+["'][^"'\n]*["'])?\)/g;
+const LABEL_ESCAPE_RE = /\\(.)/g;
 
-/** A prompt's text as the outline carries it: one line, cut short. */
-export const outlineText = (text: string | undefined): string => (text ?? "").replaceAll(WHITESPACE, " ").trim().slice(0, OUTLINE_TEXT_CHARS);
+/** A prompt's text as the outline carries it: one line, its links reduced to their labels, cut short. */
+export const outlineText = (text: string | undefined): string =>
+    (text ?? "")
+        .replaceAll(MARKDOWN_LINK_RE, (_match, label: string) => label.replaceAll(LABEL_ESCAPE_RE, "$1"))
+        .replaceAll(WHITESPACE, " ")
+        .trim()
+        .slice(0, OUTLINE_TEXT_CHARS);
 
 interface OutlinePage {
     continueCursor: null | string;

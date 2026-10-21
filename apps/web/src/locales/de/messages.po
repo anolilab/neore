@@ -3354,9 +3354,9 @@ msgstr "Anhang"
 msgid "Attachment (hidden)"
 msgstr "Anhang (ausgeblendet)"
 
-#: src/features/chat/thread/thread-minimap.tsx:105
+#: src/features/chat/thread/thread-minimap.tsx:109
 msgid "Attachment only"
-msgstr ""
+msgstr "Nur Anhang"
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:70
 msgid "Attachments:"
@@ -15106,9 +15106,13 @@ msgstr "Bewerter-Score"
 msgid "Judge: {0}"
 msgstr "Bewerter: {0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:113
+#: src/features/chat/thread/thread-minimap.tsx:131
+msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
+msgstr "Zu Prompt {promptNumber} springen, {gap} nach dem vorherigen Prompt: {preview}"
+
+#: src/features/chat/thread/thread-minimap.tsx:132
 msgid "Jump to prompt {promptNumber}: {preview}"
-msgstr ""
+msgstr "Zu Prompt {promptNumber} springen: {preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
 #: src/features/chat/pins/pin-item.tsx:40
@@ -21748,9 +21752,9 @@ msgstr "Prompt-Variablen"
 msgid "Prompts"
 msgstr "Prompts"
 
-#: src/features/chat/thread/thread-minimap.tsx:100
+#: src/features/chat/thread/thread-minimap.tsx:104
 msgid "Prompts in this conversation"
-msgstr ""
+msgstr "Prompts in dieser Unterhaltung"
 
 #: src/features/settings/components/privacy/data-access.tsx:55
 msgid "Prompts:"
