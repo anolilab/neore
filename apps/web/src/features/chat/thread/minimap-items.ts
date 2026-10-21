@@ -79,11 +79,9 @@ export const mergeOutline = (outline: ReadonlyArray<{ id: string; text: string }
     }
 
     const known = new Set(outline.map((entry) => entry.id));
-    // The outline carries no times, so a prompt that is also loaded keeps the time the loaded copy has.
-    const loadedTimes = new Map(loaded.map((item) => [item.id, item.createdAt]));
-    const older = outline.map((entry) => {
-        return { id: entry.id, preview: toMinimapPreview(entry.text), createdAt: loadedTimes.get(entry.id) };
-    });
+    const loadedById = new Map(loaded.map((item) => [item.id, item]));
+    // A prompt that is also loaded keeps its loaded copy: the outline text is cut short, and the copy has the send time.
+    const older = outline.map((entry) => loadedById.get(entry.id) ?? { id: entry.id, preview: toMinimapPreview(entry.text), createdAt: undefined });
     const cut = loaded.findIndex((item) => known.has(item.id));
 
     if (cut === -1) {

@@ -147,6 +147,9 @@ describe("helpers", () => {
         expect(outlineText("  a\n\n b\tc ")).toBe("a b c");
         expect(outlineText("x".repeat(500))).toHaveLength(200);
         expect(outlineText(undefined)).toBe("");
+        expect(outlineText("see [Function](https://en.wikipedia.org/wiki/Function_(mathematics)) now")).toBe("see Function now");
+        // A target longer than the cut must not survive as a half link.
+        expect(outlineText(`${"a".repeat(190)} [docs](https://example.com/${"p".repeat(300)})`)).toBe(`${"a".repeat(190)} docs`);
     });
 
     it("recognises a user prompt row only", () => {

@@ -136,6 +136,15 @@ describe("mergeOutline", () => {
         expect(shouldShowMinimap(mergeOutline(outline, [{ id: "x", preview: "only one loaded" }]))).toBe(true);
     });
 
+    it("keeps the loaded copy of a prompt the outline also lists, not its cut text", () => {
+        const merged = mergeOutline(
+            [{ id: "p1", text: "see [docs](https://example.com/" }],
+            [{ id: "p1", preview: "see docs and the full rest of the prompt", createdAt: 1000 }],
+        );
+
+        expect(merged).toStrictEqual([{ id: "p1", preview: "see docs and the full rest of the prompt", createdAt: 1000 }]);
+    });
+
     it("keeps the send time of a loaded prompt that the outline also lists", () => {
         const prompts = [
             { id: "p1", preview: "first", createdAt: 1000 },

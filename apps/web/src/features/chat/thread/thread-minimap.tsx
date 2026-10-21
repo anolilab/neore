@@ -126,7 +126,11 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
                                         render={
                                             <button
                                                 aria-current={isActive ? "location" : undefined}
-                                                aria-label={t`Jump to prompt ${promptNumber}: ${preview}`}
+                                                aria-label={
+                                                    gap
+                                                        ? t`Jump to prompt ${promptNumber}, ${gap} after the previous prompt: ${preview}`
+                                                        : t`Jump to prompt ${promptNumber}: ${preview}`
+                                                }
                                                 className="group focus-visible:ring-ring flex h-4 w-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2"
                                                 data-active={isActive}
                                                 onClick={() => scrollToMessage(item.id, { threadId })}

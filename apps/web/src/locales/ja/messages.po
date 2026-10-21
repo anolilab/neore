@@ -3354,9 +3354,9 @@ msgstr "添付ファイル"
 msgid "Attachment (hidden)"
 msgstr "添付ファイル（非表示）"
 
-#: src/features/chat/thread/thread-minimap.tsx:105
+#: src/features/chat/thread/thread-minimap.tsx:109
 msgid "Attachment only"
-msgstr ""
+msgstr "添付のみ"
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:70
 msgid "Attachments:"
@@ -15106,9 +15106,13 @@ msgstr "ジャッジスコア"
 msgid "Judge: {0}"
 msgstr "ジャッジ：{0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:113
+#: src/features/chat/thread/thread-minimap.tsx:131
+msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
+msgstr "プロンプト {promptNumber} へ移動（前のプロンプトから {gap} 後）: {preview}"
+
+#: src/features/chat/thread/thread-minimap.tsx:132
 msgid "Jump to prompt {promptNumber}: {preview}"
-msgstr ""
+msgstr "プロンプト {promptNumber} へ移動: {preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
 #: src/features/chat/pins/pin-item.tsx:40
@@ -21748,9 +21752,9 @@ msgstr "プロンプト変数"
 msgid "Prompts"
 msgstr "プロンプト"
 
-#: src/features/chat/thread/thread-minimap.tsx:100
+#: src/features/chat/thread/thread-minimap.tsx:104
 msgid "Prompts in this conversation"
-msgstr ""
+msgstr "この会話のプロンプト"
 
 #: src/features/settings/components/privacy/data-access.tsx:55
 msgid "Prompts:"
