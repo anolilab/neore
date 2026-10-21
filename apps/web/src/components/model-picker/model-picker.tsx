@@ -352,6 +352,8 @@ const ModelItemContent = memo<{
                         <button
                             aria-label={t`Move up in starred`}
                             className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
+                            data-move-delta={-1}
+                            data-move-id={model.id}
                             disabled={!canMoveUp}
                             onClick={(e) => {
                                 e.preventDefault();
@@ -365,6 +367,8 @@ const ModelItemContent = memo<{
                         <button
                             aria-label={t`Move down in starred`}
                             className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
+                            data-move-delta={1}
+                            data-move-id={model.id}
                             disabled={!canMoveDown}
                             onClick={(e) => {
                                 e.preventDefault();
@@ -625,6 +629,8 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const [sort, setSort] = useState<ModelSort>("default");
 
     const pickerRef = useRef<HTMLDivElement>(null);
+    // The arrow that moved a favorite, so focus can follow the row after the list reorders.
+    const [pendingMoveFocus, setPendingMoveFocus] = useState<{ before: string; delta: -1 | 1; modelId: string } | undefined>(undefined);
     const onSelectRef = useRef(onSelect);
     const onSelectMultipleRef = useRef(onSelectMultiple);
 
@@ -872,34 +878,64 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const isStarredEmpty = activeTab === "starred" && favoriteModels.length === 0 && !searchQuery.trim();
     const isShowGroupLabels = activeTab !== "starred" && sort === "default";
 
+    // Moves a starred model one place and remembers which arrow did it, so focus can follow the row (see the effect below).
+    const moveFavorite = useCallback(
+        (modelId: string, delta: -1 | 1) => {
+            if (!onMoveFavorite) {
+                return;
+            }
+
+            const ids = favoriteModels.map((model) => model.id);
+            const target = adjacentFavorite(ids, modelId, delta);
+
+            if (target === undefined) {
+                return;
+            }
+
+            onMoveFavorite(modelId, target);
+            setPendingMoveFocus({ before: ids.join("\u{0}"), delta, modelId });
+
+            // The swap puts the model one place along, so its new position is its old index plus the step.
+            const model = favoriteModels.find((entry) => entry.id === modelId);
+
+            if (model) {
+                const position = ids.indexOf(modelId) + delta + 1;
+
+                setMoveAnnouncement(t`${getModelLabel(model, nicknames)} moved to position ${position} of ${ids.length} in starred`);
+            }
+        },
+        [favoriteModels, nicknames, onMoveFavorite, t],
+    );
+
     // Only the starred list in its own order can be reordered; a sort or a search would hide what the arrows mean.
     const reorder = useMemo(() => {
         if (activeTab !== "starred" || sort !== "default" || searchQuery.trim() || !onMoveFavorite) {
             return undefined;
         }
 
-        const ids = favoriteModels.map((model) => model.id);
+        return { ids: favoriteModels.map((model) => model.id), move: moveFavorite };
+    }, [activeTab, favoriteModels, moveFavorite, onMoveFavorite, searchQuery, sort]);
 
-        return {
-            ids,
-            move: (modelId: string, delta: -1 | 1) => {
-                const target = adjacentFavorite(ids, modelId, delta);
+    // A move reorders the keyed rows, which can drop focus from the arrow that was pressed. Put it back on that arrow,
+    // or on the other arrow of the row when the pressed one is now at the list edge and disabled.
+    const orderKey = reorder?.ids.join("\u{0}");
 
-                if (target !== undefined) {
-                    onMoveFavorite(modelId, target);
+    useLayoutEffect(() => {
+        // The order is not the one the move started from yet: wait for the reordered rows to commit.
+        if (!pendingMoveFocus || pendingMoveFocus.before === orderKey) {
+            return;
+        }
 
-                    // The swap puts the model one place along, so its new position is its old index plus the step.
-                    const model = favoriteModels.find((entry) => entry.id === modelId);
+        const { delta, modelId } = pendingMoveFocus;
+        const arrowFor = (step: -1 | 1) =>
+            pickerRef.current?.querySelector<HTMLButtonElement>(`[data-move-id="${CSS.escape(modelId)}"][data-move-delta="${CSS.escape(String(step))}"]`);
+        const pressed = arrowFor(delta);
+        const other = delta === -1 ? 1 : -1;
+        const arrow = pressed && !pressed.disabled ? pressed : arrowFor(other);
 
-                    if (model) {
-                        const position = ids.indexOf(modelId) + delta + 1;
-
-                        setMoveAnnouncement(t`${getModelLabel(model, nicknames)} moved to position ${position} of ${ids.length} in starred`);
-                    }
-                }
-            },
-        };
-    }, [activeTab, favoriteModels, nicknames, onMoveFavorite, searchQuery, sort, t]);
+        arrow?.focus();
+        setPendingMoveFocus(undefined);
+    }, [orderKey, pendingMoveFocus]);
 
     // Derive the "anchor" mode from the first selected model in parallel mode.
     // All other types are locked out once a selection is made.
