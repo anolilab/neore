@@ -350,7 +350,7 @@ const ModelItemContent = memo<{
                 {onMove ? (
                     <>
                         <button
-                            aria-label={t`Move up in starred`}
+                            aria-label={t`Move ${label} up in starred`}
                             className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
                             data-move-delta={-1}
                             data-move-id={model.id}
@@ -365,7 +365,7 @@ const ModelItemContent = memo<{
                             <ArrowUp aria-hidden="true" className="size-3.5" />
                         </button>
                         <button
-                            aria-label={t`Move down in starred`}
+                            aria-label={t`Move ${label} down in starred`}
                             className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
                             data-move-delta={1}
                             data-move-id={model.id}
