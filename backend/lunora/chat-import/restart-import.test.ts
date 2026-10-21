@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { restartImportJob } from "./functions";
-import { CANCELLED_IMPORT_MESSAGE } from "./restart";
-import { importCounts, processConversationBatch, reapRestartableImport } from "./steps";
+import { CANCELLED_IMPORT_MESSAGE, keptImportKeyFor } from "./restart";
+import { finalizeImport, importCounts, processConversationBatch, reapRestartableImport } from "./steps";
 
 // The session is read straight off the harness identity: `user` is a `.global()`
 // (D1) table the in-memory harness cannot write (as in `workflow/stored-urls.test.ts`).
@@ -81,9 +81,20 @@ describe("restartImportJob", () => {
         const harness = lunoraTest(schema as never);
         const jobId = await insertJob(harness);
 
-        await insertJob(harness, { completedAt: undefined, errorMessage: undefined, r2Key: "", status: "processing" });
+        await insertJob(harness, { completedAt: undefined, createdAt: FAILED_AT - 5000, errorMessage: undefined, r2Key: "", status: "processing" });
 
         await expect(harness.withIdentity({ userId: OWNER }).mutation(restartImportJob as never, { jobId } as never)).rejects.toThrow("already in progress");
+    });
+
+    it("refuses a job that a newer import has superseded", async () => {
+        const harness = lunoraTest(schema as never);
+        const jobId = await insertJob(harness);
+
+        await insertJob(harness, { createdAt: FAILED_AT, completedAt: FAILED_AT, errorMessage: undefined, failedConversations: 0, importedConversations: 5, r2Key: "", status: "completed" });
+
+        await expect(harness.withIdentity({ userId: OWNER }).mutation(restartImportJob as never, { jobId } as never)).rejects.toThrow(
+            "Only the most recent import",
+        );
     });
 
     it("moves a restartable job back to processing and clears its failure", async () => {
@@ -162,5 +173,70 @@ describe("processConversationBatch", () => {
         );
 
         expect(await harness.run(async (ctx: any) => await ctx.runQuery(importCounts, { jobId }))).toStrictEqual({ failed: 1, imported: 1, total: 5 });
+    });
+});
+
+describe("finalizeImport", () => {
+    const finalize = (harness: ReturnType<typeof lunoraTest>, jobId: unknown, args: Record<string, unknown>) =>
+        harness.run(async (ctx: any) => await ctx.runMutation(finalizeImport, { jobId, r2Key: "uploads/owner/staged", userId: OWNER, ...args }));
+
+    const insertProcessing = (harness: ReturnType<typeof lunoraTest>) =>
+        insertJob(harness, { completedAt: undefined, errorMessage: undefined, failedConversations: 0, importedConversations: 0, r2Key: "", status: "processing" });
+
+    it("keeps the copy of a failure that committed conversations, under its key", async () => {
+        const harness = lunoraTest(schema as never);
+        const jobId = await insertProcessing(harness);
+
+        await finalize(harness, jobId, { errorMessage: "1 conversations failed to import", failed: 1, imported: 3, status: "failed" });
+
+        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+
+        expect(job.r2Key).toBe(keptImportKeyFor(OWNER, jobId));
+        expect(job.status).toBe("failed");
+    });
+
+    it("keeps no copy of a failure that committed nothing", async () => {
+        const harness = lunoraTest(schema as never);
+        const jobId = await insertProcessing(harness);
+
+        await finalize(harness, jobId, { errorMessage: "Import file contains no conversations", status: "failed" });
+
+        expect((await harness.run(async (ctx: any) => await ctx.db.get(jobId))).r2Key).toBe("");
+    });
+
+    it("keeps no copy of a completed import", async () => {
+        const harness = lunoraTest(schema as never);
+        const jobId = await insertProcessing(harness);
+
+        await finalize(harness, jobId, { failed: 0, imported: 5, status: "completed" });
+
+        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+
+        expect(job.status).toBe("completed");
+        expect(job.r2Key).toBe("");
+    });
+
+    it("keeps the cancel marker and keeps no copy when the run reports a failure after a cancel", async () => {
+        const harness = lunoraTest(schema as never);
+        const jobId = await insertJob(harness, { completedAt: FAILED_AT, errorMessage: CANCELLED_IMPORT_MESSAGE, failedConversations: 2, importedConversations: 3, r2Key: "", status: "failed" });
+
+        await finalize(harness, jobId, { errorMessage: "2 conversations failed to import", failed: 2, imported: 3, status: "failed" });
+
+        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+
+        expect(job.errorMessage).toBe(CANCELLED_IMPORT_MESSAGE);
+        expect(job.r2Key).toBe("");
+    });
+
+    it("leaves the committed counts alone when the run reports none", async () => {
+        const harness = lunoraTest(schema as never);
+        const jobId = await insertJob(harness, { completedAt: undefined, errorMessage: undefined, failedConversations: 1, importedConversations: 2, r2Key: "", status: "processing" });
+
+        await finalize(harness, jobId, { errorMessage: "boom", status: "failed" });
+
+        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+
+        expect(job.importedConversations).toBe(2);
+        expect(job.failedConversations).toBe(1);
     });
 });

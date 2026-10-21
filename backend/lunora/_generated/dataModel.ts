@@ -2187,7 +2187,7 @@ export interface IndexNamesByTable {
     chatFileAccess: "by_userId" | "by_fileId_userId";
     chatFiles: "refcount" | "hash_filename";
     chatFileThreads: "by_userId" | "by_threadId" | "by_fileId_threadId";
-    chatImportJobs: "by_user_and_status";
+    chatImportJobs: "by_user_and_createdAt" | "by_user_and_status";
     cleanupConfigs: never;
     cleanupLogs: "by_runAt";
     codingAgentRuns: "by_task_and_createdAt" | "by_user_and_toolCallId" | "by_user_and_createdAt" | "by_user_and_status";

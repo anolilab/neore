@@ -133,6 +133,7 @@ export const chatImportJobs = sqliteTable("chatImportJobs", {
     totalConversations: real("totalConversations").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({
+    by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
 }));
 

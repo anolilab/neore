@@ -409,7 +409,8 @@ export const schema = defineSchema({
         userId: v.string(),
     })
         .shardBy("userId")
-        .index("by_user_and_status", ["userId", "status"]),
+        .index("by_user_and_status", ["userId", "status"])
+        .index("by_user_and_createdAt", ["userId", "createdAt"]),
 
     cleanupConfigs: defineTable({
         batchSize: v.number(),

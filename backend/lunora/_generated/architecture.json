@@ -2423,12 +2423,7 @@
     {
       "from": "function:chat_import_steps:keepImportFile",
       "kind": "call",
-      "to": "function:chat_import_steps:checkJobCancelled"
-    },
-    {
-      "from": "function:chat_import_steps:keepImportFile",
-      "kind": "call",
-      "to": "function:chat_import_steps:importCounts"
+      "to": "function:chat_import_steps:importJobExists"
     },
     {
       "from": "function:chat_import_steps:processConversationBatch",
@@ -9718,6 +9713,13 @@
       "module": "chat-import"
     },
     {
+      "detail": "query",
+      "id": "function:chat_import_steps:importJobExists",
+      "kind": "function",
+      "name": "chat_import.steps.importJobExists",
+      "module": "chat-import"
+    },
+    {
       "detail": "action",
       "id": "function:chat_import_steps:keepImportFile",
       "kind": "function",
@@ -16851,37 +16853,31 @@
     {
       "file": "chat-import/gdpr",
       "kind": "read",
-      "line": 11,
+      "line": 12,
       "reason": "\"eraseImportJobsForUser\" is not a registered function"
     },
     {
       "file": "chat-import/gdpr",
       "kind": "write",
-      "line": 20,
+      "line": 22,
       "reason": "\"eraseImportJobsForUser\" is not a registered function"
     },
     {
       "file": "chat-import/workflows/import-workflow",
       "kind": "call",
-      "line": 47,
+      "line": 49,
       "reason": "\"chatImportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "chat-import/workflows/import-workflow",
       "kind": "call",
-      "line": 54,
+      "line": 55,
       "reason": "\"chatImportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "chat-import/workflows/import-workflow",
       "kind": "call",
-      "line": 78,
-      "reason": "\"chatImportWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "chat-import/workflows/import-workflow",
-      "kind": "call",
-      "line": 85,
+      "line": 77,
       "reason": "\"chatImportWorkflowConfig\" is not a registered function"
     },
     {

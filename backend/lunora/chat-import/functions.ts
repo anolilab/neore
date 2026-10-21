@@ -46,9 +46,10 @@ export const getImportStatus = authQuery
     .query(async ({ ctx }) => {
         const { userId } = ctx.user;
 
+        // Newest by `createdAt`: the index's status key would sort by status string first.
         const job = await ctx.db
             .query("chatImportJobs")
-            .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
+            .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
             .order("desc")
             .first();
 
@@ -167,6 +168,17 @@ export const restartImportJob = authMutation
 
         if (!isRestartable(job)) {
             throw new LunoraError("CONFLICT", "This import cannot be restarted");
+        }
+
+        // Only the newest import is restartable: an older failed one would import an outdated file over the user's later imports.
+        const newest = await ctx.db
+            .query("chatImportJobs")
+            .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
+            .order("desc")
+            .first();
+
+        if (newest?._id !== job._id) {
+            throw new LunoraError("CONFLICT", "Only the most recent import can be restarted");
         }
 
         const existing = await ctx.db

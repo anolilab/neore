@@ -560,6 +560,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_import_steps:checkJobCancelled": lunora_chat_import_steps_42.checkJobCancelled as unknown as RegisteredLunoraFunction,
     "chat_import_steps:finalizeImport": lunora_chat_import_steps_42.finalizeImport as unknown as RegisteredLunoraFunction,
     "chat_import_steps:importCounts": lunora_chat_import_steps_42.importCounts as unknown as RegisteredLunoraFunction,
+    "chat_import_steps:importJobExists": lunora_chat_import_steps_42.importJobExists as unknown as RegisteredLunoraFunction,
     "chat_import_steps:keepImportFile": lunora_chat_import_steps_42.keepImportFile as unknown as RegisteredLunoraFunction,
     "chat_import_steps:processConversationBatch": lunora_chat_import_steps_42.processConversationBatch as unknown as RegisteredLunoraFunction,
     "chat_import_steps:processImportFile": lunora_chat_import_steps_42.processImportFile as unknown as RegisteredLunoraFunction,
@@ -2908,6 +2909,12 @@ if (typeof source["jobId"] !== "string") return DEFER;
 return { "jobId": source["jobId"] };
 });
 installCompiledValidatorMap(lunora_chat_import_steps_42.importCounts.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["jobId"] !== "string") return DEFER;
+return { "jobId": source["jobId"] };
+});
+installCompiledValidatorMap(lunora_chat_import_steps_42.importJobExists.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["jobId"] !== "string") return DEFER;
@@ -8519,9 +8526,10 @@ export interface Caller {
         };
         steps: {
             checkJobCancelled: (args: { jobId: Id<"chatImportJobs"> }) => Promise<boolean>;
-            finalizeImport: (args: { errorMessage?: string; failed: number; imported: number; jobId: Id<"chatImportJobs">; keptKey?: string; r2Key: string; status: "completed" | "failed" }) => Promise<null>;
+            finalizeImport: (args: { errorMessage?: string; failed?: number; imported?: number; jobId: Id<"chatImportJobs">; r2Key: string; status: "completed" | "failed"; userId: string }) => Promise<null>;
             importCounts: (args: { jobId: Id<"chatImportJobs"> }) => Promise<{ failed: number; imported: number; total: number }>;
-            keepImportFile: (args: { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }) => Promise<string | null>;
+            importJobExists: (args: { jobId: Id<"chatImportJobs"> }) => Promise<boolean>;
+            keepImportFile: (args: { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }) => Promise<string>;
             processConversationBatch: (args: { conversations: Array<{ createdAt?: number; messages: Array<{ content: string; createdAt?: number; role: "user" | "assistant" }>; title: string }>; jobId?: Id<"chatImportJobs">; provider: string; userId: string }) => Promise<{ failed: number; imported: number }>;
             processImportFile: (args: { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }) => Promise<{ failed: number; imported: number; }>;
             reapRestartableImport: (args: { failedAt: number; jobId: Id<"chatImportJobs">; r2Key: string }) => Promise<null>;
@@ -10145,6 +10153,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             checkJobCancelled: (args) => callRegistered(context, "chat_import_steps:checkJobCancelled", args),
             finalizeImport: (args) => callRegistered(context, "chat_import_steps:finalizeImport", args),
             importCounts: (args) => callRegistered(context, "chat_import_steps:importCounts", args),
+            importJobExists: (args) => callRegistered(context, "chat_import_steps:importJobExists", args),
             keepImportFile: (args) => callRegistered(context, "chat_import_steps:keepImportFile", args),
             processConversationBatch: (args) => callRegistered(context, "chat_import_steps:processConversationBatch", args),
             processImportFile: (args) => callRegistered(context, "chat_import_steps:processImportFile", args),
