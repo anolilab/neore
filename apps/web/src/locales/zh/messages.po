@@ -439,7 +439,7 @@ msgstr "{0}（{1} 个评分）"
 
 #. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
 #. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
-#: src/components/model-picker/model-picker.tsx:308
+#: src/components/model-picker/model-picker.tsx:319
 msgid "{0} input, {1} output per 1M tokens"
 msgstr ""
 
@@ -515,7 +515,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "已使用 {0}/{1} 个 token（{2}%）"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1092
+#: src/components/model-picker/model-picker.tsx:1218
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "已选择 {0}/{MAX_PARALLEL} 个"
 
@@ -812,6 +812,11 @@ msgstr "{itemCount, plural, other {{nodeName}：包含 # 项的对象}}"
 msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, other {# 项}}"
 
+#. placeholder {0}: ids.length
+#: src/components/model-picker/model-picker.tsx:910
+msgid "{label} moved to position {position} of {0} in starred"
+msgstr "{label}已移至星标中的第{position}位（共{0}位）"
+
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
 msgstr "{metricLabel} > 每天 {threshold}"
@@ -909,7 +914,7 @@ msgstr "{name} 连接已激活"
 msgid "{name} disconnected"
 msgstr "{name} 已断开连接"
 
-#: src/components/model-picker/model-picker.tsx:677
+#: src/components/model-picker/model-picker.tsx:734
 msgid "{name} hidden from the model picker"
 msgstr ""
 
@@ -1936,7 +1941,7 @@ msgid "Add to Favorites"
 msgstr "添加到收藏"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:329
+#: src/components/model-picker/model-picker.tsx:340
 msgid "Add to starred"
 msgstr "添加到星标"
 
@@ -2495,8 +2500,8 @@ msgstr "垂直对齐（V）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:617
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
-#: src/components/model-picker/model-picker.tsx:942
-#: src/components/model-picker/model-picker.tsx:1020
+#: src/components/model-picker/model-picker.tsx:1067
+#: src/components/model-picker/model-picker.tsx:1145
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:420
@@ -2574,7 +2579,7 @@ msgid "All MCP servers active"
 msgstr "所有 MCP 服务器已启用"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:563
-#: src/components/model-picker/model-picker.tsx:892
+#: src/components/model-picker/model-picker.tsx:1017
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "所有模型"
@@ -3371,7 +3376,7 @@ msgid "Auckland"
 msgstr "奥克兰"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
-#: src/components/model-picker/model-picker.tsx:994
+#: src/components/model-picker/model-picker.tsx:1119
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:119
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -4448,7 +4453,7 @@ msgstr "缓存"
 msgid "Cache Hit Rate"
 msgstr "缓存命中率"
 
-#: src/components/model-picker/model-picker.tsx:203
+#: src/components/model-picker/model-picker.tsx:210
 #: src/features/chat/thread/message-cost-badge.tsx:56
 msgid "Cached input"
 msgstr "缓存输入"
@@ -5310,7 +5315,7 @@ msgstr "点击"
 msgid "Click \"{selector}\""
 msgstr "点击“{selector}”"
 
-#: src/components/model-picker/model-picker.tsx:1052
+#: src/components/model-picker/model-picker.tsx:1177
 msgid "Click ★ on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型上的 ★ 即可添加到这里。"
 
@@ -6032,7 +6037,7 @@ msgstr "已配置"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1114
+#: src/components/model-picker/model-picker.tsx:1240
 msgid "Confirm"
 msgstr "确认"
 
@@ -6959,6 +6964,10 @@ msgstr "无法保存每日简报设置。"
 #: src/features/notifications/components/notification-settings.tsx:103
 msgid "Could not save the email setting."
 msgstr ""
+
+#: src/components/model-picker/model-picker.tsx:913
+msgid "Could not save the new order for {label}"
+msgstr "无法保存{label}的新顺序"
 
 #: src/features/pages/components/page-view.tsx:160
 #: src/features/pages/components/page-view.tsx:248
@@ -7926,7 +7935,7 @@ msgstr "默认模型已更新"
 msgid "Default Models"
 msgstr "默认模型"
 
-#: src/components/model-picker/model-picker.tsx:1005
+#: src/components/model-picker/model-picker.tsx:1130
 msgid "Default order"
 msgstr ""
 
@@ -8418,7 +8427,7 @@ msgstr "描述你想要什么。构建器会在不清楚时提问，然后提出
 msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 msgstr "描述你的工作流……例如“根据文本生成图片，放大后再移除背景”"
 
-#: src/components/model-picker/model-picker.tsx:158
+#: src/components/model-picker/model-picker.tsx:165
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -8504,7 +8513,7 @@ msgstr "每个答案都必须通过的确定性检查。"
 msgid "Deterministic, consistent"
 msgstr "确定、一致"
 
-#: src/components/model-picker/model-picker.tsx:225
+#: src/components/model-picker/model-picker.tsx:232
 #: src/features/marketing/components/tutorials-page.tsx:131
 msgid "Developer"
 msgstr "开发者"
@@ -9519,7 +9528,7 @@ msgid "Efficient reasoning with sparse activation"
 msgstr "稀疏激活的高效推理"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:153
-#: src/components/model-picker/model-picker.tsx:76
+#: src/components/model-picker/model-picker.tsx:77
 msgid "Effort Control"
 msgstr "推理强度控制"
 
@@ -10711,7 +10720,7 @@ msgstr "更长时长"
 msgid "extended thinking"
 msgstr "扩展思考"
 
-#: src/components/model-picker/model-picker.tsx:80
+#: src/components/model-picker/model-picker.tsx:81
 msgid "Extended Thinking"
 msgstr "扩展思考"
 
@@ -11448,8 +11457,8 @@ msgstr "更新收藏失败"
 msgid "Failed to update favorite status"
 msgstr "更新收藏状态失败"
 
-#: src/components/model-picker/model-picker.tsx:672
-#: src/components/model-picker/model-picker.tsx:681
+#: src/components/model-picker/model-picker.tsx:729
+#: src/components/model-picker/model-picker.tsx:738
 #: src/features/settings/components/chat/model-filter-settings.tsx:56
 #: src/features/settings/components/chat/model-filter-settings.tsx:67
 msgid "Failed to update filter rules"
@@ -11610,7 +11619,7 @@ msgid "fast"
 msgstr "快速"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:141
-#: src/components/model-picker/model-picker.tsx:77
+#: src/components/model-picker/model-picker.tsx:78
 #: src/features/marketing/components/model-detail-page.tsx:33
 #: src/features/settings/components/chat/models-settings.tsx:29
 msgid "Fast"
@@ -11899,7 +11908,7 @@ msgstr "精选"
 msgid "Featured image"
 msgstr "特色图片"
 
-#: src/components/model-picker/model-picker.tsx:170
+#: src/components/model-picker/model-picker.tsx:177
 #: src/features/marketing/components/gateway-footer.tsx:32
 #: src/features/marketing/components/gateway-landing-page.tsx:510
 #: src/features/marketing/components/gateway-navbar.tsx:53
@@ -13579,7 +13588,7 @@ msgstr "访客账号"
 msgid "Guest accounts"
 msgstr "访客账号"
 
-#: src/components/model-picker/model-picker.tsx:856
+#: src/components/model-picker/model-picker.tsx:981
 msgid "Guest accounts use free models only."
 msgstr "访客账号只能使用免费模型。"
 
@@ -13718,7 +13727,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1029
+#: src/components/model-picker/model-picker.tsx:1154
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -14143,7 +14152,7 @@ msgstr "插画"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:968
+#: src/components/model-picker/model-picker.tsx:1093
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -14182,7 +14191,7 @@ msgstr "图片附件（已隐藏）"
 msgid "image editing"
 msgstr "图像编辑"
 
-#: src/components/model-picker/model-picker.tsx:78
+#: src/components/model-picker/model-picker.tsx:79
 #: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Image Gen"
 msgstr "图像生成"
@@ -14631,7 +14640,7 @@ msgid "inpainting"
 msgstr "局部重绘"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
-#: src/components/model-picker/model-picker.tsx:193
+#: src/components/model-picker/model-picker.tsx:200
 #: src/features/devices/components/device-tool-call.tsx:89
 #: src/features/evals/components/case-fields.tsx:69
 #: src/features/evals/components/dataset-panel.tsx:144
@@ -16186,7 +16195,7 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1097
+#: src/components/model-picker/model-picker.tsx:1223
 msgid "Locked to {0} models"
 msgstr "已锁定为{0}模型"
 
@@ -16463,7 +16472,7 @@ msgstr "管理同意偏好"
 #~ msgid "Manage gateway API keys with per-key budgets and rate limits"
 #~ msgstr "管理网关 API 密钥，支持按密钥设置预算和速率限制"
 
-#: src/components/model-picker/model-picker.tsx:684
+#: src/components/model-picker/model-picker.tsx:741
 msgid "Manage hidden labs"
 msgstr ""
 
@@ -16687,7 +16696,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大大小：{size} • 最多 {maxFiles} 个文件"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
-#: src/components/model-picker/model-picker.tsx:1091
+#: src/components/model-picker/model-picker.tsx:1217
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "已达到 {MAX_PARALLEL} 个模型的上限"
 
@@ -17263,7 +17272,7 @@ msgstr "模型已启用"
 msgid "Model filter"
 msgstr "模型筛选"
 
-#: src/components/model-picker/model-picker.tsx:344
+#: src/components/model-picker/model-picker.tsx:389
 msgid "Model info"
 msgstr "模型信息"
 
@@ -17541,6 +17550,14 @@ msgstr "下移 {0}"
 msgid "Move {0} up"
 msgstr "上移 {0}"
 
+#: src/components/model-picker/model-picker.tsx:372
+msgid "Move {label} down in starred"
+msgstr "将{label}在星标中下移"
+
+#: src/components/model-picker/model-picker.tsx:357
+msgid "Move {label} up in starred"
+msgstr "将{label}在星标中上移"
+
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
 msgstr "下移"
@@ -17746,7 +17763,7 @@ msgstr "缅甸语（缅甸）"
 msgid "Name"
 msgstr "名称"
 
-#: src/components/model-picker/model-picker.tsx:1006
+#: src/components/model-picker/model-picker.tsx:1131
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -18030,7 +18047,7 @@ msgid "Never used"
 msgstr "从未使用"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:145
-#: src/components/model-picker/model-picker.tsx:315
+#: src/components/model-picker/model-picker.tsx:326
 #: src/features/settings/components/chat/models-settings.tsx:42
 #: src/features/settings/components/chat/models-settings.tsx:566
 msgid "New"
@@ -18095,7 +18112,7 @@ msgstr "新建数据集"
 msgid "New Export"
 msgstr "新建导出"
 
-#: src/components/model-picker/model-picker.tsx:1007
+#: src/components/model-picker/model-picker.tsx:1132
 msgid "New first"
 msgstr ""
 
@@ -18599,7 +18616,7 @@ msgid "No models found matching your filters."
 msgstr "未找到符合筛选条件的模型。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:711
-#: src/components/model-picker/model-picker.tsx:1058
+#: src/components/model-picker/model-picker.tsx:1183
 msgid "No models found."
 msgstr "未找到模型。"
 
@@ -18789,7 +18806,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "未检测到语音。免提模式已停止。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:703
-#: src/components/model-picker/model-picker.tsx:1050
+#: src/components/model-picker/model-picker.tsx:1175
 msgid "No starred models"
 msgstr "没有星标模型"
 
@@ -19364,7 +19381,7 @@ msgid "Online"
 msgstr "在线"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:434
+#: src/components/model-picker/model-picker.tsx:483
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "只能比较{0}模型。清除选择以切换类型。"
 
@@ -20166,7 +20183,7 @@ msgstr "扩图"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:523
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
-#: src/components/model-picker/model-picker.tsx:197
+#: src/components/model-picker/model-picker.tsx:204
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
 #: src/features/workflow/types/index.ts:584
@@ -20329,7 +20346,7 @@ msgid "Paraguay"
 msgstr "巴拉圭"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:595
-#: src/components/model-picker/model-picker.tsx:922
+#: src/components/model-picker/model-picker.tsx:1047
 msgid "Parallel"
 msgstr "并行"
 
@@ -20557,7 +20574,7 @@ msgstr "通过 PayPal 处理付款、订单、发票和订阅"
 msgid "Payments, subscriptions, and financial data"
 msgstr "付款、订阅和财务数据"
 
-#: src/components/model-picker/model-picker.tsx:79
+#: src/components/model-picker/model-picker.tsx:80
 #: src/features/settings/components/chat/models-settings.tsx:34
 msgid "PDF"
 msgstr "PDF"
@@ -21352,15 +21369,15 @@ msgstr "上一张幻灯片"
 msgid "Previous version"
 msgstr "上一个版本"
 
-#: src/components/model-picker/model-picker.tsx:189
+#: src/components/model-picker/model-picker.tsx:196
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1009
+#: src/components/model-picker/model-picker.tsx:1134
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1008
+#: src/components/model-picker/model-picker.tsx:1133
 msgid "Price: low to high"
 msgstr ""
 
@@ -21430,7 +21447,7 @@ msgid "Private by default"
 msgstr "默认私密"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
-#: src/components/model-picker/model-picker.tsx:302
+#: src/components/model-picker/model-picker.tsx:313
 #: src/features/billing/components/personal-plan-card.tsx:23
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
@@ -21767,7 +21784,7 @@ msgstr "久经验证的电影美学"
 msgid "Proven reliability from previous generation"
 msgstr "上一代久经验证的可靠性"
 
-#: src/components/model-picker/model-picker.tsx:219
+#: src/components/model-picker/model-picker.tsx:226
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -22787,7 +22804,7 @@ msgid "Remove from project"
 msgstr "从项目中移除"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:329
+#: src/components/model-picker/model-picker.tsx:340
 msgid "Remove from starred"
 msgstr "从星标中移除"
 
@@ -24024,7 +24041,7 @@ msgid "Search models by name, ID, or provider..."
 msgstr "按名称、ID 或提供商搜索模型..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:528
-#: src/components/model-picker/model-picker.tsx:863
+#: src/components/model-picker/model-picker.tsx:988
 msgid "Search models..."
 msgstr "搜索模型..."
 
@@ -24962,7 +24979,7 @@ msgid "Sign up successful"
 msgstr "注册成功"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:246
-#: src/components/model-picker/model-picker.tsx:431
+#: src/components/model-picker/model-picker.tsx:480
 msgid "Sign up to unlock all models"
 msgstr "注册以解锁所有模型"
 
@@ -25028,7 +25045,7 @@ msgid "Singapore"
 msgstr "新加坡"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:582
-#: src/components/model-picker/model-picker.tsx:910
+#: src/components/model-picker/model-picker.tsx:1035
 msgid "Single"
 msgstr "单个"
 
@@ -25361,7 +25378,7 @@ msgstr "排序数据"
 msgid "Sort desc"
 msgstr "降序"
 
-#: src/components/model-picker/model-picker.tsx:999
+#: src/components/model-picker/model-picker.tsx:1124
 msgid "Sort models"
 msgstr ""
 
@@ -25697,7 +25714,7 @@ msgid "Star a model in the model picker and it shows up here."
 msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:547
-#: src/components/model-picker/model-picker.tsx:879
+#: src/components/model-picker/model-picker.tsx:1004
 msgid "Starred"
 msgstr "星标"
 
@@ -26385,7 +26402,7 @@ msgstr "子代理未获批准。"
 msgid "Subheading"
 msgstr "副标题"
 
-#: src/components/model-picker/model-picker.tsx:858
+#: src/components/model-picker/model-picker.tsx:983
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "以 $8/月订阅，解锁所有模型。"
 
@@ -27040,7 +27057,7 @@ msgstr "文本"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:629
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:955
+#: src/components/model-picker/model-picker.tsx:1080
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -28336,7 +28353,7 @@ msgstr "工具调用"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:157
 #: ../../packages/chat-ui/src/model-picker/utils.ts:161
-#: src/components/model-picker/model-picker.tsx:81
+#: src/components/model-picker/model-picker.tsx:82
 #: src/features/settings/components/chat/models-settings.tsx:32
 msgid "Tool Calling"
 msgstr "工具调用"
@@ -28769,7 +28786,7 @@ msgstr "你的账号当前已启用双重验证，为账号增加了一层额外
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
-#: src/components/model-picker/model-picker.tsx:933
+#: src/components/model-picker/model-picker.tsx:1058
 msgid "Type"
 msgstr "类型"
 
@@ -28947,7 +28964,7 @@ msgid "Under the Hood"
 msgstr "技术内幕"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: src/components/model-picker/model-picker.tsx:679
+#: src/components/model-picker/model-picker.tsx:736
 #: src/features/canvas/canvas-panel.tsx:242
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
@@ -30020,7 +30037,7 @@ msgid "video"
 msgstr "视频"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
-#: src/components/model-picker/model-picker.tsx:981
+#: src/components/model-picker/model-picker.tsx:1106
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -30298,7 +30315,7 @@ msgid "vision"
 msgstr "视觉"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:145
-#: src/components/model-picker/model-picker.tsx:82
+#: src/components/model-picker/model-picker.tsx:83
 #: src/features/settings/components/chat/models-settings.tsx:30
 msgid "Vision"
 msgstr "视觉"

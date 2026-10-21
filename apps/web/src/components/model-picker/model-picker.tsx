@@ -19,7 +19,7 @@ import {
 } from "@neore/ui/components/command";
 import cn from "@neore/ui/utils/cn";
 import { Link } from "@tanstack/react-router";
-import { CheckIcon, CheckSquare2, EyeOff, Image, Info, Layers2, Lock, Mic, Square, Star, Type, Video } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckIcon, CheckSquare2, EyeOff, Image, Info, Layers2, Lock, Mic, Square, Star, Type, Video } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import React, { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -33,6 +33,7 @@ import { localizeModelDescription } from "@/lib/model-descriptions";
 
 import type { ModelSort } from "./utilities";
 import {
+    adjacentFavorite,
     filterModelsByBlockedCreators,
     filterModelsByQuery,
     formatPricePerMillion,
@@ -101,6 +102,12 @@ export interface ModelPickerProps {
     isAnonymous?: boolean;
     /** Optional filtered model list — defaults to feature-flagged gateway models when not provided */
     models?: GatewayModel[];
+
+    /**
+     * Moves the first favorite onto the second's place in the stored order. Enables the move buttons on the starred tab.
+     * Resolves once the new order is saved, and rejects if the save fails and the order rolls back.
+     */
+    onMoveFavorite?: (movedId: string, targetId: string) => void | Promise<void>;
     onSelect?: (modelId: string) => void;
     onSelectMultiple?: (modelIds: string[]) => void;
     /** Called when the user stars/un-stars a model */
@@ -278,6 +285,9 @@ const ProviderSidebarItem = memo<{
 // ─── Model Row ────────────────────────────────────────────────────────────────
 
 const ModelItemContent = memo<{
+    /** Only set while the starred order can be changed; the buttons are hidden otherwise. */
+    canMoveDown?: boolean;
+    canMoveUp?: boolean;
     isFavorite: boolean;
     isInfoActive: boolean;
     isSelected: boolean;
@@ -285,9 +295,10 @@ const ModelItemContent = memo<{
     model: GatewayModel;
     onInfo: (modelId: string) => void;
     onInfoLeave: () => void;
+    onMove?: (delta: -1 | 1) => void;
     onToggleFavorite: (modelId: string, setFavorite: boolean) => void;
     selectionMode: ModelPickerSelectionMode;
-}>(({ isFavorite, isInfoActive, isSelected, label, model, onInfo, onInfoLeave, onToggleFavorite, selectionMode }) => {
+}>(({ canMoveDown, canMoveUp, isFavorite, isInfoActive, isSelected, label, model, onInfo, onInfoLeave, onMove, onToggleFavorite, selectionMode }) => {
     const { i18n, t } = useLingui();
     const costMultiplier = getCostMultiplier(model.pricing?.input_per_million);
 
@@ -340,6 +351,40 @@ const ModelItemContent = memo<{
                 >
                     <Star className={cn("size-3.5", isFavorite && "fill-current")} />
                 </button>
+                {onMove ? (
+                    <>
+                        <button
+                            aria-label={t`Move ${label} up in starred`}
+                            className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
+                            data-move-delta={-1}
+                            data-move-id={model.id}
+                            disabled={!canMoveUp}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onMove(-1);
+                            }}
+                            type="button"
+                        >
+                            <ArrowUp aria-hidden="true" className="size-3.5" />
+                        </button>
+                        <button
+                            aria-label={t`Move ${label} down in starred`}
+                            className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
+                            data-move-delta={1}
+                            data-move-id={model.id}
+                            disabled={!canMoveDown}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onMove(1);
+                            }}
+                            type="button"
+                        >
+                            <ArrowDown aria-hidden="true" className="size-3.5" />
+                        </button>
+                    </>
+                ) : null}
                 <button
                     aria-label={t`Model info`}
                     className={cn(
@@ -381,6 +426,8 @@ const ModelGroupRenderer = memo<{
     onInfoLeave: () => void;
     parallelMaxReached: boolean;
     parallelSelectedIds: Set<string>;
+    /** The starred list in screen order, and how to move one favorite. Unset when the order is not editable. */
+    reorder?: { ids: string[]; move: (modelId: string, delta: -1 | 1) => void };
     selectedModelId?: string;
     selectionMode: ModelPickerSelectionMode;
     showGroupLabel?: boolean;
@@ -397,6 +444,7 @@ const ModelGroupRenderer = memo<{
         onInfoLeave,
         parallelMaxReached,
         parallelSelectedIds,
+        reorder,
         selectedModelId,
         selectionMode,
         showGroupLabel = true,
@@ -416,6 +464,7 @@ const ModelGroupRenderer = memo<{
                     {(item: ModelItem) => {
                         const isParallelSelected = parallelSelectedIds.has(item.model.id);
                         const isSelected = selectionMode === "parallel" ? isParallelSelected : selectedModelId === item.value;
+                        const position = reorder ? reorder.ids.indexOf(item.model.id) : -1;
                         // A model is type-locked when a different mode is already anchored via the first selection
                         const isTypeMismatch =
                             selectionMode === "parallel" && anchorMode !== null && getModelMode(item.model) !== anchorMode && !isParallelSelected;
@@ -491,6 +540,8 @@ const ModelGroupRenderer = memo<{
                                 ) : null}
 
                                 <ModelItemContent
+                                    canMoveDown={position !== -1 && position < (reorder?.ids.length ?? 0) - 1}
+                                    canMoveUp={position > 0}
                                     isFavorite={isFavorite(item.model.id)}
                                     isInfoActive={infoModelId === item.model.id}
                                     isSelected={isSelected}
@@ -498,6 +549,7 @@ const ModelGroupRenderer = memo<{
                                     model={item.model}
                                     onInfo={onInfo}
                                     onInfoLeave={onInfoLeave}
+                                    onMove={reorder && position !== -1 ? (delta) => reorder.move(item.model.id, delta) : undefined}
                                     onToggleFavorite={toggleFavorite}
                                     selectionMode={selectionMode}
                                 />
@@ -531,6 +583,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     initialModelIds,
     isAnonymous = false,
     models: modelsProp,
+    onMoveFavorite,
     onSelect,
     onSelectMultiple,
     onToggleFavorite,
@@ -571,6 +624,8 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const [selectedModelId, setSelectedModelId] = useState<string | undefined>(initialModelId);
     const [parallelSelectedIds, setParallelSelectedIds] = useState<Set<string>>(() => new Set(initialModelIds));
     const [searchQuery, setSearchQuery] = useState("");
+    // Read out after a starred move, so a screen-reader user hears the result and the model's new place.
+    const [moveAnnouncement, setMoveAnnouncement] = useState("");
     const [activeTab, setActiveTab] = useState<ModelPickerTab>(defaultTab);
     const [selectionMode, setSelectionMode] = useState<ModelPickerSelectionMode>(() => ((initialModelIds?.length ?? 0) > 0 ? "parallel" : "single"));
     const [infoModelId, setInfoModelId] = useState<string | undefined>();
@@ -578,6 +633,8 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const [sort, setSort] = useState<ModelSort>("default");
 
     const pickerRef = useRef<HTMLDivElement>(null);
+    // The arrow that moved a favorite, so focus can follow the row after the list reorders.
+    const [pendingMoveFocus, setPendingMoveFocus] = useState<{ before: string; delta: -1 | 1; modelId: string } | undefined>(undefined);
     const onSelectRef = useRef(onSelect);
     const onSelectMultipleRef = useRef(onSelectMultiple);
 
@@ -825,6 +882,71 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const isStarredEmpty = activeTab === "starred" && favoriteModels.length === 0 && !searchQuery.trim();
     const isShowGroupLabels = activeTab !== "starred" && sort === "default";
 
+    // Moves a starred model one place and remembers which arrow did it, so focus can follow the row (see the effect below).
+    const moveFavorite = useCallback(
+        (modelId: string, delta: -1 | 1) => {
+            if (!onMoveFavorite) {
+                return;
+            }
+
+            const ids = favoriteModels.map((model) => model.id);
+            const target = adjacentFavorite(ids, modelId, delta);
+
+            if (target === undefined) {
+                return;
+            }
+
+            const saved = onMoveFavorite(modelId, target);
+
+            setPendingMoveFocus({ before: ids.join("\u{0}"), delta, modelId });
+
+            // The swap puts the model one place along, so its new position is its old index plus the step.
+            const model = favoriteModels.find((entry) => entry.id === modelId);
+
+            if (model) {
+                const label = getModelLabel(model, nicknames);
+                const position = ids.indexOf(modelId) + delta + 1;
+
+                setMoveAnnouncement(t`${label} moved to position ${position} of ${ids.length} in starred`);
+                // The new order shows at once but is saved later; if the save fails it rolls back, so say that instead.
+                void Promise.resolve(saved).catch(() => {
+                    setMoveAnnouncement(t`Could not save the new order for ${label}`);
+                });
+            }
+        },
+        [favoriteModels, nicknames, onMoveFavorite, t],
+    );
+
+    // Only the starred list in its own order can be reordered; a sort or a search would hide what the arrows mean.
+    const reorder = useMemo(() => {
+        if (activeTab !== "starred" || sort !== "default" || searchQuery.trim() || !onMoveFavorite) {
+            return undefined;
+        }
+
+        return { ids: favoriteModels.map((model) => model.id), move: moveFavorite };
+    }, [activeTab, favoriteModels, moveFavorite, onMoveFavorite, searchQuery, sort]);
+
+    // A move reorders the keyed rows, which can drop focus from the arrow that was pressed. Put it back on that arrow,
+    // or on the other arrow of the row when the pressed one is now at the list edge and disabled.
+    const orderKey = reorder?.ids.join("\u{0}");
+
+    useLayoutEffect(() => {
+        // The order is not the one the move started from yet: wait for the reordered rows to commit.
+        if (!pendingMoveFocus || pendingMoveFocus.before === orderKey) {
+            return;
+        }
+
+        const { delta, modelId } = pendingMoveFocus;
+        const arrowFor = (step: -1 | 1) =>
+            pickerRef.current?.querySelector<HTMLButtonElement>(`[data-move-id="${CSS.escape(modelId)}"][data-move-delta="${CSS.escape(String(step))}"]`);
+        const pressed = arrowFor(delta);
+        const other = delta === -1 ? 1 : -1;
+        const arrow = pressed && !pressed.disabled ? pressed : arrowFor(other);
+
+        arrow?.focus();
+        setPendingMoveFocus(undefined);
+    }, [orderKey, pendingMoveFocus]);
+
     // Derive the "anchor" mode from the first selected model in parallel mode.
     // All other types are locked out once a selection is made.
     const anchorMode = useMemo(() => {
@@ -848,6 +970,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
             open={!!infoModel}
         >
             <div ref={pickerRef}>
+                <span aria-live="polite" className="sr-only" role="status">
+                    {moveAnnouncement}
+                </span>
                 <Command filter={() => true} items={filteredGroupedItems} onValueChange={setSearchQuery} value={searchQuery}>
                     {isAnonymous && (
                         <div className="flex items-center gap-2.5 border-b bg-amber-50 px-3 py-2.5 dark:bg-amber-950/20">
@@ -1069,6 +1194,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                                 onInfoLeave={scheduleInfoClose}
                                                 parallelMaxReached={isParallelMaxReached}
                                                 parallelSelectedIds={parallelSelectedIds}
+                                                reorder={reorder}
                                                 selectedModelId={selectedModelId}
                                                 selectionMode={selectionMode}
                                                 showGroupLabel={isShowGroupLabels}

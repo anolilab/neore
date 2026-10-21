@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { localizeModelDescription } from "@/lib/model-descriptions";
 
 import {
+    adjacentFavorite,
     filterModelsByBlockedCreators,
     filterModelsByQuery,
     formatPricePerMillion,
@@ -15,6 +16,7 @@ import {
     getModelSearchText,
     moveFavorite,
     sortModels,
+    swapFavorites,
 } from "./utilities";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -169,6 +171,19 @@ describe(formatPricePerMillion, () => {
     });
 });
 
+describe(swapFavorites, () => {
+    it("exchanges two stored slots and leaves a favorite between them in place", () => {
+        expect(swapFavorites(["textA", "imageH", "textB"], "textA", "textB")).toStrictEqual(["textB", "imageH", "textA"]);
+    });
+
+    it("changes nothing for an unknown id or the same id twice", () => {
+        const favorites = ["a", "b"];
+
+        expect(swapFavorites(favorites, "x", "a")).toStrictEqual(favorites);
+        expect(swapFavorites(favorites, "a", "a")).toStrictEqual(favorites);
+    });
+});
+
 describe(moveFavorite, () => {
     it("moves one favorite to where another sits", () => {
         expect(moveFavorite(["a", "b", "c", "d"], "d", "b")).toStrictEqual(["a", "d", "b", "c"]);
@@ -186,5 +201,17 @@ describe(moveFavorite, () => {
         expect(moveFavorite(favorites, "x", "a")).toStrictEqual(favorites);
         expect(moveFavorite(favorites, "a", "x")).toStrictEqual(favorites);
         expect(moveFavorite(favorites, "a", "a")).toStrictEqual(favorites);
+    });
+});
+
+describe(adjacentFavorite, () => {
+    it("returns the neighbour on the screen, and nothing past either end", () => {
+        const visible = ["a", "b", "c"];
+
+        expect(adjacentFavorite(visible, "b", -1)).toBe("a");
+        expect(adjacentFavorite(visible, "b", 1)).toBe("c");
+        expect(adjacentFavorite(visible, "a", -1)).toBeUndefined();
+        expect(adjacentFavorite(visible, "c", 1)).toBeUndefined();
+        expect(adjacentFavorite(visible, "x", 1)).toBeUndefined();
     });
 });

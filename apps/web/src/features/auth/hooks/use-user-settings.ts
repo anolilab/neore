@@ -84,7 +84,7 @@ export const useUpdateUserSettings = () => {
      * include every edit queued before it. A patch that depends on the current value (a list
      * reorder, a map entry) therefore never overwrites another edit made meanwhile.
      */
-    const updateLatest = (build: (current: UserSettingsRow | undefined) => Patch) => {
+    const updateLatest = (build: (current: UserSettingsRow | undefined) => Patch): Promise<void> => {
         const before = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
         const patch = build(before);
         const fields = Object.keys(patch) as (keyof UserSettingsRow)[];
@@ -115,6 +115,16 @@ export const useUpdateUserSettings = () => {
                     void queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
                 }
             });
+
+        // The returned promise rejects when this write fails, so a caller that awaits it can report the rollback.
+        // Callers that ignore it are already covered by onError, so the rejection is marked handled here.
+        const outcome = run.then(() => undefined);
+
+        outcome.catch(() => {
+            // Handled by onError; a caller that awaits the result still sees the rejection.
+        });
+
+        return outcome;
     };
 
     return { ...mutation, updateLatest };

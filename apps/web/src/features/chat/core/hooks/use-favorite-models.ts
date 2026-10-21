@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 
-import { moveFavorite } from "@/components/model-picker/utilities";
+import { moveFavorite, swapFavorites as swapStoredFavorites } from "@/components/model-picker/utilities";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 
 const FAVORITE_MODELS_STORAGE_KEY = "neore-favorite-models";
@@ -59,6 +59,12 @@ const useFavoriteModels = () => {
         });
     };
 
+    /** Exchanges the stored slots of two favorites, so a favorite hidden on screen keeps its place. The picker arrows use this. */
+    const swapFavorites = (firstId: string, secondId: string): Promise<void> =>
+        updateLatest((current) => {
+            return { favoriteModels: swapStoredFavorites(current?.favoriteModels ?? [], firstId, secondId) };
+        });
+
     const addFavorite = (modelId: string) => {
         toggleFavorite(modelId, true);
     };
@@ -75,6 +81,7 @@ const useFavoriteModels = () => {
         isFavorite,
         removeFavorite,
         reorderFavorites,
+        swapFavorites,
         toggleFavorite,
     };
 };

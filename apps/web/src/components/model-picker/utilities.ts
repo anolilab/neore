@@ -440,3 +440,34 @@ export const moveFavorite = (favorites: ReadonlyArray<string>, movedId: string, 
 
     return next;
 };
+
+/**
+ * Exchanges the stored slots of two favorites. Favorites between them keep their place, so
+ * a hidden favorite does not move when a visible one is swapped past it. Unknown ids change nothing.
+ */
+export const swapFavorites = (favorites: ReadonlyArray<string>, firstId: string, secondId: string): string[] => {
+    const first = favorites.indexOf(firstId);
+    const second = favorites.indexOf(secondId);
+
+    if (first === -1 || second === -1 || first === second) {
+        return [...favorites];
+    }
+
+    const next = [...favorites];
+
+    next[first] = favorites[second]!;
+    next[second] = favorites[first]!;
+
+    return next;
+};
+
+/**
+ * The favorite that sits `delta` places away from `modelId` in the list on
+ * screen, or `undefined` at either end. Moving onto it with `moveFavorite`
+ * swaps the two in the stored list, skipping any hidden favorites between them.
+ */
+export const adjacentFavorite = (visibleIds: ReadonlyArray<string>, modelId: string, delta: -1 | 1): string | undefined => {
+    const index = visibleIds.indexOf(modelId);
+
+    return index === -1 ? undefined : visibleIds[index + delta];
+};
