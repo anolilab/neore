@@ -51,7 +51,7 @@ type ImportState =
     | { step: "parsing" }
     | { conversations: NormalizedConversation[]; provider: ImportProvider; skipped: string[]; step: "preview" }
     | { provider: ImportProvider; step: "uploading" }
-    | { jobId: string; provider: ImportProvider; step: "importing" }
+    | { jobId: string; provider: ImportProvider; resumed?: boolean; step: "importing" }
     | { failed: number; imported: number; provider: ImportProvider; step: "done" }
     | { jobId?: string; message: string; step: "error" };
 
@@ -111,6 +111,18 @@ const DataImport: FC = () => {
     useEffect(() => {
         if (state.step !== "importing" || jobStatus === undefined) {
             return;
+        }
+
+        // A resumed job's status can still be the cached failure until its processing push arrives; that failure must not end the resume.
+        if (state.resumed) {
+            if (jobStatus === "failed") {
+                return;
+            }
+
+            if (jobStatus === "processing") {
+                setState({ jobId: state.jobId, provider: state.provider, step: "importing" });
+                return;
+            }
         }
 
         if (jobStatus === "completed") {
@@ -298,7 +310,7 @@ const DataImport: FC = () => {
             await restartImportJob({ jobId: activeJobId });
             // The watcher reads the job's status on every render, and the cached one still says "failed" until it is refetched.
             await refetchImportStatus();
-            setState({ jobId: activeJobId, provider: (jobProvider as ImportProvider) || "chatgpt", step: "importing" });
+            setState({ jobId: activeJobId, provider: (jobProvider as ImportProvider) || "chatgpt", resumed: true, step: "importing" });
         } catch (error) {
             setState({ message: describeError(error, i18n), step: "error" });
         }

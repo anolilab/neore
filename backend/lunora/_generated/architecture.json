@@ -2462,8 +2462,23 @@
     },
     {
       "from": "function:chat_import_workflow_actions:default",
+      "kind": "call",
+      "to": "function:chat_import_workflow_actions:failImportStart"
+    },
+    {
+      "from": "function:chat_import_workflow_actions:default",
       "kind": "start",
       "to": "workflow:chatImportWorkflow"
+    },
+    {
+      "from": "function:chat_import_workflow_actions:failImportStart",
+      "kind": "schedule",
+      "to": "function:chat_import_steps:reapRestartableImport"
+    },
+    {
+      "from": "function:chat_import_workflow_actions:failImportStart",
+      "kind": "write",
+      "to": "table:chatImportJobs"
     },
     {
       "from": "function:chat_link_preview:getLinkPreview",
@@ -9759,6 +9774,13 @@
       "id": "function:chat_import_workflow_actions:default",
       "kind": "function",
       "name": "chat_import.workflow_actions.default",
+      "module": "chat-import"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_import_workflow_actions:failImportStart",
+      "kind": "function",
+      "name": "chat_import.workflow_actions.failImportStart",
       "module": "chat-import"
     },
     {

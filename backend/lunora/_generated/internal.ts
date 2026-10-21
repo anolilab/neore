@@ -423,6 +423,7 @@ export interface InternalApiTypes {
         };
         workflow_actions: {
             default: FunctionReference<"action", { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }, void>;
+            failImportStart: FunctionReference<"mutation", { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }, null>;
             startImportWorkflow: FunctionReference<"action", { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }, void>;
         };
     };
@@ -1424,6 +1425,7 @@ export const internal: InternalApiTypes = {
         },
         workflow_actions: {
             default: { __lunoraRef: "chat_import_workflow_actions:default" },
+            failImportStart: { __lunoraRef: "chat_import_workflow_actions:failImportStart" },
             startImportWorkflow: { __lunoraRef: "chat_import_workflow_actions:startImportWorkflow" },
         },
     },

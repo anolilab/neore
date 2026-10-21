@@ -8,6 +8,7 @@ import { assertStagedChatJson } from "../lib/chat-upload";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { MAX_STORED_READ_BYTES as IMPORT_FILE_MAX_BYTES, readStoredObject, readStoredText } from "../lib/storage-read";
 import { withoutUndefined } from "../lib/patch";
+import { MAX_LENGTH } from "../lib/validators";
 import { notifyQuietly } from "../notifications/notify";
 import { CANCELLED_IMPORT_MESSAGE, hasConversationsLeft, keptImportKeyFor, RESTART_WINDOW_MS } from "./restart";
 
@@ -278,7 +279,7 @@ export const importJobExists = internalQuery
  * file is already the copy, so nothing is written.
  */
 export const keepImportFile = internalAction
-    .input({ jobId: v.id("chatImportJobs"), r2Key: v.string(), userId: v.string() })
+    .input({ jobId: v.id("chatImportJobs"), r2Key: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.string())
     .action(async ({ args, ctx: context }) => {
         const key = keptImportKeyFor(args.userId, args.jobId);
@@ -317,7 +318,7 @@ export const keepImportFile = internalAction
  * `completedAt` or the key, and then the reap is a no-op.
  */
 export const reapRestartableImport = internalMutation
-    .input({ failedAt: v.number(), jobId: v.id("chatImportJobs"), r2Key: v.string() })
+    .input({ failedAt: v.number(), jobId: v.id("chatImportJobs"), r2Key: v.string().max(MAX_LENGTH.key) })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
         const job = await context.db.get(args.jobId);
@@ -393,9 +394,9 @@ export const finalizeImport = internalMutation
         failed: v.optional(v.number()),
         imported: v.optional(v.number()),
         jobId: v.id("chatImportJobs"),
-        r2Key: v.string(),
+        r2Key: v.string().max(MAX_LENGTH.key),
         status: v.union(v.literal("completed"), v.literal("failed")),
-        userId: v.string(),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
@@ -460,7 +461,8 @@ export const finalizeImport = internalMutation
 
         await notifyQuietly(context, {
             body: [`${String(imported)} conversations imported`, errorMessage].filter(Boolean).join(". "),
-            dedupeKey: `chat_import:${args.jobId}`,
+            // Per run: a restart reuses the job id, and its outcome must not be dropped as a duplicate of the first failure.
+            dedupeKey: `chat_import:${args.jobId}:${String(context.now)}`,
             link: "/chat",
             outcome: status === "completed" ? "success" : "failure",
             title: job.provider,

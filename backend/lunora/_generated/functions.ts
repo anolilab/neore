@@ -567,6 +567,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_import_steps:reapRestartableImport": lunora_chat_import_steps_42.reapRestartableImport as unknown as RegisteredLunoraFunction,
     "chat_import_steps:updateImportProgress": lunora_chat_import_steps_42.updateImportProgress as unknown as RegisteredLunoraFunction,
     "chat_import_workflow_actions:default": lunora_chat_import_workflow_actions_43.default as unknown as RegisteredLunoraFunction,
+    "chat_import_workflow_actions:failImportStart": lunora_chat_import_workflow_actions_43.failImportStart as unknown as RegisteredLunoraFunction,
     "chat_import_workflow_actions:startImportWorkflow": lunora_chat_import_workflow_actions_43.startImportWorkflow as unknown as RegisteredLunoraFunction,
     "chat_ask_user:answerAskUser": lunora_chat_ask_user_44.answerAskUser as unknown as RegisteredLunoraFunction,
     "chat_autocomplete:isComposerAutocompleteEnabled": lunora_chat_autocomplete_45.isComposerAutocompleteEnabled as unknown as RegisteredLunoraFunction,
@@ -2920,14 +2921,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["jobId"] !== "string") return DEFER;
 return { "jobId": source["jobId"] };
 });
-installCompiledValidatorMap(lunora_chat_import_steps_42.keepImportFile.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["jobId"] !== "string") return DEFER;
-if (typeof source["r2Key"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "jobId": source["jobId"], "r2Key": source["r2Key"], "userId": source["userId"] };
-});
 installCompiledValidatorMap(lunora_chat_import_steps_42.processImportFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -2937,14 +2930,6 @@ if (typeof source["r2Key"] !== "string") return DEFER;
 if (typeof source["totalConversations"] !== "number" || !Number.isFinite(source["totalConversations"])) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "jobId": source["jobId"], "provider": source["provider"], "r2Key": source["r2Key"], "totalConversations": source["totalConversations"], "userId": source["userId"] };
-});
-installCompiledValidatorMap(lunora_chat_import_steps_42.reapRestartableImport.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["failedAt"] !== "number" || !Number.isFinite(source["failedAt"])) return DEFER;
-if (typeof source["jobId"] !== "string") return DEFER;
-if (typeof source["r2Key"] !== "string") return DEFER;
-return { "failedAt": source["failedAt"], "jobId": source["jobId"], "r2Key": source["r2Key"] };
 });
 installCompiledValidatorMap(lunora_chat_import_steps_42.updateImportProgress.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -2986,26 +2971,6 @@ __val5 = source["totalConversations"];
 __has5 = true;
 }
 return { ...(__has1 ? { "currentStep": __val1 } : {}), ...(__has2 ? { "failedConversations": __val2 } : {}), ...(__has3 ? { "importedConversations": __val3 } : {}), "jobId": source["jobId"], ...(__has4 ? { "progress": __val4 } : {}), ...(__has5 ? { "totalConversations": __val5 } : {}) };
-});
-installCompiledValidatorMap(lunora_chat_import_workflow_actions_43.default.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["jobId"] !== "string") return DEFER;
-if (typeof source["provider"] !== "string") return DEFER;
-if (typeof source["r2Key"] !== "string") return DEFER;
-if (typeof source["totalConversations"] !== "number" || !Number.isFinite(source["totalConversations"])) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "jobId": source["jobId"], "provider": source["provider"], "r2Key": source["r2Key"], "totalConversations": source["totalConversations"], "userId": source["userId"] };
-});
-installCompiledValidatorMap(lunora_chat_import_workflow_actions_43.startImportWorkflow.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["jobId"] !== "string") return DEFER;
-if (typeof source["provider"] !== "string") return DEFER;
-if (typeof source["r2Key"] !== "string") return DEFER;
-if (typeof source["totalConversations"] !== "number" || !Number.isFinite(source["totalConversations"])) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "jobId": source["jobId"], "provider": source["provider"], "r2Key": source["r2Key"], "totalConversations": source["totalConversations"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_chat_autocomplete_45.isComposerAutocompleteEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8537,6 +8502,7 @@ export interface Caller {
         };
         workflow_actions: {
             default: (args: { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }) => Promise<void>;
+            failImportStart: (args: { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }) => Promise<null>;
             startImportWorkflow: (args: { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }) => Promise<void>;
         };
     };
@@ -10162,6 +10128,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         workflow_actions: {
             default: (args) => callRegistered(context, "chat_import_workflow_actions:default", args),
+            failImportStart: (args) => callRegistered(context, "chat_import_workflow_actions:failImportStart", args),
             startImportWorkflow: (args) => callRegistered(context, "chat_import_workflow_actions:startImportWorkflow", args),
         },
     },

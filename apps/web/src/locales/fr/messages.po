@@ -31335,7 +31335,7 @@ msgstr "Votre base de connaissances est pleine. Supprimez des fichiers pour en a
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:430
 msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
-msgstr "Ton dernier import s'est arrêté avant la fin. Reprends-le pour importer les conversations restantes."
+msgstr "Votre dernier import s'est arrêté avant la fin. Reprenez-le pour importer les conversations restantes."
 
 #: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "Your latest changes are not saved yet."
