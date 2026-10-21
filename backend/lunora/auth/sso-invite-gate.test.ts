@@ -313,7 +313,6 @@ describe("OIDC issuer hardening", { timeout: 30_000 }, () => {
         const { auth, db } = await createTestAuth();
         const signUp = await auth.handler(
             new Request(`${SITE}/api/auth/sign-up/email`, {
-                // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- a throwaway test account
                 body: JSON.stringify({ email: EMAIL, name: "Member", password: "a-long-enough-password" }), // secret-scanner:allow
                 headers: { "content-type": "application/json", origin: SITE },
                 method: "POST",
@@ -423,7 +422,6 @@ describe("passkeys", { timeout: 30_000 }, () => {
         const { auth } = await createTestAuth();
         const signUp = await auth.handler(
             new Request(`${SITE}/api/auth/sign-up/email`, {
-                // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- a throwaway test account
                 body: JSON.stringify({ email: EMAIL, name: "Member", password: "a-long-enough-password" }), // secret-scanner:allow
                 headers: { "content-type": "application/json", origin: SITE },
                 method: "POST",
