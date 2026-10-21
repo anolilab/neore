@@ -27,6 +27,14 @@ describe("toMinimapPreview", () => {
         expect(toMinimapPreview("check and fix [pasted-text.txt](t3-context:abc123) please")).toBe("check and fix pasted-text.txt please");
     });
 
+    it("keeps the label of a link whose target has balanced parentheses", () => {
+        expect(toMinimapPreview("read [Function](https://en.wikipedia.org/wiki/Function_(mathematics)) first")).toBe("read Function first");
+    });
+
+    it("handles a long run of unmatched opening brackets without rescanning it", () => {
+        expect(toMinimapPreview("[".repeat(50_000))).toBe(`${"[".repeat(MINIMAP_PREVIEW_CHARS - 1)}…`);
+    });
+
     it("leaves text at the limit untouched", () => {
         const exact = "b".repeat(MINIMAP_PREVIEW_CHARS);
 

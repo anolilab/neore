@@ -37,9 +37,11 @@ export const minimapGapLabel = (previousAt: number | undefined, at: number | und
 
 const WHITESPACE_RE = /\s+/g;
 // `[label](target)`: a prompt's attachment links keep their label and drop the target, which is markup to a reader.
-// Each class excludes the delimiter after it, so the match cannot backtrack.
-// eslint-disable-next-line sonarjs/super-linear-regex -- linear: see the comment above
-const MARKDOWN_LINK_RE = /\[([^\]\n]+)\]\([^()\s]*\)/g;
+// The label excludes `[` as well as `]`, so a failed match ends at the next opening bracket and a run of
+// unmatched brackets is scanned once, not once per bracket.
+// A target may hold balanced parentheses (`Function_(mathematics)`). Each alternative starts on a different character,
+// so the target scan has no overlapping paths.
+const MARKDOWN_LINK_RE = /\[([^[\]\n]+)\]\((?:[^()\s]|\([^()\s]*\))*\)/g;
 
 export const toMinimapPreview = (text: string, maxChars: number = MINIMAP_PREVIEW_CHARS): string => {
     const flat = text.replaceAll(MARKDOWN_LINK_RE, "$1").replaceAll(WHITESPACE_RE, " ").trim();

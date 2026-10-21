@@ -101,7 +101,7 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
 
     return (
         // not-prose: the rail sits inside the `prose` message column, whose list typography would otherwise apply.
-        <nav aria-label={t`Prompts in this conversation`} className={cn("not-prose max-h-[60vh] w-9 shrink-0 overflow-y-auto", className)}>
+        <nav aria-label={t`Prompts in this conversation`} className={cn("not-prose max-h-[60vh] w-14 shrink-0 overflow-y-auto", className)}>
             <TooltipProvider>
                 <ol className="m-0 flex list-none flex-col items-center gap-1 py-1">
                     {items.map((item, index) => {
@@ -114,7 +114,10 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
                         return (
                             <li className="flex w-full items-center justify-end gap-0.5" key={item.id}>
                                 {gap && (
-                                    <span aria-hidden="true" className="text-muted-foreground pointer-events-none text-[10px] tabular-nums">
+                                    <span
+                                        aria-hidden="true"
+                                        className="text-muted-foreground pointer-events-none shrink-0 text-[10px] whitespace-nowrap tabular-nums"
+                                    >
                                         {gap}
                                     </span>
                                 )}
@@ -124,7 +127,7 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
                                             <button
                                                 aria-current={isActive ? "location" : undefined}
                                                 aria-label={t`Jump to prompt ${promptNumber}: ${preview}`}
-                                                className="group focus-visible:ring-ring flex h-4 w-6 items-center justify-center rounded-sm outline-none focus-visible:ring-2"
+                                                className="group focus-visible:ring-ring flex h-4 w-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2"
                                                 data-active={isActive}
                                                 onClick={() => scrollToMessage(item.id, { threadId })}
                                                 type="button"
@@ -138,10 +141,7 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
                                     />
                                     <TooltipContent className="max-w-xs" side="left">
                                         {item.createdAt !== undefined && (
-                                            <time
-                                                className="text-muted-foreground block text-[10px] tabular-nums"
-                                                dateTime={new Date(item.createdAt).toISOString()}
-                                            >
+                                            <time className="block text-[10px] tabular-nums" dateTime={new Date(item.createdAt).toISOString()}>
                                                 {formatMessageTime(item.createdAt, i18n.locale)}
                                             </time>
                                         )}
