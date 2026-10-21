@@ -23,9 +23,8 @@ import {
     type MessageWithMetadataInternal,
     type StreamDelta,
     type StreamMessage,
-    vStreamDelta,
-    vStreamMessage,
 } from "./client";
+import { vStreamDelta, vStreamMessage } from "./validators";
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;

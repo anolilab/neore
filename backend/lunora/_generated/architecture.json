@@ -16339,67 +16339,67 @@
     {
       "file": "agent/streams",
       "kind": "read",
-      "line": 111,
+      "line": 110,
       "reason": "\"listDeltasHandler\" is not a registered function"
     },
     {
       "file": "agent/streams",
       "kind": "read",
-      "line": 311,
+      "line": 310,
       "reason": "\"finishHandler\" is not a registered function"
     },
     {
       "file": "agent/streams",
       "kind": "write",
+      "line": 319,
+      "reason": "\"finishHandler\" is not a registered function"
+    },
+    {
+      "file": "agent/streams",
+      "kind": "schedule",
       "line": 320,
       "reason": "\"finishHandler\" is not a registered function"
     },
     {
       "file": "agent/streams",
-      "kind": "schedule",
-      "line": 321,
-      "reason": "\"finishHandler\" is not a registered function"
-    },
-    {
-      "file": "agent/streams",
       "kind": "write",
-      "line": 342,
+      "line": 341,
       "reason": "\"finishHandler\" is not a registered function"
     },
     {
       "file": "agent/streams",
       "kind": "schedule",
-      "line": 358,
+      "line": 357,
       "reason": "\"finishHandler\" is not a registered function"
     },
     {
       "file": "agent/streams",
       "kind": "write",
-      "line": 360,
+      "line": 359,
       "reason": "\"finishHandler\" is not a registered function"
     },
     {
       "file": "agent/streams",
       "kind": "read",
-      "line": 434,
+      "line": 433,
       "reason": "\"deleteStreamsPageForThreadId\" is not a registered function"
     },
     {
       "file": "agent/streams",
       "kind": "write",
-      "line": 442,
+      "line": 441,
       "reason": "\"deleteStreamsPageForThreadId\" is not a registered function"
     },
     {
       "file": "agent/streams",
       "kind": "write",
-      "line": 454,
+      "line": 453,
       "reason": "\"deleteStreamsPageForThreadId\" is not a registered function"
     },
     {
       "file": "agent/streams",
       "kind": "read",
-      "line": 631,
+      "line": 630,
       "reason": "\"getStreamingMessagesWithMetadata\" is not a registered function"
     },
     {
