@@ -17,6 +17,31 @@ export const lastReachedId = (order: ReadonlyArray<string>, reached: ReadonlySet
     return undefined;
 };
 
+/**
+ * Rows counted as reached. Normally a row is reached once its top is above the reading line. When the
+ * list is scrolled to its end, the newest prompt can sit below that line (the chat cannot scroll it up
+ * there), so every row on screen counts and the last one in rail order wins.
+ */
+export const reachedRows = (rows: ReadonlyArray<{ id: string; top: number }>, line: number, viewportHeight: number, atEnd: boolean): Set<string> =>
+    new Set(rows.filter((row) => (atEnd ? row.top < viewportHeight : row.top <= line)).map((row) => row.id));
+
+/** Whether a scrollable element is at its end, within a pixel for rounding. */
+export const isScrolledToEnd = (scroller: { clientHeight: number; scrollHeight: number; scrollTop: number }): boolean =>
+    scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+
+/** The element that scrolls the message list: its nearest scrollable ancestor, or the page when there is none. */
+const findScroller = (list: HTMLElement | null): HTMLElement => {
+    for (let node = list?.parentElement ?? null; node; node = node.parentElement) {
+        const { overflowY } = getComputedStyle(node);
+
+        if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) {
+            return node;
+        }
+    }
+
+    return document.documentElement;
+};
+
 /** Rows are tagged by the message list; the rail reads the same tag. */
 const ROW_SELECTOR = "[data-list-message-id]";
 const LIST_SELECTOR = ".message-list";
@@ -52,18 +77,19 @@ export const useActivePromptId = (ids: ReadonlyArray<string>): string | undefine
         const measure = () => {
             frame = 0;
 
-            const line = window.innerHeight * READING_LINE_RATIO;
-            const reached = new Set<string>();
+            const rows: { id: string; top: number }[] = [];
 
             for (const row of document.querySelectorAll<HTMLElement>(ROW_SELECTOR)) {
                 const id = row.dataset.listMessageId;
 
-                if (id !== undefined && wanted.has(id) && row.getBoundingClientRect().top <= line) {
-                    reached.add(id);
+                if (id !== undefined && wanted.has(id)) {
+                    rows.push({ id, top: row.getBoundingClientRect().top });
                 }
             }
 
-            setActive(lastReachedId(order, reached));
+            const atEnd = isScrolledToEnd(findScroller(document.querySelector<HTMLElement>(LIST_SELECTOR)));
+
+            setActive(lastReachedId(order, reachedRows(rows, window.innerHeight * READING_LINE_RATIO, window.innerHeight, atEnd)));
         };
 
         // At most one measure per frame: scroll events arrive far faster than the screen repaints.

@@ -41,7 +41,7 @@ const WHITESPACE_RE = /\s+/g;
 // unmatched brackets is scanned once, not once per bracket.
 // A target may hold balanced parentheses (`Function_(mathematics)`). Each alternative starts on a different character,
 // so the target scan has no overlapping paths.
-const MARKDOWN_LINK_RE = /\[([^[\]\n]+)\]\((?:[^()\s]|\([^()\s]*\))*\)/g;
+const MARKDOWN_LINK_RE = /\[([^[\]\n]+)\]\((?:[^()\s]|\([^()\s]*\))*(?:\s+["'][^"'\n]*["'])?\)/g;
 
 export const toMinimapPreview = (text: string, maxChars: number = MINIMAP_PREVIEW_CHARS): string => {
     const flat = text.replaceAll(MARKDOWN_LINK_RE, "$1").replaceAll(WHITESPACE_RE, " ").trim();

@@ -27,6 +27,11 @@ describe("toMinimapPreview", () => {
         expect(toMinimapPreview("check and fix [pasted-text.txt](t3-context:abc123) please")).toBe("check and fix pasted-text.txt please");
     });
 
+    it("keeps the label of a link with a title, in double or single quotes", () => {
+        expect(toMinimapPreview('see [spec](https://example.com/a "Title here") now')).toBe("see spec now");
+        expect(toMinimapPreview("see [spec](https://example.com/a 'Title') now")).toBe("see spec now");
+    });
+
     it("keeps the label of a link whose target has balanced parentheses", () => {
         expect(toMinimapPreview("read [Function](https://en.wikipedia.org/wiki/Function_(mathematics)) first")).toBe("read Function first");
     });
