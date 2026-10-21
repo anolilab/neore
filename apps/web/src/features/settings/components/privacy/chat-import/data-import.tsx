@@ -53,7 +53,7 @@ type ImportState =
     | { provider: ImportProvider; step: "uploading" }
     | { jobId: string; provider: ImportProvider; step: "importing" }
     | { failed: number; imported: number; provider: ImportProvider; step: "done" }
-    | { message: string; step: "error" };
+    | { jobId?: string; message: string; step: "error" };
 
 /** The user-facing text of an import failure: translated for our own errors, the raw message otherwise. */
 const importErrorMessage = (error: unknown, i18n: I18n, fallback: string): string => {
@@ -78,7 +78,7 @@ const DataImport: FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [state, setState] = useState<ImportState>({ step: "idle" });
 
-    const { data: importStatus } = useQuery(crpc.chat_import.functions.getImportStatus.queryOptions({}));
+    const { data: importStatus, refetch: refetchImportStatus } = useQuery(crpc.chat_import.functions.getImportStatus.queryOptions({}));
 
     // Read the job fields as scalars: the query object is a fresh reference on every
     // poll, so depending on it directly would re-run the effects below on each tick.
@@ -91,6 +91,7 @@ const DataImport: FC = () => {
 
     const { mutateAsync: startImportJob } = useMutation(crpc.chat_import.functions.startImportJob.mutationOptions());
     const { mutateAsync: cancelImportJob } = useMutation(crpc.chat_import.functions.cancelImportJob.mutationOptions());
+    const { mutateAsync: restartImportJob } = useMutation(crpc.chat_import.functions.restartImportJob.mutationOptions());
 
     // Resume active import on mount — if the server shows a "processing" job
     // and the local state is idle, the user likely refreshed the page mid-import.
@@ -130,11 +131,12 @@ const DataImport: FC = () => {
             }
         } else if (jobStatus === "failed") {
             setState({
+                jobId: activeJobId,
                 message: jobErrorMessage ?? t`Import failed`,
                 step: "error",
             });
         }
-    }, [state, jobStatus, jobImported, jobFailed, jobErrorMessage, t]);
+    }, [state, jobStatus, jobImported, jobFailed, jobErrorMessage, activeJobId, t]);
 
     const handleFileSelect = useCallback(
         async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,6 +289,21 @@ const DataImport: FC = () => {
         }
     }, [state, cancelImportJob, t]);
 
+    const handleRestart = useCallback(async () => {
+        if (activeJobId === undefined) {
+            return;
+        }
+
+        try {
+            await restartImportJob({ jobId: activeJobId });
+            // The watcher reads the job's status on every render, and the cached one still says "failed" until it is refetched.
+            await refetchImportStatus();
+            setState({ jobId: activeJobId, provider: (jobProvider as ImportProvider) || "chatgpt", step: "importing" });
+        } catch (error) {
+            setState({ message: describeError(error, i18n), step: "error" });
+        }
+    }, [activeJobId, jobProvider, restartImportJob, refetchImportStatus, i18n]);
+
     const handleReset = useCallback(() => {
         setState({ step: "idle" });
     }, []);
@@ -399,8 +416,21 @@ const DataImport: FC = () => {
                             <p className="font-medium">{t`Import failed`}</p>
                             <p className="mt-1">{state.message}</p>
                         </div>
-                        <Button onClick={handleReset} variant="outline">
-                            {t`Try Again`}
+                        <div className="flex gap-2">
+                            {state.jobId !== undefined && importStatus?.canRestart && <Button onClick={handleRestart}>{t`Resume import`}</Button>}
+                            <Button onClick={handleReset} variant="outline">
+                                {t`Try Again`}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* A failed import that kept its file and still has conversations left */}
+                {state.step === "idle" && importStatus?.canRestart && (
+                    <div className="space-y-3">
+                        <p className="text-muted-foreground text-sm">{t`Your last import stopped before it finished. Resume it to import the conversations that are left.`}</p>
+                        <Button onClick={handleRestart} variant="outline">
+                            {t`Resume import`}
                         </Button>
                     </div>
                 )}
