@@ -439,7 +439,7 @@ msgstr "{0} z ocen: {1}"
 
 #. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
 #. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
-#: src/components/model-picker/model-picker.tsx:308
+#: src/components/model-picker/model-picker.tsx:319
 msgid "{0} input, {1} output per 1M tokens"
 msgstr ""
 
@@ -515,7 +515,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "Wykorzystane tokeny: {0} z {1} ({2}%)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1092
+#: src/components/model-picker/model-picker.tsx:1218
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "Wybrano {0} z {MAX_PARALLEL}"
 
@@ -812,6 +812,11 @@ msgstr "{itemCount, plural, one {{nodeName}: obiekt z # elementem} few {{nodeNam
 msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, one {# element} few {# elementy} many {# elementów} other {# elementu}}"
 
+#. placeholder {0}: ids.length
+#: src/components/model-picker/model-picker.tsx:910
+msgid "{label} moved to position {position} of {0} in starred"
+msgstr "{label} przesunięto na pozycję {position} z {0} na liście oznaczonych gwiazdką"
+
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
 msgstr "{metricLabel} > {threshold} dziennie"
@@ -909,7 +914,7 @@ msgstr "Aktywowano połączenie {name}"
 msgid "{name} disconnected"
 msgstr "Rozłączono {name}"
 
-#: src/components/model-picker/model-picker.tsx:677
+#: src/components/model-picker/model-picker.tsx:734
 msgid "{name} hidden from the model picker"
 msgstr ""
 
@@ -1936,7 +1941,7 @@ msgid "Add to Favorites"
 msgstr "Dodaj do ulubionych"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:329
+#: src/components/model-picker/model-picker.tsx:340
 msgid "Add to starred"
 msgstr "Dodaj do oznaczonych gwiazdką"
 
@@ -2495,8 +2500,8 @@ msgstr "Wyrównaj pionowo (V)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:617
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
-#: src/components/model-picker/model-picker.tsx:942
-#: src/components/model-picker/model-picker.tsx:1020
+#: src/components/model-picker/model-picker.tsx:1067
+#: src/components/model-picker/model-picker.tsx:1145
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:420
@@ -2574,7 +2579,7 @@ msgid "All MCP servers active"
 msgstr "Wszystkie serwery MCP aktywne"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:563
-#: src/components/model-picker/model-picker.tsx:892
+#: src/components/model-picker/model-picker.tsx:1017
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "Wszystkie modele"
@@ -3371,7 +3376,7 @@ msgid "Auckland"
 msgstr "Auckland"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
-#: src/components/model-picker/model-picker.tsx:994
+#: src/components/model-picker/model-picker.tsx:1119
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:119
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -4448,7 +4453,7 @@ msgstr "Pamięć podręczna"
 msgid "Cache Hit Rate"
 msgstr "Współczynnik trafień cache"
 
-#: src/components/model-picker/model-picker.tsx:203
+#: src/components/model-picker/model-picker.tsx:210
 #: src/features/chat/thread/message-cost-badge.tsx:56
 msgid "Cached input"
 msgstr "Wejście z pamięci podręcznej"
@@ -5310,7 +5315,7 @@ msgstr "Kliknięcie"
 msgid "Click \"{selector}\""
 msgstr "Kliknij „{selector}”"
 
-#: src/components/model-picker/model-picker.tsx:1052
+#: src/components/model-picker/model-picker.tsx:1177
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Kliknij ★ przy dowolnym modelu w sekcji Wszystkie modele, aby dodać go tutaj."
 
@@ -6032,7 +6037,7 @@ msgstr "Skonfigurowano"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1114
+#: src/components/model-picker/model-picker.tsx:1240
 msgid "Confirm"
 msgstr "Potwierdź"
 
@@ -6959,6 +6964,10 @@ msgstr "Nie udało się zapisać ustawienia Daily Brief."
 #: src/features/notifications/components/notification-settings.tsx:103
 msgid "Could not save the email setting."
 msgstr ""
+
+#: src/components/model-picker/model-picker.tsx:913
+msgid "Could not save the new order for {label}"
+msgstr "Nie udało się zapisać nowej kolejności dla {label}"
 
 #: src/features/pages/components/page-view.tsx:160
 #: src/features/pages/components/page-view.tsx:248
@@ -7926,7 +7935,7 @@ msgstr "Zaktualizowano domyślny model"
 msgid "Default Models"
 msgstr "Domyślne modele"
 
-#: src/components/model-picker/model-picker.tsx:1005
+#: src/components/model-picker/model-picker.tsx:1130
 msgid "Default order"
 msgstr ""
 
@@ -8418,7 +8427,7 @@ msgstr "Opisz, czego chcesz. Kreator zapyta, jeśli coś będzie niejasne, a pot
 msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 msgstr "Opisz swój przepływ pracy... np. „Wygeneruj obraz z tekstu, powiększ go, a potem usuń tło”"
 
-#: src/components/model-picker/model-picker.tsx:158
+#: src/components/model-picker/model-picker.tsx:165
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:213
@@ -8504,7 +8513,7 @@ msgstr "Deterministyczne sprawdzenia, które musi przejść każda odpowiedź."
 msgid "Deterministic, consistent"
 msgstr "Deterministyczny, spójny"
 
-#: src/components/model-picker/model-picker.tsx:225
+#: src/components/model-picker/model-picker.tsx:232
 #: src/features/marketing/components/tutorials-page.tsx:131
 msgid "Developer"
 msgstr "Deweloper"
@@ -9519,7 +9528,7 @@ msgid "Efficient reasoning with sparse activation"
 msgstr "Wydajne wnioskowanie z rzadką aktywacją"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:153
-#: src/components/model-picker/model-picker.tsx:76
+#: src/components/model-picker/model-picker.tsx:77
 msgid "Effort Control"
 msgstr "Kontrola wysiłku"
 
@@ -10711,7 +10720,7 @@ msgstr "wydłużony czas trwania"
 msgid "extended thinking"
 msgstr "rozszerzone myślenie"
 
-#: src/components/model-picker/model-picker.tsx:80
+#: src/components/model-picker/model-picker.tsx:81
 msgid "Extended Thinking"
 msgstr "Rozszerzone myślenie"
 
@@ -11448,8 +11457,8 @@ msgstr "Nie udało się zaktualizować ulubionych"
 msgid "Failed to update favorite status"
 msgstr "Nie udało się zaktualizować statusu ulubionego"
 
-#: src/components/model-picker/model-picker.tsx:672
-#: src/components/model-picker/model-picker.tsx:681
+#: src/components/model-picker/model-picker.tsx:729
+#: src/components/model-picker/model-picker.tsx:738
 #: src/features/settings/components/chat/model-filter-settings.tsx:56
 #: src/features/settings/components/chat/model-filter-settings.tsx:67
 msgid "Failed to update filter rules"
@@ -11610,7 +11619,7 @@ msgid "fast"
 msgstr "szybki"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:141
-#: src/components/model-picker/model-picker.tsx:77
+#: src/components/model-picker/model-picker.tsx:78
 #: src/features/marketing/components/model-detail-page.tsx:33
 #: src/features/settings/components/chat/models-settings.tsx:29
 msgid "Fast"
@@ -11899,7 +11908,7 @@ msgstr "Polecane"
 msgid "Featured image"
 msgstr "Obraz wyróżniający"
 
-#: src/components/model-picker/model-picker.tsx:170
+#: src/components/model-picker/model-picker.tsx:177
 #: src/features/marketing/components/gateway-footer.tsx:32
 #: src/features/marketing/components/gateway-landing-page.tsx:510
 #: src/features/marketing/components/gateway-navbar.tsx:53
@@ -13579,7 +13588,7 @@ msgstr "Konto gościa"
 msgid "Guest accounts"
 msgstr "Konta gości"
 
-#: src/components/model-picker/model-picker.tsx:856
+#: src/components/model-picker/model-picker.tsx:981
 msgid "Guest accounts use free models only."
 msgstr "Konta gości korzystają tylko z darmowych modeli."
 
@@ -13718,7 +13727,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1029
+#: src/components/model-picker/model-picker.tsx:1154
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -14143,7 +14152,7 @@ msgstr "ilustracja"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:968
+#: src/components/model-picker/model-picker.tsx:1093
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:117
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -14182,7 +14191,7 @@ msgstr "Załącznik graficzny (ukryty)"
 msgid "image editing"
 msgstr "edycja obrazów"
 
-#: src/components/model-picker/model-picker.tsx:78
+#: src/components/model-picker/model-picker.tsx:79
 #: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Image Gen"
 msgstr "Generowanie obrazów"
@@ -14631,7 +14640,7 @@ msgid "inpainting"
 msgstr "inpainting"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
-#: src/components/model-picker/model-picker.tsx:193
+#: src/components/model-picker/model-picker.tsx:200
 #: src/features/devices/components/device-tool-call.tsx:89
 #: src/features/evals/components/case-fields.tsx:69
 #: src/features/evals/components/dataset-panel.tsx:144
@@ -16186,7 +16195,7 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1097
+#: src/components/model-picker/model-picker.tsx:1223
 msgid "Locked to {0} models"
 msgstr "Ograniczono do modeli typu {0}"
 
@@ -16463,7 +16472,7 @@ msgstr "Zarządzaj preferencjami zgód"
 #~ msgid "Manage gateway API keys with per-key budgets and rate limits"
 #~ msgstr "Zarządzaj kluczami API bramy z budżetami i limitami żądań dla każdego klucza"
 
-#: src/components/model-picker/model-picker.tsx:684
+#: src/components/model-picker/model-picker.tsx:741
 msgid "Manage hidden labs"
 msgstr ""
 
@@ -16687,7 +16696,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Maks. rozmiar: {size} • Maks. {maxFiles} plików"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
-#: src/components/model-picker/model-picker.tsx:1091
+#: src/components/model-picker/model-picker.tsx:1217
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Osiągnięto maksimum modeli: {MAX_PARALLEL}"
 
@@ -17263,7 +17272,7 @@ msgstr "Model włączony"
 msgid "Model filter"
 msgstr "Filtr modeli"
 
-#: src/components/model-picker/model-picker.tsx:344
+#: src/components/model-picker/model-picker.tsx:389
 msgid "Model info"
 msgstr "Informacje o modelu"
 
@@ -17541,6 +17550,14 @@ msgstr "Przesuń {0} w dół"
 msgid "Move {0} up"
 msgstr "Przesuń {0} w górę"
 
+#: src/components/model-picker/model-picker.tsx:372
+msgid "Move {label} down in starred"
+msgstr "Przesuń {label} w dół na liście oznaczonych gwiazdką"
+
+#: src/components/model-picker/model-picker.tsx:357
+msgid "Move {label} up in starred"
+msgstr "Przesuń {label} w górę na liście oznaczonych gwiazdką"
+
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
 msgstr "Przesuń w dół"
@@ -17746,7 +17763,7 @@ msgstr "Birmański (Mjanma)"
 msgid "Name"
 msgstr "Nazwa"
 
-#: src/components/model-picker/model-picker.tsx:1006
+#: src/components/model-picker/model-picker.tsx:1131
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -18030,7 +18047,7 @@ msgid "Never used"
 msgstr "Nigdy nie użyto"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:145
-#: src/components/model-picker/model-picker.tsx:315
+#: src/components/model-picker/model-picker.tsx:326
 #: src/features/settings/components/chat/models-settings.tsx:42
 #: src/features/settings/components/chat/models-settings.tsx:566
 msgid "New"
@@ -18095,7 +18112,7 @@ msgstr "Nowy zbiór danych"
 msgid "New Export"
 msgstr "Nowy eksport"
 
-#: src/components/model-picker/model-picker.tsx:1007
+#: src/components/model-picker/model-picker.tsx:1132
 msgid "New first"
 msgstr ""
 
@@ -18599,7 +18616,7 @@ msgid "No models found matching your filters."
 msgstr "Nie znaleziono modeli pasujących do filtrów."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:711
-#: src/components/model-picker/model-picker.tsx:1058
+#: src/components/model-picker/model-picker.tsx:1183
 msgid "No models found."
 msgstr "Nie znaleziono modeli."
 
@@ -18789,7 +18806,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "Nie wykryto mowy. Tryb bez użycia rąk zatrzymany."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:703
-#: src/components/model-picker/model-picker.tsx:1050
+#: src/components/model-picker/model-picker.tsx:1175
 msgid "No starred models"
 msgstr "Brak modeli oznaczonych gwiazdką"
 
@@ -19364,7 +19381,7 @@ msgid "Online"
 msgstr "Online"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:434
+#: src/components/model-picker/model-picker.tsx:483
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "Można porównywać tylko modele typu {0}. Wyczyść zaznaczenie, aby zmienić typ."
 
@@ -20166,7 +20183,7 @@ msgstr "Outpainting"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:523
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
-#: src/components/model-picker/model-picker.tsx:197
+#: src/components/model-picker/model-picker.tsx:204
 #: src/features/devices/components/device-tool-call.tsx:95
 #: src/features/workflow/components/nodes/output-node.tsx:52
 #: src/features/workflow/types/index.ts:584
@@ -20329,7 +20346,7 @@ msgid "Paraguay"
 msgstr "Paragwaj"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:595
-#: src/components/model-picker/model-picker.tsx:922
+#: src/components/model-picker/model-picker.tsx:1047
 msgid "Parallel"
 msgstr "Równolegle"
 
@@ -20557,7 +20574,7 @@ msgstr "Płatności, zamówienia, faktury i subskrypcje przez PayPal"
 msgid "Payments, subscriptions, and financial data"
 msgstr "Płatności, subskrypcje i dane finansowe"
 
-#: src/components/model-picker/model-picker.tsx:79
+#: src/components/model-picker/model-picker.tsx:80
 #: src/features/settings/components/chat/models-settings.tsx:34
 msgid "PDF"
 msgstr "PDF"
@@ -21352,15 +21369,15 @@ msgstr "Poprzedni slajd"
 msgid "Previous version"
 msgstr "Poprzednia wersja"
 
-#: src/components/model-picker/model-picker.tsx:189
+#: src/components/model-picker/model-picker.tsx:196
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1009
+#: src/components/model-picker/model-picker.tsx:1134
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1008
+#: src/components/model-picker/model-picker.tsx:1133
 msgid "Price: low to high"
 msgstr ""
 
@@ -21430,7 +21447,7 @@ msgid "Private by default"
 msgstr "Domyślnie prywatne"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
-#: src/components/model-picker/model-picker.tsx:302
+#: src/components/model-picker/model-picker.tsx:313
 #: src/features/billing/components/personal-plan-card.tsx:23
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
@@ -21767,7 +21784,7 @@ msgstr "Sprawdzona kinowa estetyka"
 msgid "Proven reliability from previous generation"
 msgstr "Sprawdzona niezawodność poprzedniej generacji"
 
-#: src/components/model-picker/model-picker.tsx:219
+#: src/components/model-picker/model-picker.tsx:226
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -22787,7 +22804,7 @@ msgid "Remove from project"
 msgstr "Usuń z projektu"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:329
+#: src/components/model-picker/model-picker.tsx:340
 msgid "Remove from starred"
 msgstr "Usuń z oznaczonych gwiazdką"
 
@@ -24024,7 +24041,7 @@ msgid "Search models by name, ID, or provider..."
 msgstr "Szukaj modeli po nazwie, ID lub dostawcy..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:528
-#: src/components/model-picker/model-picker.tsx:863
+#: src/components/model-picker/model-picker.tsx:988
 msgid "Search models..."
 msgstr "Szukaj modeli..."
 
@@ -24962,7 +24979,7 @@ msgid "Sign up successful"
 msgstr "Rejestracja zakończona"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:246
-#: src/components/model-picker/model-picker.tsx:431
+#: src/components/model-picker/model-picker.tsx:480
 msgid "Sign up to unlock all models"
 msgstr "Zarejestruj się, aby odblokować wszystkie modele"
 
@@ -25028,7 +25045,7 @@ msgid "Singapore"
 msgstr "Singapur"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:582
-#: src/components/model-picker/model-picker.tsx:910
+#: src/components/model-picker/model-picker.tsx:1035
 msgid "Single"
 msgstr "Pojedynczy"
 
@@ -25361,7 +25378,7 @@ msgstr "Sortuj dane"
 msgid "Sort desc"
 msgstr "Sortuj malejąco"
 
-#: src/components/model-picker/model-picker.tsx:999
+#: src/components/model-picker/model-picker.tsx:1124
 msgid "Sort models"
 msgstr ""
 
@@ -25697,7 +25714,7 @@ msgid "Star a model in the model picker and it shows up here."
 msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:547
-#: src/components/model-picker/model-picker.tsx:879
+#: src/components/model-picker/model-picker.tsx:1004
 msgid "Starred"
 msgstr "Oznaczone gwiazdką"
 
@@ -26385,7 +26402,7 @@ msgstr "Podagent nie został zatwierdzony."
 msgid "Subheading"
 msgstr "Podtytuł"
 
-#: src/components/model-picker/model-picker.tsx:858
+#: src/components/model-picker/model-picker.tsx:983
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Wykup subskrypcję za 8 $/mies., aby odblokować wszystkie modele."
 
@@ -27040,7 +27057,7 @@ msgstr "tekst"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:629
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:955
+#: src/components/model-picker/model-picker.tsx:1080
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:116
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -28336,7 +28353,7 @@ msgstr "wywoływanie narzędzi"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:157
 #: ../../packages/chat-ui/src/model-picker/utils.ts:161
-#: src/components/model-picker/model-picker.tsx:81
+#: src/components/model-picker/model-picker.tsx:82
 #: src/features/settings/components/chat/models-settings.tsx:32
 msgid "Tool Calling"
 msgstr "Wywoływanie narzędzi"
@@ -28769,7 +28786,7 @@ msgstr "Uwierzytelnianie dwuskładnikowe jest obecnie włączone dla twojego kon
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
-#: src/components/model-picker/model-picker.tsx:933
+#: src/components/model-picker/model-picker.tsx:1058
 msgid "Type"
 msgstr "Typ"
 
@@ -28947,7 +28964,7 @@ msgid "Under the Hood"
 msgstr "Pod maską"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: src/components/model-picker/model-picker.tsx:679
+#: src/components/model-picker/model-picker.tsx:736
 #: src/features/canvas/canvas-panel.tsx:242
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
@@ -30020,7 +30037,7 @@ msgid "video"
 msgstr "wideo"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
-#: src/components/model-picker/model-picker.tsx:981
+#: src/components/model-picker/model-picker.tsx:1106
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:118
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -30298,7 +30315,7 @@ msgid "vision"
 msgstr "widzenie"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:145
-#: src/components/model-picker/model-picker.tsx:82
+#: src/components/model-picker/model-picker.tsx:83
 #: src/features/settings/components/chat/models-settings.tsx:30
 msgid "Vision"
 msgstr "Widzenie"
