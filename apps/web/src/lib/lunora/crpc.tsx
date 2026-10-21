@@ -184,7 +184,7 @@ const leaf = (client: LunoraClient, path: string[]): any => {
         mutationOptions: (overrides?: object) => {
             return {
                 mutationFn: async (args: Record<string, unknown>) =>
-                    await client.mutation(resolve(path) as never, withUnlockProof(args) as never, shardOptionsFor(args)),
+                    await client.mutation(resolve(path) as never, withUnlockProof(args) as never, shardOptionsFor(args) as never),
                 ...overrides,
             };
         },

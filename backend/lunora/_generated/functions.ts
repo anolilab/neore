@@ -8468,7 +8468,7 @@ export interface Caller {
         tools: {
             browser_node: {
                 closeBrowserSession: (args: { sessionId: Id<"browserSessions"> }) => Promise<void>;
-                executeBrowserAction: (args: { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }) => Promise<unknown>;
+                executeBrowserAction: (args: { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }) => Promise<import("@neore/service-sdk/browser-renderer").BrowserActionResponse>;
             };
             code_execution_node: {
                 default: (args: { code: string; threadId?: Id<"threads">; timeoutMs?: number; userId?: string }) => Promise<{ files: import("../chat/tools/sandbox-outputs.js").SandboxOutputFile[]; skippedFiles: import("../chat/tools/sandbox-outputs.js").SkippedOutputFile[]; error: string | undefined; results: { type: "text"; value: string; }[]; stderr: string; stdout: string; } | { error: string; results: { type: "error"; value: string; }[]; stderr: string; stdout: string; } | { error: string | undefined; results: { format?: string; type: "text" | "image" | "error"; value: string; }[]; stderr: string; stdout: string; }>;
