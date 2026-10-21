@@ -412,9 +412,12 @@ export interface InternalApiTypes {
     chat_import: {
         steps: {
             checkJobCancelled: FunctionReference<"query", { jobId: Id<"chatImportJobs"> }, boolean>;
-            finalizeImport: FunctionReference<"mutation", { errorMessage?: string; failed: number; imported: number; jobId: Id<"chatImportJobs">; r2Key: string; status: "completed" | "failed" }, null>;
-            processConversationBatch: FunctionReference<"mutation", { conversations: Array<{ createdAt?: number; messages: Array<{ content: string; createdAt?: number; role: "user" | "assistant" }>; title: string }>; provider: string; userId: string }, { failed: number; imported: number }>;
+            finalizeImport: FunctionReference<"mutation", { errorMessage?: string; failed: number; imported: number; jobId: Id<"chatImportJobs">; keptKey?: string; r2Key: string; status: "completed" | "failed" }, null>;
+            importCounts: FunctionReference<"query", { jobId: Id<"chatImportJobs"> }, { failed: number; imported: number; total: number }>;
+            keepImportFile: FunctionReference<"action", { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }, string | null>;
+            processConversationBatch: FunctionReference<"mutation", { conversations: Array<{ createdAt?: number; messages: Array<{ content: string; createdAt?: number; role: "user" | "assistant" }>; title: string }>; jobId?: Id<"chatImportJobs">; provider: string; userId: string }, { failed: number; imported: number }>;
             processImportFile: FunctionReference<"action", { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }, { failed: number; imported: number; }>;
+            reapRestartableImport: FunctionReference<"mutation", { failedAt: number; jobId: Id<"chatImportJobs">; r2Key: string }, null>;
             updateImportProgress: FunctionReference<"mutation", { currentStep?: string; failedConversations?: number; importedConversations?: number; jobId: Id<"chatImportJobs">; progress?: number; totalConversations?: number }, null>;
         };
         workflow_actions: {
@@ -1410,8 +1413,11 @@ export const internal: InternalApiTypes = {
         steps: {
             checkJobCancelled: { __lunoraRef: "chat_import_steps:checkJobCancelled" },
             finalizeImport: { __lunoraRef: "chat_import_steps:finalizeImport" },
+            importCounts: { __lunoraRef: "chat_import_steps:importCounts" },
+            keepImportFile: { __lunoraRef: "chat_import_steps:keepImportFile" },
             processConversationBatch: { __lunoraRef: "chat_import_steps:processConversationBatch" },
             processImportFile: { __lunoraRef: "chat_import_steps:processImportFile" },
+            reapRestartableImport: { __lunoraRef: "chat_import_steps:reapRestartableImport" },
             updateImportProgress: { __lunoraRef: "chat_import_steps:updateImportProgress" },
         },
         workflow_actions: {

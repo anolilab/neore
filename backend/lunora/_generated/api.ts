@@ -338,7 +338,8 @@ export interface ApiTypes {
     chat_import: {
         functions: {
             cancelImportJob: FunctionReference<"mutation", { jobId: string }, null>;
-            getImportStatus: FunctionReference<"query", {}, { _id: string; completedAt: number | null; createdAt: number; currentStep: string | null; errorMessage: string | null; failedConversations: number | null; importedConversations: number; progress: number | null; provider: string; status: string; totalConversations: number } | null>;
+            getImportStatus: FunctionReference<"query", {}, { _id: string; canRestart: boolean; completedAt: number | null; createdAt: number; currentStep: string | null; errorMessage: string | null; failedConversations: number | null; importedConversations: number; progress: number | null; provider: string; status: string; totalConversations: number } | null>;
+            restartImportJob: FunctionReference<"mutation", { jobId: string }, null>;
             startImportJob: FunctionReference<"mutation", { provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore"; totalConversations: number; uploadId: string }, { jobId: string }>;
         };
     };
@@ -1097,6 +1098,7 @@ export const api: ApiTypes = {
         functions: {
             cancelImportJob: { __lunoraRef: "chat_import_functions:cancelImportJob" },
             getImportStatus: { __lunoraRef: "chat_import_functions:getImportStatus" },
+            restartImportJob: { __lunoraRef: "chat_import_functions:restartImportJob" },
             startImportJob: { __lunoraRef: "chat_import_functions:startImportJob" },
         },
     },

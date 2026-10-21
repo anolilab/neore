@@ -10008,6 +10008,9 @@
                         "_id": {
                           "type": "string"
                         },
+                        "canRestart": {
+                          "type": "boolean"
+                        },
                         "completedAt": {
                           "anyOf": [
                             {
@@ -10076,6 +10079,7 @@
                       },
                       "required": [
                         "_id",
+                        "canRestart",
                         "completedAt",
                         "createdAt",
                         "currentStep",
@@ -10107,6 +10111,67 @@
           "chat-import"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#chat_import_functions:restartImportJob": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_import_functions:restartImportJob` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_import_functions:restartImportJob",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "jobId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "jobId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_import_functions:restartImportJob",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_import_functions:restartImportJob",
+        "tags": [
+          "chat-import"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#chat_import_functions:startImportJob": {

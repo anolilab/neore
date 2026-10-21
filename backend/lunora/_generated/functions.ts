@@ -555,11 +555,15 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "changelog_functions:setCachedChangelogs": lunora_changelog_functions_40.setCachedChangelogs as unknown as RegisteredLunoraFunction,
     "chat_import_functions:cancelImportJob": lunora_chat_import_functions_41.cancelImportJob as unknown as RegisteredLunoraFunction,
     "chat_import_functions:getImportStatus": lunora_chat_import_functions_41.getImportStatus as unknown as RegisteredLunoraFunction,
+    "chat_import_functions:restartImportJob": lunora_chat_import_functions_41.restartImportJob as unknown as RegisteredLunoraFunction,
     "chat_import_functions:startImportJob": lunora_chat_import_functions_41.startImportJob as unknown as RegisteredLunoraFunction,
     "chat_import_steps:checkJobCancelled": lunora_chat_import_steps_42.checkJobCancelled as unknown as RegisteredLunoraFunction,
     "chat_import_steps:finalizeImport": lunora_chat_import_steps_42.finalizeImport as unknown as RegisteredLunoraFunction,
+    "chat_import_steps:importCounts": lunora_chat_import_steps_42.importCounts as unknown as RegisteredLunoraFunction,
+    "chat_import_steps:keepImportFile": lunora_chat_import_steps_42.keepImportFile as unknown as RegisteredLunoraFunction,
     "chat_import_steps:processConversationBatch": lunora_chat_import_steps_42.processConversationBatch as unknown as RegisteredLunoraFunction,
     "chat_import_steps:processImportFile": lunora_chat_import_steps_42.processImportFile as unknown as RegisteredLunoraFunction,
+    "chat_import_steps:reapRestartableImport": lunora_chat_import_steps_42.reapRestartableImport as unknown as RegisteredLunoraFunction,
     "chat_import_steps:updateImportProgress": lunora_chat_import_steps_42.updateImportProgress as unknown as RegisteredLunoraFunction,
     "chat_import_workflow_actions:default": lunora_chat_import_workflow_actions_43.default as unknown as RegisteredLunoraFunction,
     "chat_import_workflow_actions:startImportWorkflow": lunora_chat_import_workflow_actions_43.startImportWorkflow as unknown as RegisteredLunoraFunction,
@@ -2903,6 +2907,20 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["jobId"] !== "string") return DEFER;
 return { "jobId": source["jobId"] };
 });
+installCompiledValidatorMap(lunora_chat_import_steps_42.importCounts.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["jobId"] !== "string") return DEFER;
+return { "jobId": source["jobId"] };
+});
+installCompiledValidatorMap(lunora_chat_import_steps_42.keepImportFile.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["jobId"] !== "string") return DEFER;
+if (typeof source["r2Key"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "jobId": source["jobId"], "r2Key": source["r2Key"], "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_chat_import_steps_42.processImportFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -2912,6 +2930,14 @@ if (typeof source["r2Key"] !== "string") return DEFER;
 if (typeof source["totalConversations"] !== "number" || !Number.isFinite(source["totalConversations"])) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "jobId": source["jobId"], "provider": source["provider"], "r2Key": source["r2Key"], "totalConversations": source["totalConversations"], "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_chat_import_steps_42.reapRestartableImport.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["failedAt"] !== "number" || !Number.isFinite(source["failedAt"])) return DEFER;
+if (typeof source["jobId"] !== "string") return DEFER;
+if (typeof source["r2Key"] !== "string") return DEFER;
+return { "failedAt": source["failedAt"], "jobId": source["jobId"], "r2Key": source["r2Key"] };
 });
 installCompiledValidatorMap(lunora_chat_import_steps_42.updateImportProgress.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8487,14 +8513,18 @@ export interface Caller {
     chat_import: {
         functions: {
             cancelImportJob: (args: { jobId: string }) => Promise<null>;
-            getImportStatus: (args?: {}) => Promise<{ _id: string; completedAt: number | null; createdAt: number; currentStep: string | null; errorMessage: string | null; failedConversations: number | null; importedConversations: number; progress: number | null; provider: string; status: string; totalConversations: number } | null>;
+            getImportStatus: (args?: {}) => Promise<{ _id: string; canRestart: boolean; completedAt: number | null; createdAt: number; currentStep: string | null; errorMessage: string | null; failedConversations: number | null; importedConversations: number; progress: number | null; provider: string; status: string; totalConversations: number } | null>;
+            restartImportJob: (args: { jobId: string }) => Promise<null>;
             startImportJob: (args: { provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore"; totalConversations: number; uploadId: string }) => Promise<{ jobId: string }>;
         };
         steps: {
             checkJobCancelled: (args: { jobId: Id<"chatImportJobs"> }) => Promise<boolean>;
-            finalizeImport: (args: { errorMessage?: string; failed: number; imported: number; jobId: Id<"chatImportJobs">; r2Key: string; status: "completed" | "failed" }) => Promise<null>;
-            processConversationBatch: (args: { conversations: Array<{ createdAt?: number; messages: Array<{ content: string; createdAt?: number; role: "user" | "assistant" }>; title: string }>; provider: string; userId: string }) => Promise<{ failed: number; imported: number }>;
+            finalizeImport: (args: { errorMessage?: string; failed: number; imported: number; jobId: Id<"chatImportJobs">; keptKey?: string; r2Key: string; status: "completed" | "failed" }) => Promise<null>;
+            importCounts: (args: { jobId: Id<"chatImportJobs"> }) => Promise<{ failed: number; imported: number; total: number }>;
+            keepImportFile: (args: { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }) => Promise<string | null>;
+            processConversationBatch: (args: { conversations: Array<{ createdAt?: number; messages: Array<{ content: string; createdAt?: number; role: "user" | "assistant" }>; title: string }>; jobId?: Id<"chatImportJobs">; provider: string; userId: string }) => Promise<{ failed: number; imported: number }>;
             processImportFile: (args: { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }) => Promise<{ failed: number; imported: number; }>;
+            reapRestartableImport: (args: { failedAt: number; jobId: Id<"chatImportJobs">; r2Key: string }) => Promise<null>;
             updateImportProgress: (args: { currentStep?: string; failedConversations?: number; importedConversations?: number; jobId: Id<"chatImportJobs">; progress?: number; totalConversations?: number }) => Promise<null>;
         };
         workflow_actions: {
@@ -10108,13 +10138,17 @@ export const createCaller = (context: CallerCtx): Caller => ({
         functions: {
             cancelImportJob: (args) => callRegistered(context, "chat_import_functions:cancelImportJob", args),
             getImportStatus: (args) => callRegistered(context, "chat_import_functions:getImportStatus", args),
+            restartImportJob: (args) => callRegistered(context, "chat_import_functions:restartImportJob", args),
             startImportJob: (args) => callRegistered(context, "chat_import_functions:startImportJob", args),
         },
         steps: {
             checkJobCancelled: (args) => callRegistered(context, "chat_import_steps:checkJobCancelled", args),
             finalizeImport: (args) => callRegistered(context, "chat_import_steps:finalizeImport", args),
+            importCounts: (args) => callRegistered(context, "chat_import_steps:importCounts", args),
+            keepImportFile: (args) => callRegistered(context, "chat_import_steps:keepImportFile", args),
             processConversationBatch: (args) => callRegistered(context, "chat_import_steps:processConversationBatch", args),
             processImportFile: (args) => callRegistered(context, "chat_import_steps:processImportFile", args),
+            reapRestartableImport: (args) => callRegistered(context, "chat_import_steps:reapRestartableImport", args),
             updateImportProgress: (args) => callRegistered(context, "chat_import_steps:updateImportProgress", args),
         },
         workflow_actions: {

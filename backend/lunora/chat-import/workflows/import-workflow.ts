@@ -50,11 +50,19 @@ export const chatImportWorkflowConfig: WorkflowConfig<ImportParams, void> = {
             imported = result.imported;
             failed = result.failed;
         } catch (error) {
-            failed = totalConversations;
+            // Keep the counts already saved: a restart resumes after them, and the rest of the file is not counted.
+            const saved = (await context.step.do("read-import-counts", async () => await context.run(internal.chat_import.steps.importCounts, { jobId }))) as {
+                failed: number;
+                imported: number;
+            };
+
+            imported = saved.imported;
+            failed = saved.failed;
             errorMessage = error instanceof Error ? error.message : "Import processing failed unexpectedly";
         }
 
         const isAllFailed = imported === 0 && failed > 0;
+        const isFailedRun = errorMessage !== undefined || isAllFailed;
         let failureSummary: string | undefined;
 
         if (isAllFailed) {
@@ -62,6 +70,14 @@ export const chatImportWorkflowConfig: WorkflowConfig<ImportParams, void> = {
         } else if (failed > 0) {
             failureSummary = `${failed} conversations failed to import`;
         }
+
+        // A failed run keeps its file for a restart (`chat-import/restart.ts`); a copy that cannot be made is simply not kept.
+        const keptKey = isFailedRun
+            ? ((await context.step.do(
+                  "keep-import-file",
+                  async () => await context.run(internal.chat_import.steps.keepImportFile, { jobId, r2Key, userId }),
+              )) as string | null)
+            : null;
 
         await context.step.do(
             "finalize-import",
@@ -71,8 +87,9 @@ export const chatImportWorkflowConfig: WorkflowConfig<ImportParams, void> = {
                     failed,
                     imported,
                     jobId,
+                    keptKey: keptKey ?? undefined,
                     r2Key,
-                    status: isAllFailed ? "failed" : "completed",
+                    status: isFailedRun ? "failed" : "completed",
                 }),
         );
     },

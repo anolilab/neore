@@ -2,13 +2,14 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { insertMessageRow, insertThread } from "../agent/table-writes";
 import { assertStagedChatJson } from "../lib/chat-upload";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
-import { MAX_STORED_READ_BYTES as IMPORT_FILE_MAX_BYTES, readStoredText } from "../lib/storage-read";
+import { MAX_STORED_READ_BYTES as IMPORT_FILE_MAX_BYTES, readStoredObject, readStoredText } from "../lib/storage-read";
 import { withoutUndefined } from "../lib/patch";
 import { notifyQuietly } from "../notifications/notify";
+import { hasConversationsLeft, keptImportKeyFor, RESTART_WINDOW_MS } from "./restart";
 
 const BATCH_SIZE = 25;
 
@@ -70,12 +71,14 @@ export const processImportFile = internalAction
             totalConversations: conversations.length,
         });
 
-        // 3. Process conversations in batches
-        let totalImported = 0;
-        let totalFailed = 0;
-        const totalBatches = Math.ceil(conversations.length / BATCH_SIZE);
+        // 3. Process conversations in batches. The counts already saved on the job are the
+        // conversations done by an earlier run (a step retry or a restart), so this resumes after them.
+        const saved = await context.runQuery(internal.chat_import.steps.importCounts, { jobId: args.jobId });
+        let totalImported = saved.imported;
+        let totalFailed = saved.failed;
+        const resumeFrom = totalImported + totalFailed;
 
-        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
+        for (let start = resumeFrom; start < conversations.length; start += BATCH_SIZE) {
             // Check for cancellation before each batch
             const cancelled = await context.runQuery(internal.chat_import.steps.checkJobCancelled, {
                 jobId: args.jobId,
@@ -89,7 +92,6 @@ export const processImportFile = internalAction
                 break;
             }
 
-            const start = batchIndex * BATCH_SIZE;
             const batch = conversations.slice(start, start + BATCH_SIZE);
 
             try {
@@ -107,6 +109,7 @@ export const processImportFile = internalAction
                             title: c.title,
                         };
                     }),
+                    jobId: args.jobId,
                     provider: args.provider,
                     userId: args.userId,
                 });
@@ -118,7 +121,7 @@ export const processImportFile = internalAction
             }
 
             // Update progress (5% reserved for init, 90% for processing, 5% for cleanup)
-            const batchProgress = 5 + Math.round(((batchIndex + 1) / totalBatches) * 90);
+            const batchProgress = 5 + Math.round(((start + batch.length) / conversations.length) * 90);
 
             await context.runMutation(internal.chat_import.steps.updateImportProgress, {
                 currentStep: "processing_conversations",
@@ -150,6 +153,26 @@ const lastActivityOf = (conv: { createdAt?: number; messages: { createdAt?: numb
 // ---------------------------------------------------------------------------
 // processConversationBatch — mutation that creates threads + messages
 // ---------------------------------------------------------------------------
+/** Add a batch's counts to the job, in the same transaction as the batch's threads. */
+const addJobCounts = async (
+    context: Pick<MutationCtx, "db">,
+    jobId: Id<"chatImportJobs"> | undefined,
+    counts: { failed: number; imported: number },
+): Promise<void> => {
+    if (!jobId) {
+        return;
+    }
+
+    const job = await context.db.get(jobId);
+
+    if (job) {
+        await context.db.patch(jobId, {
+            failedConversations: (job.failedConversations ?? 0) + counts.failed,
+            importedConversations: job.importedConversations + counts.imported,
+        });
+    }
+};
+
 export const processConversationBatch = internalMutation
     .input({
         conversations: v.array(
@@ -165,6 +188,7 @@ export const processConversationBatch = internalMutation
                 title: v.string(),
             }),
         ),
+        jobId: v.optional(v.id("chatImportJobs")),
         provider: v.string(),
         userId: v.string(),
     })
@@ -224,7 +248,86 @@ export const processConversationBatch = internalMutation
             }
         }
 
+        // The counts commit with the threads above, so a retry or a restart resumes after exactly what was saved.
+        await addJobCounts(context, args.jobId, { failed, imported });
+
         return { failed, imported };
+    });
+
+/** The conversations a job has already saved or counted as failed. Read before a run, so it resumes after them. */
+export const importCounts = internalQuery
+    .input({ jobId: v.id("chatImportJobs") })
+    .output(v.object({ failed: v.number(), imported: v.number(), total: v.number() }))
+    .query(async ({ args, ctx: context }) => {
+        const job = await context.db.get(args.jobId);
+
+        return { failed: job?.failedConversations ?? 0, imported: job?.importedConversations ?? 0, total: job?.totalConversations ?? 0 };
+    });
+
+/**
+ * Copy a failed import's file under its kept key, so a restart can read it after
+ * the staging reap. Returns `null` when the file cannot be kept (already reaped,
+ * or the import was cancelled): the job then simply cannot be restarted.
+ */
+export const keepImportFile = internalAction
+    .input({ jobId: v.id("chatImportJobs"), r2Key: v.string(), userId: v.string() })
+    .output(v.union(v.string(), v.null()))
+    .action(async ({ args, ctx: context }) => {
+        if (await context.runQuery(internal.chat_import.steps.checkJobCancelled, { jobId: args.jobId })) {
+            return null;
+        }
+
+        // Nothing left to run would make the restart a no-op, so the copy is not worth keeping.
+        const counts = await context.runQuery(internal.chat_import.steps.importCounts, { jobId: args.jobId });
+
+        if (!hasConversationsLeft({ failedConversations: counts.failed, importedConversations: counts.imported, totalConversations: counts.total })) {
+            return null;
+        }
+
+        const key = keptImportKeyFor(args.userId, args.jobId);
+
+        // A restart's file is already the kept copy.
+        if (key === args.r2Key) {
+            return key;
+        }
+
+        try {
+            const stored = await readStoredObject(context.storage, args.r2Key, { maxBytes: IMPORT_FILE_MAX_BYTES });
+
+            await context.storage.store(key, stored.bytes, {
+                allowedContentTypes: ["application/json"],
+                contentType: "application/json",
+                maxSize: IMPORT_FILE_MAX_BYTES,
+            });
+
+            return key;
+        } catch {
+            return null;
+        }
+    });
+
+/**
+ * Delete a failed import's kept file once its restart window has passed. It acts
+ * only on the failure it was scheduled for: a restart or a newer failure moves
+ * `completedAt` or the key, and then the reap is a no-op.
+ */
+export const reapRestartableImport = internalMutation
+    .input({ failedAt: v.number(), jobId: v.id("chatImportJobs"), r2Key: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx: context }) => {
+        const job = await context.db.get(args.jobId);
+
+        if (job && (job.status !== "failed" || job.completedAt !== args.failedAt || job.r2Key !== args.r2Key)) {
+            return null;
+        }
+
+        if (job) {
+            await context.db.patch(args.jobId, { r2Key: "" });
+        }
+
+        await scheduleObjectDeletion(context, [args.r2Key]);
+
+        return null;
     });
 
 // ---------------------------------------------------------------------------
@@ -284,16 +387,20 @@ export const finalizeImport = internalMutation
         failed: v.number(),
         imported: v.number(),
         jobId: v.id("chatImportJobs"),
+        /** The kept copy of a failed import, which a restart reads. Absent when nothing is kept. */
+        keptKey: v.optional(v.string()),
         r2Key: v.string(),
         status: v.union(v.literal("completed"), v.literal("failed")),
     })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
-        // Clean up the R2 import file
-        try {
-            await scheduleObjectDeletion(context, [args.r2Key]);
-        } catch {
-            // Non-fatal: file might already be deleted
+        // Clean up the R2 import file. The kept copy is the source itself on a restart, so it stays.
+        if (args.r2Key !== args.keptKey) {
+            try {
+                await scheduleObjectDeletion(context, [args.r2Key]);
+            } catch {
+                // Non-fatal: file might already be deleted
+            }
         }
 
         // Update the job record
@@ -307,10 +414,18 @@ export const finalizeImport = internalMutation
                 failedConversations: args.failed,
                 importedConversations: args.imported,
                 progress: 100,
-                r2Key: "",
+                r2Key: args.keptKey ?? "",
                 status: args.status,
             }),
         );
+
+        if (args.keptKey && args.status === "failed") {
+            await context.scheduler.runAfter(RESTART_WINDOW_MS, internal.chat_import.steps.reapRestartableImport, {
+                failedAt: context.now,
+                jobId: args.jobId,
+                r2Key: args.keptKey,
+            });
+        }
 
         const job = await context.db.get(args.jobId);
 
