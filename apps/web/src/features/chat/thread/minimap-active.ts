@@ -111,6 +111,13 @@ export const useActivePromptId = (ids: ReadonlyArray<string>): string | undefine
             mutations.observe(list, { childList: true, subtree: true });
         }
 
+        // Images and other late content change row heights without a child-list mutation or scroll.
+        const growth = list && typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : undefined;
+
+        if (list && growth) {
+            growth.observe(list);
+        }
+
         return () => {
             if (frame !== 0) {
                 cancelAnimationFrame(frame);
@@ -119,6 +126,7 @@ export const useActivePromptId = (ids: ReadonlyArray<string>): string | undefine
             window.removeEventListener("scroll", schedule, { capture: true });
             window.removeEventListener("resize", schedule);
             mutations?.disconnect();
+            growth?.disconnect();
         };
     }, [key]);
 
