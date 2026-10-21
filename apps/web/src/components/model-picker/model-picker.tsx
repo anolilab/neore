@@ -102,8 +102,12 @@ export interface ModelPickerProps {
     isAnonymous?: boolean;
     /** Optional filtered model list — defaults to feature-flagged gateway models when not provided */
     models?: GatewayModel[];
-    /** Moves the first favorite onto the second's place in the stored order. Enables the move buttons on the starred tab. */
-    onMoveFavorite?: (movedId: string, targetId: string) => void;
+
+    /**
+     * Moves the first favorite onto the second's place in the stored order. Enables the move buttons on the starred tab.
+     * Resolves once the new order is saved, and rejects if the save fails and the order rolls back.
+     */
+    onMoveFavorite?: (movedId: string, targetId: string) => void | Promise<void>;
     onSelect?: (modelId: string) => void;
     onSelectMultiple?: (modelIds: string[]) => void;
     /** Called when the user stars/un-stars a model */
@@ -892,16 +896,22 @@ const ModelPicker: FC<ModelPickerProps> = ({
                 return;
             }
 
-            onMoveFavorite(modelId, target);
+            const saved = onMoveFavorite(modelId, target);
+
             setPendingMoveFocus({ before: ids.join("\u{0}"), delta, modelId });
 
             // The swap puts the model one place along, so its new position is its old index plus the step.
             const model = favoriteModels.find((entry) => entry.id === modelId);
 
             if (model) {
+                const label = getModelLabel(model, nicknames);
                 const position = ids.indexOf(modelId) + delta + 1;
 
-                setMoveAnnouncement(t`${getModelLabel(model, nicknames)} moved to position ${position} of ${ids.length} in starred`);
+                setMoveAnnouncement(t`${label} moved to position ${position} of ${ids.length} in starred`);
+                // The new order shows at once but is saved later; if the save fails it rolls back, so say that instead.
+                void Promise.resolve(saved).catch(() => {
+                    setMoveAnnouncement(t`Could not save the new order for ${label}`);
+                });
             }
         },
         [favoriteModels, nicknames, onMoveFavorite, t],
