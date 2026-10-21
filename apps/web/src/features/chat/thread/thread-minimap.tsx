@@ -21,6 +21,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import formatMessageTime from "./format-message-time";
 import { scrollToMessage } from "./message-list";
 import { useActivePromptId } from "./minimap-active";
+import type { MinimapItem } from "./minimap-items";
 import { buildMinimapItems, isProvisionalId, mergeOutline, minimapGapLabel, promptsDropped, shouldShowMinimap } from "./minimap-items";
 
 /** The outline is cheap to keep: it changes only when the active path does, which the effect below watches. */
@@ -30,85 +31,48 @@ interface ThreadMinimapProps {
     className?: string;
 }
 
-const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
+type ThreadId = ReturnType<typeof useChatThread>["threadId"];
+
+interface MinimapRailProps {
+    className?: string;
+    items: MinimapItem[];
+    threadId: ThreadId;
+}
+
+/** Gap units in the reader's language, narrow so a label stays short: `3h` in English, a locale's own form elsewhere. */
+const gapUnitFormatters = (locale: string) => {
+    return {
+        day: new Intl.NumberFormat(locale, { style: "unit", unit: "day", unitDisplay: "narrow" }),
+        hour: new Intl.NumberFormat(locale, { style: "unit", unit: "hour", unitDisplay: "narrow" }),
+    };
+};
+
+/**
+ * The rail itself. It mounts only while the rail is shown, so the position tracking it starts does not run
+ * for a hidden rail.
+ */
+const MinimapRail: FC<MinimapRailProps> = ({ className, items, threadId }) => {
     const { i18n, t } = useLingui();
-    const { isStreaming, messages, messagesStatus } = useChatMessages();
-    const { threadId } = useChatThread();
-    const crpc = useCRPC();
-
-    // Only a chat with older pages still to load needs the server outline; a fully loaded one already has every prompt.
-    // One read per chat (not live: a live query would re-run on every streamed write), after first paint so it does not
-    // join the first-paint burst, and kept for minutes so a window refocus does not scan the chat again.
-    const afterFirstPaint = useAfterFirstPaint();
-    const hasUnloadedHistory = messagesStatus === "CanLoadMore" || messagesStatus === "LoadingMore";
-    const outlineOptions = crpc.chat.prompt_outline.getThreadPromptOutline.queryOptions(
-        afterFirstPaint && hasUnloadedHistory && threadId ? { threadId: threadId as Id<"threads"> } : skipToken,
-        { live: false },
-    );
-    // Refetched on mount: a reopened chat may have changed while it was closed, and the stale time would hide that.
-    const { data: outline } = useQuery({ ...outlineOptions, refetchOnMount: "always", staleTime: OUTLINE_STALE_MS });
-
-    const loadedItems = useMemo(() => buildMinimapItems(messages), [messages]);
-    const items = useMemo(() => mergeOutline(outline?.items, loadedItems), [outline, loadedItems]);
     // The prompt being read: its tick turns white, so the rail shows where the reader is.
     const activeId = useActivePromptId(useMemo(() => items.map((item) => item.id), [items]));
+    const formatters = useMemo(() => gapUnitFormatters(i18n.locale), [i18n.locale]);
+    const navRef = useRef<HTMLElement>(null);
 
-    // The outline is read once, so a branch switch, an edit or a delete (a loaded prompt that is no longer there)
-    // leaves it listing prompts that are off the active path. Read it again then.
-    // The key is built from the thread, not from `outlineOptions`: that one is the skipped key while the outline is not read.
-    const queryClient = useQueryClient();
-    // The thread the flag is for: a re-read after a stream belongs to that chat's outline, not whichever one is open then.
-    const reReadWhenIdle = useRef<string | undefined>(undefined);
-    const previousPrompts = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined }>({ ids: new Set(), threadId: undefined });
-
+    // A long chat can put the current prompt's tick below the rail's visible area, so keep it in view as the reader moves.
     useEffect(() => {
-        // A sent prompt's optimistic id is replaced by its stored id; that is not a prompt that went away.
-        const ids = new Set(loadedItems.filter((item) => !isProvisionalId(item.id)).map((item) => item.id));
-        const previous = previousPrompts.current;
-
-        previousPrompts.current = { ids, threadId };
-
-        if (previous.threadId === threadId && promptsDropped(previous.ids, ids)) {
-            // A regenerate hides prompts before the server moves the path, so a read made while streaming can be stale:
-            // read again once streaming settles. Outside a stream the immediate read is already the current path.
-            if (isStreaming) {
-                reReadWhenIdle.current = threadId;
-            }
-
-            queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId: threadId as Id<"threads"> }) });
-        }
-    }, [loadedItems, threadId, isStreaming, queryClient, crpc]);
-
-    useEffect(() => {
-        const pendingThreadId = reReadWhenIdle.current;
-
-        if (isStreaming || pendingThreadId === undefined) {
-            return;
-        }
-
-        reReadWhenIdle.current = undefined;
-
-        if (pendingThreadId !== threadId) {
-            return;
-        }
-
-        queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId: threadId as Id<"threads"> }) });
-    }, [isStreaming, threadId, queryClient, crpc]);
-
-    if (!shouldShowMinimap(items)) {
-        return null;
-    }
+        navRef.current?.querySelector<HTMLElement>('button[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+    }, [activeId]);
 
     return (
         // not-prose: the rail sits inside the `prose` message column, whose list typography would otherwise apply.
-        <nav aria-label={t`Prompts in this conversation`} className={cn("not-prose max-h-[60vh] w-14 shrink-0 overflow-y-auto", className)}>
+        <nav aria-label={t`Prompts in this conversation`} className={cn("not-prose max-h-[60vh] w-14 shrink-0 overflow-y-auto", className)} ref={navRef}>
             <TooltipProvider>
                 <ol className="m-0 flex list-none flex-col items-center gap-1 py-1">
                     {items.map((item, index) => {
                         const promptNumber = index + 1;
                         const preview = item.preview || t`Attachment only`;
                         // Labels the time since the previous prompt, so a long pause between sends is visible on the rail.
-                        const gap = minimapGapLabel(items[index - 1]?.createdAt, item.createdAt);
+                        const gap = minimapGapLabel(items[index - 1]?.createdAt, item.createdAt, (value, unit) => formatters[unit].format(value));
                         const isActive = item.id === activeId;
 
                         return (
@@ -159,6 +123,75 @@ const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
             </TooltipProvider>
         </nav>
     );
+};
+
+const ThreadMinimap: FC<ThreadMinimapProps> = ({ className }) => {
+    const { isStreaming, messages, messagesStatus } = useChatMessages();
+    const { threadId } = useChatThread();
+    const crpc = useCRPC();
+
+    // Only a chat with older pages still to load needs the server outline; a fully loaded one already has every prompt.
+    // One read per chat (not live: a live query would re-run on every streamed write), after first paint so it does not
+    // join the first-paint burst, and kept for minutes so a window refocus does not scan the chat again.
+    const afterFirstPaint = useAfterFirstPaint();
+    const hasUnloadedHistory = messagesStatus === "CanLoadMore" || messagesStatus === "LoadingMore";
+    const outlineOptions = crpc.chat.prompt_outline.getThreadPromptOutline.queryOptions(
+        afterFirstPaint && hasUnloadedHistory && threadId ? { threadId: threadId as Id<"threads"> } : skipToken,
+        { live: false },
+    );
+    // Refetched on mount: a reopened chat may have changed while it was closed, and the stale time would hide that.
+    const { data: outline } = useQuery({ ...outlineOptions, refetchOnMount: "always", staleTime: OUTLINE_STALE_MS });
+
+    const loadedItems = useMemo(() => buildMinimapItems(messages), [messages]);
+    const items = useMemo(() => mergeOutline(outline?.items, loadedItems), [outline, loadedItems]);
+
+    // The outline is read once, so a branch switch, an edit or a delete (a loaded prompt that is no longer there)
+    // leaves it listing prompts that are off the active path. Read it again then.
+    // The key is built from the thread, not from `outlineOptions`: that one is the skipped key while the outline is not read.
+    const queryClient = useQueryClient();
+    // The thread the flag is for: a re-read after a stream belongs to that chat's outline, not whichever one is open then.
+    const reReadWhenIdle = useRef<string | undefined>(undefined);
+    const previousPrompts = useRef<{ ids: ReadonlySet<string>; threadId: string | undefined }>({ ids: new Set(), threadId: undefined });
+
+    useEffect(() => {
+        // A sent prompt's optimistic id is replaced by its stored id; that is not a prompt that went away.
+        const ids = new Set(loadedItems.filter((item) => !isProvisionalId(item.id)).map((item) => item.id));
+        const previous = previousPrompts.current;
+
+        previousPrompts.current = { ids, threadId };
+
+        if (previous.threadId === threadId && promptsDropped(previous.ids, ids)) {
+            // A regenerate hides prompts before the server moves the path, so a read made while streaming can be stale:
+            // read again once streaming settles. Outside a stream the immediate read is already the current path.
+            if (isStreaming) {
+                reReadWhenIdle.current = threadId;
+            }
+
+            queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId: threadId as Id<"threads"> }) });
+        }
+    }, [loadedItems, threadId, isStreaming, queryClient, crpc]);
+
+    useEffect(() => {
+        const pendingThreadId = reReadWhenIdle.current;
+
+        if (isStreaming || pendingThreadId === undefined) {
+            return;
+        }
+
+        reReadWhenIdle.current = undefined;
+
+        if (pendingThreadId !== threadId) {
+            return;
+        }
+
+        queryClient.invalidateQueries({ queryKey: crpc.chat.prompt_outline.getThreadPromptOutline.queryKey({ threadId: threadId as Id<"threads"> }) });
+    }, [isStreaming, threadId, queryClient, crpc]);
+
+    if (!shouldShowMinimap(items)) {
+        return null;
+    }
+
+    return <MinimapRail className={className} items={items} threadId={threadId} />;
 };
 
 export default ThreadMinimap;

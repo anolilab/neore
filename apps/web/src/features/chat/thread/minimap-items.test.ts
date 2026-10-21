@@ -27,6 +27,10 @@ describe("toMinimapPreview", () => {
         expect(toMinimapPreview("check and fix [pasted-text.txt](t3-context:abc123) please")).toBe("check and fix pasted-text.txt please");
     });
 
+    it("shows an escaped bracket in a link label as the bracket", () => {
+        expect(toMinimapPreview(String.raw`see [report \[v2\].pdf](https://example.com/file) now`)).toBe("see report [v2].pdf now");
+    });
+
     it("keeps the label of a link with a title, in double or single quotes", () => {
         expect(toMinimapPreview('see [spec](https://example.com/a "Title here") now')).toBe("see spec now");
         expect(toMinimapPreview("see [spec](https://example.com/a 'Title') now")).toBe("see spec now");
@@ -201,6 +205,10 @@ describe("minimapGapLabel", () => {
         expect(minimapGapLabel(T0, T0 + 25 * HOUR)).toBe("1d");
     });
 
+    it("writes the unit with the formatter it is given", () => {
+        expect(minimapGapLabel(T0, T0 + 3 * HOUR, (value, unit) => `${value} ${unit}`)).toBe("3 hour");
+    });
+
     it("has no label for a shorter gap, a first prompt, or a missing time", () => {
         expect(minimapGapLabel(T0, T0 + 59 * 60 * 1000)).toBeUndefined();
         expect(minimapGapLabel(undefined, T0)).toBeUndefined();
@@ -209,6 +217,12 @@ describe("minimapGapLabel", () => {
 });
 
 describe("buildMinimapItems send times", () => {
+    it("shows no time for a prompt still sending, whose clock is this device's", () => {
+        const items = buildMinimapItems([{ id: "optimistic-1700000000", role: "user", text: "a", _creationTime: 1_700_000_000_000 }]);
+
+        expect(items[0]?.createdAt).toBeUndefined();
+    });
+
     it("carries the creation time, and drops a missing or zero one", () => {
         const items = buildMinimapItems([
             { id: "u1", role: "user", text: "a", _creationTime: 1_700_000_000_000 },
