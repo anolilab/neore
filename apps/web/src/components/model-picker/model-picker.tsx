@@ -616,6 +616,8 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const [selectedModelId, setSelectedModelId] = useState<string | undefined>(initialModelId);
     const [parallelSelectedIds, setParallelSelectedIds] = useState<Set<string>>(() => new Set(initialModelIds));
     const [searchQuery, setSearchQuery] = useState("");
+    // Read out after a starred move, so a screen-reader user hears the result and the model's new place.
+    const [moveAnnouncement, setMoveAnnouncement] = useState("");
     const [activeTab, setActiveTab] = useState<ModelPickerTab>(defaultTab);
     const [selectionMode, setSelectionMode] = useState<ModelPickerSelectionMode>(() => ((initialModelIds?.length ?? 0) > 0 ? "parallel" : "single"));
     const [infoModelId, setInfoModelId] = useState<string | undefined>();
@@ -885,10 +887,19 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
                 if (target !== undefined) {
                     onMoveFavorite(modelId, target);
+
+                    // The swap puts the model one place along, so its new position is its old index plus the step.
+                    const model = favoriteModels.find((entry) => entry.id === modelId);
+
+                    if (model) {
+                        const position = ids.indexOf(modelId) + delta + 1;
+
+                        setMoveAnnouncement(t`${getModelLabel(model, nicknames)} moved to position ${position} of ${ids.length} in starred`);
+                    }
                 }
             },
         };
-    }, [activeTab, favoriteModels, onMoveFavorite, searchQuery, sort]);
+    }, [activeTab, favoriteModels, nicknames, onMoveFavorite, searchQuery, sort, t]);
 
     // Derive the "anchor" mode from the first selected model in parallel mode.
     // All other types are locked out once a selection is made.
@@ -913,6 +924,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
             open={!!infoModel}
         >
             <div ref={pickerRef}>
+                <span aria-live="polite" className="sr-only" role="status">
+                    {moveAnnouncement}
+                </span>
                 <Command filter={() => true} items={filteredGroupedItems} onValueChange={setSearchQuery} value={searchQuery}>
                     {isAnonymous && (
                         <div className="flex items-center gap-2.5 border-b bg-amber-50 px-3 py-2.5 dark:bg-amber-950/20">
