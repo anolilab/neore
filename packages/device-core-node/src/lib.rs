@@ -16,7 +16,9 @@ use std::sync::Arc;
 use device_core::engine::SettingsUpdate;
 use device_core::envelope::Signed;
 use device_core::{DeviceState, Event};
-use napi::bindgen_prelude::{spawn_blocking, Env, Error, Function, PromiseRaw, Result, ToNapiValue};
+use napi::bindgen_prelude::{
+    spawn_blocking, Env, Error, Function, PromiseRaw, Result, ToNapiValue,
+};
 use napi::threadsafe_function::ThreadsafeFunctionCallMode;
 use napi_derive::napi;
 
@@ -165,8 +167,8 @@ impl DeviceCore {
     /// Applies a `SettingsUpdate` (JSON). Validation is in Rust.
     #[napi]
     pub fn settings_update(&self, update: String) -> Result<String> {
-        let update: SettingsUpdate =
-            serde_json::from_str(&update).map_err(|_| Error::from_reason("invalid settings update"))?;
+        let update: SettingsUpdate = serde_json::from_str(&update)
+            .map_err(|_| Error::from_reason("invalid settings update"))?;
         let view = self
             .state
             .settings_update(update)

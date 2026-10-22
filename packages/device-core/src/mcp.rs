@@ -473,7 +473,10 @@ sleep 1
 
         let first = manager.process(&config("1")).unwrap();
         assert!(Arc::ptr_eq(&first, &manager.process(&config("1")).unwrap()));
-        assert!(!Arc::ptr_eq(&first, &manager.process(&config("2")).unwrap()));
+        assert!(!Arc::ptr_eq(
+            &first,
+            &manager.process(&config("2")).unwrap()
+        ));
     }
 
     #[cfg(unix)]

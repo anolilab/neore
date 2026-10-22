@@ -400,7 +400,8 @@ const SANDBOX_LIMITS: &str = "it can change files only in the shared folders, ca
      (Mach IPC) are not restricted.";
 
 #[cfg(not(target_os = "macos"))]
-const SANDBOX_LIMITS: &str = "it can change files only in the shared folders and reads only system \
+const SANDBOX_LIMITS: &str =
+    "it can change files only in the shared folders and reads only system \
      and toolchain folders besides them. Local IPC (D-Bus, SSH and GPG agents, other sockets) and \
      network access are NOT isolated.";
 
@@ -424,7 +425,10 @@ fn network_sentence(_policy: &Policy) -> &'static str {
 pub fn describe(support: &Support, policy: Option<&Policy>) -> String {
     match (support, policy) {
         (Support::Available(mechanism), Some(policy)) => {
-            format!("Sandboxed ({mechanism}): {SANDBOX_LIMITS}{}", network_sentence(policy))
+            format!(
+                "Sandboxed ({mechanism}): {SANDBOX_LIMITS}{}",
+                network_sentence(policy)
+            )
         }
         (Support::Unavailable(reason), _) => {
             format!("NOT sandboxed ({reason}): it runs with your full access to this computer.")
@@ -493,7 +497,9 @@ mod tests {
             text.starts_with("/dev/tty") || text.starts_with("/dev/pts")
         };
 
-        assert!(!rules.iter().any(|rule| rule.writable && terminal(&rule.path)));
+        assert!(!rules
+            .iter()
+            .any(|rule| rule.writable && terminal(&rule.path)));
 
         let (profile, _) = seatbelt_profile(&policy());
         assert!(!profile.contains("/dev/tty"));
@@ -542,7 +548,10 @@ mod tests {
         assert!(policy_for_call(&missing, false, false, &roots, None)
             .unwrap_err()
             .contains("no Landlock"));
-        assert_eq!(policy_for_call(&missing, true, false, &roots, None), Ok(None));
+        assert_eq!(
+            policy_for_call(&missing, true, false, &roots, None),
+            Ok(None)
+        );
         assert_eq!(
             policy_for_call(&Support::Available("x".into()), false, false, &roots, None)
                 .unwrap()
@@ -556,8 +565,12 @@ mod tests {
     fn network_is_blocked_unless_the_user_allows_it() {
         let roots = vec![PathBuf::from("/srv/p")];
         let available = Support::Available("x".into());
-        let blocked = policy_for_call(&available, false, false, &roots, None).unwrap().unwrap();
-        let allowed = policy_for_call(&available, false, true, &roots, None).unwrap().unwrap();
+        let blocked = policy_for_call(&available, false, false, &roots, None)
+            .unwrap()
+            .unwrap();
+        let allowed = policy_for_call(&available, false, true, &roots, None)
+            .unwrap()
+            .unwrap();
 
         assert!(!blocked.network);
         assert!(allowed.network);
@@ -566,7 +579,10 @@ mod tests {
     #[test]
     fn the_seatbelt_profile_denies_the_network_unless_allowed() {
         let (blocked, _) = seatbelt_profile(&policy());
-        let (allowed, _) = seatbelt_profile(&Policy { network: true, ..policy() });
+        let (allowed, _) = seatbelt_profile(&Policy {
+            network: true,
+            ..policy()
+        });
 
         assert!(blocked.contains("(deny network*)"));
         assert!(!allowed.contains("network"));
@@ -582,11 +598,19 @@ mod tests {
         #[cfg(not(target_os = "macos"))]
         assert!(describe(&available, Some(&policy())).contains("NOT isolated"));
         #[cfg(target_os = "macos")]
-        assert!(describe(&available, Some(&policy())).contains("cannot run open, osascript or launchctl"));
+        assert!(describe(&available, Some(&policy()))
+            .contains("cannot run open, osascript or launchctl"));
         #[cfg(target_os = "macos")]
         assert!(describe(&available, Some(&policy())).contains("Network access is blocked"));
         #[cfg(target_os = "macos")]
-        assert!(describe(&available, Some(&Policy { network: true, ..policy() })).contains("Network access is allowed"));
+        assert!(describe(
+            &available,
+            Some(&Policy {
+                network: true,
+                ..policy()
+            })
+        )
+        .contains("Network access is allowed"));
         assert!(describe(&missing, None).starts_with("NOT sandboxed (no Landlock)"));
     }
 }

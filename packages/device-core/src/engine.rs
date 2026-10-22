@@ -169,12 +169,7 @@ impl DeviceState {
 
     /// Stores a pairing — only after the user confirms it in the approval window.
     /// `Ok(false)` when the user declined or did not answer.
-    pub fn pair(
-        &self,
-        device_id: &str,
-        secret: &str,
-        account_label: &str,
-    ) -> Result<bool, String> {
+    pub fn pair(&self, device_id: &str, secret: &str, account_label: &str) -> Result<bool, String> {
         let account_label = account_label.trim().to_owned();
 
         if !valid_pairing(device_id, secret, &account_label) {
@@ -195,7 +190,11 @@ impl DeviceState {
             },
             now_ms() + PAIRING_WAIT.as_millis() as u64,
             PAIRING_WAIT,
-            |prompt| self.emit(Event::Prompt { prompt: prompt.clone() }),
+            |prompt| {
+                self.emit(Event::Prompt {
+                    prompt: prompt.clone(),
+                })
+            },
         );
 
         if !matches!(answer, Answer::Once | Answer::Always) {
@@ -335,13 +334,12 @@ impl DeviceState {
                         tool_kind: action.kind().to_owned(),
                     };
 
-                    self.prompts
-                        .ask(body, call.expires_at, wait, |prompt| {
-                            self.emit_progress(&pairing, &call.call_id, "prompting");
-                            self.emit(Event::Prompt {
-                                prompt: prompt.clone(),
-                            });
-                        })
+                    self.prompts.ask(body, call.expires_at, wait, |prompt| {
+                        self.emit_progress(&pairing, &call.call_id, "prompting");
+                        self.emit(Event::Prompt {
+                            prompt: prompt.clone(),
+                        });
+                    })
                 };
 
                 let decision = match (skip_prompt, answer) {
@@ -457,7 +455,10 @@ impl DeviceState {
                         mcp_tools.insert(name, (server.name.clone(), tool.name, tool.read_only));
                     }
                 }
-                Err(error) => eprintln!("[device-core] MCP server {} unavailable: {error}", server.name),
+                Err(error) => eprintln!(
+                    "[device-core] MCP server {} unavailable: {error}",
+                    server.name
+                ),
             }
         }
 
@@ -514,8 +515,6 @@ pub fn decide(tool: &str, tainted: bool, read_only: bool, allow_rules: &[String]
         eligible,
     )
 }
-
-// ─── Tools ──────────────────────────────────────────────────────────────────
 
 fn builtin_tools(roots: &[PathBuf]) -> Vec<Value> {
     if roots.is_empty() {
@@ -1327,7 +1326,12 @@ mod tests {
             let result = worker.join().unwrap().unwrap();
             let parsed: Value = serde_json::from_str(&result.payload).unwrap();
 
-            assert!(envelope::verify(&secret, Domain::Result, &result.payload, &result.signature));
+            assert!(envelope::verify(
+                &secret,
+                Domain::Result,
+                &result.payload,
+                &result.signature
+            ));
             assert_eq!(parsed["status"], expected);
 
             if expected == "completed" {
