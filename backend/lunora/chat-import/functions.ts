@@ -16,8 +16,9 @@ import { internal } from "../_generated/internal";
 import { isUploadId, stagingKeyFor } from "../lib/chat-upload-staging";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
+import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
-import { isRestartable, resumeProgress } from "./restart";
+import { isRestartable, keptImportKeyFor, resumeProgress } from "./restart";
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -78,6 +79,39 @@ export const getImportStatus = authQuery
 // ---------------------------------------------------------------------------
 
 /**
+ * How many of a user's newest imports are read when releasing files. A kept file can only sit on the newest import: a
+ * later start releases it while it is still failed, and a restart is only allowed for the newest one. Older kept files
+ * (from before this release existed) are left to the seven-day reap.
+ */
+const RECENT_IMPORTS_RELEASED = 10;
+
+/**
+ * A new import makes every failed one unrestartable (only the newest import can restart), so the kept files of failed
+ * imports are released now instead of waiting for the seven-day reap. Only the user's newest imports are read, so the
+ * cost does not grow with their history. A file is released only under its own kept key, never a staging key that a
+ * cancelled run still holds.
+ */
+export const releaseSupersededImportFiles = async (
+    context: { db: { patch: (id: never, value: { r2Key: string }) => Promise<unknown>; query: any }; scheduler: unknown },
+    userId: string,
+): Promise<void> => {
+    const recent = await context.db
+        .query("chatImportJobs")
+        .withIndex("by_user_and_createdAt", (q: any) => q.eq("userId", userId))
+        .order("desc")
+        .take(RECENT_IMPORTS_RELEASED);
+    const kept = recent.filter(
+        (job: { _id: string; r2Key?: string; status: string }) => job.status === "failed" && job.r2Key === keptImportKeyFor(userId, job._id),
+    );
+
+    await Promise.all(kept.map((job: { _id: never }) => context.db.patch(job._id, { r2Key: "" })));
+    await scheduleObjectDeletion(
+        context,
+        kept.map((job: { r2Key?: string }) => job.r2Key),
+    );
+};
+
+/**
  * Start a new import job. The client must have already uploaded the normalized
  * conversations JSON to the upload route and passes the upload id here.
  *
@@ -118,6 +152,8 @@ export const startImportJob = authMutation
         if (existing) {
             throw new LunoraError("CONFLICT", "An import is already in progress. Please wait for it to complete.");
         }
+
+        await releaseSupersededImportFiles(ctx, userId);
 
         const jobId = await ctx.db.insert("chatImportJobs", {
             createdAt: ctx.now,
