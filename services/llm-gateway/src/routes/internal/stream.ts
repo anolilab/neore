@@ -43,7 +43,8 @@ const MAX_OUTPUT_TOKENS_HARD_CAP = 32_768;
 const MAX_MESSAGES_PER_REQUEST = 1000;
 
 /** Matches a complete single-event SSE frame, capturing its `data:` payload. */
-const SSE_SINGLE_EVENT_RE = /^data: (.+)\n\n$/;
+// `[^\n]` rather than `.`: `.` also rejects U+2028/U+2029, which JSON.stringify leaves raw inside a payload.
+const SSE_SINGLE_EVENT_RE = /^data: ([^\n]+)\n\n$/;
 
 const requestSchema = z.object({
     /** Context window size for pre-flight token estimation. Falls back to model registry. */
@@ -533,7 +534,6 @@ streamRouter.openapi(
                                         costMicrodollars,
                                         // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
                                         ...(isErrored && { errorCode: "PROVIDER_ERROR" }),
-                                        ...(isEstimated && { errorCode: "CANCELLED" }),
                                         finishReason,
                                         guardrailViolations: guardrailViolationsJson,
                                         isStreaming: true,

@@ -185,11 +185,13 @@ describe("streamed provider errors are recorded as failed calls", () => {
 /**
  * "Stop generating" cancels the relay before the provider's `finish` part, so no
  * real usage arrives. The prompt and the text already streamed were still
- * produced, so they are billed on an estimate (chars / 4) tagged CANCELLED.
+ * produced, so they are billed on an estimate (chars / 4) with finishReason "cancelled".
  */
 describe("a cancelled stream bills the tokens it already produced", () => {
     const PROMPT = "x".repeat(400); // 100 tokens
     const DELTA = "y".repeat(20); // two of them: 40 chars, 10 tokens
+    // U+2028 is a line terminator for `.` but not for JSON.stringify, so it reaches the SSE frame raw.
+    const SEPARATED_DELTA = `${"y".repeat(9)}\u{2028}${"y".repeat(10)}`;
 
     let recordSpy: ReturnType<typeof vi.spyOn>;
     let reportSpy: ReturnType<typeof vi.spyOn>;
@@ -222,7 +224,7 @@ describe("a cancelled stream bills the tokens it already produced", () => {
         return { entry: recordedEntries(recordSpy)[0], report: reportSpy.mock.calls[0]?.[0] };
     };
 
-    const ESTIMATED_ENTRY = { completionTokens: 10, errorCode: "CANCELLED", finishReason: "cancelled", promptTokens: 100 };
+    const ESTIMATED_ENTRY = { completionTokens: 10, finishReason: "cancelled", promptTokens: 100 };
     // 100 prompt tokens at $1/M + 10 completion tokens at $2/M = 120 microdollars.
     const ESTIMATED_REPORT = { completionTokens: 10, costMicrodollars: 120, promptTokens: 100 };
 
@@ -262,10 +264,14 @@ describe("a cancelled stream bills the tokens it already produced", () => {
         const { entry, report } = await billed();
 
         expect(entry).toMatchObject(ESTIMATED_ENTRY);
+        expect(entry).not.toHaveProperty("errorCode");
         expect(report).toMatchObject(ESTIMATED_REPORT);
     });
 
-    it("POST /internal/stream records the estimate when cancelled before finish", async () => {
+    it.each([
+        ["a plain delta", DELTA],
+        ["a delta with a U+2028 line separator", SEPARATED_DELTA],
+    ])("POST /internal/stream records the estimate when cancelled before finish (%s)", async (_label, delta) => {
         vi.mocked(streamText).mockImplementationOnce((({ abortSignal }: { abortSignal: AbortSignal }) => {
             const aborted = new Promise<void>((resolve) => {
                 abortSignal.addEventListener("abort", () => resolve(), { once: true });
@@ -280,8 +286,8 @@ describe("a cancelled stream bills the tokens it already produced", () => {
             return {
                 finishReason: rejectOnAbort,
                 fullStream: (async function* partsOf() {
-                    yield { text: DELTA, type: "text-delta" };
-                    yield { text: DELTA, type: "text-delta" };
+                    yield { text: delta, type: "text-delta" };
+                    yield { text: delta, type: "text-delta" };
                     await aborted;
                 })(),
                 usage: rejectOnAbort,
@@ -310,6 +316,7 @@ describe("a cancelled stream bills the tokens it already produced", () => {
         const { entry, report } = await billed();
 
         expect(entry).toMatchObject(ESTIMATED_ENTRY);
+        expect(entry).not.toHaveProperty("errorCode");
         expect(report).toMatchObject(ESTIMATED_REPORT);
     });
 });
