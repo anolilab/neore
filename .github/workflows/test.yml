@@ -343,6 +343,23 @@ jobs:
                   path: "apps/web/e2e/.report"
                   retention-days: 7
 
+            # The backend's startup log, for a run whose webServer never came up. The
+            # report above has none of it, and nothing else keeps it past the job.
+            # `.lunora` is a dotted directory, so `include-hidden-files` is needed here
+            # too. The paths are named one by one: the directory holds lunora's own
+            # dev state, which is not for upload.
+            - name: "Upload the backend startup log"
+              if: "failure()"
+              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+              with:
+                  include-hidden-files: "true"
+                  if-no-files-found: "ignore"
+                  name: "backend-startup-log-${{ matrix.shard }}"
+                  path: |
+                      backend/.lunora/crashes/
+                      backend/.lunora/dev.log
+                  retention-days: 7
+
     test-required-check:
         needs: ["files-changed", "test", "e2e"]
         name: "Check Test Run"

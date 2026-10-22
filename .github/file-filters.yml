@@ -33,6 +33,8 @@ e2e:
     - "pnpm-workspace.yaml"
     - "package.json"
     - "vis.config.ts"
+    # The backend's launcher under Playwright's webServer in CI.
+    - "scripts/dev-backend-watchdog.sh"
     - ".github/workflows/test.yml"
     - ".github/actions/**"
     - ".github/file-filters.yml"

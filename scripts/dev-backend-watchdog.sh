@@ -18,6 +18,12 @@
 #                               250ms) is itself a crash trigger while a restarted
 #                               worker is still cold. Its log is `$ARCHIVE/wrangler-dev.out`
 #                               instead of `backend/.lunora/dev.log`.
+#
+# Logs, all under the archive dir:
+#   watchdog.log    this script's lines, including each start's /api/health milestone
+#   dev-timed.log   backend/.lunora/dev.log with every line stamped as it was read
+#   lunora-dev.out  what `lunora dev` itself printed, stamped
+#   dev-<time>.log  the dev log of a run that died, copied before its restart
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,12 +35,60 @@ RUNNER="${WATCHDOG_RUNNER:-lunora}"
 # on a slow answer leaves a response to be written to a closed socket, which is
 # itself what crashes wrangler 4.124 (see `src/server.ts` at the status route).
 HEALTH_URL="http://localhost:8788/_lunora/status"
+# The URL Playwright's webServer waits on, and how long it waits. Keep
+# STARTUP_WAIT_S in step with the webServer timeout in apps/web/playwright.config.ts.
+API_HEALTH_URL="http://localhost:8788/api/health"
+STARTUP_WAIT_S=300
 
 mkdir -p "$ARCHIVE"
 
-log() {
-    echo "$(date -Is) $*" | tee -a "$ARCHIVE/watchdog.log"
+# Local time with its UTC offset. `date -Is` is GNU-only: on macOS it fails, and
+# the log lines lost their time there.
+timestamp() {
+    date +%Y-%m-%dT%H:%M:%S%z
 }
+
+log() {
+    echo "$(timestamp) $*" | tee -a "$ARCHIVE/watchdog.log"
+}
+
+# Prefixes each line on stdin with the time it was read.
+stamp_lines() {
+    while IFS= read -r line; do
+        echo "$(timestamp) $line"
+    done
+}
+
+# `lunora dev` sends wrangler's output to dev.log, which has no timestamps. Follow
+# it for this watchdog's whole life. `-n 0` skips whatever an earlier run left in
+# the file; `-F` picks it up once lunora creates it, and carries on past its truncation.
+tail -n 0 -F "$BACKEND/.lunora/dev.log" > >(stamp_lines 2> /dev/null >> "$ARCHIVE/dev-timed.log") 2> /dev/null &
+FOLLOWER=$!
+trap 'kill "$FOLLOWER" 2> /dev/null' EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+
+# Waits for the first 2xx from `$API_HEALTH_URL` and logs how long the start took.
+# No `-m` on the probe: cutting off a request the backend has accepted is what
+# crashes it, so a slow cold start is waited out rather than cut short.
+wait_for_api() {
+    local launched=$1 code=000
+
+    while [ "$SECONDS" -lt $((launched + STARTUP_WAIT_S)) ]; do
+        code="$(curl -s -o /dev/null -w '%{http_code}' "$API_HEALTH_URL")"
+
+        if [ "$code" = 200 ]; then
+            log "startup: /api/health 200 after $((SECONDS - launched))s"
+            return
+        fi
+
+        sleep 2
+    done
+
+    log "startup: /api/health still $code after ${STARTUP_WAIT_S}s; no longer waiting"
+}
+
+log "watchdog started ($RUNNER)"
 
 fails=0
 
@@ -60,6 +114,8 @@ while true; do
 
         (cd "$BACKEND" && timeout 60 ./node_modules/.bin/lunora dev stop > /dev/null 2>&1)
 
+        launched=$SECONDS
+        log "launching ($RUNNER)"
         if [ "$RUNNER" = "wrangler" ]; then
             # The command `lunora dev` itself runs (see `ps` under a lunora dev):
             # the backend's config first, then one `--config` per service in
@@ -69,17 +125,12 @@ while true; do
                 --config ../services/browser-renderer/wrangler.jsonc \
                 --config ../services/document-parser/wrangler.jsonc \
                 --config ../services/llm-gateway/wrangler.jsonc \
-                --config ../services/nsfw-checker/wrangler.jsonc >> "$ARCHIVE/wrangler-dev.out" 2>&1 &)
+                --config ../services/nsfw-checker/wrangler.jsonc 2>&1 | stamp_lines 2> /dev/null >> "$ARCHIVE/wrangler-dev.out" &)
         else
-            (cd "$BACKEND" && PATH="./node_modules/.bin:$PATH" nohup lunora dev --no-codegen --worker-port 8788 --inspector-port 9235 >> "$ARCHIVE/lunora-dev.out" 2>&1 &)
+            (cd "$BACKEND" && PATH="./node_modules/.bin:$PATH" nohup lunora dev --no-codegen --worker-port 8788 --inspector-port 9235 2>&1 | stamp_lines 2> /dev/null >> "$ARCHIVE/lunora-dev.out" &)
         fi
 
-        for _ in $(seq 1 60); do
-            curl -s -m 30 -o /dev/null "$HEALTH_URL" && break
-            sleep 2
-        done
-
-        log "backend: $(curl -s -m 30 -o /dev/null -w '%{http_code}' "$HEALTH_URL")"
+        wait_for_api "$launched"
         fails=0
     fi
 
