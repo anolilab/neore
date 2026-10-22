@@ -71,7 +71,7 @@ export const intersectsAnyDisplay = (bounds: Bounds, workAreas: Bounds[]): boole
 export const restorableState = (saved: WindowState | undefined, workAreas: Bounds[]): WindowState | undefined =>
     saved !== undefined && intersectsAnyDisplay(saved.bounds, workAreas) ? saved : undefined;
 
-export const serializeWindowState = (state: WindowState): string => `${JSON.stringify(state, null, 2)}\n`;
+const serializeWindowState = (state: WindowState): string => `${JSON.stringify(state, null, 2)}\n`;
 
 export const readWindowState = (file: string): WindowState | undefined => {
     try {
@@ -83,10 +83,10 @@ export const readWindowState = (file: string): WindowState | undefined => {
 
 /** Temp file in the same directory, then rename: a crash mid-write leaves the old file, never a torn one. */
 export const writeWindowState = (file: string, state: WindowState): void => {
-    const temp = `${file}.${process.pid}.tmp`;
+    const temporary = `${file}.${process.pid}.tmp`;
 
-    writeFileSync(temp, serializeWindowState(state));
-    renameSync(temp, file);
+    writeFileSync(temporary, serializeWindowState(state));
+    renameSync(temporary, file);
 };
 
 /** Runs `action` once, `delay` ms after the last `call`. `flush` runs a pending call now; `cancel` drops it. */
@@ -94,10 +94,12 @@ export const createDebouncer = (action: () => void, delay: number) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const cancel = (): void => {
-        if (timer !== undefined) {
-            clearTimeout(timer);
-            timer = undefined;
+        if (timer === undefined) {
+            return;
         }
+
+        clearTimeout(timer);
+        timer = undefined;
     };
 
     return {
@@ -110,10 +112,12 @@ export const createDebouncer = (action: () => void, delay: number) => {
         },
         cancel,
         flush: (): void => {
-            if (timer !== undefined) {
-                cancel();
-                action();
+            if (timer === undefined) {
+                return;
             }
+
+            cancel();
+            action();
         },
     };
 };

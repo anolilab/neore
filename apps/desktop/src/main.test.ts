@@ -15,7 +15,6 @@ type Listener = (event: { preventDefault: () => void }, url: string) => void;
 interface FakeWindow {
     focused: boolean;
     handlers: Map<string, Listener>;
-    hidden: boolean;
     id: number;
     loaded: string[];
     sent: string[];
@@ -63,19 +62,16 @@ vi.mock("electron", () => {
             center: () => {},
             focus: () => {},
             focused: true,
+            getNormalBounds: () => { return { height: 820, width: 1200, x: 0, y: 0 }; },
             handlers,
-            hidden: false,
             hide: () => {
                 window.shown = false;
-                window.hidden = true;
             },
             id,
             isDestroyed: () => false,
             isFocused: () => window.focused,
             isMaximized: () => false,
             isMinimized: () => false,
-            getNormalBounds: () => ({ height: 820, width: 1200, x: 0, y: 0 }),
-            maximize: () => {},
             isVisible: () => window.shown,
             loaded: [] as string[],
             loadURL: (url: string) => {
@@ -83,6 +79,7 @@ vi.mock("electron", () => {
 
                 return Promise.resolve();
             },
+            maximize: () => {},
             on: (event: string, listener: Listener) => {
                 handlers.set(event, listener);
 
@@ -92,7 +89,6 @@ vi.mock("electron", () => {
             sent: [] as string[],
             show: () => {
                 window.shown = true;
-                window.hidden = false;
             },
             shown: false,
             webContents: {

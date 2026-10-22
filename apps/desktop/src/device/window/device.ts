@@ -91,7 +91,7 @@ const renderPrompt = (prompt: Prompt | null): void => {
         setText("prompt-detail", body.detail);
 
         // The shell's detail starts with the sandbox verdict on its first line.
-        const sandboxLine = body.toolKind === "shell" ? (body.detail.split("\n", 1)[0] ?? "") : "";
+        const sandboxLine = body.toolKind === "shell" ? body.detail.split("\n", 1)[0] ?? "" : "";
 
         setHidden("prompt-sandbox", !sandboxLine);
         $("prompt-sandbox").className = sandboxLine.startsWith("Sandboxed") ? "muted" : "warning";
@@ -195,11 +195,20 @@ const update = async (change: (latest: SettingsView) => Record<string, unknown>)
     await state.saves;
 };
 
-const removeRoot = (root: string): Promise<void> => update((latest) => ({ roots: latest.roots.filter((other) => other !== root) }));
+const removeRoot = (root: string): Promise<void> =>
+    update((latest) => {
+        return { roots: latest.roots.filter((other) => other !== root) };
+    });
 
-const removeServer = (name: string): Promise<void> => update((latest) => ({ mcpServers: latest.mcpServers.filter((other) => other.name !== name) }));
+const removeServer = (name: string): Promise<void> =>
+    update((latest) => {
+        return { mcpServers: latest.mcpServers.filter((other) => other.name !== name) };
+    });
 
-const removeRule = (rule: string): Promise<void> => update((latest) => ({ allowRules: latest.allowRules.filter((other) => other !== rule) }));
+const removeRule = (rule: string): Promise<void> =>
+    update((latest) => {
+        return { allowRules: latest.allowRules.filter((other) => other !== rule) };
+    });
 
 const renderSettings = (): void => {
     if (state.settings === null) {
@@ -230,9 +239,9 @@ const renderSettings = (): void => {
         ),
     );
     $("rules").replaceChildren(
-        ...(view.allowRules.length === 0
+        ...view.allowRules.length === 0
             ? [listItem("None — every action asks.")]
-            : view.allowRules.map((rule) => listItem(rule, "Remove", () => removeRule(rule)))),
+            : view.allowRules.map((rule) => listItem(rule, "Remove", () => removeRule(rule))),
     );
     setText("audit-path", `Full log: ${view.auditPath}`);
 };
@@ -263,7 +272,9 @@ const addRoot = async (path: string): Promise<void> => {
     const trimmed = path.trim();
 
     if (trimmed) {
-        await update((latest) => ({ roots: [...latest.roots, trimmed] }));
+        await update((latest) => {
+            return { roots: [...latest.roots, trimmed] };
+        });
     }
 };
 
@@ -287,17 +298,19 @@ $("require-sandbox").addEventListener("change", async (event) => {
     const required = checkbox.checked;
 
     if (
-        !required &&
-        !(await globalThis.neoreDevice.confirm(
+        !required
+        && !await globalThis.neoreDevice.confirm(
             "Allow shell commands to run WITHOUT a sandbox where this computer has none? They would run with your full access.",
-        ))
+        )
     ) {
         checkbox.checked = true;
 
         return;
     }
 
-    await update(() => ({ requireShellSandbox: required }));
+    await update(() => {
+        return { requireShellSandbox: required };
+    });
 });
 
 $("allow-network").addEventListener("change", async (event) => {
@@ -305,20 +318,24 @@ $("allow-network").addEventListener("change", async (event) => {
     const allowed = checkbox.checked;
 
     if (
-        allowed &&
-        !(await globalThis.neoreDevice.confirm("Allow shell commands to use the network? An approved command could then send files or data to any server."))
+        allowed
+        && !await globalThis.neoreDevice.confirm("Allow shell commands to use the network? An approved command could then send files or data to any server.")
     ) {
         checkbox.checked = false;
 
         return;
     }
 
-    await update(() => ({ allowShellNetwork: allowed }));
+    await update(() => {
+        return { allowShellNetwork: allowed };
+    });
 });
 
 $("unpair").addEventListener("click", async () => {
     if (await globalThis.neoreDevice.confirm("Unpair this computer? The agent will no longer be able to ask for anything here.")) {
-        await update(() => ({ unpair: true }));
+        await update(() => {
+            return { unpair: true };
+        });
     }
 });
 
@@ -341,7 +358,7 @@ $("server-form").addEventListener("submit", async (event) => {
         .filter(Boolean);
 
     // The exact command line, confirmed once more: it will run as you.
-    if (!(await globalThis.neoreDevice.confirm(`Add “${name}”? This computer will run:\n\n${[command, ...args].join(" ")}`))) {
+    if (!await globalThis.neoreDevice.confirm(`Add “${name}”? This computer will run:\n\n${[command, ...args].join(" ")}`)) {
         return;
     }
 
@@ -353,10 +370,13 @@ $("server-form").addEventListener("submit", async (event) => {
             .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
     );
 
-    await update((latest) => ({ mcpServers: [...latest.mcpServers, { args, command, env, name }] }));
+    await update((latest) => {
+        return { mcpServers: [...latest.mcpServers, { args, command, env, name }] };
+    });
     (event.target as HTMLFormElement).reset();
 });
 
 globalThis.neoreDevice.onPromptQueued(() => refreshPrompt());
 window.addEventListener("focus", () => refreshPrompt());
+// eslint-disable-next-line unicorn/prefer-top-level-await -- the page builds as an IIFE, where top-level await does not parse
 refreshPrompt();

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -55,27 +55,27 @@ describe("intersectsAnyDisplay and restorableState", () => {
 });
 
 describe("atomic write", () => {
-    let dir: string;
+    let directory: string;
 
     beforeEach(() => {
-        dir = mkdtempSync(path.join(os.tmpdir(), "neore-window-state-"));
+        directory = mkdtempSync(path.join(os.tmpdir(), "neore-window-state-"));
     });
 
     afterEach(() => {
-        rmSync(dir, { force: true, recursive: true });
+        rmSync(directory, { force: true, recursive: true });
     });
 
     it("round-trips through the file and leaves no temp file behind", () => {
-        const file = path.join(dir, "window-state.json");
+        const file = path.join(directory, "window-state.json");
 
         writeWindowState(file, { ...state, maximized: true });
 
         expect(readWindowState(file)).toStrictEqual({ ...state, maximized: true });
-        expect(readdirSync(dir)).toStrictEqual(["window-state.json"]);
+        expect(readdirSync(directory)).toStrictEqual(["window-state.json"]);
     });
 
     it("reads a corrupt file as the defaults", () => {
-        const file = path.join(dir, "window-state.json");
+        const file = path.join(directory, "window-state.json");
 
         writeFileSync(file, "{");
 
@@ -84,7 +84,7 @@ describe("atomic write", () => {
     });
 
     it("reads a missing file as the defaults", () => {
-        expect(readWindowState(path.join(dir, "absent.json"))).toBeUndefined();
+        expect(readWindowState(path.join(directory, "absent.json"))).toBeUndefined();
     });
 });
 

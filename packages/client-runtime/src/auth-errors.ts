@@ -18,14 +18,14 @@ export const isAuthError = (error: unknown): boolean => {
     // Generic object with .code property (covers LunoraError.data.code, plain objects)
     if (typeof error === "object" && error !== null) {
         if ("data" in error) {
-            const { data } = error as { data: unknown };
+            const { data } = error;
 
-            if (data && typeof data === "object" && "code" in data && (data as { code: unknown }).code === "UNAUTHORIZED") {
+            if (data && typeof data === "object" && "code" in data && data.code === "UNAUTHORIZED") {
                 return true;
             }
         }
 
-        if ("code" in error && (error as { code: unknown }).code === "UNAUTHORIZED") {
+        if ("code" in error && error.code === "UNAUTHORIZED") {
             return true;
         }
     }

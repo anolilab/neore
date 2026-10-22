@@ -369,7 +369,7 @@ describe(LiveQueryManager, () => {
 
     it("gives a slot back when a seed never answers, and skips queued entries that were released", () => {
         const first = Array.from({ length: MAX_CONCURRENT_SEEDS }, (_, index) => observe(key(`x:q${String(index)}`)));
-        const queued = observe(key("x:queued"), { meta: {} });
+        const queued = observe(key("x:queued"));
         const waiting = observe(key("x:waiting"));
 
         queryClient.removeQueries({ queryKey: key("x:queued") });

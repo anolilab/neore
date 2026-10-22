@@ -11,6 +11,7 @@ import geistLatinFont from "@fontsource-variable/geist/files/geist-latin-wght-no
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useAuth } from "@lunora/react";
+import { seedHydratedAuthToken, TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@neore/client-runtime";
 import { IconSpriteSheet } from "@neore/ui/components/ai-elements/provider-icon";
 import { CSPProvider } from "@neore/ui/components/csp-provider";
 import { DirectionProvider } from "@neore/ui/components/direction";
@@ -24,11 +25,11 @@ import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useStat
 
 import type { SettingsTab } from "@/components/settings/settings-modal";
 import ImpersonationBanner from "@/features/admin/components/impersonation-banner";
-import OfflineScreen from "@/features/connection/components/offline-screen";
 import AppearanceSync from "@/features/appearance/components/appearance-sync";
 import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
+import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
 import { authClient } from "@/lib/auth/client";
@@ -36,8 +37,6 @@ import getSessionToken, { getSessionAuthState } from "@/lib/auth/server-function
 import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
-import { seedHydratedAuthToken } from "@neore/client-runtime";
-import { TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@neore/client-runtime";
 import { isNativeShell } from "@/lib/native/bridge";
 import NativeBridge from "@/lib/native/native-bridge";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
