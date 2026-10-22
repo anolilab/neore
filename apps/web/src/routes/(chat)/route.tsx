@@ -1,6 +1,7 @@
 import { Authenticated, AuthLoading, Unauthenticated } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
@@ -10,23 +11,16 @@ import ProgrammableSidebarProvider from "@/components/programmable-sidebar-provi
 import AutoGuestSignIn from "@/features/auth/components/auto-guest-signin";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import ChatLoadingSkeleton from "@/features/chat/loading/chat-loading-skeleton";
+import { chatDefaultOpen, chatSidebarNames, chatSidebarStyle } from "@/features/chat/shell-layout";
 import { KeyboardShortcutsManager } from "@/features/keyboard/components/keyboard-shortcuts-manager";
 import useKeyboardShortcutHandler from "@/features/keyboard/hooks/use-keyboard-shortcut-handler";
 import { PresentationViewerRoot } from "@/features/slides";
 import { createLunoraQueryOptions } from "@/lib/lunora/crpc";
-import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
 import { isAuthError } from "@/lib/utilities";
 
 const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);
 
 const OnboardingDialog = lazy(() => import("@/features/onboarding/components/onboarding-dialog"));
-
-const defaultOpen = ["left"];
-const sidebarNames = ["left", "right"];
-const sidebarStyle = {
-    "--header-height": "calc(var(--spacing) * 10)",
-    "--sidebar-width": "calc(var(--spacing) * 66)",
-} as React.CSSProperties;
 
 const RouteComponent = () => {
     const handleShortcut = useKeyboardShortcutHandler();
@@ -47,7 +41,7 @@ const RouteComponent = () => {
                     <OnboardingDialog />
                 </Suspense>
                 <KeyboardShortcutsManager onShortcut={handleShortcut}>
-                    <ProgrammableSidebarProvider defaultOpen={defaultOpen} sidebarNames={sidebarNames} style={sidebarStyle}>
+                    <ProgrammableSidebarProvider defaultOpen={chatDefaultOpen} sidebarNames={chatSidebarNames} style={chatSidebarStyle}>
                         <Outlet />
                     </ProgrammableSidebarProvider>
                 </KeyboardShortcutsManager>
