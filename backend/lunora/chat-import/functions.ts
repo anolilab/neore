@@ -16,6 +16,7 @@ import { internal } from "../_generated/internal";
 import { isUploadId, stagingKeyFor } from "../lib/chat-upload-staging";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
+import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
 import { isRestartable, resumeProgress } from "./restart";
 
@@ -84,6 +85,27 @@ export const getImportStatus = authQuery
  * This mutation creates a tracking record and kicks off a workflow that
  * processes conversations server-side.
  */
+/**
+ * A new import makes every failed one unrestartable (only the newest import can restart), so the files they kept are
+ * released now instead of waiting for the seven-day reap. The reap no-ops once the key is cleared.
+ */
+export const releaseSupersededImportFiles = async (
+    context: { db: { patch: (id: never, value: { r2Key: string }) => Promise<unknown>; query: any }; scheduler: unknown },
+    userId: string,
+): Promise<void> => {
+    const failed = await context.db
+        .query("chatImportJobs")
+        .withIndex("by_user_and_status", (q: any) => q.eq("userId", userId).eq("status", "failed"))
+        .collect();
+    const kept = failed.filter((job: { r2Key?: string }) => job.r2Key);
+
+    await Promise.all(kept.map((job: { _id: never }) => context.db.patch(job._id, { r2Key: "" })));
+    await scheduleObjectDeletion(
+        context,
+        kept.map((job: { r2Key?: string }) => job.r2Key),
+    );
+};
+
 export const startImportJob = authMutation
     .use(rateLimit("chat-import/start"))
     .input({
@@ -118,6 +140,8 @@ export const startImportJob = authMutation
         if (existing) {
             throw new LunoraError("CONFLICT", "An import is already in progress. Please wait for it to complete.");
         }
+
+        await releaseSupersededImportFiles(ctx, userId);
 
         const jobId = await ctx.db.insert("chatImportJobs", {
             createdAt: ctx.now,
