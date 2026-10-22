@@ -610,7 +610,14 @@ mod tests {
             ..blocked.clone()
         };
         let run_with = |policy: &Policy| {
-            run(&command, &shared, Duration::from_secs(10), 4096, Some(policy)).unwrap()
+            run(
+                &command,
+                &shared,
+                Duration::from_secs(10),
+                4096,
+                Some(policy),
+            )
+            .unwrap()
         };
 
         let refused = run_with(&blocked);
