@@ -57,7 +57,9 @@ describe("relayReply", () => {
         const outcome = await relayReply({
             fetch,
             gatewayUrl: "https://gw",
-            onDelta: (delta) => deltas.push(delta.text),
+            onDelta: (delta) => {
+                deltas.push(delta.text);
+            },
             streamToken: "tok",
         });
 
@@ -69,7 +71,14 @@ describe("relayReply", () => {
         const { fetch } = scripted([streamResponse(['{"text":"a"}\n{"text":"b"}\n{"text":"c"}'])]);
         const deltas: string[] = [];
 
-        await relayReply({ fetch, gatewayUrl: "https://gw", onDelta: (d) => deltas.push(d.text), streamToken: "tok" });
+        await relayReply({
+            fetch,
+            gatewayUrl: "https://gw",
+            onDelta: (d) => {
+                deltas.push(d.text);
+            },
+            streamToken: "tok",
+        });
 
         expect(deltas).toEqual(["a", "b", "c"]);
     });
@@ -81,7 +90,14 @@ describe("relayReply", () => {
         ]);
         const deltas: string[] = [];
 
-        const outcome = await relayReply({ fetch, gatewayUrl: "https://gw", onDelta: (d) => deltas.push(d.text), streamToken: "tok" });
+        const outcome = await relayReply({
+            fetch,
+            gatewayUrl: "https://gw",
+            onDelta: (d) => {
+                deltas.push(d.text);
+            },
+            streamToken: "tok",
+        });
 
         expect(outcome).toBe("finished");
         expect(deltas).toEqual(["a", "b", "c"]);
@@ -93,7 +109,14 @@ describe("relayReply", () => {
         const { fetch } = scripted([streamResponse(['{"text":"Hel"}\n{"text":"lo"}\n'])]);
         const deltas: string[] = [];
 
-        const outcome = await relayReply({ fetch, gatewayUrl: "https://gw", onDelta: (d) => deltas.push(d.text), streamToken: "tok" });
+        const outcome = await relayReply({
+            fetch,
+            gatewayUrl: "https://gw",
+            onDelta: (d) => {
+                deltas.push(d.text);
+            },
+            streamToken: "tok",
+        });
 
         expect(outcome).toBe("failed");
         expect(deltas).toEqual(["Hel", "lo"]);
@@ -109,7 +132,14 @@ describe("relayReply", () => {
         const { fetch } = scripted([streamResponse(['{"text":"a"}\n{"error":"boom"}\n'])]);
         const deltas: string[] = [];
 
-        const outcome = await relayReply({ fetch, gatewayUrl: "https://gw", onDelta: (d) => deltas.push(d.text), streamToken: "tok" });
+        const outcome = await relayReply({
+            fetch,
+            gatewayUrl: "https://gw",
+            onDelta: (d) => {
+                deltas.push(d.text);
+            },
+            streamToken: "tok",
+        });
 
         expect(outcome).toBe("failed");
         expect(deltas).toEqual(["a"]);

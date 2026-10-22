@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import { useAuth } from "@/auth/auth-context";
-import { SignInError } from "@/auth/grant";
+import { useAuth } from "@/auth/auth-state";
 
-export default function SignInScreen() {
+const SignInScreen = () => {
     const { signIn } = useAuth();
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -16,7 +15,7 @@ export default function SignInScreen() {
         try {
             await signIn();
         } catch (error_) {
-            setError(error_ instanceof SignInError || error_ instanceof Error ? error_.message : "Sign-in failed.");
+            setError(error_ instanceof Error ? error_.message : "Sign-in failed.");
         } finally {
             setBusy(false);
         }
@@ -24,7 +23,12 @@ export default function SignInScreen() {
 
     return (
         <View style={{ flex: 1, gap: 16, justifyContent: "center", padding: 24 }}>
-            <Pressable accessibilityRole="button" disabled={busy} onPress={onPress} style={{ alignItems: "center", backgroundColor: "#111", borderRadius: 10, padding: 14 }}>
+            <Pressable
+                accessibilityRole="button"
+                disabled={busy}
+                onPress={onPress}
+                style={{ alignItems: "center", backgroundColor: "#111", borderRadius: 10, padding: 14 }}
+            >
                 <Text style={{ color: "#fff", fontWeight: "600" }}>{busy ? "Opening sign-in..." : "Sign in with Neore"}</Text>
             </Pressable>
             {error
@@ -36,4 +40,6 @@ export default function SignInScreen() {
                 : null}
         </View>
     );
-}
+};
+
+export default SignInScreen;

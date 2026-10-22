@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
-import { useAuth } from "@/auth/auth-context";
+import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
@@ -23,16 +23,32 @@ interface Row {
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
 
-/** The text parts of a stored UI message. Other part kinds are not shown in this slice. */
+/** The text of one stored message part. Other part kinds are not shown in this slice. */
+const partText = (part: unknown): string => {
+    if (typeof part !== "object" || part === null || (part as { type?: unknown }).type !== "text") {
+        return "";
+    }
+
+    return String((part as { text?: unknown }).text ?? "");
+};
+
 const toRow = (message: { id: string; parts: unknown[]; role: string }): Row => {
     return {
         id: message.id,
         role: message.role,
-        text: message.parts
-            .map((part) => typeof part === "object" && part !== null && (part as { type?: unknown }).type === "text" ? String((part as { text?: unknown }).text ?? "") : "")
-            .join(""),
+        text: message.parts.map((part) => partText(part)).join(""),
     };
 };
+
+/** Adds `text` to the end of the row with `id`, leaving every other row as it is. */
+const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
+    rows.map((row) => {
+        if (row.id !== id) {
+            return row;
+        }
+
+        return { ...row, text: row.text + text };
+    });
 
 const fetchMessagePage = (threadId: string, cursor: string | null) =>
     getClient().query(api.chat.functions.getThreadUIMessages, {
@@ -40,7 +56,7 @@ const fetchMessagePage = (threadId: string, cursor: string | null) =>
         threadId: threadId as Id<"threads">,
     });
 
-export default function ChatScreen() {
+const ChatScreen = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
     const { status } = useAuth();
@@ -51,29 +67,33 @@ export default function ChatScreen() {
     const [error, setError] = useState<string | null>(null);
 
     const loadMessages = useCallback(async (id: string) => {
-        // ponytail: first 10 pages (200 messages, the server returns 20 per page); older history needs a load-more control.
-        const pages: Row[][] = [];
-        let cursor: string | null = null;
+        try {
+            // ponytail: first 10 pages (200 messages, the server returns 20 per page); older history needs a load-more control.
+            const pages: Row[][] = [];
+            let cursor: string | null = null;
 
-        for (let index = 0; index < MAX_HISTORY_PAGES; index += 1) {
-            // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
-            const page = await fetchMessagePage(id, cursor);
+            for (let index = 0; index < MAX_HISTORY_PAGES; index += 1) {
+                // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
+                const page = await fetchMessagePage(id, cursor);
 
-            pages.unshift(page.page.map(toRow));
+                pages.unshift(page.page.map((message) => toRow(message)));
 
-            if (page.isDone) {
-                break;
+                if (page.isDone) {
+                    break;
+                }
+
+                cursor = page.continueCursor;
             }
 
-            cursor = page.continueCursor;
+            setRows(pages.flat());
+        } catch (error_: unknown) {
+            setError(error_ instanceof Error ? error_.message : "Could not load messages.");
         }
-
-        setRows(pages.flat());
     }, []);
 
     useEffect(() => {
         if (status === "signed-in" && threadId && !sending) {
-            loadMessages(threadId).catch((error_: unknown) => setError(error_ instanceof Error ? error_.message : "Could not load messages."));
+            loadMessages(threadId);
         }
     }, [loadMessages, sending, status, threadId]);
 
@@ -103,7 +123,7 @@ export default function ChatScreen() {
             getClient().setAuthToken(jwt);
 
             const started = await startChat({
-                body: { model: DEFAULT_CHAT_MODEL, prompt, ...threadId && { threadId } },
+                body: { model: DEFAULT_CHAT_MODEL, prompt, threadId },
                 fetch,
                 gatewayUrl: config.gatewayUrl,
                 jwt,
@@ -118,7 +138,7 @@ export default function ChatScreen() {
             const outcome = await relayReply({
                 fetch,
                 gatewayUrl: config.gatewayUrl,
-                onDelta: ({ text }) => setRows((current) => current.map((row) => (row.id === assistantId ? { ...row, text: row.text + text } : row))),
+                onDelta: ({ text }) => setRows((current) => appendToRow(current, assistantId, text)),
                 streamToken: started.streamToken,
             });
 
@@ -160,10 +180,18 @@ export default function ChatScreen() {
                     style={{ borderColor: "#ccc", borderRadius: 10, borderWidth: 1, flex: 1, padding: 10 }}
                     value={draft}
                 />
-                <Pressable accessibilityRole="button" accessibilityState={{ disabled: sending }} disabled={sending} onPress={send} style={{ justifyContent: "center", padding: 12 }}>
+                <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: sending }}
+                    disabled={sending}
+                    onPress={send}
+                    style={{ justifyContent: "center", padding: 12 }}
+                >
                     <Text style={{ fontWeight: "600" }}>Send</Text>
                 </Pressable>
             </View>
         </View>
     );
-}
+};
+
+export default ChatScreen;

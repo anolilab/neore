@@ -3,33 +3,9 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
 
-import { AuthProvider, useAuth } from "@/auth/auth-context";
+import { AuthProvider } from "@/auth/auth-context";
+import { useAuth } from "@/auth/auth-state";
 import { loadConfig } from "@/lib/config";
-
-export default function RootLayout() {
-    let configError: string | null = null;
-
-    try {
-        loadConfig();
-    } catch (error) {
-        configError = error instanceof Error ? error.message : "Configuration is missing.";
-    }
-
-    if (configError) {
-        return (
-            <View style={{ alignItems: "center", flex: 1, justifyContent: "center", padding: 24 }}>
-                <Text accessibilityRole="alert">{configError}</Text>
-            </View>
-        );
-    }
-
-    return (
-        <AuthProvider>
-            <StatusBar style="auto" />
-            <SignInGate />
-        </AuthProvider>
-    );
-}
 
 /** Sends a signed-out user to the sign-in screen and a signed-in one away from it. */
 const SignInGate = () => {
@@ -56,3 +32,31 @@ const SignInGate = () => {
         </Stack>
     );
 };
+
+const RootLayout = () => {
+    let configError: string | null = null;
+
+    try {
+        loadConfig();
+    } catch (error) {
+        configError = error instanceof Error ? error.message : "Configuration is missing.";
+    }
+
+    if (configError) {
+        return (
+            <View style={{ alignItems: "center", flex: 1, justifyContent: "center", padding: 24 }}>
+                <Text accessibilityRole="alert">{configError}</Text>
+            </View>
+        );
+    }
+
+    return (
+        <AuthProvider>
+            {/* eslint-disable-next-line react/style-prop-object -- expo-status-bar takes "auto" as a string, not a style object */}
+            <StatusBar style="auto" />
+            <SignInGate />
+        </AuthProvider>
+    );
+};
+
+export default RootLayout;

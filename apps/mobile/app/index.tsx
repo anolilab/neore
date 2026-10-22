@@ -3,7 +3,7 @@ import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Pressable, Text } from "react-native";
 
-import { useAuth } from "@/auth/auth-context";
+import { useAuth } from "@/auth/auth-state";
 import { getClient } from "@/lib/lunora";
 
 interface ThreadRow {
@@ -11,30 +11,38 @@ interface ThreadRow {
     title: string;
 }
 
-export default function ThreadListScreen() {
+const ThreadListScreen = () => {
     const { status } = useAuth();
     const [threads, setThreads] = useState<ThreadRow[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (status !== "signed-in") {
-            return;
+            return undefined;
         }
 
         let isCancelled = false;
 
-        getClient()
-            .query(api.chat.composite.getThreadListData, { paginationOpts: { cursor: null, numItems: 100 } })
-            .then((data) => {
+        const load = async () => {
+            try {
+                const data = await getClient().query(api.chat.composite.getThreadListData, { paginationOpts: { cursor: null, numItems: 100 } });
+
                 if (!isCancelled) {
-                    setThreads(data.threads.page.map((thread) => { return { id: thread._id, title: thread.title || "Untitled" }; }));
+                    setThreads(
+                        data.threads.page.map((thread) => {
+                            // eslint-disable-next-line no-underscore-dangle -- `_id` is the Lunora document id, not a private field
+                            return { id: thread._id, title: thread.title || "Untitled" };
+                        }),
+                    );
                 }
-            })
-            .catch((error_: unknown) => {
+            } catch (error_: unknown) {
                 if (!isCancelled) {
                     setError(error_ instanceof Error ? error_.message : "Could not load chats.");
                 }
-            });
+            }
+        };
+
+        load();
 
         return () => {
             isCancelled = true;
@@ -42,7 +50,11 @@ export default function ThreadListScreen() {
     }, [status]);
 
     if (error) {
-        return <Text accessibilityRole="alert" style={{ padding: 16 }}>{error}</Text>;
+        return (
+            <Text accessibilityRole="alert" style={{ padding: 16 }}>
+                {error}
+            </Text>
+        );
     }
 
     return (
@@ -65,4 +77,6 @@ export default function ThreadListScreen() {
             )}
         />
     );
-}
+};
+
+export default ThreadListScreen;

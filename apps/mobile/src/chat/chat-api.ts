@@ -39,7 +39,13 @@ export const startChat = async (input: { body: StartChatBody; fetch: Fetch; gate
         });
 
         if (!response.ok) {
-            const body = (await response.json().catch(() => { return {}; })) as { error?: string };
+            let body: { error?: string } = {};
+
+            try {
+                body = (await response.json()) as { error?: string };
+            } catch {
+                // A body that is not JSON keeps the status-based message.
+            }
 
             throw new ChatError(body.error ?? `Could not send (${response.status}).`);
         }

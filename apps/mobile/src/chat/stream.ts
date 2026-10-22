@@ -1,8 +1,8 @@
 /**
  * Reads the gateway's `/v1/stream` NDJSON relay. Pure: `fetch` is injected, so the
  * framing and the resume loop are tested under vitest. The line grammar itself
- * (chunk, error, resume marker) is `parseStreamLine` from @neore/chat-ui, shared
- * with the web app and the extension.
+ * (chunk, error, resume marker) is `parseStreamLine` from the `@neore/chat-ui`
+ * package, shared with the web app and the extension.
  */
 import { parseStreamLine } from "@neore/chat-ui/utils/stream-line";
 
@@ -29,6 +29,86 @@ export const splitLines = (buffer: string): { lines: string[]; rest: string } =>
     return { lines: parts.filter((line) => line.trim() !== ""), rest };
 };
 
+/* eslint-disable no-await-in-loop -- a stream is read in order: each read and each line depends on the one before */
+/** One POST's worth of lines. Returns what ended it. */
+const readAttempt = async (
+    stream: ReadableStream<Uint8Array>,
+    onChunk: (delta: StreamDelta, index: number) => void,
+    startIndex: number,
+): Promise<"done" | "failed" | "resume"> => {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let index = startIndex;
+    let isResumed = false;
+    let isEnded = false;
+
+    /** Returns false when the line is an error, which fails the whole reply. */
+    const isLineOk = (line: string): boolean => {
+        const parsed = parseStreamLine(line);
+
+        if (parsed.kind === "error") {
+            return false;
+        }
+
+        if (parsed.kind === "end") {
+            isEnded = true;
+
+            return true;
+        }
+
+        if (parsed.kind === "resume") {
+            // The marker is the last line; the chunks counted so far are its index.
+            isResumed = true;
+            index = parsed.lastChunkIndex;
+
+            return true;
+        }
+
+        index += 1;
+        onChunk({ reasoning: parsed.reasoning, text: parsed.text }, index);
+
+        return true;
+    };
+
+    while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+            break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const { lines, rest } = splitLines(buffer);
+
+        buffer = rest;
+
+        for (const line of lines) {
+            if (!isLineOk(line)) {
+                await reader.cancel();
+
+                return "failed";
+            }
+        }
+    }
+
+    buffer += decoder.decode();
+
+    if (buffer.trim() !== "" && !isLineOk(buffer.trim())) {
+        return "failed";
+    }
+
+    if (isResumed) {
+        return "resume";
+    }
+
+    // Closing without the end line means the connection dropped mid-reply: not a finished one.
+    return isEnded ? "done" : "failed";
+};
+/* eslint-enable no-await-in-loop */
+
+/* eslint-disable no-await-in-loop -- each POST resumes from the index the previous one counted */
+
 /**
  * Relay one reply. `onDelta` is called once per relayed chunk. A resume marker
  * makes the loop POST again with the counted `lastChunkIndex`, so nothing is sent
@@ -46,7 +126,8 @@ export const relayReply = async (input: {
     let counted = 0;
 
     for (let attempt = 0; attempt <= MAX_RESUMES; attempt += 1) {
-        const body = { endMarker: true, resumable: true, streamToken: input.streamToken, ...(counted > 0 && { lastChunkIndex: counted }) };
+        const resumeFrom = counted > 0 ? { lastChunkIndex: counted } : {};
+        const body = { endMarker: true, resumable: true, streamToken: input.streamToken, ...resumeFrom };
 
         const response = await input.fetch(`${input.gatewayUrl}/v1/stream`, {
             body: JSON.stringify(body),
@@ -89,79 +170,4 @@ export const relayReply = async (input: {
 
     return "failed";
 };
-
-/** One POST's worth of lines. Returns what ended it. */
-const readAttempt = async (
-    stream: ReadableStream<Uint8Array>,
-    onChunk: (delta: StreamDelta, index: number) => void,
-    startIndex: number,
-): Promise<"done" | "failed" | "resume"> => {
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let index = startIndex;
-    let isResumed = false;
-    let isEnded = false;
-
-    /** Returns false when the line is an error, which fails the whole reply. */
-    const handle = (line: string): boolean => {
-        const parsed = parseStreamLine(line);
-
-        if (parsed.kind === "error") {
-            return false;
-        }
-
-        if (parsed.kind === "end") {
-            isEnded = true;
-
-            return true;
-        }
-
-        if (parsed.kind === "resume") {
-            // The marker is the last line; the chunks counted so far are its index.
-            isResumed = true;
-            index = parsed.lastChunkIndex;
-
-            return true;
-        }
-
-        index += 1;
-        onChunk({ reasoning: parsed.reasoning, text: parsed.text }, index);
-
-        return true;
-    };
-
-    while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-            break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const { lines, rest } = splitLines(buffer);
-
-        buffer = rest;
-
-        for (const line of lines) {
-            if (!handle(line)) {
-                await reader.cancel();
-
-                return "failed";
-            }
-        }
-    }
-
-    buffer += decoder.decode();
-
-    if (buffer.trim() !== "" && !handle(buffer.trim())) {
-        return "failed";
-    }
-
-    if (isResumed) {
-        return "resume";
-    }
-
-    // Closing without the end line means the connection dropped mid-reply: not a finished one.
-    return isEnded ? "done" : "failed";
-};
+/* eslint-enable no-await-in-loop */

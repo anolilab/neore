@@ -1,8 +1,11 @@
 /**
- * Build-time URLs. Metro inlines `process.env.EXPO_PUBLIC_*` only when each name is
+ * Build-time URLs. Metro inlines the EXPO_PUBLIC_ variables only when each name is
  * written out literally, so `loadConfig` names them one by one. A missing value is
  * a build problem: the root layout shows an error instead of calling `undefined`.
  */
+
+import { trimTrailing } from "./trim-trailing";
+
 export interface MobileConfig {
     /** The web app origin: serves `/auth/extension`, the sign-in page. */
     appUrl: string;
@@ -15,7 +18,7 @@ const required = (name: string, value: string | undefined): string => {
         throw new Error(`${name} is not set. Add it to apps/mobile/.env.`);
     }
 
-    return value.replace(/\/+$/, "");
+    return trimTrailing(value, "/");
 };
 
 export const readConfig = (env: Record<string, string | undefined>): MobileConfig => {
