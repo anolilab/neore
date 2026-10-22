@@ -22,7 +22,7 @@ describe("chat router scope", () => {
                 headers: { "Content-Type": "application/json" },
                 method: "POST",
             }),
-            { SIGNING_SECRET: "test-signing-secret" } as unknown as HonoEnv,
+            { SIGNING_SECRET: "test-signing-secret" },
         );
 
         // The stream handler rejects the fake token itself: the request reached it.
