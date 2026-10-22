@@ -5,11 +5,13 @@ import type { PlanProducts } from "./plans";
 
 const billingLogger = logger.scope("billing");
 
-const configuredProducts = (): PlanProducts => ({
-    pro: CREEM_PRODUCT_PRO,
-    team: CREEM_PRODUCT_TEAM,
-    yearly: { pro: CREEM_PRODUCT_PRO_YEARLY, team: CREEM_PRODUCT_TEAM_YEARLY },
-});
+const configuredProducts = (): PlanProducts => {
+    return {
+        pro: CREEM_PRODUCT_PRO,
+        team: CREEM_PRODUCT_TEAM,
+        yearly: { pro: CREEM_PRODUCT_PRO_YEARLY, team: CREEM_PRODUCT_TEAM_YEARLY },
+    };
+};
 
 /** Every id that appears more than once. An empty id is unconfigured, not a collision. */
 const repeatedIds = (products: PlanProducts): ReadonlySet<string> => {
