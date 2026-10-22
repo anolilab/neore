@@ -38,7 +38,7 @@ type Harness = ReturnType<typeof lunoraTest>;
 
 let harness: Harness;
 
-const charge = async (args: { kind: "Audio" | "Text"; organizationId?: string; requestId?: string; userId: string }): Promise<boolean> =>
+const charge = async (args: { count?: number; kind: "Audio" | "Text"; organizationId?: string; requestId?: string; userId: string }): Promise<boolean> =>
     await harness.run(async (ctx: any) => await ctx.runMutation(chargeDailyUnit, args));
 
 const remaining = async (key: string, userId: string): Promise<number> =>
@@ -66,6 +66,18 @@ describe("chargeDailyUnit", () => {
 
         await expect(charge({ kind: "Text", userId: "u1" })).resolves.toBe(true);
         expect(await remaining("chat/dailyText:free", "u1")).toBe(before - 1);
+    });
+
+    it("takes a multi-unit charge all or nothing: one that does not fit consumes none", async () => {
+        users.set("u1", {});
+
+        const before = await remaining("chat/dailyText:free", "u1");
+
+        await expect(charge({ count: before + 1, kind: "Text", userId: "u1" })).resolves.toBe(false);
+        expect(await remaining("chat/dailyText:free", "u1")).toBe(before);
+
+        await expect(charge({ count: before, kind: "Text", userId: "u1" })).resolves.toBe(true);
+        expect(await remaining("chat/dailyText:free", "u1")).toBe(0);
     });
 
     it("charges the premium key inside a paid organization the user belongs to, and not one they left", async () => {

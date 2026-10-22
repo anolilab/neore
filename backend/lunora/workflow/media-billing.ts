@@ -3,9 +3,10 @@
  * own gate (`video-billing.ts`); this file classifies every media node so the two cannot miss one.
  *
  * - before the run (`workflowMediaErrors`): a guest is refused when the graph has any paid media node;
- * - per node, before its paid call (`withMediaCharge`): one unit of the daily quota `/chat/media` charges for
- *   the same kind, keyed on the node run so a retry takes no second unit. Both dispatchers (`executor.ts`
- *   and the streaming endpoint in `http.ts`) wrap each image and audio case in it.
+ * - per node, before its paid call (`withMediaCharge`): the daily quota `/chat/media` charges for the same
+ *   kind, one unit per image or per comparison model, taken in one charge. It is keyed on the node run, so a
+ *   retry takes no second unit. Both dispatchers (`executor.ts` and the streaming endpoint in `http.ts`) pass
+ *   each image and audio executor its charge, which it calls after validating its inputs.
  */
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
@@ -60,18 +61,39 @@ export const workflowMediaErrors = (account: RunAccount, nodes: ReadonlyArray<Wo
 /** The request id one node run's daily unit is taken under. */
 export const mediaRequestId = (runId: string, nodeId: string): string => `workflow-media:${JSON.stringify([runId, nodeId])}`;
 
-/** Takes one daily unit for an image or audio node run before `execute`; a spent quota throws before any paid work. */
+/** The most images one image node run may generate: the cap `/chat/media` applies per request. */
+const MAX_IMAGES_PER_NODE = 4;
+
+/** The number of images an image node asks for, clamped to the cap; a request carries whatever the client sent. */
+export const imageCountOf = (numberImages: number | undefined): number =>
+    Math.min(MAX_IMAGES_PER_NODE, Math.max(1, Math.trunc(Number(numberImages ?? 1)) || 1));
+
+/**
+ * Takes `count` daily units for one node run, right before the paid call that uses them. A spent quota throws
+ * there, so an input that fails validation never draws a unit. Calling it again for the same run takes nothing.
+ */
+export type MediaCharge = (count: number) => Promise<void>;
+
+/**
+ * Runs `execute` with the charge for an image or audio node run. Other node kinds get a no-op charge.
+ * The executor calls it once, after validating its inputs and before its paid call.
+ */
 export const withMediaCharge = async <T>(
     context: Pick<ActionCtx, "runMutation">,
     run: ExecutionContext,
     node: WorkflowNode,
     userId: string,
-    execute: () => Promise<T>,
+    execute: (charge: MediaCharge) => Promise<T>,
 ): Promise<T> => {
     const kind = mediaKindOf(node);
 
-    if (kind === "Image" || kind === "Audio") {
+    const charge: MediaCharge = async (count) => {
+        if (kind !== "Image" && kind !== "Audio") {
+            return;
+        }
+
         const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+            count,
             kind,
             organizationId: run.orgId,
             requestId: mediaRequestId(run.runId, node.id),
@@ -81,7 +103,7 @@ export const withMediaCharge = async <T>(
         if (!charged) {
             throw new Error(`You've reached your daily ${kind.toLowerCase()} generation limit.`);
         }
-    }
+    };
 
-    return await execute();
+    return await execute(charge);
 };

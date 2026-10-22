@@ -34,7 +34,7 @@ import {
     type WorkflowNode,
 } from "./core";
 import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext } from "./media-args";
-import { withMediaCharge } from "./media-billing";
+import { imageCountOf, type MediaCharge, withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
 import { videoKindOf } from "./video-inputs";
@@ -140,7 +140,13 @@ const executeAINode = async (node: WorkflowNode, context: ExecutionContext, user
  * text node feeding an image node works without wiring it explicitly; the node's
  * own `prompt` is the fallback.
  */
-const executeImageNode = async (node: WorkflowNode, context: ExecutionContext, actionContext: ActionContext, userId: string): Promise<NodeExecutionResult> => {
+const executeImageNode = async (
+    node: WorkflowNode,
+    context: ExecutionContext,
+    actionContext: ActionContext,
+    userId: string,
+    charge: MediaCharge,
+): Promise<NodeExecutionResult> => {
     const data = node.data as {
         aspectRatio?: string;
         imageUrl?: string;
@@ -160,11 +166,14 @@ const executeImageNode = async (node: WorkflowNode, context: ExecutionContext, a
         return { error: "No prompt provided for image generation", success: false };
     }
 
+    const count = imageCountOf(data.numImages);
+
     try {
+        await charge(count);
         const result = await actionContext.runAction(internal.chat.functions.generateImage, {
             imageSize: data.aspectRatio ?? "1:1",
             model: resolveWorkflowModel("image", data.model),
-            numImages: data.numImages ?? 1,
+            numImages: count,
             prompt,
             threadId: "workflow",
             userId,
@@ -188,6 +197,7 @@ const executeImg2ImgNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         model?: string;
@@ -204,6 +214,7 @@ const executeImg2ImgNode = async (
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateImg2Img, {
             imageUrl,
             model: resolveWorkflowModel("img2img", data.model),
@@ -229,6 +240,7 @@ const executeUpscaleNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         enhanceDetails?: boolean;
@@ -245,6 +257,7 @@ const executeUpscaleNode = async (
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateUpscale, {
             enhanceDetails: data.enhanceDetails ?? true,
             enhanceFace: data.enhanceFace ?? false,
@@ -270,6 +283,7 @@ const executeInpaintNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         maskUrl?: string;
@@ -301,6 +315,7 @@ const executeInpaintNode = async (
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateInpaint, {
             imageUrl,
             maskUrl,
@@ -328,6 +343,7 @@ const executeCharacterRefNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         mode?: "face" | "style" | "composition";
@@ -356,6 +372,7 @@ const executeCharacterRefNode = async (
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateCharacterRef, {
             mode: data.mode ?? "face",
             model: data.model,
@@ -384,6 +401,7 @@ const executeStyleRefNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         contentImageUrl?: string;
@@ -416,6 +434,7 @@ const executeStyleRefNode = async (
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateStyleRef, {
             contentImageUrl,
             model: data.model,
@@ -445,6 +464,7 @@ const executeParallelCompareNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         aspectRatio?: string;
@@ -468,6 +488,7 @@ const executeParallelCompareNode = async (
     }
 
     try {
+        await charge(models.length);
         const result = await actionContext.runAction(internal.chat.functions.generateParallelCompare, {
             aspectRatio: data.aspectRatio,
             models,
@@ -510,7 +531,13 @@ const executeVideoNode = async (
 /**
  * Execute an audio node (text-to-speech).
  */
-const executeAudioNode = async (node: WorkflowNode, context: ExecutionContext, actionContext: ActionContext, userId: string): Promise<NodeExecutionResult> => {
+const executeAudioNode = async (
+    node: WorkflowNode,
+    context: ExecutionContext,
+    actionContext: ActionContext,
+    userId: string,
+    charge: MediaCharge,
+): Promise<NodeExecutionResult> => {
     const data = node.data as {
         model?: string;
         text?: string;
@@ -525,6 +552,7 @@ const executeAudioNode = async (node: WorkflowNode, context: ExecutionContext, a
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateAudio, {
             model: resolveWorkflowModel("tts", data.model),
             prompt: text,
@@ -550,6 +578,7 @@ const executeTranscriptionNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         language?: string;
@@ -569,6 +598,7 @@ const executeTranscriptionNode = async (
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateTranscription, {
             audioUrl,
             language: data.language,
@@ -594,6 +624,7 @@ const executeOutpaintNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         expandDirection: string;
@@ -611,6 +642,7 @@ const executeOutpaintNode = async (
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateOutpaint, {
             expandDirection: data.expandDirection ?? "all",
             expandPixels: data.expandPixels,
@@ -639,6 +671,7 @@ const executeBackgroundRemovalNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         backgroundColor?: string;
@@ -655,6 +688,7 @@ const executeBackgroundRemovalNode = async (
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateBackgroundRemoval, {
             backgroundColor: data.backgroundColor,
             imageUrl,
@@ -682,6 +716,7 @@ const executeObjectEditorNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         maskUrl?: string;
@@ -709,6 +744,7 @@ const executeObjectEditorNode = async (
     }
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateObjectEdit, {
             imageUrl,
             maskUrl,
@@ -737,6 +773,7 @@ const executeControlNetNode = async (
     context: ExecutionContext,
     actionContext: ActionContext,
     userId: string,
+    charge: MediaCharge,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
         controlType: string;
@@ -760,6 +797,7 @@ const executeControlNetNode = async (
     const prompt = typeof inputValue === "string" ? inputValue : undefined;
 
     try {
+        await charge(1);
         const result = await actionContext.runAction(internal.chat.functions.generateControlNet, {
             controlType: data.controlType ?? "pose",
             endPercent: data.endPercent,
@@ -936,7 +974,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeAudioNode(node, executionContext, context, userId),
+                                async (charge) => await executeAudioNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -946,7 +984,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeBackgroundRemovalNode(node, executionContext, context, userId),
+                                async (charge) => await executeBackgroundRemovalNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -960,7 +998,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeCharacterRefNode(node, executionContext, context, userId),
+                                async (charge) => await executeCharacterRefNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -974,7 +1012,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeControlNetNode(node, executionContext, context, userId),
+                                async (charge) => await executeControlNetNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -988,7 +1026,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeImageNode(node, executionContext, context, userId),
+                                async (charge) => await executeImageNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -1002,7 +1040,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeImg2ImgNode(node, executionContext, context, userId),
+                                async (charge) => await executeImg2ImgNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -1012,7 +1050,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeInpaintNode(node, executionContext, context, userId),
+                                async (charge) => await executeInpaintNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -1022,7 +1060,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeObjectEditorNode(node, executionContext, context, userId),
+                                async (charge) => await executeObjectEditorNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -1032,7 +1070,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeOutpaintNode(node, executionContext, context, userId),
+                                async (charge) => await executeOutpaintNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -1046,7 +1084,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeParallelCompareNode(node, executionContext, context, userId),
+                                async (charge) => await executeParallelCompareNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -1056,7 +1094,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeStyleRefNode(node, executionContext, context, userId),
+                                async (charge) => await executeStyleRefNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -1070,7 +1108,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeTranscriptionNode(node, executionContext, context, userId),
+                                async (charge) => await executeTranscriptionNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }
@@ -1080,7 +1118,7 @@ export const executeWorkflow = authAction
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeUpscaleNode(node, executionContext, context, userId),
+                                async (charge) => await executeUpscaleNode(node, executionContext, context, userId, charge),
                             );
                             break;
                         }

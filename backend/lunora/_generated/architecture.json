@@ -2722,6 +2722,16 @@
     },
     {
       "from": "function:chat_streaming_persistent_crons:cleanupExpiredStreams",
+      "kind": "read",
+      "to": "table:persistentStreams"
+    },
+    {
+      "from": "function:chat_streaming_persistent_crons:cleanupExpiredStreams",
+      "kind": "read",
+      "to": "table:streamingMessages"
+    },
+    {
+      "from": "function:chat_streaming_persistent_crons:cleanupExpiredStreams",
       "kind": "write",
       "to": "table:persistentStreams"
     },
@@ -2737,6 +2747,16 @@
     },
     {
       "from": "function:chat_streaming_persistent_library:claimStreamRun",
+      "kind": "write",
+      "to": "table:persistentStreams"
+    },
+    {
+      "from": "function:chat_streaming_persistent_library:cleanupExpiredStreams",
+      "kind": "read",
+      "to": "table:persistentStreams"
+    },
+    {
+      "from": "function:chat_streaming_persistent_library:cleanupExpiredStreams",
       "kind": "write",
       "to": "table:persistentStreams"
     },
@@ -10085,6 +10105,13 @@
       "id": "function:chat_streaming_persistent_library:claimStreamRun",
       "kind": "function",
       "name": "chat.streaming.persistent.library.claimStreamRun",
+      "module": "chat"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:chat_streaming_persistent_library:cleanupExpiredStreams",
+      "kind": "function",
+      "name": "chat.streaming.persistent.library.cleanupExpiredStreams",
       "module": "chat"
     },
     {
@@ -19946,79 +19973,79 @@
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 619,
+      "line": 625,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 657,
+      "line": 669,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 691,
+      "line": 705,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 727,
+      "line": 743,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 778,
+      "line": 796,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 826,
+      "line": 846,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 879,
+      "line": 901,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 924,
+      "line": 948,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 960,
+      "line": 986,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 997,
+      "line": 1025,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1044,
+      "line": 1074,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1086,
+      "line": 1118,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1123,
+      "line": 1157,
       "reason": "the default export is not a registered function"
     },
     {
@@ -20048,7 +20075,7 @@
     {
       "file": "workflow/media-billing",
       "kind": "call",
-      "line": 74,
+      "line": 95,
       "reason": "\"withMediaCharge\" is not a registered function"
     },
     {

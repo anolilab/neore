@@ -35,7 +35,7 @@ import {
     type WorkflowNode,
 } from "./core";
 import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext } from "./media-args";
-import { withMediaCharge } from "./media-billing";
+import { type MediaCharge, withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
 
@@ -237,7 +237,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeAudioNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeAudioNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -250,7 +250,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeBackgroundRemovalNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeBackgroundRemovalNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -270,7 +270,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeCharacterRefNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeCharacterRefNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -294,7 +294,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeControlNetNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeControlNetNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -318,7 +318,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeImageNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeImageNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -339,7 +339,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeImg2ImgNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeImg2ImgNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -352,7 +352,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeInpaintNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeInpaintNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -365,7 +365,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeObjectEditorNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeObjectEditorNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -378,7 +378,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeOutpaintNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeOutpaintNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -398,7 +398,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeParallelCompareNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeParallelCompareNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -411,7 +411,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeStyleRefNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeStyleRefNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -431,7 +431,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeTranscriptionNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeTranscriptionNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -444,7 +444,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                                 executionContext,
                                 node,
                                 userId,
-                                async () => await executeUpscaleNodeStreaming(node, executionContext, context, userId),
+                                async (charge) => await executeUpscaleNodeStreaming(node, executionContext, context, userId, charge),
                             );
 
                             output = result.output;
@@ -601,6 +601,7 @@ const executeImageNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         aspectRatio?: string;
@@ -616,11 +617,16 @@ const executeImageNodeStreaming = async (
 
     const { prompt, referenceImages } = imageRequestArgs(node, context);
 
+    if (!prompt) {
+        throw new Error("No prompt provided for image generation");
+    }
+
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateImage, {
         imageSize: data.aspectRatio ?? "1:1",
         model: resolveWorkflowModel("image", data.model),
         numImages: 1,
-        prompt: prompt ?? "",
+        prompt,
         threadId: "workflow",
         userId,
         ...(referenceImages.length > 0 && { referenceImages }),
@@ -644,6 +650,7 @@ const executeAudioNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         model?: string;
@@ -654,6 +661,11 @@ const executeAudioNodeStreaming = async (
     const inputValue = getLastOutput(context);
     const text = data.text ?? (typeof inputValue === "string" ? inputValue : "");
 
+    if (!text) {
+        throw new Error("No text provided for audio generation");
+    }
+
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateAudio, {
         model: resolveWorkflowModel("tts", data.model),
         prompt: text,
@@ -673,6 +685,7 @@ const executeImg2ImgNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         model?: string;
@@ -688,6 +701,7 @@ const executeImg2ImgNodeStreaming = async (
         throw new Error("No image input provided for image-to-image");
     }
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateImg2Img, {
         imageUrl,
         model: resolveWorkflowModel("img2img", data.model),
@@ -709,6 +723,7 @@ const executeUpscaleNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         enhanceDetails?: boolean;
@@ -724,6 +739,7 @@ const executeUpscaleNodeStreaming = async (
         throw new Error("No image input provided for upscale");
     }
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateUpscale, {
         enhanceDetails: data.enhanceDetails ?? true,
         enhanceFace: data.enhanceFace ?? false,
@@ -745,6 +761,7 @@ const executeInpaintNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         maskUrl?: string;
@@ -775,6 +792,7 @@ const executeInpaintNodeStreaming = async (
         throw new Error("No prompt provided for inpaint");
     }
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateInpaint, {
         imageUrl,
         maskUrl,
@@ -796,6 +814,7 @@ const executeCharacterRefNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         mode?: "face" | "style" | "composition";
@@ -823,6 +842,7 @@ const executeCharacterRefNodeStreaming = async (
         throw new Error("No reference images provided");
     }
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateCharacterRef, {
         mode: data.mode ?? "face",
         model: data.model,
@@ -845,6 +865,7 @@ const executeStyleRefNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         contentImageUrl?: string;
@@ -876,6 +897,7 @@ const executeStyleRefNodeStreaming = async (
         contentImageUrl = (inputValue as { contentImageUrl?: string }).contentImageUrl;
     }
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateStyleRef, {
         contentImageUrl,
         model: data.model,
@@ -899,6 +921,7 @@ const executeParallelCompareNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         aspectRatio?: string;
@@ -921,6 +944,7 @@ const executeParallelCompareNodeStreaming = async (
         throw new Error("At least 2 models required for comparison");
     }
 
+    await charge(models.length);
     const result = await actionContext.runAction(internal.chat.functions.generateParallelCompare, {
         aspectRatio: data.aspectRatio,
         models,
@@ -941,6 +965,7 @@ const executeOutpaintNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         expandDirection?: string;
@@ -957,6 +982,7 @@ const executeOutpaintNodeStreaming = async (
         throw new Error("No image input provided for outpaint");
     }
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateOutpaint, {
         expandDirection: data.expandDirection ?? "all",
         expandPixels: data.expandPixels,
@@ -979,6 +1005,7 @@ const executeBackgroundRemovalNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         backgroundColor?: string;
@@ -994,6 +1021,7 @@ const executeBackgroundRemovalNodeStreaming = async (
         throw new Error("No image input provided for background removal");
     }
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateBackgroundRemoval, {
         backgroundColor: data.backgroundColor,
         imageUrl,
@@ -1015,6 +1043,7 @@ const executeObjectEditorNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         maskUrl?: string;
@@ -1041,6 +1070,7 @@ const executeObjectEditorNodeStreaming = async (
         throw new Error("No mask provided for object editing");
     }
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateObjectEdit, {
         imageUrl,
         maskUrl,
@@ -1063,6 +1093,7 @@ const executeControlNetNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         controlType: string;
@@ -1083,6 +1114,7 @@ const executeControlNetNodeStreaming = async (
 
     const prompt = typeof inputValue === "string" ? inputValue : undefined;
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateControlNet, {
         controlType: data.controlType ?? "pose",
         endPercent: data.endPercent,
@@ -1107,6 +1139,7 @@ const executeTranscriptionNodeStreaming = async (
     context: ExecutionContext,
     actionContext: HttpActionCtx,
     userId: string,
+    charge: MediaCharge,
 ): Promise<{ output: unknown }> => {
     const data = node.data as {
         language?: string;
@@ -1120,6 +1153,7 @@ const executeTranscriptionNodeStreaming = async (
         throw new Error("No audio URL found in input");
     }
 
+    await charge(1);
     const result = await actionContext.runAction(internal.chat.functions.generateTranscription, {
         audioUrl,
         language: data.language,

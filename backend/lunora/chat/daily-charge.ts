@@ -25,24 +25,24 @@ export const DAILY_CHARGE_SCOPE = "daily-charge";
 const DAILY_CHARGE_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Charge one unit of `kind` to `userId`'s daily quota. `false` when it is
- * spent, the tier may not generate `kind` at all, or the user is gone — the
- * caller stops there. Platform admins are exempt, as on the HTTP routes.
+ * Charge `count` units (default one) of `kind` to `userId`'s daily quota, all or nothing. `false` when they
+ * do not all fit, the tier may not generate `kind` at all, or the user is gone — the caller stops there.
+ * Platform admins are exempt, as on the HTTP routes.
  *
- * With a `requestId` the unit is taken once per request: a retry of the same
- * request returns `true` without a second unit. The claim and the unit are one
- * transaction, and a refused unit releases its claim, so a retry after a refusal
- * is charged normally.
+ * With a `requestId` the units are taken once per request: a retry of the same request returns `true`
+ * without a second charge. The claim and the units are one transaction, and a refused charge releases its
+ * claim, so a retry after a refusal is charged normally.
  */
 export const chargeDailyUnit = internalMutation
     .input({
+        count: v.optional(v.number()),
         kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Text"), v.literal("Video")),
         organizationId: v.optional(v.string()),
         requestId: v.optional(v.string().max(MAX_LENGTH.long)),
         userId: v.string(),
     })
     .output(v.boolean())
-    .mutation(async ({ args: { kind, organizationId, requestId, userId }, ctx }) => {
+    .mutation(async ({ args: { count = 1, kind, organizationId, requestId, userId }, ctx }) => {
         const user = await getUser(ctx, userId);
 
         if (!user) {
@@ -75,7 +75,11 @@ export const chargeDailyUnit = internalMutation
             return true;
         }
 
-        const { ok } = await createRatelimit(key, ctx.db as never).limit(userId);
+        const limiter = createRatelimit(key, ctx.db as never);
+        const units = Math.max(1, Math.trunc(count));
+        // Checked before the limiter, which throws rather than refuses a count above its capacity.
+        const { remaining } = await limiter.getRemaining(userId);
+        const { ok } = units <= remaining ? await limiter.limit(userId, { count: units }) : { ok: false };
 
         if (!ok && requestId !== undefined) {
             await releaseClaim(ctx, DAILY_CHARGE_SCOPE, requestId);

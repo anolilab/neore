@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
 import type { WorkflowNode } from "./core";
-import { mediaKindOf, mediaRequestId, withMediaCharge, workflowMediaErrors } from "./media-billing";
+import { imageCountOf, mediaKindOf, mediaRequestId, withMediaCharge, workflowMediaErrors } from "./media-billing";
 import type { RunAccount } from "./run-setup";
 import { workflowRunErrors } from "./run-setup";
 import { executionContextOf } from "./test-execution-context";
@@ -89,43 +89,78 @@ describe(workflowMediaErrors, () => {
 describe(withMediaCharge, () => {
     const run = executionContextOf({ orgId: "org-1" });
 
-    it("takes the daily unit, then runs the node", async () => {
+    it("takes the daily units the executor asks for, then runs the paid call", async () => {
         const runMutation = vi.fn(async () => true);
-        const execute = vi.fn(async () => "url");
+        const paid = vi.fn(async () => "url");
 
-        await expect(withMediaCharge({ runMutation } as never, run, node("i", "upscale"), "user-1", execute)).resolves.toBe("url");
+        await expect(
+            withMediaCharge({ runMutation } as never, run, node("i", "upscale"), "user-1", async (charge) => {
+                await charge(3);
+
+                return await paid();
+            }),
+        ).resolves.toBe("url");
         expect(runMutation).toHaveBeenCalledExactlyOnceWith(internal.chat.daily_charge.chargeDailyUnit, {
+            count: 3,
             kind: "Image",
             organizationId: "org-1",
             requestId: mediaRequestId("run", "i"),
             userId: "user-1",
         });
-        expect(execute).toHaveBeenCalledOnce();
+        expect(paid).toHaveBeenCalledOnce();
+    });
+
+    it("takes nothing when the executor fails validation before it charges", async () => {
+        const runMutation = vi.fn(async () => true);
+
+        await withMediaCharge({ runMutation } as never, run, node("i", "image"), "user-1", async () => {
+            return { error: "No prompt provided" };
+        });
+
+        expect(runMutation).not.toHaveBeenCalled();
     });
 
     it("charges an audio node to the audio quota", async () => {
         const runMutation = vi.fn(async () => true);
 
-        await withMediaCharge({ runMutation } as never, run, node("a", "transcription"), "user-1", async () => "text");
+        await withMediaCharge({ runMutation } as never, run, node("a", "transcription"), "user-1", async (charge) => {
+            await charge(1);
 
-        expect(runMutation).toHaveBeenCalledWith(internal.chat.daily_charge.chargeDailyUnit, expect.objectContaining({ kind: "Audio" }));
+            return "text";
+        });
+
+        expect(runMutation).toHaveBeenCalledWith(internal.chat.daily_charge.chargeDailyUnit, expect.objectContaining({ count: 1, kind: "Audio" }));
     });
 
     it("refuses a spent quota before the paid call", async () => {
-        const execute = vi.fn(async () => "url");
+        const paid = vi.fn(async () => "url");
 
-        await expect(withMediaCharge({ runMutation: vi.fn(async () => false) } as never, run, node("i", "inpaint"), "user-1", execute)).rejects.toThrow(
-            "You've reached your daily image generation limit.",
-        );
-        expect(execute).not.toHaveBeenCalled();
+        await expect(
+            withMediaCharge({ runMutation: vi.fn(async () => false) } as never, run, node("i", "inpaint"), "user-1", async (charge) => {
+                await charge(1);
+
+                return await paid();
+            }),
+        ).rejects.toThrow("You've reached your daily image generation limit.");
+        expect(paid).not.toHaveBeenCalled();
     });
 
-    it("does not charge an input image node", async () => {
+    it("does not charge an input image node, even when asked to", async () => {
         const runMutation = vi.fn(async () => true);
 
-        await withMediaCharge({ runMutation } as never, run, node("i", "image", { mode: "input" }), "user-1", async () => "url");
+        await withMediaCharge({ runMutation } as never, run, node("i", "image", { mode: "input" }), "user-1", async (charge) => {
+            await charge(1);
+
+            return "url";
+        });
 
         expect(runMutation).not.toHaveBeenCalled();
+    });
+
+    it("clamps an image count to the per-request cap, and to at least one", () => {
+        expect([imageCountOf(undefined), imageCountOf(0), imageCountOf(2.9), imageCountOf(4), imageCountOf(50), imageCountOf(NaN)]).toStrictEqual([
+            1, 1, 2, 4, 4, 1,
+        ]);
     });
 
     it("keys the unit apart from the video unit of the same node", () => {

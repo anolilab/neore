@@ -288,7 +288,7 @@ export interface InternalApiTypes {
             getDecryptedCustomProvider: FunctionReference<"query", { providerId: string; userId: string }, { accessKeyId?: string; apiKey: string; apiVersion?: string; baseUrl: string; id: string; models: Array<{ id: string; name?: string }>; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" } | null>;
         };
         daily_charge: {
-            chargeDailyUnit: FunctionReference<"mutation", { kind: "Audio" | "Image" | "Text" | "Video"; organizationId?: string; requestId?: string; userId: string }, boolean>;
+            chargeDailyUnit: FunctionReference<"mutation", { count?: number; kind: "Audio" | "Image" | "Text" | "Video"; organizationId?: string; requestId?: string; userId: string }, boolean>;
         };
         edit_abandon: {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
