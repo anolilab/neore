@@ -29,3 +29,6 @@ export const isRestartable = (job: RestartableJob): boolean =>
 
 /** The key a failed import's file is kept under. Server-minted, so it is never a staging key the reap or sweep would delete. */
 export const keptImportKeyFor = (userId: string, jobId: string): string => `chat-import/${userId}/${jobId}`;
+
+/** Progress once `done` of `total` conversations are counted: 5% setup, 90% conversations. A restart starts there, not at 0. */
+export const resumeProgress = (done: number, total: number): number => (total > 0 ? 5 + Math.round((Math.min(done, total) / total) * 90) : 5);

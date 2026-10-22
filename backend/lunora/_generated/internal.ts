@@ -412,7 +412,7 @@ export interface InternalApiTypes {
     chat_import: {
         steps: {
             checkJobCancelled: FunctionReference<"query", { jobId: Id<"chatImportJobs"> }, boolean>;
-            finalizeImport: FunctionReference<"mutation", { errorMessage?: string; failed?: number; imported?: number; jobId: Id<"chatImportJobs">; r2Key: string; status: "completed" | "failed"; userId: string }, null>;
+            finalizeImport: FunctionReference<"mutation", { errorMessage?: string; failed?: number; imported?: number; jobId: Id<"chatImportJobs">; r2Key: string; runId: string; status: "completed" | "failed"; userId: string }, null>;
             importCounts: FunctionReference<"query", { jobId: Id<"chatImportJobs"> }, { failed: number; imported: number; total: number }>;
             importJobExists: FunctionReference<"query", { jobId: Id<"chatImportJobs"> }, boolean>;
             keepImportFile: FunctionReference<"action", { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }, string>;

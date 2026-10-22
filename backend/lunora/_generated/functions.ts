@@ -8491,7 +8491,7 @@ export interface Caller {
         };
         steps: {
             checkJobCancelled: (args: { jobId: Id<"chatImportJobs"> }) => Promise<boolean>;
-            finalizeImport: (args: { errorMessage?: string; failed?: number; imported?: number; jobId: Id<"chatImportJobs">; r2Key: string; status: "completed" | "failed"; userId: string }) => Promise<null>;
+            finalizeImport: (args: { errorMessage?: string; failed?: number; imported?: number; jobId: Id<"chatImportJobs">; r2Key: string; runId: string; status: "completed" | "failed"; userId: string }) => Promise<null>;
             importCounts: (args: { jobId: Id<"chatImportJobs"> }) => Promise<{ failed: number; imported: number; total: number }>;
             importJobExists: (args: { jobId: Id<"chatImportJobs"> }) => Promise<boolean>;
             keepImportFile: (args: { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }) => Promise<string>;

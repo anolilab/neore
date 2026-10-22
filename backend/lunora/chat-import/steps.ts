@@ -10,7 +10,7 @@ import { MAX_STORED_READ_BYTES as IMPORT_FILE_MAX_BYTES, readStoredObject, readS
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { notifyQuietly } from "../notifications/notify";
-import { CANCELLED_IMPORT_MESSAGE, hasConversationsLeft, keptImportKeyFor, RESTART_WINDOW_MS } from "./restart";
+import { CANCELLED_IMPORT_MESSAGE, hasConversationsLeft, keptImportKeyFor, RESTART_WINDOW_MS, resumeProgress } from "./restart";
 
 const BATCH_SIZE = 25;
 
@@ -64,20 +64,22 @@ export const processImportFile = internalAction
             throw new LunoraError("BAD_REQUEST", "Import file contains no conversations");
         }
 
-        // 2. Update total count (in case it differs from estimate)
-        await context.runMutation(internal.chat_import.steps.updateImportProgress, {
-            currentStep: "processing_conversations",
-            jobId: args.jobId,
-            progress: 5,
-            totalConversations: conversations.length,
-        });
-
-        // 3. Process conversations in batches. The counts already saved on the job are the
-        // conversations done by an earlier run (a step retry or a restart), so this resumes after them.
+        // 2. The counts already saved on the job are the conversations done by an earlier run
+        // (a step retry or a restart), so this resumes after them.
         const saved = await context.runQuery(internal.chat_import.steps.importCounts, { jobId: args.jobId });
         let totalImported = saved.imported;
         let totalFailed = saved.failed;
         const resumeFrom = totalImported + totalFailed;
+
+        // 3. Update total count (in case it differs from estimate), at the progress the resume point reached
+        await context.runMutation(internal.chat_import.steps.updateImportProgress, {
+            currentStep: "processing_conversations",
+            jobId: args.jobId,
+            progress: resumeProgress(resumeFrom, conversations.length),
+            totalConversations: conversations.length,
+        });
+
+        // 4. Process conversations in batches, from the resume point.
 
         for (let start = resumeFrom; start < conversations.length; start += BATCH_SIZE) {
             // Check for cancellation before each batch
@@ -122,7 +124,7 @@ export const processImportFile = internalAction
             }
 
             // Update progress (5% reserved for init, 90% for processing, 5% for cleanup)
-            const batchProgress = 5 + Math.round(((start + batch.length) / conversations.length) * 90);
+            const batchProgress = resumeProgress(start + batch.length, conversations.length);
 
             await context.runMutation(internal.chat_import.steps.updateImportProgress, {
                 currentStep: "processing_conversations",
@@ -395,6 +397,8 @@ export const finalizeImport = internalMutation
         imported: v.optional(v.number()),
         jobId: v.id("chatImportJobs"),
         r2Key: v.string().max(MAX_LENGTH.key),
+        /** The workflow instance: one per run, so a restart (a new instance) notifies again and a redelivered finalize does not. */
+        runId: v.string().max(MAX_LENGTH.id),
         status: v.union(v.literal("completed"), v.literal("failed")),
         userId: v.string().max(MAX_LENGTH.id),
     })
@@ -462,7 +466,7 @@ export const finalizeImport = internalMutation
         await notifyQuietly(context, {
             body: [`${String(imported)} conversations imported`, errorMessage].filter(Boolean).join(". "),
             // Per run: a restart reuses the job id, and its outcome must not be dropped as a duplicate of the first failure.
-            dedupeKey: `chat_import:${args.jobId}:${String(context.now)}`,
+            dedupeKey: `chat_import:${args.jobId}:${args.runId}`,
             link: "/chat",
             outcome: status === "completed" ? "success" : "failure",
             title: job.provider,

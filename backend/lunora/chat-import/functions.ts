@@ -17,7 +17,7 @@ import { isUploadId, stagingKeyFor } from "../lib/chat-upload-staging";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
-import { isRestartable } from "./restart";
+import { isRestartable, resumeProgress } from "./restart";
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -191,10 +191,12 @@ export const restartImportJob = authMutation
         }
 
         // `completedAt` and `errorMessage` go, so the reap scheduled for the failure no longer matches this job.
+        // `progress` is the resume point, not the 100 the failed run left behind.
         await patchRow(ctx.db, job, {
             completedAt: undefined,
             currentStep: "processing_conversations",
             errorMessage: undefined,
+            progress: resumeProgress(job.importedConversations + (job.failedConversations ?? 0), job.totalConversations),
             status: "processing",
         });
 

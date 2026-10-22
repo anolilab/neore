@@ -51,7 +51,7 @@ type ImportState =
     | { step: "parsing" }
     | { conversations: NormalizedConversation[]; provider: ImportProvider; skipped: string[]; step: "preview" }
     | { provider: ImportProvider; step: "uploading" }
-    | { jobId: string; provider: ImportProvider; resumed?: boolean; step: "importing" }
+    | { jobId: string; provider: ImportProvider; resumedFrom?: number | null; step: "importing" }
     | { failed: number; imported: number; provider: ImportProvider; step: "done" }
     | { jobId?: string; message: string; step: "error" };
 
@@ -78,7 +78,7 @@ const DataImport: FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [state, setState] = useState<ImportState>({ step: "idle" });
 
-    const { data: importStatus, refetch: refetchImportStatus } = useQuery(crpc.chat_import.functions.getImportStatus.queryOptions({}));
+    const { data: importStatus } = useQuery(crpc.chat_import.functions.getImportStatus.queryOptions({}));
 
     // Read the job fields as scalars: the query object is a fresh reference on every
     // poll, so depending on it directly would re-run the effects below on each tick.
@@ -88,6 +88,7 @@ const DataImport: FC = () => {
     const jobImported = importStatus?.importedConversations;
     const jobFailed = importStatus?.failedConversations;
     const jobErrorMessage = importStatus?.errorMessage;
+    const jobCompletedAt = importStatus?.completedAt;
 
     const { mutateAsync: startImportJob } = useMutation(crpc.chat_import.functions.startImportJob.mutationOptions());
     const { mutateAsync: cancelImportJob } = useMutation(crpc.chat_import.functions.cancelImportJob.mutationOptions());
@@ -113,16 +114,10 @@ const DataImport: FC = () => {
             return;
         }
 
-        // A resumed job's status can still be the cached failure until its processing push arrives; that failure must not end the resume.
-        if (state.resumed) {
-            if (jobStatus === "failed") {
-                return;
-            }
-
-            if (jobStatus === "processing") {
-                setState({ jobId: state.jobId, provider: state.provider, step: "importing" });
-                return;
-            }
+        // A resumed job can still report the failure it resumed from, until the restart's own push arrives. Restart clears
+        // completedAt and a new failure writes its own, so only a failure carrying the old value is stale.
+        if (state.resumedFrom !== undefined && jobStatus === "failed" && jobCompletedAt === state.resumedFrom) {
+            return;
         }
 
         if (jobStatus === "completed") {
@@ -148,7 +143,7 @@ const DataImport: FC = () => {
                 step: "error",
             });
         }
-    }, [state, jobStatus, jobImported, jobFailed, jobErrorMessage, activeJobId, t]);
+    }, [state, jobStatus, jobImported, jobFailed, jobErrorMessage, jobCompletedAt, activeJobId, t]);
 
     const handleFileSelect = useCallback(
         async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -307,14 +302,14 @@ const DataImport: FC = () => {
         }
 
         try {
+            const resumedFrom = jobCompletedAt ?? null;
+
             await restartImportJob({ jobId: activeJobId });
-            // The watcher reads the job's status on every render, and the cached one still says "failed" until it is refetched.
-            await refetchImportStatus();
-            setState({ jobId: activeJobId, provider: (jobProvider as ImportProvider) || "chatgpt", resumed: true, step: "importing" });
+            setState({ jobId: activeJobId, provider: (jobProvider as ImportProvider) || "chatgpt", resumedFrom, step: "importing" });
         } catch (error) {
             setState({ message: describeError(error, i18n), step: "error" });
         }
-    }, [activeJobId, jobProvider, restartImportJob, refetchImportStatus, i18n]);
+    }, [activeJobId, jobCompletedAt, jobProvider, restartImportJob, i18n]);
 
     const handleReset = useCallback(() => {
         setState({ step: "idle" });

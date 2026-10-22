@@ -90,7 +90,15 @@ describe("restartImportJob", () => {
         const harness = lunoraTest(schema as never);
         const jobId = await insertJob(harness);
 
-        await insertJob(harness, { createdAt: FAILED_AT, completedAt: FAILED_AT, errorMessage: undefined, failedConversations: 0, importedConversations: 5, r2Key: "", status: "completed" });
+        await insertJob(harness, {
+            completedAt: FAILED_AT,
+            createdAt: FAILED_AT,
+            errorMessage: undefined,
+            failedConversations: 0,
+            importedConversations: 5,
+            r2Key: "",
+            status: "completed",
+        });
 
         await expect(harness.withIdentity({ userId: OWNER }).mutation(restartImportJob as never, { jobId } as never)).rejects.toThrow(
             "Only the most recent import",
@@ -109,6 +117,8 @@ describe("restartImportJob", () => {
         expect(job.completedAt).toBeUndefined();
         expect(job.errorMessage).toBeUndefined();
         expect(job.r2Key).toBe(KEPT);
+        // 3 imported and 1 failed of 5: the bar resumes at 77%, not at the 100% the failed run left.
+        expect(job.progress).toBe(77);
     });
 });
 
@@ -178,10 +188,19 @@ describe("processConversationBatch", () => {
 
 describe("finalizeImport", () => {
     const finalize = (harness: ReturnType<typeof lunoraTest>, jobId: unknown, args: Record<string, unknown>) =>
-        harness.run(async (ctx: any) => await ctx.runMutation(finalizeImport, { jobId, r2Key: "uploads/owner/staged", userId: OWNER, ...args }));
+        harness.run(
+            async (ctx: any) => await ctx.runMutation(finalizeImport, { jobId, r2Key: "uploads/owner/staged", runId: "run-1", userId: OWNER, ...args }),
+        );
 
     const insertProcessing = (harness: ReturnType<typeof lunoraTest>) =>
-        insertJob(harness, { completedAt: undefined, errorMessage: undefined, failedConversations: 0, importedConversations: 0, r2Key: "", status: "processing" });
+        insertJob(harness, {
+            completedAt: undefined,
+            errorMessage: undefined,
+            failedConversations: 0,
+            importedConversations: 0,
+            r2Key: "",
+            status: "processing",
+        });
 
     it("keeps the copy of a failure that committed conversations, under its key", async () => {
         const harness = lunoraTest(schema as never);
@@ -201,7 +220,24 @@ describe("finalizeImport", () => {
 
         await finalize(harness, jobId, { errorMessage: "Import file contains no conversations", status: "failed" });
 
-        expect((await harness.run(async (ctx: any) => await ctx.db.get(jobId))).r2Key).toBe("");
+        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+
+        expect(job.r2Key).toBe("");
+    });
+
+    it("notifies once per run: a redelivered finalize reuses its run id, a restart is a new run", async () => {
+        const harness = lunoraTest(schema as never);
+        const jobId = await insertProcessing(harness);
+        const failure = { errorMessage: "boom", status: "failed" };
+
+        await finalize(harness, jobId, { ...failure, runId: "run-1" });
+        await finalize(harness, jobId, { ...failure, runId: "run-1" });
+        await finalize(harness, jobId, { ...failure, runId: "run-2" });
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect());
+        const keys = rows.map((row: any) => row.dedupeKey);
+
+        expect(keys).toEqual([`chat_import:${jobId}:run-1`, `chat_import:${jobId}:run-2`]);
     });
 
     it("keeps no copy of a completed import", async () => {
@@ -218,7 +254,14 @@ describe("finalizeImport", () => {
 
     it("keeps the cancel marker and keeps no copy when the run reports a failure after a cancel", async () => {
         const harness = lunoraTest(schema as never);
-        const jobId = await insertJob(harness, { completedAt: FAILED_AT, errorMessage: CANCELLED_IMPORT_MESSAGE, failedConversations: 2, importedConversations: 3, r2Key: "", status: "failed" });
+        const jobId = await insertJob(harness, {
+            completedAt: FAILED_AT,
+            errorMessage: CANCELLED_IMPORT_MESSAGE,
+            failedConversations: 2,
+            importedConversations: 3,
+            r2Key: "",
+            status: "failed",
+        });
 
         await finalize(harness, jobId, { errorMessage: "2 conversations failed to import", failed: 2, imported: 3, status: "failed" });
 
@@ -230,7 +273,14 @@ describe("finalizeImport", () => {
 
     it("leaves the committed counts alone when the run reports none", async () => {
         const harness = lunoraTest(schema as never);
-        const jobId = await insertJob(harness, { completedAt: undefined, errorMessage: undefined, failedConversations: 1, importedConversations: 2, r2Key: "", status: "processing" });
+        const jobId = await insertJob(harness, {
+            completedAt: undefined,
+            errorMessage: undefined,
+            failedConversations: 1,
+            importedConversations: 2,
+            r2Key: "",
+            status: "processing",
+        });
 
         await finalize(harness, jobId, { errorMessage: "boom", status: "failed" });
 

@@ -51,8 +51,7 @@ export const chatImportWorkflowConfig: WorkflowConfig<ImportParams, void> = {
 
             const result = (await context.step.do(
                 "process-import-file",
-                async () =>
-                    await context.run(internal.chat_import.steps.processImportFile, { jobId, provider, r2Key: keptKey, totalConversations, userId }),
+                async () => await context.run(internal.chat_import.steps.processImportFile, { jobId, provider, r2Key: keptKey, totalConversations, userId }),
             )) as { failed: number; imported: number };
 
             imported = result.imported;
@@ -80,6 +79,7 @@ export const chatImportWorkflowConfig: WorkflowConfig<ImportParams, void> = {
                     imported,
                     jobId,
                     r2Key,
+                    runId: workflowContext.event.instanceId,
                     status: isFailedRun ? "failed" : "completed",
                     userId,
                 }),
