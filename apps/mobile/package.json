@@ -5,11 +5,13 @@
     "main": "expo-router/entry",
     "scripts": {
         "android": "expo run:android",
+        "build": "expo export --platform ios --platform android --output-dir dist",
         "ios": "expo run:ios",
-        "lint": "eslint .",
+        "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
+        "lint:types": "tsc --noEmit",
         "start": "expo start",
         "test": "vitest run",
-        "typecheck": "tsc --noEmit"
+        "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary"
     },
     "dependencies": {
         "@expo/metro-runtime": "~58.0.14",

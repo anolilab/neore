@@ -3,22 +3,13 @@
     "compilerOptions": {
         "moduleResolution": "bundler",
         "paths": {
-            "@/*": [
-                "./src/*"
-            ]
+            "@/*": ["./src/*"]
         },
+        "types": ["expo/types", "node"],
         "allowImportingTsExtensions": true,
         "strict": true,
         "noImplicitOverride": true,
-        "noUncheckedIndexedAccess": true,
-        "types": [
-            "expo/types",
-            "node"
-        ]
+        "noUncheckedIndexedAccess": true
     },
-    "include": [
-        "**/*.ts",
-        "**/*.tsx",
-        "expo-env.d.ts"
-    ]
+    "include": ["**/*.ts", "**/*.tsx", "expo-env.d.ts"]
 }

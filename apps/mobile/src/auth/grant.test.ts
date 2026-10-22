@@ -3,15 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import type { Fetch, GrantStore, StoredGrant } from "./grant";
-import {
-    buildAuthorizeUrl,
-    createPkce,
-    exchangeGrant,
-    fetchAccessToken,
-    parseAuthorizeResponse,
-    SignInError,
-    signOutGrant,
-} from "./grant";
+import { buildAuthorizeUrl, createPkce, exchangeGrant, fetchAccessToken, parseAuthorizeResponse, SignInError, signOutGrant, toBase64Url } from "./grant";
 
 const REDIRECT = "neore-mobile://auth/callback";
 const LUNORA = "https://backend.example";
@@ -43,12 +35,18 @@ describe("PKCE", () => {
         });
 
         expect(pkce.verifier).toHaveLength(43);
-        const challenge = createHash("sha256").update(pkce.verifier).digest("base64").replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+        const challenge = toBase64Url(createHash("sha256").update(pkce.verifier).digest("base64"));
 
         expect(challenge).toHaveLength(43);
 
         const fixed = await createPkce({
-            digestBase64: async (input) => input === verifier ? "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw+cM=" : "x",
+            digestBase64: async (input) => {
+                if (input === verifier) {
+                    return "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw+cM=";
+                }
+
+                return "x";
+            },
             randomBytes: () => Buffer.from(verifier, "base64url").subarray(0, 32),
         });
 
@@ -78,7 +76,7 @@ describe("parseAuthorizeResponse", () => {
     });
 
     it("treats a missing URL as a cancelled sign-in", () => {
-        expect(() => parseAuthorizeResponse(null, input)).toThrow("cancelled");
+        expect(() => parseAuthorizeResponse(undefined, input)).toThrow("cancelled");
     });
 });
 
@@ -161,7 +159,6 @@ describe("grant storage", () => {
     });
 });
 
-// Keep randomBytes import used for a real-random smoke check.
 describe("randomness", () => {
     it("produces distinct states", async () => {
         const dependencies = {

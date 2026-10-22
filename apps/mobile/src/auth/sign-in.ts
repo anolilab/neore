@@ -24,11 +24,11 @@ export const signInWithBrowser = async (input: { appUrl: string; lunoraUrl: stri
 
     const result = await openAuthSessionAsync(buildAuthorizeUrl({ appUrl: input.appUrl, challenge, redirectUri, state }), redirectUri);
 
-    const code = parseAuthorizeResponse(result.type === "success" ? result.url : null, { redirectUri, state });
+    const code = parseAuthorizeResponse(result.type === "success" ? result.url : undefined, { redirectUri, state });
 
     return await exchangeGrant({
         code,
-        fetch: (url, init) => fetch(url, init),
+        fetch,
         lunoraUrl: input.lunoraUrl,
         redirectUri,
         store: secureGrantStore,

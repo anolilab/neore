@@ -12,6 +12,7 @@ export const secureGrantStore: GrantStore = {
     get: async () => {
         const raw = await getItemAsync(KEY);
 
+        // eslint-disable-next-line unicorn/no-null -- `GrantStore.get` answers null when signed out; the callers compare with null
         return raw === null ? null : (JSON.parse(raw) as StoredGrant);
     },
     set: async (grant) => {

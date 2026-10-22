@@ -19,6 +19,7 @@ let client: LunoraClient | undefined;
 
 /** Created on first use, so a missing env var surfaces in the layout, not at import time. */
 export const getClient = (): LunoraClient => {
+    // eslint-disable-next-line unicorn/no-top-level-assignment-in-function -- the lazy singleton is the point: the first call reads the config
     client ??= createAppClient(loadConfig().lunoraUrl);
 
     return client;

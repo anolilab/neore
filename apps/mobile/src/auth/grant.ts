@@ -6,6 +6,8 @@
  * vitest in node. The Expo glue lives in sign-in.ts and secure-store.ts.
  */
 
+import { trimTrailing } from "../lib/trim-trailing";
+
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 /** Only what the app keeps at rest: the long-lived session token, never the JWT. */
@@ -36,7 +38,7 @@ export class SignInError extends Error {
 }
 
 /** Standard base64 -> base64url without padding (RFC 7636 section 3). */
-export const toBase64Url = (base64: string): string => base64.replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+export const toBase64Url = (base64: string): string => trimTrailing(base64.replaceAll("+", "-").replaceAll("/", "_"), "=");
 
 const bytesToBase64 = (bytes: Uint8Array): string => {
     let binary = "";
@@ -48,7 +50,7 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
     return btoa(binary);
 };
 
-export interface PkceDeps {
+export interface PkceDependencies {
     /** SHA-256 of a UTF-8 string, base64 encoded (expo-crypto `digestStringAsync` with Base64). */
     digestBase64: (input: string) => Promise<string>;
     randomBytes: (count: number) => Uint8Array;
@@ -61,7 +63,7 @@ export interface PkcePair {
 }
 
 /** 32 random bytes -> 43-character verifier, S256 challenge, and an unguessable state. */
-export const createPkce = async ({ digestBase64, randomBytes }: PkceDeps): Promise<PkcePair> => {
+export const createPkce = async ({ digestBase64, randomBytes }: PkceDependencies): Promise<PkcePair> => {
     const verifier = toBase64Url(bytesToBase64(randomBytes(32)));
     const challenge = toBase64Url(await digestBase64(verifier));
     const state = toBase64Url(bytesToBase64(randomBytes(16)));
@@ -79,7 +81,7 @@ const encodeQuery = (params: Record<string, string>): string =>
  * concatenation: RN's URL polyfill is not something to trust with query strings.
  */
 export const buildAuthorizeUrl = (input: { appUrl: string; challenge: string; redirectUri: string; state: string }): string =>
-    `${input.appUrl.replace(/\/+$/, "")}/auth/extension?${encodeQuery({
+    `${trimTrailing(input.appUrl, "/")}/auth/extension?${encodeQuery({
         code_challenge: input.challenge,
         redirect_uri: input.redirectUri,
         state: input.state,
@@ -109,7 +111,7 @@ const parseQuery = (query: string): Record<string, string> => {
  * scheme such as `neore-mobile:` the origin is "null", so an origin comparison
  * would reject every real callback.
  */
-export const parseAuthorizeResponse = (responseUrl: string | null | undefined, input: { redirectUri: string; state: string }): string => {
+export const parseAuthorizeResponse = (responseUrl: string | undefined, input: { redirectUri: string; state: string }): string => {
     if (!responseUrl) {
         throw new SignInError("Sign-in was cancelled.");
     }
@@ -200,6 +202,7 @@ export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string;
     const grant = await input.store.get();
 
     if (!grant) {
+        // eslint-disable-next-line unicorn/no-null -- a signed-out result is null by contract; auth-context compares with null
         return null;
     }
 
@@ -214,6 +217,7 @@ export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string;
     if (response.status === 401) {
         await input.store.clear();
 
+        // eslint-disable-next-line unicorn/no-null -- a signed-out result is null by contract; auth-context compares with null
         return null;
     }
 
