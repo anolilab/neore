@@ -100,7 +100,7 @@ export const selectModel = async (
             const healthy = await healthService.isHealthy(preferred.provider, preferred.modelApiId);
 
             if (healthy) {
-                const pricing = pricingService ? await pricingService.getPricing(preferred.modelApiId) : null;
+                const pricing = pricingService ? await pricingService.getPricing(preferred.modelApiId, preferred.provider) : null;
 
                 return {
                     confidence: 0.95,
@@ -173,7 +173,7 @@ export const selectModel = async (
     }
 
     const alternative = scored[1];
-    const pricing = pricingService ? await pricingService.getPricing(best.candidate.modelApiId) : null;
+    const pricing = pricingService ? await pricingService.getPricing(best.candidate.modelApiId, best.candidate.provider) : null;
 
     return {
         alternativeModelId: alternative?.candidate.modelId,

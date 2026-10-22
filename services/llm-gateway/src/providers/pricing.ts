@@ -117,11 +117,16 @@ const stripTrailingSeparators = (value: string): string => {
     return value.slice(0, end);
 };
 
-/** Maps a models.dev model to our pricing, or `null` when it carries no usable price. */
-const toPricing = (model: ModelsDevelopmentModel | undefined): ModelPricing | null => {
+/**
+ * Maps a models.dev model to our pricing, or `null` when it carries no usable price. `isFreeAllowed` admits an
+ * explicit zero price: the hinted provider's own free tier. Fallback tiers never admit it, because resellers
+ * list placeholder zeros that must not win a bare-id lookup.
+ */
+const toPricing = (model: ModelsDevelopmentModel | undefined, isFreeAllowed = false): ModelPricing | null => {
     const cost = model?.cost;
+    const isPriced = isFreeAllowed ? cost?.input !== undefined || cost?.output !== undefined : Boolean(cost?.input || cost?.output);
 
-    if (!cost || (!cost.input && !cost.output)) {
+    if (!cost || !isPriced) {
         return null;
     }
 
@@ -135,9 +140,9 @@ const toPricing = (model: ModelsDevelopmentModel | undefined): ModelPricing | nu
 };
 
 /** The first model in `models` that carries a usable price, mapped. */
-const firstPriced = (models: (ModelsDevelopmentModel | undefined)[]): ModelPricing | null => {
+const firstPriced = (models: (ModelsDevelopmentModel | undefined)[], isFreeAllowed = false): ModelPricing | null => {
     for (const model of models) {
-        const pricing = toPricing(model);
+        const pricing = toPricing(model, isFreeAllowed);
 
         if (pricing) {
             return pricing;
@@ -177,7 +182,10 @@ export const extractPricing = (data: ModelsDevelopmentData, modelApiId: string, 
     const providers = Object.values(data);
 
     return (
-        firstPriced(hints.flatMap((hint) => candidates.map((candidate) => data[hint]?.models?.[candidate]))) ??
+        firstPriced(
+            hints.flatMap((hint) => candidates.map((candidate) => data[hint]?.models?.[candidate])),
+            true,
+        ) ??
         firstPriced(candidates.flatMap((candidate) => providers.map((provider) => provider.models?.[candidate]))) ??
         // Suffix match (e.g. "llama-4-scout" -> "meta-llama/llama-4-scout").
         firstPriced(

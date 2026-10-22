@@ -136,6 +136,21 @@ describe("extractPricing (provider-keyed models.dev document)", () => {
         expect(extractPricing(fixture, "gpt-5-mini", "openai")).toMatchObject({ inputPerMillion: 0.25, outputPerMillion: 2 });
     });
 
+    describe("two providers list one model id at different prices", () => {
+        const twoProviders = {
+            freeHost: { models: { "shared-model": { cost: { input: 0, output: 0 } } } },
+            paidHost: { models: { "shared-model": { cost: { input: 4, output: 8 } } } },
+        } as unknown as ModelsDevelopmentData;
+
+        it("bills the hinted provider's explicit free price, not another provider's paid one", () => {
+            expect(extractPricing(twoProviders, "shared-model", "freeHost")).toMatchObject({ inputPerMillion: 0, outputPerMillion: 0 });
+        });
+
+        it("never takes a zero price from a provider the hint did not name", () => {
+            expect(extractPricing(twoProviders, "shared-model")).toMatchObject({ inputPerMillion: 4, outputPerMillion: 8 });
+        });
+    });
+
     it("falls through an unknown provider hint", () => {
         expect(extractPricing(fixture, "gpt-5", "custom")).toMatchObject({ inputPerMillion: 1.25, outputPerMillion: 10 });
     });
