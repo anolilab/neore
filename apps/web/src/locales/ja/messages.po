@@ -38,7 +38,7 @@ msgid ", unread"
 msgstr "、未読"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "...and {0} more"
 msgstr "…他 {0} 件"
 
@@ -89,7 +89,7 @@ msgstr "現在の Azure OpenAI API には \"v1\" を指定します。2024-10-21
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "（{0} / {MAX_PARTICIPANTS}、最低 {MIN_PARTICIPANTS}）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:406
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 件失敗）"
 
@@ -214,7 +214,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 人のメンバー}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:352
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, other {# 件のメッセージ}}"
 
@@ -379,18 +379,18 @@ msgid "{0} chunks"
 msgstr "{0} チャンク"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:420
 msgid "{0} conversations failed to import"
 msgstr "{0} 件の会話をインポートできませんでした"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:342
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:359
 msgid "{0} conversations found"
 msgstr "{0} 件の会話が見つかりました"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:419
 msgid "{0} conversations imported from {1}"
 msgstr "{1} から {0} 件の会話をインポートしました"
 
@@ -497,7 +497,7 @@ msgstr "{1} 件中 {0} 件のケースが完了"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:404
 msgid "{0} of {1} conversations imported"
 msgstr "{1} 件中 {0} 件の会話をインポートしました"
 
@@ -815,7 +815,7 @@ msgstr "{itemCount, plural, other {# 個の項目}}"
 #. placeholder {0}: ids.length
 #: src/components/model-picker/model-picker.tsx:910
 msgid "{label} moved to position {position} of {0} in starred"
-msgstr "{label} をスター内の {position}/{0} 番目に移動しました"
+msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
@@ -3356,7 +3356,7 @@ msgstr "添付ファイル（非表示）"
 
 #: src/features/chat/thread/thread-minimap.tsx:73
 msgid "Attachment only"
-msgstr "添付のみ"
+msgstr ""
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:70
 msgid "Attachments:"
@@ -4577,7 +4577,7 @@ msgstr "カナダ"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:364
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4601,7 +4601,7 @@ msgstr "ディープワークをキャンセル"
 msgid "Cancel Export"
 msgstr "エクスポートをキャンセル"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:392
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:409
 msgid "Cancel Import"
 msgstr "インポートをキャンセル"
 
@@ -6967,7 +6967,7 @@ msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:913
 msgid "Could not save the new order for {label}"
-msgstr "{label} の新しい順序を保存できませんでした"
+msgstr ""
 
 #: src/features/pages/components/page-view.tsx:160
 #: src/features/pages/components/page-view.tsx:248
@@ -8501,7 +8501,7 @@ msgid "Details for case {0}"
 msgstr "ケース {0} の詳細"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:341
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:358
 msgid "Detected: {0}"
 msgstr "検出：{0}"
 
@@ -11194,7 +11194,7 @@ msgstr "スレッドを移動できませんでした"
 msgid "Failed to optimize prompt"
 msgstr "プロンプトを最適化できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:239
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:249
 msgid "Failed to parse file"
 msgstr "ファイルを解析できませんでした"
 
@@ -11379,7 +11379,7 @@ msgstr "確認メールを送信できませんでした"
 msgid "Failed to start impersonation"
 msgstr "なりすましを開始できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:274
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
 msgid "Failed to start import"
 msgstr "インポートを開始できませんでした"
 
@@ -14342,11 +14342,11 @@ msgstr "なりすましを終了"
 msgid "Import"
 msgstr "インポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:379
 msgid "Import All"
 msgstr "すべてインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:285
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:295
 msgid "Import cancelled"
 msgstr "インポートをキャンセルしました"
 
@@ -14354,15 +14354,15 @@ msgstr "インポートをキャンセルしました"
 msgid "Import cases"
 msgstr "ケースをインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:401
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:418
 msgid "Import complete!"
 msgstr "インポートが完了しました！"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:316
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:333
 msgid "Import Conversations"
 msgstr "会話をインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:315
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:332
 msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
 
@@ -14374,12 +14374,12 @@ msgstr ""
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "ChatGPT、Google Gemini、Claude から会話をインポートします。エクスポートした JSON または ZIP ファイルをアップロードしてください。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:134
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:415
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:144
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:432
 msgid "Import failed"
 msgstr "インポートに失敗しました"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:406
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
 msgstr "さらにインポート"
 
@@ -14387,7 +14387,7 @@ msgstr "さらにインポート"
 msgid "Import Notion export (.zip)"
 msgstr "Notion のエクスポートをインポート（.zip）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:212
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr ""
 
@@ -14438,7 +14438,7 @@ msgid "Imported skill \"{0}\""
 msgstr "スキル「{0}」をインポートしました"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:379
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:396
 msgid "Importing from {0}..."
 msgstr "{0} からインポートしています..."
 
@@ -15108,11 +15108,11 @@ msgstr "ジャッジ：{0}"
 
 #: src/features/chat/thread/thread-minimap.tsx:95
 msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
-msgstr "プロンプト {promptNumber} へ移動（前のプロンプトから {gap} 後）: {preview}"
+msgstr ""
 
 #: src/features/chat/thread/thread-minimap.tsx:96
 msgid "Jump to prompt {promptNumber}: {preview}"
-msgstr "プロンプト {promptNumber} へ移動: {preview}"
+msgstr ""
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
 #: src/features/chat/pins/pin-item.tsx:40
@@ -15434,7 +15434,7 @@ msgstr "最後のフレーム"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:440
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:461
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "前回のインポート：{2} に {1} から {0} 件の会話"
 
@@ -17556,11 +17556,11 @@ msgstr "{0} を上へ移動"
 
 #: src/components/model-picker/model-picker.tsx:372
 msgid "Move {label} down in starred"
-msgstr "{label} をスター内で下へ移動"
+msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:357
 msgid "Move {label} up in starred"
-msgstr "{label} をスター内で上へ移動"
+msgstr ""
 
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
@@ -18441,7 +18441,7 @@ msgstr "コンテンツなし"
 msgid "No content to display"
 msgstr "表示するコンテンツがありません"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:221
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:231
 msgid "No conversations found in the file."
 msgstr "ファイル内に会話が見つかりませんでした。"
 
@@ -20363,7 +20363,7 @@ msgstr "並列比較"
 msgid "Paris"
 msgstr "パリ"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:352
 msgid "Parsing file..."
 msgstr "ファイルを解析しています..."
 
@@ -20573,7 +20573,7 @@ msgstr "使った分だけ<0>お支払い。</0>"
 #: src/features/auth/components/organization/billing-settings-card.tsx:223
 #: src/features/billing/components/personal-plan-card.tsx:52
 msgid "Pay yearly"
-msgstr ""
+msgstr "年額で支払う"
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:210
 msgid "Payments, orders, invoices, and subscriptions via PayPal"
@@ -21457,8 +21457,6 @@ msgstr "デフォルトでプライベート"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
 #: src/components/model-picker/model-picker.tsx:313
-#: src/features/billing/components/personal-plan-card.tsx:23
-#: src/components/model-picker/model-picker.tsx:268
 #: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
@@ -21761,7 +21759,7 @@ msgstr "プロンプト"
 
 #: src/features/chat/thread/thread-minimap.tsx:68
 msgid "Prompts in this conversation"
-msgstr "この会話のプロンプト"
+msgstr ""
 
 #: src/features/settings/components/privacy/data-access.tsx:55
 msgid "Prompts:"
@@ -23224,10 +23222,10 @@ msgstr "結果"
 msgid "Resume"
 msgstr "再開"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:419
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:432
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:438
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:453
 msgid "Resume import"
-msgstr "インポートを再開"
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:470
 msgid "Resume your latest chat"
@@ -24294,7 +24292,7 @@ msgstr "音声入力の言語を選択"
 msgid "Select duration"
 msgstr "期間を選択"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
 msgid "Select File"
 msgstr "ファイルを選択"
 
@@ -25180,7 +25178,7 @@ msgid "Skipped"
 msgstr "スキップ済み"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
 msgid "Skipped files that are not chat exports: {0}"
 msgstr ""
 
@@ -25889,7 +25887,7 @@ msgstr "開始中"
 msgid "Starting {0}…"
 msgstr "{0} を開始しています…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:388
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:405
 msgid "Starting import..."
 msgstr "インポートを開始しています..."
 
@@ -26445,7 +26443,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "成功基準は {CRITERIA_MAX} 文字以内で入力してください"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:130
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:139
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "{0} から {imported} 件の会話をインポートしました"
 
@@ -26530,7 +26528,7 @@ msgstr "複数ファイルにまたがる優れたコード生成とリファク
 msgid "Superior understanding of complex visual concepts"
 msgstr "複雑な視覚的コンセプトへの優れた理解"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:343
 msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
 msgstr ""
 
@@ -27946,7 +27944,7 @@ msgstr "コンピューターからモデルファイルを削除します。後
 msgid "This run is no longer available."
 msgstr "この実行は利用できなくなりました。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:227
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr ""
 
@@ -28687,7 +28685,7 @@ msgstr "再試行"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:421
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "もう一度試す"
 
@@ -29323,7 +29321,7 @@ msgstr "組織を Team にアップグレード"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:211
 msgid "Upgrade organization to Team, monthly"
-msgstr ""
+msgstr "組織を Team にアップグレード（月額）"
 
 #: src/features/billing/components/personal-plan-card.tsx:63
 #: src/features/layout/components/nav-user.tsx:255
@@ -29332,7 +29330,7 @@ msgstr "Pro にアップグレード"
 
 #: src/features/billing/components/personal-plan-card.tsx:63
 msgid "Upgrade to Pro, monthly"
-msgstr ""
+msgstr "Pro にアップグレード（月額）"
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:472
 #: src/features/auth/components/organization/create-organization-dialog.tsx:255
@@ -29441,7 +29439,7 @@ msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} をアップロードしています"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
 msgid "Uploading data for import from {0}..."
 msgstr "{0} からのインポート用データをアップロードしています..."
 
@@ -31348,9 +31346,9 @@ msgstr "ナレッジベースが上限に達しました。{failed} 件のドキ
 msgid "Your knowledge base is full. Remove files to add more."
 msgstr "ナレッジベースが上限に達しました。追加するにはファイルを削除してください。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:430
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:451
 msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
-msgstr "前回のインポートは完了する前に停止しました。再開すると、残りの会話をインポートします。"
+msgstr ""
 
 #: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "Your latest changes are not saved yet."

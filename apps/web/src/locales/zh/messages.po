@@ -38,7 +38,7 @@ msgid ", unread"
 msgstr "，未读"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "...and {0} more"
 msgstr "……还有 {0} 个"
 
@@ -89,7 +89,7 @@ msgstr "当前的 Azure OpenAI API 请使用 \"v1\"。带日期的版本（如 2
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "（{0}/{MAX_PARTICIPANTS}，至少 {MIN_PARTICIPANTS} 个）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:406
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 个失败）"
 
@@ -214,7 +214,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 名成员}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:352
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, other {# 条消息}}"
 
@@ -379,18 +379,18 @@ msgid "{0} chunks"
 msgstr "{0} 个分块"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:420
 msgid "{0} conversations failed to import"
 msgstr "{0} 个对话导入失败"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:342
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:359
 msgid "{0} conversations found"
 msgstr "找到 {0} 个对话"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:419
 msgid "{0} conversations imported from {1}"
 msgstr "已从 {1} 导入 {0} 个对话"
 
@@ -497,7 +497,7 @@ msgstr "已完成 {0}/{1} 个用例"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:404
 msgid "{0} of {1} conversations imported"
 msgstr "已导入 {0}/{1} 个对话"
 
@@ -815,7 +815,7 @@ msgstr "{itemCount, plural, other {# 项}}"
 #. placeholder {0}: ids.length
 #: src/components/model-picker/model-picker.tsx:910
 msgid "{label} moved to position {position} of {0} in starred"
-msgstr "{label}已移至星标中的第{position}位（共{0}位）"
+msgstr ""
 
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
@@ -3356,7 +3356,7 @@ msgstr "附件（已隐藏）"
 
 #: src/features/chat/thread/thread-minimap.tsx:73
 msgid "Attachment only"
-msgstr "仅附件"
+msgstr ""
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:70
 msgid "Attachments:"
@@ -4577,7 +4577,7 @@ msgstr "加拿大"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:364
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4601,7 +4601,7 @@ msgstr "取消深度工作"
 msgid "Cancel Export"
 msgstr "取消导出"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:392
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:409
 msgid "Cancel Import"
 msgstr "取消导入"
 
@@ -6967,7 +6967,7 @@ msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:913
 msgid "Could not save the new order for {label}"
-msgstr "无法保存{label}的新顺序"
+msgstr ""
 
 #: src/features/pages/components/page-view.tsx:160
 #: src/features/pages/components/page-view.tsx:248
@@ -8501,7 +8501,7 @@ msgid "Details for case {0}"
 msgstr "用例 {0} 的详情"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:341
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:358
 msgid "Detected: {0}"
 msgstr "检测到：{0}"
 
@@ -11194,7 +11194,7 @@ msgstr "移动对话失败"
 msgid "Failed to optimize prompt"
 msgstr "优化提示词失败"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:239
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:249
 msgid "Failed to parse file"
 msgstr "解析文件失败"
 
@@ -11379,7 +11379,7 @@ msgstr "发送验证邮件失败"
 msgid "Failed to start impersonation"
 msgstr "开始模拟登录失败"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:274
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
 msgid "Failed to start import"
 msgstr "开始导入失败"
 
@@ -14342,11 +14342,11 @@ msgstr "已停止模拟登录"
 msgid "Import"
 msgstr "导入"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:379
 msgid "Import All"
 msgstr "全部导入"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:285
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:295
 msgid "Import cancelled"
 msgstr "导入已取消"
 
@@ -14354,15 +14354,15 @@ msgstr "导入已取消"
 msgid "Import cases"
 msgstr "导入用例"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:401
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:418
 msgid "Import complete!"
 msgstr "导入完成！"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:316
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:333
 msgid "Import Conversations"
 msgstr "导入对话"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:315
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:332
 msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
 
@@ -14374,12 +14374,12 @@ msgstr ""
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "从 ChatGPT、Google Gemini 或 Claude 导入对话。上传你导出的 JSON 或 ZIP 文件。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:134
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:415
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:144
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:432
 msgid "Import failed"
 msgstr "导入失败"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:406
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
 msgstr "继续导入"
 
@@ -14387,7 +14387,7 @@ msgstr "继续导入"
 msgid "Import Notion export (.zip)"
 msgstr "导入 Notion 导出文件（.zip）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:212
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr ""
 
@@ -14438,7 +14438,7 @@ msgid "Imported skill \"{0}\""
 msgstr "已导入技能“{0}”"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:379
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:396
 msgid "Importing from {0}..."
 msgstr "正在从 {0} 导入..."
 
@@ -15108,11 +15108,11 @@ msgstr "评委：{0}"
 
 #: src/features/chat/thread/thread-minimap.tsx:95
 msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
-msgstr "跳转到提示 {promptNumber}，距上一条 {gap}：{preview}"
+msgstr ""
 
 #: src/features/chat/thread/thread-minimap.tsx:96
 msgid "Jump to prompt {promptNumber}: {preview}"
-msgstr "跳转到提示 {promptNumber}：{preview}"
+msgstr ""
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
 #: src/features/chat/pins/pin-item.tsx:40
@@ -15434,7 +15434,7 @@ msgstr "最后一帧"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:440
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:461
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "上次导入：{2} 从 {1} 导入了 {0} 个对话"
 
@@ -17556,11 +17556,11 @@ msgstr "上移 {0}"
 
 #: src/components/model-picker/model-picker.tsx:372
 msgid "Move {label} down in starred"
-msgstr "将{label}在星标中下移"
+msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:357
 msgid "Move {label} up in starred"
-msgstr "将{label}在星标中上移"
+msgstr ""
 
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
@@ -18441,7 +18441,7 @@ msgstr "无内容"
 msgid "No content to display"
 msgstr "无可显示的内容"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:221
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:231
 msgid "No conversations found in the file."
 msgstr "文件中未找到对话。"
 
@@ -20363,7 +20363,7 @@ msgstr "并行对比"
 msgid "Paris"
 msgstr "巴黎"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:352
 msgid "Parsing file..."
 msgstr "正在解析文件..."
 
@@ -20573,7 +20573,7 @@ msgstr "按实际<0>用量付费。</0>"
 #: src/features/auth/components/organization/billing-settings-card.tsx:223
 #: src/features/billing/components/personal-plan-card.tsx:52
 msgid "Pay yearly"
-msgstr ""
+msgstr "按年付款"
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:210
 msgid "Payments, orders, invoices, and subscriptions via PayPal"
@@ -21457,8 +21457,6 @@ msgstr "默认私密"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
 #: src/components/model-picker/model-picker.tsx:313
-#: src/features/billing/components/personal-plan-card.tsx:23
-#: src/components/model-picker/model-picker.tsx:268
 #: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
@@ -21761,7 +21759,7 @@ msgstr "提示词"
 
 #: src/features/chat/thread/thread-minimap.tsx:68
 msgid "Prompts in this conversation"
-msgstr "本对话中的提示"
+msgstr ""
 
 #: src/features/settings/components/privacy/data-access.tsx:55
 msgid "Prompts:"
@@ -23224,10 +23222,10 @@ msgstr "结果"
 msgid "Resume"
 msgstr "恢复"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:419
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:432
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:438
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:453
 msgid "Resume import"
-msgstr "继续导入"
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:470
 msgid "Resume your latest chat"
@@ -24294,7 +24292,7 @@ msgstr "选择听写语言"
 msgid "Select duration"
 msgstr "选择时长"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
 msgid "Select File"
 msgstr "选择文件"
 
@@ -25180,7 +25178,7 @@ msgid "Skipped"
 msgstr "已跳过"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
 msgid "Skipped files that are not chat exports: {0}"
 msgstr ""
 
@@ -25889,7 +25887,7 @@ msgstr "正在启动"
 msgid "Starting {0}…"
 msgstr "正在开始拉取 {0}…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:388
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:405
 msgid "Starting import..."
 msgstr "正在开始导入..."
 
@@ -26445,7 +26443,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "成功标准不能超过 {CRITERIA_MAX} 个字符"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:130
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:139
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "已成功从 {0} 导入 {imported} 个对话"
 
@@ -26530,7 +26528,7 @@ msgstr "出众的多文件代码生成与重构"
 msgid "Superior understanding of complex visual concepts"
 msgstr "对复杂视觉概念的理解出众"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:343
 msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
 msgstr ""
 
@@ -27946,7 +27944,7 @@ msgstr "这会从你的电脑中删除模型文件。你以后可以重新拉取
 msgid "This run is no longer available."
 msgstr "此运行已不可用。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:227
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr ""
 
@@ -28687,7 +28685,7 @@ msgstr "重试"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:421
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "重试"
 
@@ -29323,7 +29321,7 @@ msgstr "将组织升级到 Team"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:211
 msgid "Upgrade organization to Team, monthly"
-msgstr ""
+msgstr "将组织升级为 Team（按月）"
 
 #: src/features/billing/components/personal-plan-card.tsx:63
 #: src/features/layout/components/nav-user.tsx:255
@@ -29332,7 +29330,7 @@ msgstr "升级到 Pro"
 
 #: src/features/billing/components/personal-plan-card.tsx:63
 msgid "Upgrade to Pro, monthly"
-msgstr ""
+msgstr "升级为 Pro（按月）"
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:472
 #: src/features/auth/components/organization/create-organization-dialog.tsx:255
@@ -29441,7 +29439,7 @@ msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
 msgid "Uploading data for import from {0}..."
 msgstr "正在上传来自 {0} 的数据以便导入..."
 
@@ -31348,9 +31346,9 @@ msgstr "你的知识库已满。有 {failed} 个文档未添加。"
 msgid "Your knowledge base is full. Remove files to add more."
 msgstr "你的知识库已满。请删除一些文件后再添加。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:430
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:451
 msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
-msgstr "上次导入在完成前已停止。继续导入即可导入剩余的对话。"
+msgstr ""
 
 #: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "Your latest changes are not saved yet."
