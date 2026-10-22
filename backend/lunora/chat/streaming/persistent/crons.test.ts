@@ -84,4 +84,26 @@ describe("cleanupExpiredStreams", () => {
         expect(await statusOf(expired)).toBe("timeout");
         expect(await statusOf(threadId)).toBe("running");
     });
+
+    it("leaves the thread running while an edit streams on it, which uses streamingMessages instead", async () => {
+        const threadId = await insertThread("running");
+        const expired = await insertStream(threadId, "streaming", Date.now() - 1000);
+
+        await run(
+            async (context) =>
+                await context.db.insert("streamingMessages", {
+                    order: 1,
+                    state: { kind: "streaming", lastHeartbeat: Date.now() },
+                    stateKind: "streaming",
+                    stepOrder: 0,
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        await cleanup();
+
+        expect(await statusOf(expired)).toBe("timeout");
+        expect(await statusOf(threadId)).toBe("running");
+    });
 });

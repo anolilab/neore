@@ -27,8 +27,13 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
         // thread means another run owns that status.
         const thread = await ctx.db.threads.findFirst({ where: { _id: stream.threadId as Id<"threads"> } });
         const live = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId: stream.threadId } });
+        // An edit streams through `streamingMessages` instead, and it holds the same running status.
+        const liveEdit = await ctx.db
+            .query("streamingMessages")
+            .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", stream.threadId as Id<"threads">).eq("stateKind", "streaming"))
+            .take(1);
 
-        if (thread?.status === "running" && !live) {
+        if (thread?.status === "running" && !live && liveEdit.length === 0) {
             await patchThread(ctx.db, thread._id, { status: "active", updatedAt: now });
         }
     }
