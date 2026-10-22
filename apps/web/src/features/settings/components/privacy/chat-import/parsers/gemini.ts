@@ -55,7 +55,7 @@ const parseISOTimestamp = (iso?: string): number | undefined => {
  * Parse a single Gemini conversation object.
  */
 const parseGeminiConversation = (conv: GeminiConversation): NormalizedConversation | null => {
-    if (!conv?.messages || conv.messages.length === 0) {
+    if (!Array.isArray(conv?.messages) || conv.messages.length === 0) {
         return null;
     }
 
