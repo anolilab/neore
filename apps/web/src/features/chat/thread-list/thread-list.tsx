@@ -1,3 +1,4 @@
+import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useLocation } from "@tanstack/react-router";
 import type { FC } from "react";
@@ -9,7 +10,6 @@ import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/quer
 import ManageThreadTagsDialog from "@/features/chat/tags/manage-thread-tags-dialog";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
-import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
 
 import { DateBoundariesProvider } from "./contexts/date-boundaries-context";
 import HierarchicalThreadList from "./hierarchical-thread-list";

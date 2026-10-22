@@ -2,6 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { isLunoraId, LUNORA_ID_SOURCE, useUnlockProof } from "@neore/client-runtime";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -13,7 +14,6 @@ import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-op
 import { LockedChatGate } from "@/features/chat/lock/locked-chat-gate";
 import { useThreadShard } from "@/features/chat/sharing/use-thread-shard";
 import { createLunoraActionQueryOptions, createLunoraQueryOptions, useCRPC } from "@/lib/lunora/crpc";
-import { isLunoraId, LUNORA_ID_SOURCE, useUnlockProof } from "@neore/client-runtime";
 
 const CHAT_THREAD_PATH_RE = new RegExp(`/chat/(${LUNORA_ID_SOURCE})(?:/|$)`);
 

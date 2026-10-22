@@ -1,9 +1,8 @@
 import { LunoraClient } from "@lunora/client";
 import type { ArgsOf, FunctionReference, ReturnOf } from "@lunora/react";
-import React from "react";
-
 import type { SessionAuthStatus } from "@neore/client-runtime";
 import { isRetryableStatus } from "@neore/client-runtime";
+import React from "react";
 
 /**
  * Deadline for one proxied auth call. Without one a single stuck upstream

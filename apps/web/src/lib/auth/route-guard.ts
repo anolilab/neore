@@ -13,9 +13,8 @@
  *
  * ✅ Safe to import in client components
  */
-import { redirect } from "@tanstack/react-router";
-
 import type { SessionAuthStatus } from "@neore/client-runtime";
+import { redirect } from "@tanstack/react-router";
 
 export interface AuthGuardContext {
     /** Absent only on a context built before the root route ran; then `isAuthenticated` decides. */

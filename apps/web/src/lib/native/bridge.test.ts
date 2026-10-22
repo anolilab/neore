@@ -12,6 +12,7 @@ import {
     onNativeCompose,
     onNativeDeviceChanged,
     onNativeDeviceProgress,
+    onNativeFiles,
     onNativeSignIn,
     openNativeDeviceSettings,
     openThreadWindow,
@@ -20,6 +21,7 @@ import {
     startNativeBrowserSignIn,
     supportsThreadWindows,
     takePendingCompose,
+    takePendingFiles,
     takePendingSignIn,
 } from "./bridge";
 
@@ -30,10 +32,12 @@ type Native = {
     device?: NativeDeviceRelayMock;
     notify: ReturnType<typeof vi.fn>;
     onCompose: ReturnType<typeof vi.fn>;
+    onFiles?: ReturnType<typeof vi.fn>;
     onSignIn?: ReturnType<typeof vi.fn>;
     openThreadWindow?: ReturnType<typeof vi.fn>;
     startBrowserSignIn?: ReturnType<typeof vi.fn>;
     takePendingCompose: ReturnType<typeof vi.fn>;
+    takePendingFiles?: ReturnType<typeof vi.fn>;
     takePendingSignIn?: ReturnType<typeof vi.fn>;
 };
 
@@ -46,7 +50,7 @@ const installNative = (overrides: Partial<Native> = {}): Native => {
         ...overrides,
     };
 
-    (globalThis as { neoreNative?: Native }).neoreNative = native;
+    Object.assign(globalThis, { neoreNative: native });
 
     return native;
 };
@@ -61,7 +65,7 @@ describe("outside the desktop shell", () => {
     });
 
     it("ignores a partial bridge", () => {
-        (globalThis as { neoreNative?: unknown }).neoreNative = { capabilities: ["notifications"] };
+        Object.assign(globalThis, { neoreNative: { capabilities: ["notifications"] } });
 
         expect(isNativeShell()).toBe(false);
     });
@@ -142,7 +146,9 @@ describe("inside the desktop shell", () => {
         const dispose = onNativeCompose(handler);
 
         dispose();
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+        });
         expect(handler).not.toHaveBeenCalled();
         expect(stop).toHaveBeenCalledTimes(1);
     });
@@ -402,5 +408,32 @@ describe("thread windows", () => {
         });
 
         expect(await openThreadWindow("../settings")).toBe(false);
+    });
+});
+
+describe("dock files", () => {
+    it("hands over the files the shell is holding as File objects", async () => {
+        installNative({
+            onFiles: vi.fn(() => () => {}),
+            takePendingFiles: vi.fn(async () => [{ data: new Uint8Array([104, 105]), name: "note.txt" }]),
+        });
+
+        const handler = vi.fn();
+
+        onNativeFiles(handler);
+
+        await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
+
+        const [files] = handler.mock.lastCall as [File[]];
+
+        expect(files.map((file) => [file.name, file.size])).toEqual([["note.txt", 2]]);
+    });
+
+    it("returns no files outside the shell or when the shell has none", async () => {
+        expect(await takePendingFiles()).toEqual([]);
+
+        installNative({ takePendingFiles: vi.fn(async () => []) });
+
+        expect(await takePendingFiles()).toEqual([]);
     });
 });

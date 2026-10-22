@@ -1,5 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { forgetUnlockProof, isThreadLockedError, onUnlockExpired, useUnlockProof } from "@neore/client-runtime";
 import { Button } from "@neore/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -7,7 +8,6 @@ import { useEffect, useId, useState } from "react";
 
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { forgetUnlockProof, isThreadLockedError, onUnlockExpired, useUnlockProof } from "@neore/client-runtime";
 
 import { ThreadLockDialog } from "./thread-lock-dialog";
 

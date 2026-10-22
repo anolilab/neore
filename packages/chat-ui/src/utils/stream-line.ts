@@ -16,8 +16,9 @@ export interface StreamSpeaker {
  * with `resumable: true` — the resume marker
  * `{ type: "resume", lastChunkIndex }`, always the last line of a relay that
  * ran out of its per-request budget. It is not a chunk: the reader asks again
- * with that `lastChunkIndex` and counts nothing for it. A resumable reply that
- * finished sends `{ type: "end" }` last, so the reader can tell it from a cut stream.
+ * with that `lastChunkIndex` and counts nothing for it. A reply that finished, for
+ * a request that sent `endMarker: true`, ends with `{ type: "end" }`, so the reader
+ * can tell it from a cut stream.
  */
 export type ParsedStreamLine =
     | { kind: "end" }
