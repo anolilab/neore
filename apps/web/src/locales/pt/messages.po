@@ -815,7 +815,7 @@ msgstr "{itemCount, plural, one {# item} other {# itens}}"
 #. placeholder {0}: ids.length
 #: src/components/model-picker/model-picker.tsx:910
 msgid "{label} moved to position {position} of {0} in starred"
-msgstr ""
+msgstr "{label} movido para a posição {position} de {0} em marcados com estrela"
 
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
@@ -3356,7 +3356,7 @@ msgstr "Anexo (oculto)"
 
 #: src/features/chat/thread/thread-minimap.tsx:73
 msgid "Attachment only"
-msgstr ""
+msgstr "Apenas anexo"
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:70
 msgid "Attachments:"
@@ -6967,7 +6967,7 @@ msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:913
 msgid "Could not save the new order for {label}"
-msgstr ""
+msgstr "Não foi possível guardar a nova ordem de {label}"
 
 #: src/features/pages/components/page-view.tsx:160
 #: src/features/pages/components/page-view.tsx:248
@@ -15108,11 +15108,11 @@ msgstr "Juiz: {0}"
 
 #: src/features/chat/thread/thread-minimap.tsx:95
 msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
-msgstr ""
+msgstr "Ir para o prompt {promptNumber}, {gap} depois do anterior: {preview}"
 
 #: src/features/chat/thread/thread-minimap.tsx:96
 msgid "Jump to prompt {promptNumber}: {preview}"
-msgstr ""
+msgstr "Ir para o prompt {promptNumber}: {preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
 #: src/features/chat/pins/pin-item.tsx:40
@@ -17556,11 +17556,11 @@ msgstr "Mover {0} para cima"
 
 #: src/components/model-picker/model-picker.tsx:372
 msgid "Move {label} down in starred"
-msgstr ""
+msgstr "Mover {label} para baixo em marcados com estrela"
 
 #: src/components/model-picker/model-picker.tsx:357
 msgid "Move {label} up in starred"
-msgstr ""
+msgstr "Mover {label} para cima em marcados com estrela"
 
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
@@ -21759,7 +21759,7 @@ msgstr "Prompts"
 
 #: src/features/chat/thread/thread-minimap.tsx:68
 msgid "Prompts in this conversation"
-msgstr ""
+msgstr "Prompts nesta conversa"
 
 #: src/features/settings/components/privacy/data-access.tsx:55
 msgid "Prompts:"
@@ -23225,7 +23225,7 @@ msgstr "Retomar"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:438
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:453
 msgid "Resume import"
-msgstr ""
+msgstr "Retomar importação"
 
 #: src/features/settings/components/account/account-settings.tsx:470
 msgid "Resume your latest chat"
@@ -31348,7 +31348,7 @@ msgstr "Sua base de conhecimento está cheia. Remova arquivos para adicionar mai
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:451
 msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
-msgstr ""
+msgstr "A sua última importação parou antes de terminar. Retome-a para importar as conversas que faltam."
 
 #: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "Your latest changes are not saved yet."

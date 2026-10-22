@@ -815,7 +815,7 @@ msgstr "{itemCount, plural, other {# 個の項目}}"
 #. placeholder {0}: ids.length
 #: src/components/model-picker/model-picker.tsx:910
 msgid "{label} moved to position {position} of {0} in starred"
-msgstr ""
+msgstr "{label} をスター内の {position}/{0} 番目に移動しました"
 
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
@@ -3356,7 +3356,7 @@ msgstr "添付ファイル（非表示）"
 
 #: src/features/chat/thread/thread-minimap.tsx:73
 msgid "Attachment only"
-msgstr ""
+msgstr "添付のみ"
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:70
 msgid "Attachments:"
@@ -6967,7 +6967,7 @@ msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:913
 msgid "Could not save the new order for {label}"
-msgstr ""
+msgstr "{label} の新しい順序を保存できませんでした"
 
 #: src/features/pages/components/page-view.tsx:160
 #: src/features/pages/components/page-view.tsx:248
@@ -15108,11 +15108,11 @@ msgstr "ジャッジ：{0}"
 
 #: src/features/chat/thread/thread-minimap.tsx:95
 msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
-msgstr ""
+msgstr "プロンプト {promptNumber} へ移動（前のプロンプトから {gap} 後）: {preview}"
 
 #: src/features/chat/thread/thread-minimap.tsx:96
 msgid "Jump to prompt {promptNumber}: {preview}"
-msgstr ""
+msgstr "プロンプト {promptNumber} へ移動: {preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
 #: src/features/chat/pins/pin-item.tsx:40
@@ -17556,11 +17556,11 @@ msgstr "{0} を上へ移動"
 
 #: src/components/model-picker/model-picker.tsx:372
 msgid "Move {label} down in starred"
-msgstr ""
+msgstr "{label} をスター内で下へ移動"
 
 #: src/components/model-picker/model-picker.tsx:357
 msgid "Move {label} up in starred"
-msgstr ""
+msgstr "{label} をスター内で上へ移動"
 
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
@@ -21759,7 +21759,7 @@ msgstr "プロンプト"
 
 #: src/features/chat/thread/thread-minimap.tsx:68
 msgid "Prompts in this conversation"
-msgstr ""
+msgstr "この会話のプロンプト"
 
 #: src/features/settings/components/privacy/data-access.tsx:55
 msgid "Prompts:"
@@ -23225,7 +23225,7 @@ msgstr "再開"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:438
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:453
 msgid "Resume import"
-msgstr ""
+msgstr "インポートを再開"
 
 #: src/features/settings/components/account/account-settings.tsx:470
 msgid "Resume your latest chat"
@@ -31348,7 +31348,7 @@ msgstr "ナレッジベースが上限に達しました。追加するにはフ
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:451
 msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
-msgstr ""
+msgstr "前回のインポートは完了する前に停止しました。再開すると、残りの会話をインポートします。"
 
 #: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "Your latest changes are not saved yet."

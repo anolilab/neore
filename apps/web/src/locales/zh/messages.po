@@ -815,7 +815,7 @@ msgstr "{itemCount, plural, other {# 项}}"
 #. placeholder {0}: ids.length
 #: src/components/model-picker/model-picker.tsx:910
 msgid "{label} moved to position {position} of {0} in starred"
-msgstr ""
+msgstr "{label}已移至星标中的第{position}位（共{0}位）"
 
 #: src/features/settings/components/chat/usage-settings.tsx:606
 msgid "{metricLabel} > {threshold} per day"
@@ -3356,7 +3356,7 @@ msgstr "附件（已隐藏）"
 
 #: src/features/chat/thread/thread-minimap.tsx:73
 msgid "Attachment only"
-msgstr ""
+msgstr "仅附件"
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:70
 msgid "Attachments:"
@@ -6967,7 +6967,7 @@ msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:913
 msgid "Could not save the new order for {label}"
-msgstr ""
+msgstr "无法保存{label}的新顺序"
 
 #: src/features/pages/components/page-view.tsx:160
 #: src/features/pages/components/page-view.tsx:248
@@ -15108,11 +15108,11 @@ msgstr "评委：{0}"
 
 #: src/features/chat/thread/thread-minimap.tsx:95
 msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
-msgstr ""
+msgstr "跳转到提示 {promptNumber}，距上一条 {gap}：{preview}"
 
 #: src/features/chat/thread/thread-minimap.tsx:96
 msgid "Jump to prompt {promptNumber}: {preview}"
-msgstr ""
+msgstr "跳转到提示 {promptNumber}：{preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
 #: src/features/chat/pins/pin-item.tsx:40
@@ -17556,11 +17556,11 @@ msgstr "上移 {0}"
 
 #: src/components/model-picker/model-picker.tsx:372
 msgid "Move {label} down in starred"
-msgstr ""
+msgstr "将{label}在星标中下移"
 
 #: src/components/model-picker/model-picker.tsx:357
 msgid "Move {label} up in starred"
-msgstr ""
+msgstr "将{label}在星标中上移"
 
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
@@ -21759,7 +21759,7 @@ msgstr "提示词"
 
 #: src/features/chat/thread/thread-minimap.tsx:68
 msgid "Prompts in this conversation"
-msgstr ""
+msgstr "本对话中的提示"
 
 #: src/features/settings/components/privacy/data-access.tsx:55
 msgid "Prompts:"
@@ -23225,7 +23225,7 @@ msgstr "恢复"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:438
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:453
 msgid "Resume import"
-msgstr ""
+msgstr "继续导入"
 
 #: src/features/settings/components/account/account-settings.tsx:470
 msgid "Resume your latest chat"
@@ -31348,7 +31348,7 @@ msgstr "你的知识库已满。请删除一些文件后再添加。"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:451
 msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
-msgstr ""
+msgstr "上次导入在完成前已停止。继续导入即可导入剩余的对话。"
 
 #: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "Your latest changes are not saved yet."

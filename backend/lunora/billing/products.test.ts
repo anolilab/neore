@@ -20,13 +20,24 @@ const { checkoutProducts, planProducts } = await import("./products");
 const { planOfProduct } = await import("./plans");
 
 describe("product ids", () => {
-    it("refuses a product id that two plans or intervals share, rather than choosing one", () => {
+    it("refuses checkout while a product id is shared between plans or intervals", () => {
         const saved = env.CREEM_PRODUCT_TEAM_YEARLY;
 
         env.CREEM_PRODUCT_TEAM_YEARLY = "prod_pro";
 
-        expect(() => planProducts()).toThrow("more than one plan or interval");
         expect(() => checkoutProducts()).toThrow("more than one plan or interval");
+
+        env.CREEM_PRODUCT_TEAM_YEARLY = saved;
+    });
+
+    it("does not throw in the webhook path: a shared id recognises nothing, and the other plans still do", () => {
+        const saved = env.CREEM_PRODUCT_TEAM_YEARLY;
+
+        env.CREEM_PRODUCT_TEAM_YEARLY = "prod_pro";
+
+        expect(() => planProducts()).not.toThrow();
+        expect(planOfProduct("prod_pro", planProducts())).toBeUndefined();
+        expect(planOfProduct("prod_team", planProducts())).toBe("team");
 
         env.CREEM_PRODUCT_TEAM_YEARLY = saved;
     });
@@ -36,7 +47,8 @@ describe("product ids", () => {
 
         env.CREEM_PRODUCT_TEAM_YEARLY = "";
 
-        expect(() => planProducts()).not.toThrow();
+        expect(() => checkoutProducts()).not.toThrow();
+        expect(planOfProduct("prod_pro", planProducts())).toBe("pro");
 
         env.CREEM_PRODUCT_TEAM_YEARLY = saved;
     });
