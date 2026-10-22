@@ -11,7 +11,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { assertComputerRoutine, createTrigger, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import { assertComputerRoutine, createTrigger, setTriggerEnabled, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
 import { findNextCronTime } from "./schedule";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
@@ -125,6 +125,29 @@ describe("trigger schedules", () => {
             triggerId: expect.any(String),
         });
     });
+
+    it("stores no next run for a webhook trigger, even when it is sent a cron expression", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        await as().mutation(updateTrigger as never, { cronExpression: "0 9 * * 1", triggerId } as never);
+
+        const trigger = await readTrigger(triggerId);
+
+        expect(trigger.nextTriggerAt).toBeUndefined();
+    });
+
+    it("enabling a schedule whose stored run has passed arms the next future run, not that stale one", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, schedule("0 9 * * 1") as never)) as { triggerId: string };
+        const stale = Date.now() - 60_000;
+
+        // Left by a schedule that was edited and then stayed disabled past its time.
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: stale }));
+        await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
+
+        const trigger = await readTrigger(triggerId);
+
+        expect(trigger.nextTriggerAt).toBeGreaterThan(Date.now());
+    });
 });
 describe("a routine's bot computer", () => {
     it("needs a bot and a schedule", () => {
@@ -176,12 +199,27 @@ describe("testRunTrigger", () => {
 
         await as.action(testRunTrigger as never, { triggerId } as never);
 
-        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, payload: "Manual test run triggered.", triggerId }]);
+        // No payload: the run uses the schedule's own input, not the generic test text a webhook gets.
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, triggerId }]);
 
         const after = await readTrigger(triggerId);
 
         expect(after.enabled).toBe(false);
         expect(after.updatedAt).toBe(before.updatedAt);
+    });
+
+    it("passes a test payload the user typed to a disabled schedule's manual run", async () => {
+        const as = harness.withIdentity({ userId: "user-a" } as never);
+        const { triggerId } = (await as.mutation(
+            createTrigger as never,
+            { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" } as never,
+        )) as {
+            triggerId: string;
+        };
+
+        await as.action(testRunTrigger as never, { testPayload: "summarise the inbox", triggerId } as never);
+
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, payload: "summarise the inbox", triggerId }]);
     });
 });
 

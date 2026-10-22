@@ -76,7 +76,8 @@ export const executeTrigger = internalAction
             const sanitizedPayload = payload ? payload.slice(0, MAX_PAYLOAD_LENGTH) : undefined;
 
             if (triggerType === "schedule") {
-                inputMessage = trigger.inputTemplate || "You have been triggered on schedule. Please perform your configured task.";
+                // A cron run passes its template as the payload, so the same text arrives either way; a manual test run may pass its own input.
+                inputMessage = sanitizedPayload || trigger.inputTemplate || "You have been triggered on schedule. Please perform your configured task.";
             } else if (triggerType === "webhook" && sanitizedPayload) {
                 const { payloadTemplate } = trigger;
 
