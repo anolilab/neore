@@ -38,7 +38,7 @@ msgid ", unread"
 msgstr "、未読"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "...and {0} more"
 msgstr "…他 {0} 件"
 
@@ -89,7 +89,7 @@ msgstr "現在の Azure OpenAI API には \"v1\" を指定します。2024-10-21
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "（{0} / {MAX_PARTICIPANTS}、最低 {MIN_PARTICIPANTS}）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:406
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 件失敗）"
 
@@ -214,7 +214,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 人のメンバー}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:352
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, other {# 件のメッセージ}}"
 
@@ -379,18 +379,18 @@ msgid "{0} chunks"
 msgstr "{0} チャンク"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:420
 msgid "{0} conversations failed to import"
 msgstr "{0} 件の会話をインポートできませんでした"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:342
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:359
 msgid "{0} conversations found"
 msgstr "{0} 件の会話が見つかりました"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:419
 msgid "{0} conversations imported from {1}"
 msgstr "{1} から {0} 件の会話をインポートしました"
 
@@ -497,7 +497,7 @@ msgstr "{1} 件中 {0} 件のケースが完了"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:404
 msgid "{0} of {1} conversations imported"
 msgstr "{1} 件中 {0} 件の会話をインポートしました"
 
@@ -1695,7 +1695,7 @@ msgstr "コメントを追加"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "組織のメンバーを <0>{0}</0> に追加"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:266
+#: src/features/auth/components/organization/billing-settings-card.tsx:283
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "モデルを追加..."
@@ -2672,7 +2672,7 @@ msgstr "「{tool}」を許可しますか？"
 msgid "Allow this site ({0})"
 msgstr "このサイトを許可（{0}）"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:236
+#: src/features/auth/components/organization/billing-settings-card.tsx:253
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "許可された AI モデル"
@@ -3945,17 +3945,17 @@ msgstr "クレジットではなく、ご自身の API キーに課金されま�
 msgid "Billing"
 msgstr "請求"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:217
+#: src/features/auth/components/organization/billing-settings-card.tsx:234
 msgid "Billing Email"
 msgstr "請求先メールアドレス"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:135
-#: src/features/auth/components/organization/billing-settings-card.tsx:166
-#: src/features/auth/components/organization/billing-settings-card.tsx:296
+#: src/features/auth/components/organization/billing-settings-card.tsx:137
+#: src/features/auth/components/organization/billing-settings-card.tsx:168
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
 msgid "Billing Settings"
 msgstr "請求設定"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:89
+#: src/features/auth/components/organization/billing-settings-card.tsx:91
 msgid "Billing settings updated successfully"
 msgstr "請求設定を更新しました"
 
@@ -4577,7 +4577,7 @@ msgstr "カナダ"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:364
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4601,7 +4601,7 @@ msgstr "ディープワークをキャンセル"
 msgid "Cancel Export"
 msgstr "エクスポートをキャンセル"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:392
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:409
 msgid "Cancel Import"
 msgstr "インポートをキャンセル"
 
@@ -6005,8 +6005,8 @@ msgstr "チーム「{teamName}」の設定を構成"
 msgid "Configure team settings"
 msgstr "チーム設定を構成"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:163
-#: src/features/auth/components/organization/billing-settings-card.tsx:294
+#: src/features/auth/components/organization/billing-settings-card.tsx:165
+#: src/features/auth/components/organization/billing-settings-card.tsx:311
 msgid "Configure the billing contact and available AI models"
 msgstr "請求先の連絡先と利用可能な AI モデルを設定します"
 
@@ -7370,8 +7370,8 @@ msgstr "画像の生成と編集の両方を、単一のフロンティア品質
 msgid "Credits"
 msgstr "クレジット"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:143
-#: src/features/auth/components/organization/billing-settings-card.tsx:184
+#: src/features/auth/components/organization/billing-settings-card.tsx:145
+#: src/features/auth/components/organization/billing-settings-card.tsx:186
 msgid "Credits per user:"
 msgstr "ユーザーあたりのクレジット："
 
@@ -7460,7 +7460,7 @@ msgstr "現在のパスワード"
 msgid "Current password is required"
 msgstr "現在のパスワードは必須です"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 msgid "Current plan:"
 msgstr "現在のプラン:"
 
@@ -7468,8 +7468,8 @@ msgstr "現在のプラン:"
 msgid "Current Prompt Variables"
 msgstr "現在のプロンプト変数"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:140
-#: src/features/auth/components/organization/billing-settings-card.tsx:181
+#: src/features/auth/components/organization/billing-settings-card.tsx:142
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 msgid "Current tier:"
 msgstr "現在のプラン："
 
@@ -8501,7 +8501,7 @@ msgid "Details for case {0}"
 msgstr "ケース {0} の詳細"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:341
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:358
 msgid "Detected: {0}"
 msgstr "検出：{0}"
 
@@ -9888,7 +9888,7 @@ msgstr "有効な AWS リージョンを入力してください（例: us-east-
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "v1 や 2024-10-21 のような API バージョンを入力してください"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:224
+#: src/features/auth/components/organization/billing-settings-card.tsx:241
 msgid "Enter billing email"
 msgstr "請求先メールアドレスを入力"
 
@@ -11194,7 +11194,7 @@ msgstr "スレッドを移動できませんでした"
 msgid "Failed to optimize prompt"
 msgstr "プロンプトを最適化できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:239
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:249
 msgid "Failed to parse file"
 msgstr "ファイルを解析できませんでした"
 
@@ -11379,7 +11379,7 @@ msgstr "確認メールを送信できませんでした"
 msgid "Failed to start impersonation"
 msgstr "なりすましを開始できませんでした"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:274
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
 msgid "Failed to start import"
 msgstr "インポートを開始できませんでした"
 
@@ -12450,7 +12450,7 @@ msgstr "フレーム"
 msgid "France"
 msgstr "フランス"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:114
 #: src/features/marketing/components/landing-page.tsx:326
 #: src/features/settings/components/chat/models-settings.tsx:39
@@ -14342,11 +14342,11 @@ msgstr "なりすましを終了"
 msgid "Import"
 msgstr "インポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:379
 msgid "Import All"
 msgstr "すべてインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:285
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:295
 msgid "Import cancelled"
 msgstr "インポートをキャンセルしました"
 
@@ -14354,15 +14354,15 @@ msgstr "インポートをキャンセルしました"
 msgid "Import cases"
 msgstr "ケースをインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:401
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:418
 msgid "Import complete!"
 msgstr "インポートが完了しました！"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:316
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:333
 msgid "Import Conversations"
 msgstr "会話をインポート"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:315
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:332
 msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
 
@@ -14374,12 +14374,12 @@ msgstr ""
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "ChatGPT、Google Gemini、Claude から会話をインポートします。エクスポートした JSON または ZIP ファイルをアップロードしてください。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:134
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:415
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:144
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:432
 msgid "Import failed"
 msgstr "インポートに失敗しました"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:406
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
 msgstr "さらにインポート"
 
@@ -14387,7 +14387,7 @@ msgstr "さらにインポート"
 msgid "Import Notion export (.zip)"
 msgstr "Notion のエクスポートをインポート（.zip）"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:212
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr ""
 
@@ -14438,7 +14438,7 @@ msgid "Imported skill \"{0}\""
 msgstr "スキル「{0}」をインポートしました"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:379
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:396
 msgid "Importing from {0}..."
 msgstr "{0} からインポートしています..."
 
@@ -15434,7 +15434,7 @@ msgstr "最後のフレーム"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:440
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:461
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "前回のインポート：{2} に {1} から {0} 件の会話"
 
@@ -16511,7 +16511,7 @@ msgstr "参加者を管理"
 msgid "Manage Publication"
 msgstr "公開を管理"
 
-#: src/features/billing/components/personal-plan-card.tsx:35
+#: src/features/billing/components/personal-plan-card.tsx:37
 msgid "Manage subscription"
 msgstr "サブスクリプションを管理"
 
@@ -16524,7 +16524,7 @@ msgstr "タグを管理"
 msgid "Manage tags…"
 msgstr "タグを管理…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:197
+#: src/features/auth/components/organization/billing-settings-card.tsx:199
 msgid "Manage Team subscription"
 msgstr "Team サブスクリプションを管理"
 
@@ -18441,7 +18441,7 @@ msgstr "コンテンツなし"
 msgid "No content to display"
 msgstr "表示するコンテンツがありません"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:221
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:231
 msgid "No conversations found in the file."
 msgstr "ファイル内に会話が見つかりませんでした。"
 
@@ -19397,7 +19397,7 @@ msgstr "効率のためトークンあたりのアクティブパラメータは
 msgid "Only in one run"
 msgstr "一方の実行のみ"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:134
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
 msgid "Only organization owners can manage billing settings"
 msgstr "請求設定を管理できるのは組織のオーナーのみです"
 
@@ -20363,7 +20363,7 @@ msgstr "並列比較"
 msgid "Paris"
 msgstr "パリ"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:352
 msgid "Parsing file..."
 msgstr "ファイルを解析しています..."
 
@@ -20569,6 +20569,11 @@ msgstr "一時停止中"
 #: src/features/marketing/components/gateway-landing-page.tsx:723
 msgid "Pay for what <0>you use.</0>"
 msgstr "使った分だけ<0>お支払い。</0>"
+
+#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/billing/components/personal-plan-card.tsx:52
+msgid "Pay yearly"
+msgstr "年額で支払う"
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:210
 msgid "Payments, orders, invoices, and subscriptions via PayPal"
@@ -21452,7 +21457,7 @@ msgstr "デフォルトでプライベート"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
 #: src/components/model-picker/model-picker.tsx:313
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:556
@@ -21460,7 +21465,7 @@ msgstr "デフォルトでプライベート"
 msgid "Pro"
 msgstr "Pro"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro はあなた個人のプランです。すべてのモデルと1日1,000メッセージ。"
 
@@ -22727,7 +22732,7 @@ msgstr "{fileName} を削除"
 msgid "Remove {label}"
 msgstr "{label} を削除"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:245
+#: src/features/auth/components/organization/billing-settings-card.tsx:262
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "{model} を削除"
@@ -23217,8 +23222,8 @@ msgstr "結果"
 msgid "Resume"
 msgstr "再開"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:419
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:432
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:438
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:453
 msgid "Resume import"
 msgstr "インポートを再開"
 
@@ -23710,8 +23715,8 @@ msgstr "サウジアラビア"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:160
-#: src/features/auth/components/organization/billing-settings-card.tsx:291
+#: src/features/auth/components/organization/billing-settings-card.tsx:162
+#: src/features/auth/components/organization/billing-settings-card.tsx:308
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -24287,7 +24292,7 @@ msgstr "音声入力の言語を選択"
 msgid "Select duration"
 msgstr "期間を選択"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
 msgid "Select File"
 msgstr "ファイルを選択"
 
@@ -24405,7 +24410,7 @@ msgstr "最後の列まで選択"
 msgid "Select to top of table"
 msgstr "表の最上部まで選択"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:238
+#: src/features/auth/components/organization/billing-settings-card.tsx:255
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "組織のメンバーが使える AI モデルを選択します。Enterprise ですべてのモデルを許可する場合は空欄のままにしてください。"
 
@@ -25173,7 +25178,7 @@ msgid "Skipped"
 msgstr "スキップ済み"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
 msgid "Skipped files that are not chat exports: {0}"
 msgstr ""
 
@@ -25882,7 +25887,7 @@ msgstr "開始中"
 msgid "Starting {0}…"
 msgstr "{0} を開始しています…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:388
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:405
 msgid "Starting import..."
 msgstr "インポートを開始しています..."
 
@@ -26438,7 +26443,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "成功基準は {CRITERIA_MAX} 文字以内で入力してください"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:130
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:139
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "{0} から {imported} 件の会話をインポートしました"
 
@@ -26523,7 +26528,7 @@ msgstr "複数ファイルにまたがる優れたコード生成とリファク
 msgid "Superior understanding of complex visual concepts"
 msgstr "複雑な視覚的コンセプトへの優れた理解"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:343
 msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
 msgstr ""
 
@@ -27939,7 +27944,7 @@ msgstr "コンピューターからモデルファイルを削除します。後
 msgid "This run is no longer available."
 msgstr "この実行は利用できなくなりました。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:227
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr ""
 
@@ -28680,7 +28685,7 @@ msgstr "再試行"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:421
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "もう一度試す"
 
@@ -29310,14 +29315,22 @@ msgstr "アップデート"
 msgid "Upgrade"
 msgstr "アップグレード"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:208
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
 msgid "Upgrade organization to Team"
 msgstr "組織を Team にアップグレード"
 
-#: src/features/billing/components/personal-plan-card.tsx:47
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
+msgid "Upgrade organization to Team, monthly"
+msgstr "組織を Team にアップグレード（月額）"
+
+#: src/features/billing/components/personal-plan-card.tsx:63
 #: src/features/layout/components/nav-user.tsx:255
 msgid "Upgrade to Pro"
 msgstr "Pro にアップグレード"
+
+#: src/features/billing/components/personal-plan-card.tsx:63
+msgid "Upgrade to Pro, monthly"
+msgstr "Pro にアップグレード（月額）"
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:472
 #: src/features/auth/components/organization/create-organization-dialog.tsx:255
@@ -29426,7 +29439,7 @@ msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} をアップロードしています"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
 msgid "Uploading data for import from {0}..."
 msgstr "{0} からのインポート用データをアップロードしています..."
 
@@ -31333,7 +31346,7 @@ msgstr "ナレッジベースが上限に達しました。{failed} 件のドキ
 msgid "Your knowledge base is full. Remove files to add more."
 msgstr "ナレッジベースが上限に達しました。追加するにはファイルを削除してください。"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:430
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:451
 msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
 msgstr "前回のインポートは完了する前に停止しました。再開すると、残りの会話をインポートします。"
 
@@ -31381,11 +31394,11 @@ msgstr "ご自身の OpenAI キー。OpenAI のモデルに使用され、Codex 
 msgid "Your pages"
 msgstr "自分のページ"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Your plan"
 msgstr "あなたのプラン"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:188
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "プランとクレジット枠はサブスクリプションに応じて決まります。"
 

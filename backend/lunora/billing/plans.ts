@@ -16,8 +16,15 @@ import { withoutUndefined } from "../lib/patch";
 
 export type PaidPlan = "pro" | "team";
 
-/** The Creem product id of each paid plan (`CREEM_PRODUCT_PRO` / `CREEM_PRODUCT_TEAM`). */
-export type PlanProducts = Readonly<Record<PaidPlan, string>>;
+export type BillingInterval = "month" | "year";
+
+/**
+ * The Creem product id of each paid plan (`CREEM_PRODUCT_PRO` / `CREEM_PRODUCT_TEAM`), and
+ * optionally its yearly twin (`…_YEARLY`). A yearly product sells the SAME plan: it grants
+ * the same tier and lands on the same row, only the billing period differs. An empty id
+ * means that product is not configured.
+ */
+export type PlanProducts = Readonly<Record<PaidPlan, string>> & { readonly yearly?: Readonly<Record<PaidPlan, string>> };
 
 /** Where a plan's tier is written: Pro on the buyer, Team on the organization. */
 const SUBJECT_OF_PLAN = { pro: "user", team: "organization" } as const satisfies Record<PaidPlan, "organization" | "user">;
@@ -28,12 +35,16 @@ export const planOfProduct = (productId: string, products: PlanProducts): PaidPl
         return undefined;
     }
 
-    if (productId === products.pro) {
+    if (productId === products.pro || productId === products.yearly?.pro) {
         return "pro";
     }
 
-    return productId === products.team ? "team" : undefined;
+    return productId === products.team || productId === products.yearly?.team ? "team" : undefined;
 };
+
+/** The product to check out for a plan and period, or `""` when that one is not configured. */
+export const productFor = (plan: PaidPlan, interval: BillingInterval, products: PlanProducts): string =>
+    interval === "year" ? (products.yearly?.[plan] ?? "") : products[plan];
 
 /**
  * States that keep the paid tier. An ALLOWLIST, so a state this code has never

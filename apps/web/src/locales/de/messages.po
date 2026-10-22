@@ -38,7 +38,7 @@ msgid ", unread"
 msgstr ", ungelesen"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "...and {0} more"
 msgstr "...und {0} weitere"
 
@@ -89,7 +89,7 @@ msgstr "\"v1\" für die aktuelle Azure-OpenAI-API. Eine datierte Version wie 202
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "({0} von {MAX_PARTICIPANTS}, mindestens {MIN_PARTICIPANTS})"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:406
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} fehlgeschlagen)"
 
@@ -214,7 +214,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, one {# Mitglied} other {# Mitglieder}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:352
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, one {# Nachricht} other {# Nachrichten}}"
 
@@ -379,18 +379,18 @@ msgid "{0} chunks"
 msgstr "{0} Chunks"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:420
 msgid "{0} conversations failed to import"
 msgstr "{0} Unterhaltungen konnten nicht importiert werden"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:342
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:359
 msgid "{0} conversations found"
 msgstr "{0} Unterhaltungen gefunden"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:419
 msgid "{0} conversations imported from {1}"
 msgstr "{0} Unterhaltungen aus {1} importiert"
 
@@ -497,7 +497,7 @@ msgstr "{0} von {1} Testfällen abgeschlossen"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:404
 msgid "{0} of {1} conversations imported"
 msgstr "{0} von {1} Unterhaltungen importiert"
 
@@ -1695,7 +1695,7 @@ msgstr "Kommentar hinzufügen"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "Füge ein Mitglied aus deiner Organisation zu <0>{0}</0> hinzu"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:266
+#: src/features/auth/components/organization/billing-settings-card.tsx:283
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "Ein Modell hinzufügen..."
@@ -2672,7 +2672,7 @@ msgstr "\"{tool}\" erlauben?"
 msgid "Allow this site ({0})"
 msgstr "Diese Website erlauben ({0})"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:236
+#: src/features/auth/components/organization/billing-settings-card.tsx:253
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "Erlaubte KI-Modelle"
@@ -3945,17 +3945,17 @@ msgstr "Wird über deinen eigenen API-Schlüssel abgerechnet, nicht über deine 
 msgid "Billing"
 msgstr "Abrechnung"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:217
+#: src/features/auth/components/organization/billing-settings-card.tsx:234
 msgid "Billing Email"
 msgstr "Abrechnungs-E-Mail"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:135
-#: src/features/auth/components/organization/billing-settings-card.tsx:166
-#: src/features/auth/components/organization/billing-settings-card.tsx:296
+#: src/features/auth/components/organization/billing-settings-card.tsx:137
+#: src/features/auth/components/organization/billing-settings-card.tsx:168
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
 msgid "Billing Settings"
 msgstr "Abrechnungseinstellungen"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:89
+#: src/features/auth/components/organization/billing-settings-card.tsx:91
 msgid "Billing settings updated successfully"
 msgstr "Abrechnungseinstellungen erfolgreich aktualisiert"
 
@@ -4577,7 +4577,7 @@ msgstr "Kanada"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:364
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4601,7 +4601,7 @@ msgstr "Deep Work abbrechen"
 msgid "Cancel Export"
 msgstr "Export abbrechen"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:392
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:409
 msgid "Cancel Import"
 msgstr "Import abbrechen"
 
@@ -6005,8 +6005,8 @@ msgstr "Einstellungen für Team \"{teamName}\" konfigurieren"
 msgid "Configure team settings"
 msgstr "Teameinstellungen konfigurieren"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:163
-#: src/features/auth/components/organization/billing-settings-card.tsx:294
+#: src/features/auth/components/organization/billing-settings-card.tsx:165
+#: src/features/auth/components/organization/billing-settings-card.tsx:311
 msgid "Configure the billing contact and available AI models"
 msgstr "Rechnungskontakt und verfügbare KI-Modelle konfigurieren"
 
@@ -7370,8 +7370,8 @@ msgstr "Creator, die Bilder mit einem einzigen Modell in Spitzenqualität sowohl
 msgid "Credits"
 msgstr "Credits"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:143
-#: src/features/auth/components/organization/billing-settings-card.tsx:184
+#: src/features/auth/components/organization/billing-settings-card.tsx:145
+#: src/features/auth/components/organization/billing-settings-card.tsx:186
 msgid "Credits per user:"
 msgstr "Credits pro Benutzer:"
 
@@ -7460,7 +7460,7 @@ msgstr "Aktuelles Passwort"
 msgid "Current password is required"
 msgstr "Aktuelles Passwort ist erforderlich"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 msgid "Current plan:"
 msgstr "Aktueller Plan:"
 
@@ -7468,8 +7468,8 @@ msgstr "Aktueller Plan:"
 msgid "Current Prompt Variables"
 msgstr "Aktuelle Prompt-Variablen"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:140
-#: src/features/auth/components/organization/billing-settings-card.tsx:181
+#: src/features/auth/components/organization/billing-settings-card.tsx:142
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 msgid "Current tier:"
 msgstr "Aktuelle Stufe:"
 
@@ -8501,7 +8501,7 @@ msgid "Details for case {0}"
 msgstr "Details zu Testfall {0}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:341
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:358
 msgid "Detected: {0}"
 msgstr "Erkannt: {0}"
 
@@ -9888,7 +9888,7 @@ msgstr "Gib eine gültige AWS-Region ein, z. B. us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "Gib eine API-Version wie v1 oder 2024-10-21 ein"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:224
+#: src/features/auth/components/organization/billing-settings-card.tsx:241
 msgid "Enter billing email"
 msgstr "Abrechnungs-E-Mail eingeben"
 
@@ -11194,7 +11194,7 @@ msgstr "Thread konnte nicht verschoben werden"
 msgid "Failed to optimize prompt"
 msgstr "Prompt konnte nicht optimiert werden"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:239
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:249
 msgid "Failed to parse file"
 msgstr "Datei konnte nicht verarbeitet werden"
 
@@ -11379,7 +11379,7 @@ msgstr "Verifizierungs-E-Mail konnte nicht gesendet werden"
 msgid "Failed to start impersonation"
 msgstr "Identitätswechsel konnte nicht gestartet werden"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:274
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
 msgid "Failed to start import"
 msgstr "Import konnte nicht gestartet werden"
 
@@ -12450,7 +12450,7 @@ msgstr "Einzelbilder"
 msgid "France"
 msgstr "Frankreich"
 
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:114
 #: src/features/marketing/components/landing-page.tsx:326
 #: src/features/settings/components/chat/models-settings.tsx:39
@@ -14342,11 +14342,11 @@ msgstr "Identitätswechsel beendet"
 msgid "Import"
 msgstr "Importieren"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:379
 msgid "Import All"
 msgstr "Alle importieren"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:285
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:295
 msgid "Import cancelled"
 msgstr "Import abgebrochen"
 
@@ -14354,15 +14354,15 @@ msgstr "Import abgebrochen"
 msgid "Import cases"
 msgstr "Testfälle importieren"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:401
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:418
 msgid "Import complete!"
 msgstr "Import abgeschlossen!"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:316
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:333
 msgid "Import Conversations"
 msgstr "Unterhaltungen importieren"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:315
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:332
 msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr ""
 
@@ -14374,12 +14374,12 @@ msgstr ""
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "Unterhaltungen aus ChatGPT, Google Gemini oder Claude importieren. Lade deine exportierte JSON- oder ZIP-Datei hoch."
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:134
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:415
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:144
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:432
 msgid "Import failed"
 msgstr "Import fehlgeschlagen"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:406
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
 msgstr "Weitere importieren"
 
@@ -14387,7 +14387,7 @@ msgstr "Weitere importieren"
 msgid "Import Notion export (.zip)"
 msgstr "Notion-Export importieren (.zip)"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:212
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr ""
 
@@ -14438,7 +14438,7 @@ msgid "Imported skill \"{0}\""
 msgstr "Skill „{0}“ importiert"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:379
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:396
 msgid "Importing from {0}..."
 msgstr "Wird aus {0} importiert..."
 
@@ -15434,7 +15434,7 @@ msgstr "Letztes Bild"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:440
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:461
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "Letzter Import: {0} Unterhaltungen aus {1} am {2}"
 
@@ -16511,7 +16511,7 @@ msgstr "Teilnehmer verwalten"
 msgid "Manage Publication"
 msgstr "Veröffentlichung verwalten"
 
-#: src/features/billing/components/personal-plan-card.tsx:35
+#: src/features/billing/components/personal-plan-card.tsx:37
 msgid "Manage subscription"
 msgstr "Abonnement verwalten"
 
@@ -16524,7 +16524,7 @@ msgstr "Tags verwalten"
 msgid "Manage tags…"
 msgstr "Tags verwalten…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:197
+#: src/features/auth/components/organization/billing-settings-card.tsx:199
 msgid "Manage Team subscription"
 msgstr "Team-Abonnement verwalten"
 
@@ -18441,7 +18441,7 @@ msgstr "Kein Inhalt"
 msgid "No content to display"
 msgstr "Kein Inhalt zum Anzeigen"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:221
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:231
 msgid "No conversations found in the file."
 msgstr "Keine Konversationen in der Datei gefunden."
 
@@ -19397,7 +19397,7 @@ msgstr "Nur 3B aktivierte Parameter pro Token für mehr Effizienz"
 msgid "Only in one run"
 msgstr "Nur in einem Durchlauf"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:134
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
 msgid "Only organization owners can manage billing settings"
 msgstr "Nur Organisationsinhaber können Abrechnungseinstellungen verwalten"
 
@@ -20363,7 +20363,7 @@ msgstr "Paralleler Vergleich"
 msgid "Paris"
 msgstr "Paris"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:352
 msgid "Parsing file..."
 msgstr "Datei wird verarbeitet..."
 
@@ -20569,6 +20569,11 @@ msgstr "Pausiert"
 #: src/features/marketing/components/gateway-landing-page.tsx:723
 msgid "Pay for what <0>you use.</0>"
 msgstr "Zahle nur, <0>was du nutzt.</0>"
+
+#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/billing/components/personal-plan-card.tsx:52
+msgid "Pay yearly"
+msgstr "Jährlich bezahlen"
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:210
 msgid "Payments, orders, invoices, and subscriptions via PayPal"
@@ -21452,7 +21457,7 @@ msgstr "Standardmäßig privat"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
 #: src/components/model-picker/model-picker.tsx:313
-#: src/features/billing/components/personal-plan-card.tsx:23
+#: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:132
 #: src/features/marketing/components/landing-page.tsx:344
 #: src/features/settings/components/chat/models-settings.tsx:556
@@ -21460,7 +21465,7 @@ msgstr "Standardmäßig privat"
 msgid "Pro"
 msgstr "Pro"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Pro is your own plan: every model and 1,000 messages a day."
 msgstr "Pro ist dein eigener Plan: jedes Modell und 1.000 Nachrichten pro Tag."
 
@@ -22727,7 +22732,7 @@ msgstr "{fileName} entfernen"
 msgid "Remove {label}"
 msgstr "{label} entfernen"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:245
+#: src/features/auth/components/organization/billing-settings-card.tsx:262
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "{model} entfernen"
@@ -23217,8 +23222,8 @@ msgstr "Ergebnis"
 msgid "Resume"
 msgstr "Fortsetzen"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:419
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:432
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:438
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:453
 msgid "Resume import"
 msgstr "Import fortsetzen"
 
@@ -23710,8 +23715,8 @@ msgstr "Saudi-Arabien"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:160
-#: src/features/auth/components/organization/billing-settings-card.tsx:291
+#: src/features/auth/components/organization/billing-settings-card.tsx:162
+#: src/features/auth/components/organization/billing-settings-card.tsx:308
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -24287,7 +24292,7 @@ msgstr "Diktatsprache auswählen"
 msgid "Select duration"
 msgstr "Dauer auswählen"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
 msgid "Select File"
 msgstr "Datei auswählen"
 
@@ -24405,7 +24410,7 @@ msgstr "Bis zur letzten Spalte auswählen"
 msgid "Select to top of table"
 msgstr "Bis zum Anfang der Tabelle auswählen"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:238
+#: src/features/auth/components/organization/billing-settings-card.tsx:255
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "Wähle aus, welche KI-Modelle Organisationsmitglieder verwenden können. Für Enterprise leer lassen, um alle Modelle zu erlauben."
 
@@ -25173,7 +25178,7 @@ msgid "Skipped"
 msgstr "Übersprungen"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
 msgid "Skipped files that are not chat exports: {0}"
 msgstr ""
 
@@ -25882,7 +25887,7 @@ msgstr "Wird gestartet"
 msgid "Starting {0}…"
 msgstr "{0} wird gestartet…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:388
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:405
 msgid "Starting import..."
 msgstr "Import wird gestartet..."
 
@@ -26438,7 +26443,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "Die Erfolgskriterien dürfen höchstens {CRITERIA_MAX} Zeichen lang sein"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:130
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:139
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "{imported} Konversationen von {0} erfolgreich importiert"
 
@@ -26523,7 +26528,7 @@ msgstr "Hervorragende Codegenerierung und Refactoring über mehrere Dateien"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Hervorragendes Verständnis komplexer visueller Konzepte"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:343
 msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
 msgstr ""
 
@@ -27939,7 +27944,7 @@ msgstr "Dadurch werden die Modelldateien von deinem Computer entfernt. Du kannst
 msgid "This run is no longer available."
 msgstr "Dieser Durchlauf ist nicht mehr verfügbar."
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:227
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:237
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr ""
 
@@ -28680,7 +28685,7 @@ msgstr "Erneut versuchen"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:421
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "Erneut versuchen"
 
@@ -29310,14 +29315,22 @@ msgstr "Neuigkeiten"
 msgid "Upgrade"
 msgstr "Upgraden"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:208
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
 msgid "Upgrade organization to Team"
 msgstr "Organisation auf Team upgraden"
 
-#: src/features/billing/components/personal-plan-card.tsx:47
+#: src/features/auth/components/organization/billing-settings-card.tsx:211
+msgid "Upgrade organization to Team, monthly"
+msgstr "Organisation auf Team upgraden, monatlich"
+
+#: src/features/billing/components/personal-plan-card.tsx:63
 #: src/features/layout/components/nav-user.tsx:255
 msgid "Upgrade to Pro"
 msgstr "Auf Pro upgraden"
+
+#: src/features/billing/components/personal-plan-card.tsx:63
+msgid "Upgrade to Pro, monthly"
+msgstr "Auf Pro upgraden, monatlich"
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:472
 #: src/features/auth/components/organization/create-organization-dialog.tsx:255
@@ -29426,7 +29439,7 @@ msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} wird hochgeladen"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
 msgid "Uploading data for import from {0}..."
 msgstr "Daten für Import von {0} werden hochgeladen..."
 
@@ -31333,7 +31346,7 @@ msgstr "Deine Wissensdatenbank ist voll. {failed} Dokument(e) wurden nicht hinzu
 msgid "Your knowledge base is full. Remove files to add more."
 msgstr "Deine Wissensdatenbank ist voll. Entferne Dateien, um weitere hinzuzufügen."
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:430
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:451
 msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
 msgstr "Dein letzter Import wurde vor dem Abschluss beendet. Setze ihn fort, um die verbleibenden Unterhaltungen zu importieren."
 
@@ -31381,11 +31394,11 @@ msgstr "Dein eigener OpenAI-Schlüssel – wird für OpenAI-Modelle verwendet un
 msgid "Your pages"
 msgstr "Deine Seiten"
 
-#: src/features/billing/components/personal-plan-card.tsx:20
+#: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Your plan"
 msgstr "Dein Plan"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:188
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "Dein Plan und dein Guthaben richten sich nach deinem Abonnement."
 

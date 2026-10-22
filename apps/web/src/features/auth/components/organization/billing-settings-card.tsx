@@ -19,6 +19,7 @@ import type { SettingsCardProperties } from "@/components/settings/settings-card
 import SettingsCard from "@/components/settings/settings-card";
 import { useActiveOrganization, useHasPermission } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import useBillingOptions from "@/features/billing/hooks/use-billing-options";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -55,6 +56,7 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
 
     const updateBillingMutation = useMutation(crpc.auth.billing.updateBillingSettings.mutationOptions());
     const { isPending: checkoutPending, openPortal, startCheckout } = useCheckout();
+    const { yearly } = useBillingOptions();
 
     const [selectedModels, setSelectedModels] = useState<string[]>(billingInfo?.allowedModels ?? []);
     const selectedModelSet = new Set(selectedModels);
@@ -197,16 +199,31 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
                                             {t`Manage Team subscription`}
                                         </Button>
                                     ) : (
-                                        <Button
-                                            disabled={checkoutPending}
-                                            onClick={() => {
-                                                void startCheckout("team");
-                                            }}
-                                            size="sm"
-                                            type="button"
-                                        >
-                                            {t`Upgrade organization to Team`}
-                                        </Button>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Button
+                                                disabled={checkoutPending}
+                                                onClick={() => {
+                                                    void startCheckout("team");
+                                                }}
+                                                size="sm"
+                                                type="button"
+                                            >
+                                                {yearly.team ? t`Upgrade organization to Team, monthly` : t`Upgrade organization to Team`}
+                                            </Button>
+                                            {yearly.team ? (
+                                                <Button
+                                                    disabled={checkoutPending}
+                                                    onClick={() => {
+                                                        void startCheckout("team", "year");
+                                                    }}
+                                                    size="sm"
+                                                    type="button"
+                                                    variant="outline"
+                                                >
+                                                    {t`Pay yearly`}
+                                                </Button>
+                                            ) : null}
+                                        </div>
                                     )}
                                 </div>
 

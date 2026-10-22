@@ -9254,6 +9254,18 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "interval": {
+                        "anyOf": [
+                          {
+                            "const": "month",
+                            "type": "string"
+                          },
+                          {
+                            "const": "year",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "plan": {
                         "anyOf": [
                           {
@@ -9318,6 +9330,81 @@
           "billing"
         ],
         "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#billing_checkout:getBillingOptions": {
+      "post": {
+        "description": "Invoke the `query` `billing_checkout:getBillingOptions` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "billing_checkout:getBillingOptions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "billing_checkout:getBillingOptions",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "yearly": {
+                      "properties": {
+                        "pro": {
+                          "type": "boolean"
+                        },
+                        "team": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "pro",
+                        "team"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "yearly"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: billing_checkout:getBillingOptions",
+        "tags": [
+          "billing"
+        ],
+        "x-lunora-function-kind": "query"
       }
     },
     "/_lunora/rpc#billing_checkout:getMyPlan": {

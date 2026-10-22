@@ -14,9 +14,10 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
-import { CREEM_PRODUCT_PRO, CREEM_PRODUCT_TEAM, CREEM_WEBHOOK_SECRET } from "../env";
+import { CREEM_WEBHOOK_SECRET } from "../env";
 import { logger } from "../lib/logger";
 import { subscriptionUpdateOf } from "./plans";
+import { planProducts } from "./products";
 
 const billingLogger = logger.scope("billing");
 
@@ -93,7 +94,7 @@ export const processCreemWebhook = internalAction
             return { applied, status: response.status };
         }
 
-        const update = subscription ? subscriptionUpdateOf(subscription, event, { pro: CREEM_PRODUCT_PRO, team: CREEM_PRODUCT_TEAM }) : undefined;
+        const update = subscription ? subscriptionUpdateOf(subscription, event, planProducts()) : undefined;
 
         if (update) {
             await ctx.runMutation(internal.auth.billing.applyCreemSubscription, update);

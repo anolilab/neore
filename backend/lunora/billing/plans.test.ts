@@ -9,9 +9,10 @@ import { LunoraError } from "lunorash/server";
 import { describe, expect, it } from "vitest";
 
 import { resolveUserPlan } from "../auth/lib/plan";
-import { billingOrganizationOf, creemTierPatch, portalCustomerFor, subscriptionUpdateOf, tierForSubscription } from "./plans";
+import { billingOrganizationOf, creemTierPatch, planOfProduct, portalCustomerFor, productFor, subscriptionUpdateOf, tierForSubscription } from "./plans";
 
 const PRODUCTS = { pro: "prod_pro", team: "prod_team" };
+const WITH_YEARLY = { ...PRODUCTS, yearly: { pro: "prod_pro_year", team: "prod_team_year" } };
 
 describe(tierForSubscription, () => {
     it.each([
@@ -151,5 +152,45 @@ describe(portalCustomerFor, () => {
     it("refuses another owner of the organization, and a subject that never subscribed", () => {
         expect(() => portalCustomerFor("u2", { creemCustomerId: "cus_1", creemPurchaserId: "u1" })).toThrow(LunoraError);
         expect(() => portalCustomerFor("u1", { creemCustomerId: null, creemPurchaserId: "u1" })).toThrow("no subscription");
+    });
+});
+
+describe("yearly products", () => {
+    const subscription = (priceId: string, referenceId: string, state = "active") => ({ id: "sub_1", priceId, referenceId, state }) as never;
+
+    it("sell the same plan as their monthly twin", () => {
+        expect(planOfProduct("prod_pro_year", WITH_YEARLY)).toBe("pro");
+        expect(planOfProduct("prod_team_year", WITH_YEARLY)).toBe("team");
+        expect(planOfProduct("prod_pro", WITH_YEARLY)).toBe("pro");
+    });
+
+    it("grant the same tier, and land on the same row, as the monthly plan", () => {
+        expect(tierForSubscription({ priceId: "prod_pro_year", state: "active" }, WITH_YEARLY)).toBe("pro");
+        expect(subscriptionUpdateOf(subscription("prod_team_year", "org_1"), { customerId: "cust_1", purchaserId: "u1" }, WITH_YEARLY)).toMatchObject({
+            baseTier: "pro",
+            creemPurchaserId: "u1",
+            referenceId: "org_1",
+            subject: "organization",
+        });
+        expect(subscriptionUpdateOf(subscription("prod_pro_year", "user_1", "canceled"), {}, WITH_YEARLY)).toMatchObject({ baseTier: "free", subject: "user" });
+    });
+
+    it("grant nothing when yearly is not configured, even for an empty or unknown id", () => {
+        expect(planOfProduct("prod_pro_year", PRODUCTS)).toBeUndefined();
+        expect(planOfProduct("", { ...PRODUCTS, yearly: { pro: "", team: "" } })).toBeUndefined();
+        expect(planOfProduct("prod_other", WITH_YEARLY)).toBeUndefined();
+    });
+});
+
+describe(productFor, () => {
+    it("picks the product for the plan and period", () => {
+        expect(productFor("pro", "month", WITH_YEARLY)).toBe("prod_pro");
+        expect(productFor("pro", "year", WITH_YEARLY)).toBe("prod_pro_year");
+        expect(productFor("team", "year", WITH_YEARLY)).toBe("prod_team_year");
+    });
+
+    it("answers an empty id for a yearly product that is not configured", () => {
+        expect(productFor("pro", "year", PRODUCTS)).toBe("");
+        expect(productFor("team", "year", { ...PRODUCTS, yearly: { pro: "x", team: "" } })).toBe("");
     });
 });
