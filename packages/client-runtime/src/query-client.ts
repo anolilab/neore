@@ -1,14 +1,8 @@
 /**
- * The app's TanStack QueryClient.
+ * The app's TanStack QueryClient. No default `queryFn` or `hashFn` is set: `lunoraQueryOptions`,
+ * which every `crpc.*.queryOptions()` call goes through, supplies its own `queryFn` and `queryKey`.
  *
- * Ported from the previous query-client.ts, which took the old QueryClient
- * from a helper library purely to borrow its `queryFn()` and `hashFn()` as defaults. Lunora
- * needs neither: `lunoraQueryOptions` — which every `crpc.*.queryOptions()` call
- * goes through — supplies its own `queryFn` and `queryKey`, so there is nothing
- * for a default to do and no client to thread in.
- *
- * The retry policy is the part worth keeping, and it is unchanged in behaviour:
- * deterministic client errors are never retried, auth errors get two attempts to
+ * Retry policy: deterministic client errors are never retried, auth errors get two attempts to
  * cover the reconnection race where a query fires before the refreshed JWT has
  * propagated, everything else gets three.
  */
@@ -29,11 +23,7 @@ export const hydrationConfig = {
     },
 };
 
-/**
- * The previous `isCRPCError` predicate was "this came from the backend at all". Lunora
- * has no single predicate for that, but `getErrorCode` returns a code only for
- * errors it recognises — which is the same question.
- */
+/** Whether the error came from the backend at all: `getErrorCode` returns a code only for errors it recognises. */
 const isBackendError = (error: unknown): boolean => getErrorCode(error) !== undefined;
 
 export const createQueryClient = (): QueryClient =>
@@ -59,7 +49,6 @@ export const createQueryClient = (): QueryClient =>
 
                     return failureCount < 3;
                 },
-                // Exponential backoff with max 30s
                 retryDelay: (attemptIndex) => Math.min(2000 * 2 ** attemptIndex, 30_000),
                 staleTime: 30_000,
             },

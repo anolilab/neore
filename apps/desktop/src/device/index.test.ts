@@ -122,7 +122,7 @@ const { DEVICE_CHANNEL, LOCAL_CHANNEL } = await import("./channels");
 
 const SITE_ORIGIN = new URL("https://neore.example");
 const options: DeviceIpcOptions = {
-    isTrusted: (event) => isTrustedUrl(SITE_ORIGIN, (event as unknown as IpcEvent).senderFrame?.url),
+    isTrusted: (event) => isTrustedUrl(SITE_ORIGIN, event.senderFrame?.url),
 };
 
 const siteWebContents = (url: string): WebContents => {

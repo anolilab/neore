@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { isTrustedUrl } from "./trust.js";
 import { clampBadgeCount, createSetBadgeHandler, MAX_BADGE_COUNT } from "./badge.js";
+import { isTrustedUrl } from "./trust.js";
 
 const origin = new URL("https://neore.ai");
-const sender = (url: string | undefined) => ({ senderFrame: url === undefined ? undefined : { url } });
+const sender = (url: string | undefined) => {
+    return { senderFrame: url === undefined ? undefined : { url } };
+};
 
 const setup = (platform: NodeJS.Platform = "darwin") => {
     const setBadgeCount = vi.fn();
@@ -25,7 +27,7 @@ describe("clampBadgeCount", () => {
         expect(clampBadgeCount(input)).toBe(expected);
     });
 
-    it.each([["5"], [undefined], [null], [Number.NaN], [Number.POSITIVE_INFINITY]])("refuses %s", (input) => {
+    it.each([["5"], [undefined], [null], [NaN], [Infinity]])("refuses %s", (input) => {
         expect(() => clampBadgeCount(input)).toThrow(TypeError);
     });
 });

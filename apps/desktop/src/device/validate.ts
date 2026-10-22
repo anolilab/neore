@@ -70,5 +70,3 @@ export const readPromptAnswer = (id: unknown, answer: unknown): { answer: string
 
     return { answer, id };
 };
-
-export { MAX_ENVELOPE_BYTES };

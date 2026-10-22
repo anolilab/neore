@@ -108,7 +108,7 @@ const recordExternalOpens = (app: ElectronApplication): Promise<void> =>
     });
 
 const openedUrls = (app: ElectronApplication): Promise<string[]> =>
-    app.evaluate(() => (globalThis as unknown as { neoreOpened?: string[] }).neoreOpened ?? []);
+    app.evaluate(() => (globalThis as { neoreOpened?: string[] }).neoreOpened ?? []);
 
 test("loads the site and exposes the bridge only there", async () => {
     const app = await launch();
@@ -184,7 +184,7 @@ test("creates the tray, and a Quick Composer window on its own local page", asyn
     try {
         await siteWindow(app);
 
-        expect(await app.evaluate(() => (globalThis as unknown as { neoreShell?: { tray: boolean } }).neoreShell?.tray)).toBe(true);
+        expect(await app.evaluate(() => (globalThis as { neoreShell?: { tray: boolean } }).neoreShell?.tray)).toBe(true);
         expect(await siteWindowCount(app)).toBe(1);
 
         const composer = await composerPage(app);

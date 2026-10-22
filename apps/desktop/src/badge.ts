@@ -15,7 +15,7 @@ export const clampBadgeCount = (value: unknown): number => {
     return Math.min(MAX_BADGE_COUNT, Math.max(0, Math.trunc(value)));
 };
 
-export const supportsBadge = (platform: NodeJS.Platform): boolean => platform === "darwin" || platform === "linux";
+const supportsBadge = (platform: NodeJS.Platform): boolean => platform === "darwin" || platform === "linux";
 
 /** The sender shape the main process checks; `senderFrame` is what `isTrustedUrl` reads. */
 export interface BadgeSender {
@@ -26,16 +26,16 @@ export interface BadgeSender {
  * The `neore:set-badge` handler. An untrusted sender is refused before the
  * payload is looked at; on a platform without a badge the call is accepted and does nothing.
  */
-export const createSetBadgeHandler =
-    <Event extends BadgeSender>(deps: { isTrusted: (event: Event) => boolean; platform: NodeJS.Platform; setBadgeCount: (count: number) => void }) =>
-    (event: Event, payload: unknown): void => {
-        if (!deps.isTrusted(event)) {
-            throw new Error("setBadge: untrusted sender");
-        }
+export const createSetBadgeHandler
+    = <Event extends BadgeSender>(dependencies: { isTrusted: (event: Event) => boolean; platform: NodeJS.Platform; setBadgeCount: (count: number) => void }) =>
+        (event: Event, payload: unknown): void => {
+            if (!dependencies.isTrusted(event)) {
+                throw new Error("setBadge: untrusted sender");
+            }
 
-        const count = clampBadgeCount(payload);
+            const count = clampBadgeCount(payload);
 
-        if (supportsBadge(deps.platform)) {
-            deps.setBadgeCount(count);
-        }
-    };
+            if (supportsBadge(dependencies.platform)) {
+                dependencies.setBadgeCount(count);
+            }
+        };

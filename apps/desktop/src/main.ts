@@ -16,6 +16,8 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notific
 import { createSetBadgeHandler } from "./badge.js";
 import { CAPABILITIES_ARG, CHANNEL, SITE_ORIGIN_ARG } from "./channels.js";
 import { registerDeviceIpc } from "./device/index.js";
+import type { DroppedFile } from "./dropped-files.js";
+import { queueDroppedFiles, readDroppedFiles } from "./dropped-files.js";
 import { loginItemMenuState } from "./login-item.js";
 import type { PendingSignIn, SignInHandoff } from "./sign-in.js";
 import { beginSignIn, completeSignIn, isBlockedOauthUrl, parseSignInCallback } from "./sign-in.js";
@@ -31,6 +33,7 @@ interface ShellState {
     isQuitting: boolean;
     mainWindow?: BrowserWindow;
     pendingCompose?: string;
+    pendingFiles?: DroppedFile[];
     pendingSignIn?: SignInHandoff;
     signInFlow?: PendingSignIn;
     tray?: Tray;
@@ -39,6 +42,7 @@ interface ShellState {
 const origin = siteOrigin();
 const composerPage = pathToFileURL(path.join(__dirname, "quick-composer", "index.html"));
 const ALLOWED_PERMISSIONS = new Set(["clipboard-sanitized-write", "media", "notifications"]);
+// eslint-disable-next-line no-secrets/no-secrets -- a keyboard accelerator, not a credential
 const QUICK_COMPOSER_SHORTCUT = "CommandOrControl+Shift+Space";
 
 /**
@@ -177,15 +181,17 @@ const saveWindowState = (win: BrowserWindow): void => {
 };
 
 /** What every site window gets: the site preload, isolated and sandboxed. */
-const siteWebPreferences = (): WebPreferences => ({
-    additionalArguments: [`${SITE_ORIGIN_ARG}${origin.origin}`, `${CAPABILITIES_ARG}${siteCapabilities().join(",")}`],
-    contextIsolation: true,
-    nodeIntegration: false,
-    preload: path.join(__dirname, "preload.cjs"),
-    sandbox: true,
-    webSecurity: true,
-    webviewTag: false,
-});
+const siteWebPreferences = (): WebPreferences => {
+    return {
+        additionalArguments: [`${SITE_ORIGIN_ARG}${origin.origin}`, `${CAPABILITIES_ARG}${siteCapabilities().join(",")}`],
+        contextIsolation: true,
+        nodeIntegration: false,
+        preload: path.join(__dirname, "preload.cjs"),
+        sandbox: true,
+        webSecurity: true,
+        webviewTag: false,
+    };
+};
 
 /** Popups, navigation and webviews of a site window: same-origin stays in the app, sign-in goes to the system browser, the rest is refused. */
 const guardSiteWindow = (win: BrowserWindow): void => {
@@ -248,7 +254,7 @@ const createMainWindow = (): BrowserWindow => {
         minWidth: 420,
         title: "Neore",
         ...macTitleBar,
-        ...(saved === undefined ? {} : { x: saved.bounds.x, y: saved.bounds.y }),
+        ...saved !== undefined && { x: saved.bounds.x, y: saved.bounds.y },
         webPreferences: siteWebPreferences(),
         width: saved?.bounds.width ?? DEFAULT_SIZE.width,
     });
@@ -304,6 +310,17 @@ const focusMain = (): void => {
 
     mainWindow.show();
     mainWindow.focus();
+};
+
+/** Like `handOffCompose`: the files are held for `takePendingFiles`, and the event only tells the page to ask. */
+const handOffFiles = (files: DroppedFile[]): void => {
+    if (files.length === 0) {
+        return;
+    }
+
+    state.pendingFiles = queueDroppedFiles(state.pendingFiles, files);
+    focusMain();
+    state.mainWindow?.webContents.send(CHANNEL.files);
 };
 
 /** The text is handed over through `takePendingCompose`; the event only tells the page to ask. */
@@ -554,6 +571,18 @@ const registerIpc = (): void => {
         return text;
     });
 
+    ipcMain.handle(CHANNEL.takePendingFiles, (event): DroppedFile[] => {
+        if (!isTrusted(event)) {
+            return [];
+        }
+
+        const files = state.pendingFiles ?? [];
+
+        state.pendingFiles = undefined;
+
+        return files;
+    });
+
     ipcMain.handle(CHANNEL.startBrowserSignIn, (event): void => {
         if (!isTrusted(event)) {
             throw new Error("sign-in: untrusted sender");
@@ -686,6 +715,13 @@ app.on("ready", start);
 app.on("open-url", (event, url) => {
     event.preventDefault();
     handleDeepLink(url);
+});
+
+// macOS: a file dragged onto the dock icon. Waits for `ready`, because the window it may open needs the app ready.
+app.on("open-file", async (event, filePath) => {
+    event.preventDefault();
+    await app.whenReady();
+    handOffFiles(await readDroppedFiles([filePath]));
 });
 
 app.on("second-instance", (_event, argv) => {

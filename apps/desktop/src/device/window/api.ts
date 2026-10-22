@@ -3,6 +3,7 @@ import type { Prompt, SettingsView } from "../types";
 
 declare global {
     // The preload exposes this on the page's global object; the device page reads it from there.
+    // eslint-disable-next-line vars-on-top -- declare global takes var, not let or const
     var neoreDevice: DeviceWindowApi;
 }
 

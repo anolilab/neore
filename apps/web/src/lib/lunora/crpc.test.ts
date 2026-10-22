@@ -1,3 +1,4 @@
+import { connectLiveQueries, forgetAllUnlockProofs, rememberUnlockProof } from "@neore/client-runtime";
 import type { QueryKey } from "@tanstack/react-query";
 import { QueryClient } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
@@ -5,8 +6,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiPath } from "./crpc";
 import { runLunoraAction, useCRPC } from "./crpc";
-import { connectLiveQueries } from "@neore/client-runtime";
-import { forgetAllUnlockProofs, rememberUnlockProof } from "@neore/client-runtime";
 
 const harness = vi.hoisted(() => {
     const client = {

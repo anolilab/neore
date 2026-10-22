@@ -9,25 +9,19 @@ export interface Signed {
     signature: string;
 }
 
-export interface DeviceStatus {
-    accountLabel: string | null;
-    deviceId: string | null;
-    platform: "linux" | "macos" | "windows";
-}
-
 export interface Prompt {
     body:
         | { accountLabel: string; kind: "pairing" }
         | {
-              allowAlways: boolean;
-              detail: string;
-              input: string;
-              kind: "call";
-              taintedBy: string[];
-              threadTitle: string;
-              tool: string;
-              toolKind: string;
-          };
+            allowAlways: boolean;
+            detail: string;
+            input: string;
+            kind: "call";
+            taintedBy: string[];
+            threadTitle: string;
+            tool: string;
+            toolKind: string;
+        };
     expiresAt: number;
     id: number;
 }

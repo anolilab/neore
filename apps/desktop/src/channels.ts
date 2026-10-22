@@ -2,16 +2,19 @@
 export const CHANNEL = {
     closeQuickComposer: "neore:close-quick-composer",
     compose: "neore:compose",
+    /** Files dropped on the dock icon are waiting: the page then calls `takePendingFiles`. */
+    files: "neore:files",
     notify: "neore:notify",
     /** Opens one thread in its own window; the site passes the thread id, the shell builds the URL. */
     openThreadWindow: "neore:open-thread-window",
-    /** The dock / launcher badge: the site reports its unread count. */
-    setBadge: "neore:set-badge",
     /** Quick Composer only: its own page sends these, nothing else. */
     quickCompose: "neore:quick-compose",
+    /** The dock / launcher badge: the site reports its unread count. */
+    setBadge: "neore:set-badge",
     signIn: "neore:sign-in",
     startBrowserSignIn: "neore:start-browser-sign-in",
     takePendingCompose: "neore:take-pending-compose",
+    takePendingFiles: "neore:take-pending-files",
     takePendingSignIn: "neore:take-pending-sign-in",
 } as const;
 

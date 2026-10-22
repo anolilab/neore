@@ -7,6 +7,7 @@ import type { DeviceCoreConstructor } from "./types";
  */
 export const loadDeviceCore = (): DeviceCoreConstructor => {
     const name = ["@neore", "device-core-node"].join("/");
+    // eslint-disable-next-line global-require, import/no-dynamic-require, @typescript-eslint/no-require-imports -- the addon is a native module resolved by name at runtime
     const addon = require(name) as { DeviceCore: DeviceCoreConstructor };
 
     return addon.DeviceCore;

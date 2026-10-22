@@ -113,12 +113,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const win = state.local;
 
         return (
-            win !== undefined &&
-            !win.isDestroyed() &&
-            event.sender === win.webContents &&
-            event.senderFrame !== null &&
-            event.senderFrame === win.webContents.mainFrame &&
-            event.senderFrame.url === localUrl
+            win !== undefined
+            && !win.isDestroyed()
+            && event.sender === win.webContents
+            && event.senderFrame !== null
+            && event.senderFrame === win.webContents.mainFrame
+            && event.senderFrame.url === localUrl
         );
     };
 
@@ -255,7 +255,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const parent = liveLocal();
         const result = parent === undefined ? await dialog.showOpenDialog(dialogOptions) : await dialog.showOpenDialog(parent, dialogOptions);
 
-        return result.canceled ? null : (result.filePaths[0] ?? null);
+        return result.canceled ? null : result.filePaths[0] ?? null;
     });
 
     // A native dialog, so the page cannot draw a confirmation that looks like one.
