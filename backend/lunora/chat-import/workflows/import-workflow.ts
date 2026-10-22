@@ -27,6 +27,7 @@ export interface ImportParams {
     jobId: Id<"chatImportJobs">;
     provider: string;
     r2Key: string;
+    runId: string;
     totalConversations: number;
     userId: string;
 }
@@ -35,7 +36,7 @@ export const chatImportWorkflowConfig: WorkflowConfig<ImportParams, void> = {
     handler: async (workflowContext): Promise<void> => {
         // Every step works on this user's rows, which live on their shard.
         const context = onUserShard(workflowContext, workflowContext.params.userId);
-        const { jobId, provider, r2Key, totalConversations, userId } = context.params;
+        const { jobId, provider, r2Key, runId, totalConversations, userId } = context.params;
 
         // Left unset when the run fails before reporting them: finalize then keeps the counts each batch committed.
         let imported: number | undefined;
@@ -79,7 +80,7 @@ export const chatImportWorkflowConfig: WorkflowConfig<ImportParams, void> = {
                     imported,
                     jobId,
                     r2Key,
-                    runId: workflowContext.event.instanceId,
+                    runId,
                     status: isFailedRun ? "failed" : "completed",
                     userId,
                 }),

@@ -227,6 +227,7 @@ export interface Doc_chatImportJobs {
     progress?: number;
     provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore";
     r2Key?: string;
+    runId?: string;
     status: "pending" | "processing" | "completed" | "failed";
     totalConversations: number;
     userId: string;
@@ -2952,6 +2953,7 @@ export interface Insert_chatImportJobs {
     progress?: number;
     provider: "chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore";
     r2Key?: string;
+    runId?: string;
     status: "pending" | "processing" | "completed" | "failed";
     totalConversations: number;
     userId: string;

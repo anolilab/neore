@@ -2,6 +2,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation } from "../_generated/server";
+import { chatLogger } from "../lib/logger";
 import { withDependency } from "../lib/dependency";
 import { withoutUndefined } from "../lib/patch";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
@@ -13,15 +14,27 @@ export const startImportWorkflow = internalAction
         jobId: v.id("chatImportJobs"),
         provider: v.string(),
         r2Key: v.string().max(MAX_LENGTH.key),
+        runId: v.string().max(MAX_LENGTH.id),
         totalConversations: v.number(),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .action(async ({ args, ctx: context }) => {
         try {
             await withDependency("workflow engine", () => context.workflows.get("chatImportWorkflow").create({ params: args }));
-        } catch {
+        } catch (error) {
+            // The cause is kept in the logs: the user only sees that the start failed.
+            chatLogger.error(
+                "chat import: workflow could not start",
+                { isRestart: args.r2Key === keptImportKeyFor(args.userId, args.jobId), jobId: args.jobId },
+                error,
+            );
             // No workflow will run to finish the job, so fail it here: otherwise it stays processing and blocks every later import.
-            await context.runMutation(internal.chat_import.workflow_actions.failImportStart, { jobId: args.jobId, r2Key: args.r2Key, userId: args.userId });
+            await context.runMutation(internal.chat_import.workflow_actions.failImportStart, {
+                jobId: args.jobId,
+                r2Key: args.r2Key,
+                runId: args.runId,
+                userId: args.userId,
+            });
         }
     });
 
@@ -31,12 +44,18 @@ export const startImportWorkflow = internalAction
  * job is not restartable and the user starts again.
  */
 export const failImportStart = internalMutation
-    .input({ jobId: v.id("chatImportJobs"), r2Key: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
+    .input({
+        jobId: v.id("chatImportJobs"),
+        r2Key: v.string().max(MAX_LENGTH.key),
+        runId: v.string().max(MAX_LENGTH.id),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
         const job = await context.db.get(args.jobId);
 
-        if (!job || job.status !== "processing") {
+        // Only the run that failed to start may fail the job: a stale start must not fail a newer run.
+        if (!job || job.status !== "processing" || job.runId !== args.runId) {
             return null;
         }
 

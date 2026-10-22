@@ -404,6 +404,8 @@ export const schema = defineSchema({
         progress: v.optional(v.number()),
         provider: v.union(v.literal("chatgpt"), v.literal("gemini"), v.literal("claude"), v.literal("claude-code"), v.literal("codex"), v.literal("neore")),
         r2Key: v.optional(v.string()),
+        /** The run the job is on: a start or a restart mints it, and the workflow's finalize only acts for that run. */
+        runId: v.optional(v.string()),
         status: v.union(v.literal("pending"), v.literal("processing"), v.literal("completed"), v.literal("failed")),
         totalConversations: v.number(),
         userId: v.string(),

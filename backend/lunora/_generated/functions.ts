@@ -8501,9 +8501,9 @@ export interface Caller {
             updateImportProgress: (args: { currentStep?: string; failedConversations?: number; importedConversations?: number; jobId: Id<"chatImportJobs">; progress?: number; totalConversations?: number }) => Promise<null>;
         };
         workflow_actions: {
-            default: (args: { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }) => Promise<void>;
-            failImportStart: (args: { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }) => Promise<null>;
-            startImportWorkflow: (args: { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }) => Promise<void>;
+            default: (args: { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; runId: string; totalConversations: number; userId: string }) => Promise<void>;
+            failImportStart: (args: { jobId: Id<"chatImportJobs">; r2Key: string; runId: string; userId: string }) => Promise<null>;
+            startImportWorkflow: (args: { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; runId: string; totalConversations: number; userId: string }) => Promise<void>;
         };
     };
     coding_agents: {

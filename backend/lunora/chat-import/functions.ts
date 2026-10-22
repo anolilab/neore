@@ -127,6 +127,7 @@ export const startImportJob = authMutation
             progress: 0,
             provider: input.provider,
             r2Key,
+            runId: String(ctx.now),
             status: "processing",
             totalConversations: input.totalConversations,
             userId,
@@ -137,6 +138,7 @@ export const startImportJob = authMutation
             jobId,
             provider: input.provider,
             r2Key,
+            runId: String(ctx.now),
             totalConversations: input.totalConversations,
             userId,
         });
@@ -191,12 +193,16 @@ export const restartImportJob = authMutation
         }
 
         // `completedAt` and `errorMessage` go, so the reap scheduled for the failure no longer matches this job.
-        // `progress` is the resume point, not the 100 the failed run left behind.
+        // `progress` is the resume point, not the 100 the failed run left behind. `runId` is the new run: the failed run's
+        // finalize, if it is redelivered now, no longer matches the job and does nothing.
+        const runId = String(ctx.now);
+
         await patchRow(ctx.db, job, {
             completedAt: undefined,
             currentStep: "processing_conversations",
             errorMessage: undefined,
             progress: resumeProgress(job.importedConversations + (job.failedConversations ?? 0), job.totalConversations),
+            runId,
             status: "processing",
         });
 
@@ -204,6 +210,7 @@ export const restartImportJob = authMutation
             jobId,
             provider: job.provider,
             r2Key: job.r2Key ?? "",
+            runId,
             totalConversations: job.totalConversations,
             userId,
         });

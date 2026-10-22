@@ -39,6 +39,7 @@ const insertJob = (harness: ReturnType<typeof lunoraTest>, overrides: Record<str
                 importedConversations: 3,
                 provider: "chatgpt",
                 r2Key: KEPT,
+                runId: "run-1",
                 status: "failed",
                 totalConversations: 5,
                 userId: OWNER,
@@ -119,6 +120,8 @@ describe("restartImportJob", () => {
         expect(job.r2Key).toBe(KEPT);
         // 3 imported and 1 failed of 5: the bar resumes at 77%, not at the 100% the failed run left.
         expect(job.progress).toBe(77);
+        // The restart is a new run, so the failed run's finalize no longer owns the job.
+        expect(job.runId).not.toBe("run-1");
     });
 });
 
@@ -225,19 +228,31 @@ describe("finalizeImport", () => {
         expect(job.r2Key).toBe("");
     });
 
-    it("notifies once per run: a redelivered finalize reuses its run id, a restart is a new run", async () => {
+    it("notifies once for a run that finalizes twice", async () => {
         const harness = lunoraTest(schema as never);
         const jobId = await insertProcessing(harness);
         const failure = { errorMessage: "boom", status: "failed" };
 
         await finalize(harness, jobId, { ...failure, runId: "run-1" });
         await finalize(harness, jobId, { ...failure, runId: "run-1" });
-        await finalize(harness, jobId, { ...failure, runId: "run-2" });
 
         const rows = await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect());
-        const keys = rows.map((row: any) => row.dedupeKey);
 
-        expect(keys).toEqual([`chat_import:${jobId}:run-1`, `chat_import:${jobId}:run-2`]);
+        expect(rows.map((row: any) => row.dedupeKey)).toEqual([`chat_import:${jobId}:run-1`]);
+    });
+
+    it("does nothing for a run a restart has superseded", async () => {
+        const harness = lunoraTest(schema as never);
+        const jobId = await insertJob(harness, { completedAt: undefined, errorMessage: undefined, r2Key: "", runId: "run-2", status: "processing" });
+
+        await finalize(harness, jobId, { errorMessage: "boom", failed: 1, imported: 3, runId: "run-1", status: "failed" });
+
+        const job = await harness.run(async (ctx: any) => await ctx.db.get(jobId));
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect());
+
+        expect(job.status).toBe("processing");
+        expect(job.r2Key).toBe("");
+        expect(rows).toHaveLength(0);
     });
 
     it("keeps no copy of a completed import", async () => {

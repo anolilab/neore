@@ -120,7 +120,16 @@ export const processImportFile = internalAction
                 totalImported += result.imported;
                 totalFailed += result.failed;
             } catch {
-                totalFailed += batch.length;
+                // The batch may have committed before its response was lost. Its counts go with its threads, so adopt the saved
+                // counts when they moved; otherwise the batch did not commit and it counts as failed.
+                const committed = await context.runQuery(internal.chat_import.steps.importCounts, { jobId: args.jobId });
+
+                if (committed.imported + committed.failed > totalImported + totalFailed) {
+                    totalImported = committed.imported;
+                    totalFailed = committed.failed;
+                } else {
+                    totalFailed += batch.length;
+                }
             }
 
             // Update progress (5% reserved for init, 90% for processing, 5% for cleanup)
@@ -413,6 +422,11 @@ export const finalizeImport = internalMutation
             // Erased while the import ran: nothing refers to these objects any more.
             await scheduleObjectDeletion(context, [...doomed, keptKey]);
 
+            return null;
+        }
+
+        // A restart mints a new run for the job. This run's finalize, if it is redelivered after that, no longer owns the job.
+        if (job.runId !== args.runId) {
             return null;
         }
 

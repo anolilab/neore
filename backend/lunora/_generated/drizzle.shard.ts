@@ -129,6 +129,7 @@ export const chatImportJobs = sqliteTable("chatImportJobs", {
     progress: real("progress"),
     provider: text("provider", { mode: "json" }).$type<"chatgpt" | "gemini" | "claude" | "claude-code" | "codex" | "neore">().notNull(),
     r2Key: text("r2Key"),
+    runId: text("runId"),
     status: text("status", { mode: "json" }).$type<"pending" | "processing" | "completed" | "failed">().notNull(),
     totalConversations: real("totalConversations").notNull(),
     userId: text("userId").notNull(),

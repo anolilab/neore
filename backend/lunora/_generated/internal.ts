@@ -422,9 +422,9 @@ export interface InternalApiTypes {
             updateImportProgress: FunctionReference<"mutation", { currentStep?: string; failedConversations?: number; importedConversations?: number; jobId: Id<"chatImportJobs">; progress?: number; totalConversations?: number }, null>;
         };
         workflow_actions: {
-            default: FunctionReference<"action", { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }, void>;
-            failImportStart: FunctionReference<"mutation", { jobId: Id<"chatImportJobs">; r2Key: string; userId: string }, null>;
-            startImportWorkflow: FunctionReference<"action", { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; totalConversations: number; userId: string }, void>;
+            default: FunctionReference<"action", { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; runId: string; totalConversations: number; userId: string }, void>;
+            failImportStart: FunctionReference<"mutation", { jobId: Id<"chatImportJobs">; r2Key: string; runId: string; userId: string }, null>;
+            startImportWorkflow: FunctionReference<"action", { jobId: Id<"chatImportJobs">; provider: string; r2Key: string; runId: string; totalConversations: number; userId: string }, void>;
         };
     };
     coding_agents: {

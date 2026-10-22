@@ -77,6 +77,8 @@ const DataImport: FC = () => {
     const crpc = useCRPC();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [state, setState] = useState<ImportState>({ step: "idle" });
+    const [restarting, setRestarting] = useState(false);
+    const restartingRef = useRef(false);
 
     const { data: importStatus } = useQuery(crpc.chat_import.functions.getImportStatus.queryOptions({}));
 
@@ -297,9 +299,13 @@ const DataImport: FC = () => {
     }, [state, cancelImportJob, t]);
 
     const handleRestart = useCallback(async () => {
-        if (activeJobId === undefined) {
+        // A ref, not the state flag: two clicks in one tick both read the state before it updates.
+        if (activeJobId === undefined || restartingRef.current) {
             return;
         }
+
+        restartingRef.current = true;
+        setRestarting(true);
 
         try {
             const resumedFrom = jobCompletedAt ?? null;
@@ -308,6 +314,9 @@ const DataImport: FC = () => {
             setState({ jobId: activeJobId, provider: (jobProvider as ImportProvider) || "chatgpt", resumedFrom, step: "importing" });
         } catch (error) {
             setState({ message: describeError(error, i18n), step: "error" });
+        } finally {
+            restartingRef.current = false;
+            setRestarting(false);
         }
     }, [activeJobId, jobCompletedAt, jobProvider, restartImportJob, i18n]);
 
@@ -424,7 +433,11 @@ const DataImport: FC = () => {
                             <p className="mt-1">{state.message}</p>
                         </div>
                         <div className="flex gap-2">
-                            {state.jobId !== undefined && importStatus?.canRestart && <Button onClick={handleRestart}>{t`Resume import`}</Button>}
+                            {state.jobId !== undefined && importStatus?.canRestart && (
+                                <Button disabled={restarting} onClick={handleRestart}>
+                                    {t`Resume import`}
+                                </Button>
+                            )}
                             <Button onClick={handleReset} variant="outline">
                                 {t`Try Again`}
                             </Button>
@@ -436,7 +449,7 @@ const DataImport: FC = () => {
                 {state.step === "idle" && importStatus?.canRestart && (
                     <div className="space-y-3">
                         <p className="text-muted-foreground text-sm">{t`Your last import stopped before it finished. Resume it to import the conversations that are left.`}</p>
-                        <Button onClick={handleRestart} variant="outline">
+                        <Button disabled={restarting} onClick={handleRestart} variant="outline">
                             {t`Resume import`}
                         </Button>
                     </div>
