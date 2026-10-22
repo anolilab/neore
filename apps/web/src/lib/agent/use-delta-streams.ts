@@ -3,9 +3,8 @@ import { useQuery } from "@lunora/react";
 import { sorted } from "@neore/backend/agent/shared";
 import type { SyncStreamsReturnValue } from "@neore/backend/agent/types";
 import type { StreamArgs, StreamDelta, StreamMessage } from "@neore/backend/agent/validators";
-import { useState } from "react";
-
 import { shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
+import { useState } from "react";
 
 import type { StreamQuery, StreamQueryArgs } from "./types";
 

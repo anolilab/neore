@@ -13,13 +13,13 @@ The request was "a desktop app, it should be an Expo app". The evidence says
 Expo cannot be the desktop runtime, and following T3 Code (the owner's choice)
 means the same split.
 
-| Fact                                                                                                                                                                                                       | Source                                                                                                      |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Fact                                                                                                                                                                                                       | Source                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Expo supports iOS and Android. macOS is "out-of-tree" only; **Windows has no Expo target**. A maintainer said the team won't invest in desktop and pointed to Mac Catalyst.                                | [Expo docs](https://docs.expo.dev/modules/additional-platform-support/), [discussion](https://github.com/expo/expo/discussions/22273) |
-| The only route is `expo-desktop` (react-native-macos/windows): one maintainer, "best-effort", no releases.                                                                                                 | [shirakaba/expo-desktop](https://github.com/shirakaba/expo-desktop)                                         |
-| An "Expo Desktop launch" article that circulates is uncorroborated; the page we fetched was a sign-in landing page. Treat it as false until Expo says so.                                                  | —                                                                                                           |
-| Neore's heavy features are DOM-only: Univer (sheets), Fabric.js (design), tiptap (pages), Streamdown/KaTeX/Mermaid, React Flow. None has a react-native-macos/windows equivalent, so "all features" fails. | `apps/web/src/features/{canvas,pages,workflow,slides}`                                                      |
-| The reference apps split the same way: **T3 Code** = Electron 44 desktop + **Expo 58 / RN 0.88** mobile + shared web UI; **opencode** desktop = Electron 44 (`packages/desktop`).                          | `gh api` on both repos, 2026-10-19                                                                          |
+| The only route is `expo-desktop` (react-native-macos/windows): one maintainer, "best-effort", no releases.                                                                                                 | [shirakaba/expo-desktop](https://github.com/shirakaba/expo-desktop)                                                                   |
+| An "Expo Desktop launch" article that circulates is uncorroborated; the page we fetched was a sign-in landing page. Treat it as false until Expo says so.                                                  | —                                                                                                                                     |
+| Neore's heavy features are DOM-only: Univer (sheets), Fabric.js (design), tiptap (pages), Streamdown/KaTeX/Mermaid, React Flow. None has a react-native-macos/windows equivalent, so "all features" fails. | `apps/web/src/features/{canvas,pages,workflow,slides}`                                                                                |
+| The reference apps split the same way: **T3 Code** = Electron 44 desktop + **Expo 58 / RN 0.88** mobile + shared web UI; **opencode** desktop = Electron 44 (`packages/desktop`).                          | `gh api` on both repos, 2026-10-19                                                                                                    |
 
 **So:** desktop = Electron around the existing web app (parity for free).
 Mobile = Expo for iOS and Android. Nothing here is Expo-on-desktop.
@@ -31,7 +31,7 @@ Quick Composer, notifications, `neore://` deep links, updater, single-instance,
 system-browser Google sign-in, and ~4.7k lines of reviewed Rust for **device
 execution** (HMAC envelopes, approvals, `shell_run` in Landlock/`sandbox-exec`,
 local MCP). Per `apps/native/README.md`, **nothing is signed or notarized and no
-CI secret is set** (`native.yml` builds an unsigned *draft* release). There is no
+CI secret is set** (`native.yml` builds an unsigned _draft_ release). There is no
 Expo app, no download page, and no mobile project (`gen/android|apple` not
 generated).
 
@@ -42,13 +42,13 @@ page, local approval window) is kept; only the runtime changes.
 
 What each tells us. "Unverified" means read from a secondary source or inferred.
 
-| App                     | Shape                                                                                                              | Take                                                                                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OpenAI Codex app        | Desktop "command center": parallel agents, worktrees, skills, automations, in-app browser, computer use, memory, plugins, SSH devboxes. Stack **unverified**. | Many threads visible at once; background "automations" (we have Tasks/Triggers); an in-app browser and review pane next to the chat.                                  |
-| T3 Code                 | Electron 44 shell + Node backend child process, token-authenticated localhost socket; `client-runtime`/`contracts` packages shared by web, desktop, **Expo mobile**; `@legendapp/list` on web *and* mobile; `electron-updater`, native keychain (`@napi-rs/keyring`), custom protocol for remote environments. | Extract the client runtime into a package both clients import. One list lib on both platforms. Keychain for secrets.                                                  |
-| opencode                | Electron 44 + electron-vite + electron-builder + electron-updater; UI in a shared `packages/app`/`ui`; desktop is a client of a local server. (Earlier Tauri history **unverified**.) | Thin shell, shared UI package.                                                                                                                                        |
-| Conductor (Mac)         | Parallel agent workspaces, each with its own diff, checks and PR path.                                             | Workspace = unit of parallel work; only relevant to Coding agents.                                                                                                    |
-| Jan, Cherry Studio, LobeChat | Local-first chat clients (Jan: Tauri; Cherry: Electron, local data). Architecture details **unverified**.      | Local-model onboarding; data stays on device story. We already have Local models and Device execution.                                                                |
+| App                          | Shape                                                                                                                                                                                                                                                                                                          | Take                                                                                                                                 |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| OpenAI Codex app             | Desktop "command center": parallel agents, worktrees, skills, automations, in-app browser, computer use, memory, plugins, SSH devboxes. Stack **unverified**.                                                                                                                                                  | Many threads visible at once; background "automations" (we have Tasks/Triggers); an in-app browser and review pane next to the chat. |
+| T3 Code                      | Electron 44 shell + Node backend child process, token-authenticated localhost socket; `client-runtime`/`contracts` packages shared by web, desktop, **Expo mobile**; `@legendapp/list` on web _and_ mobile; `electron-updater`, native keychain (`@napi-rs/keyring`), custom protocol for remote environments. | Extract the client runtime into a package both clients import. One list lib on both platforms. Keychain for secrets.                 |
+| opencode                     | Electron 44 + electron-vite + electron-builder + electron-updater; UI in a shared `packages/app`/`ui`; desktop is a client of a local server. (Earlier Tauri history **unverified**.)                                                                                                                          | Thin shell, shared UI package.                                                                                                       |
+| Conductor (Mac)              | Parallel agent workspaces, each with its own diff, checks and PR path.                                                                                                                                                                                                                                         | Workspace = unit of parallel work; only relevant to Coding agents.                                                                   |
+| Jan, Cherry Studio, LobeChat | Local-first chat clients (Jan: Tauri; Cherry: Electron, local data). Architecture details **unverified**.                                                                                                                                                                                                      | Local-model onboarding; data stays on device story. We already have Local models and Device execution.                               |
 
 Not found: anything on Zed's agent panel or the Claude desktop app. Worth a
 second look before Phase 2.
@@ -75,17 +75,17 @@ Cloudflare, so the window just loads `NEORE_SITE_URL`.
 
 ### Mapping
 
-| Today (Tauri)                                  | Electron                                                                                                             |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Window loads `NEORE_SITE_URL` (compile-time)   | Same, baked in at build (`define`); no runtime override. `build` refuses a release without it.                       |
-| Runtime `CapabilityBuilder` ACL per origin     | `contextIsolation`, `sandbox`, no `nodeIntegration`; preload exposes one `window.neoreNative`; **every `ipcMain` handler checks `event.senderFrame.url` against the allowed origin**. Local windows get their own preload and channel set. |
-| `window.open` / `_blank` → system browser      | `setWindowOpenHandler` + `will-navigate` lock; same-origin loads in place, everything else `shell.openExternal`.      |
-| Tray, global Quick Composer, hide-on-close     | `Tray`, `globalShortcut`, a local `BrowserWindow`; `close` → hide.                                                   |
-| Notifications, `neore://` deep links, single-instance | `Notification`, `setAsDefaultProtocolClient` + `second-instance` / `open-url`, `requestSingleInstanceLock`.   |
-| System-browser Google sign-in (`sign_in.rs`)   | Port the PKCE flow to the main process; still the extension grant ending at `/api/auth/client-grant/cookie`. Reuse the redirect `neore://auth/callback`. |
-| Updater plugin + signing key                   | `electron-updater` + `electron-builder` 26 (as T3 and opencode ship).                                                |
-| Device secret file store (`device/store.rs`)   | Electron `safeStorage` (OS keychain-backed; T3 has an `ElectronSafeStorage` wrapper) or `@napi-rs/keyring`.          |
-| `ipc:` CSP workaround                          | **Disappears.** No Tauri postMessage fallback, so no per-page console warning; the web CSP stays as is.              |
+| Today (Tauri)                                         | Electron                                                                                                                                                                                                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Window loads `NEORE_SITE_URL` (compile-time)          | Same, baked in at build (`define`); no runtime override. `build` refuses a release without it.                                                                                                                                             |
+| Runtime `CapabilityBuilder` ACL per origin            | `contextIsolation`, `sandbox`, no `nodeIntegration`; preload exposes one `window.neoreNative`; **every `ipcMain` handler checks `event.senderFrame.url` against the allowed origin**. Local windows get their own preload and channel set. |
+| `window.open` / `_blank` → system browser             | `setWindowOpenHandler` + `will-navigate` lock; same-origin loads in place, everything else `shell.openExternal`.                                                                                                                           |
+| Tray, global Quick Composer, hide-on-close            | `Tray`, `globalShortcut`, a local `BrowserWindow`; `close` → hide.                                                                                                                                                                         |
+| Notifications, `neore://` deep links, single-instance | `Notification`, `setAsDefaultProtocolClient` + `second-instance` / `open-url`, `requestSingleInstanceLock`.                                                                                                                                |
+| System-browser Google sign-in (`sign_in.rs`)          | Port the PKCE flow to the main process; still the extension grant ending at `/api/auth/client-grant/cookie`. Reuse the redirect `neore://auth/callback`.                                                                                   |
+| Updater plugin + signing key                          | `electron-updater` + `electron-builder` 26 (as T3 and opencode ship).                                                                                                                                                                      |
+| Device secret file store (`device/store.rs`)          | Electron `safeStorage` (OS keychain-backed; T3 has an `ElectronSafeStorage` wrapper) or `@napi-rs/keyring`.                                                                                                                                |
+| `ipc:` CSP workaround                                 | **Disappears.** No Tauri postMessage fallback, so no per-page console warning; the web CSP stays as is.                                                                                                                                    |
 
 Web side: `apps/web/src/lib/native/bridge.ts` detects `window.__TAURI__` and
 calls `core.invoke`. Swap it for `window.neoreNative` with the same exports
@@ -179,19 +179,19 @@ doesn't, the fix is upstream, not a fork.
 Stack (versions as T3 Code ships them: Expo 58, RN 0.88; **only their
 dependency list was read, not their usage**):
 
-| Need                         | Pick                                                                                                  | Why                                                                                                         |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Routing                      | `expo-router`                                                                                         | Mirrors TanStack file routes; deep links for free.                                                          |
-| Message list                 | `@legendapp/list` (beta, built for chat: no inverted list, keeps scroll position) or FlashList v2     | Benchmarks found were blog-grade; **benchmark on a streaming thread on a mid Android** before choosing.    |
-| Streaming                    | `expo/fetch` (Expo ≥52) against the gateway's NDJSON `/chat/chunks`                                   | RN's `fetch` doesn't stream. AI SDK docs note an iOS `application/octet-stream` workaround if choppy.       |
-| Markdown while streaming     | **Open question.** Evaluate native renderers; fallback is Streamdown inside one `"use dom"` component per message, which is heavy. | No source found that benchmarks this. Decide with a spike on a 50-message thread.                           |
-| Cache / offline              | `expo-sqlite`                                                                                         | Thread list + last N messages.                                                                              |
-| Secrets                      | `expo-secure-store`                                                                                   | Session token.                                                                                              |
-| Images / video / files       | `expo-image`, `expo-video`, `expo-document-picker`, `expo-image-picker`                               | Uploads go over TUS (`@lunora/client/upload`); needs RN file handles, verify.                               |
-| Animation / gestures         | Reanimated 4 + Gesture Handler                                                                        | Standard.                                                                                                   |
-| Styling                      | Uniwind (T3 uses it) or NativeWind                                                                    | Reuse design tokens from `packages/ui`.                                                                     |
-| Updates / builds             | EAS Build + EAS Update                                                                                | OTA fixes between store reviews.                                                                            |
-| Extras                       | `expo-notifications`, `expo-quick-actions`, `expo-paste-input`, share extension, `expo-widgets`       | Share-to-Neore and a home widget are the "install it" features.                                             |
+| Need                     | Pick                                                                                                                               | Why                                                                                                     |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Routing                  | `expo-router`                                                                                                                      | Mirrors TanStack file routes; deep links for free.                                                      |
+| Message list             | `@legendapp/list` (beta, built for chat: no inverted list, keeps scroll position) or FlashList v2                                  | Benchmarks found were blog-grade; **benchmark on a streaming thread on a mid Android** before choosing. |
+| Streaming                | `expo/fetch` (Expo ≥52) against the gateway's NDJSON `/chat/chunks`                                                                | RN's `fetch` doesn't stream. AI SDK docs note an iOS `application/octet-stream` workaround if choppy.   |
+| Markdown while streaming | **Open question.** Evaluate native renderers; fallback is Streamdown inside one `"use dom"` component per message, which is heavy. | No source found that benchmarks this. Decide with a spike on a 50-message thread.                       |
+| Cache / offline          | `expo-sqlite`                                                                                                                      | Thread list + last N messages.                                                                          |
+| Secrets                  | `expo-secure-store`                                                                                                                | Session token.                                                                                          |
+| Images / video / files   | `expo-image`, `expo-video`, `expo-document-picker`, `expo-image-picker`                                                            | Uploads go over TUS (`@lunora/client/upload`); needs RN file handles, verify.                           |
+| Animation / gestures     | Reanimated 4 + Gesture Handler                                                                                                     | Standard.                                                                                               |
+| Styling                  | Uniwind (T3 uses it) or NativeWind                                                                                                 | Reuse design tokens from `packages/ui`.                                                                 |
+| Updates / builds         | EAS Build + EAS Update                                                                                                             | OTA fixes between store reviews.                                                                        |
+| Extras                   | `expo-notifications`, `expo-quick-actions`, `expo-paste-input`, share extension, `expo-widgets`                                    | Share-to-Neore and a home widget are the "install it" features.                                         |
 
 ### Backend work the app needs (none exists today)
 
@@ -199,7 +199,7 @@ dependency list was read, not their usage**):
   the browser extension already keeps a session token and trades it for JWTs
   (`backend/lunora/auth/extension-grant.ts`). The app behaves like the extension
   with its own redirect URI added to `TRUSTED_EXTENSION_REDIRECT_URIS`. Not the
-  `client-grant/cookie` endpoint — that one yields a *cookie* and accepts only
+  `client-grant/cookie` endpoint — that one yields a _cookie_ and accepts only
   the desktop redirect. Confirm with `lunora-auth` before writing code.
 - **Push.** The backend sends **Web Push only** (`@lunora/notify`, VAPID, browser
   endpoints allow-listed in `push-endpoint.ts`). Phones need APNs/FCM (or Expo
@@ -218,36 +218,36 @@ the **native extra**. Mobile: **N** native RN, **D** reuse web code in an Expo D
 component (`"use dom"`), **L** open the web app (in-app browser), **—** not on
 phones.
 
-| Feature        | Desktop extra                    | Mobile | Note                                                           |
-| -------------- | -------------------------------- | ------ | -------------------------------------------------------------- |
-| chat           | menu, badge, multi-window        | N      | MVP. Streaming, branches (‹ 2/3 ›), regenerate, tool approvals |
-| auth           | system-browser Google (done)     | N      | extension grant, see above                                     |
-| home           | —                                | N      | one `getHomeOverview`                                          |
-| layout         | menu bar                         | N      | tab/stack navigation, not the sidebar                          |
-| notifications  | native + badge                   | N      | needs mobile push                                              |
-| projects       | —                                | N      |                                                                |
-| prompts        | —                                | N      |                                                                |
-| skills         | —                                | N      | list/toggle                                                    |
-| sub-agents     | —                                | N      | rendered in the thread                                         |
-| tasks          | —                                | N      | create/monitor                                                 |
-| knowledge      | drop files on dock               | N      | TUS upload                                                     |
-| vault          | —                                | N      | signed URLs                                                    |
-| coding-agents  | —                                | N      | start + follow results                                         |
-| settings       | launch at login                  | N      | subset                                                         |
-| appearance     | —                                | N      |                                                                |
-| onboarding     | —                                | N      |                                                                |
-| changelog      | —                                | N      | small                                                          |
-| devices        | **device execution (Rust)**      | N      | list/revoke only; pairing and approval stay on the desktop     |
-| canvas         | —                                | D      | Fabric.js design + artifacts                                   |
-| pages          | —                                | D      | tiptap; read view native later                                 |
-| slides         | —                                | D      | viewer first                                                   |
-| workflow       | —                                | D      | React Flow editor; run status native                           |
-| evals          | —                                | L      |                                                                |
-| billing        | —                                | L      | store-policy decision above                                    |
-| admin          | —                                | L      |                                                                |
-| local-models   | works (Chromium)  | —      | a phone's `localhost` is not the user's Ollama                 |
-| keyboard       | shortcuts, palette               | —      |                                                                |
-| marketing      | download page                    | —      | web only                                                       |
+| Feature       | Desktop extra                | Mobile | Note                                                           |
+| ------------- | ---------------------------- | ------ | -------------------------------------------------------------- |
+| chat          | menu, badge, multi-window    | N      | MVP. Streaming, branches (‹ 2/3 ›), regenerate, tool approvals |
+| auth          | system-browser Google (done) | N      | extension grant, see above                                     |
+| home          | —                            | N      | one `getHomeOverview`                                          |
+| layout        | menu bar                     | N      | tab/stack navigation, not the sidebar                          |
+| notifications | native + badge               | N      | needs mobile push                                              |
+| projects      | —                            | N      |                                                                |
+| prompts       | —                            | N      |                                                                |
+| skills        | —                            | N      | list/toggle                                                    |
+| sub-agents    | —                            | N      | rendered in the thread                                         |
+| tasks         | —                            | N      | create/monitor                                                 |
+| knowledge     | drop files on dock           | N      | TUS upload                                                     |
+| vault         | —                            | N      | signed URLs                                                    |
+| coding-agents | —                            | N      | start + follow results                                         |
+| settings      | launch at login              | N      | subset                                                         |
+| appearance    | —                            | N      |                                                                |
+| onboarding    | —                            | N      |                                                                |
+| changelog     | —                            | N      | small                                                          |
+| devices       | **device execution (Rust)**  | N      | list/revoke only; pairing and approval stay on the desktop     |
+| canvas        | —                            | D      | Fabric.js design + artifacts                                   |
+| pages         | —                            | D      | tiptap; read view native later                                 |
+| slides        | —                            | D      | viewer first                                                   |
+| workflow      | —                            | D      | React Flow editor; run status native                           |
+| evals         | —                            | L      |                                                                |
+| billing       | —                            | L      | store-policy decision above                                    |
+| admin         | —                            | L      |                                                                |
+| local-models  | works (Chromium)             | —      | a phone's `localhost` is not the user's Ollama                 |
+| keyboard      | shortcuts, palette           | —      |                                                                |
+| marketing     | download page                | —      | web only                                                       |
 
 Phases: **4** = auth + chat + threads + composer/attachments + push (one
 shippable TestFlight/Play internal build); **5** = the N rows; **6** = the D rows
@@ -260,6 +260,11 @@ and polish. Each ships behind a feature flag per row.
 - **Live-query load.** The web client holds ≤32 subscriptions and throttles
   seeds to 3 (`CLAUDE.md`). A phone resuming from background re-subscribes
   everything; the mobile client needs a smaller first-paint budget.
+  **Proposed, not measured:** the mobile client opens at most 8 live
+  subscriptions per socket and seeds 2 at a time; a resume re-subscribes only
+  the queries the visible screen reads, and the rest load on open. Chat is the
+  only screen that needs more than 4. Verify on a mid Android before relying on
+  the numbers; they are the first thing to change if the first paint is slow.
 - **Store review.** Billing, UGC/report-abuse, account deletion (we have GDPR
   deletion) and "sign in with Apple" if a social login is offered.
 - **Porting device execution.** The Rust core moves to a napi addon and its
@@ -278,60 +283,131 @@ and polish. Each ships behind a feature flag per row.
    building. Until then, builds stay unsigned in CI drafts.
 2. **iOS billing:** hide upgrade UI on iOS (no IAP) for launch. Revisit once
    the store-policy wording has been checked by someone who reads it.
-3. **Electron tooling:** electron-vite + electron-builder (opencode's route).
-   T3's custom scripts only where the preload bundle check needs them.
+3. **Electron tooling:** electron-builder for packaging. **Deviation:** the
+   bundling is esbuild in `apps/desktop/scripts/build.mjs`, not electron-vite.
+   The same script checks every sandboxed preload: its only import may be
+   `electron`, so a Node built-in fails the build.
 4. **Shared code:** the React feature code is not portable to React Native
    as-is (Tailwind/DOM). Shared packages hold logic (`client-runtime`) and
    presentational primitives that have no DOM dependency. Web-only components
    (Univer, Fabric, tiptap, React Flow) reach phones through `"use dom"`
    components, not rewrites. `packages/chat-ui` already forbids backend, auth
    and router imports, so it is the first candidate.
+5. **Update feed:** GitHub Releases. `publish` in `electron-builder.yml` uses
+   `releaseType: draft`, and electron-updater reads `latest*.yml` from the
+   release. Caveats: a draft is invisible to the updater until someone publishes
+   it, and macOS auto-update needs a signed build, so it does nothing for
+   today's unsigned builds. The feed is configured; it is not tested end to end.
+6. **Device secret storage (deviation, open):** the pairing secret is in
+   `device.json` under the device store, written by `device-core` with mode 0600
+   on Unix. §4 asked for `safeStorage` or `@napi-rs/keyring`. `safeStorage` lives
+   in the Electron main process, but `device-core` verifies the HMACs in Rust and
+   needs the secret there, so it is the wrong side of that boundary. A keyring
+   crate inside `device-core` is the real fix. It is a new dependency, so it is
+   the owner's call. Windows relies on the profile ACL, untested.
 
 ## 10. Status
 
-Last updated 2026-10-19.
+Last updated 2026-10-19. Nothing below is committed.
 
-**Hermes check, `@lunora/client` 1.0.0-alpha.213 (static, from the published dist):**
-- `WebSocket`, `fetch`, `TextEncoder`/`TextDecoder`, `ReadableStream`,
-  `structuredClone`: used, present on Hermes.
-- `BroadcastChannel`: feature-detected (`typeof BroadcastChannel`); absent means
-  no cross-tab coordination. Degrades, no crash.
-- `indexedDB`: the offline outbox and query cache. Injectable (`indexedDB`
-  option) and otherwise detected; absent makes `createIndexedDbPersistence`
-  throw `INTERNAL`. **Phase 4 must pass an RN storage adapter** (expo-sqlite).
-  Not a defect; not filed upstream.
-- Not verified: runtime behaviour on Hermes. Confirm on the first Expo boot.
+**Done**
 
-**Electron shell (`apps/desktop`), replacing Tauri:**
-- Verified 2026-10-19: `src/main.test.ts` (window, popup, permission, IPC and
-  deep-link handlers, `electron` mocked) and `src/site.test.ts` pass, 20 tests.
-  `e2e/shell.spec.ts` drives the real Electron binary (4 tests) and passes.
-  The real window loads `/chat` from the site origin; the process stays up.
-- Gotcha: a shell with `ELECTRON_RUN_AS_NODE=1` (set by the T3 app) makes
-  Electron run as plain Node and reject every Electron flag. Run Electron with
-  that variable unset. This caused an earlier false "Playwright/Electron 44
-  incompatibility" diagnosis.
-- Done: origin and deep-link parsing, a port of `site.rs` (`src/site.test.ts`,
-  10 unit tests, same cases as the Rust tests); sender check (`src/trust.ts`);
-  main process (single instance, `open-url` before ready, argv on first launch,
-  popup and navigation rules mirroring `lib.rs`, permission allow-list for the
-  site only, notification suppression while focused, compose hand-off);
-  sandboxed preload exposing `window.neoreNative` only on the site origin, with
-  `capabilities` listing what is wired.
-- Web bridge swapped (`apps/web/src/lib/native/bridge.ts`): the transport is
-  now `window.neoreNative`, and it reads `capabilities`. Sign-in and device
-  functions are inert until their ports land. Verified: web typecheck clean
-  (after `pnpm build:packages`), 14 bridge tests, 123 device, native and
-  notification tests pass.
-- Not yet: Google sign-in in the system browser (`sign_in.rs` PKCE port,
-  currently the navigation is blocked and nothing else happens), tray, global
-  Quick Composer, updater, device execution, electron-builder packaging and
-  fuses, the web-side bridge swap (`bridge.ts` still targets `__TAURI__`).
-- Decided: on macOS, closing the window hides it and the dock icon reopens it.
-  Elsewhere closing quits, because there is no tray yet.
-- Tauri (`apps/native`) is still in the tree; it is deleted only after parity.
+- Electron shell (`apps/desktop`, Electron 44) replaces Tauri; `apps/native` is
+  deleted. Sandboxed preload exposes `window.neoreNative` on the site origin
+  only; every IPC handler checks the sender.
+- Device execution: `packages/device-core` (Rust) and `packages/device-core-node`
+  (napi). The web bridge calls the shell relay only when it advertises `device`.
+- Device pairing secret is in the OS keychain (`keyring`), with a file fallback
+  when the keychain refuses, and a migration from the old inline secret.
+- Shared folders may not contain the home folder (`refused_root`); roots saved
+  before this are dropped on load.
+- Shell network setting (`allow_shell_network`, default off) is enforced on
+  macOS through the sandbox profile and verified by a test that connects to a
+  local listener.
+- Security review (read-only, 14 findings) done. Fixed: audit log is 0600; MCP
+  servers restart when their config changes; a background child can no longer
+  block `shell_run`; the pairing prompt says it replaces an existing pairing.
+  Not changed: the main-window navigation (see Open).
+- Every sandboxed preload is checked at build (`apps/desktop/scripts/build.mjs`):
+  its only import may be `electron`. Verified with a forced failure.
+- Desktop CI (`.github/workflows/desktop.yml`): builds the addon for every
+  packaged arch (macOS x64+arm64 in one job, Windows x64+arm64 in one job, Linux
+  x64 and arm64 separately), runs `smoke` before packaging and `smoke:artifacts`
+  after it. Windows signing is Authenticode, read from `WIN_CSC_*`.
+- Rust `device-core` tests run in CI on ubuntu, windows and macos (`test.yml`).
+- Update feed: `latest*.yml` from one electron-builder run per platform.
+- Desktop lint: `apps/desktop/src` is at 30 findings, each a deliberate rule
+  (the null wire contract, the runtime `require` for the addon, the `vi.mock`
+  seams, mutual references). 107 findings are in `electron-builder.yml`, which
+  the lint pass did not touch.
+- PostHog desktop events: `desktop_first_launch` (sent from PostHog's `loaded`
+  callback, flag set only when sent), `desktop_signed_in`, and
+  `desktop_download_clicked` on the new download page (`/download`).
+- Download page (`/download`): OS detection, a primary button, and the full list.
+  Links go to the GitHub releases page. Arch is shown only for Linux.
+- Mobile sign-in: the backend admits `neore-mobile://auth/callback` through the
+  extension grant, opt-in via `TRUSTED_EXTENSION_REDIRECT_URIS` (same trust model
+  as the desktop URI). The app's PKCE sign-in code is in `apps/mobile/src/auth`.
+- Expo app `apps/mobile`: first slice, `eas.json` profiles. Sign-in code exists
+  and is unblocked on the app side; first real sign-in is not run.
+- Safari mixed-content check is skipped inside the Electron shell (`isSafariUserAgent`).
+- Hermes check of `@lunora/client` (alpha.213): present except `indexedDB`.
+  Phase 4 needs an RN storage adapter (expo-sqlite).
+- Client runtime extracted to `packages/client-runtime` (Phase 3).
+- MCP "Always allow" applies only to read-only tools: `decide` in
+  `packages/device-core/src/engine.rs` requires `readOnly`, an untainted call and
+  a tool other than `shell_run`/`fs_write`. Stored rules for other tools are kept
+  but inert.
+- Call nonces persist to `device-nonces.json` (`NonceSet::persisted`, `envelope.rs`);
+  a failed write refuses the call.
 
-**Not started:** device-execution crate and napi addon (step 3),
-client-runtime extraction (Phase 3), the Expo app (Phase 4).
+**Open: needs a decision from the owner**
+
+- Windows arm64 Windows installers: one merged `latest.yml`, built in one job
+  with the arm64 addon cross-compiled on the x64 runner. Unverified on the runner
+  image (see the workflow header).
+- Main-window navigation: the security review asked for a site-origin allowlist.
+  Not done: GitHub, Microsoft and generic OIDC sign-in redirect inside the main
+  window (`backend/lunora/auth.ts`), and a site-origin-only guard would cancel
+  them. Decide the providers' hosts before adding the guard.
+- Shared folder `~` or a parent of it: refused now, existing roots dropped on
+  load. Confirm this behaviour change is acceptable.
+- Mobile `neore-mobile://auth/callback`: opt-in, so operators must list it in
+  `TRUSTED_EXTENSION_REDIRECT_URIS`. Recommendation: keep it opt-in, the same as
+  the native URI. Any app can register a custom scheme, so default-on would admit
+  every such app's callback. Pending: `lunora-auth` sign-off, which I cannot give
+  from here. Until it is given, the mobile sign-in is not enabled on any
+  deployment.
+- Mobile Phase 4 slice (chat, push, billing): scope and start date.
+- Security findings still open: the Linux TIOCSTI risk; `/proc` readable on Linux;
+  Mach IPC not restricted on macOS (unverified).
+- Device secret: now in the keychain. Windows credential store and Linux secret
+  service have not been run.
+
+**Open: needs a machine or an account I do not have**
+
+- Release smoke: launch the packaged app, load the site and sign in before a draft
+  release. `smoke` and `smoke:artifacts` check the bundles and the packaged addon
+  only.
+- Sandbox tests on Linux (Landlock) and Windows (Job Objects, Windows
+  restrictions): the CI job runs the unit tests only.
+- Keychain on real macOS and Windows machines, and the Linux secret service.
+- Tray, Quick Composer and the network checkbox: manual check on each OS.
+- Windows and Linux arm64 addon: the cross-compile on the Windows runner and the
+  arm64 runner labels need one real run.
+- Update feed: needs a published draft and a signed macOS build.
+- Signing: Apple Developer ID and notarization; Windows certificate for Authenticode.
+  `apps/desktop/.env.signing.example` could not be read here (a permission rule
+  blocks it), so its header is unchanged.
+- Homebrew cask: needs the first signed release (checksum).
+- Expo: `eas init` needs your Expo account.
+- Hermes runtime behaviour: needs the first Expo boot.
+- Lunora #1266 reproduction: needs a device or Hermes run.
+- Download page: translations need `pnpm translate:extract` and `translate:compile`;
+  `routeTree.gen.ts` regenerates on the next dev or build.
+
+**Phase 2 desktop UX (§5)**: partly built. Window-state restore, launch at login
+and the dock/taskbar badge are wired in `apps/desktop/src/main.ts`. Not built:
+multi-window, command palette, running rail, offline screen.
 
 **Lunora issues:** none filed. Nothing reproduced yet.

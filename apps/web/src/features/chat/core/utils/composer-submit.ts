@@ -23,3 +23,16 @@ export const requestComposerSubmit = (request: ComposerSubmitRequest): void => {
 
 /** Subscribes the new-thread composer — including to a request made before it mounted. */
 export const onComposerSubmitRequest = (handler: (request: ComposerSubmitRequest) => void): (() => void) => composerSubmitChannel.consume(handler);
+
+export interface ComposerAttachRequest {
+    files: File[];
+}
+
+const composerAttachChannel = createRequestChannel<ComposerAttachRequest>();
+
+/** Files dropped on the dock icon. The new-thread composer attaches them through its normal upload path; nothing is sent. */
+export const requestComposerAttach = (request: ComposerAttachRequest): void => {
+    composerAttachChannel.request(request);
+};
+
+export const onComposerAttachRequest = (handler: (request: ComposerAttachRequest) => void): (() => void) => composerAttachChannel.consume(handler);

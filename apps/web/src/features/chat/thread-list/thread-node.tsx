@@ -3,6 +3,7 @@ import { msg } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { forgetUnlockProof, LUNORA_ID_SOURCE, useUnlockProof } from "@neore/client-runtime";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
@@ -52,7 +53,6 @@ import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
-import { forgetUnlockProof, LUNORA_ID_SOURCE, useUnlockProof } from "@neore/client-runtime";
 import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
 import { showError } from "@/lib/toast";
 
@@ -250,6 +250,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const named = (action: string) => t`${action}: ${displayTitle}`;
     // Read after mount: the shell exists only in the browser, and the server render must match the first client render.
     const [canOpenWindow, setCanOpenWindow] = useState(false);
+
     useEffect(() => {
         setCanOpenWindow(supportsThreadWindows());
     }, []);

@@ -2,6 +2,7 @@ import type { I18n } from "@lingui/core";
 import { setupI18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { LunoraClient } from "@lunora/client";
+import { connectLiveQueries, createQueryClient, createWsTicketMinter } from "@neore/client-runtime";
 import { createRouter as createTanstackRouter, ErrorComponent } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { getGlobalStartContext } from "@tanstack/react-start";
@@ -16,7 +17,6 @@ import { deLocalizeUrl, localizeUrl } from "@/lib/intl/client";
 import AnalyticsProvider from "@/providers/analytics-provider";
 
 import routerWithLingui from "./lib/intl/router-plugin";
-import { connectLiveQueries, createQueryClient, createWsTicketMinter } from "@neore/client-runtime";
 import { routeTree } from "./routeTree.gen";
 
 // Dev-only: the e2e suite's mocked gateway (see `lib/development-msw.ts`). Compiled out of a build.

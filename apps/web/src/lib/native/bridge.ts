@@ -11,16 +11,25 @@
 
 type UnlistenFunction = () => void;
 
+/** A file the shell read from disk for the page; `File` is built from it here. */
+export interface NativeDroppedFile {
+    data: Uint8Array<ArrayBuffer>;
+    name: string;
+}
+
 /** What the Electron preload exposes (`apps/desktop/src/preload.ts`). */
 interface NativeBridge {
     capabilities: ReadonlyArray<string>;
     device?: NativeDeviceRelay;
     notify: (title: string, body?: string) => Promise<void>;
     onCompose: (handler: () => void) => UnlistenFunction;
-    openThreadWindow: (threadId: string) => Promise<void>;
+    /** Files dropped on the dock icon (macOS). Optional: older shells lack it. */
+    onFiles?: (handler: () => void) => UnlistenFunction;
     onSignIn: (handler: () => void) => UnlistenFunction;
+    openThreadWindow: (threadId: string) => Promise<void>;
     startBrowserSignIn: () => Promise<void>;
     takePendingCompose: () => Promise<string | undefined>;
+    takePendingFiles?: () => Promise<NativeDroppedFile[]>;
     takePendingSignIn: () => Promise<NativeSignIn | undefined>;
 }
 
@@ -101,29 +110,42 @@ export const takePendingCompose = async (): Promise<string | undefined> => {
     }
 };
 
-/**
- * Calls `handler` with every text the shell hands over (Quick Composer, a
- * `neore://new?text=` link, a share), including one that arrived before the
- * page loaded. Returns the unsubscribe function.
- */
-export const onNativeCompose = (handler: (text: string) => void): UnlistenFunction => {
-    const native = getNative();
+/** Takes (and clears) the files the shell was handed on the dock icon, as `File`s. */
+export const takePendingFiles = async (): Promise<File[]> => {
+    try {
+        const files = await getNative()?.takePendingFiles?.();
 
-    if (!native) {
-        return () => {};
+        return (files ?? []).map(({ data, name }) => new File([data], name));
+    } catch {
+        return [];
     }
+};
 
+/**
+ * Pulls what the shell holds once on subscribe (a value that arrived before the
+ * page listened) and again on every `listen` notification. `listen` returns
+ * `undefined` when the shell does not offer that event, and then nothing is pulled.
+ */
+const onNativePending = <T>(
+    listen: (listener: () => void) => UnlistenFunction | undefined,
+    take: () => Promise<T | undefined>,
+    handler: (value: T) => void,
+): UnlistenFunction => {
     let disposed = false;
 
     const drain = async () => {
-        const text = await takePendingCompose();
+        const value = await take();
 
-        if (text !== undefined && !disposed) {
-            handler(text);
+        if (value !== undefined && !disposed) {
+            handler(value);
         }
     };
 
-    const stop = native.onCompose(() => drain());
+    const stop = listen(() => drain());
+
+    if (stop === undefined) {
+        return () => {};
+    }
 
     void drain();
 
@@ -132,6 +154,29 @@ export const onNativeCompose = (handler: (text: string) => void): UnlistenFuncti
         stop();
     };
 };
+
+/**
+ * Calls `handler` with each batch of files the shell is handed (the dock icon),
+ * including a batch that arrived before the page loaded. Returns the unsubscribe function.
+ */
+export const onNativeFiles = (handler: (files: File[]) => void): UnlistenFunction =>
+    onNativePending(
+        (listener) => getNative()?.onFiles?.(listener),
+        async () => {
+            const files = await takePendingFiles();
+
+            return files.length > 0 ? files : undefined;
+        },
+        handler,
+    );
+
+/**
+ * Calls `handler` with every text the shell hands over (Quick Composer, a
+ * `neore://new?text=` link, a share), including one that arrived before the
+ * page loaded. Returns the unsubscribe function.
+ */
+export const onNativeCompose = (handler: (text: string) => void): UnlistenFunction =>
+    onNativePending((listener) => getNative()?.onCompose(listener), takePendingCompose, handler);
 
 /** A system-browser sign-in the shell received: the code, and the verifier that proves this app started it. */
 export interface NativeSignIn {
@@ -162,32 +207,8 @@ export const takePendingSignIn = async (): Promise<NativeSignIn | undefined> => 
  * Calls `handler` with each browser sign-in the shell receives, including one
  * that arrived before the page subscribed. Returns the unsubscribe function.
  */
-export const onNativeSignIn = (handler: (signIn: NativeSignIn) => void): UnlistenFunction => {
-    const native = getSignInBridge();
-
-    if (!native) {
-        return () => {};
-    }
-
-    let disposed = false;
-
-    const drain = async () => {
-        const signIn = await takePendingSignIn();
-
-        if (signIn !== undefined && !disposed) {
-            handler(signIn);
-        }
-    };
-
-    const stop = native.onSignIn(() => drain());
-
-    void drain();
-
-    return () => {
-        disposed = true;
-        stop();
-    };
-};
+export const onNativeSignIn = (handler: (signIn: NativeSignIn) => void): UnlistenFunction =>
+    onNativePending((listener) => getSignInBridge()?.onSignIn(listener), takePendingSignIn, handler);
 
 /** Opens the system browser on the sign-in page (the shell does the same when Google is opened in the window). */
 export const startNativeBrowserSignIn = async (): Promise<void> => {

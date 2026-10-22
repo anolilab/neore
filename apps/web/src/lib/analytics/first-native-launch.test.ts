@@ -5,16 +5,16 @@ import { isNativeShell } from "@/lib/native/bridge";
 import { reportFirstNativeLaunch } from "./first-native-launch";
 import { trackEvent } from "./track";
 
-vi.mock("./track", () => ({
-    trackEvent: vi.fn(() => {
-        return true;
-    }),
-}));
-vi.mock("@/lib/native/bridge", () => ({
-    isNativeShell: vi.fn(() => {
-        return true;
-    }),
-}));
+vi.mock("./track", () => {
+    return {
+        trackEvent: vi.fn(() => true),
+    };
+});
+vi.mock("@/lib/native/bridge", () => {
+    return {
+        isNativeShell: vi.fn(() => true),
+    };
+});
 
 const KEY = "neore:desktop-first-launch";
 

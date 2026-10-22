@@ -1,9 +1,9 @@
 "use client";
 
+import { isPageShardKnown, notePageShard } from "@neore/client-runtime";
 import { skipToken, useQuery } from "@tanstack/react-query";
 
 import { useCRPC } from "@/lib/lunora/crpc";
-import { isPageShardKnown, notePageShard } from "@neore/client-runtime";
 
 /**
  * Settle which shard `pageId` lives on before anything queries it — see

@@ -13,8 +13,6 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 
-import ConnectionBanner from "@/features/connection/components/connection-banner";
-
 export type ComposerMode = "text" | "image" | "video" | "audio";
 
 export interface ComposerBaseRef {
@@ -146,8 +144,6 @@ const ComposerBase = ({
                 type: "spring",
             }}
         >
-            <ConnectionBanner />
-
             {/* Main composer container — single clean border */}
             <motion.div
                 className={clsx(

@@ -1,8 +1,8 @@
+import { forgetAllUnlockProofs } from "@neore/client-runtime";
 import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { use, useCallback, useMemo } from "react";
 
 import type { AuthClient } from "@/lib/auth/client";
-import { forgetAllUnlockProofs } from "@neore/client-runtime";
 
 import type { AnyAuthClient } from "../../types/auth-core-types";
 import type { AuthHooks, AuthMutators } from "../../types/hook-integration-types";
