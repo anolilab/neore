@@ -13,6 +13,7 @@ import { CopyIcon, PinIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { FC } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -360,7 +361,7 @@ const TextSelectionMenu: FC<TextSelectionMenuProps> = ({ isTextModel = true, thr
     const top = selection ? selection.rect.top - 44 : 0;
     const left = selection ? selection.rect.left + selection.rect.width / 2 : 0;
 
-    return (
+    const menu = (
         <AnimatePresence>
             {selection && threadId && (
                 <motion.div
@@ -387,6 +388,10 @@ const TextSelectionMenu: FC<TextSelectionMenuProps> = ({ isTextModel = true, thr
             )}
         </AnimatePresence>
     );
+
+    // Portalled to the body so no ancestor's stacking context can put the menu under the chat input.
+    // The typeof check keeps server rendering away from `document`; the menu is always mounted.
+    return typeof document === "undefined" ? menu : createPortal(menu, document.body);
 };
 
 export default TextSelectionMenu;

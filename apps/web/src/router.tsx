@@ -2,6 +2,7 @@ import type { I18n } from "@lingui/core";
 import { setupI18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { LunoraClient } from "@lunora/client";
+import { connectLiveQueries, createQueryClient, createWsTicketMinter } from "@neore/client-runtime";
 import { createRouter as createTanstackRouter, ErrorComponent } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { getGlobalStartContext } from "@tanstack/react-start";
@@ -16,9 +17,6 @@ import { deLocalizeUrl, localizeUrl } from "@/lib/intl/client";
 import AnalyticsProvider from "@/providers/analytics-provider";
 
 import routerWithLingui from "./lib/intl/router-plugin";
-import { connectLiveQueries } from "./lib/lunora/live-queries";
-import { createQueryClient } from "./lib/lunora/query-client";
-import { createWsTicketMinter } from "./lib/lunora/ws-ticket";
 import { routeTree } from "./routeTree.gen";
 
 declare module "@tanstack/react-router" {
@@ -65,7 +63,7 @@ export const getRouter = (): ReturnType<typeof createTanstackRouter> => {
     // server, where each query fetches once and is dehydrated).
     // The socket authenticates with a single-use ticket minted per connect,
     // never the JWT (see `lib/lunora/ws-ticket.ts`).
-    connectLiveQueries(lunora, queryClient, createWsTicketMinter(env.VITE_LUNORA_URL));
+    connectLiveQueries(lunora, queryClient, createWsTicketMinter(env.VITE_LUNORA_URL), { dev: import.meta.env.DEV });
 
     const router = createTanstackRouter({
         context: {

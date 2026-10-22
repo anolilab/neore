@@ -3,6 +3,7 @@ import { msg } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { forgetUnlockProof, LUNORA_ID_SOURCE, useUnlockProof } from "@neore/client-runtime";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
@@ -22,6 +23,7 @@ import {
     ChevronDown,
     ChevronRight,
     DownloadIcon,
+    ExternalLink,
     Folder,
     GitBranch,
     GitCompareArrows,
@@ -51,8 +53,7 @@ import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
-import { LUNORA_ID_SOURCE } from "@/lib/lunora/ids";
-import { forgetUnlockProof, useUnlockProof } from "@/lib/lunora/unlock-proofs";
+import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
 import { showError } from "@/lib/toast";
 
 import MessageSearchMatches from "./message-search-matches";
@@ -245,6 +246,12 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const isUnlocked = isLocked && unlockProof !== undefined;
     // A locked chat shows no title: the list never has one for it.
     const displayTitle = isLocked ? t`Locked chat` : node.title;
+    // Read after mount: the shell exists only in the browser, and the server render must match the first client render.
+    const [canOpenWindow, setCanOpenWindow] = useState(false);
+
+    useEffect(() => {
+        setCanOpenWindow(supportsThreadWindows());
+    }, []);
     const setShowManageTagsDialog = useThreadListUIStore(selectSetShowManageTagsDialog);
     const isTransitioningRef = useRef(false);
 
@@ -642,6 +649,28 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     />
                     <TooltipContent>{t`Move to project`}</TooltipContent>
                 </Tooltip>
+
+                {canOpenWindow && (
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                <Button
+                                    aria-label={t`Open in new window`}
+                                    className="hover:text-primary h-6 w-6 p-0"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        void openThreadWindow(node.threadId);
+                                    }}
+                                    size="icon-sm"
+                                    variant="ghost"
+                                >
+                                    <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                                </Button>
+                            }
+                        />
+                        <TooltipContent>{t`Open in new window`}</TooltipContent>
+                    </Tooltip>
+                )}
 
                 {isTemporary ? (
                     // Temporary chats expire and are deleted, so a tag would outlive

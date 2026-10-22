@@ -32,9 +32,13 @@ const chatRouter = new OpenAPIHono<HonoEnv>();
 // and every model call the backend then makes comes back through
 // `/internal/model/proxy`, where `contentSafetyMiddleware` checks the user text
 // (see the `/internal/*` registrations in `src/index.ts`). That is the one
-// enforcement point; the middleware ignores non-`/internal/` paths, so registering
-// it here only looked like a second check.
-chatRouter.use("*", chatInputValidationMiddleware);
+// enforcement point: `contentSafetyMiddleware` is mounted only on `/internal/*`,
+// so it never runs on these routes.
+// Scoped to the paths this router serves. It is mounted at "/" ahead of the other
+// routers, so a bare "*" would also validate `/v1/stream`, which carries no model.
+chatRouter.use("/v1/chat", chatInputValidationMiddleware);
+chatRouter.use("/v1/chat/*", chatInputValidationMiddleware);
+chatRouter.use("/v1/prompts/optimize", chatInputValidationMiddleware);
 
 // ── HMAC signing helpers ─────────────────────────────────────────────────────
 

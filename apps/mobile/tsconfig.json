@@ -1,0 +1,15 @@
+{
+    "extends": "expo/tsconfig.base.json",
+    "compilerOptions": {
+        "moduleResolution": "bundler",
+        "paths": {
+            "@/*": ["./src/*"]
+        },
+        "types": ["expo/types", "node"],
+        "allowImportingTsExtensions": true,
+        "strict": true,
+        "noImplicitOverride": true,
+        "noUncheckedIndexedAccess": true
+    },
+    "include": ["**/*.ts", "**/*.tsx", "expo-env.d.ts"]
+}

@@ -31,7 +31,6 @@ export default defineConfig({
                     "@neore/browser-extension",
                     "@neore/chat-ui",
                     "@neore/cli",
-                    "@neore/native",
                     "@neore/service-sdk",
                     "@neore/ui",
                     "@neore/web",
@@ -124,7 +123,9 @@ export default defineConfig({
             // extracted from `apps/web/src/**`, which IS scanned, and every
             // `lingui extract` renumbers them — `msgid "One-time password"`
             // tripped the generic-password rule and would re-surface on each run.
-            excludePatterns: ["backend/lunora/_generated/**", "apps/web/src/locales/**"],
+            // The baseline lists the findings already accepted, so scanning it
+            // reports those same findings again on every commit.
+            excludePatterns: ["backend/lunora/_generated/**", "apps/web/src/locales/**", ".secrets-baseline.json"],
         },
     },
 

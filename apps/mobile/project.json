@@ -1,0 +1,7 @@
+{
+    "name": "@neore/mobile",
+    "$schema": "../../node_modules/@visulima/vis/schemas/project.schema.json",
+    "sourceRoot": "apps/mobile",
+    "projectType": "application",
+    "implicitDependencies": []
+}

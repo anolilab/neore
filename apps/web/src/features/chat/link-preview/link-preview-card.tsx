@@ -8,6 +8,7 @@
  */
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
+import { LIVE_META_KEY } from "@neore/client-runtime";
 import cn from "@neore/ui/utils/cn";
 import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useQuery } from "@tanstack/react-query";
@@ -16,7 +17,6 @@ import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { createLunoraActionQueryOptions, useLunora } from "@/lib/lunora/crpc";
-import { LIVE_META_KEY } from "@/lib/lunora/live-queries";
 
 /** Start loading a little before the card is on screen. */
 const ROOT_MARGIN = "200px 0px";

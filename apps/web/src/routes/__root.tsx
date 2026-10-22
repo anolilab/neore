@@ -11,6 +11,7 @@ import geistLatinFont from "@fontsource-variable/geist/files/geist-latin-wght-no
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useAuth } from "@lunora/react";
+import { seedHydratedAuthToken, TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@neore/client-runtime";
 import { IconSpriteSheet } from "@neore/ui/components/ai-elements/provider-icon";
 import { CSPProvider } from "@neore/ui/components/csp-provider";
 import { DirectionProvider } from "@neore/ui/components/direction";
@@ -20,7 +21,7 @@ import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts, useRouteContext, useRouter } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import type { SettingsTab } from "@/components/settings/settings-modal";
 import ImpersonationBanner from "@/features/admin/components/impersonation-banner";
@@ -28,6 +29,7 @@ import AppearanceSync from "@/features/appearance/components/appearance-sync";
 import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
+import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
 import { authClient } from "@/lib/auth/client";
@@ -35,8 +37,7 @@ import getSessionToken, { getSessionAuthState } from "@/lib/auth/server-function
 import env from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/intl/client";
 import { CRPCProvider, useLunora, useLunoraAuth } from "@/lib/lunora/crpc";
-import { seedHydratedAuthToken } from "@/lib/lunora/hydrate-auth-token";
-import { TOKEN_RETRY_DELAY_MS, tokenRefreshDelayMs } from "@/lib/lunora/token-refresh";
+import { isNativeShell } from "@/lib/native/bridge";
 import NativeBridge from "@/lib/native/native-bridge";
 import { getClientPostHogState } from "@/lib/posthog/client-state";
 import { forgetClientPostHog, readRequestContext, rememberClientPostHog } from "@/lib/request-context";
@@ -353,6 +354,13 @@ const RootComponent = () => {
     // in the browser, so this is the only place the SSR token reaches the
     // browser's client. See `seedHydratedAuthToken`.
     seedHydratedAuthToken(context.lunoraClient, context.token);
+    // The native bridge exists only in the browser, so it is read after mount: the
+    // server and the first client render must match.
+    const [isNative, setIsNative] = useState(false);
+
+    useEffect(() => {
+        setIsNative(isNativeShell());
+    }, []);
     const router = useRouter();
     const { i18n } = useLingui();
     const direction = useUIStateStore((state) => state.layout.direction);
@@ -442,6 +450,8 @@ const RootComponent = () => {
                                                     }
                                                 >
                                                     <ImpersonationBanner />
+                                                    {/* Eager, not lazy: a lazy chunk cannot load while the app is offline, which is when this screen is needed. */}
+                                                    {isNative && <OfflineScreen />}
                                                     <ScreenSizeDebug />
                                                     <Outlet />
                                                     <Suspense fallback={null}>

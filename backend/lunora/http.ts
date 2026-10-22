@@ -73,7 +73,7 @@ export const getAllowedOrigins = (): ((origin: string) => string | null) => {
 
     // In development, allow explicit local origins (never use wildcard with credentials)
     if (ENVIRONMENT === "development") {
-        staticOrigins.push("http://localhost:3005", "http://localhost:5173", "http://localhost:4173");
+        staticOrigins.push("http://localhost:3005", "http://localhost:5173", "http://localhost:5174", "http://localhost:4173");
     }
 
     if (SITE_URL) {

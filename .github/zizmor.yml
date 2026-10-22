@@ -15,10 +15,9 @@ rules:
             - "semantic-pull-request.yml"
     # A cache written by a tag-triggered build is readable only by that tag, and
     # pull request caches are scoped to their own ref, so a PR cannot plant one
-    # that a release restores. The cache is what keeps the Tauri build bearable.
+    # that a release restores.
     cache-poisoning:
-        ignore:
-            - "native.yml"
+        ignore: []
 
     # Vendored agent-skill templates under .agents/ are third-party and not ours
     # to change; they are never run as this repository's workflows.

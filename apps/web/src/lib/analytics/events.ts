@@ -158,6 +158,9 @@ export interface AnalyticsEventMap {
     chat_import_failed: ChatImportFailedProperties;
     chat_import_started: ChatImportStartedProperties;
     default_model_changed: DefaultModelChangedProperties;
+    desktop_download_clicked: { arch: string; platform: string };
+    desktop_first_launch: Record<string, never>;
+    desktop_signed_in: Record<string, never>;
     file_uploaded: FileUploadedProperties;
     memory_toggled: MemoryToggledProperties;
     message_copied: MessageCopiedProperties;

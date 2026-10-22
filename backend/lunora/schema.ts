@@ -590,7 +590,7 @@ export const schema = defineSchema({
         .index("by_userId_createdAt", ["userId", "createdAt"])
         .index("by_status_deadline", ["status", "deadline"])
         .index("by_createdAt", ["createdAt"]),
-    // A paired install of the desktop shell (`devices/`, `apps/native`). The
+    // A paired install of the desktop shell (`devices/`, `apps/desktop`). The
     // secret signs calls and verifies results; it is removed on revoke, so a
     // revoked row can sign nothing. `manifest` is the device's verified tools.
     devices: defineTable({
