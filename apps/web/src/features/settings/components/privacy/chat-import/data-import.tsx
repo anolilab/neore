@@ -51,9 +51,9 @@ type ImportState =
     | { step: "parsing" }
     | { conversations: NormalizedConversation[]; provider: ImportProvider; skipped: string[]; step: "preview" }
     | { provider: ImportProvider; step: "uploading" }
-    | { jobId: string; provider: ImportProvider; step: "importing" }
+    | { jobId: string; provider: ImportProvider; resumedFrom?: number | null; step: "importing" }
     | { failed: number; imported: number; provider: ImportProvider; step: "done" }
-    | { message: string; step: "error" };
+    | { jobId?: string; message: string; step: "error" };
 
 /** The user-facing text of an import failure: translated for our own errors, the raw message otherwise. */
 const importErrorMessage = (error: unknown, i18n: I18n, fallback: string): string => {
@@ -77,6 +77,8 @@ const DataImport: FC = () => {
     const crpc = useCRPC();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [state, setState] = useState<ImportState>({ step: "idle" });
+    const [restarting, setRestarting] = useState(false);
+    const restartingRef = useRef(false);
 
     const { data: importStatus } = useQuery(crpc.chat_import.functions.getImportStatus.queryOptions({}));
 
@@ -88,9 +90,11 @@ const DataImport: FC = () => {
     const jobImported = importStatus?.importedConversations;
     const jobFailed = importStatus?.failedConversations;
     const jobErrorMessage = importStatus?.errorMessage;
+    const jobCompletedAt = importStatus?.completedAt;
 
     const { mutateAsync: startImportJob } = useMutation(crpc.chat_import.functions.startImportJob.mutationOptions());
     const { mutateAsync: cancelImportJob } = useMutation(crpc.chat_import.functions.cancelImportJob.mutationOptions());
+    const { mutateAsync: restartImportJob } = useMutation(crpc.chat_import.functions.restartImportJob.mutationOptions());
 
     // Resume active import on mount — if the server shows a "processing" job
     // and the local state is idle, the user likely refreshed the page mid-import.
@@ -112,6 +116,12 @@ const DataImport: FC = () => {
             return;
         }
 
+        // A resumed job can still report the failure it resumed from, until the restart's own push arrives. Restart clears
+        // completedAt and a new failure writes its own, so only a failure carrying the old value is stale.
+        if (state.resumedFrom !== undefined && jobStatus === "failed" && jobCompletedAt === state.resumedFrom) {
+            return;
+        }
+
         if (jobStatus === "completed") {
             const imported = jobImported ?? 0;
             const failed = jobFailed ?? 0;
@@ -130,11 +140,12 @@ const DataImport: FC = () => {
             }
         } else if (jobStatus === "failed") {
             setState({
+                jobId: activeJobId,
                 message: jobErrorMessage ?? t`Import failed`,
                 step: "error",
             });
         }
-    }, [state, jobStatus, jobImported, jobFailed, jobErrorMessage, t]);
+    }, [state, jobStatus, jobImported, jobFailed, jobErrorMessage, jobCompletedAt, activeJobId, t]);
 
     const handleFileSelect = useCallback(
         async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,6 +298,28 @@ const DataImport: FC = () => {
         }
     }, [state, cancelImportJob, t]);
 
+    const handleRestart = useCallback(async () => {
+        // A ref, not the state flag: two clicks in one tick both read the state before it updates.
+        if (activeJobId === undefined || restartingRef.current) {
+            return;
+        }
+
+        restartingRef.current = true;
+        setRestarting(true);
+
+        try {
+            const resumedFrom = jobCompletedAt ?? null;
+
+            await restartImportJob({ jobId: activeJobId });
+            setState({ jobId: activeJobId, provider: (jobProvider as ImportProvider) || "chatgpt", resumedFrom, step: "importing" });
+        } catch (error) {
+            setState({ message: describeError(error, i18n), step: "error" });
+        } finally {
+            restartingRef.current = false;
+            setRestarting(false);
+        }
+    }, [activeJobId, jobCompletedAt, jobProvider, restartImportJob, i18n]);
+
     const handleReset = useCallback(() => {
         setState({ step: "idle" });
     }, []);
@@ -399,8 +432,25 @@ const DataImport: FC = () => {
                             <p className="font-medium">{t`Import failed`}</p>
                             <p className="mt-1">{state.message}</p>
                         </div>
-                        <Button onClick={handleReset} variant="outline">
-                            {t`Try Again`}
+                        <div className="flex gap-2">
+                            {state.jobId !== undefined && importStatus?.canRestart && (
+                                <Button disabled={restarting} onClick={handleRestart}>
+                                    {t`Resume import`}
+                                </Button>
+                            )}
+                            <Button onClick={handleReset} variant="outline">
+                                {t`Try Again`}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* A failed import that kept its file and still has conversations left */}
+                {state.step === "idle" && importStatus?.canRestart && (
+                    <div className="space-y-3">
+                        <p className="text-muted-foreground text-sm">{t`Your last import stopped before it finished. Resume it to import the conversations that are left.`}</p>
+                        <Button disabled={restarting} onClick={handleRestart} variant="outline">
+                            {t`Resume import`}
                         </Button>
                     </div>
                 )}

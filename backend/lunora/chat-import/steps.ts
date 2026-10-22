@@ -2,13 +2,15 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { insertMessageRow, insertThread } from "../agent/table-writes";
 import { assertStagedChatJson } from "../lib/chat-upload";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
-import { MAX_STORED_READ_BYTES as IMPORT_FILE_MAX_BYTES, readStoredText } from "../lib/storage-read";
+import { MAX_STORED_READ_BYTES as IMPORT_FILE_MAX_BYTES, readStoredObject, readStoredText } from "../lib/storage-read";
 import { withoutUndefined } from "../lib/patch";
+import { MAX_LENGTH } from "../lib/validators";
 import { notifyQuietly } from "../notifications/notify";
+import { CANCELLED_IMPORT_MESSAGE, hasConversationsLeft, keptImportKeyFor, RESTART_WINDOW_MS, resumeProgress } from "./restart";
 
 const BATCH_SIZE = 25;
 
@@ -62,20 +64,24 @@ export const processImportFile = internalAction
             throw new LunoraError("BAD_REQUEST", "Import file contains no conversations");
         }
 
-        // 2. Update total count (in case it differs from estimate)
+        // 2. The counts already saved on the job are the conversations done by an earlier run
+        // (a step retry or a restart), so this resumes after them.
+        const saved = await context.runQuery(internal.chat_import.steps.importCounts, { jobId: args.jobId });
+        let totalImported = saved.imported;
+        let totalFailed = saved.failed;
+        const resumeFrom = totalImported + totalFailed;
+
+        // 3. Update total count (in case it differs from estimate), at the progress the resume point reached
         await context.runMutation(internal.chat_import.steps.updateImportProgress, {
             currentStep: "processing_conversations",
             jobId: args.jobId,
-            progress: 5,
+            progress: resumeProgress(resumeFrom, conversations.length),
             totalConversations: conversations.length,
         });
 
-        // 3. Process conversations in batches
-        let totalImported = 0;
-        let totalFailed = 0;
-        const totalBatches = Math.ceil(conversations.length / BATCH_SIZE);
+        // 4. Process conversations in batches, from the resume point.
 
-        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
+        for (let start = resumeFrom; start < conversations.length; start += BATCH_SIZE) {
             // Check for cancellation before each batch
             const cancelled = await context.runQuery(internal.chat_import.steps.checkJobCancelled, {
                 jobId: args.jobId,
@@ -89,7 +95,6 @@ export const processImportFile = internalAction
                 break;
             }
 
-            const start = batchIndex * BATCH_SIZE;
             const batch = conversations.slice(start, start + BATCH_SIZE);
 
             try {
@@ -107,6 +112,7 @@ export const processImportFile = internalAction
                             title: c.title,
                         };
                     }),
+                    jobId: args.jobId,
                     provider: args.provider,
                     userId: args.userId,
                 });
@@ -114,11 +120,20 @@ export const processImportFile = internalAction
                 totalImported += result.imported;
                 totalFailed += result.failed;
             } catch {
-                totalFailed += batch.length;
+                // The batch may have committed before its response was lost. Its counts go with its threads, so adopt the saved
+                // counts when they moved; otherwise the batch did not commit and it counts as failed.
+                const committed = await context.runQuery(internal.chat_import.steps.importCounts, { jobId: args.jobId });
+
+                if (committed.imported + committed.failed > totalImported + totalFailed) {
+                    totalImported = committed.imported;
+                    totalFailed = committed.failed;
+                } else {
+                    totalFailed += batch.length;
+                }
             }
 
             // Update progress (5% reserved for init, 90% for processing, 5% for cleanup)
-            const batchProgress = 5 + Math.round(((batchIndex + 1) / totalBatches) * 90);
+            const batchProgress = resumeProgress(start + batch.length, conversations.length);
 
             await context.runMutation(internal.chat_import.steps.updateImportProgress, {
                 currentStep: "processing_conversations",
@@ -150,6 +165,26 @@ const lastActivityOf = (conv: { createdAt?: number; messages: { createdAt?: numb
 // ---------------------------------------------------------------------------
 // processConversationBatch — mutation that creates threads + messages
 // ---------------------------------------------------------------------------
+/** Add a batch's counts to the job, in the same transaction as the batch's threads. */
+const addJobCounts = async (
+    context: Pick<MutationCtx, "db">,
+    jobId: Id<"chatImportJobs"> | undefined,
+    counts: { failed: number; imported: number },
+): Promise<void> => {
+    if (!jobId) {
+        return;
+    }
+
+    const job = await context.db.get(jobId);
+
+    if (job) {
+        await context.db.patch(jobId, {
+            failedConversations: (job.failedConversations ?? 0) + counts.failed,
+            importedConversations: job.importedConversations + counts.imported,
+        });
+    }
+};
+
 export const processConversationBatch = internalMutation
     .input({
         conversations: v.array(
@@ -165,6 +200,7 @@ export const processConversationBatch = internalMutation
                 title: v.string(),
             }),
         ),
+        jobId: v.optional(v.id("chatImportJobs")),
         provider: v.string(),
         userId: v.string(),
     })
@@ -224,7 +260,91 @@ export const processConversationBatch = internalMutation
             }
         }
 
+        // The counts commit with the threads above, so a retry or a restart resumes after exactly what was saved.
+        await addJobCounts(context, args.jobId, { failed, imported });
+
         return { failed, imported };
+    });
+
+/** The conversations a job has already saved or counted as failed. Read before a run, so it resumes after them. */
+export const importCounts = internalQuery
+    .input({ jobId: v.id("chatImportJobs") })
+    .output(v.object({ failed: v.number(), imported: v.number(), total: v.number() }))
+    .query(async ({ args, ctx: context }) => {
+        const job = await context.db.get(args.jobId);
+
+        return { failed: job?.failedConversations ?? 0, imported: job?.importedConversations ?? 0, total: job?.totalConversations ?? 0 };
+    });
+
+/** Whether the job row still exists. Erasure deletes it, and a copy made after that would be left behind. */
+export const importJobExists = internalQuery
+    .input({ jobId: v.id("chatImportJobs") })
+    .output(v.boolean())
+    .query(async ({ args, ctx: context }) => (await context.db.get(args.jobId)) !== null);
+
+/**
+ * Copy an import's staged file under its kept key before it is processed, so the
+ * copy exists however long the import runs: the staging object is reaped an hour
+ * after the upload. Only chat JSON is copied, and the check runs on the staging
+ * object first, because the copy is written as `application/json`. A restart's
+ * file is already the copy, so nothing is written.
+ */
+export const keepImportFile = internalAction
+    .input({ jobId: v.id("chatImportJobs"), r2Key: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.string())
+    .action(async ({ args, ctx: context }) => {
+        const key = keptImportKeyFor(args.userId, args.jobId);
+
+        if (args.r2Key === key) {
+            return key;
+        }
+
+        await assertStagedChatJson(context, args.r2Key);
+
+        if (!(await context.runQuery(internal.chat_import.steps.importJobExists, { jobId: args.jobId }))) {
+            throw new LunoraError("NOT_FOUND", "Import job not found");
+        }
+
+        const stored = await readStoredObject(context.storage, args.r2Key, { maxBytes: IMPORT_FILE_MAX_BYTES });
+
+        await context.storage.store(key, stored.bytes, {
+            allowedContentTypes: ["application/json"],
+            contentType: "application/json",
+            maxSize: IMPORT_FILE_MAX_BYTES,
+        });
+
+        // Erasure may have run while the copy was written; the copy is then ours to delete.
+        if (!(await context.runQuery(internal.chat_import.steps.importJobExists, { jobId: args.jobId }))) {
+            await context.storage.delete(key);
+
+            throw new LunoraError("NOT_FOUND", "Import job not found");
+        }
+
+        return key;
+    });
+
+/**
+ * Delete a failed import's kept file once its restart window has passed. It acts
+ * only on the failure it was scheduled for: a restart or a newer failure moves
+ * `completedAt` or the key, and then the reap is a no-op.
+ */
+export const reapRestartableImport = internalMutation
+    .input({ failedAt: v.number(), jobId: v.id("chatImportJobs"), r2Key: v.string().max(MAX_LENGTH.key) })
+    .output(v.null())
+    .mutation(async ({ args, ctx: context }) => {
+        const job = await context.db.get(args.jobId);
+
+        if (job && (job.status !== "failed" || job.completedAt !== args.failedAt || job.r2Key !== args.r2Key)) {
+            return null;
+        }
+
+        if (job) {
+            await context.db.patch(args.jobId, { r2Key: "" });
+        }
+
+        await scheduleObjectDeletion(context, [args.r2Key]);
+
+        return null;
     });
 
 // ---------------------------------------------------------------------------
@@ -281,50 +401,92 @@ export const updateImportProgress = internalMutation
 export const finalizeImport = internalMutation
     .input({
         errorMessage: v.optional(v.string()),
-        failed: v.number(),
-        imported: v.number(),
+        /** Left out when the run failed before reporting its counts: the counts each batch committed stand. */
+        failed: v.optional(v.number()),
+        imported: v.optional(v.number()),
         jobId: v.id("chatImportJobs"),
-        r2Key: v.string(),
+        r2Key: v.string().max(MAX_LENGTH.key),
+        /** The workflow instance: one per run, so a restart (a new instance) notifies again and a redelivered finalize does not. */
+        runId: v.string().max(MAX_LENGTH.id),
         status: v.union(v.literal("completed"), v.literal("failed")),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
-        // Clean up the R2 import file
+        const keptKey = keptImportKeyFor(args.userId, args.jobId);
+        // The staging object goes unless it is the kept copy itself, which a restart reads.
+        const doomed: (string | undefined)[] = [args.r2Key === keptKey ? undefined : args.r2Key];
+        const job = await context.db.get(args.jobId);
+
+        if (!job) {
+            // Erased while the import ran: nothing refers to these objects any more.
+            await scheduleObjectDeletion(context, [...doomed, keptKey]);
+
+            return null;
+        }
+
+        // A restart mints a new run for the job. This run's finalize, if it is redelivered after that, no longer owns the job.
+        if (job.runId !== args.runId) {
+            return null;
+        }
+
+        // The row decides, not the workflow's view of it: a cancel that landed during the run keeps its marker and is never restartable.
+        const cancelled = job.errorMessage === CANCELLED_IMPORT_MESSAGE;
+        const imported = args.imported ?? job.importedConversations;
+        const failed = args.failed ?? job.failedConversations ?? 0;
+        // Kept only when something was committed: a file that failed validation or parsing commits nothing, and a restart would fail the same way.
+        const keep =
+            args.status === "failed" &&
+            !cancelled &&
+            imported + failed > 0 &&
+            hasConversationsLeft({ failedConversations: failed, importedConversations: imported, totalConversations: job.totalConversations });
+
+        if (!keep) {
+            doomed.push(keptKey);
+        }
+
         try {
-            await scheduleObjectDeletion(context, [args.r2Key]);
+            await scheduleObjectDeletion(context, doomed);
         } catch {
             // Non-fatal: file might already be deleted
         }
 
-        // Update the job record
+        const status = cancelled ? "failed" : args.status;
+        const errorMessage = cancelled ? job.errorMessage : args.errorMessage;
+
         // Note: set r2Key to "" (empty string) to clear it — `undefined` in a patch does not clear a field
         await context.db.patch(
             args.jobId,
             withoutUndefined({
                 completedAt: context.now,
-                currentStep: args.status === "completed" ? "done" : "failed",
-                errorMessage: args.errorMessage,
-                failedConversations: args.failed,
-                importedConversations: args.imported,
+                currentStep: status === "completed" ? "done" : "failed",
+                errorMessage,
+                failedConversations: failed,
+                importedConversations: imported,
                 progress: 100,
-                r2Key: "",
-                status: args.status,
+                r2Key: keep ? keptKey : "",
+                status,
             }),
         );
 
-        const job = await context.db.get(args.jobId);
-
-        if (job) {
-            await notifyQuietly(context, {
-                body: [`${String(args.imported)} conversations imported`, args.errorMessage].filter(Boolean).join(". "),
-                dedupeKey: `chat_import:${args.jobId}`,
-                link: "/chat",
-                outcome: args.status === "completed" ? "success" : "failure",
-                title: job.provider,
-                type: "chat_import",
-                userId: job.userId,
+        if (keep) {
+            await context.scheduler.runAfter(RESTART_WINDOW_MS, internal.chat_import.steps.reapRestartableImport, {
+                failedAt: context.now,
+                jobId: args.jobId,
+                r2Key: keptKey,
             });
         }
+
+        await notifyQuietly(context, {
+            body: [`${String(imported)} conversations imported`, errorMessage].filter(Boolean).join(". "),
+            // Per run: a restart reuses the job id, and its outcome must not be dropped as a duplicate of the first failure.
+            dedupeKey: `chat_import:${args.jobId}:${args.runId}`,
+            link: "/chat",
+            outcome: status === "completed" ? "success" : "failure",
+            title: job.provider,
+            type: "chat_import",
+            userId: job.userId,
+        });
 
         return null;
     });

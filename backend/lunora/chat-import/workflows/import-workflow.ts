@@ -27,6 +27,7 @@ export interface ImportParams {
     jobId: Id<"chatImportJobs">;
     provider: string;
     r2Key: string;
+    runId: string;
     totalConversations: number;
     userId: string;
 }
@@ -35,31 +36,38 @@ export const chatImportWorkflowConfig: WorkflowConfig<ImportParams, void> = {
     handler: async (workflowContext): Promise<void> => {
         // Every step works on this user's rows, which live on their shard.
         const context = onUserShard(workflowContext, workflowContext.params.userId);
-        const { jobId, provider, r2Key, totalConversations, userId } = context.params;
+        const { jobId, provider, r2Key, runId, totalConversations, userId } = context.params;
 
-        let imported = 0;
-        let failed = 0;
+        // Left unset when the run fails before reporting them: finalize then keeps the counts each batch committed.
+        let imported: number | undefined;
+        let failed: number | undefined;
         let errorMessage: string | undefined;
 
         try {
+            // The copy comes first, while the staging object still exists; processing reads the copy.
+            const keptKey = (await context.step.do(
+                "keep-import-file",
+                async () => await context.run(internal.chat_import.steps.keepImportFile, { jobId, r2Key, userId }),
+            )) as string;
+
             const result = (await context.step.do(
                 "process-import-file",
-                async () => await context.run(internal.chat_import.steps.processImportFile, { jobId, provider, r2Key, totalConversations, userId }),
+                async () => await context.run(internal.chat_import.steps.processImportFile, { jobId, provider, r2Key: keptKey, totalConversations, userId }),
             )) as { failed: number; imported: number };
 
             imported = result.imported;
             failed = result.failed;
         } catch (error) {
-            failed = totalConversations;
             errorMessage = error instanceof Error ? error.message : "Import processing failed unexpectedly";
         }
 
-        const isAllFailed = imported === 0 && failed > 0;
+        const isAllFailed = imported === 0 && (failed ?? 0) > 0;
+        const isFailedRun = errorMessage !== undefined || isAllFailed;
         let failureSummary: string | undefined;
 
         if (isAllFailed) {
             failureSummary = `All ${failed} conversations failed to import`;
-        } else if (failed > 0) {
+        } else if ((failed ?? 0) > 0) {
             failureSummary = `${failed} conversations failed to import`;
         }
 
@@ -72,7 +80,9 @@ export const chatImportWorkflowConfig: WorkflowConfig<ImportParams, void> = {
                     imported,
                     jobId,
                     r2Key,
-                    status: isAllFailed ? "failed" : "completed",
+                    runId,
+                    status: isFailedRun ? "failed" : "completed",
+                    userId,
                 }),
         );
     },

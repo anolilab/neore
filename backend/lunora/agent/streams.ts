@@ -17,13 +17,7 @@ import { isLockedWithoutProof } from "./thread-passcode";
 import { MAX_LENGTH } from "../lib/validators";
 import { mergedStream, stream } from "../lib/streams";
 import { streamDeltasFields, streamingMessagesFieldsWithoutState } from "../schema";
-import {
-    deriveUIMessagesFromDeltas,
-    fromUIMessages,
-    type MessageWithMetadataInternal,
-    type StreamDelta,
-    type StreamMessage,
-} from "./client";
+import { deriveUIMessagesFromDeltas, fromUIMessages, type MessageWithMetadataInternal, type StreamDelta, type StreamMessage } from "./client";
 import { vStreamDelta, vStreamMessage } from "./validators";
 
 const SECOND = 1000;

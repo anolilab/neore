@@ -15,7 +15,9 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { isUploadId, stagingKeyFor } from "../lib/chat-upload-staging";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
+import { isRestartable, resumeProgress } from "./restart";
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -26,6 +28,7 @@ export const getImportStatus = authQuery
         v.union(
             v.object({
                 _id: v.string(),
+                canRestart: v.boolean(),
                 completedAt: v.union(v.number(), v.null()),
                 createdAt: v.number(),
                 currentStep: v.union(v.string(), v.null()),
@@ -43,9 +46,10 @@ export const getImportStatus = authQuery
     .query(async ({ ctx }) => {
         const { userId } = ctx.user;
 
+        // Newest by `createdAt`: the index's status key would sort by status string first.
         const job = await ctx.db
             .query("chatImportJobs")
-            .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
+            .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
             .order("desc")
             .first();
 
@@ -55,6 +59,7 @@ export const getImportStatus = authQuery
 
         return {
             _id: job._id,
+            canRestart: isRestartable(job),
             completedAt: job.completedAt ?? null,
             createdAt: job.createdAt ?? 0,
             currentStep: job.currentStep ?? null,
@@ -122,6 +127,7 @@ export const startImportJob = authMutation
             progress: 0,
             provider: input.provider,
             r2Key,
+            runId: String(ctx.now),
             status: "processing",
             totalConversations: input.totalConversations,
             userId,
@@ -132,6 +138,7 @@ export const startImportJob = authMutation
             jobId,
             provider: input.provider,
             r2Key,
+            runId: String(ctx.now),
             totalConversations: input.totalConversations,
             userId,
         });
@@ -139,6 +146,78 @@ export const startImportJob = authMutation
         ctx.log.event("chat.start_import_job", { provider: input.provider, totalConversations: input.totalConversations });
 
         return { jobId };
+    });
+
+/**
+ * Run a failed import again from the file it kept. It resumes after the
+ * conversations already saved, so nothing imported before is imported twice;
+ * conversations counted as failed are not retried.
+ */
+export const restartImportJob = authMutation
+    .use(rateLimit("chat-import/start"))
+    .input({
+        jobId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.null())
+    .mutation(async ({ args: input, ctx }) => {
+        const { userId } = ctx.user;
+        const jobId = ctx.db.asId("chatImportJobs", input.jobId);
+        const job = await ctx.db.get(jobId);
+
+        if (!job || job.userId !== userId) {
+            throw new LunoraError("NOT_FOUND", "Import job not found");
+        }
+
+        if (!isRestartable(job)) {
+            throw new LunoraError("CONFLICT", "This import cannot be restarted");
+        }
+
+        // Only the newest import is restartable: an older failed one would import an outdated file over the user's later imports.
+        const newest = await ctx.db
+            .query("chatImportJobs")
+            .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
+            .order("desc")
+            .first();
+
+        if (newest?._id !== job._id) {
+            throw new LunoraError("CONFLICT", "Only the most recent import can be restarted");
+        }
+
+        const existing = await ctx.db
+            .query("chatImportJobs")
+            .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "processing"))
+            .first();
+
+        if (existing) {
+            throw new LunoraError("CONFLICT", "An import is already in progress. Please wait for it to complete.");
+        }
+
+        // `completedAt` and `errorMessage` go, so the reap scheduled for the failure no longer matches this job.
+        // `progress` is the resume point, not the 100 the failed run left behind. `runId` is the new run: the failed run's
+        // finalize, if it is redelivered now, no longer matches the job and does nothing.
+        const runId = String(ctx.now);
+
+        await patchRow(ctx.db, job, {
+            completedAt: undefined,
+            currentStep: "processing_conversations",
+            errorMessage: undefined,
+            progress: resumeProgress(job.importedConversations + (job.failedConversations ?? 0), job.totalConversations),
+            runId,
+            status: "processing",
+        });
+
+        ctx.scheduler.runAfter(0, internal.chat_import.workflow_actions.startImportWorkflow, {
+            jobId,
+            provider: job.provider,
+            r2Key: job.r2Key ?? "",
+            runId,
+            totalConversations: job.totalConversations,
+            userId,
+        });
+
+        ctx.log.event("chat.restart_import_job", { provider: job.provider });
+
+        return null;
     });
 
 /**

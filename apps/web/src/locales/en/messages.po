@@ -37,7 +37,7 @@ msgid ", unread"
 msgstr ", unread"
 
 #. placeholder {0}: state.conversations.length - 10
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:340
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
 msgid "...and {0} more"
 msgstr "...and {0} more"
 
@@ -88,7 +88,7 @@ msgstr "\"v1\" for the current Azure OpenAI API. A dated version such as 2024-10
 msgid "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgstr "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:373
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:389
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} failed)"
 
@@ -213,7 +213,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, one {# member} other {# members}}"
 
 #. placeholder {0}: c.messages.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:336
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:352
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr "{0, plural, one {# message} other {# messages}}"
 
@@ -378,18 +378,18 @@ msgid "{0} chunks"
 msgstr "{0} chunks"
 
 #. placeholder {0}: state.failed
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
 msgid "{0} conversations failed to import"
 msgstr "{0} conversations failed to import"
 
 #. placeholder {0}: state.conversations.length
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:342
 msgid "{0} conversations found"
 msgstr "{0} conversations found"
 
 #. placeholder {0}: state.imported
 #. placeholder {1}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:386
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:402
 msgid "{0} conversations imported from {1}"
 msgstr "{0} conversations imported from {1}"
 
@@ -496,7 +496,7 @@ msgstr "{0} of {1} cases finished"
 
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: importStatus.totalConversations
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:371
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:387
 msgid "{0} of {1} conversations imported"
 msgstr "{0} of {1} conversations imported"
 
@@ -3353,7 +3353,7 @@ msgstr "Attachment"
 msgid "Attachment (hidden)"
 msgstr "Attachment (hidden)"
 
-#: src/features/chat/thread/thread-minimap.tsx:109
+#: src/features/chat/thread/thread-minimap.tsx:73
 msgid "Attachment only"
 msgstr "Attachment only"
 
@@ -4576,7 +4576,7 @@ msgstr "Canada"
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:424
 #: src/features/settings/components/personalization/memory-item.tsx:141
 #: src/features/settings/components/personalization/memory-settings.tsx:246
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:348
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:364
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
@@ -4600,7 +4600,7 @@ msgstr "Cancel deep work"
 msgid "Cancel Export"
 msgstr "Cancel Export"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:376
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:392
 msgid "Cancel Import"
 msgstr "Cancel Import"
 
@@ -8500,7 +8500,7 @@ msgid "Details for case {0}"
 msgstr "Details for case {0}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:325
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:341
 msgid "Detected: {0}"
 msgstr "Detected: {0}"
 
@@ -11193,7 +11193,7 @@ msgstr "Failed to move thread"
 msgid "Failed to optimize prompt"
 msgstr "Failed to optimize prompt"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:238
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:239
 msgid "Failed to parse file"
 msgstr "Failed to parse file"
 
@@ -11378,7 +11378,7 @@ msgstr "Failed to send verification email"
 msgid "Failed to start impersonation"
 msgstr "Failed to start impersonation"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:273
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:274
 msgid "Failed to start import"
 msgstr "Failed to start import"
 
@@ -14341,11 +14341,11 @@ msgstr "Impersonation Stopped"
 msgid "Import"
 msgstr "Import"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:346
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:362
 msgid "Import All"
 msgstr "Import All"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:284
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:285
 msgid "Import cancelled"
 msgstr "Import cancelled"
 
@@ -14353,15 +14353,15 @@ msgstr "Import cancelled"
 msgid "Import cases"
 msgstr "Import cases"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:385
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:401
 msgid "Import complete!"
 msgstr "Import complete!"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:300
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:316
 msgid "Import Conversations"
 msgstr "Import Conversations"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:299
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:315
 msgid "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 msgstr "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data export, or local Claude Code and Codex CLI sessions. Upload your exported JSON or ZIP file, or session .jsonl files."
 
@@ -14373,12 +14373,12 @@ msgstr "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data e
 #~ msgid "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 #~ msgstr "Import conversations from ChatGPT, Google Gemini, or Claude. Upload your exported JSON or ZIP file."
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:133
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:399
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:134
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:415
 msgid "Import failed"
 msgstr "Import failed"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:390
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:406
 msgid "Import More"
 msgstr "Import More"
 
@@ -14386,7 +14386,7 @@ msgstr "Import More"
 msgid "Import Notion export (.zip)"
 msgstr "Import Notion export (.zip)"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:211
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:212
 msgid "Import one kind of export at a time."
 msgstr "Import one kind of export at a time."
 
@@ -14437,7 +14437,7 @@ msgid "Imported skill \"{0}\""
 msgstr "Imported skill \"{0}\""
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:363
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:379
 msgid "Importing from {0}..."
 msgstr "Importing from {0}..."
 
@@ -15105,11 +15105,11 @@ msgstr "Judge score"
 msgid "Judge: {0}"
 msgstr "Judge: {0}"
 
-#: src/features/chat/thread/thread-minimap.tsx:131
+#: src/features/chat/thread/thread-minimap.tsx:95
 msgid "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
 msgstr "Jump to prompt {promptNumber}, {gap} after the previous prompt: {preview}"
 
-#: src/features/chat/thread/thread-minimap.tsx:132
+#: src/features/chat/thread/thread-minimap.tsx:96
 msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr "Jump to prompt {promptNumber}: {preview}"
 
@@ -15433,7 +15433,7 @@ msgstr "Last frame"
 #. placeholder {0}: importStatus.importedConversations
 #. placeholder {1}: PROVIDER_LABELS[importStatus.provider as ImportProvider] ?? importStatus.provider
 #. placeholder {2}: formatDate(importStatus.createdAt, i18n.locale)
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:411
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:440
 msgid "Last import: {0} conversations from {1} on {2}"
 msgstr "Last import: {0} conversations from {1} on {2}"
 
@@ -18440,7 +18440,7 @@ msgstr "No content"
 msgid "No content to display"
 msgstr "No content to display"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:220
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:221
 msgid "No conversations found in the file."
 msgstr "No conversations found in the file."
 
@@ -20362,7 +20362,7 @@ msgstr "Parallel Compare"
 msgid "Paris"
 msgstr "Paris"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:319
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:335
 msgid "Parsing file..."
 msgstr "Parsing file..."
 
@@ -21751,7 +21751,7 @@ msgstr "Prompt Variables"
 msgid "Prompts"
 msgstr "Prompts"
 
-#: src/features/chat/thread/thread-minimap.tsx:104
+#: src/features/chat/thread/thread-minimap.tsx:68
 msgid "Prompts in this conversation"
 msgstr "Prompts in this conversation"
 
@@ -23216,6 +23216,11 @@ msgstr "Result"
 msgid "Resume"
 msgstr "Resume"
 
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:419
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:432
+msgid "Resume import"
+msgstr "Resume import"
+
 #: src/features/settings/components/account/account-settings.tsx:470
 msgid "Resume your latest chat"
 msgstr "Resume your latest chat"
@@ -24281,7 +24286,7 @@ msgstr "Select dictation language"
 msgid "Select duration"
 msgstr "Select duration"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:313
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
 msgid "Select File"
 msgstr "Select File"
 
@@ -25167,7 +25172,7 @@ msgid "Skipped"
 msgstr "Skipped"
 
 #. placeholder {0}: state.skipped.join(", ")
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:329
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:345
 msgid "Skipped files that are not chat exports: {0}"
 msgstr "Skipped files that are not chat exports: {0}"
 
@@ -25876,7 +25881,7 @@ msgstr "Starting"
 msgid "Starting {0}…"
 msgstr "Starting {0}…"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:388
 msgid "Starting import..."
 msgstr "Starting import..."
 
@@ -26432,7 +26437,7 @@ msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "Success criteria must be {CRITERIA_MAX} characters or less"
 
 #. placeholder {0}: PROVIDER_LABELS[provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:129
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:130
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "Successfully imported {imported} conversations from {0}"
 
@@ -26517,7 +26522,7 @@ msgstr "Superior multi-file code generation and refactoring"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Superior understanding of complex visual concepts"
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:310
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:326
 msgid "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
 msgstr "Supported formats: ChatGPT export (conversations.json), Google Gemini (Takeout ZIP), Claude.ai export, a Neore data export (.json), Claude Code or Codex CLI session files (.jsonl)."
 
@@ -27933,7 +27938,7 @@ msgstr "This removes the model files from your computer. You can pull it again l
 msgid "This run is no longer available."
 msgstr "This run is no longer available."
 
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:226
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:227
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "This selection is too large to import at once. Import fewer files at a time."
 
@@ -28674,7 +28679,7 @@ msgstr "Try again"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
 #: src/components/settings/settings-modal.tsx:179
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:403
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:421
 msgid "Try Again"
 msgstr "Try Again"
 
@@ -29420,7 +29425,7 @@ msgid "Uploading {attachmentName}"
 msgstr "Uploading {attachmentName}"
 
 #. placeholder {0}: PROVIDER_LABELS[state.provider]
-#: src/features/settings/components/privacy/chat-import/data-import.tsx:356
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:372
 msgid "Uploading data for import from {0}..."
 msgstr "Uploading data for import from {0}..."
 
@@ -31326,6 +31331,10 @@ msgstr "Your knowledge base is full. {failed} document(s) were not added."
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:152
 msgid "Your knowledge base is full. Remove files to add more."
 msgstr "Your knowledge base is full. Remove files to add more."
+
+#: src/features/settings/components/privacy/chat-import/data-import.tsx:430
+msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
+msgstr "Your last import stopped before it finished. Resume it to import the conversations that are left."
 
 #: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "Your latest changes are not saved yet."
