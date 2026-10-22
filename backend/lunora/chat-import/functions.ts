@@ -18,7 +18,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
-import { isRestartable, resumeProgress } from "./restart";
+import { isRestartable, keptImportKeyFor, resumeProgress } from "./restart";
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -79,25 +79,30 @@ export const getImportStatus = authQuery
 // ---------------------------------------------------------------------------
 
 /**
- * Start a new import job. The client must have already uploaded the normalized
- * conversations JSON to the upload route and passes the upload id here.
- *
- * This mutation creates a tracking record and kicks off a workflow that
- * processes conversations server-side.
+ * How many of a user's newest imports are read when releasing files. A kept file can only sit on the newest import: a
+ * later start releases it while it is still failed, and a restart is only allowed for the newest one. Older kept files
+ * (from before this release existed) are left to the seven-day reap.
  */
+const RECENT_IMPORTS_RELEASED = 10;
+
 /**
- * A new import makes every failed one unrestartable (only the newest import can restart), so the files they kept are
- * released now instead of waiting for the seven-day reap. The reap no-ops once the key is cleared.
+ * A new import makes every failed one unrestartable (only the newest import can restart), so the kept files of failed
+ * imports are released now instead of waiting for the seven-day reap. Only the user's newest imports are read, so the
+ * cost does not grow with their history. A file is released only under its own kept key, never a staging key that a
+ * cancelled run still holds.
  */
 export const releaseSupersededImportFiles = async (
     context: { db: { patch: (id: never, value: { r2Key: string }) => Promise<unknown>; query: any }; scheduler: unknown },
     userId: string,
 ): Promise<void> => {
-    const failed = await context.db
+    const recent = await context.db
         .query("chatImportJobs")
-        .withIndex("by_user_and_status", (q: any) => q.eq("userId", userId).eq("status", "failed"))
-        .collect();
-    const kept = failed.filter((job: { r2Key?: string }) => job.r2Key);
+        .withIndex("by_user_and_createdAt", (q: any) => q.eq("userId", userId))
+        .order("desc")
+        .take(RECENT_IMPORTS_RELEASED);
+    const kept = recent.filter(
+        (job: { _id: string; r2Key?: string; status: string }) => job.status === "failed" && job.r2Key === keptImportKeyFor(userId, job._id),
+    );
 
     await Promise.all(kept.map((job: { _id: never }) => context.db.patch(job._id, { r2Key: "" })));
     await scheduleObjectDeletion(
@@ -106,6 +111,13 @@ export const releaseSupersededImportFiles = async (
     );
 };
 
+/**
+ * Start a new import job. The client must have already uploaded the normalized
+ * conversations JSON to the upload route and passes the upload id here.
+ *
+ * This mutation creates a tracking record and kicks off a workflow that
+ * processes conversations server-side.
+ */
 export const startImportJob = authMutation
     .use(rateLimit("chat-import/start"))
     .input({

@@ -310,6 +310,9 @@ describe("releaseSupersededImportFiles", () => {
     it("clears the kept file of the user's failed imports, and nothing else", async () => {
         const harness = lunoraTest(schema as never);
         const failedJobId = await insertJob(harness);
+
+        // Finalize keeps a file under the job's own key; the release matches on exactly that key.
+        await harness.run(async (ctx: any) => await ctx.db.patch(failedJobId, { r2Key: keptImportKeyFor(OWNER, failedJobId) }));
         const otherUserJobId = await insertJob(harness, { userId: "someone-else" });
         const completedJobId = await insertJob(harness, { completedAt: FAILED_AT, errorMessage: undefined, r2Key: "", status: "completed" });
 
@@ -323,5 +326,17 @@ describe("releaseSupersededImportFiles", () => {
         expect(failed.status).toBe("failed");
         expect(other.r2Key).toBe(KEPT);
         expect(completed.status).toBe("completed");
+    });
+
+    it("leaves a cancelled job's staging key alone: only its own kept key is released", async () => {
+        const harness = lunoraTest(schema as never);
+        const stagingKey = "uploads/owner/staged";
+        const cancelledJobId = await insertJob(harness, { errorMessage: CANCELLED_IMPORT_MESSAGE, r2Key: stagingKey });
+
+        await harness.run(async (ctx: any) => await releaseSupersededImportFiles(ctx, OWNER));
+
+        const cancelled = await harness.run(async (ctx: any) => await ctx.db.get(cancelledJobId));
+
+        expect(cancelled.r2Key).toBe(stagingKey);
     });
 });
