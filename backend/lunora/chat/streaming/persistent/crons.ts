@@ -6,13 +6,13 @@ const BATCH_SIZE = 100;
 export const cleanupExpiredStreams = internalMutation.input({}).mutation(async ({ ctx }) => {
     const { now } = ctx;
 
-    // Query all streams that have expired, regardless of status
-    // This is more efficient than checking status + calculating expiration
-    const expiredStreams = await ctx.db
-        .query("persistentStreams")
-        .withIndex("by_expiresAt", (q) => q.lt("expiresAt", now))
-        .filter((document) => document.status === "pending" || document.status === "streaming")
-        .take(BATCH_SIZE);
+    // Only a pending or streaming stream can expire into `timeout`, so the status test goes in SQL. The legacy
+    // `.filter()` walked every `by_expiresAt` row, and finished streams are never deleted, so the walk grew with the
+    // table's whole history.
+    const { page: expiredStreams } = await ctx.db.persistentStreams.findMany({
+        limit: BATCH_SIZE,
+        where: { expiresAt: { lt: now }, status: { in: ["pending", "streaming"] } },
+    });
 
     for (const stream of expiredStreams) {
         console.log("Cleaning up expired stream", stream._id, {
