@@ -110,7 +110,7 @@ interface MessageContentProps {
 // render would re-render every message's content for nothing.
 const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, message }) => {
     const { t } = useLingui();
-    const toolMeta = useMCPToolMeta(message.parts.some((part) => resolveMcpToolName(part) !== null));
+    const toolMeta = useMCPToolMeta(message.parts.some((part: UIMessage["parts"][number]) => resolveMcpToolName(part) !== null));
     // Stable per locale, so the memoized chat-ui renderer is not re-rendered for it.
     const citationLabel = useCallback((index: number) => t`Source ${index}`, [t]);
     const components = useMemo(() => {

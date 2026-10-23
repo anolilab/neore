@@ -15,6 +15,7 @@ import { isRetryableStatus } from "./session-read";
 const AUTH_PROXY_TIMEOUT_MS = 30_000;
 
 const COOKIE_VALUE_RE = /=(.*)/s;
+const COOKIE_SEPARATOR_RE = /;\s*/u;
 
 /**
  * Lunora's `OptionalRestArgs&lt;F>` — the args as a rest tuple. `@lunora/react` has
@@ -86,7 +87,9 @@ type ClientOptions = {
 };
 
 const parseCookies = (cookieHeader: string): Map<string, string> => {
-    const cookies = cookieHeader.split("; ");
+    // RFC 6265 puts a space after each semicolon, but a client may omit it; a session cookie after
+    // a bare semicolon must still be found, or the visitor is answered as signed out.
+    const cookies = cookieHeader.split(COOKIE_SEPARATOR_RE);
     const cookieMap = new Map<string, string>();
 
     for (const cookie of cookies) {
