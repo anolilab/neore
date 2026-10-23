@@ -415,25 +415,3 @@ export const getChunksAfter = internalQuery
 
         return { chunks: page.map((chunk) => toChunk(chunk)), status, totalChunks: lastChunk ? lastChunk.seq + 1 : afterIndex };
     });
-
-const BATCH_SIZE = 100;
-
-export const cleanupExpiredStreams = internalMutation.input({}).mutation(async ({ ctx }) => {
-    const { now } = ctx;
-    // Use by_expiresAt index to efficiently find expired streams
-    const expiredStreams = await ctx.db
-        .query("persistentStreams")
-        .withIndex("by_expiresAt", (q) => q.lt("expiresAt", now))
-        .take(BATCH_SIZE);
-
-    for (const stream of expiredStreams) {
-        if (!(stream.status === "pending" || stream.status === "streaming")) {
-            continue;
-        }
-
-        console.log("Cleaning up expired stream", stream._id);
-        await ctx.db.patch(stream._id, {
-            status: "timeout",
-        });
-    }
-});

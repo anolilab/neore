@@ -377,7 +377,6 @@ export interface InternalApiTypes {
                 library: {
                     addChunk: FunctionReference<"mutation", { final: boolean; reasoning?: string; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }, void>;
                     claimStreamRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, boolean>;
-                    cleanupExpiredStreams: FunctionReference<"mutation", {}, void>;
                     createStream: FunctionReference<"mutation", { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, Id<"persistentStreams">>;
                     finishStoppedReply: FunctionReference<"mutation", { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }, { messageId?: Id<"messages">; stopped: boolean }>;
                     getChunksAfter: FunctionReference<"query", { afterIndex: number; streamId: Id<"persistentStreams"> }, { chunks: Array<{ reasoning?: string; speaker?: { name: string; skillId: string }; text: string }>; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
@@ -1379,7 +1378,6 @@ export const internal: InternalApiTypes = {
                 library: {
                     addChunk: { __lunoraRef: "chat_streaming_persistent_library:addChunk" },
                     claimStreamRun: { __lunoraRef: "chat_streaming_persistent_library:claimStreamRun" },
-                    cleanupExpiredStreams: { __lunoraRef: "chat_streaming_persistent_library:cleanupExpiredStreams" },
                     createStream: { __lunoraRef: "chat_streaming_persistent_library:createStream" },
                     finishStoppedReply: { __lunoraRef: "chat_streaming_persistent_library:finishStoppedReply" },
                     getChunksAfter: { __lunoraRef: "chat_streaming_persistent_library:getChunksAfter" },
