@@ -10,7 +10,9 @@
 # It starts `lunora dev --no-codegen`: codegen is not this script's business,
 # and running it here would race anyone else regenerating `_generated/`.
 #
-# Usage:  scripts/dev-backend-watchdog.sh            (foreground; Ctrl+C to stop)
+# Usage:  scripts/dev-backend-watchdog.sh            (foreground; Ctrl+C to stop, or
+#                                                    `pkill -f dev-backend-watchdog` when
+#                                                    the terminal was closed: it ignores SIGHUP)
 # Env:    WATCHDOG_ARCHIVE_DIR  where crashed runs' logs go (default backend/.lunora/crashes)
 #         WATCHDOG_RUNNER       `lunora` (default) or `wrangler`. `wrangler` starts the
 #                               worker exactly as `lunora dev` does but without its
@@ -87,6 +89,10 @@ else
     OUT="$ARCHIVE/lunora-dev.out"
 fi
 
+# A closed terminal sends SIGHUP to the whole group. This shell ignores it, so the
+# output pipes below survive; the launch also moves the backend into its own
+# session (`setsid` is not on macOS, so perl does it), so it does not get the signal.
+trap '' HUP
 trap 'exit 143' TERM
 trap 'exit 130' INT
 
@@ -153,14 +159,14 @@ while true; do
             # The command `lunora dev` itself runs (see `ps` under a lunora dev):
             # the backend's config first, then one `--config` per service in
             # `backend/lunora.config.ts`, so the service bindings resolve in-session.
-            (cd "$BACKEND" && nohup ./node_modules/.bin/wrangler dev --port 8788 --inspector-port 9235 --var WORKER_ENV:development \
+            (cd "$BACKEND" && perl -MPOSIX -e 'setsid() or die "setsid: $!"; exec @ARGV' -- nohup ./node_modules/.bin/wrangler dev --port 8788 --inspector-port 9235 --var WORKER_ENV:development \
                 --config wrangler.jsonc \
                 --config ../services/browser-renderer/wrangler.jsonc \
                 --config ../services/document-parser/wrangler.jsonc \
                 --config ../services/llm-gateway/wrangler.jsonc \
                 --config ../services/nsfw-checker/wrangler.jsonc 2>&1 | stamp_lines 2> /dev/null >> "$OUT" &)
         else
-            (cd "$BACKEND" && PATH="./node_modules/.bin:$PATH" nohup lunora dev --no-codegen --worker-port 8788 --inspector-port 9235 2>&1 | stamp_lines 2> /dev/null >> "$OUT" &)
+            (cd "$BACKEND" && PATH="./node_modules/.bin:$PATH" perl -MPOSIX -e 'setsid() or die "setsid: $!"; exec @ARGV' -- nohup lunora dev --no-codegen --worker-port 8788 --inspector-port 9235 2>&1 | stamp_lines 2> /dev/null >> "$OUT" &)
         fi
 
         starting=1
