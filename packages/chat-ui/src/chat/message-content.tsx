@@ -381,7 +381,13 @@ const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
 
     return (
         <div className="mb-4">
-            <img alt={part.prompt || part.filename || t`Image`} className="max-h-[400px] max-w-full rounded-lg object-contain" src={part.image} />
+            <img
+                alt={part.prompt || part.filename || t`Image`}
+                className="max-h-[400px] max-w-full rounded-lg object-contain"
+                decoding="async"
+                loading="lazy"
+                src={part.image}
+            />
             {part.prompt && (
                 <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs italic" title={part.prompt}>
                     {part.prompt}
