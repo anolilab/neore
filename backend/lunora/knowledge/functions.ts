@@ -96,22 +96,22 @@ export const getChunksByEmbeddingIds = internalQuery
             pageNumber?: number;
         }[] = [];
 
-        for (const embeddingId of embeddingIds) {
-            const chunk = await ctx.db
-                .query("knowledgeChunks")
-                .withIndex("by_embeddingId", (q) => q.eq("embeddingId", embeddingId))
-                .first();
+        // Lookups run together, and each file is read once however many of its chunks match.
+        // `Promise.all` keeps the order of `embeddingIds`, so results come back in the same order.
+        const chunks = await Promise.all(
+            embeddingIds.map((embeddingId) =>
+                ctx.db
+                    .query("knowledgeChunks")
+                    .withIndex("by_embeddingId", (q) => q.eq("embeddingId", embeddingId))
+                    .first(),
+            ),
+        );
+        const ownedChunks = chunks.flatMap((chunk) => (chunk && chunk.userId === userId && fileIdSet.has(chunk.fileId as string) ? [chunk] : []));
+        const uniqueFileIds = [...new Set(ownedChunks.map((chunk) => chunk.fileId))];
+        const files = new Map(await Promise.all(uniqueFileIds.map(async (fileId) => [fileId as string, await ctx.db.get(fileId)] as const)));
 
-            if (!chunk || chunk.userId !== userId) {
-                continue;
-            }
-
-            if (!fileIdSet.has(chunk.fileId as string)) {
-                continue;
-            }
-
-            // Get file name
-            const file = await ctx.db.get(chunk.fileId);
+        for (const chunk of ownedChunks) {
+            const file = files.get(chunk.fileId as string);
 
             if (!file) {
                 continue;
