@@ -87,8 +87,7 @@ type ClientOptions = {
 };
 
 const parseCookies = (cookieHeader: string): Map<string, string> => {
-    // RFC 6265 puts a space after each semicolon, but a client may omit it; a session cookie after
-    // a bare semicolon must still be found, or the visitor is answered as signed out.
+    // Some clients omit RFC 6265's space after the semicolon; a missed session cookie reads as signed out.
     const cookies = cookieHeader.split(COOKIE_SEPARATOR_RE);
     const cookieMap = new Map<string, string>();
 
