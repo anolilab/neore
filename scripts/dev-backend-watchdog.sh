@@ -3,9 +3,9 @@
 #
 # `wrangler dev` escalates miniflare's "Network connection lost." to a fatal
 # process exit (see CLAUDE.md → Local dev), taking the backend down mid-session.
-# This loop notices the worker process is gone, archives the dev log of the run
-# that died (`backend/.lunora/dev.log` is truncated on every start, so without
-# this the requests that preceded a crash are lost), and starts it again.
+# This loop notices the worker process is gone, moves the output of the run that
+# died aside (the next start would otherwise append to it, and its requests
+# before the crash would be lost), and starts it again.
 #
 # It starts `lunora dev --no-codegen`: codegen is not this script's business,
 # and running it here would race anyone else regenerating `_generated/`.
@@ -17,13 +17,13 @@
 #                               supervisor, whose readiness probe (1s timeout, every
 #                               250ms) is itself a crash trigger while a restarted
 #                               worker is still cold. Its log is `$ARCHIVE/wrangler-dev.out`
-#                               instead of `backend/.lunora/dev.log`.
+#                               instead of `lunora-dev.out`.
 #
 # Logs, all under the archive dir:
 #   watchdog.log    this script's lines, including each start's /api/health milestone
-#   dev-timed.log   backend/.lunora/dev.log with every line stamped as it was read
 #   lunora-dev.out  what `lunora dev` itself printed, stamped
-#   dev-<time>.log  the dev log of a run that died, copied before its restart
+#   startup-ps.log  processes at each launch, then every 30s until the first 200
+#   dev-<time>.log  the output of a run that died, moved aside before its restart
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,13 +32,19 @@ ARCHIVE="${WATCHDOG_ARCHIVE_DIR:-$BACKEND/.lunora/crashes}"
 RUNNER="${WATCHDOG_RUNNER:-lunora}"
 # `/_lunora/status` is answered before any setup in `src/server.ts`, so it is
 # instant even under load. Probe it with a LONG timeout: a probe that gives up
-# on a slow answer leaves a response to be written to a closed socket, which is
-# itself what crashes wrangler 4.124 (see `src/server.ts` at the status route).
+# on a slow answer leaves a response to be written to a closed socket, which
+# crashed wrangler before 4.129.1 (see `src/server.ts` at the status route). The
+# bound keeps a stalled answer from holding the loop forever.
 HEALTH_URL="http://localhost:8788/_lunora/status"
 # The URL Playwright's webServer waits on, and how long it waits. Keep
 # STARTUP_WAIT_S in step with the webServer timeout in apps/web/playwright.config.ts.
 API_HEALTH_URL="http://localhost:8788/api/health"
 STARTUP_WAIT_S=300
+# The "still" milestone is written this long after a launch's outage began. A pass
+# of the loop can take about 60 s while both probes hang, so the margin is that
+# long, and the milestone reaches the log before Playwright's webServer timeout
+# kills the process group.
+STARTUP_LOG_S=$((STARTUP_WAIT_S - 60))
 
 mkdir -p "$ARCHIVE"
 
@@ -48,73 +54,94 @@ timestamp() {
     date +%Y-%m-%dT%H:%M:%S%z
 }
 
+# stderr too: Playwright shows a webServer's stderr in the CI log, and the log
+# upload is missing whenever its artifact download fails.
 log() {
-    echo "$(timestamp) $*" | tee -a "$ARCHIVE/watchdog.log"
+    echo "$(timestamp) $*" | tee -a "$ARCHIVE/watchdog.log" >&2
 }
 
-# Prefixes each line on stdin with the time it was read.
+# Prefixes each line on stdin with the time it was read, including a last line
+# that has no newline yet.
 stamp_lines() {
-    while IFS= read -r line; do
+    while IFS= read -r line || [ -n "$line" ]; do
         echo "$(timestamp) $line"
     done
 }
 
-# `lunora dev` sends wrangler's output to dev.log, which has no timestamps. Follow
-# it for this watchdog's whole life. `-n 0` skips whatever an earlier run left in
-# the file; `-F` picks it up once lunora creates it, and carries on past its truncation.
-tail -n 0 -F "$BACKEND/.lunora/dev.log" > >(stamp_lines 2> /dev/null >> "$ARCHIVE/dev-timed.log") 2> /dev/null &
-FOLLOWER=$!
-trap 'kill "$FOLLOWER" 2> /dev/null' EXIT
+# Processes alive while a launch starts, so a launch that prints nothing shows what it is stuck in.
+snapshot_processes() {
+    {
+        echo "$(timestamp) processes"
+        # pgrep cannot print the elapsed time or the full command line, which is the point here.
+        # shellcheck disable=SC2009
+        ps -eo pid,ppid,etime,%cpu,args | grep -E 'lunora|wrangler|workerd|cargo|rustc|worker-build|pnpm|esbuild' | grep -v grep
+    } >> "$ARCHIVE/startup-ps.log"
+}
+
+# The output file of the runner in use. Each launch appends to it.
+if [ "$RUNNER" = "wrangler" ]; then
+    OUT="$ARCHIVE/wrangler-dev.out"
+else
+    OUT="$ARCHIVE/lunora-dev.out"
+fi
+
 trap 'exit 143' TERM
 trap 'exit 130' INT
 
-# Waits for the first 2xx from `$API_HEALTH_URL` and logs how long the start took.
-# No `-m` on the probe: cutting off a request the backend has accepted is what
-# crashes it, so a slow cold start is waited out rather than cut short.
-wait_for_api() {
-    local launched=$1 code=000
+# One probe of `$API_HEALTH_URL` per loop while a launch is starting. The bound
+# matches the status probe's, and is long enough that a slow cold start is not
+# cut short. The loop does not restart a worker during a launch (see below).
+probe_startup() {
+    local code
 
-    while [ "$SECONDS" -lt $((launched + STARTUP_WAIT_S)) ]; do
-        code="$(curl -s -o /dev/null -w '%{http_code}' "$API_HEALTH_URL")"
+    code="$(curl -s -m 30 -o /dev/null -w '%{http_code}' "$API_HEALTH_URL")"
 
-        if [ "$code" = 200 ]; then
-            log "startup: /api/health 200 after $((SECONDS - launched))s"
-            return
-        fi
-
-        sleep 2
-    done
-
-    log "startup: /api/health still $code after ${STARTUP_WAIT_S}s; no longer waiting"
+    if [ "$code" = 200 ]; then
+        log "startup: /api/health 200 after $((SECONDS - launched))s"
+        starting=0
+    elif [ "$SECONDS" -ge $((launched + STARTUP_LOG_S)) ]; then
+        log "startup: /api/health still $code after ${STARTUP_LOG_S}s; no longer waiting"
+        starting=0
+    fi
 }
 
 log "watchdog started ($RUNNER)"
 
 fails=0
+# Whether a launch is still waiting for its first 200, and the time its clock started.
+starting=0
+launched=0
+# When the current streak of failed status probes began.
+outage_since=0
+# When the process snapshot was last taken.
+snapshot_at=0
 
 while true; do
     if curl -s -m 30 -o /dev/null "$HEALTH_URL"; then
         fails=0
     else
+        if [ "$fails" -eq 0 ]; then
+            outage_since=$SECONDS
+        fi
         fails=$((fails + 1))
     fi
 
     # Three missed checks AND no worker process: a slow answer under load is not
-    # a crash, and restarting a live-but-busy backend would cause one.
-    if [ "$fails" -ge 3 ] && ! pgrep -f "wrangler.js dev --port 8788" > /dev/null; then
+    # a crash, and restarting a live-but-busy backend would cause one. Not during a
+    # launch either: lunora may not have spawned wrangler yet, so that check would
+    # relaunch a backend that is still coming up.
+    if [ "$starting" -eq 0 ] && [ "$fails" -ge 3 ] && ! pgrep -f "wrangler.js dev --port 8788" > /dev/null; then
         stamp="$(date +%Y%m%dT%H%M%S)"
 
-        if [ "$RUNNER" = "wrangler" ]; then
-            mv "$ARCHIVE/wrangler-dev.out" "$ARCHIVE/dev-$stamp.log" 2> /dev/null
-        else
-            cp "$BACKEND/.lunora/dev.log" "$ARCHIVE/dev-$stamp.log" 2> /dev/null
-        fi
+        mv "$OUT" "$ARCHIVE/dev-$stamp.log" 2> /dev/null
 
         log "backend gone — archived dev-$stamp.log, restarting ($RUNNER)"
 
+        # The startup clock began when the outage did, so the misses before this decision
+        # and the stop below count against it, as they do against Playwright's clock.
+        launched=$outage_since
         (cd "$BACKEND" && timeout 60 ./node_modules/.bin/lunora dev stop > /dev/null 2>&1)
 
-        launched=$SECONDS
         log "launching ($RUNNER)"
         if [ "$RUNNER" = "wrangler" ]; then
             # The command `lunora dev` itself runs (see `ps` under a lunora dev):
@@ -125,13 +152,23 @@ while true; do
                 --config ../services/browser-renderer/wrangler.jsonc \
                 --config ../services/document-parser/wrangler.jsonc \
                 --config ../services/llm-gateway/wrangler.jsonc \
-                --config ../services/nsfw-checker/wrangler.jsonc 2>&1 | stamp_lines 2> /dev/null >> "$ARCHIVE/wrangler-dev.out" &)
+                --config ../services/nsfw-checker/wrangler.jsonc 2>&1 | stamp_lines 2> /dev/null >> "$OUT" &)
         else
-            (cd "$BACKEND" && PATH="./node_modules/.bin:$PATH" nohup lunora dev --no-codegen --worker-port 8788 --inspector-port 9235 2>&1 | stamp_lines 2> /dev/null >> "$ARCHIVE/lunora-dev.out" &)
+            (cd "$BACKEND" && PATH="./node_modules/.bin:$PATH" nohup lunora dev --no-codegen --worker-port 8788 --inspector-port 9235 2>&1 | stamp_lines 2> /dev/null >> "$OUT" &)
         fi
 
-        wait_for_api "$launched"
+        starting=1
         fails=0
+        snapshot_processes
+        snapshot_at=$SECONDS
+    fi
+
+    if [ "$starting" -eq 1 ]; then
+        if [ $((SECONDS - snapshot_at)) -ge 30 ]; then
+            snapshot_processes
+            snapshot_at=$SECONDS
+        fi
+        probe_startup
     fi
 
     sleep 3
