@@ -10,9 +10,8 @@
 # It starts `lunora dev --no-codegen`: codegen is not this script's business,
 # and running it here would race anyone else regenerating `_generated/`.
 #
-# Usage:  scripts/dev-backend-watchdog.sh            (foreground; Ctrl+C to stop, or
-#                                                    `pkill -f dev-backend-watchdog` when
-#                                                    the terminal was closed: it ignores SIGHUP)
+# Usage:  scripts/dev-backend-watchdog.sh            (foreground; Ctrl+C to stop)
+#         It ignores SIGHUP: after closing the terminal, stop it with `pkill -f dev-backend-watchdog`.
 # Env:    WATCHDOG_ARCHIVE_DIR  where crashed runs' logs go (default backend/.lunora/crashes)
 #         WATCHDOG_RUNNER       `lunora` (default) or `wrangler`. `wrangler` starts the
 #                               worker exactly as `lunora dev` does but without its
@@ -82,6 +81,22 @@ snapshot_processes() {
     } >> "$ARCHIVE/startup-ps.log"
 }
 
+# Runs its arguments in a new session, so a closed terminal's SIGHUP does not reach
+# the backend (macOS has no setsid, so perl makes the call). Under CI the backend
+# stays in Playwright's process group instead, so Playwright's stop takes it down.
+detach() {
+    if [ -n "${CI:-}" ]; then
+        exec "$@"
+    fi
+    perl -MPOSIX -e 'setsid() or die "setsid: $!"; exec @ARGV' -- "$@"
+}
+
+# Stops the backend this watchdog started. `lunora dev` is a managed daemon, so
+# ending the watchdog does not end it.
+stop_backend() {
+    (cd "$BACKEND" && ./node_modules/.bin/lunora dev stop) > /dev/null 2>&1
+}
+
 # The output file of the runner in use. Each launch appends to it.
 if [ "$RUNNER" = "wrangler" ]; then
     OUT="$ARCHIVE/wrangler-dev.out"
@@ -90,11 +105,10 @@ else
 fi
 
 # A closed terminal sends SIGHUP to the whole group. This shell ignores it, so the
-# output pipes below survive; the launch also moves the backend into its own
-# session (`setsid` is not on macOS, so perl does it), so it does not get the signal.
+# output pipes below survive, and `detach` keeps the backend out of the group.
 trap '' HUP
-trap 'exit 143' TERM
-trap 'exit 130' INT
+trap 'stop_backend; exit 143' TERM
+trap 'stop_backend; exit 130' INT
 
 # One probe of `$API_HEALTH_URL` per loop while a launch is starting. The bound
 # matches the status probe's, and is long enough that a slow cold start is not
@@ -113,6 +127,9 @@ probe_startup() {
     elif [ "$SECONDS" -ge $((launched + STARTUP_GIVE_UP_S)) ]; then
         log "startup: /api/health still $code after ${STARTUP_GIVE_UP_S}s; restarts apply again"
         starting=0
+        # The streak that began with this launch ends here. Clearing it makes the next
+        # restart count from its own first miss, not from this launch's start.
+        fails=0
     fi
 }
 
@@ -159,14 +176,14 @@ while true; do
             # The command `lunora dev` itself runs (see `ps` under a lunora dev):
             # the backend's config first, then one `--config` per service in
             # `backend/lunora.config.ts`, so the service bindings resolve in-session.
-            (cd "$BACKEND" && perl -MPOSIX -e 'setsid() or die "setsid: $!"; exec @ARGV' -- nohup ./node_modules/.bin/wrangler dev --port 8788 --inspector-port 9235 --var WORKER_ENV:development \
+            (cd "$BACKEND" && detach nohup ./node_modules/.bin/wrangler dev --port 8788 --inspector-port 9235 --var WORKER_ENV:development \
                 --config wrangler.jsonc \
                 --config ../services/browser-renderer/wrangler.jsonc \
                 --config ../services/document-parser/wrangler.jsonc \
                 --config ../services/llm-gateway/wrangler.jsonc \
                 --config ../services/nsfw-checker/wrangler.jsonc 2>&1 | stamp_lines 2> /dev/null >> "$OUT" &)
         else
-            (cd "$BACKEND" && PATH="./node_modules/.bin:$PATH" perl -MPOSIX -e 'setsid() or die "setsid: $!"; exec @ARGV' -- nohup lunora dev --no-codegen --worker-port 8788 --inspector-port 9235 2>&1 | stamp_lines 2> /dev/null >> "$OUT" &)
+            (cd "$BACKEND" && export PATH="./node_modules/.bin:$PATH" && detach nohup lunora dev --no-codegen --worker-port 8788 --inspector-port 9235 2>&1 | stamp_lines 2> /dev/null >> "$OUT" &)
         fi
 
         starting=1
