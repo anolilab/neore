@@ -6,9 +6,8 @@ const BATCH_SIZE = 100;
 export const cleanupExpiredStreams = internalMutation.input({}).mutation(async ({ ctx }) => {
     const { now } = ctx;
 
-    // Only a pending or streaming stream can expire into `timeout`, so the status test goes in SQL. The legacy
-    // `.filter()` walked every `by_expiresAt` row, and finished streams are never deleted, so the walk grew with the
-    // table's whole history.
+    // Only pending and streaming streams expire into `timeout`. Filter them in SQL, so finished rows (never deleted)
+    // are not read.
     const { page: expiredStreams } = await ctx.db.persistentStreams.findMany({
         limit: BATCH_SIZE,
         where: { expiresAt: { lt: now }, status: { in: ["pending", "streaming"] } },

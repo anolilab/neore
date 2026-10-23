@@ -10,9 +10,8 @@
  * guessed runtime name (e.g. "mcp_Brave_Search__web_search").
  *
  * React Query deduplicates the fetch so all DefaultToolCall instances share
- * a single network request per session. It runs only once a message has an MCP
- * tool part: each run connects to every enabled server, so a thread with no MCP
- * calls should not pay for it.
+ * a single network request per session. It runs only for a message with an MCP
+ * tool part, since each run connects to every enabled server.
  */
 
 import { api } from "@neore/backend/api";

@@ -38,25 +38,32 @@ const seedThread = async (): Promise<Thread> =>
         return { messageId, threadId };
     });
 
-const insertStreams = async (thread: Thread, status: string, expiresAt: number, count: number): Promise<string[]> =>
+const insertStreams = async (thread: Thread, status: string, expiresAt: number, count: number): Promise<void> =>
     await harness.run(async (context) => {
-        const ids: string[] = [];
-
         for (let index = 0; index < count; index += 1) {
-            ids.push(
-                await context.db.insert("persistentStreams", {
-                    expiresAt,
-                    messageId: thread.messageId,
-                    status,
-                    streamingConfig: { contentType: "text", model: "m" },
-                    threadId: thread.threadId,
-                    userId: OWNER,
-                }),
-            );
+            await context.db.insert("persistentStreams", {
+                expiresAt,
+                messageId: thread.messageId,
+                status,
+                streamingConfig: { contentType: "text", model: "m" },
+                threadId: thread.threadId,
+                userId: OWNER,
+            });
         }
-
-        return ids;
     });
+
+const insertStream = async (thread: Thread, status: string, expiresAt: number): Promise<string> =>
+    await harness.run(
+        async (context) =>
+            await context.db.insert("persistentStreams", {
+                expiresAt,
+                messageId: thread.messageId,
+                status,
+                streamingConfig: { contentType: "text", model: "m" },
+                threadId: thread.threadId,
+                userId: OWNER,
+            }),
+    );
 
 const sweep = async () => await harness.run(async (context) => await context.runMutation(cleanupExpiredStreams, {}));
 
@@ -76,35 +83,35 @@ describe("cleanupExpiredStreams", () => {
         expect.assertions(2);
 
         const thread = await seedThread();
-        const [pending] = await insertStreams(thread, "pending", Date.now() - HOUR, 1);
-        const [streaming] = await insertStreams(thread, "streaming", Date.now() - HOUR, 1);
+        const pending = await insertStream(thread, "pending", Date.now() - HOUR);
+        const streaming = await insertStream(thread, "streaming", Date.now() - HOUR);
 
         await sweep();
 
-        await expect(statusOf(pending!)).resolves.toBe("timeout");
-        await expect(statusOf(streaming!)).resolves.toBe("timeout");
+        await expect(statusOf(pending)).resolves.toBe("timeout");
+        await expect(statusOf(streaming)).resolves.toBe("timeout");
     });
 
     it("leaves a finished stream alone, even when it is past its expiry", async () => {
         expect.assertions(1);
 
         const thread = await seedThread();
-        const [done] = await insertStreams(thread, "done", Date.now() - HOUR, 1);
+        const done = await insertStream(thread, "done", Date.now() - HOUR);
 
         await sweep();
 
-        await expect(statusOf(done!)).resolves.toBe("done");
+        await expect(statusOf(done)).resolves.toBe("done");
     });
 
     it("leaves a stream that has not expired yet alone", async () => {
         expect.assertions(1);
 
         const thread = await seedThread();
-        const [live] = await insertStreams(thread, "streaming", Date.now() + HOUR, 1);
+        const live = await insertStream(thread, "streaming", Date.now() + HOUR);
 
         await sweep();
 
-        await expect(statusOf(live!)).resolves.toBe("streaming");
+        await expect(statusOf(live)).resolves.toBe("streaming");
     });
 
     it("reads only the live rows, not the finished streams the table has accumulated", async () => {
@@ -113,12 +120,12 @@ describe("cleanupExpiredStreams", () => {
         const thread = await seedThread();
 
         await insertStreams(thread, "done", Date.now() - HOUR, FINISHED);
-        const [pending] = await insertStreams(thread, "pending", Date.now() - HOUR, 1);
+        const pending = await insertStream(thread, "pending", Date.now() - HOUR);
 
         const { cost } = await measureDb(sweep);
 
         // Each expired finished stream would be one row read on the old `by_expiresAt` walk.
         expect(cost.rowsRead).toBeLessThan(FINISHED / 5);
-        await expect(statusOf(pending!)).resolves.toBe("timeout");
+        await expect(statusOf(pending)).resolves.toBe("timeout");
     });
 });
