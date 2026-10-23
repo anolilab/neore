@@ -1594,7 +1594,11 @@ error")` (any transport, including the SSRF-guarded tool
     **`scripts/dev-backend-watchdog.sh`** restarts the backend when its worker
     process is gone and archives the dying run's `dev.log` (which a restart
     truncates) to `backend/.lunora/crashes/`; CI's e2e job runs the backend
-    under it. **The mechanism, reproduced:** a client that ABANDONS a request
+    under it. Wrangler's output stays in `dev.log` (`lunora dev`'s own stdout
+    has only its status lines), so the watchdog stamps a copy of it in
+    `dev-timed.log` and logs `/api/health`'s first 200 in `watchdog.log`. A
+    failed e2e shard uploads that directory as `backend-startup-log-<shard>`.
+    **The mechanism, reproduced:** a client that ABANDONS a request
     the backend has already accepted — a timeout, a closed tab, a navigation —
     leaves a reply to be written to a closed socket, and that write is the
     "Network connection lost." (closing a context mid-first-paint took the

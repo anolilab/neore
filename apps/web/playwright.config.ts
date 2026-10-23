@@ -100,14 +100,7 @@ export default defineConfig({
      */
     webServer: [
         {
-            /**
-             * In CI the backend runs under `scripts/dev-backend-watchdog.sh`,
-             * which restarts it when wrangler's fatal "Network connection
-             * lost." exit takes it down (CLAUDE.md → Local dev) — otherwise one
-             * such exit fails every spec after it. Specs also wait for
-             * `/api/health` before starting (`e2e/chat-helpers.ts`).
-             */
-            command: process.env.CI ? "scripts/dev-backend-watchdog.sh" : "pnpm --filter @neore/backend run dev",
+            command: "pnpm --filter @neore/backend run dev",
             cwd: "../..",
 
             /**

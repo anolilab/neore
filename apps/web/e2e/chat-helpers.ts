@@ -210,9 +210,8 @@ export const contextPoster =
 
 /**
  * Wait until the backend answers `/_lunora/status`. The local dev backend can die
- * mid-suite (wrangler's fatal "Network connection lost."); the watchdog brings
- * it back, and a spec that starts before it has would fail for that reason
- * alone.
+ * mid-suite (wrangler's fatal "Network connection lost."), and a spec that starts
+ * before it answers would fail for that reason alone.
  */
 export const waitForBackend = async (timeoutMs = 120_000): Promise<void> => {
     const deadline = Date.now() + timeoutMs;

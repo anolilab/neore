@@ -14,7 +14,7 @@
     //
     // The inspector port is pinned for the same reason, one level down, but on
     // the CLI: `--inspector-port 9235` in project.json's dev target, package.json's
-    // `dev` script and scripts/dev-backend-watchdog.sh (the flag exists since
+    // `dev` script (the flag exists since
     // anolilab/lunora#689). A new entry point that starts `lunora dev` must pass
     // it too, or the backend takes wrangler's default 9229 and, when that is
     // busy, walks UPWARD into 9230-9234 — which the five services declare in
