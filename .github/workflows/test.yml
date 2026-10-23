@@ -145,9 +145,7 @@ jobs:
         if: "needs.files-changed.outputs.e2e == 'true'"
         needs: "files-changed"
         runs-on: "ubuntu-24.04"
-        # Longer than the e2e step's own limit (set below), so the failure-only log upload
-        # still runs. Setup before that step took 15 to 18 minutes on recent runs.
-        timeout-minutes: 55
+        timeout-minutes: 45
         strategy:
             fail-fast: false
             matrix:
@@ -325,11 +323,7 @@ jobs:
             # captcha plugin and the credential flows are exercised for real; a
             # runner that does set it would skip them with a reason rather than
             # time out twelve times over.
-            # Its own limit, below the job's: a job cancelled at its timeout skips every step
-            # after it, including the failure-only backend log upload. A step that times out
-            # is a failure, so that upload runs.
             - name: "Run e2e tests"
-              timeout-minutes: 25
               shell: "bash"
               run: "pnpm --filter @neore/web run test:e2e --shard=${{ matrix.shard }}/3"
 
@@ -347,21 +341,6 @@ jobs:
                   include-hidden-files: "true"
                   name: "playwright-report-${{ matrix.shard }}"
                   path: "apps/web/e2e/.report"
-                  retention-days: 7
-
-            # The backend's startup log, for a run whose webServer never came up. The
-            # report above has none of it, and nothing else keeps it past the job.
-            # `.lunora` is a dotted directory, so `include-hidden-files` is needed here
-            # too. Only the crashes directory is uploaded: the rest of `.lunora` is
-            # lunora's own dev state, which is not for upload.
-            - name: "Upload the backend startup log"
-              if: "failure()"
-              uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
-              with:
-                  include-hidden-files: "true"
-                  if-no-files-found: "ignore"
-                  name: "backend-startup-log-${{ matrix.shard }}"
-                  path: "backend/.lunora/crashes/"
                   retention-days: 7
 
     test-required-check:
