@@ -40,10 +40,9 @@ HEALTH_URL="http://localhost:8788/_lunora/status"
 # STARTUP_WAIT_S in step with the webServer timeout in apps/web/playwright.config.ts.
 API_HEALTH_URL="http://localhost:8788/api/health"
 STARTUP_WAIT_S=300
-# The "still" milestone is written this long after a launch's outage began. A pass
-# of the loop can take about 60 s while both probes hang, so the margin is that
-# long, and the milestone reaches the log before Playwright's webServer timeout
-# kills the process group.
+# The "still" milestone is written this long after a launch's outage began. One pass
+# of the loop can take about 60 s while both probes hang, so it lands before
+# Playwright's webServer timeout kills the process group.
 STARTUP_LOG_S=$((STARTUP_WAIT_S - 60))
 
 mkdir -p "$ARCHIVE"
@@ -90,7 +89,7 @@ trap 'exit 130' INT
 
 # One probe of `$API_HEALTH_URL` per loop while a launch is starting. The bound
 # matches the status probe's, and is long enough that a slow cold start is not
-# cut short. The loop does not restart a worker during a launch (see below).
+# cut short.
 probe_startup() {
     local code
 
