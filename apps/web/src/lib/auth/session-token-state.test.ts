@@ -86,6 +86,15 @@ describe(fetchSessionToken, () => {
         await expect(fetchSessionToken(SITE, new Headers(), OPTIONS)).resolves.toMatchObject({ status: "unauthenticated" });
     });
 
+    it("a request with NO session cookie is signed out without asking the backend", async () => {
+        const fetchSpy = answer(() => Response.json({ token: jwt(NOW_SECONDS + 900) }));
+
+        vi.stubGlobal("fetch", fetchSpy);
+
+        await expect(fetchSessionToken(SITE, new Headers(), OPTIONS)).resolves.toStrictEqual({ isFresh: true, status: "unauthenticated", token: undefined });
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
     it("keeps the last known token when a refresh is rate-limited", async () => {
         const headers = withSession();
         const token = jwt(NOW_SECONDS + 900);

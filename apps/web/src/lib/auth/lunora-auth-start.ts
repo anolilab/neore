@@ -289,10 +289,13 @@ export const fetchSessionToken = async (siteUrl: string, headers: Headers, optio
         return await fetchToken();
     }
 
-    // No session cookie, no cache key — and nothing worth caching either, since
-    // the token endpoint answers on the strength of that cookie.
+    // No session cookie means no session: the token endpoint answers only on the
+    // strength of that cookie (no bearer plugin is installed), so asking it cannot
+    // succeed. Answering here keeps a slow or hung backend off the SSR of every
+    // cookie-less visitor, the landing page included. The answer is the one
+    // `fetchToken` gives for a 401, and a failed fetch here was already signed out.
     if (!sessionCookie) {
-        return await fetchToken();
+        return { isFresh: true, status: "unauthenticated", token: undefined };
     }
 
     if (options.forceRefresh) {
