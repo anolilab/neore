@@ -44,6 +44,9 @@ STARTUP_WAIT_S=300
 # of the loop can take about 60 s while both probes hang, so it lands before
 # Playwright's webServer timeout kills the process group.
 STARTUP_LOG_S=$((STARTUP_WAIT_S - 60))
+# A launch is protected from restarts until this long after its outage began. Playwright
+# has given up well before this, so a launch this slow has already failed the run.
+STARTUP_GIVE_UP_S=900
 
 mkdir -p "$ARCHIVE"
 
@@ -98,8 +101,11 @@ probe_startup() {
     if [ "$code" = 200 ]; then
         log "startup: /api/health 200 after $((SECONDS - launched))s"
         starting=0
-    elif [ "$SECONDS" -ge $((launched + STARTUP_LOG_S)) ]; then
-        log "startup: /api/health still $code after ${STARTUP_LOG_S}s; no longer waiting"
+    elif [ "$milestone_logged" -eq 0 ] && [ "$SECONDS" -ge $((launched + STARTUP_LOG_S)) ]; then
+        log "startup: /api/health still $code after ${STARTUP_LOG_S}s"
+        milestone_logged=1
+    elif [ "$SECONDS" -ge $((launched + STARTUP_GIVE_UP_S)) ]; then
+        log "startup: /api/health still $code after ${STARTUP_GIVE_UP_S}s; restarts apply again"
         starting=0
     fi
 }
@@ -109,6 +115,7 @@ log "watchdog started ($RUNNER)"
 fails=0
 # Whether a launch is still waiting for its first 200, and the time its clock started.
 starting=0
+milestone_logged=0
 launched=0
 # When the current streak of failed status probes began.
 outage_since=0
@@ -157,6 +164,7 @@ while true; do
         fi
 
         starting=1
+        milestone_logged=0
         fails=0
         snapshot_processes
         snapshot_at=$SECONDS
