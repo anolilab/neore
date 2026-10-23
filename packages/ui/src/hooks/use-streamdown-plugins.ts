@@ -18,11 +18,8 @@ import { code } from "../utils/code-highlighter";
  */
 export const BASIC_STREAMDOWN_PLUGINS: PluginConfig = { cjk, code };
 
-/** Inline math like `$x$`. */
-const INLINE_MATH_PATTERN = /\$[^\s$]/;
-
 export const needsHeavyStreamdownPlugins = (text: string): boolean =>
-    text.includes("```mermaid") || text.includes("$$") || text.includes(String.raw`\(`) || text.includes(String.raw`\[`) || INLINE_MATH_PATTERN.test(text);
+    text.includes("```mermaid") || text.includes("$$") || text.includes(String.raw`\(`) || text.includes(String.raw`\[`);
 
 // Held on an object so the loader mutates a property rather than rebinding a
 // module-level `let` from inside a function.

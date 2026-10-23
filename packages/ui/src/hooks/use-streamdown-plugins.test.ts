@@ -4,8 +4,12 @@ import { describe, expect, it } from "vitest";
 import { loadHeavyStreamdownPlugins, needsHeavyStreamdownPlugins } from "./use-streamdown-plugins";
 
 describe("mhchem formulas", () => {
-    it(String.raw`routes inline \ce formulas to the heavy plugin set`, () => {
-        expect(needsHeavyStreamdownPlugins(String.raw`Water is $\ce{H2O}$.`)).toBe(true);
+    it(String.raw`routes inline \(...\) formulas to the heavy plugin set`, () => {
+        expect(needsHeavyStreamdownPlugins(String.raw`Water is \(\ce{H2O}\).`)).toBe(true);
+    });
+
+    it("keeps single-dollar text on the basic plugin set, since it is never math", () => {
+        expect(needsHeavyStreamdownPlugins(String.raw`Water is $\ce{H2O}$ and it costs $20.`)).toBe(false);
     });
 
     it(String.raw`renders \ce and \pu once the heavy plugins have loaded`, async () => {
