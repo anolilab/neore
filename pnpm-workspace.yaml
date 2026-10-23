@@ -686,6 +686,9 @@ overrides:
   ip-address@<=10.1.0: ">=10.1.1"
   ip-address@<=10.3.0: ">=10.3.1"
   ip-address@<=10.7.0: ">=10.7.1"
+  # GHSA-rxp7-6hxx-x8q5 (Address6 zone identifier, quadratic time), via
+  # express-rate-limit. Fixed in 10.7.4; the tree had 10.7.3.
+  ip-address@<=10.7.3: ">=10.7.4"
   # `jose` is a peer of `@better-auth/core`, so two copies of it split core into
   # two peer-hashed instances — and `BetterAuthPlugin` is nominal across
   # instances, so every plugin passed to `createAuth` stops typechecking. That is
