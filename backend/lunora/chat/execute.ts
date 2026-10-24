@@ -28,6 +28,7 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    createRunSteering,
     endStoppedRun,
     failRun,
     finishRun,
@@ -329,6 +330,9 @@ export const runStreamingAgent = internalAction
                 streamTextArgs.system = baseInstructions ? `${baseInstructions}\n\n${additionalContext}` : additionalContext;
             }
 
+            // Messages the user sends into the reply while it streams (`chat/steering.ts`).
+            const steering = createRunSteering(ctx, { streamId, threadId, userId });
+
             // Stream text
             // Admitted by `streamRunThread` above: the run reads its context without a proof.
             // Aborted only after a sidebar stop's reply is saved (see the catch below).
@@ -339,6 +343,7 @@ export const runStreamingAgent = internalAction
             const result = await threadObject.streamText(streamTextArgs, {
                 admittedRun: true,
                 statelessMode: threadStatelessMode,
+                takeSteer: steering.takeSteer,
             });
 
             // Write chunks to persistent storage (DB only, no HTTP response)
@@ -374,7 +379,7 @@ export const runStreamingAgent = internalAction
             };
 
             try {
-                piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream);
+                piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream, { steeredBefore: steering.steeredBefore });
             } catch (error) {
                 await stoppedAt(error);
 
@@ -524,7 +529,11 @@ export const continueAfterToolApproval = internalAction
             }
 
             // The gate above admitted this continuation, so its knowledge search may read the chat's own files.
-            await resumeApprovedRun(ctx, { answer, approvalId, approved, config, denyReason, streamId, threadId, userId }, { admittedRun: true });
+            await resumeApprovedRun(
+                ctx,
+                { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
+                { admittedRun: true, steerable: true },
+            );
 
             await setThreadStatus(ctx, threadId, "active");
         } catch (error) {

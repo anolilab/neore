@@ -31,6 +31,15 @@ async function* parts(items: (string | "finish-step")[]) {
     }
 }
 
+/** Two steps, each opened by a `start-step` part, as a steered run streams them. */
+async function* steps() {
+    yield { type: "start-step" };
+    yield { text: "Reading.", type: "text-delta" };
+    yield { type: "finish-step" };
+    yield { type: "start-step" };
+    yield { text: "The other one", type: "text-delta" };
+}
+
 describe(pipeToPersistentChunks, () => {
     it("stops at a refused write and owes the whole text, since no step has finished", async () => {
         const { ctx, written } = ctxAccepting(1);
@@ -95,6 +104,35 @@ describe(pipeToPersistentChunks, () => {
         };
 
         await expect(pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. ", "Two", "finish-step"]))).rejects.toBe(boom);
+    });
+
+    it("marks where the reply continues below a steered message, after the step before it", async () => {
+        const chunks: { restart?: boolean; text: string }[] = [];
+        const ctx = {
+            runMutation: async (_ref: unknown, args: { restart?: boolean; text: string }) => {
+                chunks.push({ ...(args.restart && { restart: true }), text: args.text });
+            },
+        };
+        // Delivered at the boundary before the second step only.
+        const steered = [false, true];
+
+        const piped = await pipeToPersistentChunks(ctx as never, "stream-1", steps(), { steeredBefore: () => steered.shift() ?? false });
+
+        expect(chunks).toStrictEqual([{ text: "Reading." }, { restart: true, text: "" }]);
+        expect(piped.pending).toStrictEqual({ reasoning: "", text: "The other one" });
+    });
+
+    it("owes nothing when a stop refuses the restart marker: the steps before it are saved", async () => {
+        const { ctx, written } = ctxAccepting(1);
+        const steered = [false, true];
+
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", steps(), { steeredBefore: () => steered.shift() ?? false }).catch(
+            (error_: unknown) => error_,
+        );
+
+        expect(written).toStrictEqual(["Reading."]);
+        expect(isStreamWriteRefused(error)).toBe(true);
+        expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "" });
     });
 
     it("rethrows any other write failure as it was", async () => {

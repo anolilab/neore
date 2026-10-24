@@ -10,13 +10,21 @@
  * does coming back to a thread whose stream finished while you were away, and
  * a queue restored from sessionStorage after a reload.
  *
+ * Steered prompts (sent INTO the running reply, `chat/steering.ts`) sit here
+ * too, marked as such, until the reply takes them — the stream reports their
+ * ids delivered and their chips go. One still here when its turn to send comes
+ * is withdrawn first: `withdrawn` (the reply never took it) sends it like any
+ * queued prompt, `delivered` drops it.
+ *
  * Transition rules: `core/utils/prompt-queue.ts`. Mount exactly once per thread
  * — two mounted runners would each drain an item per stream.
  */
 
 import { Plural, useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
-import { ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
+import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { CornerDownRightIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useEffect, useRef } from "react";
 
@@ -24,7 +32,8 @@ import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
-import { decideAutoSend } from "@/features/chat/core/utils/prompt-queue";
+import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 /**
  * `sendMessage` clears the composer synchronously (before its first await) —
@@ -50,6 +59,42 @@ const useSendQueuedPrompt = () => {
     );
 };
 
+/**
+ * Sends the thread's next queued prompt, withdrawing a steered one from its run
+ * first (`takeNextToSend`). One whose withdrawal failed goes back, paused.
+ */
+const useSendNextPrompt = () => {
+    const crpc = useCRPC();
+    const sendQueuedPrompt = useSendQueuedPrompt();
+    const { mutateAsync: withdrawSteer } = useMutation(crpc.chat.steering.withdrawSteer.mutationOptions());
+
+    return useCallback(
+        async (threadId: string): Promise<void> => {
+            const store = usePromptQueueStore.getState();
+            const next = await takeNextToSend(
+                () => store.shift(threadId),
+                async (steer) => {
+                    const { outcome } = await withdrawSteer({
+                        steerId: steer.id,
+                        streamId: steer.streamId as Id<"persistentStreams">,
+                        threadId: threadId as Id<"threads">,
+                    });
+
+                    return outcome;
+                },
+            );
+
+            if (next?.kind === "send") {
+                sendQueuedPrompt(next.prompt);
+            } else if (next?.kind === "requeue") {
+                store.enqueue(threadId, next.prompt);
+                store.setPaused(threadId, true);
+            }
+        },
+        [sendQueuedPrompt, withdrawSteer],
+    );
+};
+
 const QueueChip: FC<{ onRemove: (id: string) => void; position: number; prompt: QueuedChatPrompt }> = ({ onRemove, position, prompt }) => {
     const { t } = useLingui();
     const preview = prompt.text.trim() || t`(attachments only)`;
@@ -61,6 +106,12 @@ const QueueChip: FC<{ onRemove: (id: string) => void; position: number; prompt: 
             <span aria-hidden="true" className="text-muted-foreground tabular-nums">
                 {position}.
             </span>
+            {prompt.steer && (
+                <span className="text-muted-foreground flex items-center">
+                    <CornerDownRightIcon aria-hidden="true" className="size-3" />
+                    <span className="sr-only">{t`Steering:`}</span>
+                </span>
+            )}
             <span className="max-w-64 truncate" title={prompt.text}>
                 {preview}
             </span>
@@ -94,7 +145,12 @@ const ComposerPromptQueue: FC = () => {
     const { isStreaming } = useChatIsStreaming();
     const { error } = useChatError();
     const queue = usePromptQueueStore(selectThreadQueue(threadId));
-    const sendQueuedPrompt = useSendQueuedPrompt();
+    const sendNextPrompt = useSendNextPrompt();
+    const crpc = useCRPC();
+    // The same query (and key) the chat context reads, so no second subscription.
+    const { data: activeStream } = useQuery(
+        crpc.chat.streaming.getActiveStreamForThread.queryOptions(threadId && threadId !== "default" ? { threadId: threadId as Id<"threads"> } : skipToken),
+    );
 
     // Restores a queue left in sessionStorage by a reload; it arrives paused.
     useEffect(() => {
@@ -102,6 +158,21 @@ const ComposerPromptQueue: FC = () => {
             usePromptQueueStore.getState().hydrate(threadId);
         }
     }, [threadId]);
+
+    // A steered prompt the running reply has taken is in the thread now: retire its chip.
+    useEffect(() => {
+        const deliveredIds = activeStream?.deliveredSteerIds;
+
+        if (!threadId || !activeStream || !deliveredIds?.length) {
+            return;
+        }
+
+        const { remove } = usePromptQueueStore.getState();
+
+        for (const id of deliveredSteerItems(queue.items, activeStream.streamId, deliveredIds)) {
+            remove(threadId, id);
+        }
+    }, [activeStream, queue.items, threadId]);
 
     // Runner: act only on a streaming -> idle transition within the same thread.
     const observedRef = useRef({ isStreaming, threadId });
@@ -115,7 +186,7 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const { queues, setPaused, shift } = usePromptQueueStore.getState();
+        const { queues, setPaused } = usePromptQueueStore.getState();
         const current = queues[threadId];
         const decision = decideAutoSend({
             hasError: Boolean(error),
@@ -128,13 +199,9 @@ const ComposerPromptQueue: FC = () => {
         if (decision === "pause") {
             setPaused(threadId, true);
         } else if (decision === "send") {
-            const next = shift(threadId);
-
-            if (next) {
-                sendQueuedPrompt(next);
-            }
+            void sendNextPrompt(threadId);
         }
-    }, [error, isStreaming, sendQueuedPrompt, threadId]);
+    }, [error, isStreaming, sendNextPrompt, threadId]);
 
     const handleRemove = useCallback(
         (id: string) => {
@@ -150,24 +217,22 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const { setPaused, shift } = usePromptQueueStore.getState();
-
-        setPaused(threadId, false);
-
-        const next = shift(threadId);
-
-        if (next) {
-            sendQueuedPrompt(next);
-        }
-    }, [sendQueuedPrompt, threadId]);
+        usePromptQueueStore.getState().setPaused(threadId, false);
+        void sendNextPrompt(threadId);
+    }, [sendNextPrompt, threadId]);
 
     if (queue.items.length === 0) {
         return null;
     }
 
     const count = queue.items.length;
+    const steerCount = queue.items.filter((item) => item.steer).length;
     const willAutoSend = isStreaming && !queue.paused;
-    const statusText = willAutoSend ? t`${count} queued — sends when the current reply finishes` : t`${count} queued`;
+    let statusText = willAutoSend ? t`${count} queued — sends when the current reply finishes` : t`${count} queued`;
+
+    if (steerCount === count && isStreaming) {
+        statusText = t`${count} steering — the reply reads it at its next step`;
+    }
 
     return (
         <div className="mx-2 mt-2 flex flex-wrap items-center gap-1.5">

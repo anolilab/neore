@@ -8,15 +8,17 @@
  * - Chat actions (sendMessage, cancelStream)
  * - Drag and drop support
  * - Prompt history (ArrowUp/ArrowDown recall of this thread's prompts)
- * - Queueing while a turn streams (`composer-prompt-queue.tsx`)
+ * - Queueing while a turn streams (`composer-prompt-queue.tsx`), or steering it:
+ *   sending the text INTO the running reply (`chat_steering.steerRun`)
  * - "Restore to input" requests from the message list (`core/utils/composer-restore.ts`)
  */
 
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { formatNumber } from "@neore/ui/utils/locale-format";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -718,6 +720,37 @@ const ComposerInput = ({
         [setText, promptHistory],
     );
 
+    // Steer: while a reply streams, send the text INTO it; the run takes it at its
+    // next step boundary (`chat/steering.ts`). Text only — attachments and
+    // reference images go through the queue. The steer shows as a chip in the
+    // queue until the reply takes it; one the reply never took (a text-only
+    // reply has no step boundary) is sent after it, like a queued message. A
+    // refused steer (a group chat, a reply that just ended) is simply queued.
+    const { mutateAsync: steerRun } = useMutation(crpc.chat.steering.steerRun.mutationOptions());
+    const canSteer = isThreadComposer && !isComparisonValid && Boolean(sseStreamState) && attachments.length === 0 && attachedReferences.length === 0;
+
+    const handleSteer = useCallback(() => {
+        const streamId = sseStreamState;
+        const steerText = text;
+
+        if (!canSteer || !threadId || !streamId || !steerText.trim() || disabled) {
+            return;
+        }
+
+        promptHistory.reset();
+        clear();
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        void steerRun({ streamId: streamId as Id<"persistentStreams">, text: steerText, threadId: threadId as Id<"threads"> })
+            .then(({ steerId }) => {
+                enqueue(threadId, { attachments: [], steer: { id: steerId, streamId }, text: steerText });
+
+                return undefined;
+            })
+            .catch(() => enqueue(threadId, { attachments: [], text: steerText }));
+    }, [canSteer, clear, disabled, promptHistory, sseStreamState, steerRun, text, threadId]);
+
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
     // sendMessage before the first await. The network request runs in the background.
@@ -1193,6 +1226,7 @@ const ComposerInput = ({
                 onSelectChat={compact ? undefined : handleSelectChat}
                 onSelectFileUpload={compact ? undefined : handleSelectFileUpload}
                 onSelectVaultFile={compact ? undefined : handleSelectVaultFile}
+                onSteer={canSteer ? handleSteer : undefined}
                 onSubmit={handleSubmit}
                 placeholder={placeholder ?? t`Type your message...`}
                 ref={inputAreaRef}

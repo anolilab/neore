@@ -20,7 +20,7 @@ import { api } from "../../_generated/api";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
-import type { ContextHandler } from "../../agent/client/types";
+import type { ContextHandler, TakeSteer } from "../../agent/client/types";
 import type { ResearchDepth } from "../../agent/client/create-tool";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
@@ -55,7 +55,7 @@ import { runAfterOnShard } from "../../lib/shard-scheduler";
 import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
 import type { ReplySkill } from "../../usage/activity-logic";
-import { replyUsageArgs } from "../../usage/activity-logic";
+import { repliesByOrder, replyUsageArgs } from "../../usage/activity-logic";
 import { scheduleReplyUsage } from "../../usage/schedule";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
@@ -525,10 +525,13 @@ export const afterRun = (
     }
 
     // Usage heatmap + per-skill breakdown (`usage/activity.ts`), on the user's own shard.
-    scheduleReplyUsage(
-        ctx.scheduler as never,
-        replyUsageArgs(savedMessages, { at: Date.now(), userId, ...(args.skill && { skill: args.skill }), ...(args.timeZone && { timeZone: args.timeZone }) }),
-    );
+    // One record per reply: a steered run saved two (`repliesByOrder`).
+    for (const reply of repliesByOrder(savedMessages)) {
+        scheduleReplyUsage(
+            ctx.scheduler as never,
+            replyUsageArgs(reply, { at: Date.now(), userId, ...(args.skill && { skill: args.skill }), ...(args.timeZone && { timeZone: args.timeZone }) }),
+        );
+    }
 
     if (!args.extractMemory || !prompt) {
         return;
@@ -603,6 +606,50 @@ export const buildRunStreamArgs = (options: { model: string; reasoningEffort: nu
     };
 
     return streamTextArgs;
+};
+
+/**
+ * Steering for one interactive run (`chat/steering.ts`). `takeSteer` is the
+ * agent's step-boundary hook; `steeredBefore` tells the stream pipe that a
+ * message was delivered before the step now starting, so it writes the
+ * `restart` marker (`persist-stream.ts`) once per delivery.
+ *
+ * A failed delivery is logged and the run carries on: its steers stay queued,
+ * and the client sends them after the reply as ordinary messages.
+ */
+export const createRunSteering = (
+    ctx: Pick<ActionCtx, "runMutation">,
+    run: { streamId: string; threadId: string; userId: string },
+): { steeredBefore: () => boolean; takeSteer: TakeSteer } => {
+    let restartDue = false;
+
+    return {
+        steeredBefore: () => {
+            const due = restartDue;
+
+            restartDue = false;
+
+            return due;
+        },
+        takeSteer: async ({ pendingMessageId }) => {
+            try {
+                const delivered = await ctx.runMutation(internal.chat.steering.deliverSteers, {
+                    pendingMessageId,
+                    streamId: run.streamId as Id<"persistentStreams">,
+                    threadId: run.threadId as Id<"threads">,
+                    userId: run.userId,
+                });
+
+                restartDue ||= delivered !== null;
+
+                return delivered;
+            } catch (error) {
+                streamLogger.warn("[AgentRun] Steer delivery failed:", error);
+
+                return null;
+            }
+        },
+    };
 };
 
 /**
@@ -747,6 +794,8 @@ export const endStoppedRun = async (
  *   row names it as its branch parent).
  * - `contextHandler`: replaces the agent's default context.
  * - `keepOpenUnlessPaused`: as for {@link finishRun}.
+ * - `steerable`: the continuation takes steered messages (`createRunSteering`).
+ *   Interactive one-assistant runs only, never a group participant.
  */
 export const resumeApprovedRun = async (
     ctx: ActionCtx,
@@ -773,6 +822,7 @@ export const resumeApprovedRun = async (
         beforeStream?: () => Promise<void>;
         contextHandler?: ContextHandler;
         keepOpenUnlessPaused?: boolean;
+        steerable?: boolean;
     } = {},
 ): Promise<{ lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
@@ -855,13 +905,19 @@ export const resumeApprovedRun = async (
 
         await options.beforeStream?.();
 
+        const steering = options.steerable === true ? createRunSteering(ctx, { streamId, threadId, userId }) : undefined;
+        const runOptions = { saveStreamDeltas: false, ...(steering && { takeSteer: steering.takeSteer }) };
         const result = approved
-            ? await agent.approveToolCall(ctx, { threadId, userId }, { approvalId }, streamTextArgs as never, { saveStreamDeltas: false })
-            : await agent.denyToolCall(ctx, { approvalId, ...(denyReason !== undefined && { reason: denyReason }), threadId }, streamTextArgs as never, {
-                  saveStreamDeltas: false,
-              });
+            ? await agent.approveToolCall(ctx, { threadId, userId }, { approvalId }, streamTextArgs as never, runOptions)
+            : await agent.denyToolCall(
+                  ctx,
+                  { approvalId, ...(denyReason !== undefined && { reason: denyReason }), threadId },
+                  streamTextArgs as never,
+                  runOptions,
+              );
 
         // A stop during this continuation ends it here, after its owed text is saved (`endStoppedRun`).
+        // After a steer the reply continues below the steered message; `finishStoppedReply` reads that off the stream.
         const stoppedAt = async (error: unknown) => {
             await endStoppedRun(ctx, error, {
                 agentName: options.agentName,
@@ -879,7 +935,7 @@ export const resumeApprovedRun = async (
         let piped: PipedStream;
 
         try {
-            piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream);
+            piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream, { steeredBefore: steering?.steeredBefore });
         } catch (error) {
             return await stoppedAt(error);
         }

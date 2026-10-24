@@ -633,11 +633,22 @@ export type Options = {
     storageOptions?: StorageOptions;
 
     /**
+     * Steering (`chat/steering.ts`): called at each step boundary of a streamed
+     * run with the pending row the next step will be saved into. A message it
+     * returns was written into the thread after the reply so far; the model sees
+     * it from this step on, and later steps are saved after it.
+     */
+    takeSteer?: TakeSteer;
+
+    /**
      * The usage handler to use for this thread. Overrides any handler
      * set in the agent constructor.
      */
     usageHandler?: UsageHandler;
 };
+
+/** See {@link Options.takeSteer}. `null` when there is nothing to deliver. */
+export type TakeSteer = (at: { pendingMessageId: string }) => Promise<{ messageId: string; text: string } | null>;
 
 export type SyncStreamsReturnValue = { kind: "list"; messages: StreamMessage[] } | { deltas: StreamDelta[]; kind: "deltas" } | undefined;
 

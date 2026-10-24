@@ -15,6 +15,7 @@ import { internalMutation, internalQuery, type MutationCtx } from "../../../_gen
 import { patchRow } from "../../../lib/patch";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { MAX_LENGTH } from "../../../lib/validators";
+import { latestSteerMessageId, type SteerEntry } from "../../lib/steer-queue";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
 
@@ -86,6 +87,8 @@ export const addChunk = internalMutation
     .input({
         final: v.boolean(),
         reasoning: v.optional(v.string()),
+        /** Steering: the reply continues below a message the user sent into it (`chat/steering.ts`). */
+        restart: v.optional(v.boolean()),
         /** Group chat: this chunk starts a new participant's reply. */
         speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
         streamId: v.id("persistentStreams"),
@@ -115,6 +118,7 @@ export const addChunk = internalMutation
 
         await ctx.db.insert("persistentChunks", {
             reasoning: args.reasoning,
+            ...(args.restart && { restart: true }),
             seq,
             ...(args.speaker && { speaker: args.speaker }),
             streamId: args.streamId,
@@ -259,9 +263,15 @@ export const finishStoppedReply = internalMutation
         const threadId = stream.threadId as Id<"threads">;
         let messageId: Id<"messages"> | undefined;
 
+        // A steered run carries on below its latest steered message (`chat/steering.ts`): its pending
+        // row and the text it owes belong in that message's order, with that message as their prompt.
+        const steeredId = latestSteerMessageId(stream.steers as SteerEntry[] | undefined);
+        const steerRow = steeredId ? await ctx.db.messages.findFirst({ where: { _id: steeredId as Id<"messages">, threadId } }) : null;
+        const order = steerRow?.order ?? args.order;
+
         const pending = await ctx.db.messages.findFirst({
             orderBy: [{ stepOrder: "desc" }],
-            where: { order: args.order, status: "pending", threadId, tool: false },
+            where: { order, status: "pending", threadId, tool: false },
         });
 
         if (args.pendingText.length === 0 && args.pendingReasoning.length === 0) {
@@ -275,9 +285,13 @@ export const finishStoppedReply = internalMutation
                 ...(args.pendingReasoning ? [{ text: args.pendingReasoning, type: "reasoning" as const }] : []),
                 ...(args.pendingText ? [{ text: args.pendingText, type: "text" as const }] : []),
             ];
-            const placement = args.continuation
+            let placement = args.continuation
                 ? { overrideOrder: args.order, parentMessageId: args.promptMessageId, promptMessageId: undefined }
                 : { overrideOrder: undefined, parentMessageId: undefined, promptMessageId: args.promptMessageId as Id<"messages"> };
+
+            if (steerRow) {
+                placement = { overrideOrder: undefined, parentMessageId: undefined, promptMessageId: steerRow._id };
+            }
 
             const saved = await addMessagesHandler(ctx, {
                 agentName: args.agentName,
@@ -355,7 +369,8 @@ export const getStreamText = internalQuery
             });
             // In a group turn, earlier participants' replies are already saved
             // messages; only the current speaker's text is still "streaming".
-            const lastMarker = allChunks.findLastIndex((chunk) => chunk.speaker);
+            // Likewise the text before a steered message (`restart`).
+            const lastMarker = allChunks.findLastIndex((chunk) => chunk.speaker || chunk.restart);
             const chunks = lastMarker === -1 ? allChunks : allChunks.slice(lastMarker);
 
             speaker = lastMarker === -1 ? undefined : (allChunks[lastMarker]?.speaker ?? undefined);
@@ -394,6 +409,7 @@ export const getChunksAfter = internalQuery
             chunks: v.array(
                 v.object({
                     reasoning: v.optional(v.string()),
+                    restart: v.optional(v.boolean()),
                     speaker: v.optional(v.object({ name: v.string(), skillId: v.string() })),
                     text: v.string(),
                 }),
@@ -433,8 +449,8 @@ export const getChunksAfter = internalQuery
             return lockedAnswer;
         }
 
-        const toChunk = (c: { reasoning?: string | null; speaker?: { name: string; skillId: string } | null; text: string }) => {
-            return { reasoning: c.reasoning ?? undefined, ...(c.speaker && { speaker: c.speaker }), text: c.text };
+        const toChunk = (c: { reasoning?: string | null; restart?: boolean | null; speaker?: { name: string; skillId: string } | null; text: string }) => {
+            return { reasoning: c.reasoning ?? undefined, ...(c.restart && { restart: true }), ...(c.speaker && { speaker: c.speaker }), text: c.text };
         };
 
         // Only the chunks past the cursor, in order. With nothing new this is

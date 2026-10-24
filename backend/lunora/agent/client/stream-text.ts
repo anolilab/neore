@@ -147,11 +147,22 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
                 const model = stepResult.model ?? callOptions.model;
 
                 call.updateModel(model);
-
-                return stepResult;
             }
 
-            return undefined;
+            // Steering: a message the user sent into the run, at the boundary
+            // before this step (never before the first). Appended after the
+            // caller's compression, so it is never summarised away; a `messages`
+            // override carries forward to later steps.
+            const steer = callOptions.stepNumber > 0 ? await call.takeSteer() : null;
+
+            if (steer) {
+                return {
+                    ...stepResult,
+                    messages: [...(stepResult?.messages ?? callOptions.messages), { content: steer.text, role: "user" as const }],
+                };
+            }
+
+            return stepResult ?? undefined;
         },
     }) as StreamTextResult<TOOLS, AiContext, OUTPUT>;
     const stream = streamer?.consumeStream(result.toUIMessageStream<AIUIMessage<TOOLS>>());
