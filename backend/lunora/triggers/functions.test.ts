@@ -259,6 +259,18 @@ describe("updateTrigger on a new schedule", () => {
         expect(updated.nextTriggerAt).toBe(Date.parse("2026-03-12T12:00:00Z"));
     });
 
+    it("keeps a due run the tick has not taken when the expression is re-saved unchanged", async () => {
+        const due = NOW - 60_000;
+        const triggerId = await insertSchedule(true);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { cronExpression: "0 9 * * 1", triggerId } as never);
+
+        const kept = await readTrigger(triggerId);
+
+        expect(kept.nextTriggerAt).toBe(due);
+    });
+
     it("refuses a schedule that never fires on an enabled trigger, and clears the time on a disabled one", async () => {
         const as = harness.withIdentity({ userId: "user-a" } as never);
         const enabledId = await insertSchedule(true);

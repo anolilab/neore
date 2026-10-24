@@ -263,11 +263,15 @@ export const updateTrigger = authMutation
 
         // Only a schedule has a next run. A new schedule moves it; the old time would fire once more on the old schedule.
         // A disabled schedule may store one too: enabling replaces it if it has passed (`firstRunOf`).
+        // Re-saving the same expression keeps a pending due time, so a run the tick has not taken yet still fires.
         const isSchedule = trigger.type === "schedule";
         let nextTriggerAt: number | undefined;
 
         if (isSchedule) {
-            nextTriggerAt = args.cronExpression === undefined ? trigger.nextTriggerAt : findNextCronTime(args.cronExpression, context.now);
+            nextTriggerAt =
+                args.cronExpression === undefined || (args.cronExpression === trigger.cronExpression && trigger.nextTriggerAt !== undefined)
+                    ? trigger.nextTriggerAt
+                    : findNextCronTime(args.cronExpression, context.now);
         }
 
         if (args.cronExpression !== undefined) {
