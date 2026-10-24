@@ -110,4 +110,22 @@ describe("a gap in the deltas", () => {
         expect(requestedCursors).toEqual([0, 5, 0, 5]);
         expect(result.current?.[0]?.deltas.map(({ end, start }) => [start, end])).toEqual([[0, 5]]);
     });
+
+    it("treats a new stream's first delta as a gap when it does not start at 0", () => {
+        let served = false;
+
+        harness.serve = () => {
+            if (!served) {
+                served = true;
+
+                return [delta(9, 12)];
+            }
+
+            return [delta(0, 5)];
+        };
+
+        const { result } = renderHook(() => useDeltaStreams(query, { threadId: "thread-1" } as never));
+
+        expect(result.current?.[0]?.deltas.map(({ end, start }) => [start, end])).toEqual([[0, 5]]);
+    });
 });

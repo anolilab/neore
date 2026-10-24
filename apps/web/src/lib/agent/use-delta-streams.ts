@@ -135,15 +135,16 @@ const useDeltaStreams = <Query extends StreamQuery<any> = StreamQuery<object>>(
 
         if (newDeltas?.length) {
             for (const delta of newDeltas) {
-                const oldCursor = cursors[delta.streamId];
+                // A stream with no cursor yet was queried from 0, so its first delta must start there too.
+                const oldCursor = cursors[delta.streamId] ?? 0;
 
-                if (resetStreamIds.has(delta.streamId) || (oldCursor && delta.start < oldCursor)) {
+                if (resetStreamIds.has(delta.streamId) || delta.start < oldCursor) {
                     continue;
                 }
 
                 const existing = newDeltasByStreamId.get(delta.streamId);
                 const expectedStart = existing ? existing.at(-1)?.end : oldCursor;
-                const isGap = existing ? expectedStart !== delta.start : Boolean(oldCursor) && oldCursor !== delta.start;
+                const isGap = expectedStart !== delta.start;
 
                 if (isGap) {
                     if (import.meta.env.DEV) {
