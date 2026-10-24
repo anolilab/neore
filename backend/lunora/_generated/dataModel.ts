@@ -1892,6 +1892,7 @@ export interface Doc_userSettings {
     sendBehavior?: string;
     taskEmailEnabled?: boolean;
     temporaryChatRetentionHours?: number;
+    threadTitleInstructions?: string;
     timezone?: string;
     userId: string;
     voiceModeVoice?: string;
@@ -4619,6 +4620,7 @@ export interface Insert_userSettings {
     sendBehavior?: string;
     taskEmailEnabled?: boolean;
     temporaryChatRetentionHours?: number;
+    threadTitleInstructions?: string;
     timezone?: string;
     userId: string;
     voiceModeVoice?: string;

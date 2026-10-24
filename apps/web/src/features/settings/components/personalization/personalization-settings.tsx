@@ -1,6 +1,7 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { Button } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
 import { Field, FieldDescription, FieldLabel } from "@neore/ui/components/field";
@@ -24,7 +25,7 @@ const MAX_CUSTOM_INSTRUCTIONS_LENGTH = 3000;
 const MAX_NICKNAME_LENGTH = 50;
 const MAX_PROFESSION_LENGTH = 100;
 
-const SYNCED_FIELDS = ["nickname", "profession", "aboutMe", "customInstructions"] as const;
+const SYNCED_FIELDS = ["nickname", "profession", "aboutMe", "customInstructions", "threadTitleInstructions"] as const;
 
 type SyncedField = (typeof SYNCED_FIELDS)[number];
 
@@ -39,6 +40,7 @@ const PersonalizationSettings: FC = () => {
     const [profession, setProfession] = useState("");
     const [aboutMe, setAboutMe] = useState("");
     const [customInstructions, setCustomInstructions] = useState("");
+    const [threadTitleInstructions, setThreadTitleInstructions] = useState("");
     const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
 
     const handleOptimizedSystemPrompt = useCallback(
@@ -66,12 +68,14 @@ const PersonalizationSettings: FC = () => {
             customInstructions: userSettings.customInstructions ?? "",
             nickname: userSettings.nickname ?? "",
             profession: userSettings.profession ?? "",
+            threadTitleInstructions: userSettings.threadTitleInstructions ?? "",
         };
         const setters: Record<SyncedField, (value: string) => void> = {
             aboutMe: setAboutMe,
             customInstructions: setCustomInstructions,
             nickname: setNickname,
             profession: setProfession,
+            threadTitleInstructions: setThreadTitleInstructions,
         };
         const changed = SYNCED_FIELDS.filter((field) => server[field] !== lastSynced[field]);
 
@@ -128,6 +132,23 @@ const PersonalizationSettings: FC = () => {
             handleUpdateSetting("customInstructions", trimmed);
         }
     }, [customInstructions, userSettings?.customInstructions, handleUpdateSetting]);
+
+    // Sent as "" to clear: `handleUpdateSetting` maps blank to `undefined`, which the wire drops, so the old text would stay.
+    const handleThreadTitleInstructionsBlur = useCallback(async () => {
+        const trimmed = threadTitleInstructions.trim();
+
+        if (trimmed === (userSettings?.threadTitleInstructions ?? "")) {
+            return;
+        }
+
+        try {
+            await updateSettingsMutation.mutateAsync({ threadTitleInstructions: trimmed });
+            trackEvent("settings_changed", { section: "personalization", setting_key: "threadTitleInstructions" });
+            toast.success(t`Settings saved`);
+        } catch {
+            toast.error(t`Failed to save settings`);
+        }
+    }, [threadTitleInstructions, userSettings?.threadTitleInstructions, updateSettingsMutation, t]);
 
     if (isLoading) {
         return (
@@ -230,6 +251,29 @@ const PersonalizationSettings: FC = () => {
                         />
                         <div className="text-muted-foreground mt-1 text-right text-xs">
                             {customInstructions.length} /{MAX_CUSTOM_INSTRUCTIONS_LENGTH}
+                        </div>
+                    </Field>
+                </CardContent>
+            </SettingsCard>
+
+            <SettingsCard
+                description={t`Tell the AI how to word the titles it gives new conversations. This adds to the default title style.`}
+                title={t`Thread Titles`}
+            >
+                <CardContent className="space-y-4">
+                    <Field>
+                        <FieldLabel htmlFor="thread-title-instructions">{t`How should titles be written?`}</FieldLabel>
+                        <FieldDescription>{t`For example: "Keep titles under four words", "Write titles in German", or "Start with a verb".`}</FieldDescription>
+                        <Input
+                            id="thread-title-instructions"
+                            maxLength={MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
+                            onBlur={handleThreadTitleInstructionsBlur}
+                            onChange={(e) => setThreadTitleInstructions(e.target.value)}
+                            placeholder={t`Enter your title instructions...`}
+                            value={threadTitleInstructions}
+                        />
+                        <div className="text-muted-foreground mt-1 text-right text-xs">
+                            {threadTitleInstructions.length} /{MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
                         </div>
                     </Field>
                 </CardContent>
