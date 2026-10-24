@@ -654,7 +654,7 @@ overrides:
   effect@<3.20.0: ">=3.20.0"
   express-rate-limit@>=8.2.0 <8.2.2: ">=8.2.2"
   # GHSA-v422-hmwv-36x6. Only `express` pulls a vulnerable copy.
-  express>body-parser: ">=2.3.0"
+  express>body-parser: ">=2.4.0"
   # Kept on 3.x. The open-ended `>=3.1.x` targets these replaced moved ajv's
   # `^3.0.1` onto 4.1.3, which then drew four advisories of the 4.x line
   # (GHSA-qw65-cvwx-89v3, GHSA-58mr-gqgx-xq4g, GHSA-hrr3-gc8f-f4qj,
@@ -777,6 +777,20 @@ overrides:
   xlsx: "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   yaml@>=1.0.0 <1.10.3: ">=1.10.3"
   yauzl@<3.2.1: ">=3.2.1"
+  body-parser@>=2.0.0 <2.4.0: ^2.4.0
+  fast-uri@>=3.0.0 <3.1.9: ^3.1.9
+  postal-mime@>=3.0.0 <4.0.8: ^4.0.8
+  serialize-javascript@<7.1.3: ^7.1.3
+  undici@>=8.0.0 <8.12.2: ^8.12.2
+  # miniflare pins undici exactly, and the bare `undici` floor above keeps that pin.
+  miniflare>undici: ^8.12.2
+  # Other tools that pin undici exactly to 8.11.2.
+  "@ai-sdk/provider-utils>undici": ^8.12.2
+  "@dotenvx/dotenvx>undici": ^8.12.2
+  "@shadcn/registry>undici": ^8.12.2
+  shadcn>undici: ^8.12.2
+  ajv>fast-uri: ^3.1.9
+  zod@<4.6.6: ^4.6.6
 shellEmulator: true
 
 trustPolicy: no-downgrade
