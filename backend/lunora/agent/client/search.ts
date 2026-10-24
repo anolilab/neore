@@ -105,16 +105,15 @@ export const fetchRecentAndSearchMessages = async (
     const { targetMessageId } = args;
     // A branched thread holds sibling replies and edited prompts; only the
     // prompt's own path is history. `null` = unbranched, every row counts.
-    const pathIds =
+    // The path only filters the recent page, so both reads are issued together.
+    const readPathIds =
         args.threadId && targetMessageId
-            ? await context.runQuery(internal.agent.branches.getContextPathIds, {
+            ? context.runQuery(internal.agent.branches.getContextPathIds, {
                   promptMessageId: targetMessageId as Id<"messages">,
                   threadId: args.threadId as Id<"threads">,
               })
             : null;
-    const onPath = pathIds ? new Set(pathIds) : undefined;
-
-    if (args.threadId && options.recentMessages !== 0) {
+    const readRecent = async () => {
         // Internal for the same reason as `listMessages`: the thread is already
         // authorized, and background runs carry no identity. A run admitted under
         // the lock state reads without a proof (`admittedRun`); any other read
@@ -134,7 +133,13 @@ export const fetchRecentAndSearchMessages = async (
             ? await context.runQuery(internal.agent.messages.listMessagesByThreadIdAdmitted, recentArgs)
             : await context.runQuery(internal.agent.messages.listMessagesByThreadIdInternal, { ...recentArgs, unlockProof: args.unlockProof });
 
-        const pathPage = onPath ? page.filter((m) => onPath.has(m._id)) : page;
+        return page;
+    };
+    const [pathIds, recentPage] = await Promise.all([readPathIds, args.threadId && options.recentMessages !== 0 ? readRecent() : null]);
+    const onPath = pathIds ? new Set(pathIds) : undefined;
+
+    if (recentPage) {
+        const pathPage = onPath ? recentPage.filter((m) => onPath.has(m._id)) : recentPage;
 
         included = new Set(pathPage.map((m) => m._id));
         recentMessages = filterOutOrphanedToolMessages(sorted(pathPage));
