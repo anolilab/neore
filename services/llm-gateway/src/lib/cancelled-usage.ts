@@ -4,9 +4,9 @@
  * every token it streamed, so recording zeros would make a stopped reply free.
  *
  * This is a LOWER-bound estimate of tokens, used ONLY when no `finish` usage arrived — never
- * when real usage exists. It uses the same chars/4 heuristic as `token-estimator.ts`
- * and counts text only: tool calls, tool results and files in the prompt are left
- * out, so the token counts stay below what the provider charged.
+ * when real usage exists. It uses the same chars/4 heuristic as `token-estimator.ts`.
+ * Output counts text, reasoning and the arguments of completed tool calls; tool results and
+ * files in the prompt are left out, so the token counts stay below what the provider charged.
  *
  * The cache hit count is unknown here, so `cachedTokens` is 0 and every prompt token is
  * billed at the full input rate. A cancelled turn that hit the provider's prompt cache is

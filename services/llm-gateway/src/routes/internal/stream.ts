@@ -423,18 +423,21 @@ streamRouter.openapi(
             let emittedChars = 0;
             let reasoningChars = 0;
 
-            /** Counts the text a relayed chunk carries, for the usage estimate of a cancelled stream. */
+            /** Counts the output a relayed chunk carries, for the usage estimate of a cancelled stream. */
             const countDelta = (chunk: string): void => {
                 const payload = SSE_SINGLE_EVENT_RE.exec(chunk)?.[1];
 
-                if (!payload?.startsWith('{"textDelta"')) {
+                if (!payload?.startsWith('{"textDelta"') && !payload?.startsWith('{"args"')) {
                     return;
                 }
 
                 try {
-                    const { textDelta, type } = JSON.parse(payload) as { textDelta: string; type: string };
+                    const { args, textDelta = "", type } = JSON.parse(payload) as { args?: unknown; textDelta?: string; type: string };
 
-                    if (type === "reasoning") {
+                    if (args !== undefined) {
+                        // A completed tool call is output the provider billed for.
+                        emittedChars += JSON.stringify(args).length;
+                    } else if (type === "reasoning") {
                         reasoningChars += textDelta.length;
                     } else {
                         emittedChars += textDelta.length;

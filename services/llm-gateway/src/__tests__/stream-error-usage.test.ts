@@ -268,11 +268,51 @@ describe("a cancelled stream bills the tokens it already produced", () => {
         expect(report).toMatchObject(ESTIMATED_REPORT);
     });
 
-    it.each([
-        ["a plain delta", DELTA],
-        ["a delta with a U+2028 line separator", SEPARATED_DELTA],
-    ])("POST /internal/stream records the estimate when cancelled before finish (%s)", async (_label, delta) => {
-        vi.mocked(streamText).mockImplementationOnce((({ abortSignal }: { abortSignal: AbortSignal }) => {
+    it("POST /internal/model/proxy bills a completed tool call's arguments when cancelled before finish", async () => {
+        const args = JSON.stringify({ query: "z".repeat(40) });
+
+        vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({
+            doStream: async () => {
+                return {
+                    stream: new ReadableStream({
+                        start(controller) {
+                            controller.enqueue({ input: args, toolCallId: "call-1", toolName: "search", type: "tool-call" });
+                        },
+                    }),
+                };
+            },
+        } as never);
+
+        const res = await fetchApp(
+            new Request("http://localhost/internal/model/proxy", {
+                body: JSON.stringify({
+                    action: "stream",
+                    callOptions: { prompt: [{ content: [{ text: PROMPT, type: "text" }], role: "user" }] },
+                    modelApiId: "gpt-test-1",
+                    modelId: "gpt-test",
+                    provider: "openai",
+                    requestId: "req-proxy-tool-cancel",
+                    userId: "user-1",
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+            }),
+            bindingEnv(createMockEnv()),
+        );
+
+        const reader = res.body!.getReader();
+
+        await reader.read();
+        await reader.cancel("user stopped");
+
+        const { entry } = await billed();
+
+        expect(entry).toMatchObject({ completionTokens: Math.ceil(args.length / 4), finishReason: "cancelled" });
+    });
+
+    /** A `streamText` that yields `parts`, then stays open until the request is aborted, as a cancelled stream does. */
+    const streamTextUntilAborted = (parts: object[]) =>
+        (({ abortSignal }: { abortSignal: AbortSignal }) => {
             const aborted = new Promise<void>((resolve) => {
                 abortSignal.addEventListener("abort", () => resolve(), { once: true });
             });
@@ -286,13 +326,56 @@ describe("a cancelled stream bills the tokens it already produced", () => {
             return {
                 finishReason: rejectOnAbort,
                 fullStream: (async function* partsOf() {
-                    yield { text: delta, type: "text-delta" };
-                    yield { text: delta, type: "text-delta" };
+                    yield* parts;
                     await aborted;
                 })(),
                 usage: rejectOnAbort,
             };
-        }) as never);
+        }) as never;
+
+    it("POST /internal/stream bills a completed tool call's arguments when cancelled before finish", async () => {
+        const input = { query: "z".repeat(40) };
+
+        vi.mocked(streamText).mockImplementationOnce(streamTextUntilAborted([{ input, toolCallId: "call-1", toolName: "search", type: "tool-call" }]));
+        vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({} as never);
+
+        const res = await fetchApp(
+            new Request("http://localhost/internal/stream", {
+                body: JSON.stringify({
+                    messages: [{ content: PROMPT, role: "user" }],
+                    modelApiId: "gpt-test-1",
+                    modelId: "gpt-test",
+                    provider: "openai",
+                    requestId: "req-stream-tool-cancel",
+                    userId: "user-1",
+                    warmupTimeoutMs: 0,
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+            }),
+            bindingEnv(createMockEnv()),
+        );
+
+        const reader = res.body!.getReader();
+
+        await reader.read();
+        await reader.cancel("user stopped");
+
+        const { entry } = await billed();
+
+        expect(entry).toMatchObject({ completionTokens: Math.ceil(JSON.stringify(input).length / 4), finishReason: "cancelled" });
+    });
+
+    it.each([
+        ["a plain delta", DELTA],
+        ["a delta with a U+2028 line separator", SEPARATED_DELTA],
+    ])("POST /internal/stream records the estimate when cancelled before finish (%s)", async (_label, delta) => {
+        vi.mocked(streamText).mockImplementationOnce(
+            streamTextUntilAborted([
+                { text: delta, type: "text-delta" },
+                { text: delta, type: "text-delta" },
+            ]),
+        );
         vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({} as never);
 
         const res = await fetchApp(

@@ -361,6 +361,12 @@ modelProxyRouter.openapi(
                                     break;
                                 }
 
+                                // A completed tool call is output the provider billed for. Provider parts carry its arguments as a JSON string.
+                                case "tool-call": {
+                                    emittedChars += typeof value.input === "string" ? value.input.length : JSON.stringify(value.input ?? {}).length;
+                                    break;
+                                }
+
                                 default: {
                                     // Other stream parts carry no usage or text to count.
                                     break;
