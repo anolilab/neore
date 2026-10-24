@@ -679,7 +679,8 @@ const llmGatewayEnv = (siteOrigins: Output.Output<string | undefined>) => ({
     LUNORA_URL: requireEnv("BACKEND_PUBLIC_ORIGIN"),
     MUSIC_BUCKET: MusicBucket,
     MUSIC_RENDER_QUEUE: MusicRenders,
-    NODE_ENV: stage === "production" ? "production" : "development",
+    // Every deployed stage is public on workers.dev: no stack traces, docs or MOCK_LLM outside wrangler dev.
+    NODE_ENV: "production",
     PRICING_KV: GatewayPricingKv,
     // Where user-facing gateway errors deep-link their "fix-it" actions.
     PUBLIC_DASHBOARD_URL: requireEnv("SITE_URL"),

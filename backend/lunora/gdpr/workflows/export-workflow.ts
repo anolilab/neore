@@ -16,6 +16,7 @@
  * in-flight instances resume at the wrong place, so treat them as a contract.
  */
 import type { WorkflowConfig } from "@lunora/workflow";
+import { LunoraError } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
@@ -26,6 +27,12 @@ export interface ExportParams {
     userEmail: string;
     userId: string;
 }
+
+/** The user-facing reason a failed export shows; never the raw error. */
+export const exportFailureMessage = (error: unknown): string =>
+    error instanceof LunoraError && error.code === "PAYLOAD_TOO_LARGE"
+        ? "Your export is larger than the 32 MB limit; contact support"
+        : "Failed to generate export file";
 
 export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
     handler: async (workflowContext): Promise<void> => {
@@ -87,38 +94,13 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // guard below narrows it to `{}`. Cast at the boundary, same as
         // `chat-import/workflows/import-workflow.ts` does. The value is the R2
         // object key `generateExportFile` returns.
-        const storageId = (await context.step.do(
-            "generate-export-file",
-            async () =>
-                await context.run(internal.gdpr.steps.generateExportFile, {
-                    activity,
-                    bots,
-                    codingAgentRuns,
-                    conversations,
-                    devices,
-                    evals,
-                    files,
-                    memories,
-                    notifications,
-                    pages,
-                    profile,
-                    prompts,
-                    requestId,
-                    settings,
-                    tasks,
-                    threadTags,
-                    userEmail,
-                    userId,
-                }),
-        )) as Id<"_storage"> | undefined;
-
-        if (!storageId) {
-            await progress({ errorMessage: "Failed to generate export file", progress: 80, status: "failed" });
+        const failExport = async (message: string): Promise<void> => {
+            await progress({ errorMessage: message, progress: 80, status: "failed" });
             await context.step.do(
                 "notify-export-failed",
                 async () =>
                     await context.run(internal.notifications.functions.createNotification, {
-                        body: "Failed to generate export file",
+                        body: message,
                         dedupeKey: `data_export:${requestId}`,
                         link: "/dashboard/settings/privacy",
                         outcome: "failure",
@@ -127,6 +109,44 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         userId,
                     }),
             );
+        };
+
+        let storageId: Id<"_storage"> | undefined;
+
+        try {
+            storageId = (await context.step.do(
+                "generate-export-file",
+                async () =>
+                    await context.run(internal.gdpr.steps.generateExportFile, {
+                        activity,
+                        bots,
+                        codingAgentRuns,
+                        conversations,
+                        devices,
+                        evals,
+                        files,
+                        memories,
+                        notifications,
+                        pages,
+                        profile,
+                        prompts,
+                        requestId,
+                        settings,
+                        tasks,
+                        threadTags,
+                        userEmail,
+                        userId,
+                    }),
+            )) as Id<"_storage"> | undefined;
+        } catch (error) {
+            // Do not rethrow: the row is already failed, and a rethrow would make the runtime retry the whole handler.
+            await failExport(exportFailureMessage(error));
+
+            return;
+        }
+
+        if (!storageId) {
+            await failExport("Failed to generate export file");
 
             return;
         }

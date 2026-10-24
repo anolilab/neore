@@ -7,18 +7,28 @@
  * a wildcard, so an unchecked expression fires every minute.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { assertComputerRoutine, createTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import { assertComputerRoutine, createTrigger, setTriggerEnabled, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import { findNextCronTime } from "./schedule";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
 // session is read straight off the harness identity.
-const { sessionFrom } = vi.hoisted(() => {
+const { registry, sessionFrom } = vi.hoisted(() => {
     return {
+        registry: new Map<string, unknown>(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
     };
+});
+
+// `testRunTrigger` reads the trigger through `ctx.runQuery(internal.…)`.
+vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+beforeAll(async () => {
+    registerModule(registry, "triggers_functions", await import("./functions"));
 });
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
@@ -115,6 +125,29 @@ describe("trigger schedules", () => {
             triggerId: expect.any(String),
         });
     });
+
+    it("stores no next run for a webhook trigger, even when it is sent a cron expression", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        await as().mutation(updateTrigger as never, { cronExpression: "0 9 * * 1", triggerId } as never);
+
+        const trigger = await readTrigger(triggerId);
+
+        expect(trigger.nextTriggerAt).toBeUndefined();
+    });
+
+    it("enabling a schedule whose stored run has passed arms the next future run, not that stale one", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, schedule("0 9 * * 1") as never)) as { triggerId: string };
+        const stale = Date.now() - 60_000;
+
+        // Left by a schedule that was edited and then stayed disabled past its time.
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: stale }));
+        await as().mutation(setTriggerEnabled as never, { enabled: true, triggerId } as never);
+
+        const trigger = await readTrigger(triggerId);
+
+        expect(trigger.nextTriggerAt).toBeGreaterThan(Date.now());
+    });
 });
 describe("a routine's bot computer", () => {
     it("needs a bot and a schedule", () => {
@@ -148,5 +181,106 @@ describe("a routine's bot computer", () => {
 
         expect(cleared.botId).toBeUndefined();
         expect(cleared.botComputer).toBeUndefined();
+    });
+});
+
+describe("testRunTrigger", () => {
+    // The run reads the trigger when it starts, after this action returned. Enabling the
+    // trigger only for the action's length meant a disabled trigger never ran.
+    it("runs a disabled trigger without enabling it", async () => {
+        const as = harness.withIdentity({ userId: "user-a" } as never);
+        const { triggerId } = (await as.mutation(
+            createTrigger as never,
+            { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" } as never,
+        )) as {
+            triggerId: string;
+        };
+        const before = await readTrigger(triggerId);
+
+        await as.action(testRunTrigger as never, { triggerId } as never);
+
+        // No payload: the run uses the schedule's own input, not the generic test text a webhook gets.
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, triggerId }]);
+
+        const after = await readTrigger(triggerId);
+
+        expect(after.enabled).toBe(false);
+        expect(after.updatedAt).toBe(before.updatedAt);
+    });
+
+    it("passes a test payload the user typed to a disabled schedule's manual run", async () => {
+        const as = harness.withIdentity({ userId: "user-a" } as never);
+        const { triggerId } = (await as.mutation(
+            createTrigger as never,
+            { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" } as never,
+        )) as {
+            triggerId: string;
+        };
+
+        await as.action(testRunTrigger as never, { testPayload: "summarise the inbox", triggerId } as never);
+
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ ignoreDisabled: true, payload: "summarise the inbox", triggerId }]);
+    });
+});
+
+describe("updateTrigger on a new schedule", () => {
+    const NOW = Date.parse("2026-03-12T10:30:00Z");
+
+    const insertSchedule = async (enabled: boolean): Promise<string> =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("triggers", {
+                    createdAt: NOW,
+                    cronExpression: "0 9 * * 1",
+                    enabled,
+                    model: "m",
+                    name: "Weekly",
+                    nextTriggerAt: findNextCronTime("0 9 * * 1", NOW),
+                    triggerCount: 0,
+                    type: "schedule",
+                    updatedAt: NOW,
+                    userId: "user-a",
+                }),
+        );
+
+    beforeEach(() => {
+        harness.close();
+        harness = lunoraTest(schema as never, { now: NOW } as never);
+    });
+
+    it("moves the next run to the new schedule", async () => {
+        const triggerId = await insertSchedule(true);
+
+        await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { cronExpression: "0 12 * * *", triggerId } as never);
+
+        const updated = await readTrigger(triggerId);
+
+        expect(updated.nextTriggerAt).toBe(findNextCronTime("0 12 * * *", NOW));
+        expect(updated.nextTriggerAt).toBe(Date.parse("2026-03-12T12:00:00Z"));
+    });
+
+    it("keeps a due run the tick has not taken when the expression is re-saved unchanged", async () => {
+        const due = NOW - 60_000;
+        const triggerId = await insertSchedule(true);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { nextTriggerAt: due }));
+        await harness.withIdentity({ userId: "user-a" } as never).mutation(updateTrigger as never, { cronExpression: "0 9 * * 1", triggerId } as never);
+
+        const kept = await readTrigger(triggerId);
+
+        expect(kept.nextTriggerAt).toBe(due);
+    });
+
+    it("refuses a schedule that never fires on an enabled trigger, and clears the time on a disabled one", async () => {
+        const as = harness.withIdentity({ userId: "user-a" } as never);
+        const enabledId = await insertSchedule(true);
+
+        await expect(as.mutation(updateTrigger as never, { cronExpression: "0 9 30 2 *", triggerId: enabledId } as never)).rejects.toThrow("never fires");
+
+        const disabledId = await insertSchedule(false);
+
+        await as.mutation(updateTrigger as never, { cronExpression: "0 9 30 2 *", triggerId: disabledId } as never);
+
+        expect("nextTriggerAt" in (await readTrigger(disabledId))).toBe(false);
     });
 });

@@ -12,7 +12,10 @@ import { forgetAllUnlockProofs, rememberUnlockProof } from "@/lib/lunora/unlock-
 import useDeltaStreams from "./use-delta-streams";
 
 const harness = vi.hoisted(() => {
-    return { calls: [] as { args: Record<string, unknown> }[] };
+    return {
+        calls: [] as { args: Record<string, unknown> }[],
+        serve: undefined as ((cursor: number) => { end: number; parts: never[]; start: number; streamId: string }[]) | undefined,
+    };
 });
 
 vi.mock("@lunora/react", async (importOriginal) => {
@@ -29,6 +32,12 @@ vi.mock("@lunora/react", async (importOriginal) => {
                 return { streams: { messages: [{ order: 1, status: "streaming", stepOrder: 0, streamId: "stream-1" }] } };
             }
 
+            if (streamArgs?.kind === "deltas" && harness.serve) {
+                const cursor = (args.streamArgs as { cursors: { cursor: number }[] }).cursors[0]?.cursor ?? 0;
+
+                return { streams: { deltas: harness.serve(cursor) } };
+            }
+
             return undefined;
         },
     };
@@ -42,6 +51,7 @@ const argsByKind = (kind: "deltas" | "list") =>
 afterEach(() => {
     forgetAllUnlockProofs();
     harness.calls.length = 0;
+    harness.serve = undefined;
 });
 
 describe("live stream queries on a chat", () => {
@@ -67,5 +77,55 @@ describe("live stream queries on a chat", () => {
         renderHook(() => useDeltaStreams(query, { threadId: "thread-1" } as never));
 
         expect(argsByKind("deltas")[0]).not.toHaveProperty("unlockProof");
+    });
+});
+
+describe("a gap in the deltas", () => {
+    const delta = (start: number, end: number) => {
+        return { end, parts: [], start, streamId: "stream-1" };
+    };
+
+    it("does not throw: it drops the stream's deltas and re-fetches from the start", () => {
+        let gapServed = false;
+
+        harness.serve = (cursor) => {
+            if (cursor === 0) {
+                return [delta(0, 5)];
+            }
+
+            if (!gapServed) {
+                // the server skipped ahead of what we hold
+                gapServed = true;
+
+                return [delta(9, 12)];
+            }
+
+            return [];
+        };
+
+        const { result } = renderHook(() => useDeltaStreams(query, { threadId: "thread-1" } as never));
+        const requestedCursors = argsByKind("deltas").map((args) => (args.streamArgs as { cursors: { cursor: number }[] }).cursors[0]?.cursor);
+
+        // 0 -> held [0,5]; 5 -> gap -> reset; 0 again -> [0,5]; never the hole [9,12].
+        expect(requestedCursors).toEqual([0, 5, 0, 5]);
+        expect(result.current?.[0]?.deltas.map(({ end, start }) => [start, end])).toEqual([[0, 5]]);
+    });
+
+    it("treats a new stream's first delta as a gap when it does not start at 0", () => {
+        let served = false;
+
+        harness.serve = () => {
+            if (!served) {
+                served = true;
+
+                return [delta(9, 12)];
+            }
+
+            return [delta(0, 5)];
+        };
+
+        const { result } = renderHook(() => useDeltaStreams(query, { threadId: "thread-1" } as never));
+
+        expect(result.current?.[0]?.deltas.map(({ end, start }) => [start, end])).toEqual([[0, 5]]);
     });
 });

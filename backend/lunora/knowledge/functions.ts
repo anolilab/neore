@@ -65,6 +65,9 @@ export const getThreadKnowledgeFileIds = internalQuery.input({ threadId: v.id("t
     return links.map((l) => l.knowledgeFileId as string);
 });
 
+/** Vectorize's top-K ceiling: no search asks for more chunks, so a longer id list is never fanned out. */
+const MAX_CHUNK_LOOKUPS = 100;
+
 export const getChunksByEmbeddingIds = internalQuery
     .input({
         embeddingIds: v.array(v.string()),
@@ -99,7 +102,7 @@ export const getChunksByEmbeddingIds = internalQuery
         // Lookups run together, and each file is read once however many of its chunks match.
         // `Promise.all` keeps the order of `embeddingIds`, so results come back in the same order.
         const chunks = await Promise.all(
-            embeddingIds.map((embeddingId) =>
+            embeddingIds.slice(0, MAX_CHUNK_LOOKUPS).map((embeddingId) =>
                 ctx.db
                     .query("knowledgeChunks")
                     .withIndex("by_embeddingId", (q) => q.eq("embeddingId", embeddingId))

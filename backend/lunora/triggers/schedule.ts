@@ -66,11 +66,19 @@ export const checkDueTriggers = internalMutation
                 continue;
             }
 
-            // Schedule the execution as a background action
-            void ctx.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
-                payload: trigger.inputTemplate ?? undefined,
-                triggerId,
-            });
+            // Schedule the execution as a background action. A failed call leaves this trigger due, so the next
+            // tick retries it, and the rest of the batch still runs. A throw here would roll back the whole batch.
+            try {
+                await ctx.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
+                    payload: trigger.inputTemplate ?? undefined,
+                    triggerId,
+                });
+            } catch (error) {
+                console.error(`[Triggers] Could not schedule trigger ${triggerId}; it stays due for the next tick`, error);
+                await ctx.db.patch(triggerId, { lastError: "Could not schedule this run; it will be retried", updatedAt: now });
+
+                continue;
+            }
 
             // Compute next trigger time
             if (step.nextTime !== undefined) {
@@ -81,9 +89,13 @@ export const checkDueTriggers = internalMutation
             }
         }
 
-        // If more triggers remain, schedule a follow-up run
+        // If more triggers remain, schedule a follow-up run. A failed one is not fatal: the every-minute tick picks up what remains.
         if (dueTriggers.length > TRIGGER_BATCH_SIZE) {
-            void ctx.scheduler.runAfter(100, internal.triggers.schedule.checkDueTriggers, {});
+            try {
+                await ctx.scheduler.runAfter(100, internal.triggers.schedule.checkDueTriggers, {});
+            } catch (error) {
+                console.error("[Triggers] Could not schedule the follow-up check; the next tick picks up the rest", error);
+            }
         }
 
         return null;

@@ -288,7 +288,7 @@ export interface InternalApiTypes {
             getDecryptedCustomProvider: FunctionReference<"query", { providerId: string; userId: string }, { accessKeyId?: string; apiKey: string; apiVersion?: string; baseUrl: string; id: string; models: Array<{ id: string; name?: string }>; region?: string; supportsTools: boolean; type: "openai" | "anthropic" | "local-browser" | "google" | "azure" | "bedrock" | "mistral" } | null>;
         };
         daily_charge: {
-            chargeDailyUnit: FunctionReference<"mutation", { kind: "Audio" | "Text" | "Video"; organizationId?: string; requestId?: string; userId: string }, boolean>;
+            chargeDailyUnit: FunctionReference<"mutation", { count?: number; kind: "Audio" | "Image" | "Text" | "Video"; organizationId?: string; requestId?: string; userId: string }, boolean>;
         };
         edit_abandon: {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
@@ -950,8 +950,8 @@ export interface InternalApiTypes {
     };
     triggers: {
         execute: {
-            default: FunctionReference<"action", { payload?: string; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { payload?: string; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            executeTrigger: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
             admitTriggerRun: FunctionReference<"mutation", { triggerId: Id<"triggers"> }, null | string>;

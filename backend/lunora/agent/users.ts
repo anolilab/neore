@@ -192,7 +192,10 @@ async function deletePageForUserId(context: MutationContext, args: DeleteAllArgs
                 numItems: 100,
             });
 
-        await Promise.all(messages.page.map((m) => deleteMessage(context, m as unknown as Doc<"messages">)));
+        // One at a time: parallel deletes lose `chatFiles` refcount decrements.
+        for (const m of messages.page) {
+            await deleteMessage(context, m as unknown as Doc<"messages">);
+        }
 
         if (messages.isDone) {
             isStreamsInProgress = true;

@@ -298,7 +298,7 @@ generateRouter.openapi(
             const tokens = extractTokenCounts(result.usage);
 
             // Calculate cost
-            const pricing = await pricingService.getPricing(body.modelApiId);
+            const pricing = await pricingService.getPricing(body.modelApiId, body.provider);
             const costMicrodollars = pricing
                 ? calculateCost(pricing, {
                       cachedTokens: tokens.cachedTokens,

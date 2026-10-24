@@ -289,6 +289,16 @@ describe("deploy env bindings", () => {
         expect(alchemyScript).toMatch(GATEWAY_BACKEND_ORIGIN);
     });
 
+    it("runs the gateway in production mode on every deployed stage", () => {
+        const start = alchemyScript.indexOf("const llmGatewayEnv");
+        const gatewayEnv = alchemyScript.slice(start, alchemyScript.indexOf('Cloudflare.Worker("llm-gateway"', start));
+        const wrangler = readJsonc(join(REPO_ROOT, "services/llm-gateway/wrangler.jsonc")) as { env: { preview: { vars: { NODE_ENV: string } } } };
+
+        expect(gatewayEnv).toContain('NODE_ENV: "production"');
+        expect(gatewayEnv).not.toContain(': "development"');
+        expect(wrangler.env.preview.vars.NODE_ENV).toBe("production");
+    });
+
     it("turns Lunora's identity memo off on the backend", () => {
         // The memo keys on the auth headers only, not the path, so with a cache window
         // an API key resolved on /api/v1 is reused on a route that ignores it.

@@ -46,14 +46,6 @@ import { getWindowPlan, parseMessageHash, readVirtualizeFlag, resolveJumpMessage
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
-/**
- * Throttled messages hook for streaming optimization
- *
- * During streaming, limits updates to 60fps to prevent excessive re-renders.
- * When not streaming, updates immediately.
- */
-const THROTTLE_MS = 16; // ~60fps
-
 // Rough height of an unmeasured row; the virtualizer corrects it on first measure.
 const ESTIMATED_ROW_HEIGHT = 160;
 
@@ -90,66 +82,6 @@ export const scrollToMessage = (messageId: string, options: { position?: Message
 
 // The flag is read once per mount; flipping it takes a reload.
 const subscribeToNothing = (): (() => void) => () => {};
-
-const useThrottledMessages = (messages: UIMessage[], isStreaming: boolean): UIMessage[] => {
-    const [throttledMessages, setThrottledMessages] = useState(messages);
-    const lastUpdateRef = useRef(0);
-    const pendingUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const previousMessagesLengthRef = useRef(messages.length);
-
-    useEffect(() => {
-        // Always update immediately if:
-        // - Not streaming
-        // - Message count changed (new message added/completed)
-        // - Last message status changed to "success" (stream completed)
-        const lastMessage = messages.at(-1);
-        const hasCompletedMessage = lastMessage?.role === "assistant" && lastMessage?.status === "success";
-        const isMessageCountChanged = messages.length !== previousMessagesLengthRef.current;
-
-        previousMessagesLengthRef.current = messages.length;
-
-        if (!isStreaming || isMessageCountChanged || hasCompletedMessage) {
-            if (pendingUpdateRef.current) {
-                clearTimeout(pendingUpdateRef.current);
-                pendingUpdateRef.current = null;
-            }
-
-            setThrottledMessages(messages);
-
-            return undefined;
-        }
-
-        const now = Date.now();
-        const timeSinceLastUpdate = now - lastUpdateRef.current;
-
-        // If enough time has passed, update immediately
-        if (timeSinceLastUpdate >= THROTTLE_MS) {
-            lastUpdateRef.current = now;
-            setThrottledMessages(messages);
-
-            return undefined;
-        }
-
-        // Otherwise, schedule an update
-        if (pendingUpdateRef.current) {
-            clearTimeout(pendingUpdateRef.current);
-        }
-
-        pendingUpdateRef.current = setTimeout(() => {
-            lastUpdateRef.current = Date.now();
-            setThrottledMessages(messages);
-            pendingUpdateRef.current = null;
-        }, THROTTLE_MS - timeSinceLastUpdate);
-
-        return () => {
-            if (pendingUpdateRef.current) {
-                clearTimeout(pendingUpdateRef.current);
-            }
-        };
-    }, [messages, isStreaming]);
-
-    return throttledMessages;
-};
 
 /**
  * Ids present once the thread's first page landed. Messages outside this set
@@ -284,15 +216,14 @@ interface MessageListProps {
 /**
  * Main MessageList component
  */
-const MessageList: FC<MessageListProps> = memo(({ className, editComposerComponent: EditComposer, emptyComponent, maxWidth = "65ch" }) => {
+const MessageList: FC<MessageListProps> = memo(({ className, editComposerComponent: EditComposer, emptyComponent, maxWidth: maxWidthProp }) => {
+    const maxWidth = maxWidthProp ?? "65ch";
     const { t } = useLingui();
-    const { loadMore, messages: rawMessages, messagesReady, messagesStatus } = useChatMessages();
+    const { loadMore, messages, messagesReady, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
     const { activeStreamId, gatewayUrl, isStreaming, pendingStreamId, streamToken } = useChatIsStreaming();
     const editingMessageId = useChatUIStore((state) => state.editingMessageId);
 
-    // Use throttled messages during streaming for 60fps rendering
-    const messages = useThrottledMessages(rawMessages, isStreaming);
     const initialIds = useInitialMessageIds(messages, messagesReady);
 
     // The server snapshot is `false`: localStorage does not exist during SSR.

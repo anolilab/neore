@@ -40,13 +40,16 @@ const assertCronExpression = (cronExpression: string): void => {
 };
 
 /**
- * The first run of a schedule trigger that has never run. Nothing else sets
- * `nextTriggerAt` before the first run, and the due query only matches a set
- * value, so an enabled trigger without one never fired. `undefined` when there is
- * no such run: it is never stored as a due time.
+ * The next run to arm when a schedule trigger is enabled. Nothing else sets `nextTriggerAt` before the
+ * first run, and the due query only matches a set value, so an enabled trigger without one never fired.
+ * A stored time already in the past is stale on the way from disabled to enabled: a disabled trigger keeps
+ * whatever time it had, and enabling must not run it at once. An enabled trigger's due time is still live
+ * (the tick has not run it yet), so it is kept. `undefined` when there is no such run: it is never stored as a due time.
  */
 const firstRunOf = (trigger: Doc<"triggers">, now: number): number | undefined =>
-    trigger.type === "schedule" && trigger.cronExpression && trigger.nextTriggerAt === undefined ? findNextCronTime(trigger.cronExpression, now) : undefined;
+    trigger.type === "schedule" && trigger.cronExpression && (trigger.nextTriggerAt === undefined || (trigger.enabled !== true && trigger.nextTriggerAt < now))
+        ? findNextCronTime(trigger.cronExpression, now)
+        : undefined;
 
 /**
  * A routine may use its bot's computer only when it has a bot and runs on a
@@ -258,9 +261,26 @@ export const updateTrigger = authMutation
 
         if (args.searchMode !== undefined) patch.searchMode = args.searchMode;
 
+        // Only a schedule has a next run. A new schedule moves it; the old time would fire once more on the old schedule.
+        // A disabled schedule may store one too: enabling replaces it if it has passed (`firstRunOf`).
+        // Re-saving the same expression keeps a pending due time, so a run the tick has not taken yet still fires.
+        const isSchedule = trigger.type === "schedule";
+        let nextTriggerAt: number | undefined;
+
+        if (isSchedule) {
+            nextTriggerAt =
+                args.cronExpression === undefined || (args.cronExpression === trigger.cronExpression && trigger.nextTriggerAt !== undefined)
+                    ? trigger.nextTriggerAt
+                    : findNextCronTime(args.cronExpression, context.now);
+        }
+
         if (args.cronExpression !== undefined) {
             assertCronExpression(args.cronExpression);
             patch.cronExpression = args.cronExpression;
+
+            if (trigger.enabled === true && isSchedule && nextTriggerAt === undefined) {
+                throw new LunoraError("BAD_REQUEST", "This schedule never fires within the next 28 years. Check its day and month.");
+            }
         }
 
         if (args.timezone !== undefined) patch.timezone = args.timezone;
@@ -284,13 +304,16 @@ export const updateTrigger = authMutation
         // `patchRow` removes a field set to `undefined`, which a plain patch cannot do.
         await patchRow(context.db, trigger, {
             ...withoutUndefined(patch),
+            // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
+            // Also clears a time a non-schedule trigger stored before this check existed.
+            ...((args.cronExpression !== undefined || !isSchedule) && { nextTriggerAt }),
             ...(args.botId !== undefined && { botId: nextBotId }),
             ...((args.botId !== undefined || args.botComputer !== undefined) && { botComputer: nextComputer === true ? true : undefined }),
         });
 
-        if (trigger.enabled === true) {
+        if (trigger.enabled === true && nextTriggerAt !== undefined) {
             // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
-            await noteShardDue(context, context.now, userId);
+            await noteShardDue(context, nextTriggerAt, userId);
         }
 
         context.log.event("triggers.update_trigger", { enabled: trigger.enabled === true });
@@ -432,32 +455,16 @@ export const testRunTrigger = authAction
             throw new LunoraError("NOT_FOUND", "Trigger not found");
         }
 
-        // Temporarily enable the trigger so executeTrigger doesn't bail
         const wasEnabled = trigger.enabled === true;
+        // A schedule's input is its template, so only a payload the user typed overrides it (`executeTrigger`).
+        const payload = trigger.type === "schedule" ? args.testPayload : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
 
-        if (!wasEnabled) {
-            await context.runMutation(internal.triggers.functions.setTriggerEnabledInternal, {
-                enabled: true,
-                triggerId: args.triggerId as Id<"triggers">,
-            });
-        }
-
-        try {
-            const payload = args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
-
-            await context.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
-                payload,
-                triggerId: args.triggerId as Id<"triggers">,
-            });
-        } finally {
-            // Restore original enabled state
-            if (!wasEnabled) {
-                await context.runMutation(internal.triggers.functions.setTriggerEnabledInternal, {
-                    enabled: false,
-                    triggerId: args.triggerId as Id<"triggers">,
-                });
-            }
-        }
+        // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
+        await context.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
+            ignoreDisabled: true,
+            payload,
+            triggerId: args.triggerId as Id<"triggers">,
+        });
 
         context.log.event("triggers.test_run_trigger", { wasEnabled });
     });

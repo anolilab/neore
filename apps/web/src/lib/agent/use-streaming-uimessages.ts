@@ -81,7 +81,8 @@ const useStreamingUIMessages = <
             const lastDelta = stream.deltas.at(-1);
             const cursor = messageStateRef.current[stream.streamMessage.streamId]?.cursor;
 
-            if (!cursor || (lastDelta && lastDelta.start >= cursor)) {
+            // Compare the end: after a gap reset the refetch starts at 0, so its deltas start below the retained cursor.
+            if (!cursor || (lastDelta && lastDelta.end > cursor)) {
                 hasNewDeltas = true;
                 break;
             }

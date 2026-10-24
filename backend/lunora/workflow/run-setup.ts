@@ -8,6 +8,7 @@ import { internal } from "../_generated/internal";
 import type { ExecutionContext, WorkflowContent } from "./core";
 import { workflowVideoErrors } from "./video-billing";
 import { workflowInputErrors } from "./media-args";
+import { workflowMediaErrors } from "./media-billing";
 
 /** The part of an action or HTTP action context the run setup reads through. */
 type RunContext = Pick<ActionCtx, "auth" | "runQuery">;
@@ -47,6 +48,7 @@ export const resolveRunAccount = async (context: RunContext, userId: string): Pr
 export const workflowRunErrors = (account: RunAccount, content: Pick<WorkflowContent, "edges" | "nodes">): string[] => [
     ...workflowInputErrors(content),
     ...workflowVideoErrors(account, content.nodes, content.edges),
+    ...workflowMediaErrors(account, content.nodes),
 ];
 
 /** The execution context of one run. The organization is the account's, so a clip is charged to it. */

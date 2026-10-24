@@ -17,7 +17,7 @@ const DEFAULT_TTL_SECONDS = 86_400; // 24 hours
 /** Hard ceiling so a misconfigured value can't pin entries indefinitely. */
 const MAX_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 /** Client errors a retry can still resolve — never cached. */
-const TRANSIENT_CLIENT_STATUSES = new Set([408, 425, 429]);
+const TRANSIENT_CLIENT_STATUSES = new Set([408, 422, 425, 429]);
 
 const resolveTtlSeconds = (raw: string | undefined): number => {
     if (!raw) return DEFAULT_TTL_SECONDS;
@@ -96,8 +96,10 @@ export const idempotencyMiddleware = createMiddleware<HonoEnv>(async (c, next) =
 
     // Only cache terminal/durable responses. Skip transient failures
     // (5xx, 408, 429) so a retry can reach a healthy backend instead of
-    // replaying a poisoned error indefinitely. Skip non-2xx unless the
-    // 4xx is a deterministic client error that won't change on retry.
+    // replaying a poisoned error indefinitely. A 422 from structured-output
+    // repair depends on the sample, not the request, so it is never cached
+    // either. Skip non-2xx unless the 4xx is a deterministic client error
+    // that won't change on retry.
     const isSuccess = responseStatus >= 200 && responseStatus < 300;
     const isClientError = responseStatus >= 400 && responseStatus < 500;
     const isTransientClient = TRANSIENT_CLIENT_STATUSES.has(responseStatus);

@@ -781,11 +781,6 @@
       "to": "table:threadRelationships"
     },
     {
-      "from": "function:agent_threads:listPinnedThreads",
-      "kind": "read",
-      "to": "table:threads"
-    },
-    {
       "from": "function:agent_threads:listThreadOrders",
       "kind": "read",
       "to": "table:threads"
@@ -2724,6 +2719,11 @@
       "from": "function:chat_slides_internal:updateSlide",
       "kind": "write",
       "to": "table:presentationSlides"
+    },
+    {
+      "from": "function:chat_streaming_persistent_crons:cleanupExpiredStreams",
+      "kind": "read",
+      "to": "table:streamingMessages"
     },
     {
       "from": "function:chat_streaming_persistent_crons:cleanupExpiredStreams",
@@ -6279,11 +6279,6 @@
       "from": "function:triggers_functions:testRunTrigger",
       "kind": "call",
       "to": "function:triggers_functions:getTriggerInternal"
-    },
-    {
-      "from": "function:triggers_functions:testRunTrigger",
-      "kind": "call",
-      "to": "function:triggers_functions:setTriggerEnabledInternal"
     },
     {
       "from": "function:triggers_functions:testRunTrigger",
@@ -16374,43 +16369,43 @@
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 205,
+      "line": 207,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 217,
+      "line": 219,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 356,
+      "line": 358,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 373,
+      "line": 375,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 424,
+      "line": 426,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "read",
-      "line": 434,
+      "line": 436,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
       "file": "agent/messages",
       "kind": "write",
-      "line": 440,
+      "line": 442,
       "reason": "\"addMessagesHandler\" is not a registered function"
     },
     {
@@ -16578,7 +16573,7 @@
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1425,
+      "line": 1431,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -18438,31 +18433,19 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 44,
-      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "gdpr/workflows/export-workflow",
-      "kind": "call",
-      "line": 48,
-      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "gdpr/workflows/export-workflow",
-      "kind": "call",
       "line": 51,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 56,
+      "line": 55,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 60,
+      "line": 58,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
@@ -18474,25 +18457,7 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 65,
-      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "gdpr/workflows/export-workflow",
-      "kind": "call",
       "line": 67,
-      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "gdpr/workflows/export-workflow",
-      "kind": "call",
-      "line": 68,
-      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
-    },
-    {
-      "file": "gdpr/workflows/export-workflow",
-      "kind": "call",
-      "line": 69,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
@@ -18504,13 +18469,31 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 73,
+      "line": 72,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 78,
+      "line": 74,
+      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/export-workflow",
+      "kind": "call",
+      "line": 75,
+      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/export-workflow",
+      "kind": "call",
+      "line": 76,
+      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/export-workflow",
+      "kind": "call",
+      "line": 77,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
@@ -18522,19 +18505,31 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 81,
+      "line": 85,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 82,
+      "line": 87,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 93,
+      "line": 88,
+      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/export-workflow",
+      "kind": "call",
+      "line": 89,
+      "reason": "\"dataExportWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/export-workflow",
+      "kind": "call",
+      "line": 102,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
@@ -18546,19 +18541,19 @@
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 140,
+      "line": 160,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 149,
+      "line": 169,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/export-workflow",
       "kind": "call",
-      "line": 154,
+      "line": 174,
       "reason": "\"dataExportWorkflowConfig\" is not a registered function"
     },
     {
@@ -18894,13 +18889,13 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 875,
+      "line": 882,
       "reason": "\"checkRateLimit\" is not a registered function"
     },
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 917,
+      "line": 924,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
@@ -19902,133 +19897,133 @@
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 102,
+      "line": 103,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 122,
+      "line": 123,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 124,
+      "line": 125,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 153,
+      "line": 154,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 172,
+      "line": 173,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 383,
+      "line": 462,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 395,
+      "line": 474,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 407,
+      "line": 486,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 425,
+      "line": 504,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 540,
+      "line": 628,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 578,
+      "line": 672,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 612,
+      "line": 708,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 648,
+      "line": 746,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 699,
+      "line": 799,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 747,
+      "line": 849,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 800,
+      "line": 904,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 845,
+      "line": 951,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 881,
+      "line": 989,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 918,
+      "line": 1028,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 965,
+      "line": 1077,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1007,
+      "line": 1121,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "workflow/http",
       "kind": "call",
-      "line": 1044,
+      "line": 1160,
       "reason": "the default export is not a registered function"
     },
     {
@@ -20056,15 +20051,21 @@
       "reason": "\"runVideoNode\" is not a registered function"
     },
     {
-      "file": "workflow/run-setup",
+      "file": "workflow/media-billing",
       "kind": "call",
-      "line": 34,
-      "reason": "\"resolveRunAccount\" is not a registered function"
+      "line": 95,
+      "reason": "\"withMediaCharge\" is not a registered function"
     },
     {
       "file": "workflow/run-setup",
       "kind": "call",
       "line": 35,
+      "reason": "\"resolveRunAccount\" is not a registered function"
+    },
+    {
+      "file": "workflow/run-setup",
+      "kind": "call",
+      "line": 36,
       "reason": "\"resolveRunAccount\" is not a registered function"
     },
     {

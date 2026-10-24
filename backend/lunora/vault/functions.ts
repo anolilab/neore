@@ -560,11 +560,16 @@ export const deleteAttachments = authMutation
         // Chat attachments (chatId defined) that are in the deletion list
         const validAttachments = personalFiles.filter((attachment) => attachment.chatId !== undefined && attachmentIdsToDelete.has(attachment._id));
 
-        // Delete files from storage and database records in parallel
         const keysToDelete = validAttachments.map((a) => a.key).filter((key): key is string => key !== undefined);
         const idsToDelete = validAttachments.map((a) => a._id);
 
-        await Promise.all([...keysToDelete.map((key) => scheduleObjectDeletion(ctx, [key])), ...idsToDelete.map((id) => ctx.db.delete(id))]);
+        await Promise.all(keysToDelete.map((key) => scheduleObjectDeletion(ctx, [key])));
+
+        // One at a time: `files` is audited, and parallel deletes of an audited table nest
+        // its trigger past the recursion limit (see `lib/audit-triggers.ts`).
+        for (const id of idsToDelete) {
+            await ctx.db.delete(id);
+        }
 
         ctx.log.event("vault.delete_attachments", { deleted: idsToDelete.length, requested: attachmentIds.length });
     });

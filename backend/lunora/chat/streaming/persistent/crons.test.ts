@@ -2,6 +2,9 @@
  * The expiry sweep turns an expired pending or streaming stream into `timeout`. A finished stream is never
  * revisited, and a stream that has not expired yet is left as it is. Finished streams are never deleted, so the
  * sweep must not read them: the cost test below pins the rows it reads.
+ *
+ * A run that dies without reaching `failRun` leaves its thread `running`. When its stream expires, the sweep
+ * hands the thread back, unless a newer stream or an edit on it is still live.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -127,5 +130,72 @@ describe("cleanupExpiredStreams", () => {
         // Each expired finished stream would be one row read on the old `by_expiresAt` walk.
         expect(cost.rowsRead).toBeLessThan(FINISHED / 5);
         await expect(statusOf(pending)).resolves.toBe("timeout");
+    });
+
+    describe("the thread an expired stream ran on", () => {
+        it("is handed back to active when its stream times out", async () => {
+            expect.assertions(2);
+
+            const thread = await seedThread();
+            const expired = await insertStream(thread, "streaming", Date.now() - HOUR);
+
+            await sweep();
+
+            await expect(statusOf(expired)).resolves.toBe("timeout");
+            await expect(statusOf(thread.threadId)).resolves.toBe("active");
+        });
+
+        it("is left as it is when it is not running", async () => {
+            expect.assertions(2);
+
+            const thread = await seedThread();
+
+            await harness.run(async (context) => await context.db.patch(thread.threadId as never, { status: "active" }));
+
+            const expired = await insertStream(thread, "streaming", Date.now() - HOUR);
+
+            await sweep();
+
+            await expect(statusOf(expired)).resolves.toBe("timeout");
+            await expect(statusOf(thread.threadId)).resolves.toBe("active");
+        });
+
+        it("stays running while a newer stream on it is live", async () => {
+            expect.assertions(2);
+
+            const thread = await seedThread();
+            const expired = await insertStream(thread, "streaming", Date.now() - HOUR);
+
+            await insertStream(thread, "streaming", Date.now() + HOUR);
+
+            await sweep();
+
+            await expect(statusOf(expired)).resolves.toBe("timeout");
+            await expect(statusOf(thread.threadId)).resolves.toBe("running");
+        });
+
+        it("stays running while an edit streams on it, which uses streamingMessages instead", async () => {
+            expect.assertions(2);
+
+            const thread = await seedThread();
+            const expired = await insertStream(thread, "streaming", Date.now() - HOUR);
+
+            await harness.run(
+                async (context) =>
+                    await context.db.insert("streamingMessages", {
+                        order: 1,
+                        state: { kind: "streaming", lastHeartbeat: Date.now() },
+                        stateKind: "streaming",
+                        stepOrder: 0,
+                        threadId: thread.threadId,
+                        userId: OWNER,
+                    }),
+            );
+
+            await sweep();
+
+            await expect(statusOf(expired)).resolves.toBe("timeout");
+            await expect(statusOf(thread.threadId)).resolves.toBe("running");
+        });
     });
 });

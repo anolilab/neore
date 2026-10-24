@@ -221,3 +221,17 @@ describe("parseClaude", () => {
         expect(((result[0] as NormalizedConversation).messages[0] as NormalizedMessage).createdAt).toBe(new Date("2024-03-01T12:00:01.654321Z").getTime());
     });
 });
+
+describe("parseClaude with a malformed conversation", () => {
+    it("keeps the first conversation when a later message has a non-string sender", () => {
+        const data = [
+            { chat_messages: [{ sender: "human", text: "Hello" }], name: "Good" },
+            { chat_messages: [{ sender: 42, text: "odd" }, null], name: "Bad" },
+        ];
+
+        const result = parseClaude(data);
+
+        expect(result).toHaveLength(1);
+        expect((result[0] as NormalizedConversation).title).toBe("Good");
+    });
+});

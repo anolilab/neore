@@ -23,7 +23,11 @@ interface GeminiConversation {
     updateTime?: string;
 }
 
-const normalizeRole = (role: string): "user" | "assistant" | null => {
+const normalizeRole = (role: unknown): "user" | "assistant" | null => {
+    if (typeof role !== "string") {
+        return null;
+    }
+
     const upper = role.toUpperCase();
 
     if (upper === "USER") {
@@ -51,14 +55,14 @@ const parseISOTimestamp = (iso?: string): number | undefined => {
  * Parse a single Gemini conversation object.
  */
 const parseGeminiConversation = (conv: GeminiConversation): NormalizedConversation | null => {
-    if (!conv.messages || conv.messages.length === 0) {
+    if (!Array.isArray(conv?.messages) || conv.messages.length === 0) {
         return null;
     }
 
     const messages: NormalizedMessage[] = [];
 
     for (const message of conv.messages) {
-        const role = normalizeRole(message.role);
+        const role = normalizeRole(message?.role);
 
         if (!role) {
             continue;

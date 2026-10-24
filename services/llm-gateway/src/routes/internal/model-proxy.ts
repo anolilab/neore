@@ -16,6 +16,7 @@ import { CUSTOM_PROVIDER_FORMATS } from "@neore/ai/gateway";
 import { z } from "zod";
 
 import type { AppEnv, HonoEnv } from "../../env.js";
+import { countPromptTextChars, estimateCancelledUsage } from "../../lib/cancelled-usage.js";
 import { GatewayError } from "../../lib/errors.js";
 import { deserializeFromWire, serializeForWire } from "../../lib/model-serialization.js";
 import { internalAuth } from "../../middleware/auth.js";
@@ -66,7 +67,7 @@ const resolveProviderPolicy = (env: AppEnv, provider: string, modelApiId: string
 
     return {
         applyFilters: true,
-        pricing: async () => await pricingService.getPricing(modelApiId),
+        pricing: async () => await pricingService.getPricing(modelApiId, provider),
         recordHealth: {
             failure: async () => await healthService.recordFailure(provider, modelApiId),
             success: async (latencyMs) => await healthService.recordSuccess(provider, modelApiId, latencyMs),
@@ -314,6 +315,8 @@ modelProxyRouter.openapi(
 
                     let lastUsage: { cachedTokens: number; completionTokens: number; promptTokens: number; reasoningTokens: number } | undefined;
                     let lastFinishReason: string | undefined;
+                    let emittedChars = 0;
+                    let reasoningChars = 0;
 
                     try {
                         let isErrored = false;
@@ -327,19 +330,47 @@ modelProxyRouter.openapi(
                                 ttftMs = Date.now() - startTime;
                             }
 
-                            if (value.type === "error") {
-                                isErrored = true;
-                            } else if (value.type === "finish") {
-                                // Track usage from finish chunk
-                                const { usage } = value;
+                            switch (value.type) {
+                                case "error": {
+                                    isErrored = true;
+                                    break;
+                                }
 
-                                lastUsage = {
-                                    cachedTokens: usage?.inputTokens?.cacheRead ?? 0,
-                                    completionTokens: usage?.outputTokens?.total ?? 0,
-                                    promptTokens: usage?.inputTokens?.total ?? 0,
-                                    reasoningTokens: usage?.outputTokens?.reasoning ?? 0,
-                                };
-                                lastFinishReason = value.finishReason?.unified;
+                                case "finish": {
+                                    // Track usage from finish chunk
+                                    const { usage } = value;
+
+                                    lastUsage = {
+                                        cachedTokens: usage?.inputTokens?.cacheRead ?? 0,
+                                        completionTokens: usage?.outputTokens?.total ?? 0,
+                                        promptTokens: usage?.inputTokens?.total ?? 0,
+                                        reasoningTokens: usage?.outputTokens?.reasoning ?? 0,
+                                    };
+                                    lastFinishReason = value.finishReason?.unified;
+                                    break;
+                                }
+
+                                // Counted for the usage estimate of a stream cancelled before its finish.
+                                case "reasoning-delta": {
+                                    reasoningChars += value.delta.length;
+                                    break;
+                                }
+
+                                case "text-delta": {
+                                    emittedChars += value.delta.length;
+                                    break;
+                                }
+
+                                // A completed tool call is output the provider billed for. Provider parts carry its arguments as a JSON string.
+                                case "tool-call": {
+                                    emittedChars += typeof value.input === "string" ? value.input.length : JSON.stringify(value.input ?? {}).length;
+                                    break;
+                                }
+
+                                default: {
+                                    // Other stream parts carry no usage or text to count.
+                                    break;
+                                }
                             }
 
                             // Serialize the stream part (handle Uint8Array in file parts)
@@ -349,9 +380,15 @@ modelProxyRouter.openapi(
                         }
 
                         // Record usage even when the client cancelled: the provider already produced these tokens.
+                        // A cancel before the `finish` part leaves no usage, so it is estimated from what was sent.
                         // A cancelled stream is not a successful one, so it does not count toward health.
                         const latencyMs = Date.now() - startTime;
-                        const tokens = lastUsage ?? { cachedTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 };
+                        const isEstimated = lastUsage === undefined && isCancelled;
+                        const tokens =
+                            lastUsage ??
+                            (isEstimated
+                                ? estimateCancelledUsage({ emittedChars, promptChars: countPromptTextChars(callOptions.prompt), reasoningChars })
+                                : { cachedTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 });
 
                         const pricing = await policy.pricing();
                         const costMicrodollars = pricing ? calculateCost(pricing, tokens) : 0;
@@ -381,7 +418,7 @@ modelProxyRouter.openapi(
                                         costMicrodollars,
                                         // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
                                         ...(isErrored && { errorCode: "PROVIDER_ERROR" }),
-                                        finishReason: lastFinishReason,
+                                        finishReason: isEstimated ? "cancelled" : lastFinishReason,
                                         isStreaming: true,
                                         latencyMs,
                                         operation: "chat",

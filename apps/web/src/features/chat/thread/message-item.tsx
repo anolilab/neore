@@ -467,13 +467,16 @@ const EMPTY_COMPONENTS: NonNullable<MessageItemProps["components"]> = {};
 const canEditReply = (message: UIMessage): boolean => message.role === "assistant" && message.status === "success" && message.text.trim() !== "";
 
 const MessageItem: FC<MessageItemProps> = memo(
-    ({ className, components = EMPTY_COMPONENTS, index, isLast = false, isStreaming = false, maxWidth = "var(--thread-max-width)", message }) => {
+    ({ className, components, index, isLast: isLastProp, isStreaming: isStreamingProp, maxWidth: maxWidthProp, message }) => {
+        const isLast = isLastProp ?? false;
+        const isStreaming = isStreamingProp ?? false;
+        const maxWidth = maxWidthProp ?? "var(--thread-max-width)";
         const {
             ActionBar = DefaultActionBar,
             AssistantMessage = DefaultAssistantMessage,
             SystemMessage = DefaultSystemMessage,
             UserMessage = DefaultUserMessage,
-        } = components;
+        } = components ?? EMPTY_COMPONENTS;
 
         // Interaction state
         const { isCopied, isHovered, setHovered } = useMessageInteractionState(message.id);

@@ -25,7 +25,11 @@ interface ClaudeConversation {
     uuid?: string;
 }
 
-const normalizeRole = (sender: string): "user" | "assistant" | null => {
+const normalizeRole = (sender: unknown): "user" | "assistant" | null => {
+    if (typeof sender !== "string") {
+        return null;
+    }
+
     const lower = sender.toLowerCase();
 
     if (lower === "human") {
@@ -53,16 +57,16 @@ const parseISOTimestamp = (iso?: string): number | undefined => {
  * Parse a single Claude conversation object.
  */
 const parseClaudeConversation = (conv: ClaudeConversation): NormalizedConversation | null => {
-    const rawMessages = conv.chat_messages;
+    const rawMessages = conv?.chat_messages;
 
-    if (!rawMessages || rawMessages.length === 0) {
+    if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
         return null;
     }
 
     const messages: NormalizedMessage[] = [];
 
     for (const message of rawMessages) {
-        const role = normalizeRole(message.sender);
+        const role = normalizeRole(message?.sender);
 
         if (!role) {
             continue;

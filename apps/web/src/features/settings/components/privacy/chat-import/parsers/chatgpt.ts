@@ -100,17 +100,19 @@ const linearizeConversation = (conv: ChatGPTConversation): NormalizedMessage[] =
     const messages: NormalizedMessage[] = [];
 
     for (const node of messageChain) {
-        if (!node.message) {
-            continue;
-        }
-
-        const { role } = node.message.author;
+        const role = node.message?.author?.role;
 
         if (role !== "user" && role !== "assistant") {
             continue;
         }
 
-        const content = extractTextFromParts(node.message.content.parts);
+        const parts = node.message?.content?.parts;
+
+        if (!node.message || !Array.isArray(parts)) {
+            continue;
+        }
+
+        const content = extractTextFromParts(parts);
 
         if (!content) {
             continue;
@@ -139,7 +141,7 @@ const parseChatGPT = (data: unknown): NormalizedConversation[] => {
     const conversations: NormalizedConversation[] = [];
 
     for (const conv of data as ChatGPTConversation[]) {
-        if (!conv.mapping) {
+        if (!conv?.mapping) {
             continue;
         }
 

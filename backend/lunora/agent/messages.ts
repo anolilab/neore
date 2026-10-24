@@ -69,21 +69,20 @@ export const deleteByIds = internalMutation
     .input({ messageIds: v.array(v.id("messages")) })
     .output(v.array(v.id("messages")))
     .mutation(async ({ args, ctx }) => {
-        const deletedMessageIds = await Promise.all(
-            args.messageIds.map(async (id) => {
-                const message = await ctx.db.get(id);
+        const deletedMessageIds: Id<"messages">[] = [];
 
-                if (message) {
-                    await deleteMessage(ctx, message);
+        // One at a time: `deleteMessage` releases file references read-modify-write, so
+        // parallel deletes of messages sharing a file lose decrements (`changeRefcount`).
+        for (const id of args.messageIds) {
+            const message = await ctx.db.get(id);
 
-                    return id;
-                }
+            if (message) {
+                await deleteMessage(ctx, message);
+                deletedMessageIds.push(id);
+            }
+        }
 
-                return null;
-            }),
-        );
-
-        return deletedMessageIds.filter((id) => id !== null);
+        return deletedMessageIds;
     });
 
 /**
@@ -123,7 +122,10 @@ export const deleteByOrder = internalMutation
             })
             .take(64);
 
-        await Promise.all(messages.map((m) => deleteMessage(ctx, m as unknown as Doc<"messages">)));
+        // One at a time: parallel deletes lose `chatFiles` refcount decrements.
+        for (const m of messages) {
+            await deleteMessage(ctx, m as unknown as Doc<"messages">);
+        }
 
         return {
             isDone: messages.length < 64,

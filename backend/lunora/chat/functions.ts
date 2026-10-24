@@ -5229,7 +5229,11 @@ export const generateCharacterRef = internalAction
         await assertPaidModel(context, userId, modelDefinition);
 
         // Validate reference image count
-        const maxImages = modelDefinition.maxReferenceImages ?? 4;
+        const maxImages = modelDefinition.maxReferenceImages ?? 0;
+
+        if (maxImages === 0) {
+            throw new LunoraError("BAD_REQUEST", `Model ${modelId} does not accept reference images`);
+        }
 
         if (referenceImages.length > maxImages) {
             throw new LunoraError("BAD_REQUEST", `Model ${modelId} supports max ${maxImages} reference images`);

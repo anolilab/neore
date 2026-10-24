@@ -1,4 +1,6 @@
+import type { Id } from "../../../_generated/dataModel";
 import { internalMutation } from "../../../_generated/server";
+import { patchThread } from "../../../agent/table-writes";
 import { purgeExpiredToolApprovalRuns } from "../../lib/tool-approval-cleanup";
 
 const BATCH_SIZE = 100;
@@ -19,6 +21,22 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
             status: stream.status,
         });
         await ctx.db.patch(stream._id, { status: "timeout" });
+
+        // A run that died without reaching `failRun` (evicted, or a dropped redelivery)
+        // leaves its thread `running`; nothing else resets it. A newer live stream on the
+        // thread means another run owns that status.
+        const threadId = stream.threadId as Id<"threads">;
+        const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
+        const live = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId } });
+        // An edit streams through `streamingMessages` instead, and it holds the same running status.
+        const liveEdit = await ctx.db
+            .query("streamingMessages")
+            .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", threadId).eq("stateKind", "streaming"))
+            .take(1);
+
+        if (thread?.status === "running" && !live && liveEdit.length === 0) {
+            await patchThread(ctx.db, thread._id, { status: "active", updatedAt: now });
+        }
     }
 
     if (expiredStreams.length > 0) {

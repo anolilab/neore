@@ -5,7 +5,10 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
 import { gdprLogger } from "../lib/logger";
 import { queueEmail } from "../email/mailer";
+import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
+
+const TRAILING_SLASH = /\/$/;
 
 export const collectProfile = internalQuery
     .input({ userId: v.string() })
@@ -555,12 +558,8 @@ export const sendExportReadyEmail = internalAction
             throw new LunoraError("NOT_FOUND", "Export request not found or storage ID missing");
         }
 
-        const { storageId } = request;
-        const downloadUrl = await withDependency("file storage", () => context.storage.getUrl(storageId));
-
-        if (!downloadUrl) {
-            throw new LunoraError("INTERNAL", "Failed to get download URL for export");
-        }
+        // Link to the app, never to storage: the privacy page's Download button signs a fresh short-lived URL.
+        const downloadUrl = `${SITE_URL.replace(TRAILING_SLASH, "")}/dashboard/settings/privacy`;
 
         const { default: DataExportReadyEmail } = await import("../email/templates/data-export-ready");
 

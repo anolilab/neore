@@ -535,7 +535,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
 
                         // Record usage
                         const latencyMs = Date.now() - startTime;
-                        const pricing = await pricingService.getPricing(modelApiId);
+                        const pricing = await pricingService.getPricing(modelApiId, provider);
                         const costMicrodollars = pricing
                             ? calculateCost(pricing, {
                                   cachedTokens: tokens.cachedTokens,
@@ -684,7 +684,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
 
         const latencyMs = Date.now() - startTime;
         const tokens = extractTokenCounts(result.usage);
-        const pricing = await pricingService.getPricing(modelApiId);
+        const pricing = await pricingService.getPricing(modelApiId, provider);
         const costMicrodollars = pricing
             ? calculateCost(pricing, {
                   cachedTokens: tokens.cachedTokens,
@@ -941,7 +941,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
                                 controller.enqueue(encoder.encode("data: [DONE]\n\n"));
 
                                 const latencyMs = Date.now() - startTime;
-                                const pricing = await pricingService.getPricing(fallbackCandidate.modelApiId);
+                                const pricing = await pricingService.getPricing(fallbackCandidate.modelApiId, fallbackCandidate.provider);
                                 const costMicrodollars = pricing
                                     ? calculateCost(pricing, {
                                           cachedTokens: tokens.cachedTokens,
@@ -1021,7 +1021,7 @@ completionsRouter.post("/v1/chat/completions", async (c) => {
 
                 const latencyMs = Date.now() - startTime;
                 const tokens = extractTokenCounts(fbResult.usage);
-                const pricing = await pricingService.getPricing(fallbackCandidate.modelApiId);
+                const pricing = await pricingService.getPricing(fallbackCandidate.modelApiId, fallbackCandidate.provider);
                 const costMicrodollars = pricing
                     ? calculateCost(pricing, {
                           cachedTokens: tokens.cachedTokens,
