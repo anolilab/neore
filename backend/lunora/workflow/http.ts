@@ -35,7 +35,7 @@ import {
     type WorkflowNode,
 } from "./core";
 import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext } from "./media-args";
-import { type MediaCharge, withMediaCharge } from "./media-billing";
+import { imageCountOf, type MediaCharge, withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
 
@@ -608,6 +608,7 @@ const executeImageNodeStreaming = async (
         imageUrl?: string;
         mode?: string;
         model?: string;
+        numImages?: number;
         prompt?: string;
     };
 
@@ -621,11 +622,13 @@ const executeImageNodeStreaming = async (
         throw new Error("No prompt provided for image generation");
     }
 
-    await charge(1);
+    const count = imageCountOf(data.numImages);
+
+    await charge(count);
     const result = await actionContext.runAction(internal.chat.functions.generateImage, {
         imageSize: data.aspectRatio ?? "1:1",
         model: resolveWorkflowModel("image", data.model),
-        numImages: 1,
+        numImages: count,
         prompt,
         threadId: "workflow",
         userId,
