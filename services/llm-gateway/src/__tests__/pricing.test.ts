@@ -149,6 +149,16 @@ describe("extractPricing (provider-keyed models.dev document)", () => {
         it("never takes a zero price from a provider the hint did not name", () => {
             expect(extractPricing(twoProviders, "shared-model")).toMatchObject({ inputPerMillion: 4, outputPerMillion: 8 });
         });
+
+        it("does not bill a zero price from the prefix's provider when another provider serves the hinted call", () => {
+            const reseller: ModelsDevelopmentData = {
+                openai: { models: { foo: { cost: { input: 0, output: 0 } } } },
+                openrouter: { models: {} },
+                other: { models: { "openai/foo": { cost: { input: 2, output: 4 } } } },
+            };
+
+            expect(extractPricing(reseller, "openai/foo", "openrouter")).toMatchObject({ inputPerMillion: 2, outputPerMillion: 4 });
+        });
     });
 
     it("falls through an unknown provider hint", () => {

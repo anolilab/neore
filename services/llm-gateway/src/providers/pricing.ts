@@ -180,12 +180,15 @@ export const extractPricing = (data: ModelsDevelopmentData, modelApiId: string, 
     const candidates = [...new Set([normalisedId, afterPrefix, baseId].filter((id): id is string => Boolean(id)))];
     const hints = [...new Set([providerHint, prefix].filter((hint): hint is string => Boolean(hint)))];
     const providers = Object.values(data);
+    // An explicit zero price is trusted only from the provider that serves the call, never from a prefix it does not name.
+    const freeHints = providerHint ? [providerHint] : hints;
 
     return (
         firstPriced(
-            hints.flatMap((hint) => candidates.map((candidate) => data[hint]?.models?.[candidate])),
+            freeHints.flatMap((hint) => candidates.map((candidate) => data[hint]?.models?.[candidate])),
             true,
         ) ??
+        firstPriced(hints.flatMap((hint) => candidates.map((candidate) => data[hint]?.models?.[candidate]))) ??
         firstPriced(candidates.flatMap((candidate) => providers.map((provider) => provider.models?.[candidate]))) ??
         // Suffix match (e.g. "llama-4-scout" -> "meta-llama/llama-4-scout").
         firstPriced(
