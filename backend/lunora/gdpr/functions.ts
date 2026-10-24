@@ -353,12 +353,15 @@ export const getExportDownloadUrl = authAction
             throw new LunoraError("NOT_FOUND", "Export file was not generated. Please try requesting a new export.");
         }
 
-        if (request.expiresAt && request.expiresAt < Date.now()) {
+        // The stored object can outlive the export until the expiry sweep deletes it, so the link must not.
+        const secondsLeft = request.expiresAt ? Math.floor((request.expiresAt - Date.now()) / 1000) : Infinity;
+
+        if (secondsLeft < 1) {
             throw new LunoraError("BAD_REQUEST", "Export has expired");
         }
 
         const { storageId } = request;
-        const url = await withDependency("file storage", () => signedReadUrl(ctx.storage, String(storageId), 3600));
+        const url = await withDependency("file storage", () => signedReadUrl(ctx.storage, String(storageId), Math.min(3600, secondsLeft)));
 
         if (!url) {
             throw new LunoraError("INTERNAL_SERVER_ERROR", "Failed to generate download URL. Please try again.");

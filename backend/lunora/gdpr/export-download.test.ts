@@ -18,7 +18,7 @@ const { registry, sessionFrom, signedReadUrl } = vi.hoisted(() => {
             context.auth.userId
                 ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, plan: null, role: null, userId: context.auth.userId }
                 : null,
-        signedReadUrl: vi.fn(async (_storage: unknown, key: string) => `https://files.example/${key}?sig=abc`),
+        signedReadUrl: vi.fn(async (_storage: unknown, key: string, _ttlSeconds: number) => `https://files.example/${key}?sig=abc`),
     };
 });
 
@@ -77,6 +77,29 @@ describe("getExportDownloadUrl", () => {
 
         expect(result.url).toContain("sig=");
         expect(signedReadUrl).toHaveBeenCalledWith(expect.anything(), KEY, 3600);
+    });
+
+    it("never signs a link that outlives the export's expiry", async () => {
+        const expiresAt = Date.now() + 5 * 60_000;
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("gdprRequests", {
+                expiresAt,
+                requestedAt: Date.now(),
+                requestType: "export",
+                status: "completed",
+                storageId: KEY,
+                userEmail: "a@example.com",
+                userId: USER,
+            });
+        });
+
+        await harness.withIdentity({ userId: USER } as never).action(getExportDownloadUrl as never, {} as never);
+
+        const ttl = signedReadUrl.mock.lastCall?.[2];
+
+        expect(ttl).toBeLessThanOrEqual(300);
+        expect(ttl).toBeGreaterThan(0);
     });
 });
 
