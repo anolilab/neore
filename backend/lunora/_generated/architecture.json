@@ -18917,7 +18917,7 @@
     {
       "file": "lib/rate-limiter",
       "kind": "call",
-      "line": 930,
+      "line": 924,
       "reason": "\"resetRateLimit\" is not a registered function"
     },
     {
