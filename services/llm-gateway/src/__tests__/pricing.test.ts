@@ -51,8 +51,9 @@ describe("calculateCost", () => {
             outputPerMillion: 60,
             reasoningOutputPerMillion: 60,
         };
+        // completionTokens is the total output, reasoning included: 200 text + 300 reasoning.
         const usage: TokenUsage = {
-            completionTokens: 200,
+            completionTokens: 500,
             promptTokens: 100,
             reasoningTokens: 300,
         };
@@ -64,13 +65,28 @@ describe("calculateCost", () => {
         expect(calculateCost(pricing, usage)).toBe(31_500);
     });
 
+    it("charges reasoning once when it is already counted in the total output", () => {
+        const pricing: ModelPricing = {
+            inputPerMillion: 3,
+            outputPerMillion: 15,
+        };
+        const usage: TokenUsage = {
+            completionTokens: 1_000_000,
+            promptTokens: 0,
+            reasoningTokens: 1_000_000,
+        };
+
+        // All 1M output tokens are reasoning: one charge at $15, not $15 twice.
+        expect(calculateCost(pricing, usage)).toBe(15_000_000);
+    });
+
     it("falls back to outputPerMillion for reasoning when reasoningOutputPerMillion not set", () => {
         const pricing: ModelPricing = {
             inputPerMillion: 3,
             outputPerMillion: 15,
         };
         const usage: TokenUsage = {
-            completionTokens: 0,
+            completionTokens: 1_000_000,
             promptTokens: 0,
             reasoningTokens: 1_000_000,
         };

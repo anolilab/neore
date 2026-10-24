@@ -50,11 +50,15 @@ const PRICING_TTL = 86_400;
 /**
  * Calculate cost in microdollars from token usage and pricing.
  * $1.00 = 1,000,000 microdollars.
+ *
+ * `completionTokens` is the total output, reasoning included (AI SDK `outputTokens.total`), so reasoning
+ * is charged once: at its own rate, and the rest of the output at the output rate.
  */
 export const calculateCost = (pricing: ModelPricing, usage: TokenUsage): number => {
     const regularInputTokens = usage.promptTokens - (usage.cachedTokens ?? 0);
     const inputCost = (regularInputTokens * pricing.inputPerMillion) / 1_000_000;
-    const outputCost = (usage.completionTokens * pricing.outputPerMillion) / 1_000_000;
+    const textOutputTokens = Math.max(0, usage.completionTokens - (usage.reasoningTokens ?? 0));
+    const outputCost = (textOutputTokens * pricing.outputPerMillion) / 1_000_000;
     const cachedCost = ((usage.cachedTokens ?? 0) * (pricing.cachedInputPerMillion ?? pricing.inputPerMillion)) / 1_000_000;
     const reasoningCost = ((usage.reasoningTokens ?? 0) * (pricing.reasoningOutputPerMillion ?? pricing.outputPerMillion)) / 1_000_000;
 

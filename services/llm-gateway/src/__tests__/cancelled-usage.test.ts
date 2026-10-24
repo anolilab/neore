@@ -13,9 +13,10 @@ describe(estimateCancelledUsage, () => {
     });
 
     it("estimates four characters per token, rounded up", () => {
+        // Completion is the total output, reasoning included: ceil((40 + 9) / 4) = 13.
         expect(estimateCancelledUsage({ emittedChars: 40, promptChars: 400, reasoningChars: 9 })).toStrictEqual({
             cachedTokens: 0,
-            completionTokens: 10,
+            completionTokens: 13,
             promptTokens: 100,
             reasoningTokens: 3,
         });
