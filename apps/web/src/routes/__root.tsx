@@ -26,6 +26,7 @@ import type { SettingsTab } from "@/components/settings/settings-modal";
 import ImpersonationBanner from "@/features/admin/components/impersonation-banner";
 import AppearanceSync from "@/features/appearance/components/appearance-sync";
 import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script";
+import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-size";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -573,6 +574,8 @@ export const Route = createRootRouteWithContext<AppContext>()({
             scripts: [
                 // Applies the stored accent colour before first paint (no flash); carries the CSP nonce.
                 { children: ACCENT_BOOT_SCRIPT },
+                // Same for the chat text size.
+                { children: CHAT_TEXT_SIZE_BOOT_SCRIPT },
                 jsonLd({
                     "@context": "https://schema.org",
                     "@type": "WebSite",

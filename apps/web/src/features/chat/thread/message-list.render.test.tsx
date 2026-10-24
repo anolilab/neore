@@ -5,7 +5,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import type { Context, ReactNode } from "react";
 import { createElement, useLayoutEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -253,4 +253,19 @@ describe("message list render cost", () => {
         },
         RENDER_TEST_TIMEOUT_MS,
     );
+});
+
+describe("message list text size hook", () => {
+    it("renders messages inside the .message-list element that styles.css scales for the chat text size", () => {
+        harness.messages = Array.from({ length: 4 }, (_, index) => makeMessage(index));
+        harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
+
+        mount();
+
+        const list = screen.getAllByRole("list").find((element) => element.classList.contains("message-list"));
+
+        expect(list).toBeDefined();
+        expect(within(list!).getByText("message 0")).toBeDefined();
+        expect(within(list!).getByText("message 3")).toBeDefined();
+    });
 });

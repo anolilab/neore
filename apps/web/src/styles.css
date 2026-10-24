@@ -22,6 +22,35 @@
     --thread-max-width: 65ch;
 }
 
+/* Chat text size (Settings > Appearance). `data-chat-text-size` on <html> is set before first paint by
+   CHAT_TEXT_SIZE_BOOT_SCRIPT and kept in step by AppearanceSync; the default size sets no attribute, so
+   nothing here applies. Message text is sized by Tailwind's `text-*` utilities (the message body and
+   the markdown renderer both use them), which read the `--text-*` tokens, so the tokens are scaled
+   inside `.message-list` only: the sidebar and chrome keep their size. A font-size on the list itself
+   would not reach that text, and would also resize the `ch`-based --thread-max-width column.
+   Unlayered on purpose so the line-height rule wins over Tailwind's `leading-7` utility. */
+:root[data-chat-text-size="small"] {
+    --chat-text-scale: 0.875;
+}
+
+:root[data-chat-text-size="large"] {
+    --chat-text-scale: 1.125;
+}
+
+:root[data-chat-text-size] .message-list {
+    --text-xs: calc(0.75rem * var(--chat-text-scale));
+    --text-sm: calc(0.875rem * var(--chat-text-scale));
+    --text-base: calc(1rem * var(--chat-text-scale));
+    --text-lg: calc(1.125rem * var(--chat-text-scale));
+    --text-xl: calc(1.25rem * var(--chat-text-scale));
+    --text-2xl: calc(1.5rem * var(--chat-text-scale));
+    --text-3xl: calc(1.875rem * var(--chat-text-scale));
+}
+
+:root[data-chat-text-size] .message-list .leading-7 {
+    line-height: calc(1.75rem * var(--chat-text-scale));
+}
+
 .thread-viewport > [data-radix-scroll-area-content] {
     @apply flex flex-col items-center self-stretch bg-inherit;
 }

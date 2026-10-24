@@ -11,10 +11,12 @@ import type { FC } from "react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 
-import { useAppearanceSettings } from "@/features/layout/hooks/use-ui-state";
+import { useAppearanceSettings, useLayoutState } from "@/features/layout/hooks/use-ui-state";
 
 import type { AccentId } from "../lib/accent-presets";
 import { ACCENT_PRESETS, isAccentId } from "../lib/accent-presets";
+import type { ChatTextSize } from "../lib/chat-text-size";
+import { CHAT_TEXT_SIZES, isChatTextSize } from "../lib/chat-text-size";
 import type { CodeHighlightThemeId, MermaidThemeId } from "../lib/code-themes";
 import { CODE_HIGHLIGHT_THEME_IDS, isCodeHighlightThemeId, isMermaidThemeId, MERMAID_THEME_IDS } from "../lib/code-themes";
 import type { ContrastId, DensityId, MainFontId } from "../lib/display-preferences";
@@ -120,6 +122,16 @@ const AppearanceControls: FC = () => {
         ],
         [t],
     );
+
+    const { fontSize, setFontSize } = useLayoutState();
+
+    const textSizeLabels = useMemo<Record<ChatTextSize, string>>(() => {
+        return {
+            large: t`Large`,
+            medium: t`Medium (default)`,
+            small: t`Small`,
+        };
+    }, [t]);
 
     const accentLabels = useMemo<Record<AccentId, string>>(() => {
         return {
@@ -258,6 +270,34 @@ const AppearanceControls: FC = () => {
                     options={fontOptions}
                     value={mainFont}
                 />
+            </div>
+            <div className="space-y-2">
+                <Label className="text-base font-medium" htmlFor="chat-text-size">
+                    {t`Chat Text Size`}
+                </Label>
+                <p className="text-muted-foreground text-sm">{t`Size of the text in chat messages. The sidebar and the rest of the app keep their size.`}</p>
+                <Select
+                    onValueChange={(value) => {
+                        if (!isChatTextSize(value)) {
+                            return;
+                        }
+
+                        setFontSize(value);
+                        toast.success(t`Chat text size updated`);
+                    }}
+                    value={fontSize}
+                >
+                    <SelectTrigger id="chat-text-size">
+                        <SelectValue>{(value: string | null) => (isChatTextSize(value) ? textSizeLabels[value] : value)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                        {CHAT_TEXT_SIZES.map((size) => (
+                            <SelectItem key={size} value={size}>
+                                {textSizeLabels[size]}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
             <div className="space-y-2">
                 <Label className="text-base font-medium" htmlFor="code-highlight-theme">
