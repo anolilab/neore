@@ -122,7 +122,7 @@ const useThreadGroups = (
         const pinnedThreadsArray = pinnedThreads || [];
         const pinnedThreadsSet = new Set<string>(pinnedThreadsArray.map((pin: any) => pin._id));
 
-        // Like pinnedThreads, the rows are ThreadDoc objects: the id is `_id`, not `threadId`.
+        // Thread docs carry `_id`, not `threadId`.
         const threadOrdersArray = threadOrders || [];
         const threadOrderMap = new Map<string, number>(threadOrdersArray.map((order: any) => [order._id, order.order]));
 
