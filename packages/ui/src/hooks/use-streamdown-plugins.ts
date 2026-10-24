@@ -18,8 +18,11 @@ import { code } from "../utils/code-highlighter";
  */
 export const BASIC_STREAMDOWN_PLUGINS: PluginConfig = { cjk, code };
 
+// Matches what `singleDollarTextMath` parses as math; a lone `$20` has no pair.
+const DOLLAR_PAIR_RE = /\$[^$\n]*\$/u;
+
 export const needsHeavyStreamdownPlugins = (text: string): boolean =>
-    text.includes("```mermaid") || text.includes("$$") || text.includes(String.raw`\(`) || text.includes(String.raw`\[`);
+    text.includes("```mermaid") || text.includes("$$") || DOLLAR_PAIR_RE.test(text) || text.includes(String.raw`\(`) || text.includes(String.raw`\[`);
 
 // Held on an object so the loader mutates a property rather than rebinding a
 // module-level `let` from inside a function.
@@ -34,7 +37,9 @@ export const loadHeavyStreamdownPlugins = (): Promise<PluginConfig> => {
     // a side effect of import, so it has to load before any formula renders.
     heavy.loading ??= Promise.all([import("@streamdown/mermaid"), import("@streamdown/math"), import("katex/contrib/mhchem")])
         .then(([mermaidModule, mathModule]) => {
-            heavy.cached = { ...BASIC_STREAMDOWN_PLUGINS, math: mathModule.math, mermaid: mermaidModule.mermaid };
+            const math = mathModule.createMathPlugin({ singleDollarTextMath: true });
+
+            heavy.cached = { ...BASIC_STREAMDOWN_PLUGINS, math, mermaid: mermaidModule.mermaid };
 
             return heavy.cached;
         })
