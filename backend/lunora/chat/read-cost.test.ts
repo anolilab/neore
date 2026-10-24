@@ -140,7 +140,8 @@ describe("thread list and thread page cost", () => {
 
             // Was 37 statements (10 temporary threads × 3 for an un-hinted get,
             // plus a `count()`) and ~1,230 rows (every list read the whole range).
-            expect(cost.statements, JSON.stringify(cost.byTable)).toBe(7);
+            // Pinned threads are two index reads now: trashed-false rows, then never-trashed ones.
+            expect(cost.statements, JSON.stringify(cost.byTable)).toBe(8);
             // 101 (page + lookahead) + 10 + 10 temporary + 5 pinned + 300 ordered + 1 + 1.
             expect(cost.rowsRead).toBe(428);
         } finally {

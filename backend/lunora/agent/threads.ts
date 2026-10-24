@@ -514,6 +514,29 @@ export const unpinThread = internalMutation
         return publicThread(newThread);
     });
 
+/**
+ * A user's pinned threads, from `by_user_and_pinned_deleted`. A never-trashed thread has `deleted` unset, not
+ * `false`, so each is its own range read. An `OR` on `deleted` matches no index and would scan every thread.
+ */
+const pinnedThreadsFor = async (context: QueryContext, userId: string): Promise<Doc<"threads">[]> => {
+    const [trashedFalse, neverTrashed] = await Promise.all([
+        context.db.threads.findMany({
+            limit: 100,
+            orderBy: [{ pinnedAt: "asc" }, { _creationTime: "asc" }],
+            where: { deleted: false, pinnedAt: { gte: 0 }, userId },
+        }),
+        context.db.threads.findMany({
+            limit: 100,
+            orderBy: [{ pinnedAt: "asc" }, { _creationTime: "asc" }],
+            where: { deleted: { isNull: true }, pinnedAt: { gte: 0 }, userId },
+        }),
+    ]);
+
+    return [...trashedFalse.page, ...neverTrashed.page]
+        .toSorted((a, b) => (a.pinnedAt ?? 0) - (b.pinnedAt ?? 0) || a._creationTime - b._creationTime)
+        .slice(0, 100);
+};
+
 export const listPinnedThreads = query
     .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(v.from(v.array(vThreadDocument)))
@@ -524,14 +547,9 @@ export const listPinnedThreads = query
             return [];
         }
 
-        // A never-trashed thread has `deleted` unset, not `false`.
-        const threads = await ctx.db.threads.findMany({
-            limit: 100,
-            orderBy: [{ pinnedAt: "asc" }, { _creationTime: "asc" }],
-            where: { OR: [{ deleted: { isNull: true } }, { deleted: false }], pinnedAt: { gte: 0 }, userId: args.userId },
-        });
+        const threads = await pinnedThreadsFor(ctx, args.userId);
 
-        return threads.page.filter((t) => t.pinnedAt !== undefined).map((item) => listThreadItem(item));
+        return threads.filter((t) => t.pinnedAt !== undefined).map((item) => listThreadItem(item));
     });
 
 // Thread order functions
@@ -928,12 +946,7 @@ export const getThreadListDataBatchHandler = async (
             where: { expiresAt: { gt: now }, userId },
         }),
         // 3. Pinned (`by_user_and_pinned_deleted`).
-        context.db.threads.findMany({
-            limit: 100,
-            orderBy: [{ pinnedAt: "asc" }, { _creationTime: "asc" }],
-            // A never-trashed thread has `deleted` unset, not `false`.
-            where: { OR: [{ deleted: { isNull: true } }, { deleted: false }], pinnedAt: { gte: 0 }, userId },
-        }),
+        pinnedThreadsFor(context, userId),
         // 4. Manual order (`by_user_and_order`), ordered threads only. The old
         //    walk also took the never-ordered rows (NULL sorts first) and dropped
         //    them after the limit, so they could crowd ordered ones out. No
@@ -976,7 +989,7 @@ export const getThreadListDataBatchHandler = async (
         .filter((t): t is Doc<"threads"> => t !== undefined && !t.deleted)
         .map((item) => listThreadItem(item));
 
-    const pinnedThreads = pinnedThreadsRaw.page.filter((t) => t.pinnedAt !== undefined).map((item) => listThreadItem(item as unknown as Doc<"threads">));
+    const pinnedThreads = pinnedThreadsRaw.filter((t) => t.pinnedAt !== undefined).map((item) => listThreadItem(item as unknown as Doc<"threads">));
 
     const threadOrders: ThreadDoc[] = [];
 
