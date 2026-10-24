@@ -75,6 +75,7 @@ export const checkDueTriggers = internalMutation
                 });
             } catch (error) {
                 console.error(`[Triggers] Could not schedule trigger ${triggerId}; it stays due for the next tick`, error);
+                await ctx.db.patch(triggerId, { lastError: "Could not schedule this run; it will be retried", updatedAt: now });
 
                 continue;
             }
@@ -89,8 +90,13 @@ export const checkDueTriggers = internalMutation
         }
 
         // If more triggers remain, schedule a follow-up run
+        // A failed follow-up is not fatal: the every-minute tick picks up what remains.
         if (dueTriggers.length > TRIGGER_BATCH_SIZE) {
-            await ctx.scheduler.runAfter(100, internal.triggers.schedule.checkDueTriggers, {});
+            try {
+                await ctx.scheduler.runAfter(100, internal.triggers.schedule.checkDueTriggers, {});
+            } catch (error) {
+                console.error("[Triggers] Could not schedule the follow-up check; the next tick picks up the rest", error);
+            }
         }
 
         return null;
