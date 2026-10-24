@@ -63,6 +63,7 @@ import { patchBrowserSession } from "../browser/session-writes";
 import { authAction, authMutation, authQuery, liteAuthQuery, optionalAuthQuery, publicQuery, rateLimit } from "../lib/crpc";
 import { throwBadRequest, throwForbidden, throwThreadNotFound, throwUnauthorized } from "../lib/error-helpers";
 import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
+import { cancelSubAgentRunsForStop } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { chatLogger, streamLogger } from "../lib/logger";
 import type { RateLimitContext } from "../lib/rate-limiter";
@@ -3873,9 +3874,11 @@ export const abortStreamByMessageId = authMutation
         // along: it stops its own reply when a live stream carries it, and a placeholder key (a new thread's first
         // reply) or a failed lookup matches none, so the thread's replies stop. A failed lookup is logged below.
         const persistent = await context.runMutation(internal.chat.streaming.persistent.library.stopActiveForThread, { messageId, threadId });
-        const aborted = legacy || persistent;
+        // After the reply is stopped, so the sub-agents' post-backs do not wait on it. See `cancelSubAgentRunsForStop`.
+        const subAgents = await cancelSubAgentRunsForStop(context, threadId, userId);
+        const aborted = legacy || persistent || subAgents > 0;
 
-        context.log.event("chat.abort_stream_by_message_id", { aborted, legacy, lookupFailed, persistent });
+        context.log.event("chat.abort_stream_by_message_id", { aborted, legacy, lookupFailed, persistent, subAgents });
 
         return { aborted };
     });
@@ -3897,9 +3900,11 @@ export const abortThreadStream = authMutation
         // Legacy streamingMessages runs and persistent (edge-streamed) replies both count.
         const legacy = await context.runMutation(internal.agent.streams.abortActiveForThread, { threadId: threadId as Id<"threads"> });
         const persistent = await context.runMutation(internal.chat.streaming.persistent.library.stopActiveForThread, { threadId });
-        const aborted = legacy || persistent;
+        // A sub-agent's own thread stops its run; any other thread stops the runs it delegated. See `cancelSubAgentRunsForStop`.
+        const subAgents = await cancelSubAgentRunsForStop(context, threadId, userId);
+        const aborted = legacy || persistent || subAgents > 0;
 
-        context.log.event("chat.abort_thread_stream", { aborted, legacy, persistent });
+        context.log.event("chat.abort_thread_stream", { aborted, legacy, persistent, subAgents });
 
         return { aborted };
     });

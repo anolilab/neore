@@ -927,6 +927,7 @@ export interface InternalApiTypes {
             createRun: FunctionReference<"mutation", { parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns"> } | { error: string }>;
             postResult: FunctionReference<"mutation", { attempt: number; runId: Id<"subAgentRuns"> }, null>;
             reapRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
+            shouldRunStop: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, boolean>;
         };
     };
     tasks: {
@@ -1928,6 +1929,7 @@ export const internal: InternalApiTypes = {
             createRun: { __lunoraRef: "sub_agents_functions:createRun" },
             postResult: { __lunoraRef: "sub_agents_functions:postResult" },
             reapRun: { __lunoraRef: "sub_agents_functions:reapRun" },
+            shouldRunStop: { __lunoraRef: "sub_agents_functions:shouldRunStop" },
         },
     },
     tasks: {

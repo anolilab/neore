@@ -18,6 +18,8 @@
  *
  * The user's own provider keys and custom endpoints apply to every headless run.
  */
+import { stepCountIs } from "ai";
+
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -31,7 +33,7 @@ import getAgent from "./get-agent";
 import { closeMCPClients } from "./mcp-tools";
 import type { SearchMode } from "./tool-builder";
 import { servesUser } from "../../lib/shard-context";
-import { applyToolAllowlist } from "../../sub-agents/logic";
+import { applyToolAllowlist, stopWhenRequested } from "../../sub-agents/logic";
 import type { ReplySkill, SavedRowLike } from "../../usage/activity-logic";
 import { replyUsageArgs } from "../../usage/activity-logic";
 import { scheduleReplyUsage } from "../../usage/schedule";
@@ -67,6 +69,12 @@ export interface HeadlessRunOptions {
     personalization: "full" | "none";
     /** Omitted when continuing a thread: its latest message is the prompt. */
     prompt?: string;
+    /**
+     * Asked after each step: `true` ends the loop there. The step that just
+     * finished was run and is saved and billed; the step cap stays in force
+     * alongside this (a stop condition given to the agent would replace it).
+     */
+    shouldStop?: () => Promise<boolean>;
     /** Instructions and run config, as a `/<slug>` invocation would contribute them. */
     skill?: { config?: SkillConfig; instructions: string };
     /** Appended to the agent's own instructions. */
@@ -161,6 +169,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, options: HeadlessRunOptio
         const generateArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({ model, reasoningEffort: skill?.config?.reasoningEffort, shouldAutoContinue: options.maxSteps === undefined }),
             ...(prompt !== undefined && { prompt }),
+            ...(options.shouldStop && { stopWhen: [stepCountIs(options.maxSteps ?? getMaxSteps(true)), stopWhenRequested(options.shouldStop)] }),
             // Without extra parts the agent falls back to its own instructions.
             ...(extraParts.length > 0 && { system: [agent.options.instructions, ...extraParts].filter(Boolean).join("\n\n") }),
         };

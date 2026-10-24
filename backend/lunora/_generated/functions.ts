@@ -1267,12 +1267,14 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "skills_marketplace:uninstallSkill": lunora_skills_marketplace_159.uninstallSkill as unknown as RegisteredLunoraFunction,
     "sub_agents_execute:runSubAgent": lunora_sub_agents_execute_160.runSubAgent as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:attachChildThread": lunora_sub_agents_functions_161.attachChildThread as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:cancelRun": lunora_sub_agents_functions_161.cancelRun as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:claimRun": lunora_sub_agents_functions_161.claimRun as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:completeRun": lunora_sub_agents_functions_161.completeRun as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:createRun": lunora_sub_agents_functions_161.createRun as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:getRunByToolCall": lunora_sub_agents_functions_161.getRunByToolCall as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:postResult": lunora_sub_agents_functions_161.postResult as unknown as RegisteredLunoraFunction,
     "sub_agents_functions:reapRun": lunora_sub_agents_functions_161.reapRun as unknown as RegisteredLunoraFunction,
+    "sub_agents_functions:shouldRunStop": lunora_sub_agents_functions_161.shouldRunStop as unknown as RegisteredLunoraFunction,
     "system_prompts_functions:createPreset": lunora_system_prompts_functions_162.createPreset as unknown as RegisteredLunoraFunction,
     "system_prompts_functions:deletePreset": lunora_system_prompts_functions_162.deletePreset as unknown as RegisteredLunoraFunction,
     "system_prompts_functions:listPresets": lunora_system_prompts_functions_162.listPresets as unknown as RegisteredLunoraFunction,
@@ -7291,6 +7293,12 @@ if (typeof source["childThreadId"] !== "string") return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "childThreadId": source["childThreadId"], "runId": source["runId"] };
 });
+installCompiledValidatorMap(lunora_sub_agents_functions_161.cancelRun.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["runId"] !== "string") return DEFER;
+return { "runId": source["runId"] };
+});
 installCompiledValidatorMap(lunora_sub_agents_functions_161.claimRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -7347,6 +7355,12 @@ if (typeof source["runId"] !== "string") return DEFER;
 return { "attempt": source["attempt"], "runId": source["runId"] };
 });
 installCompiledValidatorMap(lunora_sub_agents_functions_161.reapRun.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["runId"] !== "string") return DEFER;
+return { "runId": source["runId"] };
+});
+installCompiledValidatorMap(lunora_sub_agents_functions_161.shouldRunStop.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
@@ -9248,12 +9262,14 @@ export interface Caller {
         };
         functions: {
             attachChildThread: (args: { childThreadId: string; runId: Id<"subAgentRuns"> }) => Promise<null>;
+            cancelRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ cancelled: boolean }>;
             claimRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ depth: number; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeRun: (args: { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }) => Promise<boolean>;
             createRun: (args: { parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }) => Promise<{ runId: Id<"subAgentRuns"> } | { error: string }>;
-            getRunByToolCall: (args: { toolCallId: string }) => Promise<{ _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed"; task: string } | null>;
+            getRunByToolCall: (args: { toolCallId: string }) => Promise<{ _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string } | null>;
             postResult: (args: { attempt: number; runId: Id<"subAgentRuns"> }) => Promise<null>;
             reapRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
+            shouldRunStop: (args: { runId: Id<"subAgentRuns"> }) => Promise<boolean>;
         };
     };
     system_prompts: {
@@ -10874,12 +10890,14 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         functions: {
             attachChildThread: (args) => callRegistered(context, "sub_agents_functions:attachChildThread", args),
+            cancelRun: (args) => callRegistered(context, "sub_agents_functions:cancelRun", args),
             claimRun: (args) => callRegistered(context, "sub_agents_functions:claimRun", args),
             completeRun: (args) => callRegistered(context, "sub_agents_functions:completeRun", args),
             createRun: (args) => callRegistered(context, "sub_agents_functions:createRun", args),
             getRunByToolCall: (args) => callRegistered(context, "sub_agents_functions:getRunByToolCall", args),
             postResult: (args) => callRegistered(context, "sub_agents_functions:postResult", args),
             reapRun: (args) => callRegistered(context, "sub_agents_functions:reapRun", args),
+            shouldRunStop: (args) => callRegistered(context, "sub_agents_functions:shouldRunStop", args),
         },
     },
     system_prompts: {

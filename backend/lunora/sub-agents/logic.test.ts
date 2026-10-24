@@ -11,6 +11,7 @@ import {
     SUB_AGENT_MAX_PER_RUN,
     SUB_AGENT_MAX_TOOLS,
     SUB_AGENT_RESULT_MAX,
+    stopWhenRequested,
     subAgentCapProblem,
     truncateResult,
 } from "./logic";
@@ -102,6 +103,43 @@ describe(buildResultMessage, () => {
         expect(text).toContain("**Sub-agent failed:** Do it");
         expect(text).toContain("Quota exhausted");
         expect(text).not.toContain("/chat/");
+    });
+});
+
+describe("buildResultMessage for a cancelled run", () => {
+    it("tells the parent a running sub-agent's last step still ran and was billed", () => {
+        const text = buildResultMessage({ childThreadId: "child-1", started: true, status: "cancelled", task: "Do it" });
+
+        expect(text).toContain("**Sub-agent stopped:** Do it");
+        expect(text).toContain("was billed");
+        expect(text).toContain("/chat/child-1");
+    });
+
+    it("says a queued one never ran", () => {
+        expect(buildResultMessage({ started: false, status: "cancelled", task: "Do it" })).toContain("before it started, so nothing ran");
+    });
+});
+
+describe(stopWhenRequested, () => {
+    const steps = (count: number) => Array.from({ length: count }, () => ({}) as never);
+
+    it("asks once per step count and reuses the answer for the second evaluation of that step", async () => {
+        let asked = 0;
+        let requested = false;
+        const stop = stopWhenRequested(async () => {
+            asked += 1;
+
+            return requested;
+        });
+
+        expect(await stop({ steps: steps(1) })).toBe(false);
+
+        requested = true;
+
+        expect(await stop({ steps: steps(1) })).toBe(false);
+        expect(asked).toBe(1);
+        expect(await stop({ steps: steps(2) })).toBe(true);
+        expect(asked).toBe(2);
     });
 });
 

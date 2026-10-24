@@ -1462,7 +1462,7 @@ export interface Doc_subAgentRuns {
     resultPostedAt?: number;
     skillSlug?: string;
     startedAt?: number;
-    status: "queued" | "running" | "succeeded" | "failed";
+    status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
     task: string;
     toolAllowlist?: Array<string>;
     toolCallId?: string;
@@ -4189,7 +4189,7 @@ export interface Insert_subAgentRuns {
     resultPostedAt?: number;
     skillSlug?: string;
     startedAt?: number;
-    status: "queued" | "running" | "succeeded" | "failed";
+    status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
     task: string;
     toolAllowlist?: Array<string>;
     toolCallId?: string;

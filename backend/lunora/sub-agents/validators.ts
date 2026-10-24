@@ -5,4 +5,4 @@
  */
 import { v } from "lunorash/server";
 
-export const vSubAgentRunStatus = v.union(v.literal("queued"), v.literal("running"), v.literal("succeeded"), v.literal("failed"));
+export const vSubAgentRunStatus = v.union(v.literal("queued"), v.literal("running"), v.literal("succeeded"), v.literal("failed"), v.literal("cancelled"));

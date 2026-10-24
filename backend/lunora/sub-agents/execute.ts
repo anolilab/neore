@@ -5,7 +5,9 @@
  * On the jobs queue (at-least-once): the run claims its row first
  * (`claimRun`), so only one delivery ever runs it, and reports once at the end
  * (`completeRun`), which posts once. A delivery killed mid-run leaves the row
- * `running` until the reaper fails it. Enqueued from the parent run's shard —
+ * `running` until the reaper fails it. A run the owner cancels is ended by
+ * `cancelRun` at once; this loop sees it between steps (`shouldRunStop`) and
+ * stops, and its own `completeRun` then finds the run already ended. Enqueued from the parent run's shard —
  * the owner's — so the child thread, its messages and the post-back all live
  * there.
  */
@@ -67,6 +69,11 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
                 if (!(await ctx.runQuery(internal.tasks.internal.canRunForUser, { userId }))) {
                     throw new SubAgentRunError("This account is being deleted.");
                 }
+
+                // Cancelled between the claim and now: no thread, no first step.
+                if (await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId })) {
+                    throw new SubAgentRunError("This sub-agent was stopped.");
+                }
             },
             memory: false,
             model,
@@ -75,6 +82,7 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             },
             personalization: "full",
             prompt: buildSubAgentPrompt(claim.task),
+            shouldStop: async () => await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId }),
             skill,
             system: SUB_AGENT_SYSTEM,
             thread: { tags: ["sub-agent"], title: `Sub-agent: ${claim.task}`.split("\n", 1)[0]!.slice(0, 120) },
