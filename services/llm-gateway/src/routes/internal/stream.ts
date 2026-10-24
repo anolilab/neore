@@ -536,7 +536,7 @@ streamRouter.openapi(
                                         completionTokens: tokens.completionTokens,
                                         costMicrodollars,
                                         // A provider error inside the stream is a failed call, so its GenAI span must not export as OK.
-                                        ...(isErrored && { errorCode: "PROVIDER_ERROR" }),
+                                        ...(isErrored && !isCancelled && { errorCode: "PROVIDER_ERROR" }),
                                         finishReason,
                                         guardrailViolations: guardrailViolationsJson,
                                         isStreaming: true,

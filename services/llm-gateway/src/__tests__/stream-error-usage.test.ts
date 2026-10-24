@@ -311,7 +311,7 @@ describe("a cancelled stream bills the tokens it already produced", () => {
     });
 
     /** A `streamText` that yields `parts`, then stays open until the request is aborted, as a cancelled stream does. */
-    const streamTextUntilAborted = (parts: object[]) =>
+    const streamTextUntilAborted = (parts: object[], { failOnAbort = false } = {}) =>
         (({ abortSignal }: { abortSignal: AbortSignal }) => {
             const aborted = new Promise<void>((resolve) => {
                 abortSignal.addEventListener("abort", () => resolve(), { once: true });
@@ -328,6 +328,10 @@ describe("a cancelled stream bills the tokens it already produced", () => {
                 fullStream: (async function* partsOf() {
                     yield* parts;
                     await aborted;
+
+                    if (failOnAbort) {
+                        throw new Error("aborted mid-iteration");
+                    }
                 })(),
                 usage: rejectOnAbort,
             };
@@ -364,6 +368,38 @@ describe("a cancelled stream bills the tokens it already produced", () => {
         const { entry } = await billed();
 
         expect(entry).toMatchObject({ completionTokens: Math.ceil(JSON.stringify(input).length / 4), finishReason: "cancelled" });
+    });
+
+    it("POST /internal/stream does not tag a cancelled stream as a provider failure when its iteration throws on abort", async () => {
+        vi.mocked(streamText).mockImplementationOnce(streamTextUntilAborted([{ text: DELTA, type: "text-delta" }], { failOnAbort: true }));
+        vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({} as never);
+
+        const res = await fetchApp(
+            new Request("http://localhost/internal/stream", {
+                body: JSON.stringify({
+                    messages: [{ content: PROMPT, role: "user" }],
+                    modelApiId: "gpt-test-1",
+                    modelId: "gpt-test",
+                    provider: "openai",
+                    requestId: "req-stream-abort-error",
+                    userId: "user-1",
+                    warmupTimeoutMs: 0,
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+            }),
+            bindingEnv(createMockEnv()),
+        );
+
+        const reader = res.body!.getReader();
+
+        await reader.read();
+        await reader.cancel("user stopped");
+
+        const { entry } = await billed();
+
+        expect(entry).toMatchObject({ finishReason: "cancelled" });
+        expect(entry).not.toHaveProperty("errorCode");
     });
 
     it.each([
