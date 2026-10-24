@@ -66,11 +66,18 @@ export const checkDueTriggers = internalMutation
                 continue;
             }
 
-            // Schedule the execution as a background action
-            await ctx.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
-                payload: trigger.inputTemplate ?? undefined,
-                triggerId,
-            });
+            // Schedule the execution as a background action. A failed call leaves this trigger due, so the next
+            // tick retries it, and the rest of the batch still runs. A throw here would roll back the whole batch.
+            try {
+                await ctx.scheduler.runAfter(0, internal.triggers.execute.executeTrigger, {
+                    payload: trigger.inputTemplate ?? undefined,
+                    triggerId,
+                });
+            } catch (error) {
+                console.error(`[Triggers] Could not schedule trigger ${triggerId}; it stays due for the next tick`, error);
+
+                continue;
+            }
 
             // Compute next trigger time
             if (step.nextTime !== undefined) {
