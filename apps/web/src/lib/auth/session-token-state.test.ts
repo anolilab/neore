@@ -86,6 +86,28 @@ describe(fetchSessionToken, () => {
         await expect(fetchSessionToken(SITE, new Headers(), OPTIONS)).resolves.toMatchObject({ status: "unauthenticated" });
     });
 
+    it("a request with NO session cookie is signed out without asking the backend", async () => {
+        const fetchSpy = answer(() => Response.json({ token: jwt(NOW_SECONDS + 900) }));
+
+        vi.stubGlobal("fetch", fetchSpy);
+
+        await expect(fetchSessionToken(SITE, new Headers(), OPTIONS)).resolves.toStrictEqual({ isFresh: true, status: "unauthenticated", token: undefined });
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("finds the session cookie after a bare semicolon, which a client may send without the space", async () => {
+        expect.assertions(2);
+
+        const fetchSpy = answer(() => Response.json({ token: jwt(NOW_SECONDS + 900) }));
+
+        vi.stubGlobal("fetch", fetchSpy);
+
+        const headers = new Headers({ cookie: `other=1;neore.session_token=session-${crypto.randomUUID()}` });
+
+        await expect(fetchSessionToken(SITE, headers, OPTIONS)).resolves.toMatchObject({ status: "authenticated" });
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
     it("keeps the last known token when a refresh is rate-limited", async () => {
         const headers = withSession();
         const token = jwt(NOW_SECONDS + 900);

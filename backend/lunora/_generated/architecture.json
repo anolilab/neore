@@ -2727,11 +2727,6 @@
     },
     {
       "from": "function:chat_streaming_persistent_crons:cleanupExpiredStreams",
-      "kind": "read",
-      "to": "table:persistentStreams"
-    },
-    {
-      "from": "function:chat_streaming_persistent_crons:cleanupExpiredStreams",
       "kind": "write",
       "to": "table:persistentStreams"
     },
@@ -2747,16 +2742,6 @@
     },
     {
       "from": "function:chat_streaming_persistent_library:claimStreamRun",
-      "kind": "write",
-      "to": "table:persistentStreams"
-    },
-    {
-      "from": "function:chat_streaming_persistent_library:cleanupExpiredStreams",
-      "kind": "read",
-      "to": "table:persistentStreams"
-    },
-    {
-      "from": "function:chat_streaming_persistent_library:cleanupExpiredStreams",
       "kind": "write",
       "to": "table:persistentStreams"
     },
@@ -10110,13 +10095,6 @@
       "id": "function:chat_streaming_persistent_library:claimStreamRun",
       "kind": "function",
       "name": "chat.streaming.persistent.library.claimStreamRun",
-      "module": "chat"
-    },
-    {
-      "detail": "mutation",
-      "id": "function:chat_streaming_persistent_library:cleanupExpiredStreams",
-      "kind": "function",
-      "name": "chat.streaming.persistent.library.cleanupExpiredStreams",
       "module": "chat"
     },
     {

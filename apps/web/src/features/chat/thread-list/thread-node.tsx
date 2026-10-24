@@ -42,7 +42,7 @@ import type { FC } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
-import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
+import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { ThreadLockMode } from "@/features/chat/lock/thread-lock-dialog";
 import { ThreadLockDialog } from "@/features/chat/lock/thread-lock-dialog";
@@ -346,7 +346,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             // Also prefetch messages directly into TanStack Query cache
             void queryClient.prefetchQuery(
                 createLunoraQueryOptions(lunoraClient, api.chat.functions.getThreadUIMessages, {
-                    paginationOpts: THREAD_LIST_PAGINATION_OPTS,
+                    paginationOpts: DEFAULT_PAGINATION_OPTS,
                     threadId: node.threadId as Id<"threads">,
                 }),
             );

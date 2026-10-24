@@ -1,7 +1,6 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
 import { Authenticated } from "@lunora/react";
-import { api } from "@neore/backend/api";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@neore/ui/components/breadcrumb";
 import { ScrollArea } from "@neore/ui/components/scroll-area";
 import { SidebarInset } from "@neore/ui/components/sidebar";
@@ -40,7 +39,6 @@ import SettingsPageOutline from "@/features/layout/components/settings-page-outl
 import SiteHeader from "@/features/layout/components/site-header";
 import { breadcrumbLabel, DASHBOARD_PAGE_NAMES } from "@/features/layout/lib/dashboard-page-names";
 import { requireSession } from "@/lib/auth/route-guard";
-import { createLunoraQueryOptions } from "@/lib/lunora/crpc";
 
 /** The page names, as descriptors: this runs outside a component, so the caller translates them (`i18n._`). */
 const getNavigationItems = (
@@ -261,23 +259,8 @@ const RouteComponent = () => {
 };
 
 export const Route = createFileRoute("/dashboard")({
-    staleTime: 60_000, // 1 minute - dashboard data changes infrequently
-    gcTime: 10 * 60 * 1000, // 10 minutes - keep dashboard data cached
     beforeLoad: ({ context, location }) => {
         requireSession(context, location);
-    },
-    loader: async ({ context }) => {
-        // No token yet (the session read failed and the guard let the page render):
-        // these would fail unauthenticated. The page's own queries fetch once
-        // `AuthRecovery` hands the client its token.
-        if (!context.isAuthenticated) {
-            return;
-        }
-
-        await Promise.all([
-            context.queryClient.ensureQueryData(createLunoraQueryOptions(context.lunoraClient, api.auth.functions.getCurrentUser, {})),
-            context.queryClient.ensureQueryData(createLunoraQueryOptions(context.lunoraClient, api.auth.functions.hasPassword, {})),
-        ]);
     },
     component: RouteComponent,
 });

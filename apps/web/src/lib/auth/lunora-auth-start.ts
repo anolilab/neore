@@ -15,6 +15,7 @@ import { isRetryableStatus } from "./session-read";
 const AUTH_PROXY_TIMEOUT_MS = 30_000;
 
 const COOKIE_VALUE_RE = /=(.*)/s;
+const COOKIE_SEPARATOR_RE = /;\s*/u;
 
 /**
  * Lunora's `OptionalRestArgs&lt;F>` — the args as a rest tuple. `@lunora/react` has
@@ -86,7 +87,8 @@ type ClientOptions = {
 };
 
 const parseCookies = (cookieHeader: string): Map<string, string> => {
-    const cookies = cookieHeader.split("; ");
+    // Some clients omit RFC 6265's space after the semicolon; a missed session cookie reads as signed out.
+    const cookies = cookieHeader.split(COOKIE_SEPARATOR_RE);
     const cookieMap = new Map<string, string>();
 
     for (const cookie of cookies) {
@@ -289,10 +291,13 @@ export const fetchSessionToken = async (siteUrl: string, headers: Headers, optio
         return await fetchToken();
     }
 
-    // No session cookie, no cache key — and nothing worth caching either, since
-    // the token endpoint answers on the strength of that cookie.
+    // No session cookie means no session: the token endpoint answers only on the
+    // strength of that cookie (no bearer plugin is installed), so asking it cannot
+    // succeed. Answering here keeps a slow or hung backend off the SSR of every
+    // cookie-less visitor, the landing page included. The answer is the one
+    // `fetchToken` gives for a 401, and a failed fetch here was already signed out.
     if (!sessionCookie) {
-        return await fetchToken();
+        return { isFresh: true, status: "unauthenticated", token: undefined };
     }
 
     if (options.forceRefresh) {

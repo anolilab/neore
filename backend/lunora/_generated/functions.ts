@@ -728,7 +728,6 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_streaming_persistent_crons:cleanupExpiredStreams": lunora_chat_streaming_persistent_crons_65.cleanupExpiredStreams as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:addChunk": lunora_chat_streaming_persistent_library_66.addChunk as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:claimStreamRun": lunora_chat_streaming_persistent_library_66.claimStreamRun as unknown as RegisteredLunoraFunction,
-    "chat_streaming_persistent_library:cleanupExpiredStreams": lunora_chat_streaming_persistent_library_66.cleanupExpiredStreams as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:createStream": lunora_chat_streaming_persistent_library_66.createStream as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:finishStoppedReply": lunora_chat_streaming_persistent_library_66.finishStoppedReply as unknown as RegisteredLunoraFunction,
     "chat_streaming_persistent_library:getChunksAfter": lunora_chat_streaming_persistent_library_66.getChunksAfter as unknown as RegisteredLunoraFunction,
@@ -8436,7 +8435,6 @@ export interface Caller {
                 library: {
                     addChunk: (args: { final: boolean; reasoning?: string; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }) => Promise<void>;
                     claimStreamRun: (args: { streamId: Id<"persistentStreams"> }) => Promise<boolean>;
-                    cleanupExpiredStreams: (args?: {}) => Promise<void>;
                     createStream: (args: { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }) => Promise<Id<"persistentStreams">>;
                     finishStoppedReply: (args: { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }) => Promise<{ messageId?: Id<"messages">; stopped: boolean }>;
                     getChunksAfter: (args: { afterIndex: number; streamId: Id<"persistentStreams"> }) => Promise<{ chunks: Array<{ reasoning?: string; speaker?: { name: string; skillId: string }; text: string }>; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
@@ -10063,7 +10061,6 @@ export const createCaller = (context: CallerCtx): Caller => ({
                 library: {
                     addChunk: (args) => callRegistered(context, "chat_streaming_persistent_library:addChunk", args),
                     claimStreamRun: (args) => callRegistered(context, "chat_streaming_persistent_library:claimStreamRun", args),
-                    cleanupExpiredStreams: (args) => callRegistered(context, "chat_streaming_persistent_library:cleanupExpiredStreams", args),
                     createStream: (args) => callRegistered(context, "chat_streaming_persistent_library:createStream", args),
                     finishStoppedReply: (args) => callRegistered(context, "chat_streaming_persistent_library:finishStoppedReply", args),
                     getChunksAfter: (args) => callRegistered(context, "chat_streaming_persistent_library:getChunksAfter", args),

@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
-import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
+import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -87,7 +87,6 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
     const { activeStreamId, isStreaming } = useChatIsStreaming();
     const { isNewThread, thread, threadId } = useChatThread();
 
-    useChatMessages();
     const { jwtToken } = useChatActions();
 
     // Detect comparison parent instantly from the already-loaded thread doc (no extra query).

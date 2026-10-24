@@ -167,7 +167,9 @@ export const Route = createFileRoute("/(chat)/chat/")({
         return {
             promptId: search.promptId as string | undefined,
             redirectReason: search.redirectReason as string | undefined,
-            initialMessage: search.initialMessage === true || search.initialMessage === "true",
+            // `|| undefined`, not `false`: a default written into the search is put into the URL, and the
+            // router then redirects a bare `/chat` to `/chat?initialMessage=false` before it renders.
+            initialMessage: search.initialMessage === true || search.initialMessage === "true" || undefined,
         };
     },
     component: ChatPage,

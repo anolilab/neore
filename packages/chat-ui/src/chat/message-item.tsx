@@ -120,7 +120,9 @@ const UserMessage = ({ maxWidth, message, onBranch, onCopy, onPin }: Pick<Messag
                                 <img
                                     alt={img.filename || t`Attached image`}
                                     className="max-h-40 max-w-[200px] rounded-lg object-cover"
+                                    decoding="async"
                                     key={img.key}
+                                    loading="lazy"
                                     src={img.url || img.data}
                                 />
                             );

@@ -10,7 +10,8 @@
  * guessed runtime name (e.g. "mcp_Brave_Search__web_search").
  *
  * React Query deduplicates the fetch so all DefaultToolCall instances share
- * a single network request per session.
+ * a single network request per session. It runs only for a message with an MCP
+ * tool part, since each run connects to every enabled server.
  */
 
 import { api } from "@neore/backend/api";
@@ -29,10 +30,11 @@ export interface MCPToolMeta {
     serverName: string;
 }
 
-const useMCPToolMeta = (): Map<string, MCPToolMeta> => {
+const useMCPToolMeta = (enabled: boolean): Map<string, MCPToolMeta> => {
     const listMeta = useAction(api.chat.functions.listMCPToolsMeta);
 
     const { data } = useQuery({
+        enabled,
         gcTime: GC_TIME,
         queryFn: () => listMeta({}),
         queryKey: ["mcp-tool-meta"],
