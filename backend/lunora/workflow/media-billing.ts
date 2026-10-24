@@ -65,8 +65,7 @@ export const mediaRequestId = (runId: string, nodeId: string): string => `workfl
 const MAX_IMAGES_PER_NODE = 4;
 
 /** The number of images an image node asks for, clamped to the cap; a request carries whatever the client sent. */
-export const imageCountOf = (numberImages: number | undefined): number =>
-    Math.min(MAX_IMAGES_PER_NODE, Math.max(1, Math.trunc(Number(numberImages)) || 1));
+export const imageCountOf = (numberImages: number | undefined): number => Math.min(MAX_IMAGES_PER_NODE, Math.max(1, Math.trunc(Number(numberImages)) || 1));
 
 /**
  * Takes `count` daily units for one node run, right before the paid call that uses them. A spent quota throws
