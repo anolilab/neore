@@ -12,6 +12,7 @@ import { createTusAdapter } from "@lunora/client/upload";
 
 import getSessionToken from "@/lib/auth/server-functions";
 import env from "@/lib/env";
+import { acquireUnloadGuard } from "@/lib/unload-guard";
 
 import { failureFor, UploadFailedError } from "./upload-error";
 
@@ -35,11 +36,7 @@ export interface UploadFileOptions {
     signal?: AbortSignal;
 }
 
-export const uploadFile = async (file: File, { contentType, onProgress, purpose, signal }: UploadFileOptions): Promise<string> => {
-    if (signal?.aborted) {
-        throw new DOMException("The upload was aborted", "AbortError");
-    }
-
+const sendFile = async (file: File, { contentType, onProgress, purpose, signal }: UploadFileOptions): Promise<string> => {
     const token = await getSessionToken();
     const endpoint = new URL("/uploads", env.VITE_LUNORA_URL);
 
@@ -72,5 +69,20 @@ export const uploadFile = async (file: File, { contentType, onProgress, purpose,
         const status = statusOf(error);
 
         throw new UploadFailedError(failureFor(status), status, error);
+    }
+};
+
+export const uploadFile = async (file: File, options: UploadFileOptions): Promise<string> => {
+    if (options.signal?.aborted) {
+        throw new DOMException("The upload was aborted", "AbortError");
+    }
+
+    // The bytes leave from this tab, so closing it ends the upload.
+    const releaseUnloadGuard = acquireUnloadGuard();
+
+    try {
+        return await sendFile(file, options);
+    } finally {
+        releaseUnloadGuard();
     }
 };

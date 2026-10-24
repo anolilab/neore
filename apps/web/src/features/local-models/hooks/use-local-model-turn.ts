@@ -10,6 +10,7 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import type { NewChatTemporaryFields } from "@/features/chat/core/utils/new-chat-temporary";
 import type { LocalModelTarget } from "@/features/settings/lib/custom-models";
 import { findLocalModelTarget } from "@/features/settings/lib/custom-models";
+import { useUnloadGuard } from "@/hooks/use-unload-guard";
 import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -182,7 +183,12 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
         } as UIMessage;
     }, [live, target?.modelId]);
 
-    return { cancel, isStreaming: live !== null && !live.persistedId, send, streamingMessage, target };
+    const isStreaming = live !== null && !live.persistedId;
+
+    // The reply streams to this tab and is saved from it, so closing the tab loses it.
+    useUnloadGuard(isStreaming);
+
+    return { cancel, isStreaming, send, streamingMessage, target };
 };
 
 export default useLocalModelTurn;

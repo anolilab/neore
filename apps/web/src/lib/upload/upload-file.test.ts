@@ -98,4 +98,47 @@ describe(uploadFile, () => {
         expect(error).toBeInstanceOf(UploadFailedError);
         expect(error).toMatchObject({ reason, status });
     });
+
+    describe("the close warning", () => {
+        const isGuarded = (): boolean => {
+            const event = new Event("beforeunload", { cancelable: true });
+
+            globalThis.dispatchEvent(event);
+
+            return event.defaultPrevented;
+        };
+
+        it("is on while the upload runs and off once it completes", async () => {
+            const server = tusServer();
+            const guardedDuring: boolean[] = [];
+
+            vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+                guardedDuring.push(isGuarded());
+
+                return server.fetch(input, init);
+            });
+
+            await uploadFile(new File(["%PDF-1.7"], "a.pdf"), { contentType: "application/pdf" });
+
+            expect(guardedDuring.length).toBeGreaterThan(0);
+            expect(guardedDuring.every(Boolean)).toBe(true);
+            expect(isGuarded()).toBe(false);
+        });
+
+        it("is off after the upload fails", async () => {
+            vi.stubGlobal("fetch", tusServer(413).fetch);
+
+            await expect(uploadFile(new File(["x"], "a.pdf"), { contentType: "application/pdf" })).rejects.toBeInstanceOf(UploadFailedError);
+            expect(isGuarded()).toBe(false);
+        });
+
+        it("is never on for an upload cancelled before it starts", async () => {
+            const controller = new AbortController();
+
+            controller.abort();
+
+            await expect(uploadFile(new File(["x"], "a.pdf"), { contentType: "application/pdf", signal: controller.signal })).rejects.toThrow("aborted");
+            expect(isGuarded()).toBe(false);
+        });
+    });
 });
