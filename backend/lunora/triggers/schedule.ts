@@ -89,8 +89,7 @@ export const checkDueTriggers = internalMutation
             }
         }
 
-        // If more triggers remain, schedule a follow-up run
-        // A failed follow-up is not fatal: the every-minute tick picks up what remains.
+        // If more triggers remain, schedule a follow-up run. A failed one is not fatal: the every-minute tick picks up what remains.
         if (dueTriggers.length > TRIGGER_BATCH_SIZE) {
             try {
                 await ctx.scheduler.runAfter(100, internal.triggers.schedule.checkDueTriggers, {});
