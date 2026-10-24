@@ -6,4 +6,4 @@
  */
 export type TriggerType = "schedule" | "webhook" | "event";
 
-export type TriggerExecutionStatus = "running" | "completed" | "failed";
+export type TriggerExecutionStatus = "running" | "completed" | "failed" | "filtered";

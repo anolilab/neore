@@ -2695,7 +2695,8 @@ export const schema = defineSchema({
         error: v.optional(v.string()),
         payload: v.optional(v.string()),
         startedAt: v.number(),
-        status: v.union(v.literal("running"), v.literal("completed"), v.literal("failed")),
+        // "filtered": a verified delivery whose payload failed the trigger's filters; it ran nothing.
+        status: v.union(v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("filtered")),
         threadId: v.optional(v.string()),
         triggerId: v.id("triggers"),
     }).index("by_triggerId_startedAt", ["triggerId", "startedAt"]),
@@ -2713,6 +2714,23 @@ export const schema = defineSchema({
         eventFilter: v.optional(v.string()),
         eventProvider: v.optional(v.string()),
         eventType: v.optional(v.string()),
+        // Webhook triggers: every filter must match the JSON body for a delivery to run (`triggers/filters.ts`).
+        filters: v.optional(
+            v.array(
+                v.object({
+                    op: v.union(
+                        v.literal("equals"),
+                        v.literal("not_equals"),
+                        v.literal("contains"),
+                        v.literal("starts_with"),
+                        v.literal("exists"),
+                        v.literal("not_exists"),
+                    ),
+                    path: v.string(),
+                    value: v.optional(v.string()),
+                }),
+            ),
+        ),
         inputTemplate: v.optional(v.string()),
         lastError: v.optional(v.string()),
         lastTriggeredAt: v.optional(v.number()),

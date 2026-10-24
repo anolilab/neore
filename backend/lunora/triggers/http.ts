@@ -40,6 +40,7 @@ import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, timingSafeEqua
 import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
+import { evaluateFilters } from "./filters";
 
 const DIGITS_ONLY = /^\d{1,12}$/u;
 
@@ -54,7 +55,7 @@ const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
  * at the call site, instead of re-casting at every field access — and keeps the field
  * types (the `type` union, `enabled: boolean`) from the generated `Doc<"triggers">`.
  */
-type WebhookTrigger = Pick<Doc<"triggers">, "enabled" | "type" | "userId" | "webhookSecret" | "webhookSignatureScheme">;
+type WebhookTrigger = Pick<Doc<"triggers">, "enabled" | "filters" | "type" | "userId" | "webhookSecret" | "webhookSignatureScheme">;
 
 /**
  * Handle an incoming webhook request for a trigger.
@@ -195,7 +196,37 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             return Response.json({ duplicate: true, ok: true }, { headers: { "Content-Type": "application/json" }, status: 200 });
         }
 
-        // 4. Schedule trigger execution. The claim is already committed, so a
+        // 4. Payload filters, on the body only now that its signature is proven. A
+        //    filtered delivery KEEPS its claim: a replay of it is a duplicate and
+        //    writes nothing. It runs nothing, so it is not charged (`admitTriggerRun`
+        //    lives in the execution) and does not count as a run. 202, not 200: the
+        //    delivery was accepted and deliberately not acted on.
+        const verdict = evaluateFilters(trigger.filters, body);
+
+        if (!verdict.matched) {
+            try {
+                await context.runMutation(internal.triggers.functions.recordFilteredExecution, {
+                    reason: verdict.reason.slice(0, 500),
+                    triggerId: triggerId as Id<"triggers">,
+                });
+            } catch (error) {
+                await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+
+                throw error;
+            }
+
+            return Response.json(
+                {
+                    filter: { op: verdict.filter.op, path: verdict.filter.path, value: verdict.filter.value ?? null },
+                    ok: true,
+                    outcome: "filtered",
+                    reason: verdict.reason,
+                },
+                { headers: { "Content-Type": "application/json" }, status: 202 },
+            );
+        }
+
+        // 5. Schedule trigger execution. The claim is already committed, so a
         //    failure here must give it back — otherwise the sender's retry of
         //    this same delivery reads as a replay, and it never runs at all.
         try {

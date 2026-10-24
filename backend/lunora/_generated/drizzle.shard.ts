@@ -1477,7 +1477,7 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
     error: text("error"),
     payload: text("payload"),
     startedAt: real("startedAt").notNull(),
-    status: text("status", { mode: "json" }).$type<"running" | "completed" | "failed">().notNull(),
+    status: text("status", { mode: "json" }).$type<"running" | "completed" | "failed" | "filtered">().notNull(),
     threadId: text("threadId"),
     triggerId: text("triggerId").references((): AnySQLiteColumn => triggers._id).notNull(),
 }, (t) => ({
@@ -1497,6 +1497,7 @@ export const triggers = sqliteTable("triggers", {
     eventFilter: text("eventFilter"),
     eventProvider: text("eventProvider"),
     eventType: text("eventType"),
+    filters: text("filters", { mode: "json" }).$type<Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>>(),
     inputTemplate: text("inputTemplate"),
     lastError: text("lastError"),
     lastTriggeredAt: real("lastTriggeredAt"),

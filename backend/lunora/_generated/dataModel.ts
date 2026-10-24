@@ -1726,7 +1726,7 @@ export interface Doc_triggerExecutions {
     error?: string;
     payload?: string;
     startedAt: number;
-    status: "running" | "completed" | "failed";
+    status: "running" | "completed" | "failed" | "filtered";
     threadId?: string;
     triggerId: Id<"triggers">;
 }
@@ -1744,6 +1744,7 @@ export interface Doc_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventType?: string;
+    filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
     inputTemplate?: string;
     lastError?: string;
     lastTriggeredAt?: number;
@@ -4454,7 +4455,7 @@ export interface Insert_triggerExecutions {
     error?: string;
     payload?: string;
     startedAt: number;
-    status: "running" | "completed" | "failed";
+    status: "running" | "completed" | "failed" | "filtered";
     threadId?: string;
     triggerId: Id<"triggers">;
 }
@@ -4472,6 +4473,7 @@ export interface Insert_triggers {
     eventFilter?: string;
     eventProvider?: string;
     eventType?: string;
+    filters?: Array<{ op: "equals" | "not_equals" | "contains" | "starts_with" | "exists" | "not_exists"; path: string; value?: string }>;
     inputTemplate?: string;
     lastError?: string;
     lastTriggeredAt?: number;

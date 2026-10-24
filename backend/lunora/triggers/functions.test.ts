@@ -313,3 +313,50 @@ describe("updateTrigger on a new schedule", () => {
         expect("nextTriggerAt" in (await readTrigger(disabledId))).toBe(false);
     });
 });
+
+describe("webhook payload filters", () => {
+    const as = () => harness.withIdentity({ userId: "user-a" } as never);
+    const webhook = { model: "m", name: "Hook", type: "webhook" };
+    const filter = { op: "equals", path: "action", value: "opened" };
+
+    it("stores a valid set on create, replaces it on update and clears it with an empty set", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { ...webhook, filters: [filter] } as never)) as { triggerId: string };
+
+        expect((await readTrigger(triggerId)).filters).toEqual([filter]);
+
+        const next = { op: "exists", path: "pull_request.number" };
+
+        await as().mutation(updateTrigger as never, { filters: [next], triggerId } as never);
+        expect((await readTrigger(triggerId)).filters).toEqual([next]);
+
+        await as().mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
+        expect((await readTrigger(triggerId)).filters).toEqual([next]);
+
+        await as().mutation(updateTrigger as never, { filters: [], triggerId } as never);
+        expect("filters" in (await readTrigger(triggerId))).toBe(false);
+    });
+
+    it("refuses more than 10 filters, a path past 8 segments, and a comparison without a value", async () => {
+        const tooMany = Array.from({ length: 11 }, () => filter);
+
+        await expect(as().mutation(createTrigger as never, { ...webhook, filters: tooMany } as never)).rejects.toThrow("at most 10");
+        await expect(as().mutation(createTrigger as never, { ...webhook, filters: [{ op: "exists", path: "a.b.c.d.e.f.g.h.i" }] } as never)).rejects.toThrow(
+            "8 deep",
+        );
+        await expect(as().mutation(createTrigger as never, { ...webhook, filters: [{ op: "equals", path: "a" }] } as never)).rejects.toThrow("needs a value");
+    });
+
+    it("refuses a path longer than the argument cap", async () => {
+        await expect(as().mutation(createTrigger as never, { ...webhook, filters: [{ op: "exists", path: "a".repeat(201) }] } as never)).rejects.toThrow();
+    });
+
+    it("keeps filters to webhook triggers", async () => {
+        const schedule = { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" };
+
+        await expect(as().mutation(createTrigger as never, { ...schedule, filters: [filter] } as never)).rejects.toThrow("Only a webhook trigger");
+
+        const { triggerId } = (await as().mutation(createTrigger as never, schedule as never)) as { triggerId: string };
+
+        await expect(as().mutation(updateTrigger as never, { filters: [filter], triggerId } as never)).rejects.toThrow("Only a webhook trigger");
+    });
+});

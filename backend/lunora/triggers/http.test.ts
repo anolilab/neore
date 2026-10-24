@@ -10,6 +10,7 @@ import schema from "../schema";
 import { internal } from "../_generated/internal";
 import { claimKey, releaseKey } from "../lib/claim-once";
 import { SIGNED_REQUEST_WINDOW_MS } from "../lib/crypto";
+import { recordFilteredExecution } from "./functions";
 import handleTriggerWebhook from "./http";
 
 const rateLimit = vi.hoisted(() => {
@@ -58,10 +59,19 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
             }),
     );
     const scheduled: unknown[] = [];
-    const scheduler = { fail: false };
+    const scheduler = { fail: false, recordFails: false };
     const context = {
-        runMutation: async (reference: unknown, args: unknown) =>
-            await harness.run(async (ctx: any) => await ctx.runMutation(reference === internal.lib.claim_once.releaseKey ? releaseKey : claimKey, args)),
+        runMutation: async (reference: unknown, args: unknown) => {
+            if (reference === internal.triggers.functions.recordFilteredExecution) {
+                if (scheduler.recordFails) {
+                    throw new Error("write failed");
+                }
+
+                return await harness.run(async (ctx: any) => await ctx.runMutation(recordFilteredExecution, args));
+            }
+
+            return await harness.run(async (ctx: any) => await ctx.runMutation(reference === internal.lib.claim_once.releaseKey ? releaseKey : claimKey, args));
+        },
         runQuery: async () => trigger,
         scheduler: {
             runAfter: async (_delay: number, _reference: unknown, args: unknown) => {
@@ -88,7 +98,15 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
         return response.status;
     };
 
-    return { post, scheduled, scheduler, statusOf };
+    /** The execution rows of the trigger, newest first. */
+    const history = async () =>
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("triggerExecutions").collect();
+
+            return rows.toSorted((a: any, b: any) => b.startedAt - a.startedAt);
+        });
+
+    return { history, post, scheduled, scheduler, statusOf, triggerId };
 };
 
 const signedHeaders = async (body: string, timestampSeconds = Math.floor(NOW / 1000)) => {
@@ -282,6 +300,125 @@ describe("trigger webhook signing", () => {
             rateLimit.ok = false;
             expect(await statusOf("{}", { "x-hub-signature-256": `sha256=${"0".repeat(64)}` })).toBe(401);
             expect(rateLimit.charged).toBe(0);
+        });
+    });
+
+    describe("payload filters", () => {
+        const FILTERED_TRIGGER = {
+            ...SIGNED_TRIGGER,
+            filters: [
+                { op: "equals", path: "action", value: "opened" },
+                { op: "exists", path: "pull_request.number" },
+            ],
+        };
+        const MATCHING = '{"action":"opened","pull_request":{"number":7}}';
+        const stampOf = (body: string, seconds: number) => signedHeaders(body, seconds);
+
+        it("runs a delivery whose payload matches every filter", async () => {
+            const { history, scheduled, statusOf } = await setup(FILTERED_TRIGGER);
+
+            expect(await statusOf(MATCHING, await signedHeaders(MATCHING))).toBe(200);
+            expect(scheduled).toHaveLength(1);
+            expect(await history()).toHaveLength(0);
+        });
+
+        it("answers 202 'filtered' with the first failing filter, runs nothing and records one row", async () => {
+            const { history, post, scheduled, triggerId } = await setup(FILTERED_TRIGGER);
+            const body = '{"action":"closed","pull_request":{"number":7}}';
+            const response = await post(body, await signedHeaders(body));
+
+            expect(response.status).toBe(202);
+            expect(await response.json()).toMatchObject({ filter: { op: "equals", path: "action", value: "opened" }, ok: true, outcome: "filtered" });
+            expect(scheduled).toHaveLength(0);
+
+            const rows = await history();
+
+            expect(rows).toHaveLength(1);
+            expect(rows[0]).toMatchObject({ status: "filtered", triggerId });
+            // The untrusted body is not stored.
+            expect(rows[0].payload).toBeUndefined();
+
+            // Nothing counts as a run: the trigger's bookkeeping is untouched.
+            const trigger = await harness.run(async (ctx: any) => await ctx.db.get(triggerId));
+
+            expect(trigger).toMatchObject({ triggerCount: 0 });
+            expect(trigger.lastTriggeredAt).toBeUndefined();
+        });
+
+        it("treats a missing path as a failed match", async () => {
+            const { scheduled, statusOf } = await setup(FILTERED_TRIGGER);
+            const body = '{"action":"opened"}';
+
+            expect(await statusOf(body, await signedHeaders(body))).toBe(202);
+            expect(scheduled).toHaveLength(0);
+        });
+
+        it("filters a non-JSON body, fail closed", async () => {
+            const { scheduled, statusOf } = await setup({ ...SIGNED_TRIGGER, filters: [{ op: "not_exists", path: "x" }] });
+
+            expect(await statusOf("plain text", await signedHeaders("plain text"))).toBe(202);
+            expect(scheduled).toHaveLength(0);
+        });
+
+        it("never evaluates an unsigned body, and charges nothing for it", async () => {
+            const { history, statusOf } = await setup(FILTERED_TRIGGER);
+
+            expect(await statusOf("{}", { "x-neore-timestamp": String(Math.floor(NOW / 1000)), "x-signature-256": "sha256=00" })).toBe(401);
+            expect(await history()).toHaveLength(0);
+        });
+
+        it("keeps the claim, so a replay of a filtered delivery is a duplicate and writes nothing", async () => {
+            const { history, post } = await setup(FILTERED_TRIGGER);
+            const body = '{"action":"closed"}';
+            const headers = await signedHeaders(body);
+
+            const first = await post(body, headers);
+
+            expect(first.status).toBe(202);
+
+            const replay = await post(body, headers);
+
+            expect(replay.status).toBe(200);
+            expect(await replay.json()).toMatchObject({ duplicate: true });
+            expect(await history()).toHaveLength(1);
+        });
+
+        it("collapses consecutive filtered deliveries into one history row, and a run starts a new one", async () => {
+            const { history, statusOf } = await setup(FILTERED_TRIGGER);
+            const miss = async (n: number) => {
+                const body = `{"action":"closed","n":${String(n)}}`;
+
+                return await statusOf(body, await stampOf(body, Math.floor(NOW / 1000)));
+            };
+
+            expect(await miss(1)).toBe(202);
+            expect(await miss(2)).toBe(202);
+            expect(await miss(3)).toBe(202);
+            expect(await history()).toHaveLength(1);
+        });
+
+        it("gives the claim back when the filtered row cannot be written, so the sender's retry is evaluated", async () => {
+            const { post, scheduler } = await setup(FILTERED_TRIGGER);
+            const body = '{"action":"closed"}';
+            const headers = await signedHeaders(body);
+
+            scheduler.recordFails = true;
+            const failed = await post(body, headers);
+
+            expect(failed.status).toBe(500);
+
+            scheduler.recordFails = false;
+
+            const retried = await post(body, headers);
+
+            expect(retried.status).toBe(202);
+        });
+
+        it("still charges the delivery limit, since the sender is proven", async () => {
+            const { statusOf } = await setup(FILTERED_TRIGGER);
+
+            expect(await statusOf('{"action":"closed"}', await signedHeaders('{"action":"closed"}'))).toBe(202);
+            expect(rateLimit.charged).toBe(1);
         });
     });
 
