@@ -208,6 +208,24 @@ describe("thread relationships", () => {
 
         expect(children.map((child) => child._id)).toEqual([ownChild]);
     });
+
+    it("a viewer granted a sub-agent child is given neither the relation to its parent nor the parent's title", async () => {
+        const parent = await newThread(OWNER, { title: "Private parent title" });
+        const child = await newThread(OWNER, { title: "Sub-agent task" });
+
+        await run(async (context) => {
+            await context.db.insert("threadRelationships", { branchType: "subagent", createdAt: 0, parentThreadId: parent, threadId: child, userId: OWNER });
+            // Read access to the child alone: nothing on the parent.
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId: child, userId: GRANTEE });
+        });
+
+        const relation = procedureAt("agent_threads", "getThreadRelationship");
+
+        expect(await as(GRANTEE).query(relation, { threadId: child } as never)).toBeNull();
+        expect(await as(STRANGER).query(relation, { threadId: child } as never)).toBeNull();
+        expect(await as(GRANTEE).query(procedureAt("chat_functions", "getThread"), { threadId: parent } as never)).toBeNull();
+        expect(await as(OWNER).query(relation, { threadId: child } as never)).toMatchObject({ branchType: "subagent", parentThreadId: parent });
+    });
 });
 
 describe("thread sharing", () => {
