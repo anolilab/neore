@@ -33,7 +33,7 @@ vi.mock("@lunora/react", async (importOriginal) => {
             }
 
             if (streamArgs?.kind === "deltas" && harness.serve) {
-                const cursor = (streamArgs as unknown as { cursors: { cursor: number }[] }).cursors[0]?.cursor ?? 0;
+                const cursor = (args.streamArgs as { cursors: { cursor: number }[] }).cursors[0]?.cursor ?? 0;
 
                 return { streams: { deltas: harness.serve(cursor) } };
             }

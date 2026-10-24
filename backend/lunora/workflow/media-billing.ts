@@ -14,7 +14,7 @@ import type { ExecutionContext, WorkflowNode } from "./core";
 import type { RunAccount } from "./run-setup";
 import { isVideoNode } from "./video-inputs";
 
-export type MediaKind = "Audio" | "Image" | "Video";
+type MediaKind = "Audio" | "Image" | "Video";
 
 const IMAGE_NODE_TYPES = new Set([
     "background-removal",
@@ -66,7 +66,7 @@ const MAX_IMAGES_PER_NODE = 4;
 
 /** The number of images an image node asks for, clamped to the cap; a request carries whatever the client sent. */
 export const imageCountOf = (numberImages: number | undefined): number =>
-    Math.min(MAX_IMAGES_PER_NODE, Math.max(1, Math.trunc(Number(numberImages ?? 1)) || 1));
+    Math.min(MAX_IMAGES_PER_NODE, Math.max(1, Math.trunc(Number(numberImages)) || 1));
 
 /**
  * Takes `count` daily units for one node run, right before the paid call that uses them. A spent quota throws

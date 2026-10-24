@@ -903,15 +903,9 @@ export const checkRateLimit = async (
             throw error;
         }
 
-        if (failMode === "open") {
-            console.error("[rate-limit] check failed open", { error, operation });
+        console.error(`[rate-limit] check failed ${failMode}`, { error, operation });
 
-            return { ok: true };
-        }
-
-        console.error("[rate-limit] check failed closed", { error, operation });
-
-        return { ok: false };
+        return { ok: failMode === "open" };
     }
 };
 

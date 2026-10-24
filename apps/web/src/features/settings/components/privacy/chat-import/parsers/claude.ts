@@ -57,9 +57,9 @@ const parseISOTimestamp = (iso?: string): number | undefined => {
  * Parse a single Claude conversation object.
  */
 const parseClaudeConversation = (conv: ClaudeConversation): NormalizedConversation | null => {
-    const rawMessages = Array.isArray(conv?.chat_messages) ? conv.chat_messages : undefined;
+    const rawMessages = conv?.chat_messages;
 
-    if (!rawMessages || rawMessages.length === 0) {
+    if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
         return null;
     }
 

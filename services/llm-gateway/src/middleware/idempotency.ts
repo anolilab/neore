@@ -98,8 +98,8 @@ export const idempotencyMiddleware = createMiddleware<HonoEnv>(async (c, next) =
     // (5xx, 408, 429) so a retry can reach a healthy backend instead of
     // replaying a poisoned error indefinitely. A 422 from structured-output
     // repair depends on the sample, not the request, so it is never cached
-    // either. Skip non-2xx unless the
-    // 4xx is a deterministic client error that won't change on retry.
+    // either. Skip non-2xx unless the 4xx is a deterministic client error
+    // that won't change on retry.
     const isSuccess = responseStatus >= 200 && responseStatus < 300;
     const isClientError = responseStatus >= 400 && responseStatus < 500;
     const isTransientClient = TRANSIENT_CLIENT_STATUSES.has(responseStatus);

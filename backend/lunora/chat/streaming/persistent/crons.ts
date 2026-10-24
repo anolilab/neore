@@ -25,12 +25,13 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
         // A run that died without reaching `failRun` (evicted, or a dropped redelivery)
         // leaves its thread `running`; nothing else resets it. A newer live stream on the
         // thread means another run owns that status.
-        const thread = await ctx.db.threads.findFirst({ where: { _id: stream.threadId as Id<"threads"> } });
-        const live = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId: stream.threadId } });
+        const threadId = stream.threadId as Id<"threads">;
+        const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
+        const live = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId } });
         // An edit streams through `streamingMessages` instead, and it holds the same running status.
         const liveEdit = await ctx.db
             .query("streamingMessages")
-            .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", stream.threadId as Id<"threads">).eq("stateKind", "streaming"))
+            .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", threadId).eq("stateKind", "streaming"))
             .take(1);
 
         if (thread?.status === "running" && !live && liveEdit.length === 0) {

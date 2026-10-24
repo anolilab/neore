@@ -192,9 +192,8 @@ const useDeltaStreams = <Query extends StreamQuery<any> = StreamQuery<object>>(
             const { streamId } = streamMessage;
             const old = state.deltaStreams?.find((ds) => ds.streamMessage.streamId === streamId);
             const streamDeltas = newDeltasByStreamId.get(streamId);
-            const isReset = resetStreamIds.has(streamId);
 
-            if (isReset) {
+            if (resetStreamIds.has(streamId)) {
                 return { deltas: [], streamMessage };
             }
 

@@ -274,7 +274,7 @@ export const updateTrigger = authMutation
             assertCronExpression(args.cronExpression);
             patch.cronExpression = args.cronExpression;
 
-            if (trigger.enabled === true && trigger.type === "schedule" && nextTriggerAt === undefined) {
+            if (trigger.enabled === true && isSchedule && nextTriggerAt === undefined) {
                 throw new LunoraError("BAD_REQUEST", "This schedule never fires within the next 28 years. Check its day and month.");
             }
         }

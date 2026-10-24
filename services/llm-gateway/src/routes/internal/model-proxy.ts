@@ -362,6 +362,7 @@ modelProxyRouter.openapi(
                                 }
 
                                 default: {
+                                    // Other stream parts carry no usage or text to count.
                                     break;
                                 }
                             }

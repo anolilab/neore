@@ -6,7 +6,7 @@ import { calculateCost, extractPricing, PricingService } from "../providers/pric
 import sample from "./fixtures/models-dev.sample.json";
 import { createMockEnv, MockKVNamespace } from "./helpers/mock-env.js";
 
-const fixture = sample as ModelsDevelopmentData;
+const fixture: ModelsDevelopmentData = sample;
 
 describe("calculateCost", () => {
     const GPT4O_PRICING: ModelPricing = {
@@ -137,10 +137,10 @@ describe("extractPricing (provider-keyed models.dev document)", () => {
     });
 
     describe("two providers list one model id at different prices", () => {
-        const twoProviders = {
+        const twoProviders: ModelsDevelopmentData = {
             freeHost: { models: { "shared-model": { cost: { input: 0, output: 0 } } } },
             paidHost: { models: { "shared-model": { cost: { input: 4, output: 8 } } } },
-        } as unknown as ModelsDevelopmentData;
+        };
 
         it("bills the hinted provider's explicit free price, not another provider's paid one", () => {
             expect(extractPricing(twoProviders, "shared-model", "freeHost")).toMatchObject({ inputPerMillion: 0, outputPerMillion: 0 });

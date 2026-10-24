@@ -264,6 +264,7 @@ export const DefaultSourceGroup: FC<{ firstIndex?: number; sources: (SourceDocum
         return null;
     }
 
+    const first = firstIndex ?? 1;
     const sourceUrls = sources.filter((s): s is SourceUrlPart => s.type === "source-url").map((s) => s.url);
 
     return (
@@ -272,17 +273,10 @@ export const DefaultSourceGroup: FC<{ firstIndex?: number; sources: (SourceDocum
             <SourcesContent>
                 {sources.map((source, index) => {
                     if (source.type === "source-url") {
-                        return (
-                            <Source
-                                href={safeHttpUrl(source.url) ?? "#"}
-                                index={index + (firstIndex ?? 1)}
-                                key={source.sourceId}
-                                title={source.title || source.url}
-                            />
-                        );
+                        return <Source href={safeHttpUrl(source.url) ?? "#"} index={index + first} key={source.sourceId} title={source.title || source.url} />;
                     }
 
-                    return <Source href="#" index={index + (firstIndex ?? 1)} key={source.sourceId} title={source.title || source.filename || t`Document`} />;
+                    return <Source href="#" index={index + first} key={source.sourceId} title={source.title || source.filename || t`Document`} />;
                 })}
             </SourcesContent>
         </Sources>
