@@ -103,13 +103,15 @@ export const useUpdateUserSettings = () => {
 
         settingsWrites.pending += 1;
 
-        const run = settingsWrites.tail.then(() => {
-            const latest = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
+        const run = settingsWrites.tail.then(async () => {
+            const entryNow = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey });
+            const rebuilt = cacheEntry !== undefined && entryNow !== cacheEntry;
+            const cached = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
+            // A rebuilt cache may not have its row yet. The server's row for this session says whose settings they are.
+            const latest = owner !== undefined && cached === undefined ? await queryClient.fetchQuery(queryOptions) : cached;
 
             // The account changed while this write waited (sign-in over a guest clears the cache): sending it now would store
             // the old account's edit on the new one. The caller sees a failed save.
-            const entryNow = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey });
-            const rebuilt = cacheEntry !== undefined && entryNow !== cacheEntry;
             const accountChanged = owner === undefined ? rebuilt : latest?.userId !== owner;
 
             if (accountChanged) {

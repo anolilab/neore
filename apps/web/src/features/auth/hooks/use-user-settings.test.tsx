@@ -13,7 +13,10 @@ import { useUpdateUserSettings } from "./use-user-settings";
 const QUERY_KEY = ["getUserSettings"];
 
 const harness = vi.hoisted(() => {
-    return { sent: [] as { fail: () => void; release: () => void; value: string | undefined }[] };
+    return {
+        sent: [] as { fail: () => void; release: () => void; value: string | undefined }[],
+        serverRow: undefined as { threadTitleInstructions: string; userId: string } | undefined,
+    };
 });
 
 const sendSave = (body: { threadTitleInstructions?: string }) =>
@@ -29,7 +32,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                     functions: {
                         getUserSettings: {
                             queryOptions: () => {
-                                return { queryKey: ["getUserSettings"] };
+                                return { queryFn: async () => harness.serverRow ?? null, queryKey: ["getUserSettings"] };
                             },
                         },
                         updateUserSettings: {
@@ -51,6 +54,7 @@ const setup = () => {
 
     queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "" });
     harness.sent = [];
+    harness.serverRow = undefined;
 
     const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 
@@ -238,6 +242,61 @@ describe("useUpdateUserSettings.updateLatest", () => {
 
         // Each write sends the newest cached value when its turn comes, so both carry "Edited".
         expect(harness.sent.map((request) => request.value)).toEqual(["Edited", "Edited"]);
+    });
+
+    it("sends a queued edit when the rebuilt cache has no row and the server's row is the same account's", async () => {
+        const { queryClient, result } = setup();
+
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "", userId: "member" });
+
+        act(() => {
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "First" };
+            });
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "Edited" };
+            });
+        });
+        await flush();
+
+        // Same-account session switch: the cache is rebuilt and its row has not loaded yet when the queued edit runs.
+        queryClient.clear();
+        harness.serverRow = { threadTitleInstructions: "Server", userId: "member" };
+
+        await act(async () => {
+            harness.sent[0]?.release();
+            await Promise.resolve();
+        });
+        await flush();
+
+        expect(harness.sent.map((request) => request.value)).toEqual(["Edited", "Edited"]);
+    });
+
+    it("refuses a queued edit when the server's row belongs to another account", async () => {
+        const { queryClient, result } = setup();
+
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "", userId: "member" });
+
+        act(() => {
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "First" };
+            });
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "Edited" };
+            });
+        });
+        await flush();
+
+        queryClient.clear();
+        harness.serverRow = { threadTitleInstructions: "Other", userId: "someone-else" };
+
+        await act(async () => {
+            harness.sent[0]?.release();
+            await Promise.resolve();
+        });
+        await flush();
+
+        expect(harness.sent).toHaveLength(1);
     });
 
     it("leaves the new account's cache alone when a save of the previous account fails", async () => {
