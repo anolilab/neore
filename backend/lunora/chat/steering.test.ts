@@ -271,8 +271,11 @@ describe("a deleted thread", () => {
         await harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { threadId }));
 
         expect(await harness.run(async (ctx: any) => await ctx.db.get(threadId))).toBeNull();
-        expect((await steersOnStream()).map((entry) => entry.status)).toStrictEqual(["delivered", "delivered"]);
-        expect((await steersOnStream()).every((entry) => entry.text === undefined)).toBe(true);
+
+        const remaining = await steersOnStream();
+
+        expect(remaining.map((entry) => entry.status)).toStrictEqual(["delivered", "delivered"]);
+        expect(remaining.every((entry) => entry.text === undefined)).toBe(true);
     });
 });
 
