@@ -180,4 +180,32 @@ describe("useUpdateUserSettings.updateLatest", () => {
 
         expect(harness.sent).toHaveLength(1);
     });
+
+    it("still sends a queued write when the cache was rebuilt for the same account", async () => {
+        const { queryClient, result } = setup();
+
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "", userId: "member" });
+
+        act(() => {
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "First" };
+            });
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "Second" };
+            });
+        });
+        await flush();
+
+        // Switching between sessions of one account clears the cache; the same row comes back from the server.
+        queryClient.clear();
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "First", userId: "member" });
+
+        await act(async () => {
+            harness.sent[0]?.release();
+            await Promise.resolve();
+        });
+        await flush();
+
+        expect(harness.sent).toHaveLength(2);
+    });
 });
