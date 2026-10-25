@@ -33,6 +33,22 @@ const MCP_CALL_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_ROOTS: usize = 20;
 const MAX_MCP_SERVERS: usize = 20;
 const AUDIT_MAX_BYTES: u64 = 5 * 1024 * 1024;
+/// The pairing, when its secret is usable. A pairing whose keychain entry could not be read loads with an empty secret;
+/// an HMAC keyed with the empty string is public, so such a pairing must refuse every call and manifest until the
+/// keychain answers on a later load.
+fn usable_pairing(settings: &Settings) -> Result<Pairing, String> {
+    let pairing = settings
+        .pairing
+        .clone()
+        .ok_or("this computer is not paired")?;
+
+    if pairing.secret.is_empty() {
+        return Err("the pairing secret is unavailable: the keychain could not be read".into());
+    }
+
+    Ok(pairing)
+}
+
 /// How long a pairing waits for its confirmation click.
 const PAIRING_WAIT: Duration = Duration::from_secs(5 * 60);
 
@@ -288,10 +304,7 @@ impl DeviceState {
     /// Verifies, asks, runs and signs one call the page relayed.
     pub fn execute(&self, signed: &Signed) -> Result<Signed, String> {
         let settings = self.settings();
-        let pairing = settings
-            .pairing
-            .clone()
-            .ok_or("this computer is not paired")?;
+        let pairing = usable_pairing(&settings)?;
         let call = envelope::verify_call(
             &pairing.secret,
             &pairing.device_id,
@@ -430,10 +443,7 @@ impl DeviceState {
     /// The signed tool list, for the backend to offer the agent.
     pub fn manifest(&self) -> Result<Signed, String> {
         let settings = self.settings();
-        let pairing = settings
-            .pairing
-            .clone()
-            .ok_or("this computer is not paired")?;
+        let pairing = usable_pairing(&settings)?;
         let mut tools = builtin_tools(&shareable_roots(&settings.roots));
         let mut mcp_tools = HashMap::new();
 
@@ -1014,6 +1024,30 @@ pub fn validate_servers(servers: &[McpServerConfig]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pairing_whose_secret_is_unavailable_is_not_usable() {
+        let unavailable = Settings {
+            pairing: Some(Pairing {
+                account_label: "me".into(),
+                device_id: "dev1".into(),
+                secret: String::new(),
+            }),
+            ..Default::default()
+        };
+        let usable = Settings {
+            pairing: Some(Pairing {
+                account_label: "me".into(),
+                device_id: "dev1".into(),
+                secret: "k".repeat(64),
+            }),
+            ..Default::default()
+        };
+
+        assert!(usable_pairing(&unavailable).is_err());
+        assert!(usable_pairing(&usable).is_ok());
+        assert!(usable_pairing(&Settings::default()).is_err());
+    }
 
     #[test]
     fn a_disconnected_shared_folder_survives_an_unrelated_save() {
