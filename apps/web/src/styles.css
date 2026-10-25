@@ -28,8 +28,9 @@
    the markdown renderer both use them), which read the `--text-*` tokens, so the tokens are scaled
    on `.message-text` only: the content wrapper of a user or assistant message (message-item.tsx).
    Timestamps and the action bar are siblings of it, and the sidebar and chrome sit outside, so they
-   keep their size. A font-size on the list itself would not reach that text, and would also resize
-   the `ch`-based --thread-max-width column.
+   keep their size. So do the embedded file viewers (chat-ui's message-content.tsx): they carry
+   `.message-text-fixed`, which re-declares the tokens at scale 1. A font-size on the list itself
+   would not reach the text, and would also resize the `ch`-based --thread-max-width column.
    Unlayered on purpose so the line-height rule wins over Tailwind's `leading-7` utility. */
 :root[data-chat-text-size="small"] {
     --chat-text-scale: 0.875;
@@ -39,7 +40,8 @@
     --chat-text-scale: 1.125;
 }
 
-:root[data-chat-text-size] .message-text {
+:root[data-chat-text-size] .message-text,
+:root[data-chat-text-size] .message-text-fixed {
     --text-xs: calc(0.75rem * var(--chat-text-scale));
     --text-sm: calc(0.875rem * var(--chat-text-scale));
     --text-base: calc(1rem * var(--chat-text-scale));
@@ -52,6 +54,14 @@
 :root[data-chat-text-size] .message-text.leading-7,
 :root[data-chat-text-size] .message-text .leading-7 {
     line-height: calc(1.75rem * var(--chat-text-scale));
+}
+
+:root[data-chat-text-size] .message-text-fixed {
+    --chat-text-scale: 1;
+}
+
+:root[data-chat-text-size] .message-text .message-text-fixed .leading-7 {
+    line-height: 1.75rem;
 }
 
 .thread-viewport > [data-radix-scroll-area-content] {

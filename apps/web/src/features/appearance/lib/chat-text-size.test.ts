@@ -121,7 +121,8 @@ describe("persisted chat text size", () => {
     });
 });
 
-const TOKEN_RULE = /:root\[data-chat-text-size\] \.message-text \{([^}]*)\}/;
+const TOKEN_RULE = /:root\[data-chat-text-size\] \.message-text,\s*:root\[data-chat-text-size\] \.message-text-fixed \{([^}]*)\}/;
+const FIXED_RULE = /:root\[data-chat-text-size\] \.message-text-fixed \{\s*--chat-text-scale: 1;\s*\}/;
 const LIST_SCOPED_RULE = /data-chat-text-size\][^{]*\.message-list/;
 const ROOT_TOKEN_RULE = /:root\[data-chat-text-size[^\]]*\]\s*\{[^}]*--text-/;
 
@@ -142,6 +143,10 @@ describe("chat text size styles", () => {
 
         expect(css).not.toMatch(ROOT_TOKEN_RULE);
         expect(css).not.toMatch(LIST_SCOPED_RULE);
+    });
+
+    it("lets embedded viewers opt out of the scale with .message-text-fixed", () => {
+        expect(css).toMatch(FIXED_RULE);
     });
 
     it("has no rule for the default size, so it changes nothing", () => {

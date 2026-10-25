@@ -279,4 +279,13 @@ describe("message list text size hook", () => {
             expect(timestamp.closest(".message-text")).toBeNull();
         }
     });
+
+    it("marks a system note as message text too", () => {
+        harness.messages = [{ ...makeMessage(0, "system note"), role: "system" } as UIMessage];
+        harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
+
+        mountInto();
+
+        expect(screen.getByText("system note").closest(".message-text")).not.toBeNull();
+    });
 });

@@ -223,7 +223,7 @@ const DefaultAssistantMessage: FC<AssistantMessageRendererProps> = ({ actionBar,
  */
 const DefaultSystemMessage: FC<SystemMessageRendererProps> = ({ children }) => (
     <Message
-        className="mx-auto mb-4 max-w-(--thread-max-width) rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+        className="message-text mx-auto mb-4 max-w-(--thread-max-width) rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
         from="system"
     >
         <span className="sr-only">

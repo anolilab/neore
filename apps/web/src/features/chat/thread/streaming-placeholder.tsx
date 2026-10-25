@@ -645,7 +645,9 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
     if (compact) {
         return (
             <div className={cn("streaming-placeholder-compact", className)}>
-                <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                <div className="message-text">
+                    <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                </div>
                 {metricsBar}
             </div>
         );
@@ -664,7 +666,9 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                 </span>
                 <MessageContentWrapper className="text-foreground col-span-2 col-start-2 row-start-1 leading-7 wrap-break-word dark:text-white">
                     {speaker && <SpeakerChip className="mb-1" name={speaker.name} />}
-                    <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                    <div className="message-text leading-7">
+                        <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                    </div>
                     {metricsBar}
                 </MessageContentWrapper>
             </Message>
@@ -696,7 +700,7 @@ export const ThinkingPlaceholder: FC<ThinkingPlaceholderProps> = memo(({ classNa
             <span className="sr-only">
                 <Trans>Assistant Reply:</Trans>{" "}
             </span>
-            <MessageContentWrapper className="text-foreground col-span-2 col-start-2 row-start-1 leading-7 wrap-break-word dark:text-white">
+            <MessageContentWrapper className="message-text text-foreground col-span-2 col-start-2 row-start-1 leading-7 wrap-break-word dark:text-white">
                 <span className="animate-pulse text-gray-400">
                     <Trans>Thinking...</Trans>
                 </span>
