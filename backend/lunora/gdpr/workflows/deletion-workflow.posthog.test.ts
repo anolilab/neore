@@ -13,7 +13,7 @@ interface Call {
 }
 
 /** Runs the real handler against a context whose steps record calls; the PostHog step returns `postHog`, or throws it when it is an Error. */
-const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error) => {
+const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error, minimiseFails = false) => {
     const calls: Call[] = [];
     let current = "";
 
@@ -23,6 +23,10 @@ const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error
         calls.push({ args, name });
 
         // Batched steps are drained until `hasMore` is false; everything else returns null.
+        if (minimiseFails && current === "minimise-gdpr-records-posthog-failed") {
+            throw new Error("minimise failed");
+        }
+
         if (current === "erase-post-hog-person") {
             if (postHog instanceof Error) {
                 throw postHog;
@@ -96,6 +100,32 @@ describe("account deletion workflow, PostHog step", () => {
 
         expect(JSON.parse(audit?.args.details as string)).toStrictEqual({ requestId: "req-1" });
         expect(stepNames(calls)).toContain("log-audit-posthog-failed");
+    });
+
+    it("minimises the request records after the failure audit when the PostHog step is exhausted", async () => {
+        const failure = new Error("[GDPR/PostHog] Failed to delete person user-1: 503 Service Unavailable");
+        const { calls, outcome } = await runWorkflow(failure);
+
+        expect(outcome).toBe(failure);
+
+        const names = stepNames(calls);
+
+        expect(names.indexOf("minimise-gdpr-records-posthog-failed")).toBeGreaterThan(names.indexOf("log-audit-posthog-failed"));
+
+        const minimise = calls.find((call) => call.name.startsWith("minimise-gdpr-records-posthog-failed|"));
+
+        expect(minimise?.args).toStrictEqual({ userId: "user-1" });
+
+        const failed = calls.find((call) => call.args.status === "failed");
+
+        expect(String(failed?.args.errorMessage)).not.toContain("a@example.com");
+    });
+
+    it("still reports the PostHog error when the minimisation step fails too", async () => {
+        const failure = new Error("[GDPR/PostHog] Failed to delete person user-1: 503 Service Unavailable");
+        const { outcome } = await runWorkflow(failure, true);
+
+        expect(outcome).toBe(failure);
     });
 
     it("never marks a request failed when the PostHog step succeeds", async () => {

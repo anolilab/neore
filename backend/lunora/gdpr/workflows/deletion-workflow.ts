@@ -378,6 +378,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     }),
             );
 
+            // The failed request must not keep the email either: minimise after the failure audit,
+            // as on the success path. Its own failure must not replace the PostHog error the
+            // instance reports; a re-run minimises again (the step is idempotent).
+            try {
+                await context.step.do(
+                    "minimise-gdpr-records-posthog-failed",
+                    async () => await context.run(steps.minimiseGdprRecords, { userId: args.userId }),
+                );
+            } catch {
+                // Deliberately swallowed: `error` below is the root cause.
+            }
+
             throw error;
         }
 
