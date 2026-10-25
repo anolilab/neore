@@ -32,3 +32,11 @@ export const POSTHOG_RETRY_WATCHDOG_MS = 2 * 60 * 60 * 1000;
  * alone; one that finds it lapsed (the first delivery died mid-run) takes the attempt over.
  */
 export const POSTHOG_RETRY_LEASE_MS = 10 * 60 * 1000;
+
+/**
+ * At most one deletion confirmation email per request, whichever path sends it (the workflow's
+ * success path or the scheduled analytics-erasure retry): both claim this scope, keyed on the
+ * request id, before they send. Past the whole retry chain (about 79 hours) plus redelivery.
+ */
+export const DELETION_CONFIRMATION_EMAIL_SCOPE = "gdpr-deletion-confirmed-email";
+export const DELETION_CONFIRMATION_CLAIM_TTL_MS = 14 * 24 * 60 * 60 * 1000;

@@ -22,6 +22,7 @@ const runWorkflow = async (
     auditFails = false,
     statusFails = false,
     scheduleFails: boolean | number = false,
+    isEmailClaimTaken = false,
 ) => {
     const calls: Call[] = [];
     const stepRetries: string[] = [];
@@ -56,6 +57,11 @@ const runWorkflow = async (
         if (scheduleFailuresLeft > 0 && current === "schedule-post-hog-retry") {
             scheduleFailuresLeft -= 1;
             throw new Error("scheduling failed");
+        }
+
+        // The claim mutation answers `false` for a key the scheduled retry (or an earlier run) already holds.
+        if (current === "claim-deletion-confirmed-email") {
+            return !isEmailClaimTaken;
         }
 
         if (auditFails && current === "log-audit-posthog-failed") {
@@ -310,6 +316,23 @@ describe("account deletion workflow, PostHog step", () => {
         const audit = calls.find((call) => call.args.action === "deletion_completed");
 
         expect(JSON.parse(audit?.args.details as string)).toStrictEqual({ posthog: "deleted", requestId: "req-1" });
+    });
+
+    it("claims the shared confirmation key before it mails, so a retry that completed the request mails nothing twice", async () => {
+        const { calls } = await runWorkflow("deleted");
+        const names = stepNames(calls);
+        const claim = calls.find((call) => call.name.startsWith("claim-deletion-confirmed-email|"));
+
+        expect(names.indexOf("claim-deletion-confirmed-email")).toBeGreaterThan(-1);
+        expect(names.indexOf("claim-deletion-confirmed-email")).toBeLessThan(names.indexOf("send-deletion-confirmed-email-action"));
+        expect(claim?.args).toMatchObject({ key: "req-1", scope: "gdpr-deletion-confirmed-email" });
+
+        const taken = await runWorkflow("deleted", false, false, false, false, true);
+
+        expect(taken.outcome).toBe("resolved");
+        expect(completionMarked(taken.calls)).toBe(true);
+        expect(stepNames(taken.calls)).not.toContain("send-deletion-confirmed-email-action");
+        expect(stepNames(taken.calls)).toContain("minimise-gdpr-records");
     });
 
     it("completes on no_profile (nothing to erase) and records it as such, not as deleted", async () => {

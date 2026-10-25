@@ -23,7 +23,7 @@ import type { Id } from "../../_generated/dataModel";
 import { gdprLogger } from "../../lib/logger";
 import { ROOT_SHARD_KEY } from "../../lib/shard-context";
 import { onUserShard } from "../../lib/workflow-shard";
-import { POSTHOG_FAILED_MESSAGE } from "../constants";
+import { DELETION_CONFIRMATION_CLAIM_TTL_MS, DELETION_CONFIRMATION_EMAIL_SCOPE, POSTHOG_FAILED_MESSAGE } from "../constants";
 
 export interface DeletionParams {
     requestId: Id<"gdprRequests">;
@@ -457,13 +457,35 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             status: "completed",
         });
 
-        await context.step.do(
-            "send-deletion-confirmed-email-action",
-            async () =>
-                await context.run(internal.gdpr.steps.email_steps.sendDeletionConfirmedEmailAction, {
-                    userEmail: args.userEmail,
-                }),
+        // One confirmation per request: the scheduled analytics retry claims the same key, so a
+        // re-run and a retry that both complete the request cannot both mail it. The claim is its
+        // own step, so a send step that is re-run after a stop does not find its own claim taken.
+        const emailClaim = { key: args.requestId, scope: DELETION_CONFIRMATION_EMAIL_SCOPE };
+        const isEmailClaimed = await context.step.do(
+            "claim-deletion-confirmed-email",
+            async () => await context.run(internal.lib.claim_once.claimKey, { ...emailClaim, ttlMs: DELETION_CONFIRMATION_CLAIM_TTL_MS }),
         );
+
+        if (isEmailClaimed) {
+            try {
+                await context.step.do(
+                    "send-deletion-confirmed-email-action",
+                    async () =>
+                        await context.run(internal.gdpr.steps.email_steps.sendDeletionConfirmedEmailAction, {
+                            userEmail: args.userEmail,
+                        }),
+                );
+            } catch (error) {
+                try {
+                    // The send is exhausted: give the claim back so a re-run (or the retry) can still mail it.
+                    await context.run(internal.lib.claim_once.releaseKey, emailClaim);
+                } catch {
+                    // Best-effort: the send error below is the root cause.
+                }
+
+                throw error;
+            }
+        }
 
         await context.step.do(
             "log-audit",

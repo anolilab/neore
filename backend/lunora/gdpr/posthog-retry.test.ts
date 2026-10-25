@@ -14,6 +14,7 @@ import { updateRequestProgress } from "./functions";
 import {
     expireStalePostHogRetry,
     failPostHogRetry,
+    recordPostHogErased,
     recordPostHogRetrySuccess,
     retryPostHogErasure,
     schedulePostHogRetry,
@@ -545,7 +546,8 @@ describe("the watchdog", () => {
 });
 
 describe("a redelivered attempt", () => {
-    const claim = async (n: number) => await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: n, chain: 1, requestId, userId: USER }));
+    const claim = async (n: number) =>
+        (await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: n, chain: 1, requestId, userId: USER }))) !== "skip";
 
     it("finishes a request its own interrupted attempt left processing", async () => {
         expect(await claim(1)).toBe(true);
@@ -754,6 +756,199 @@ describe("attempt deduplication", () => {
         expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
         // The queued attempt 1 and its successor, each once.
         expect(jobs().map((job) => (job.args as { attempt: number }).attempt)).toStrictEqual([1, 2]);
+    });
+});
+
+describe("a newer chain, a concurrent re-run and a stopped attempt", () => {
+    const EMAIL_SCOPE = "gdpr-deletion-confirmed-email";
+    const start = async (n: number, chain = 1) =>
+        await run(async (ctx) => await ctx.runMutation(startPostHogRetry, { attempt: n, chain, requestId, userId: USER }));
+    const erased = async (n: number, posthog: "deleted" | "no_profile" = "deleted", chain = 1) =>
+        await run(async (ctx) => await ctx.runMutation(recordPostHogErased, { attempt: n, chain, posthog, requestId, userId: USER }));
+    const failedRun = async () =>
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("gdprAuditLog", {
+                    action: "deletion_failed",
+                    details: JSON.stringify({ requestId }),
+                    performedBy: "system",
+                    timestamp: NOW,
+                    userId: USER,
+                }),
+        );
+    const emailClaims = async () =>
+        ((await run(async (ctx) => await ctx.db.query("idempotencyClaims").collect())) as { key: string; scope: string }[]).filter(
+            (row) => row.scope === EMAIL_SCOPE && row.key === requestId,
+        );
+    const getterKey = "gdpr_posthog_retry:getRetryConfirmationEmail";
+
+    it("lets an old chain's watchdog and failure leave a request a newer chain owns alone", async () => {
+        await failedRun();
+        await start(1, 1);
+        // A workflow re-run fails again: chain 2 starts and its attempt 1 is running.
+        await failedRun();
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        expect(await start(1, 2)).toBe("erase");
+
+        await run(async (ctx) => await ctx.runMutation(expireStalePostHogRetry, { attempt: 1, chain: 1, requestId, userId: USER }));
+        await run(async (ctx) => await ctx.runMutation(failPostHogRetry, { attempt: 1, chain: 1, errorClass: "late", requestId, userId: USER }));
+
+        expect(await statusOf()).toBe("processing");
+        expect(jobs()).toHaveLength(0);
+        expect(await actions()).not.toContain("deletion_retry_failed");
+        // And an old chain's queued attempt does not start.
+        expect(await start(2, 1)).toBe("skip");
+    });
+
+    it("does not complete, or mail, a request a re-run failed while the retry's erasure was in flight", async () => {
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockImplementation(async () => {
+            await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+
+            return "deleted";
+        });
+
+        await attempt(1);
+
+        const row = await request();
+
+        expect(row.status).toBe("failed");
+        expect(row.userEmail).toBe("a@example.com");
+        expect(await actions()).toStrictEqual(["deletion_retry_started"]);
+        expect(sendEmailSpy).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing when a re-run completed the request meanwhile, and the re-run's claim keeps a second mail out", async () => {
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockImplementation(async () => {
+            await run(async (ctx) => await ctx.db.patch(requestId, { status: "completed" }));
+
+            return "deleted";
+        });
+
+        await attempt(1);
+
+        expect(sendEmailSpy).not.toHaveBeenCalled();
+        expect(await actions()).not.toContain("deletion_retry_succeeded");
+
+        // The re-run's own mail holds the shared claim: a retry that completes later finds it taken.
+        vi.mocked(erasePostHogPerson).mockReset();
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
+        await run(async (ctx) => {
+            const now = Date.now();
+
+            await ctx.db.insert("idempotencyClaims", { claimedAt: now, expiresAt: now + HOUR, key: requestId, scope: EMAIL_SCOPE });
+        });
+        await attempt(2);
+
+        expect(await statusOf()).toBe("completed");
+        expect(sendEmailSpy).not.toHaveBeenCalled();
+    });
+
+    it("finishes a redelivered attempt whose erasure was recorded, even while the lease is held", async () => {
+        await start(1);
+        await erased(1);
+        vi.setSystemTime(NOW + POSTHOG_RETRY_LEASE_MS - 1);
+
+        await attempt(1);
+
+        // PostHog is not called again, the lease did not matter, and the watchdog has nothing to fail.
+        expect(erasePostHogPerson).not.toHaveBeenCalled();
+        expect(await statusOf()).toBe("completed");
+        expect(await details("deletion_retry_succeeded")).toStrictEqual({ attempt: 1, chain: 1, posthog: "deleted", requestId });
+
+        await run(async (ctx) => await ctx.runMutation(expireStalePostHogRetry, { attempt: 1, chain: 1, requestId, userId: USER }));
+
+        expect(await actions()).not.toContain("deletion_retry_failed");
+    });
+
+    it("does not let the watchdog fail an attempt that erased: it queues the attempt again", async () => {
+        await start(1);
+        await erased(1, "no_profile");
+
+        await run(async (ctx) => await ctx.runMutation(expireStalePostHogRetry, { attempt: 1, chain: 1, requestId, userId: USER }));
+
+        expect(await statusOf()).toBe("processing");
+        expect(await actions()).not.toContain("deletion_retry_failed");
+        expect(jobs()).toHaveLength(1);
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 1, chain: 1, requestId, userId: USER });
+        expect(jobs()[0]?.scheduledFor).toBe(NOW);
+    });
+
+    it("resends a confirmation whose send stopped after the claim, once, on redelivery", async () => {
+        await setEmail("a@example.com");
+        // The first delivery erased, completed the request and claimed the mail, then stopped.
+        await start(1);
+        await erased(1);
+        await run(async (ctx) => await ctx.runMutation(recordPostHogRetrySuccess, { attempt: 1, chain: 1, posthog: "deleted", requestId, userId: USER }));
+        await run(async (ctx) => {
+            const now = Date.now();
+
+            await ctx.db.insert("idempotencyClaims", { claimedAt: now, expiresAt: now + HOUR, key: requestId, scope: EMAIL_SCOPE });
+        });
+        const before = await request();
+
+        expect(before.userEmail).toBe("a@example.com");
+
+        await attempt(1);
+
+        expect(erasePostHogPerson).not.toHaveBeenCalled();
+        expect(sendEmailSpy).toHaveBeenCalledTimes(1);
+        expect(sendEmailSpy.mock.calls[0]?.[1]).toStrictEqual({ userEmail: "a@example.com" });
+        const after = await request();
+
+        expect(after.userEmail).toBe("");
+        expect(await actions()).toContain("deletion_confirmation_sent");
+        expect(await emailClaims()).toHaveLength(1);
+
+        await attempt(1);
+
+        expect(sendEmailSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("has the watchdog queue the attempt again for a confirmation that is still owed", async () => {
+        await setEmail("a@example.com");
+        await start(1);
+        await erased(1);
+        await run(async (ctx) => await ctx.runMutation(recordPostHogRetrySuccess, { attempt: 1, chain: 1, posthog: "deleted", requestId, userId: USER }));
+
+        await run(async (ctx) => await ctx.runMutation(expireStalePostHogRetry, { attempt: 1, chain: 1, requestId, userId: USER }));
+
+        expect(jobs()).toHaveLength(1);
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 1, chain: 1, requestId, userId: USER });
+    });
+
+    it("does not mark the attempt failed when the address cannot be read: the erasure stays recorded and a redelivery mails", async () => {
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+
+        const original = registry.get(getterKey);
+
+        registry.set(getterKey, {
+            ...(original as object),
+            handler: () => {
+                throw new Error("read failed");
+            },
+        });
+
+        try {
+            await expect(attempt(1)).rejects.toThrow();
+        } finally {
+            registry.set(getterKey, original);
+        }
+
+        expect(await statusOf()).toBe("completed");
+        expect(await actions()).toStrictEqual(["deletion_completed", "deletion_retry_started", "deletion_retry_succeeded"]);
+        expect(sendEmailSpy).not.toHaveBeenCalled();
+
+        await attempt(1);
+
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(1);
+        expect(sendEmailSpy).toHaveBeenCalledTimes(1);
+        const after = await request();
+
+        expect(after.userEmail).toBe("");
     });
 });
 

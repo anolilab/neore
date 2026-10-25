@@ -3797,6 +3797,11 @@
     },
     {
       "from": "function:gdpr_posthog_retry:expireStalePostHogRetry",
+      "kind": "read",
+      "to": "table:gdprAuditLog"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:expireStalePostHogRetry",
       "kind": "write",
       "to": "table:gdprAuditLog"
     },
@@ -3807,6 +3812,11 @@
     },
     {
       "from": "function:gdpr_posthog_retry:failPostHogRetry",
+      "kind": "read",
+      "to": "table:gdprAuditLog"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:failPostHogRetry",
       "kind": "write",
       "to": "table:gdprAuditLog"
     },
@@ -3814,6 +3824,21 @@
       "from": "function:gdpr_posthog_retry:failPostHogRetry",
       "kind": "write",
       "to": "table:gdprRequests"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:getRetryConfirmationEmail",
+      "kind": "read",
+      "to": "table:gdprAuditLog"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:recordPostHogErased",
+      "kind": "read",
+      "to": "table:gdprAuditLog"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:recordPostHogRetrySuccess",
+      "kind": "read",
+      "to": "table:gdprAuditLog"
     },
     {
       "from": "function:gdpr_posthog_retry:recordPostHogRetrySuccess",
@@ -3838,7 +3863,17 @@
     {
       "from": "function:gdpr_posthog_retry:retryPostHogErasure",
       "kind": "call",
+      "to": "function:gdpr_posthog_retry:recordPostHogErased"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:retryPostHogErasure",
+      "kind": "call",
       "to": "function:gdpr_posthog_retry:recordPostHogRetrySuccess"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:retryPostHogErasure",
+      "kind": "call",
+      "to": "function:gdpr_posthog_retry:settleRetryConfirmation"
     },
     {
       "from": "function:gdpr_posthog_retry:retryPostHogErasure",
@@ -3849,6 +3884,16 @@
       "from": "function:gdpr_posthog_retry:retryPostHogErasure",
       "kind": "call",
       "to": "function:gdpr_steps_email_steps:sendDeletionConfirmedEmailAction"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:retryPostHogErasure",
+      "kind": "call",
+      "to": "function:lib_claim_once:claimKey"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:retryPostHogErasure",
+      "kind": "call",
+      "to": "function:lib_claim_once:releaseKey"
     },
     {
       "from": "function:gdpr_posthog_retry:schedulePostHogRetry",
@@ -3864,6 +3909,21 @@
       "from": "function:gdpr_posthog_retry:schedulePostHogRetry",
       "kind": "write",
       "to": "table:gdprRequests"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:settleRetryConfirmation",
+      "kind": "write",
+      "to": "table:gdprAuditLog"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:settleRetryConfirmation",
+      "kind": "write",
+      "to": "table:gdprRequests"
+    },
+    {
+      "from": "function:gdpr_posthog_retry:startPostHogRetry",
+      "kind": "read",
+      "to": "table:gdprAuditLog"
     },
     {
       "from": "function:gdpr_posthog_retry:startPostHogRetry",
@@ -11270,6 +11330,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:gdpr_posthog_retry:recordPostHogErased",
+      "kind": "function",
+      "name": "gdpr.posthog_retry.recordPostHogErased",
+      "module": "gdpr"
+    },
+    {
+      "detail": "mutation",
       "id": "function:gdpr_posthog_retry:recordPostHogRetrySuccess",
       "kind": "function",
       "name": "gdpr.posthog_retry.recordPostHogRetrySuccess",
@@ -11287,6 +11354,13 @@
       "id": "function:gdpr_posthog_retry:schedulePostHogRetry",
       "kind": "function",
       "name": "gdpr.posthog_retry.schedulePostHogRetry",
+      "module": "gdpr"
+    },
+    {
+      "detail": "mutation",
+      "id": "function:gdpr_posthog_retry:settleRetryConfirmation",
+      "kind": "function",
+      "name": "gdpr.posthog_retry.settleRetryConfirmation",
       "module": "gdpr"
     },
     {
@@ -18649,13 +18723,25 @@
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 463,
+      "line": 466,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
       "file": "gdpr/workflows/deletion-workflow",
       "kind": "call",
-      "line": 471,
+      "line": 474,
+      "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/deletion-workflow",
+      "kind": "call",
+      "line": 481,
+      "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
+    },
+    {
+      "file": "gdpr/workflows/deletion-workflow",
+      "kind": "call",
+      "line": 493,
       "reason": "\"accountDeletionWorkflowConfig\" is not a registered function"
     },
     {
@@ -19015,67 +19101,67 @@
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 95,
+      "line": 96,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 95,
+      "line": 96,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 95,
+      "line": 96,
       "reason": "\"completeClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 95,
+      "line": 96,
       "reason": "\"hasClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "read",
-      "line": 95,
+      "line": 96,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 109,
+      "line": 110,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 109,
+      "line": 110,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 112,
+      "line": 113,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 112,
+      "line": 113,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 159,
+      "line": 160,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 220,
+      "line": 221,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
