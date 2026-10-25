@@ -42,15 +42,22 @@ import { showInfo } from "@/lib/toast";
 import LoadMoreTrigger from "./load-more-trigger";
 import MessageItem from "./message-item";
 import type { MessagePosition, WindowPlan } from "./message-windowing";
-import { getWindowPlan, parseMessageHash, readVirtualizeFlag, resolveJumpMessageId, resolveJumpTarget, shouldAnimateEntrance } from "./message-windowing";
+import {
+    getWindowPlan,
+    parseMessageHash,
+    readVirtualizeFlag,
+    resolveJumpMessageId,
+    resolveJumpTarget,
+    shouldAnimateEntrance,
+    shouldLoadOlderForJump,
+} from "./message-windowing";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
 // Rough height of an unmeasured row; the virtualizer corrects it on first measure.
 const ESTIMATED_ROW_HEIGHT = 160;
 
-/** How many older pages a jump may pull in looking for its target, and how big each is. */
-const JUMP_MAX_PAGES = 10;
+/** How big each older page a jump pulls in looking for its target is. */
 const JUMP_PAGE_SIZE = 50;
 
 interface ScrollToMessageDetail {
@@ -286,7 +293,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     }, []);
 
     // A jump target may not be loaded yet (paginated): remember it, pull older
-    // pages until it appears or JUMP_MAX_PAGES is spent, then jump. Scoped to a
+    // pages until it appears or the page budget is spent (see shouldLoadOlderForJump), then jump. Scoped to a
     // thread so a request made while navigating never pages through the
     // previous thread's history.
     const pendingJumpRef = useRef<PendingJump | undefined>(undefined);
@@ -351,7 +358,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 return; // This effect re-runs when the page lands.
             }
 
-            if (messagesStatus === "CanLoadMore" && pending.pagesLoaded < JUMP_MAX_PAGES) {
+            if (messagesStatus === "CanLoadMore" && shouldLoadOlderForJump(pending.pagesLoaded, jumpStateRef.current.messages, pending.position)) {
                 pending.pagesLoaded += 1;
                 jumpContextRef.current.loadMore(JUMP_PAGE_SIZE);
 
