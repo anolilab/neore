@@ -193,6 +193,7 @@
         "@vitest/browser": "catalog:test",
         "@vitest/browser-playwright": "catalog:test",
         "axe-core": "catalog:test",
+        "msw": "catalog:test",
         "babel-plugin-react-compiler": "catalog:react",
         "eslint": "catalog:lint",
         "eslint-plugin-jsx-a11y": "catalog:lint",
