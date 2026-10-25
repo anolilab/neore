@@ -4521,6 +4521,16 @@
       "to": "table:idempotencyClaims"
     },
     {
+      "from": "function:lib_claim_once:claimKeyFenced",
+      "kind": "read",
+      "to": "table:idempotencyClaims"
+    },
+    {
+      "from": "function:lib_claim_once:claimKeyFenced",
+      "kind": "write",
+      "to": "table:idempotencyClaims"
+    },
+    {
       "from": "function:lib_claim_once:purgeExpiredClaims",
       "kind": "read",
       "to": "table:idempotencyClaims"
@@ -12199,6 +12209,12 @@
     },
     {
       "detail": "mutation",
+      "id": "function:lib_claim_once:claimKeyFenced",
+      "kind": "function",
+      "name": "lib.claim_once.claimKeyFenced"
+    },
+    {
+      "detail": "mutation",
       "id": "function:lib_claim_once:completeKey",
       "kind": "function",
       "name": "lib.claim_once.completeKey"
@@ -19135,37 +19151,37 @@
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 110,
+      "line": 115,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 110,
+      "line": 115,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 113,
+      "line": 118,
       "reason": "\"claimLease\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 113,
+      "line": 118,
       "reason": "\"claimOnce\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "write",
-      "line": 160,
+      "line": 172,
       "reason": "\"releaseClaim\" is not a registered function"
     },
     {
       "file": "lib/claim-once",
       "kind": "schedule",
-      "line": 221,
+      "line": 239,
       "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
