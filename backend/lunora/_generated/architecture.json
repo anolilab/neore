@@ -19777,13 +19777,13 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 187,
+      "line": 192,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 202,
+      "line": 207,
       "reason": "the default export is not a registered function"
     },
     {
