@@ -34,7 +34,15 @@ import getAgent from "./get-agent";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
-import { asRefusedWrite, isStreamWriteRefused, originalWriteError, pipeToPersistentChunks, type PipedStream, type StreamText } from "./persist-stream";
+import {
+    asRefusedWrite,
+    isStreamWriteRefused,
+    originalWriteError,
+    pipeToPersistentChunks,
+    type PipedStream,
+    type StreamText,
+    stopWhenStopped,
+} from "./persist-stream";
 import { buildReasoningProviderOptions } from "./reasoning-options";
 import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
@@ -843,6 +851,7 @@ export const resumeApprovedRun = async (
         });
 
         streamTextArgs.abortSignal = stopping.signal;
+        streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, getMaxSteps(config.shouldAutoContinue));
 
         await options.beforeStream?.();
 

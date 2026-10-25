@@ -17,9 +17,16 @@
  * stream is drained, whatever text arrived is flushed, and a
  * {@link StreamFailedError} is thrown so the caller's catch writes the error
  * chunk and marks the thread failed.
+ *
+ * A sidebar stop ends the stream row, which a run notices on its next chunk write. A
+ * long tool step writes none, so the pipe also looks at the row: while no part has
+ * arrived for {@link STOP_POLL_MS}. A stop found that way
+ * is thrown as a refused write, the same as one found on a write, so the caller's
+ * `endStoppedRun` saves the owed text and aborts the model call and its tools.
  */
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
+import { stepCountIs } from "ai";
 import type { ActionCtx } from "../../_generated/server";
 
 /** Sentence delimiter check — same as persistent/client.ts:30. */
@@ -31,6 +38,9 @@ const hasDelimeter = (text: string) => text.includes(".") || text.includes("!") 
  * this, not the relay, sets the update cadence of punctuation-free text.
  */
 export const MAX_FLUSH_INTERVAL_MS = 150;
+
+/** How long the pipe waits without a part before it asks whether the stream was stopped. */
+export const STOP_POLL_MS = 2000;
 
 /** The model stream yielded an `error` part. `cause` is the part's raw error. */
 export class StreamFailedError extends Error {
@@ -85,6 +95,28 @@ export const asRefusedWrite = (error: unknown, pending: StreamText): unknown => 
     return code === "CONFLICT" || data?.code === "CONFLICT" ? streamWriteRefused(pending, error) : error;
 };
 
+const STOPPED = Symbol("stopped");
+
+/**
+ * Whether a sidebar stop ended the stream row: `done` is only ever written to a run's live stream by
+ * `stopActiveForThread`. A failed read is not a stop. Without `runQuery` there is nothing to ask.
+ */
+export const isStreamStopped = async (ctx: Partial<Pick<ActionCtx, "runQuery">>, streamId: string): Promise<boolean> =>
+    ctx.runQuery !== undefined &&
+    (await ctx
+        .runQuery(internal.chat.streaming.persistent.library.getStreamStatus, { streamId: streamId as Id<"persistentStreams"> })
+        .then((status) => status === "done")
+        .catch(() => false));
+
+/**
+ * The `stopWhen` for a run's `streamText`: the step cap, and a stop found after a step's tools finished, so the
+ * next model call never starts. The pipe cannot gate it, because the SDK starts the next step without waiting for a reader.
+ */
+export const stopWhenStopped = (ctx: Partial<Pick<ActionCtx, "runQuery">>, streamId: string, maxSteps: number) => [
+    stepCountIs(maxSteps),
+    async () => await isStreamStopped(ctx, streamId),
+];
+
 export interface PipedStream {
     /** Wall-clock ms of the first non-empty delta, if any. */
     firstTokenTime: number | undefined;
@@ -94,10 +126,94 @@ export interface PipedStream {
     unsaved: StreamText;
 }
 
+/**
+ * Yields `source`'s parts, and throws `onStop()` once `isStopped` answers true after `pollMs` without `lastActivityAt()`
+ * moving. The caller reports its last chunk write, not the last part: tool-input deltas and step markers never write one,
+ * so a stop during them has to be found here. A part still pending then is abandoned: the abort the caller issues
+ * next ends it, and returning the iterator now would wait on that pending read. Any other early exit closes the source.
+ */
+async function* untilStopped<T>(
+    source: AsyncIterable<T>,
+    isStopped: () => Promise<boolean>,
+    onStop: () => Error,
+    pollMs: number,
+    lastActivityAt: () => number,
+): AsyncGenerator<T> {
+    const iterator = source[Symbol.asyncIterator]();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let watching = true;
+    let stopFound = false;
+    // True only while the consumer holds a part: leaving then (a failed write) is an early exit that must close the source.
+    let consumerHoldsPart = false;
+    // The wait for the part being read, if there is one. Each wait is its own promise, so nothing long-lived holds on to a settled part.
+    let wake: (() => void) | undefined;
+    const tick = () => {
+        timer = setTimeout(async () => {
+            if (watching && Date.now() - lastActivityAt() >= pollMs && (await isStopped())) {
+                stopFound = true;
+                wake?.();
+
+                return;
+            }
+
+            if (watching) {
+                tick();
+            }
+        }, pollMs);
+    };
+
+    tick();
+
+    try {
+        while (true) {
+            // A stop found while the consumer was busy ends the run before another read, so no part is taken and dropped.
+            if (stopFound) {
+                throw onStop();
+            }
+
+            const next = iterator.next();
+            const step: IteratorResult<T> | typeof STOPPED = await new Promise<IteratorResult<T> | typeof STOPPED>((resolve, reject) => {
+                wake = () => {
+                    resolve(STOPPED);
+                };
+                next.then(resolve).catch(reject);
+            });
+
+            wake = undefined;
+
+            if (step === STOPPED) {
+                // The abandoned read may still fail once the caller aborts: nobody is left to hear it.
+                next.catch(() => undefined);
+
+                throw onStop();
+            }
+
+            if (step.done) {
+                return;
+            }
+
+            consumerHoldsPart = true;
+            yield step.value;
+            consumerHoldsPart = false;
+        }
+    } finally {
+        watching = false;
+        clearTimeout(timer);
+
+        // A consumer that left on its own error would have closed the source with a plain `for await`; do the same, so the
+        // model stream's reader is not left open. A stop leaves a read pending that the caller's abort ends, so it is not closed here.
+        if (consumerHoldsPart) {
+            await iterator.return?.().catch(() => undefined);
+        }
+    }
+}
+
 export const pipeToPersistentChunks = async (
-    ctx: Pick<ActionCtx, "runMutation">,
+    // Without `runQuery` the pipe only learns of a stop from a refused write.
+    ctx: Partial<Pick<ActionCtx, "runQuery">> & Pick<ActionCtx, "runMutation">,
     streamId: string,
     fullStream: AsyncIterable<{ error?: unknown; text?: string; type: string }>,
+    { stopPollMs = STOP_POLL_MS }: { stopPollMs?: number } = {},
 ): Promise<PipedStream> => {
     let pending: StreamText = { reasoning: "", text: "" };
     let unsaved: StreamText = { reasoning: "", text: "" };
@@ -126,9 +242,16 @@ export const pipeToPersistentChunks = async (
         lastFlushAt = Date.now();
     };
 
+    const isStopped = async () => await isStreamStopped(ctx, streamId);
+    const refusedByStop = () =>
+        streamWriteRefused({ reasoning: unsaved.reasoning + pending.reasoning, text: unsaved.text + pending.text }, new Error("Stream was stopped"));
+
     // `fullStream`, not `textStream`: reasoning deltas only exist on the full
     // stream, and the client renders them live from `persistentChunks.reasoning`.
-    for await (const part of fullStream) {
+    const startedAt = Date.now();
+    const parts = ctx.runQuery === undefined ? fullStream : untilStopped(fullStream, isStopped, refusedByStop, stopPollMs, () => lastFlushAt ?? startedAt);
+
+    for await (const part of parts) {
         let delta: string;
 
         switch (part.type) {

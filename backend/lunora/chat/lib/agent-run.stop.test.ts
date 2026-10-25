@@ -10,7 +10,7 @@ import { internal } from "../../_generated/internal";
 import { endStoppedRun, finishRun, resumeApprovedRun } from "./agent-run";
 import { buildAgentTools } from "./agent-tools";
 import getAgent from "./get-agent";
-import { streamWriteRefused } from "./persist-stream";
+import { pipeToPersistentChunks, streamWriteRefused } from "./persist-stream";
 
 // The continuation builds its agent and tools here; the test drives the stream it gets back.
 vi.mock("./get-agent", () => {
@@ -61,6 +61,38 @@ const STOP_ARGS = {
     stop: new AbortController(),
     streamId: "stream-1",
 };
+
+describe("a stop during a long tool step", () => {
+    it("is found while the run writes nothing, the reply is saved as stopped, and the tool's signal is aborted", async () => {
+        const mutations: { args: Record<string, unknown>; ref: unknown }[] = [];
+        const ctx = {
+            runMutation: vi.fn(async (ref: unknown, args: Record<string, unknown>) => {
+                mutations.push({ args, ref });
+
+                return ref === internal.chat.streaming.persistent.library.finishStoppedReply ? { messageId: "stopped-1", stopped: true } : null;
+            }),
+            runQuery: vi.fn(async () => "done"),
+        };
+        const stop = new AbortController();
+        const toolEnded = { aborted: false };
+        // The model wrote some text and is now inside a tool call that only ends when the run's signal aborts.
+        const fullStream = (async function* quietTool() {
+            yield { text: "Searching. ", type: "text-delta" };
+            await new Promise<void>((resolve) => {
+                stop.signal.addEventListener("abort", () => resolve(), { once: true });
+            });
+            toolEnded.aborted = true;
+        })();
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", fullStream, { stopPollMs: 10 }).catch((error_: unknown) => error_);
+        const saved = await endStoppedRun(ctx as never, error, { ...STOP_ARGS, result: { consumeStream: async () => undefined }, stop });
+
+        expect(saved).toStrictEqual(["stopped-1"]);
+        expect(mutations.at(-1)?.ref).toBe(internal.chat.streaming.persistent.library.finishStoppedReply);
+        expect(mutations.at(-1)?.args).toMatchObject({ pendingText: "Searching. " });
+        expect(stop.signal.aborted).toBe(true);
+        await vi.waitFor(() => expect(toolEnded.aborted).toBe(true));
+    });
+});
 
 describe(endStoppedRun, () => {
     it("saves the owed text of a refused write, then aborts the model call", async () => {
