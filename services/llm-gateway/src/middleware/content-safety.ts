@@ -103,6 +103,45 @@ export const CROSS_LANGUAGE_ALLOWLIST: ReadonlyArray<string> = [
 const checker = createChecker({ allowlist: CROSS_LANGUAGE_ALLOWLIST });
 
 /**
+ * Verdicts keyed by the SHA-256 of the checked text, oldest first. A run re-sends
+ * the same user text on every model step, so one scan serves the rest of the run.
+ * The checker is fixed per isolate, so a hit cannot return another text's verdict.
+ * Evicts the oldest entry once the cache is full.
+ */
+const VERDICT_CACHE_LIMIT = 256;
+const verdicts = new Map<string, boolean>();
+
+const digestHex = async (text: string): Promise<string> => {
+    const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+
+    return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
+/** Whether `text` contains a banned word, scanned once per distinct text. */
+const containsBannedWords = async (text: string): Promise<boolean> => {
+    const key = await digestHex(text);
+    const cached = verdicts.get(key);
+
+    if (cached !== undefined) {
+        return cached;
+    }
+
+    const verdict = checker.check(text).hasBannedWords;
+
+    verdicts.set(key, verdict);
+
+    if (verdicts.size > VERDICT_CACHE_LIMIT) {
+        const oldest = verdicts.keys().next().value;
+
+        if (oldest !== undefined) {
+            verdicts.delete(oldest);
+        }
+    }
+
+    return verdict;
+};
+
+/**
  * The message fields the extractors below read. Values stay `unknown` because
  * the body is unparsed JSON here — the runtime guards do the narrowing.
  */
@@ -221,9 +260,7 @@ export const contentSafetyMiddleware = createMiddleware<HonoEnv>(async (c, next)
         return next();
     }
 
-    const result = checker.check(textToCheck);
-
-    if (result.hasBannedWords) {
+    if (await containsBannedWords(textToCheck)) {
         // Do NOT echo the matched words back. Returning the list would let
         // any HMAC-authed caller (or anyone who reaches this handler before
         // auth runs) probe for banned terms a few requests at a time and
