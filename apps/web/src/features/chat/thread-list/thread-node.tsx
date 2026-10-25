@@ -667,7 +667,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         <TooltipTrigger
                             render={
                                 <Button
-                                    aria-label={t`Open in new window`}
+                                    aria-label={named(t`Open in new window`)}
                                     className="hover:text-primary h-6 w-6 p-0"
                                     onClick={(e) => {
                                         e.stopPropagation();
