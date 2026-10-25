@@ -17,7 +17,12 @@ const session = vi.hoisted(() => {
 });
 
 vi.mock("../auth", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("../auth")>()), getAuth: () => ({ api: { createApiKey } }) };
+    return {
+        ...(await importOriginal<typeof import("../auth")>()),
+        getAuth: () => {
+            return { api: { createApiKey } };
+        },
+    };
 });
 
 vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
@@ -36,7 +41,7 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
 
-const { ALLOWED_EXPIRY_DAYS, MAX_API_KEYS_PER_USER, createScopedApiKey, getApiKeyCreationState } = await import("./api-keys");
+const { ALLOWED_EXPIRY_DAYS, createScopedApiKey, getApiKeyCreationState, MAX_API_KEYS_PER_USER } = await import("./api-keys");
 
 const USER = "user-1";
 
@@ -111,7 +116,7 @@ describe("createScopedApiKey", () => {
         expect(createApiKey).not.toHaveBeenCalled();
     });
 
-    it.each(["", "   ", "x".repeat(33)])("refuses the name %j", async (name) => {
+    it.each(["", " ".repeat(3), "x".repeat(33)])("refuses the name %j", async (name) => {
         await expect(create({ name, scopes: ["threads:read"] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
         expect(createApiKey).not.toHaveBeenCalled();

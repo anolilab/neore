@@ -20,17 +20,17 @@ const ORG = "org-1";
 const OTHER_ORG = "org-2";
 
 const { sessionFrom, sessions, users } = vi.hoisted(() => {
-    const sessions = new Map<string, { id: string; role: string } | null>();
+    const sessionByUser = new Map<string, { id: string; role: string } | null>();
 
     return {
         sessionFrom: async (context: { auth: { userId?: string | null } }) => {
             const { userId } = context.auth;
 
             return userId
-                ? { activeOrganization: sessions.get(userId) ?? null, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, userId }
+                ? { activeOrganization: sessionByUser.get(userId) ?? null, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, userId }
                 : null;
         },
-        sessions,
+        sessions: sessionByUser,
         users: new Set<string>(),
     };
 });
@@ -88,11 +88,26 @@ const insertTeamMember = async (teamId: string, userId: string, role?: "admin" |
     await seed(async (db) => await db.insert("teamMember", { createdAt: 1, teamId, userId, ...(role && { role }) }));
 };
 
-const teamMembers = async (teamId: string): Promise<Array<{ role?: string; userId: string }>> =>
-    await seed(async (db) => (await db.teamMember.findMany({ where: { teamId } })).page);
+const teamMembers = async (teamId: string): Promise<{ role?: string; userId: string }[]> =>
+    await seed(async (db) => {
+        const { page } = await db.teamMember.findMany({ where: { teamId } });
+
+        return page;
+    });
+
+const teamNameOf = async (teamId: string): Promise<string | undefined> =>
+    await seed(async (db) => {
+        const team = await db.team.findFirst({ where: { _id: teamId } });
+
+        return team.name;
+    });
 
 const memberCountOf = async (teamId: string): Promise<number | undefined> =>
-    await seed(async (db) => (await db.team.findFirst({ where: { _id: teamId } })).memberCount);
+    await seed(async (db) => {
+        const team = await db.team.findFirst({ where: { _id: teamId } });
+
+        return team.memberCount;
+    });
 
 beforeEach(() => {
     harness = lunoraTest(schema as never);
@@ -155,7 +170,7 @@ describe("updateTeam and deleteTeam", () => {
 
         await as(ADMIN).mutation(updateTeam as never, { name: "Renamed", teamId } as never);
 
-        expect(await seed(async (db) => (await db.team.findFirst({ where: { _id: teamId } })).name)).toBe("Renamed");
+        expect(await teamNameOf(teamId)).toBe("Renamed");
     });
 
     it("refuses a plain member, even one who is a team admin", async () => {
@@ -172,7 +187,7 @@ describe("updateTeam and deleteTeam", () => {
 
         await expect(as(OWNER).mutation(updateTeam as never, { name: "Renamed", teamId } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
         await expect(as(OWNER).mutation(deleteTeam as never, { teamId } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
-        expect(await seed(async (db) => (await db.team.findFirst({ where: { _id: teamId } })).name)).toBe("Team");
+        expect(await teamNameOf(teamId)).toBe("Team");
     });
 
     it("deletes a team with all of its members", async () => {
@@ -306,12 +321,19 @@ describe("updateTeamMemberRole", () => {
             code: "FORBIDDEN",
         });
         expect(await teamMembers(teamId)).toMatchObject([{ userId: MEMBER }]);
-        expect((await teamMembers(teamId))[0]?.role).not.toBe("admin");
+        const [member] = await teamMembers(teamId);
+
+        expect(member?.role).not.toBe("admin");
     });
 });
 
 describe("updateTeamSettings", () => {
     const settingsOf = async (teamId: string) => await seed(async (db) => await db.teamSettings.findFirst({ where: { teamId } }));
+    const allowedModelsOf = async (teamId: string) => {
+        const settings = await settingsOf(teamId);
+
+        return settings?.allowedModels;
+    };
 
     it("lets an admin set the allowed models, and clearing them removes the override", async () => {
         const teamId = await insertTeam();
@@ -320,7 +342,7 @@ describe("updateTeamSettings", () => {
         expect(await settingsOf(teamId)).toMatchObject({ allowedModels: ["m1"], organizationId: ORG });
 
         await as(ADMIN).mutation(updateTeamSettings as never, { allowedModels: null, teamId } as never);
-        expect((await settingsOf(teamId))?.allowedModels).toBeUndefined();
+        expect(await allowedModelsOf(teamId)).toBeUndefined();
     });
 
     it("lets a team admin edit, and refuses a plain team member", async () => {
@@ -332,7 +354,7 @@ describe("updateTeamSettings", () => {
         await as(TEAM_ADMIN).mutation(updateTeamSettings as never, { allowedModels: ["m1"], teamId } as never);
 
         await expect(as(MEMBER).mutation(updateTeamSettings as never, { allowedModels: ["m2"], teamId } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
-        expect((await settingsOf(teamId))?.allowedModels).toStrictEqual(["m1"]);
+        expect(await allowedModelsOf(teamId)).toStrictEqual(["m1"]);
     });
 
     it("refuses a team of another organization", async () => {
@@ -391,7 +413,7 @@ describe("reads", () => {
 
         await insertTeamMember(teamId, MEMBER);
 
-        const members = (await as(OWNER).query(listTeamMembers as never, { teamId } as never)) as Array<{ role: string; userId: string }>;
+        const members = (await as(OWNER).query(listTeamMembers as never, { teamId } as never)) as { role: string; userId: string }[];
 
         expect(members).toMatchObject([{ role: "member", userId: MEMBER }]);
     });

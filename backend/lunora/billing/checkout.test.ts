@@ -227,7 +227,7 @@ describe("createCheckout", () => {
 });
 
 describe("createCheckout input", () => {
-    const { plan, interval } = (createCheckout as unknown as { args: Record<"interval" | "plan", { parse: (value: unknown) => unknown }> }).args;
+    const { interval, plan } = (createCheckout as unknown as { args: Record<"interval" | "plan", { parse: (value: unknown) => unknown }> }).args;
 
     it("accepts only the two paid plans and the two intervals", () => {
         expect(plan.parse("pro")).toBe("pro");

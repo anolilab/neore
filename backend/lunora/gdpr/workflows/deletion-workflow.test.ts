@@ -59,7 +59,7 @@ const execute = async (): Promise<void> => {
 };
 
 const stepNames = (): string[] => trace.flatMap((entry) => (entry.kind === "step" ? [entry.name] : []));
-const runs = (): Array<Extract<Entry, { kind: "run" }>> => trace.filter((entry): entry is Extract<Entry, { kind: "run" }> => entry.kind === "run");
+const runs = (): Extract<Entry, { kind: "run" }>[] => trace.filter((entry): entry is Extract<Entry, { kind: "run" }> => entry.kind === "run");
 const indexOfStep = (name: string): number => trace.findIndex((entry) => entry.kind === "step" && entry.name === name);
 const indexOfRun = (ref: string): number => trace.findIndex((entry) => entry.kind === "run" && entry.ref === ref);
 const completionIndex = (): number =>
@@ -121,7 +121,7 @@ describe("account deletion workflow: order", () => {
             .map((entry) => entry.args["progress"] as number);
 
         expect(progress.length).toBeGreaterThan(10);
-        expect(progress).toStrictEqual([...progress].sort((a, b) => a - b));
+        expect(progress).toStrictEqual(progress.toSorted((a, b) => a - b));
         expect(progress[0]).toBe(3);
         expect(progress.at(-1)).toBe(100);
     });
@@ -171,8 +171,10 @@ describe("account deletion workflow: shards", () => {
         expect(billing).toHaveLength(1);
         expect(billing[0]).toMatchObject({ args: { referenceId: USER }, shardKey: ROOT_SHARD_KEY });
 
-        for (const entry of runs().filter((run) => run.ref !== "billing_gdpr:cancelBilling")) {
-            expect(entry.shardKey, entry.ref).toBe(USER);
+        for (const entry of runs()) {
+            if (entry.ref !== "billing_gdpr:cancelBilling") {
+                expect(entry.shardKey, entry.ref).toBe(USER);
+            }
         }
     });
 });
@@ -224,11 +226,10 @@ describe("account deletion workflow: batched steps", () => {
     });
 
     it("walks the thread cascade with the cursor each round returned", async () => {
-        answer = (ref, round) => {
-            return ref === "gdpr_steps_deletion_steps:deleteUserThreadCascade"
+        answer = (ref, round) =>
+            ref === "gdpr_steps_deletion_steps:deleteUserThreadCascade"
                 ? { cursor: `c${String(round)}`, hasMore: round < 3 }
                 : { cursor: null, hasMore: false };
-        };
 
         await execute();
 
