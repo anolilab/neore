@@ -322,22 +322,30 @@ describe("webhook payload filters", () => {
     it("stores a valid set on create, replaces it on update and clears it with an empty set", async () => {
         const { triggerId } = (await as().mutation(createTrigger as never, { ...webhook, filters: [filter] } as never)) as { triggerId: string };
 
-        expect((await readTrigger(triggerId)).filters).toEqual([filter]);
+        const storedFilters = async () => {
+            const row = await readTrigger(triggerId);
+
+            return row.filters;
+        };
+
+        expect(await storedFilters()).toEqual([filter]);
 
         const next = { op: "exists", path: "pull_request.number" };
 
         await as().mutation(updateTrigger as never, { filters: [next], triggerId } as never);
-        expect((await readTrigger(triggerId)).filters).toEqual([next]);
+        expect(await storedFilters()).toEqual([next]);
 
         await as().mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
-        expect((await readTrigger(triggerId)).filters).toEqual([next]);
+        expect(await storedFilters()).toEqual([next]);
 
         await as().mutation(updateTrigger as never, { filters: [], triggerId } as never);
-        expect("filters" in (await readTrigger(triggerId))).toBe(false);
+        expect(await storedFilters()).toBeUndefined();
     });
 
     it("refuses more than 10 filters, a path past 8 segments, and a comparison without a value", async () => {
-        const tooMany = Array.from({ length: 11 }, () => filter);
+        const tooMany = Array.from({ length: 11 }, (_, index) => {
+            return { ...filter, value: String(index) };
+        });
 
         await expect(as().mutation(createTrigger as never, { ...webhook, filters: tooMany } as never)).rejects.toThrow("at most 10");
         await expect(as().mutation(createTrigger as never, { ...webhook, filters: [{ op: "exists", path: "a.b.c.d.e.f.g.h.i" }] } as never)).rejects.toThrow(

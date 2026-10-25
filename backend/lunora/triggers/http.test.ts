@@ -313,6 +313,12 @@ describe("trigger webhook signing", () => {
         };
         const MATCHING = '{"action":"opened","pull_request":{"number":7}}';
         const stampOf = (body: string, seconds: number) => signedHeaders(body, seconds);
+        /** Delivers a signed body that fails FILTERED_TRIGGER's filters; `n` keeps each delivery distinct. */
+        const missOf = async (statusOf: (body: string, headers: Record<string, string>) => Promise<number>, n: number) => {
+            const body = `{"action":"closed","n":${String(n)}}`;
+
+            return await statusOf(body, await stampOf(body, Math.floor(NOW / 1000)));
+        };
 
         it("runs a delivery whose payload matches every filter", async () => {
             const { history, scheduled, statusOf } = await setup(FILTERED_TRIGGER);
@@ -385,16 +391,32 @@ describe("trigger webhook signing", () => {
 
         it("collapses consecutive filtered deliveries into one history row, and a run starts a new one", async () => {
             const { history, statusOf } = await setup(FILTERED_TRIGGER);
-            const miss = async (n: number) => {
-                const body = `{"action":"closed","n":${String(n)}}`;
-
-                return await statusOf(body, await stampOf(body, Math.floor(NOW / 1000)));
-            };
+            const miss = async (n: number) => await missOf(statusOf, n);
 
             expect(await miss(1)).toBe(202);
             expect(await miss(2)).toBe(202);
             expect(await miss(3)).toBe(202);
             expect(await history()).toHaveLength(1);
+        });
+
+        it("keeps one filtered row even when misses alternate with runs, so runs stay visible", async () => {
+            const { history, statusOf, triggerId } = await setup(FILTERED_TRIGGER);
+            const miss = async (n: number) => await missOf(statusOf, n);
+
+            for (let n = 1; n <= 4; n += 1) {
+                vi.setSystemTime(NOW + n * 2000);
+                expect(await miss(n)).toBe(202);
+
+                vi.setSystemTime(NOW + n * 2000 + 1000);
+                await harness.run(async (ctx: any) => {
+                    await ctx.db.insert("triggerExecutions", { startedAt: Date.now(), status: "completed", triggerId });
+                });
+            }
+
+            const rows = await history();
+
+            expect(rows.filter((row: any) => row.status === "filtered")).toHaveLength(1);
+            expect(rows.filter((row: any) => row.status === "completed")).toHaveLength(4);
         });
 
         it("gives the claim back when the filtered row cannot be written, so the sender's retry is evaluated", async () => {

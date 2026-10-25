@@ -506,6 +506,9 @@ const vGetTriggerExecutionsOutput = v.array(
     }),
 );
 
+/** How many of a trigger's newest rows are searched for its filtered row. */
+const FILTERED_LOOKBACK = 50;
+
 export const getTriggerExecutions = authQuery
     .input({
         limit: v.optional(v.number()),
@@ -526,9 +529,23 @@ export const getTriggerExecutions = authQuery
             .query("triggerExecutions")
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
             .order("desc")
-            .take(args.limit ?? 20);
+            .take(Math.max(args.limit ?? 20, FILTERED_LOOKBACK));
 
-        return executions.map((entry) => {
+        // At most one filtered row is shown (the newest), so misses never push real runs out of the list.
+        let seenFiltered = false;
+        const visible = executions.filter((entry) => {
+            if (entry.status !== "filtered") {
+                return true;
+            }
+
+            const keep = !seenFiltered;
+
+            seenFiltered = true;
+
+            return keep;
+        });
+
+        return visible.slice(0, args.limit ?? 20).map((entry) => {
             return {
                 _id: entry._id as string,
                 completedAt: entry.completedAt ?? null,
@@ -690,8 +707,9 @@ export const createExecution = internalMutation
  * nothing: no `admitTriggerRun` charge, no `triggerCount` / `lastTriggeredAt`
  * change, no notification (`updateExecution` would send one). The payload is
  * NOT stored: it is untrusted, up to 1 MB, and can be replayed at the delivery
- * limit. A filtered row directly above another collapses into it (newest
- * wins), so a sender whose events mostly miss the filters cannot fill the
+ * limit. A trigger keeps ONE filtered row, found among its newest
+ * `FILTERED_LOOKBACK` rows and moved to the front by each miss, so a sender
+ * whose events miss the filters (even alternating with runs) cannot fill the
  * history or push the real runs out of the list.
  */
 export const recordFilteredExecution = internalMutation
@@ -701,13 +719,14 @@ export const recordFilteredExecution = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { reason, triggerId }, ctx }) => {
-        const [latest] = await ctx.db
+        const recent = await ctx.db
             .query("triggerExecutions")
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
             .order("desc")
-            .take(1);
+            .take(FILTERED_LOOKBACK);
+        const latest = recent.find((entry) => entry.status === "filtered");
 
-        if (latest?.status === "filtered") {
+        if (latest) {
             await ctx.db.patch(latest._id, { completedAt: ctx.now, error: reason, startedAt: ctx.now });
 
             return null;
