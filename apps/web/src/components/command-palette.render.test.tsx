@@ -39,6 +39,22 @@ vi.mock("@/lib/lunora/crpc", () => {
             return {
                 queryFn: async () => {
                     const query = (args as { searchQuery: string }).searchQuery;
+
+                    if (query.startsWith("gamma")) {
+                        const busy = Array.from({ length: 9 }, (_, index) => {
+                            return { _id: `busy-${index}`, order: index, stepOrder: 0, text: `gamma busy match ${index}` };
+                        });
+
+                        return {
+                            continueCursor: "",
+                            isDone: true,
+                            page: [
+                                { _id: "thread-busy", relevantMessages: busy, title: "Busy thread" },
+                                { _id: "thread-quiet", relevantMessages: [{ _id: "quiet-0", order: 1, stepOrder: 0, text: "gamma quiet match" }], title: "Quiet thread" },
+                            ],
+                        };
+                    }
+
                     const [id, text] = query.startsWith("beta")
                         ? ["message-7", "The beta cohort starts in May"]
                         : ["message-9", "We agreed on the alpha rollout date"];
@@ -251,6 +267,19 @@ describe("command palette message search", () => {
         expect(screen.queryByText(RESULT_TEXT)).toBeNull();
         expect(await screen.findByText(BETA_TEXT, undefined, { timeout: 3000 })).toBeTruthy();
         expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+    });
+
+    it("keeps a busy thread from filling every slot", async () => {
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "gamma" } });
+
+        expect(await screen.findByText("gamma quiet match", undefined, { timeout: 3000 })).toBeTruthy();
+        expect(screen.getByText("gamma busy match 0")).toBeTruthy();
+        // Eight slots: the quiet thread's hit takes one, so the busy thread's seventh match is cut.
+        expect(screen.getByText("gamma busy match 6")).toBeTruthy();
+        expect(screen.queryByText("gamma busy match 7")).toBeNull();
     });
 
     it("opens a highlighted message hit with Enter", async () => {

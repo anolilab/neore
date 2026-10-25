@@ -87,21 +87,25 @@ interface MessageHit {
     threadTitle?: string;
 }
 
-/** The matching messages that have text, in the server's relevance order, capped for a palette. */
+/**
+ * The matching messages that have text, capped for a palette. The server groups hits by thread and orders the threads by match count, so
+ * taking the first few would let one busy thread fill every slot; instead each thread gets a slot per round, keeping its own relevance order.
+ */
 const collectMessageHits = (threads: MessageSearchThread[] = []): MessageHit[] => {
+    const queues = threads.map((thread) => (thread.relevantMessages ?? []).filter((message) => message.text?.trim()).map((message) => {return { message, thread }}));
     const hits: MessageHit[] = [];
 
-    for (const thread of threads) {
-        const messages = thread.relevantMessages ?? [];
+    for (let round = 0; hits.length < MAX_MESSAGE_HITS && queues.some((queue) => round < queue.length); round += 1) {
+        for (const queue of queues) {
+            const entry = queue[round];
 
-        for (const message of messages) {
-            if (message.text?.trim()) {
-                hits.push({ message: { ...message, text: message.text }, threadId: thread._id, threadTitle: thread.title });
+            if (entry && hits.length < MAX_MESSAGE_HITS) {
+                hits.push({ message: { ...entry.message, text: entry.message.text as string }, threadId: entry.thread._id, threadTitle: entry.thread.title });
             }
         }
     }
 
-    return hits.slice(0, MAX_MESSAGE_HITS);
+    return hits;
 };
 
 interface Item {
