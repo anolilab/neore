@@ -17,11 +17,13 @@ const TRIGGER_TYPE_LABELS: Record<SelectableTriggerType, MessageDescriptor> = {
 };
 
 interface TriggerTypePickerProps {
+    /** Locks the choice: a saved trigger's type cannot be changed. */
+    disabled?: boolean;
     onSelect: (type: SelectableTriggerType) => void;
     value: string;
 }
 
-const TriggerTypePicker: FC<TriggerTypePickerProps> = ({ onSelect, value }) => {
+const TriggerTypePicker: FC<TriggerTypePickerProps> = ({ disabled = false, onSelect, value }) => {
     const { i18n, t } = useLingui();
 
     return (
@@ -29,9 +31,10 @@ const TriggerTypePicker: FC<TriggerTypePickerProps> = ({ onSelect, value }) => {
             {SELECTABLE_TRIGGER_TYPES.map((type) => (
                 <button
                     aria-pressed={value === type}
-                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                         value === type ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/50"
                     }`}
+                    disabled={disabled}
                     key={type}
                     onClick={() => onSelect(type)}
                     type="button"

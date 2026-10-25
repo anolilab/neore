@@ -263,7 +263,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 {/* Type */}
                 <div className="space-y-1.5">
                     <Label>{t`Trigger Type`}</Label>
-                    <TriggerTypePicker onSelect={(type) => onChange({ ...formData, type })} value={formData.type} />
+                    <TriggerTypePicker disabled={formData.type === "event"} onSelect={(type) => onChange({ ...formData, type })} value={formData.type} />
                 </div>
 
                 {/* Schedule config */}
@@ -335,7 +335,10 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 {formData.type === "event" && (
                     <div className="bg-muted rounded-lg p-3 text-sm" role="status">
                         <p className="text-muted-foreground">
-                            <Trans>Event triggers are not supported and never run. Delete this trigger and create a schedule or webhook trigger instead.</Trans>
+                            <Trans>
+                                Event triggers are not supported: nothing starts this one automatically, and it cannot be edited. Delete it and create a
+                                schedule or webhook trigger instead.
+                            </Trans>
                         </p>
                     </div>
                 )}

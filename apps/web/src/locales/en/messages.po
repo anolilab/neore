@@ -10249,7 +10249,7 @@ msgid "Event"
 msgstr "Event"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:321
-msgid "Event triggers are not supported and never run. Delete this trigger and create a schedule or webhook trigger instead."
+msgid "Event triggers are not supported: nothing starts this one automatically, and it cannot be edited. Delete it and create a schedule or webhook trigger instead."
 msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:129

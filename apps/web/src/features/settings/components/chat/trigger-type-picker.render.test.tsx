@@ -40,4 +40,18 @@ describe("TriggerTypePicker", () => {
 
         expect(onSelect).toHaveBeenCalledWith("webhook");
     });
+
+    it("locks the choice when disabled", () => {
+        const onSelect = vi.fn();
+
+        render(<TriggerTypePicker disabled onSelect={onSelect} value="event" />);
+
+        for (const button of screen.getAllByRole("button")) {
+            expect((button as HTMLButtonElement).disabled).toBe(true);
+        }
+
+        fireEvent.click(screen.getByRole("button", { name: "Webhook" }));
+
+        expect(onSelect).not.toHaveBeenCalled();
+    });
 });

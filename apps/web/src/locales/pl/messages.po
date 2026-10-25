@@ -10250,8 +10250,8 @@ msgid "Event"
 msgstr "Zdarzenie"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:321
-msgid "Event triggers are not supported and never run. Delete this trigger and create a schedule or webhook trigger instead."
-msgstr "Wyzwalacze zdarzeń nie są obsługiwane i nigdy się nie uruchamiają. Usuń ten wyzwalacz i zamiast niego utwórz wyzwalacz harmonogramu lub webhooka."
+msgid "Event triggers are not supported: nothing starts this one automatically, and it cannot be edited. Delete it and create a schedule or webhook trigger instead."
+msgstr "Wyzwalacze zdarzeń nie są obsługiwane: nic nie uruchamia tego automatycznie i nie można go edytować. Usuń go i utwórz zamiast tego wyzwalacz harmonogramu lub webhooka."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:129
 msgid "Every 6 hours"

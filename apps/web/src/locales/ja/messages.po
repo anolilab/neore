@@ -10250,8 +10250,8 @@ msgid "Event"
 msgstr "イベント"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:321
-msgid "Event triggers are not supported and never run. Delete this trigger and create a schedule or webhook trigger instead."
-msgstr "イベントトリガーはサポートされておらず、実行されません。このトリガーを削除して、代わりにスケジュールまたはWebhookのトリガーを作成してください。"
+msgid "Event triggers are not supported: nothing starts this one automatically, and it cannot be edited. Delete it and create a schedule or webhook trigger instead."
+msgstr "イベントトリガーはサポートされていません。このトリガーを自動的に開始するものはなく、編集もできません。削除して、代わりにスケジュールまたはWebhookトリガーを作成してください。"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:129
 msgid "Every 6 hours"
