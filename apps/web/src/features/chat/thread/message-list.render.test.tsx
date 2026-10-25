@@ -5,7 +5,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import type { Context, ReactNode } from "react";
 import { createElement, useLayoutEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -174,14 +174,18 @@ const Host = (): ReactNode => {
     );
 };
 
-const mount = () => {
+const mountInto = () => {
     const queryClient = new QueryClient();
 
-    render(
+    return render(
         <QueryClientProvider client={queryClient}>
             <Host />
         </QueryClientProvider>,
     );
+};
+
+const mount = () => {
+    mountInto();
 };
 
 /** Pushes a live update whose only change is the last message's text; returns the rows it re-rendered. */
@@ -255,17 +259,24 @@ describe("message list render cost", () => {
     );
 });
 
+/* eslint-disable testing-library/no-node-access, testing-library/no-container -- the assertion is about DOM ancestry */
 describe("message list text size hook", () => {
-    it("renders messages inside the .message-list element that styles.css scales for the chat text size", () => {
+    it("marks the message text with .message-text and keeps timestamps outside it", () => {
         harness.messages = Array.from({ length: 4 }, (_, index) => makeMessage(index));
         harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
 
-        mount();
+        const { container } = mountInto();
 
-        const list = screen.getAllByRole("list").find((element) => element.classList.contains("message-list"));
+        for (const index of [0, 1, 2, 3]) {
+            expect(screen.getByText(`message ${index}`).closest(".message-text")).not.toBeNull();
+        }
 
-        expect(list).toBeDefined();
-        expect(within(list!).getByText("message 0")).toBeDefined();
-        expect(within(list!).getByText("message 3")).toBeDefined();
+        const timestamps = container.querySelectorAll("time");
+
+        expect(timestamps.length).toBeGreaterThan(0);
+
+        for (const timestamp of timestamps) {
+            expect(timestamp.closest(".message-text")).toBeNull();
+        }
     });
 });

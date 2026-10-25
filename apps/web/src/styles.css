@@ -26,8 +26,10 @@
    CHAT_TEXT_SIZE_BOOT_SCRIPT and kept in step by AppearanceSync; the default size sets no attribute, so
    nothing here applies. Message text is sized by Tailwind's `text-*` utilities (the message body and
    the markdown renderer both use them), which read the `--text-*` tokens, so the tokens are scaled
-   inside `.message-list` only: the sidebar and chrome keep their size. A font-size on the list itself
-   would not reach that text, and would also resize the `ch`-based --thread-max-width column.
+   on `.message-text` only: the content wrapper of a user or assistant message (message-item.tsx).
+   Timestamps and the action bar are siblings of it, and the sidebar and chrome sit outside, so they
+   keep their size. A font-size on the list itself would not reach that text, and would also resize
+   the `ch`-based --thread-max-width column.
    Unlayered on purpose so the line-height rule wins over Tailwind's `leading-7` utility. */
 :root[data-chat-text-size="small"] {
     --chat-text-scale: 0.875;
@@ -37,7 +39,7 @@
     --chat-text-scale: 1.125;
 }
 
-:root[data-chat-text-size] .message-list {
+:root[data-chat-text-size] .message-text {
     --text-xs: calc(0.75rem * var(--chat-text-scale));
     --text-sm: calc(0.875rem * var(--chat-text-scale));
     --text-base: calc(1rem * var(--chat-text-scale));
@@ -47,7 +49,8 @@
     --text-3xl: calc(1.875rem * var(--chat-text-scale));
 }
 
-:root[data-chat-text-size] .message-list .leading-7 {
+:root[data-chat-text-size] .message-text.leading-7,
+:root[data-chat-text-size] .message-text .leading-7 {
     line-height: calc(1.75rem * var(--chat-text-scale));
 }
 

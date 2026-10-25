@@ -27,6 +27,12 @@ describe("chat text size boot script", () => {
         document.documentElement.removeAttribute(CHAT_TEXT_SIZE_ATTRIBUTE);
     });
 
+    it("is a fixed script whose literals match the storage key and attribute", () => {
+        expect(CHAT_TEXT_SIZE_BOOT_SCRIPT).not.toContain("${");
+        expect(CHAT_TEXT_SIZE_BOOT_SCRIPT).toContain(`localStorage.getItem(${JSON.stringify(UI_STATE_STORAGE_KEY)})`);
+        expect(CHAT_TEXT_SIZE_BOOT_SCRIPT).toContain(`setAttribute(${JSON.stringify(CHAT_TEXT_SIZE_ATTRIBUTE)},z)`);
+    });
+
     it("applies a stored small or large size before hydration", () => {
         store({ fontSize: "large" });
         runBootScript();
@@ -115,7 +121,8 @@ describe("persisted chat text size", () => {
     });
 });
 
-const TOKEN_RULE = /:root\[data-chat-text-size\] \.message-list \{([^}]*)\}/;
+const TOKEN_RULE = /:root\[data-chat-text-size\] \.message-text \{([^}]*)\}/;
+const LIST_SCOPED_RULE = /data-chat-text-size\][^{]*\.message-list/;
 const ROOT_TOKEN_RULE = /:root\[data-chat-text-size[^\]]*\]\s*\{[^}]*--text-/;
 
 describe("chat text size styles", () => {
@@ -126,7 +133,7 @@ describe("chat text size styles", () => {
         expect(css).toContain(':root[data-chat-text-size="large"] {\n    --chat-text-scale: 1.125;');
     });
 
-    it("scales the text tokens inside the message list, not on the root", () => {
+    it("scales the text tokens on the message content wrapper only, not on the root or the whole list", () => {
         const rule = css.match(TOKEN_RULE)?.[1] ?? "";
 
         for (const token of ["xs", "sm", "base", "lg", "xl", "2xl", "3xl"]) {
@@ -134,6 +141,7 @@ describe("chat text size styles", () => {
         }
 
         expect(css).not.toMatch(ROOT_TOKEN_RULE);
+        expect(css).not.toMatch(LIST_SCOPED_RULE);
     });
 
     it("has no rule for the default size, so it changes nothing", () => {

@@ -175,7 +175,9 @@ const DefaultUserMessage: FC<UserMessageRendererProps> = ({ actionBar, children,
             <Trans>Your message:</Trans>{" "}
         </span>
         {/* Attachments would go here */}
-        <MessageContentWrapper className="col-start-2 row-start-2 rounded-3xl px-5 py-(--density-bubble-py) wrap-break-word">{children}</MessageContentWrapper>
+        <MessageContentWrapper className="message-text col-start-2 row-start-2 rounded-3xl px-5 py-(--density-bubble-py) wrap-break-word">
+            {children}
+        </MessageContentWrapper>
         {!isPending && actionBar}
     </Message>
 );
@@ -202,7 +204,7 @@ const DefaultAssistantMessage: FC<AssistantMessageRendererProps> = ({ actionBar,
             </span>
             <MessageContentWrapper
                 className={cn(
-                    "col-span-2 col-start-2 row-start-1 leading-7 wrap-break-word",
+                    "message-text col-span-2 col-start-2 row-start-1 leading-7 wrap-break-word",
                     hasRateLimitError ? "text-destructive dark:text-red-400" : "text-foreground dark:text-white",
                 )}
             >
