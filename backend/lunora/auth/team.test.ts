@@ -79,8 +79,8 @@ const as = (userId: string) => harness.withIdentity({ userId } as never);
 /** Inserts through the harness; the tables are `.global()` in production but plain shard tables here. */
 const seed = async <T>(run: (db: any) => Promise<T>): Promise<T> => (await harness.run(async (ctx: any) => await run(ctx.db))) as T;
 
-const insertTeam = async (organizationId = ORG): Promise<string> =>
-    await seed(async (db) => await db.insert("team", { createdAt: 1, memberCount: 0, name: "Team", organizationId }));
+const insertTeam = async (organizationId = ORG, memberCount = 0): Promise<string> =>
+    await seed(async (db) => await db.insert("team", { createdAt: 1, memberCount, name: "Team", organizationId }));
 
 const insertOrgMember = async (userId: string, organizationId = ORG, role = "member"): Promise<void> => {
     await seed(async (db) => await db.insert("member", { createdAt: 1, organizationId, role, userId }));
@@ -407,13 +407,14 @@ describe("setActiveTeam and leaveTeam", () => {
     });
 
     it("refuses to leave a team of another organization and keeps the membership and counter", async () => {
-        const teamId = await insertTeam(OTHER_ORG);
+        const teamId = await insertTeam(OTHER_ORG, 2);
 
         await insertTeamMember(teamId, MEMBER);
+        await insertTeamMember(teamId, TEAM_ADMIN, "admin");
 
         await expect(as(MEMBER).mutation(leaveTeam as never, { teamId } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
-        expect(await teamMembers(teamId)).toMatchObject([{ userId: MEMBER }]);
-        expect(await memberCountOf(teamId)).toBe(0);
+        expect(await teamMembers(teamId)).toHaveLength(2);
+        expect(await memberCountOf(teamId)).toBe(2);
     });
 
     it("answers NOT_FOUND when the caller was never on the team", async () => {
