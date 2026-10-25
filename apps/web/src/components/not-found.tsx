@@ -4,7 +4,6 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { buttonVariants } from "@neore/ui/components/button";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, LogIn, MessageSquare, Sparkles } from "lucide-react";
-import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 
 const NAV_LINKS: ReadonlyArray<{ icon: typeof MessageSquare; label: MessageDescriptor; to: "/auth/sign-in" | "/chat" | "/models" }> = [
@@ -68,12 +67,7 @@ const NotFound = () => {
             {/* Main content */}
             <div className="relative z-10 flex flex-col items-center gap-6 px-6 text-center">
                 {/* Pixel 404 */}
-                <motion.div
-                    animate={{ opacity: 1, y: 0 }}
-                    className="relative select-none"
-                    initial={{ opacity: 0, y: 32 }}
-                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                >
+                <div className="animate-in fade-in slide-in-from-bottom-8 fill-mode-both relative duration-700 ease-out select-none motion-reduce:animate-none">
                     {/* Primary number */}
                     <span
                         className="block leading-none font-black"
@@ -123,39 +117,23 @@ const NotFound = () => {
                             </span>
                         </>
                     )}
-                </motion.div>
+                </div>
 
                 {/* Thin separator */}
-                <motion.div
-                    animate={{ opacity: 0.35, scaleX: 1 }}
-                    className="h-px w-40 origin-center"
-                    initial={{ opacity: 0, scaleX: 0 }}
-                    style={{ backgroundColor: "#caff00" }}
-                    transition={{ delay: 0.4, duration: 0.55 }}
-                />
+                <div className="animate-in fade-in zoom-in-0 fill-mode-both h-px w-40 origin-center bg-[#caff00]/35 delay-400 duration-550 motion-reduce:animate-none" />
 
                 {/* Text */}
-                <motion.div
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col items-center gap-2"
-                    initial={{ opacity: 0, y: 10 }}
-                    transition={{ delay: 0.5, duration: 0.5 }}
-                >
+                <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both flex flex-col items-center gap-2 delay-500 duration-500 motion-reduce:animate-none">
                     <p className="text-xl font-semibold tracking-tight" style={{ color: "#f2f2f2", fontFamily: '"Geist Variable", sans-serif' }}>
                         <Trans>Page not found</Trans>
                     </p>
                     <p className="max-w-xs text-sm leading-relaxed" style={{ color: "#6b6b6b", fontFamily: '"Geist Variable", sans-serif' }}>
                         <Trans>This page doesn&apos;t exist or may have been moved.</Trans>
                     </p>
-                </motion.div>
+                </div>
 
                 {/* Navigation links */}
-                <motion.div
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col items-center gap-3"
-                    initial={{ opacity: 0, y: 10 }}
-                    transition={{ delay: 0.65, duration: 0.5 }}
-                >
+                <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both flex flex-col items-center gap-3 delay-650 duration-500 motion-reduce:animate-none">
                     <p
                         className="text-xs tracking-widest uppercase"
                         style={{ color: "#3c3c3c", fontFamily: '"Geist Variable", sans-serif', letterSpacing: "0.15em" }}
@@ -190,29 +168,24 @@ const NotFound = () => {
                             </Link>
                         ))}
                     </div>
-                </motion.div>
+                </div>
 
                 {/* Divider */}
-                <motion.div
-                    animate={{ opacity: 1 }}
-                    className="flex w-48 items-center gap-3"
-                    initial={{ opacity: 0 }}
-                    transition={{ delay: 0.8, duration: 0.4 }}
-                >
+                <div className="animate-in fade-in fill-mode-both flex w-48 items-center gap-3 delay-800 duration-400 motion-reduce:animate-none">
                     <div className="h-px flex-1" style={{ backgroundColor: "rgba(202,255,0,0.08)" }} />
                     <span className="text-xs" style={{ color: "#3c3c3c", fontFamily: '"Geist Variable", sans-serif' }}>
                         <Trans>or</Trans>
                     </span>
                     <div className="h-px flex-1" style={{ backgroundColor: "rgba(202,255,0,0.08)" }} />
-                </motion.div>
+                </div>
 
                 {/* Primary CTA */}
-                <motion.div animate={{ opacity: 1, y: 0 }} initial={{ opacity: 0, y: 10 }} transition={{ delay: 0.9, duration: 0.5 }}>
+                <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both delay-900 duration-500 motion-reduce:animate-none">
                     {/* A link styled as a button: it navigates, so it keeps link semantics. */}
                     <Link className={buttonVariants()} to="/">
                         <Trans>Return home</Trans>
                     </Link>
-                </motion.div>
+                </div>
             </div>
         </div>
     );

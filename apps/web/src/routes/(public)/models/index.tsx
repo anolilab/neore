@@ -3,16 +3,16 @@ import { msg } from "@lingui/core/macro";
 import { createFileRoute } from "@tanstack/react-router";
 
 import ModelsPage from "@/features/marketing/components/models-page";
-import { ALL_MODELS, IMAGE_MODELS, TEXT_MODELS, VIDEO_MODELS } from "@/features/marketing/data/models-data";
 import env from "@/lib/env";
-import { localizeModelDescription } from "@/lib/model-descriptions";
 import { jsonLd, seo } from "@/lib/seo";
 
 const TRAILING_SLASH_RE = /\/$/;
 
 export const Route = createFileRoute("/(public)/models/")({
     component: ModelsPage,
-    head: ({ match }) => {
+    head: async ({ match }) => {
+        const { ALL_MODELS, IMAGE_MODELS, TEXT_MODELS, VIDEO_MODELS } = await import("@/features/marketing/data/models-data");
+        const { localizeModelDescription } = await import("@/lib/model-descriptions");
         const { i18n } = match.context;
         const translate = (descriptor: MessageDescriptor) => i18n._(descriptor);
         const modelCount = ALL_MODELS.length;

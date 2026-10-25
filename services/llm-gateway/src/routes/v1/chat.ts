@@ -21,6 +21,8 @@ import type { HonoEnv } from "../../env.js";
 import { isProductionEnv } from "../../env.js";
 import { canonicalPathAndQuery } from "../../lib/canonical-query.js";
 import { chatInputValidationMiddleware } from "../../middleware/input-validation.js";
+import type { RateLimitBindings } from "../../middleware/native-rate-limit.js";
+import { consumeRateLimit, secondsUntilNextMinute } from "../../middleware/native-rate-limit.js";
 
 const chatRouter = new OpenAPIHono<HonoEnv>();
 
@@ -71,17 +73,16 @@ const signRequest = async (method: string, url: string, body: ArrayBuffer, secre
 // ── Rate limiting ────────────────────────────────────────────────────────────
 
 /**
- * Generic per-user rate limiter using KV. Identifies users by JWT hash
- * (avoids decoding the token). Returns { ok: true } if under limit.
+ * Per-user, per-minute limit on the native Rate Limiting bindings. Identifies
+ * users by JWT hash (avoids decoding the token). `ok` is `null` when no binding
+ * exists for `limit`: the caller fails closed.
  */
 const checkRateLimit = async (
-    kv: KVNamespace | undefined,
+    env: RateLimitBindings,
     authHeader: string,
     prefix: string,
     limit: number,
-): Promise<{ limit: number; ok: boolean; retryAfter?: number }> => {
-    if (!kv) return { limit, ok: true };
-
+): Promise<{ limit: number; ok: boolean | null; retryAfter?: number }> => {
     const encoder = new TextEncoder();
     const hash = await crypto.subtle.digest("SHA-256", encoder.encode(authHeader));
     const userHash = [...new Uint8Array(hash)]
@@ -89,20 +90,9 @@ const checkRateLimit = async (
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
 
-    const minuteBucket = Math.floor(Date.now() / 60_000);
-    const key = `rl:${prefix}:${userHash}:${minuteBucket}`;
+    const ok = await consumeRateLimit(env, limit, `${prefix}:${userHash}`);
 
-    const current = Number(await kv.get(key)) || 0;
-
-    if (current >= limit) {
-        const retryAfter = 60 - (Math.floor(Date.now() / 1000) % 60);
-
-        return { limit, ok: false, retryAfter };
-    }
-
-    await kv.put(key, String(current + 1), { expirationTtl: 120 });
-
-    return { limit, ok: true };
+    return ok === false ? { limit, ok, retryAfter: secondsUntilNextMinute() } : { limit, ok };
 };
 
 const CHAT_RPM = 30;
@@ -127,7 +117,11 @@ const forwardToBackend = async (c: Context<HonoEnv>, backendPath: string, rateLi
         return c.json({ error: "Gateway not configured" }, 500);
     }
 
-    const rateLimit = await checkRateLimit(c.env.RATE_LIMIT_KV, authHeader, rateLimitPrefix, rateLimitRpm);
+    const rateLimit = await checkRateLimit(c.env, authHeader, rateLimitPrefix, rateLimitRpm);
+
+    if (rateLimit.ok === null) {
+        return c.json({ error: { code: "MISCONFIGURED", message: "Rate limit backend unavailable" } }, 503);
+    }
 
     if (!rateLimit.ok) {
         return c.json(

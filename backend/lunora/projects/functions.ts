@@ -1,5 +1,7 @@
 import { LunoraError, v } from "lunorash/server";
 
+import { listPinnedProjectsHandler, listProjectsHandler } from "../agent/projects";
+import { vProjectDocFields } from "../agent/validators";
 import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
@@ -52,42 +54,40 @@ export const listProjects = authQuery
             numItems: v.number(),
         }),
     })
+    // Written out, not `vPaginationResult(...)`: codegen cannot read a call, and
+    // an output it cannot read is emitted as an empty schema in the OpenAPI spec.
+    .output(
+        v.object({
+            continueCursor: v.union(v.string(), v.null()),
+            isDone: v.boolean(),
+            page: v.array(v.object({ ...vProjectDocFields })),
+            pageStatus: v.optional(v.union(v.literal("SplitRecommended"), v.literal("SplitRequired"), v.null())),
+            splitCursor: v.optional(v.union(v.string(), v.null())),
+        }),
+    )
     .query(async ({ args: { organizationId, paginationOpts }, ctx: context }) => {
         const { userId } = context.user;
 
-        // Note: runQuery to agent component is necessary, but lightweight auth
-        // saves 200-400ms on the auth check before entering this handler
         if (organizationId) {
-            return await context.runQuery(api.agent.projects.listProjects, {
-                organizationId,
-                paginationOpts,
-            });
+            return await listProjectsHandler(context, { organizationId, paginationOpts });
         }
 
-        return await context.runQuery(api.agent.projects.listProjects, {
-            paginationOpts,
-            userId,
-        });
+        return await listProjectsHandler(context, { paginationOpts, userId });
     });
 
 export const listPinnedProjects = authQuery
     .input({
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
     })
+    .output(v.array(v.object({ ...vProjectDocFields })))
     .query(async ({ args: { organizationId }, ctx: context }) => {
         const { userId } = context.user;
 
-        // Note: runQuery to agent component is necessary, but lightweight auth
-        // saves 200-400ms on the auth check before entering this handler
         if (organizationId) {
-            return await context.runQuery(api.agent.projects.listPinnedProjects, {
-                organizationId,
-            });
+            return await listPinnedProjectsHandler(context, { organizationId });
         }
 
-        return await context.runQuery(api.agent.projects.listPinnedProjects, {
-            userId,
-        });
+        return await listPinnedProjectsHandler(context, { userId });
     });
 
 export const createProject = authMutation

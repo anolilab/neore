@@ -23,11 +23,52 @@ const rootDir = path.resolve(__dirname, "..");
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+// Lines queue as they arrive, so a burst of piped answers is kept until asked for.
+const lines = [];
+const waiting = [];
+let closed = false;
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) });
+
+rl.on("line", (line) => {
+    const resolve = waiting.shift();
+
+    if (resolve) {
+        resolve(line);
+    } else {
+        lines.push(line);
+    }
+});
+
+rl.on("close", () => {
+    closed = true;
+
+    for (const resolve of waiting.splice(0)) {
+        resolve("");
+    }
+});
+
+const nextLine = () => {
+    if (lines.length > 0) {
+        return Promise.resolve(lines.shift());
+    }
+
+    if (closed) {
+        return Promise.resolve("");
+    }
+
+    return new Promise((resolve) => {
+        waiting.push(resolve);
+    });
+};
 
 const ask = async (question, defaultValue) => {
     const suffix = defaultValue ? ` (${defaultValue})` : "";
-    const answer = await rl.question(`${question}${suffix}: `);
+
+    rl.setPrompt(`${question}${suffix}: `);
+    rl.prompt();
+
+    const answer = await nextLine();
+
     return answer.trim() || defaultValue || "";
 };
 
@@ -372,15 +413,11 @@ const main = async () => {
         console.log("  [keep]  VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY");
     }
 
-    // JWKS
-    if (!backendEnv["JWKS"]) {
-        console.log("\n  JWKS not set — will use dynamic JWKS fetching (slower, ~100-400ms overhead per query).");
-        console.log("  Run 'pnpm env:sync:auth' after configuring auth to generate static JWKS.");
-    } else if (backendEnv["JWKS"] === '{"keys":[]}') {
-        console.log("\n  JWKS placeholder is empty — removing it (breaks JWT validation).");
-        console.log("  Run 'pnpm env:sync:auth' to generate valid JWKS.");
-        delete backendEnv["JWKS"];
+    // The schema needs JWKS present; empty means dynamic fetching, as CI writes it.
+    if (!backendEnv["JWKS"] || backendEnv["JWKS"] === '{"keys":[]}') {
+        backendEnv["JWKS"] = "";
         backendChanged = true;
+        console.log("\n  [set]   JWKS empty (the backend fetches keys dynamically)");
     } else {
         console.log("\n  [keep]  JWKS");
     }
@@ -606,7 +643,8 @@ const main = async () => {
 
     console.log("Backend core:");
     for (const key of coreKeys) {
-        const status = backendEnv[key] ? "configured" : "MISSING";
+        // Presence, not truthiness: ADMIN and JWKS may be empty but must exist.
+        const status = backendEnv[key] !== undefined ? "configured" : "MISSING";
         console.log(`  ${status === "configured" ? "[ok]" : "[!!]"} ${key}: ${status}`);
     }
 
@@ -648,8 +686,7 @@ const main = async () => {
 
     console.log("\n=== Next Steps ===\n");
     console.log("1. If you haven't generated the backend types yet:");
-    console.log("   pnpm --filter @neore/backend run codegen   # Generate lunora/_generated");
-    console.log("   pnpm env:sync:auth       # Generate proper JWKS\n");
+    console.log("   pnpm --filter @neore/backend run codegen   # Generate lunora/_generated\n");
     console.log("2. Start the development stack (web on :5173, backend + its services on :8788, public gateway on :8787):");
     console.log("   pnpm dev\n");
 

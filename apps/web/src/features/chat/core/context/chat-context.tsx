@@ -30,7 +30,7 @@ import useLocalModelTurn from "@/features/local-models/hooks/use-local-model-tur
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
 import env from "@/lib/env";
-import { AppError, ErrorFactory } from "@/lib/errors";
+import { AppError, ErrorFactory, RateLimitError } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
 import { useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { registerStreamOfThread } from "@/lib/lunora/shard-routing";
@@ -72,6 +72,24 @@ const CHAT_STREAM_URL = `${env.VITE_LLM_GATEWAY_URL}/v1/chat`;
 
 /** Chat edit endpoint — message edits go through the LLM Gateway */
 const CHAT_EDIT_URL = `${env.VITE_LLM_GATEWAY_URL}/v1/chat/edit`;
+
+/**
+ * A gateway error body. Most failures are `{ error, message }`; a rate limit is
+ * `{ error: { code, message, retryAfter } }` (seconds), so both shapes are read.
+ */
+interface GatewayErrorBody {
+    bannedWords?: string[];
+    error?: string | { code?: string; message?: string; retryAfter?: number };
+    message?: string;
+}
+
+/** The error for a failed gateway response. A 429 is a `RateLimitError`, so the chat shows the limit, not a server error. */
+const gatewayError = (status: number, body: GatewayErrorBody): Error => {
+    const nested = typeof body.error === "object" ? body.error : undefined;
+    const message = body.message || nested?.message || (typeof body.error === "string" ? body.error : "") || `HTTP ${status}`;
+
+    return status === 429 ? new RateLimitError(message, (nested?.retryAfter ?? 60) * 1000) : new Error(message);
+};
 
 /**
  * Trusted gateway origin used to validate any server-supplied `gatewayUrl`
@@ -1020,7 +1038,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 if (!response.ok) {
                     const errorData = (await response.json().catch(() => {
                         return {};
-                    })) as { bannedWords?: string[]; error?: string; message?: string };
+                    })) as GatewayErrorBody;
 
                     if (errorData.error === "BANNED_CONTENT") {
                         // Restore composer text so the user can edit their message
@@ -1036,7 +1054,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                         return;
                     }
 
-                    throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
+                    throw gatewayError(response.status, errorData);
                 }
 
                 const data = (await response.json()) as {
@@ -1352,9 +1370,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 if (!response.ok) {
                     const errorData = (await response.json().catch(() => {
                         return {};
-                    })) as { error?: string; message?: string };
+                    })) as GatewayErrorBody;
 
-                    throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
+                    throw gatewayError(response.status, errorData);
                 }
 
                 const data = (await response.json()) as {
@@ -1525,9 +1543,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 if (!response.ok) {
                     const errorData = (await response.json().catch(() => {
                         return {};
-                    })) as { error?: string; message?: string };
+                    })) as GatewayErrorBody;
 
-                    throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
+                    throw gatewayError(response.status, errorData);
                 }
 
                 const data = (await response.json()) as { messageId?: string; threadId?: string };

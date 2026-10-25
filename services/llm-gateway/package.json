@@ -49,6 +49,7 @@
         "@anolilab/prettier-config": "catalog:lint",
         "@cloudflare/workers-types": "catalog:build",
         "eslint": "catalog:lint",
+        "msw": "catalog:test",
         "prettier": "catalog:lint",
         "typescript": "catalog:tsc",
         "vitest": "catalog:test",

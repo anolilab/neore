@@ -13,6 +13,7 @@ import { internal } from "../../../_generated/internal";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx } from "../../../_generated/server";
 import { patchRow } from "../../../lib/patch";
+import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { MAX_LENGTH } from "../../../lib/validators";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
@@ -374,9 +375,18 @@ export const getStreamText = internalQuery
         };
     });
 
+/** Statuses after which a stream writes no more chunks (`http-api.ts` stops polling on them too). */
+const SETTLED_STREAM_STATUSES: ReadonlySet<string> = new Set(["done", "error", "timeout"]);
+
 export const getChunksAfter = internalQuery
     .input({
         afterIndex: v.number(),
+        /**
+         * Check the thread's lock before answering. Default true: a caller that does
+         * not pass it is always checked. The chunk poll passes false on its later
+         * reads, which are checked anyway whenever they return chunks or a settled status.
+         */
+        checkLock: v.optional(v.boolean()),
         streamId: v.id("persistentStreams"),
     })
     .output(
@@ -389,6 +399,12 @@ export const getChunksAfter = internalQuery
                 }),
             ),
             /**
+             * The stream's thread was locked after the stream started. Answered in
+             * this query so the poll needs no second round trip. A locked stream
+             * returns no chunks, and `locked` is false whenever the lock was not checked.
+             */
+            locked: v.boolean(),
+            /**
              * Read in the SAME query as the chunks, so the two agree: a stream
              * seen `done` has its final chunk in `chunks`. Two separate queries
              * could see the final chunk's mutation land between them and report
@@ -399,10 +415,24 @@ export const getChunksAfter = internalQuery
             totalChunks: v.number(),
         }),
     )
-    .query(async ({ args: { afterIndex, streamId }, ctx }) => {
+    .query(async ({ args: { afterIndex, checkLock = true, streamId }, ctx }) => {
         // One indexed row, not an un-hinted `db.get` (which probes every table).
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
-        const status = (stream?.status ?? "error") as StreamStatus;
+
+        // A missing stream is an error, not a lock: an expired one must not read as "This chat is locked."
+        if (!stream) {
+            return { chunks: [], locked: false, status: "error", totalChunks: afterIndex };
+        }
+
+        const status = stream.status as StreamStatus;
+        const mustCheck = checkLock || SETTLED_STREAM_STATUSES.has(status);
+        const lockedAnswer = { chunks: [], locked: true, status, totalChunks: afterIndex };
+
+        // Before any content leaves: at once when asked, and always when the stream has settled.
+        if (mustCheck && (await streamLockedAfterStart(ctx, stream))) {
+            return lockedAnswer;
+        }
+
         const toChunk = (c: { reasoning?: string | null; speaker?: { name: string; skillId: string } | null; text: string }) => {
             return { reasoning: c.reasoning ?? undefined, ...(c.speaker && { speaker: c.speaker }), text: c.text };
         };
@@ -415,5 +445,10 @@ export const getChunksAfter = internalQuery
         });
         const lastChunk = page.at(-1);
 
-        return { chunks: page.map((chunk) => toChunk(chunk)), status, totalChunks: lastChunk ? lastChunk.seq + 1 : afterIndex };
+        // A later read of a long-poll skipped the check above; check before these chunks leave.
+        if (!mustCheck && page.length > 0 && (await streamLockedAfterStart(ctx, stream))) {
+            return lockedAnswer;
+        }
+
+        return { chunks: page.map((chunk) => toChunk(chunk)), locked: false, status, totalChunks: lastChunk ? lastChunk.seq + 1 : afterIndex };
     });

@@ -5,7 +5,7 @@
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
-import { internalMutation, type MutationCtx } from "../_generated/server";
+import { internalMutation, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
@@ -74,6 +74,72 @@ export const getProject = query
         return publicProject(project);
     });
 
+/** The project list read, shared by the public query and the owner's wrapper in `projects/functions.ts`. */
+export const listProjectsHandler = async (
+    ctx: QueryCtx,
+    args: {
+        organizationId?: string;
+        paginationOpts?: { cursor: string | null; endCursor?: string | null; id?: number; numItems: number };
+        userId?: string;
+    },
+) => {
+    const identity = await getAuthUserIdentity(ctx);
+
+    if (!identity) {
+        return { continueCursor: "" as string, isDone: true, page: [] };
+    }
+
+    if (!args.userId && !args.organizationId) {
+        return {
+            continueCursor: "" as string,
+            isDone: true,
+            page: [],
+        };
+    }
+
+    // Users can only list their own projects, or those of an organization they
+    // are a MEMBER of. The org branch below reads `by_organization` with no owner
+    // filter, so without the membership check any caller naming an org id read
+    // its full project rows (context, workflow content, share tokens).
+    if (args.userId && args.userId !== identity.userId) {
+        return { continueCursor: "" as string, isDone: true, page: [] };
+    }
+
+    if (!args.userId && args.organizationId) {
+        if (!(await getMemberByOrganizationAndUser(ctx, args.organizationId, identity.userId))) {
+            return { continueCursor: "" as string, isDone: true, page: [] };
+        }
+
+        // A proven membership: other members' projects of that org pass row-level security.
+        admitOrganization(ctx, args.organizationId);
+    }
+
+    // `projects` is `.global()` (D1): no legacy reader, so the ORM facade.
+    // The order mirrors the old descending index walk — `by_user_and_pinned`
+    // is (userId, pinnedAt, _creationTime), `by_organization` is
+    // (organizationId, _creationTime).
+    const paginationOptions = args.paginationOpts ?? { cursor: null, numItems: 100 };
+    const projects = args.userId
+        ? await ctx.db.projects.findMany({
+              cursor: paginationOptions.cursor,
+              limit: paginationOptions.numItems,
+              orderBy: [{ pinnedAt: "desc" }, { _creationTime: "desc" }],
+              where: { userId: args.userId },
+          })
+        : await ctx.db.projects.findMany({
+              cursor: paginationOptions.cursor,
+              limit: paginationOptions.numItems,
+              orderBy: [{ _creationTime: "desc" }],
+              where: { organizationId: args.organizationId as string },
+          });
+
+    return {
+        continueCursor: projects.continueCursor,
+        isDone: projects.isDone,
+        page: (projects.page as unknown as Doc<"projects">[]).map((item) => publicProject(item)),
+    };
+};
+
 export const listProjects = query
     .input({
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
@@ -81,63 +147,46 @@ export const listProjects = query
         userId: v.optional(v.string().max(MAX_LENGTH.id)),
     })
     .output(v.from(vPaginationResult(vProjectDocument)))
-    .query(async ({ args, ctx }) => {
-        const identity = await getAuthUserIdentity(ctx);
+    .query(async ({ args, ctx }) => await listProjectsHandler(ctx, args));
 
-        if (!identity) {
-            return { continueCursor: "" as string, isDone: true, page: [] };
-        }
+export const listPinnedProjectsHandler = async (ctx: QueryCtx, args: { organizationId?: string; userId?: string }) => {
+    const identity = await getAuthUserIdentity(ctx);
 
-        if (!args.userId && !args.organizationId) {
-            return {
-                continueCursor: "" as string,
-                isDone: true,
-                page: [],
-            };
-        }
+    if (!identity) {
+        return [];
+    }
 
-        // Users can only list their own projects, or those of an organization they
-        // are a MEMBER of. The org branch below reads `by_organization` with no owner
-        // filter, so without the membership check any caller naming an org id read
-        // its full project rows (context, workflow content, share tokens).
-        if (args.userId && args.userId !== identity.userId) {
-            return { continueCursor: "" as string, isDone: true, page: [] };
-        }
+    if (args.userId && args.userId !== identity.userId) {
+        return [];
+    }
 
-        if (!args.userId && args.organizationId) {
-            if (!(await getMemberByOrganizationAndUser(ctx, args.organizationId, identity.userId))) {
-                return { continueCursor: "" as string, isDone: true, page: [] };
-            }
+    if (args.userId) {
+        const { page: projects } = await ctx.db.projects.findMany({
+            limit: 200,
+            orderBy: [{ pinnedAt: "asc" }, { _creationTime: "asc" }],
+            where: { pinnedAt: { gte: 0 }, userId: args.userId },
+        });
+        const pinned = projects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
 
-            // A proven membership: other members' projects of that org pass row-level security.
-            admitOrganization(ctx, args.organizationId);
-        }
+        return pinned.map((item) => publicProject(item));
+    }
 
-        // `projects` is `.global()` (D1): no legacy reader, so the ORM facade.
-        // The order mirrors the old descending index walk — `by_user_and_pinned`
-        // is (userId, pinnedAt, _creationTime), `by_organization` is
-        // (organizationId, _creationTime).
-        const paginationOptions = args.paginationOpts ?? { cursor: null, numItems: 100 };
-        const projects = args.userId
-            ? await ctx.db.projects.findMany({
-                  cursor: paginationOptions.cursor,
-                  limit: paginationOptions.numItems,
-                  orderBy: [{ pinnedAt: "desc" }, { _creationTime: "desc" }],
-                  where: { userId: args.userId },
-              })
-            : await ctx.db.projects.findMany({
-                  cursor: paginationOptions.cursor,
-                  limit: paginationOptions.numItems,
-                  orderBy: [{ _creationTime: "desc" }],
-                  where: { organizationId: args.organizationId as string },
-              });
+    // Membership, not just an org id: see `listProjects`.
+    if (args.organizationId && (await getMemberByOrganizationAndUser(ctx, args.organizationId, identity.userId))) {
+        admitOrganization(ctx, args.organizationId);
 
-        return {
-            continueCursor: projects.continueCursor,
-            isDone: projects.isDone,
-            page: (projects.page as unknown as Doc<"projects">[]).map((item) => publicProject(item)),
-        };
-    });
+        const { page: allProjects } = await ctx.db.projects.findMany({
+            limit: 200,
+            orderBy: [{ _creationTime: "asc" }],
+            where: { organizationId: args.organizationId },
+        });
+        const pinned = allProjects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
+
+        return pinned.map((item) => publicProject(item));
+    }
+
+    return [];
+};
 
 export const listPinnedProjects = query
     .input({
@@ -145,44 +194,7 @@ export const listPinnedProjects = query
         userId: v.optional(v.string().max(MAX_LENGTH.id)),
     })
     .output(v.from(v.array(vProjectDocument)))
-    .query(async ({ args, ctx }) => {
-        const identity = await getAuthUserIdentity(ctx);
-
-        if (!identity) {
-            return [];
-        }
-
-        if (args.userId && args.userId !== identity.userId) {
-            return [];
-        }
-
-        if (args.userId) {
-            const { page: projects } = await ctx.db.projects.findMany({
-                limit: 200,
-                orderBy: [{ pinnedAt: "asc" }, { _creationTime: "asc" }],
-                where: { pinnedAt: { gte: 0 }, userId: args.userId },
-            });
-            const pinned = projects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
-
-            return pinned.map((item) => publicProject(item));
-        }
-
-        // Membership, not just an org id: see `listProjects`.
-        if (args.organizationId && (await getMemberByOrganizationAndUser(ctx, args.organizationId, identity.userId))) {
-            admitOrganization(ctx, args.organizationId);
-
-            const { page: allProjects } = await ctx.db.projects.findMany({
-                limit: 200,
-                orderBy: [{ _creationTime: "asc" }],
-                where: { organizationId: args.organizationId },
-            });
-            const pinned = allProjects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
-
-            return pinned.map((item) => publicProject(item));
-        }
-
-        return [];
-    });
+    .query(async ({ args, ctx }) => await listPinnedProjectsHandler(ctx, args));
 
 export const createProject = internalMutation
     .input(vProjectCreateFields)

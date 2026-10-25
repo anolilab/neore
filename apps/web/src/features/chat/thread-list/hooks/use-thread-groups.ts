@@ -122,8 +122,9 @@ const useThreadGroups = (
         const pinnedThreadsArray = pinnedThreads || [];
         const pinnedThreadsSet = new Set<string>(pinnedThreadsArray.map((pin: any) => pin._id));
 
+        // Thread docs carry `_id`, not `threadId`.
         const threadOrdersArray = threadOrders || [];
-        const threadOrderMap = new Map<string, number>(threadOrdersArray.map((order: any) => [order.threadId, order.order]));
+        const threadOrderMap = new Map<string, number>(threadOrdersArray.map((order: any) => [order._id, order.order]));
 
         // Find root threads (threads without parent relationships)
         const rootThreads = threadsToUse.filter((thread: any) => !relationshipMap.has(thread._id));

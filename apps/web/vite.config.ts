@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 
 import { cloudflare } from "@cloudflare/vite-plugin";
@@ -12,7 +14,7 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import mdxPlugin from "fumadocs-mdx/vite";
 import Unfonts from "unplugin-fonts/vite";
 import { purgePolyfills } from "unplugin-purge-polyfills";
-import type { UserConfig } from "vite";
+import type { Plugin, UserConfig } from "vite";
 import { defineConfig, loadEnv } from "vite";
 import { ViteImageOptimizer } from "vite-plugin-image-optimizer";
 import svgr from "vite-plugin-svgr";
@@ -44,6 +46,23 @@ const LUNORA_CHUNK_RE = /\/node_modules\/@lunora\//;
 const BASE_UI_CHUNK_RE = /\/node_modules\/@base-ui\/react\//;
 const LLM_GATEWAY_PATH_RE = /^\/llm-gateway/;
 const LUNORA_HTTP_PATH_RE = /^\/lunora-http/;
+
+/**
+ * Serves msw's service worker in `vite dev` only, for the e2e suite's mocked
+ * gateway (`src/lib/development-msw.ts`). Serve-only, so it never reaches a build.
+ */
+const mswServiceWorker = (): Plugin => {
+    return {
+        apply: "serve",
+        configureServer(server) {
+            server.middlewares.use("/mockServiceWorker.js", (_request: IncomingMessage, response: ServerResponse) => {
+                response.setHeader("Content-Type", "application/javascript");
+                response.end(readFileSync(join(server.config.root, "node_modules/msw/lib/mockServiceWorker.js")));
+            });
+        },
+        name: "msw-service-worker",
+    };
+};
 
 export default defineConfig(async ({ mode }) => {
     const environment = loadEnv(mode, process.cwd());
@@ -158,6 +177,7 @@ export default defineConfig(async ({ mode }) => {
             // Enables ESM `import * as wasm from "*.wasm"` syntax used by
             // wasm-pack output (e.g. @silvia-odwyer/photon).
             wasm(),
+            mswServiceWorker(),
             mdxPlugin(sourceConfig, { updateViteConfig: false }),
             purgePolyfills.vite({}),
             isDevelopment && viteErrorOverlay({ showBalloonButton: false }),

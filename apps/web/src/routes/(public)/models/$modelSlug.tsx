@@ -3,9 +3,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 
 import ModelDetailPage from "@/features/marketing/components/model-detail-page";
 import type { MarketingModel } from "@/features/marketing/data/models-data";
-import { ALL_MODELS, getModelBySlug } from "@/features/marketing/data/models-data";
 import env from "@/lib/env";
-import { localizeModelDescription } from "@/lib/model-descriptions";
 import { jsonLd, seo } from "@/lib/seo";
 
 const TRAILING_SLASH_RE = /\/$/;
@@ -23,7 +21,8 @@ const ModelDetailPageWrapper = () => {
 
 export const Route = createFileRoute("/(public)/models/$modelSlug")({
     component: ModelDetailPageWrapper,
-    loader: ({ context, params }): ModelDetailLoaderData => {
+    loader: async ({ context, params }): Promise<ModelDetailLoaderData> => {
+        const { getModelBySlug } = await import("@/features/marketing/data/models-data");
         const model = getModelBySlug(params.modelSlug);
 
         if (!model) {
@@ -43,11 +42,13 @@ export const Route = createFileRoute("/(public)/models/$modelSlug")({
             },
         };
     },
-    head: ({ loaderData, match }) => {
+    head: async ({ loaderData, match }) => {
         if (!loaderData) {
             return {};
         }
 
+        const { ALL_MODELS } = await import("@/features/marketing/data/models-data");
+        const { localizeModelDescription } = await import("@/lib/model-descriptions");
         const { i18n } = match.context;
         const { model, seo: modelSeo } = loaderData;
         const url = `${env.VITE_SITE_URL.replace(TRAILING_SLASH_RE, "")}/models/${model.slug}`;

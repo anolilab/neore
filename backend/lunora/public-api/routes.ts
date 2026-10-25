@@ -158,9 +158,9 @@ const streamSourceFor = (ctx: HttpActionCtx, streamId: string): StreamSource => 
 
     return {
         read: async (afterIndex) => {
-            const { chunks, status } = await ctx.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, { afterIndex, streamId: id });
+            const { chunks, locked, status } = await ctx.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, { afterIndex, streamId: id });
 
-            return { chunks, status };
+            return { chunks, locked, status };
         },
     };
 };
@@ -204,6 +204,11 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
             maxDurationMs: BLOCKING_CHAT_MAX_MS,
             signal: input.signal,
         });
+
+        // A thread locked mid-reply is NOT FOUND to an API key; its partial text is dropped.
+        if (collected.status === "thread_locked") {
+            throw new PublicApiError("not_found", "Thread not found.");
+        }
 
         return { data: { messageId: body.messageId, reasoning: collected.reasoning, status: collected.status, text: collected.text, threadId: body.threadId } };
     }

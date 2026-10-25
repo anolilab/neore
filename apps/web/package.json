@@ -208,6 +208,7 @@
         "eslint-plugin-zod": "catalog:lint",
         "fumadocs-mdx": "catalog:fumadocs",
         "jsdom": "catalog:test",
+        "msw": "catalog:test",
         "playwright": "catalog:test",
         "prettier": "catalog:lint",
         "prettier-plugin-tailwindcss": "catalog:lint",
