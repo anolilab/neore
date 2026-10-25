@@ -71,6 +71,7 @@ const attempt = async (n: number, chain = 1) =>
 beforeAll(async () => {
     registerModule(registry, "gdpr_functions", await import("./functions"));
     registerModule(registry, "gdpr_posthog_retry", await import("./posthog-retry"));
+    registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
 
     // The mail itself is not under test: the spy sees the address the retry sends it to.
     const emailSteps = await import("./steps/email-steps");
@@ -327,26 +328,67 @@ describe("the address kept for the confirmation email", () => {
         expect(await statusOf()).toBe("completed");
     });
 
-    it("fails the attempt when the mail cannot be queued, and the next attempt mails it", async () => {
+    it("keeps the erasure recorded as succeeded and the request completed when the mail cannot be queued", async () => {
         await setEmail("a@example.com");
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
         sendEmailSpy.mockRejectedValueOnce(new Error("queue down"));
 
         await attempt(1);
 
-        const failed = await request();
+        const row = await request();
 
-        expect(failed.status).toBe("failed");
-        expect(failed.userEmail).toBe("a@example.com");
-        expect(await actions()).not.toContain("deletion_completed");
+        expect(row.status).toBe("completed");
+        expect(row.userEmail).toBe("");
+        expect(await actions()).toStrictEqual(["deletion_completed", "deletion_retry_started", "deletion_retry_succeeded"]);
+        expect(sendEmailSpy).toHaveBeenCalledTimes(1);
+        expect(jobs()).toHaveLength(0);
+    });
 
+    it("gives the send claim back when the mail cannot be queued, so a later delivery can send it", async () => {
+        const emailClaims = async () =>
+            ((await run(async (ctx) => await ctx.db.query("idempotencyClaims").collect())) as { key: string; scope: string }[]).filter(
+                (row) => row.scope === "gdpr-deletion-confirmed-email" && row.key === requestId,
+            );
+
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+        sendEmailSpy.mockRejectedValueOnce(new Error("queue down"));
+
+        await attempt(1);
+
+        expect(await emailClaims()).toHaveLength(0);
+
+        // A later attempt on a request that is failed again with its address kept finds the claim free.
+        await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed", userEmail: "a@example.com" }));
         await attempt(2);
 
         expect(sendEmailSpy).toHaveBeenCalledTimes(2);
-        expect(await statusOf()).toBe("completed");
-        const done = await request();
+        expect(await emailClaims()).toHaveLength(1);
+    });
 
-        expect(done.userEmail).toBe("");
+    it("sends the mail at most once per request: a second delivery after a successful send sends nothing", async () => {
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+
+        await attempt(1);
+        await attempt(1);
+
+        expect(sendEmailSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not send when the request's confirmation was already sent", async () => {
+        await setEmail("a@example.com");
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+        await run(async (ctx) => {
+            const now = Date.now();
+
+            await ctx.db.insert("idempotencyClaims", { claimedAt: now, expiresAt: now + HOUR, key: requestId, scope: "gdpr-deletion-confirmed-email" });
+        });
+
+        await attempt(1);
+
+        expect(sendEmailSpy).not.toHaveBeenCalled();
+        expect(await statusOf()).toBe("completed");
     });
 
     it("minimises the user's other records when the chain ends", async () => {

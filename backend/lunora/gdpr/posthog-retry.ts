@@ -12,9 +12,11 @@
  *
  * The confirmation email: the workflow's failure branch leaves the address on the request while a
  * chain is pending (the job never carries it, so it stays out of the scheduler), the successful
- * attempt mails it from there, and the chain's end minimises it: success (completing the request
+ * attempt reads it from there, and the chain's end minimises it: success (completing the request
  * and minimising are one transaction, so a request is never completed with the address still on
  * it) or exhaustion. The address is therefore kept for the length of the chain, about 79 hours.
+ * The mail goes out after that success is recorded, at most once per request (a claim), and a
+ * failed send is logged only: the erasure it confirms has already succeeded.
  *
  * A watchdog scheduled when an attempt starts fails an attempt that stopped without recording an
  * outcome (crash or timeout), which no redelivery would otherwise resume.
@@ -23,7 +25,7 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import type { MutationCtx } from "../_generated/server";
+import type { ActionCtx, MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { claimOnce, hasClaim } from "../lib/claim-once";
 import { HttpError } from "../lib/fetch-timeout";
@@ -300,8 +302,8 @@ export const getRetryConfirmationEmail = internalQuery
 
 /**
  * Completes the request the way the workflow's success path does, records the attempt plus the
- * same `deletion_completed` outcome, and minimises the records (the confirmation email has been
- * sent by now), in ONE transaction: a failure leaves it `processing` for the redelivered job to
+ * same `deletion_completed` outcome, and minimises the records (the action read the confirmation
+ * address beforehand), in ONE transaction: a failure leaves it `processing` for the redelivered job to
  * finish, and a request completed or cancelled meanwhile is neither changed nor recorded twice.
  */
 export const recordPostHogRetrySuccess = internalMutation
@@ -337,6 +339,33 @@ class PostHogUnconfiguredError extends Error {
     override readonly name = "unconfigured";
 }
 
+/** At most one confirmation email per request, across every chain and attempt: the claim is made before the send and given back if the send throws. */
+const EMAIL_SCOPE = "gdpr-deletion-confirmed-email";
+
+/**
+ * Best effort and after the outcome is recorded: the erasure has succeeded whether or not this
+ * works, so a failure is logged (error name only) and changes neither the request nor the audit.
+ */
+const sendConfirmation = async (context: ActionCtx, requestId: string, userEmail: string): Promise<void> => {
+    const claim = { key: requestId, scope: EMAIL_SCOPE };
+
+    try {
+        if (!(await context.runMutation(internal.lib.claim_once.claimKey, { ...claim, ttlMs: ATTEMPT_CLAIM_TTL_MS }))) {
+            return;
+        }
+
+        try {
+            await context.runAction(internal.gdpr.steps.email_steps.sendDeletionConfirmedEmailAction, { userEmail });
+        } catch (error) {
+            await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+
+            throw error;
+        }
+    } catch (error) {
+        gdprLogger.error(`Deletion confirmation email for request ${requestId} was not sent (${errorClassOf(error)})`);
+    }
+};
+
 export const retryPostHogErasure = internalAction
     .input({ attempt: v.number(), chain: v.number(), requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
@@ -346,6 +375,7 @@ export const retryPostHogErasure = internalAction
         }
 
         let posthog: Awaited<ReturnType<typeof erasePostHogPerson>>;
+        let userEmail: string;
 
         try {
             posthog = await erasePostHogPerson(args.userId, process.env);
@@ -356,16 +386,11 @@ export const retryPostHogErasure = internalAction
                 throw new PostHogUnconfiguredError("PostHog erasure is not configured");
             }
 
-            // The address stays on the request until `recordPostHogRetrySuccess` minimises it, so
-            // a failure here (or in a later attempt) still finds it. A failed send fails the attempt.
-            const userEmail = await context.runQuery(internal.gdpr.posthog_retry.getRetryConfirmationEmail, {
+            // Read before the success is recorded, which minimises the address with the request.
+            userEmail = await context.runQuery(internal.gdpr.posthog_retry.getRetryConfirmationEmail, {
                 requestId: args.requestId,
                 userId: args.userId,
             });
-
-            if (userEmail !== "") {
-                await context.runAction(internal.gdpr.steps.email_steps.sendDeletionConfirmedEmailAction, { userEmail });
-            }
         } catch (error) {
             // Never rethrown: the scheduler would re-run a throwing job within minutes, off the 1h/6h/24h schedule.
             await context.runMutation(internal.gdpr.posthog_retry.failPostHogRetry, { ...args, errorClass: errorClassOf(error) });
@@ -376,6 +401,10 @@ export const retryPostHogErasure = internalAction
         // Not caught: a failure here leaves the request `processing`, and the scheduler's redelivery
         // of this job resumes it (`startPostHogRetry`). It must never be recorded as a failed erasure.
         await context.runMutation(internal.gdpr.posthog_retry.recordPostHogRetrySuccess, { ...args, posthog });
+
+        if (userEmail !== "") {
+            await sendConfirmation(context, args.requestId, userEmail);
+        }
 
         return null;
     });
