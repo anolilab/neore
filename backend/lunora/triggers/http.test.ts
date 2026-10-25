@@ -394,8 +394,8 @@ describe("trigger webhook signing", () => {
             expect(await history()).toHaveLength(0);
         });
 
-        it("keeps the claim, so a replay of a filtered delivery is a duplicate and writes nothing", async () => {
-            const { history, post } = await setup(FILTERED_TRIGGER);
+        it("releases the claim, so a replay of a filtered delivery is evaluated again and still collapses into one row", async () => {
+            const { history, post, scheduled } = await setup(FILTERED_TRIGGER);
             const body = '{"action":"closed"}';
             const headers = await signedHeaders(body);
 
@@ -405,8 +405,9 @@ describe("trigger webhook signing", () => {
 
             const replay = await post(body, headers);
 
-            expect(replay.status).toBe(200);
-            expect(await replay.json()).toMatchObject({ duplicate: true });
+            expect(replay.status).toBe(202);
+            expect(await replay.json()).toMatchObject({ outcome: "filtered" });
+            expect(scheduled).toHaveLength(0);
             expect(await history()).toHaveLength(1);
         });
 

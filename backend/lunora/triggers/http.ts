@@ -197,10 +197,12 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         }
 
         // 4. Payload filters, on the body only now that its signature is proven. A
-        //    filtered delivery KEEPS its claim: a replay of it is a duplicate and
-        //    writes nothing. It runs nothing, so it is not charged (`admitTriggerRun`
-        //    lives in the execution) and does not count as a run. 202, not 200: the
-        //    delivery was accepted and deliberately not acted on.
+        //    filtered delivery RELEASES its claim once recorded: the owner may fix the
+        //    filters and redeliver the same signed body within the claim's TTL, and that
+        //    replay must be evaluated again. A replay that still misses writes only the
+        //    one collapsed history row. It runs nothing, so it is not charged
+        //    (`admitTriggerRun` lives in the execution) and does not count as a run.
+        //    202, not 200: the delivery was accepted and deliberately not acted on.
         //    The body is decoded strictly for this: the lossy decode above turns invalid
         //    UTF-8 into U+FFFD, which could let bytes that are not JSON parse as JSON.
         //    A body that does not decode is evaluated as the empty (non-JSON) string.
@@ -217,6 +219,8 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 
                 throw error;
             }
+
+            await context.runMutation(internal.lib.claim_once.releaseKey, claim);
 
             return Response.json(
                 {
