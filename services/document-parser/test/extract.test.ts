@@ -17,6 +17,25 @@ const fixture = (name: string): Uint8Array => new Uint8Array(readFileSync(new UR
 /** Whether the error is undici's network failure, which it reports as this TypeError whatever the cause. */
 const isConnectionFailure = (error: unknown): boolean => error instanceof TypeError && error.message === "fetch failed";
 
+/** Response bytes that reached the client before undici's socket error ended the request; 0 when there is none. */
+const responseBytesBeforeDrop = (error: unknown): number => {
+    for (let current: unknown = error; current instanceof Error; current = current.cause) {
+        if (
+            "code" in current &&
+            current.code === "UND_ERR_SOCKET" &&
+            "socket" in current &&
+            typeof current.socket === "object" &&
+            current.socket !== null &&
+            "bytesRead" in current.socket &&
+            typeof current.socket.bytesRead === "number"
+        ) {
+            return current.socket.bytesRead;
+        }
+    }
+
+    return 0;
+};
+
 /** 25 MiB — `MAX_DOCUMENT_BYTES` in `src/shape.rs`. */
 const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
@@ -273,10 +292,10 @@ describe("document-parser Worker", () => {
 
             outcome = response.status;
         } catch (error) {
-            // Only a failure after the client pushed past the cap can be the race:
-            // the Worker must have read that far to refuse. An earlier failure means
-            // the request never got through, which is a real failure.
-            if (!isConnectionFailure(error) || sent <= MAX_DOCUMENT_BYTES) {
+            // Only a failure after the client pushed past the cap can be the race: the
+            // Worker must have read that far to refuse. It must also have answered
+            // (response bytes on the socket), or the request never reached it.
+            if (!isConnectionFailure(error) || sent <= MAX_DOCUMENT_BYTES || responseBytesBeforeDrop(error) === 0) {
                 throw error;
             }
 
