@@ -5,11 +5,8 @@ import { KeyboardShortcutsManager, useKeyboardShortcuts } from "./keyboard-short
 
 // Mock the UI state hook that provides keyboard shortcuts
 const mockKeyboardShortcuts = {
-    archiveThread: "ctrl+a",
     audioRecord: "ctrl+shift+r",
     commandPalette: "ctrl+k",
-    createBranch: "ctrl+shift+c",
-    deleteThread: "ctrl+d",
     escape: "escape",
     firstItem: "home",
     focusSearch: "ctrl+f",
@@ -18,9 +15,7 @@ const mockKeyboardShortcuts = {
     newChat: "ctrl+n",
     newTemporaryChat: "ctrl+shift+n",
     nextItem: "arrowdown",
-    pinThread: "ctrl+p",
     prevItem: "arrowup",
-    search: "ctrl+k",
     sidebarLeft: "ctrl+b",
     sidebarRight: "ctrl+shift+b",
 };

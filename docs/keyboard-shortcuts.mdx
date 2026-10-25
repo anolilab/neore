@@ -13,7 +13,7 @@ Most commonly used shortcuts:
 
 | Action | Windows/Linux | macOS |
 |--------|---------------|-------|
-| Command Palette / Search | `Ctrl+K` | `Cmd+K` |
+| Command Palette | `Ctrl+K` | `Cmd+K` |
 | New Chat | `Ctrl+N` | `Cmd+N` |
 | New Temporary Chat | `Ctrl+Shift+N` | `Cmd+Shift+N` |
 | Focus Search | `Ctrl+F` | `Cmd+F` |
@@ -62,9 +62,15 @@ These fire anywhere in the app (except while you are typing in a text field), wi
 | Shortcut | Action |
 |---|---|
 | `Ctrl+K` / `Cmd+K` | Open the command palette / global search |
-| `Ctrl+F` / `Cmd+F` | Focus the thread search input |
+| `Ctrl+F` / `Cmd+F` | Open the thread search (if it is closed) and focus its input |
 | `Ctrl+/` / `Cmd+/` | Show the keyboard help overlay |
 | `Escape` | Close dialogs and menus, cancel the current action |
+
+:::note
+`Ctrl+F` only replaces the browser's find while the thread list is on the page. With
+the sidebar closed there is nothing to focus, and the browser's find opens as usual.
+You can also leave Focus Search unbound to keep the browser's find everywhere.
+:::
 
 ## Thread Actions
 
@@ -136,22 +142,29 @@ Some shortcuts can be rebound at **Settings → App → Keyboard Shortcuts**:
 |---|---|
 | New Chat | Arrow Up / Down, Home, End |
 | New Temporary Chat | Audio recording |
-| Copy last code block | |
-| Search | Thread actions (palette-driven) |
+| Copy Last Code Block | Thread actions (palette-driven) |
+| Open Model Picker | |
+| Command Palette | |
+| Focus Search | |
 | Left sidebar | |
 | Right sidebar | |
 | Help | |
 | Escape | |
 
+Command Palette (`Ctrl+K`) and Focus Search (`Ctrl+F`) are two separate
+shortcuts: the first opens the palette, the second opens and focuses the thread
+list's search.
+
 To change one:
 
 1. Navigate to **Settings → App → Keyboard Shortcuts**
-2. Click the shortcut you want to change
+2. Click **Record** next to the shortcut you want to change
 3. Press the new key combination
-4. Save
+4. Click **Save Shortcuts**
 
-You can reset an individual shortcut, or reset all of them back to their
-defaults.
+**Clear** next to a shortcut leaves it unbound (it has no key until you record
+one), and **Reset to Defaults** puts every shortcut on this page back to its
+default and saves that.
 
 ## Slash Commands
 
@@ -178,10 +191,11 @@ See [Chat](/docs/chat#slash-commands) and [Skills](/docs/skills).
 **Issue**: Shortcut not working
 - **Solution**: Check whether you're in a text input field — shortcuts are disabled while typing
 - **Solution**: Check whether it is one of the four palette-only thread actions above
+- **Solution**: `Ctrl+F` does nothing special when the thread list is not on the page; the browser's find takes it
 - **Solution**: Ensure no browser extension is intercepting the combination
 
 **Issue**: Shortcut conflicts with the browser
-- **Solution**: Rebind it in Settings → App → Keyboard Shortcuts, if it is one of the customizable ones
+- **Solution**: Rebind it in Settings → App → Keyboard Shortcuts, if it is one of the customizable ones (Clear Focus Search to keep the browser's find)
 
 **Issue**: Can't remember shortcuts
 - **Solution**: Press `Ctrl+/` (Mac: `Cmd+/`) to see the help overlay

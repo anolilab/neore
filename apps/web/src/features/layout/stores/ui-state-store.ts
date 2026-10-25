@@ -46,12 +46,9 @@ export type AppearanceSettings = {
 };
 
 export type KeyboardShortcuts = {
-    archiveThread: string;
     audioRecord: string;
     commandPalette: string;
     copyLastCodeBlock: string;
-    createBranch: string;
-    deleteThread: string;
     escape: string;
     firstItem: string;
     focusSearch: string;
@@ -61,9 +58,7 @@ export type KeyboardShortcuts = {
     newTemporaryChat: string;
     nextItem: string;
     openModelPicker: string;
-    pinThread: string;
     prevItem: string;
-    search: string;
     sidebarLeft: string;
     sidebarRight: string;
 };
@@ -90,13 +85,11 @@ export type UserPreferences = {
     soundEffects: boolean;
 };
 
-const defaultKeyboardShortcuts: KeyboardShortcuts = {
-    archiveThread: `${platformModifier}+a`,
+/** What "Reset to Defaults" restores. */
+export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     audioRecord: `${platformModifier}+shift+r`,
     commandPalette: `${platformModifier}+k`,
     copyLastCodeBlock: `${platformModifier}+shift+x`,
-    createBranch: `${platformModifier}+shift+c`,
-    deleteThread: `${platformModifier}+d`,
     escape: "escape",
     firstItem: "home",
     focusSearch: `${platformModifier}+f`,
@@ -106,9 +99,7 @@ const defaultKeyboardShortcuts: KeyboardShortcuts = {
     newTemporaryChat: `${platformModifier}+shift+n`,
     nextItem: "arrowdown",
     openModelPicker: `${platformModifier}+shift+m`,
-    pinThread: `${platformModifier}+p`,
     prevItem: "arrowup",
-    search: `${platformModifier}+k`,
     sidebarLeft: `${platformModifier}+b`,
     sidebarRight: `${platformModifier}+shift+b`,
 };

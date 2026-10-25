@@ -70,7 +70,6 @@ const ThreadList: FC = () => {
     );
 
     // Get actions directly from store (stable references, no need for shallow comparison)
-    const setShowSearch = useThreadListUIStore((state) => state.setShowSearch);
     const setShowKeyboardHelp = useThreadListUIStore((state) => state.setShowKeyboardHelp);
     const setSelectedThreadIds = useThreadListUIStore((state) => state.setSelectedThreadIds);
     const setLastSelectedIndex = useThreadListUIStore((state) => state.setLastSelectedIndex);
@@ -227,7 +226,6 @@ const ThreadList: FC = () => {
                     setLoadingStates={setLoadingStates}
                     setSelectedThreadIds={setSelectedThreadIds}
                     setShowKeyboardHelp={setShowKeyboardHelp}
-                    setShowSearch={setShowSearch}
                     showKeyboardHelp={showKeyboardHelp}
                     threadRelationships={threadRelationships ?? []}
                     threadSearchResults={threadSearchResults}

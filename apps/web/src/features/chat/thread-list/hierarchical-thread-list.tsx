@@ -6,6 +6,7 @@ import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { KeyCombo, Keys, KeySymbol, ShortcutsProvider } from "@neore/ui/components/keyboard-shortcuts";
+import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -14,6 +15,7 @@ import type { FC, ReactNode } from "react";
 import { lazy, memo, startTransition, Suspense, useCallback, useId, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import {
     useDeleteProject,
     useMoveThreadToProject,
@@ -47,20 +49,18 @@ const ProjectFormDialog = lazy(() => import("@/features/projects/components/proj
 // KeyboardHelp - Shows keyboard shortcuts overlay
 const keyboardHelpMappings = {
     "?": { label: "Question Mark", symbols: { default: "?" } },
-    a: { label: "A", symbols: { default: "A" } },
-    b: { label: "B", symbols: { default: "B" } },
-    d: { label: "D", symbols: { default: "D" } },
-    f: { label: "F", symbols: { default: "F" } },
     n: { label: "N", symbols: { default: "N" } },
-    p: { label: "P", symbols: { default: "P" } },
 };
 
 const KeyboardHelp: FC<{ onClose: () => void; show: boolean }> = ({ onClose, show }) => {
     const { t } = useLingui();
+    const { keyboardShortcuts } = useKeyboardShortcuts();
 
     if (!show) {
         return null;
     }
+
+    const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
 
     return (
         <div className="bg-background/95 inset-0 z-50 rounded-lg border p-4 backdrop-blur-sm">
@@ -81,26 +81,12 @@ const KeyboardHelp: FC<{ onClose: () => void; show: boolean }> = ({ onClose, sho
                             <span className="text-muted-foreground">{t`New temporary thread`}</span>
                             <KeyCombo keyNames={[Keys.Command, Keys.Shift, "n"]} />
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Delete thread`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "d"]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Pin/Unpin thread`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "p"]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Create branch`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "b"]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Archive/Unarchive thread`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "a"]} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">{t`Search threads`}</span>
-                            <KeyCombo keyNames={[Keys.Command, "f"]} />
-                        </div>
+                        {focusSearchShortcut && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">{t`Focus search`}</span>
+                                <kbd className="font-mono">{focusSearchShortcut}</kbd>
+                            </div>
+                        )}
                         <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">{t`Navigate threads`}</span>
                             <KeyCombo keyNames={[Keys.ArrowUp, Keys.ArrowDown]} />
@@ -470,7 +456,6 @@ const HierarchicalThreadList: FC<
     setLoadingStates,
     setSelectedThreadIds,
     setShowKeyboardHelp,
-    setShowSearch,
     showKeyboardHelp,
     threadRelationships,
     threadSearchResults,
@@ -1082,25 +1067,17 @@ const HierarchicalThreadList: FC<
 
     // Keyboard shortcuts - extracted to dedicated hook
     useThreadListKeyboard({
-        currentThreadId,
-        flattenedThreads,
         handleArrowDown,
         handleArrowUp,
-        handleCreateBranch,
-        handleDeleteThread,
         handleEnter,
         handleKeyboardEscape,
-        handlePinThread,
         handleSelectAll,
-        handleUnpinThread,
         isKeyboardNavigating,
         isSelectionMode,
         navigate,
         onExitSelectionMode,
         selectedThreadIndex,
         setShowKeyboardHelp,
-        setShowSearch,
-        updateThread,
     });
 
     // Reset keyboard navigation on mouse interaction

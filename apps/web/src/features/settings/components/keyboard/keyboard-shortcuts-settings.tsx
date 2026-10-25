@@ -2,6 +2,7 @@
 
 import { Field } from "@base-ui/react/field";
 import { useLingui } from "@lingui/react/macro";
+import { isValidShortcut } from "@neore/backend/auth/shortcut";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { useAppForm } from "@neore/ui/components/form";
@@ -16,117 +17,147 @@ import { toast } from "sonner";
 import * as z from "zod";
 
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
+import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
+import { defaultKeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-const keyboardShortcutSchema = z.strictObject({
-    copyLastCodeBlock: z.string().optional(),
-    escape: z.string().optional(),
-    help: z.string().optional(),
-    newChat: z.string().optional(),
-    newTemporaryChat: z.string().optional(),
-    openModelPicker: z.string().optional(),
-    search: z.string().optional(),
-    sidebarLeft: z.string().optional(),
-    sidebarRight: z.string().optional(),
-});
+// Same rule the backend applies on save (`@neore/backend/auth/shortcut`); "" is a cleared binding.
+const DUPLICATE_SHORTCUT_MESSAGE = "Already used by another action";
+const shortcutValueSchema = z.string().refine(isValidShortcut, { error: "Not a valid shortcut" });
+
+// Exactly the shortcuts this page edits. The store holds more (navigation, audio) that stay fixed.
+// Strict, so a key added to the form without a schema entry fails instead of being saved unchecked.
+// Two actions on one chord would both fire, so a chord may be bound once; modifier spelling and order do not matter.
+const shortcutIdentity = (value: string): string => {
+    const parts = value.toLowerCase().split("+");
+    const key = parts.pop() ?? "";
+    const modifiers = new Set(parts.map((modifier) => (modifier === "cmd" ? "meta" : modifier)));
+
+    return [...[...modifiers].toSorted((a, b) => a.localeCompare(b)), key].join("+");
+};
+
+const keyboardShortcutSchema = z
+    .strictObject({
+        commandPalette: shortcutValueSchema,
+        copyLastCodeBlock: shortcutValueSchema,
+        escape: shortcutValueSchema,
+        focusSearch: shortcutValueSchema,
+        help: shortcutValueSchema,
+        newChat: shortcutValueSchema,
+        newTemporaryChat: shortcutValueSchema,
+        openModelPicker: shortcutValueSchema,
+        sidebarLeft: shortcutValueSchema,
+        sidebarRight: shortcutValueSchema,
+    })
+    .check((context) => {
+        const owners = new Map<string, string[]>();
+
+        for (const [key, value] of Object.entries(context.value)) {
+            if (!(value && isValidShortcut(value))) {
+                continue;
+            }
+
+            const identity = shortcutIdentity(value);
+
+            owners.set(identity, [...(owners.get(identity) ?? []), key]);
+        }
+
+        for (const keys of owners.values()) {
+            if (keys.length > 1) {
+                for (const key of keys) {
+                    context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
+                }
+            }
+        }
+    });
 
 type KeyboardShortcutForm = z.infer<typeof keyboardShortcutSchema>;
 
-// Get default shortcuts for descriptions
-const getDefaultShortcut = (key: string): string => {
-    switch (key) {
-        case "copyLastCodeBlock": {
-            return `ctrl+shift+x`;
-        }
-        case "help": {
-            return `ctrl+/`;
-        }
-        case "newChat": {
-            return `ctrl+n`;
-        }
-        case "newTemporaryChat": {
-            return `ctrl+shift+n`;
-        }
-        case "openModelPicker": {
-            return `ctrl+shift+m`;
-        }
-        case "search": {
-            return `ctrl+k`;
-        }
-        case "sidebarLeft": {
-            return `ctrl+b`;
-        }
-        case "sidebarRight": {
-            return `ctrl+shift+b`;
-        }
-        default: {
-            return "";
-        }
+const EDITABLE_SHORTCUT_KEYS = Object.keys(keyboardShortcutSchema.shape) as (keyof KeyboardShortcutForm)[];
+
+const pickEditableShortcuts = (shortcuts: Partial<KeyboardShortcuts>): KeyboardShortcutForm =>
+    Object.fromEntries(EDITABLE_SHORTCUT_KEYS.map((key) => [key, shortcuts[key] ?? ""])) as KeyboardShortcutForm;
+
+const isDuplicate = (errors: unknown[] | undefined): boolean =>
+    (errors ?? []).some((error) => (error as { message?: string } | undefined)?.message === DUPLICATE_SHORTCUT_MESSAGE);
+
+const MODIFIER_KEYS = new Set(["Alt", "Control", "Meta", "Shift"]);
+
+const saveStatus = (state: { canSubmit: boolean; isSubmitting: boolean }): "invalid" | "ready" | "saving" => {
+    if (state.isSubmitting) {
+        return "saving";
     }
+
+    return state.canSubmit ? "ready" : "invalid";
 };
+
+const defaultShortcut = (key: keyof KeyboardShortcutForm): string => formatShortcutForDisplay(defaultKeyboardShortcuts[key]);
 
 const KeyboardShortcutsSettings: FC = () => {
     const { t } = useLingui();
 
-    const shortcutLabels = {
+    const shortcutLabels: Record<keyof KeyboardShortcutForm, string> = {
+        commandPalette: t`Command Palette`,
         copyLastCodeBlock: t`Copy Last Code Block`,
         escape: t`Escape`,
+        focusSearch: t`Focus Search`,
         help: t`Help`,
         newChat: t`New Chat`,
         newTemporaryChat: t`New Temporary Chat`,
         openModelPicker: t`Open Model Picker`,
-        search: t`Search`,
         sidebarLeft: t`Sidebar Left`,
         sidebarRight: t`Sidebar Right`,
     };
 
-    const shortcutDescriptions = {
-        copyLastCodeBlock: t`Copy the last code block of the latest assistant reply (${formatShortcutForDisplay(getDefaultShortcut("copyLastCodeBlock"))})`,
+    const shortcutDescriptions: Record<keyof KeyboardShortcutForm, string> = {
+        commandPalette: t`Open the command palette and global search (${defaultShortcut("commandPalette")})`,
+        copyLastCodeBlock: t`Copy the last code block of the latest assistant reply (${defaultShortcut("copyLastCodeBlock")})`,
         escape: t`Close dialogs and menus`,
-        help: t`Show help dialog (${formatShortcutForDisplay(getDefaultShortcut("help"))})`,
-        newChat: t`Start a new chat (${formatShortcutForDisplay(getDefaultShortcut("newChat"))})`,
-        newTemporaryChat: t`Start a new temporary chat (${formatShortcutForDisplay(getDefaultShortcut("newTemporaryChat"))})`,
-        openModelPicker: t`Open the model picker in the composer (${formatShortcutForDisplay(getDefaultShortcut("openModelPicker"))})`,
-        search: t`Open search (${formatShortcutForDisplay(getDefaultShortcut("search"))})`,
-        sidebarLeft: t`Toggle left sidebar (${formatShortcutForDisplay(getDefaultShortcut("sidebarLeft"))})`,
-        sidebarRight: t`Toggle right sidebar (${formatShortcutForDisplay(getDefaultShortcut("sidebarRight"))})`,
+        focusSearch: t`Open the thread search and focus it. Leave it unbound to keep the browser's find (${defaultShortcut("focusSearch")})`,
+        help: t`Show help dialog (${defaultShortcut("help")})`,
+        newChat: t`Start a new chat (${defaultShortcut("newChat")})`,
+        newTemporaryChat: t`Start a new temporary chat (${defaultShortcut("newTemporaryChat")})`,
+        openModelPicker: t`Open the model picker in the composer (${defaultShortcut("openModelPicker")})`,
+        sidebarLeft: t`Toggle left sidebar (${defaultShortcut("sidebarLeft")})`,
+        sidebarRight: t`Toggle right sidebar (${defaultShortcut("sidebarRight")})`,
     };
     const { keyboardShortcuts, resetKeyboardShortcuts, setKeyboardShortcuts } = useKeyboardShortcuts();
     const crpc = useCRPC();
 
-    const updateUserSettingsMutation = useMutation(crpc.auth.functions.updateUserSettings.mutationOptions());
+    const { mutateAsync: updateUserSettings } = useMutation(crpc.auth.functions.updateUserSettings.mutationOptions());
     const [isRecording, setIsRecording] = useState<string | undefined>(undefined);
     const [pressedKeys, setPressedKeys] = useState<string[]>([]);
+    // Reset and Save are one queue: neither starts while the other is in flight, so the last click is the last write.
+    const [isResetting, setIsResetting] = useState(false);
 
-    const form = useAppForm({
-        defaultValues: keyboardShortcuts,
-        onSubmit: async ({ value }) => {
+    // The one save path: Save and Reset to Defaults both go through it.
+    const saveShortcuts = useCallback(
+        async (value: Partial<KeyboardShortcuts>, successMessage: string) => {
             try {
-                await updateUserSettingsMutation.mutateAsync({
-                    keyboardShortcuts: value,
-                });
+                await updateUserSettings({ keyboardShortcuts: value });
 
                 setKeyboardShortcuts(value);
 
-                toast.success(t`Keyboard shortcuts updated successfully`);
+                toast.success(successMessage);
             } catch (error) {
                 toast.error(t`Failed to update keyboard shortcuts`);
 
                 throw error;
             }
         },
-        validators: {
-            onChange: ({ value }) => {
-                const result = keyboardShortcutSchema.safeParse(value);
+        [updateUserSettings, setKeyboardShortcuts, t],
+    );
 
-                if (!result.success) {
-                    return { keyboardShortcuts: result.error.message };
-                }
-
-                return undefined;
-            },
+    const form = useAppForm({
+        defaultValues: pickEditableShortcuts(keyboardShortcuts),
+        onSubmit: async ({ value }) => {
+            await saveShortcuts(value, t`Keyboard shortcuts updated successfully`);
         },
+        validators: { onChange: keyboardShortcutSchema },
     });
+
+    // A string, not `t`: a new function identity per render would tear down the recording listeners mid-press.
+    const invalidShortcutMessage = t`That key combination cannot be used as a shortcut`;
 
     // Handle keyboard recording
     useEffect(() => {
@@ -143,6 +174,11 @@ const KeyboardShortcutsSettings: FC = () => {
             event.preventDefault();
             event.stopPropagation();
 
+            // A modifier on its own is not a shortcut; wait for the key it modifies.
+            if (MODIFIER_KEYS.has(event.key)) {
+                return;
+            }
+
             // Use the utility function to convert the event to a shortcut string
             const shortcut = eventToShortcut(event);
 
@@ -153,7 +189,12 @@ const KeyboardShortcutsSettings: FC = () => {
 
             // Stop recording on key up
             const handleKeyUp = () => {
-                form.setFieldValue(isRecording as keyof KeyboardShortcutForm, shortcut);
+                // Keep a combination the backend would refuse out of the form, so Save never greys out unexplained.
+                if (isValidShortcut(shortcut)) {
+                    form.setFieldValue(isRecording as keyof KeyboardShortcutForm, shortcut);
+                } else {
+                    toast.error(invalidShortcutMessage);
+                }
 
                 setIsRecording(undefined);
                 setPressedKeys([]);
@@ -167,7 +208,7 @@ const KeyboardShortcutsSettings: FC = () => {
         return () => {
             controller.abort();
         };
-    }, [isRecording, form]);
+    }, [isRecording, form, invalidShortcutMessage]);
 
     const startRecording = (field: string) => {
         setIsRecording(field);
@@ -179,12 +220,32 @@ const KeyboardShortcutsSettings: FC = () => {
         setPressedKeys([]);
     };
 
-    const handleReset = useCallback(() => {
-        resetKeyboardShortcuts();
-        form.reset();
+    const handleReset = useCallback(async () => {
+        if (isResetting || form.state.isSubmitting) {
+            return;
+        }
 
-        toast.info(t`Keyboard shortcuts reset to defaults`);
-    }, [resetKeyboardShortcuts, form, t]);
+        const defaults = pickEditableShortcuts(defaultKeyboardShortcuts);
+
+        // Ends a recording in progress, so a later key press cannot write into the form after the reset.
+        setIsRecording(undefined);
+        setPressedKeys([]);
+        setIsResetting(true);
+
+        try {
+            // The server keeps its own copy, so it is saved first; on failure the previous bindings stay in place.
+            // The whole default set goes, not just the form's keys: the server merges, so a fixed binding (audio,
+            // list navigation) it already holds would otherwise survive a reset the local store has applied.
+            await saveShortcuts(defaultKeyboardShortcuts, t`Keyboard shortcuts reset to defaults`);
+
+            resetKeyboardShortcuts();
+            form.reset(defaults);
+        } catch {
+            // `saveShortcuts` already told the user.
+        } finally {
+            setIsResetting(false);
+        }
+    }, [isResetting, resetKeyboardShortcuts, form, saveShortcuts, t]);
 
     return (
         <div className="space-y-6">
@@ -205,18 +266,25 @@ const KeyboardShortcutsSettings: FC = () => {
                     >
                         <CardContent className="space-y-6">
                             <div className="space-y-4">
-                                {Object.entries(shortcutLabels).map(([key, label]) => (
+                                {EDITABLE_SHORTCUT_KEYS.map((key) => (
                                     <Field.Root className="space-y-2" key={key}>
                                         <div className="flex items-center justify-between">
                                             <div>
                                                 <Label className="text-sm font-medium" htmlFor={key}>
-                                                    {label}
+                                                    {shortcutLabels[key]}
                                                 </Label>
-                                                <p className="text-muted-foreground text-xs">
-                                                    {shortcutDescriptions[key as keyof typeof shortcutDescriptions]}
-                                                </p>
+                                                <p className="text-muted-foreground text-xs">{shortcutDescriptions[key]}</p>
+                                                <form.Subscribe selector={(state) => isDuplicate(state.fieldMeta[key]?.errors)}>
+                                                    {(duplicate) =>
+                                                        duplicate && (
+                                                            <p className="text-destructive text-xs" role="alert">
+                                                                {t`Another action already uses this key combination. Change or clear one of them to save.`}
+                                                            </p>
+                                                        )
+                                                    }
+                                                </form.Subscribe>
                                             </div>
-                                            <form.AppField name={key as keyof KeyboardShortcutForm}>
+                                            <form.AppField name={key}>
                                                 {(field) => (
                                                     <div className="flex items-center gap-2">
                                                         <Input
@@ -231,6 +299,8 @@ const KeyboardShortcutsSettings: FC = () => {
                                                             }
                                                         />
                                                         <Button
+                                                            aria-label={`${isRecording === key ? t`Stop` : t`Record`} ${shortcutLabels[key]}`}
+                                                            disabled={isResetting}
                                                             onClick={() => {
                                                                 if (isRecording === key) {
                                                                     stopRecording();
@@ -245,9 +315,10 @@ const KeyboardShortcutsSettings: FC = () => {
                                                             {isRecording === key ? t`Stop` : t`Record`}
                                                         </Button>
                                                         <Button
+                                                            aria-label={`${t`Clear`} ${shortcutLabels[key]}`}
                                                             disabled={!field.state.value}
                                                             onClick={() => {
-                                                                form.setFieldValue(key as keyof KeyboardShortcutForm, "");
+                                                                form.setFieldValue(key, "");
                                                             }}
                                                             size="sm"
                                                             type="button"
@@ -259,7 +330,7 @@ const KeyboardShortcutsSettings: FC = () => {
                                                 )}
                                             </form.AppField>
                                         </div>
-                                        {key !== "sidebarRight" && <Separator />}
+                                        {key !== EDITABLE_SHORTCUT_KEYS.at(-1) && <Separator />}
                                     </Field.Root>
                                 ))}
                             </div>
@@ -267,13 +338,17 @@ const KeyboardShortcutsSettings: FC = () => {
 
                         <CardFooter>
                             <div className="flex gap-2">
-                                <Button onClick={handleReset} type="button" variant="outline">
-                                    {t`Reset to Defaults`}
-                                </Button>
                                 <form.Subscribe selector={(state) => state.isSubmitting}>
                                     {(isSubmitting) => (
-                                        <Button disabled={isSubmitting} type="submit">
-                                            {isSubmitting ? t`Saving...` : t`Save Shortcuts`}
+                                        <Button disabled={isSubmitting || isResetting} onClick={handleReset} type="button" variant="outline">
+                                            {t`Reset to Defaults`}
+                                        </Button>
+                                    )}
+                                </form.Subscribe>
+                                <form.Subscribe selector={saveStatus}>
+                                    {(status) => (
+                                        <Button disabled={status !== "ready" || isResetting} type="submit">
+                                            {status === "saving" ? t`Saving...` : t`Save Shortcuts`}
                                         </Button>
                                     )}
                                 </form.Subscribe>
