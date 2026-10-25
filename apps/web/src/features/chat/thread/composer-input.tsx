@@ -46,6 +46,7 @@ import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { isThreadLockedError } from "@/lib/lunora/unlock-proofs";
 import { showError } from "@/lib/toast";
 
 import type { ChatReference } from "./chat-reference";
@@ -102,9 +103,12 @@ const errorMessage = (error: unknown, fallback: string, describe?: (error: Attac
 /**
  * The server answered with an error code, so it did not queue the steer. An error
  * without one (a dropped connection, a timeout) leaves it unknown whether it did.
+ * A locked chat's rejection counts as unknown too: the chip stays a steer, and the
+ * queue's withdrawal hits the same lock and pauses with the text kept, where a
+ * plain send would take it out of the queue before the same lock failed it.
  */
 const wasRefused = (error: unknown): boolean => {
-    if (typeof error !== "object" || error === null) {
+    if (typeof error !== "object" || error === null || isThreadLockedError(error)) {
         return false;
     }
 
