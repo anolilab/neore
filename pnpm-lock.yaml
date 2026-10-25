@@ -3138,6 +3138,9 @@ importers:
       eslint:
         specifier: catalog:lint
         version: 10.13.0(jiti@2.7.0)(supports-color@10.2.2)
+      msw:
+        specifier: catalog:test
+        version: 3.0.3(@types/node@26.6.5)(graphql@16.11.0)(supports-color@10.2.2)(typescript@6.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
       prettier:
         specifier: catalog:lint
         version: 3.9.10
