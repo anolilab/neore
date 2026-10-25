@@ -141,7 +141,7 @@ const MediaPreviewPanel = ({ children, className, defaultSize = 60, minSize = 30
         <ResizablePanel defaultSize={defaultSize} minSize={minSize}>
             <div className={cn("relative flex h-full flex-col bg-black/95", className)}>
                 {/* Media display */}
-                <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
+                <div className="relative flex flex-1 items-center justify-center p-4">
                     {media.type === "image" ? (
                         imageContent
                     ) : (
