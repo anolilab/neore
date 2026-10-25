@@ -310,6 +310,8 @@ const PersonalizationSettings: FC = () => {
                         <FieldLabel htmlFor="thread-title-instructions">{t`How should titles be written?`}</FieldLabel>
                         <FieldDescription>{t`For example: "Keep titles under four words", "Write titles in German", or "Start with a verb".`}</FieldDescription>
                         <Input
+                            // The draft belongs to an account; until the session names it, typed text would be dropped when it does.
+                            disabled={ownerId === null}
                             id="thread-title-instructions"
                             maxLength={MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
                             onBlur={handleThreadTitleInstructionsBlur}

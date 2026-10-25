@@ -15,7 +15,7 @@ const harness = vi.hoisted(() => {
         listeners: new Set<() => void>(),
         pendingSaves: [] as { land: () => void; resolve: () => void; value: string }[],
         settings: { threadTitleInstructions: undefined as string | undefined },
-        userId: "user-1",
+        userId: "user-1" as string | null,
     };
 
     return { store };
@@ -40,7 +40,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
 vi.mock("@/features/auth/hooks/session-user-management", () => {
     return {
         useSession: () => {
-            return { data: { user: { id: harness.store.userId } } };
+            return { data: harness.store.userId === null ? undefined : { user: { id: harness.store.userId } } };
         },
     };
 });
@@ -194,6 +194,23 @@ describe("PersonalizationSettings thread title instructions", () => {
         render(<PersonalizationSettings />);
 
         expect(field().value).toBe("Start with a verb");
+    });
+
+    it("does not accept text until the session names the account", () => {
+        harness.store.userId = null;
+
+        const view = render(<PersonalizationSettings />);
+
+        expect(field().disabled).toBe(true);
+
+        harness.store.userId = "user-1";
+        view.rerender(<PersonalizationSettings />);
+
+        expect(field().disabled).toBe(false);
+
+        fireEvent.change(field(), { target: { value: "Short titles" } });
+
+        expect(field().value).toBe("Short titles");
     });
 
     it("drops text typed for one account when another signs in, instead of saving it there", () => {
