@@ -6261,6 +6261,16 @@
       "to": "table:triggers"
     },
     {
+      "from": "function:triggers_functions:recordFilteredExecution",
+      "kind": "read",
+      "to": "table:triggerExecutions"
+    },
+    {
+      "from": "function:triggers_functions:recordFilteredExecution",
+      "kind": "write",
+      "to": "table:triggerExecutions"
+    },
+    {
       "from": "function:triggers_functions:setTriggerEnabled",
       "kind": "write",
       "to": "table:triggers"
@@ -14143,6 +14153,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:triggers_functions:recordFilteredExecution",
+      "kind": "function",
+      "name": "triggers.functions.recordFilteredExecution",
+      "module": "triggers"
+    },
+    {
+      "detail": "mutation",
       "id": "function:triggers_functions:setTriggerEnabled",
       "kind": "function",
       "name": "triggers.functions.setTriggerEnabled",
@@ -19735,19 +19752,31 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 82,
+      "line": 83,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 192,
+      "line": 193,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 207,
+      "line": 208,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "triggers/http",
+      "kind": "call",
+      "line": 213,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "triggers/http",
+      "kind": "call",
+      "line": 238,
       "reason": "the default export is not a registered function"
     },
     {
