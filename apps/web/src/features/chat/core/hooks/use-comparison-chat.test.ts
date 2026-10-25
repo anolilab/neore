@@ -30,6 +30,7 @@ vi.mock("@/hooks/use-gateway-models", () => {
         useGatewayModels: () => [
             { filterCapabilities: ["reasoning"], id: "model-a" },
             { filterCapabilities: ["text"], id: "model-b" },
+            { filterCapabilities: ["effort_control"], id: "model-c" },
         ],
     };
 });
@@ -191,6 +192,22 @@ describe("useComparisonChat reasoning effort", () => {
         expect(children.find((args) => args.model === "model-b")?.reasoningEffort).toBeUndefined();
         expect(sentBodies().find((body) => body.model === "model-a")).toMatchObject({ reasoningEffort: 75 });
         expect(sentBodies().find((body) => body.model === "model-b")?.reasoningEffort).toBeUndefined();
+    });
+
+    it("keeps the pending effort for a model that only advertises effort control", async () => {
+        useModelStore.getState().setPendingSettings({ reasoningEffort: 50 });
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt", parentThreadId: "parent" }));
+
+        await act(async () => {
+            await result.current.sendToExistingChildren("again", [
+                { model: "model-c", threadId: "child-c" },
+                { model: "model-b", threadId: "child-b" },
+            ]);
+        });
+
+        expect(sentBodies().find((body) => body.threadId === "child-c")).toMatchObject({ reasoningEffort: 50 });
+        expect(sentBodies().find((body) => body.threadId === "child-b")?.reasoningEffort).toBeUndefined();
     });
 
     it("does the same for a follow-up to existing children", async () => {

@@ -29,8 +29,15 @@ export const stepReasoningEffort = (current: number | undefined, direction: Effo
     return EFFORT_STOPS.findLast((stop) => stop < value) ?? EFFORT_MIN;
 };
 
-/** The model catalog entry's capability test; the selector's own (`reasoning-effort-selector.tsx`). */
+/**
+ * The model catalog entry's capability test: the two capabilities the backend accepts an effort for
+ * (`chat/lib/agent-run.ts`, `chat/functions.ts`).
+ */
 export const supportsReasoningEffort = (
     models: ReadonlyArray<{ filterCapabilities?: ReadonlyArray<string>; id: string }>,
     modelId: string | undefined,
-): boolean => models.find((candidate) => candidate.id === modelId)?.filterCapabilities?.includes("reasoning") ?? false;
+): boolean => {
+    const capabilities = models.find((candidate) => candidate.id === modelId)?.filterCapabilities;
+
+    return capabilities?.includes("reasoning") === true || capabilities?.includes("effort_control") === true;
+};

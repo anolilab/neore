@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EFFORT_STOPS, stepReasoningEffort } from "./reasoning-effort-steps";
+import { EFFORT_STOPS, stepReasoningEffort, supportsReasoningEffort } from "./reasoning-effort-steps";
 
 describe("stepReasoningEffort", () => {
     it("offers the slider's five stops", () => {
@@ -36,5 +36,26 @@ describe("stepReasoningEffort", () => {
         expect(stepReasoningEffort(60, "decrease")).toBe(50);
         expect(stepReasoningEffort(130, "increase")).toBe(100);
         expect(stepReasoningEffort(-5, "decrease")).toBe(0);
+    });
+});
+
+describe("supportsReasoningEffort", () => {
+    const models = [
+        { filterCapabilities: ["reasoning"], id: "reasons" },
+        { filterCapabilities: ["effort_control"], id: "effort-only" },
+        { filterCapabilities: ["text"], id: "plain" },
+        { id: "no-capabilities" },
+    ];
+
+    it("accepts both capabilities the backend takes an effort for", () => {
+        expect(supportsReasoningEffort(models, "reasons")).toBe(true);
+        expect(supportsReasoningEffort(models, "effort-only")).toBe(true);
+    });
+
+    it("refuses a model without either, an unknown model and no model", () => {
+        expect(supportsReasoningEffort(models, "plain")).toBe(false);
+        expect(supportsReasoningEffort(models, "no-capabilities")).toBe(false);
+        expect(supportsReasoningEffort(models, "missing")).toBe(false);
+        expect(supportsReasoningEffort(models, undefined)).toBe(false);
     });
 });
