@@ -5,7 +5,7 @@
  *
  * The source is rendered as a fenced block through Streamdown, so Mermaid is
  * reached only through `useStreamdownPlugins`, which loads it on demand. The
- * Mermaid config is the one the chat uses (`message-content.tsx`): the plugin's
+ * Mermaid config is the chat's (`useStreamdownAppearance`): the plugin's
  * default `securityLevel: "strict"` applies, which encodes HTML in labels and
  * disables click handlers. The raw source sits behind a disclosure.
  *

@@ -39,6 +39,13 @@ describe(capDelimitedColumns, () => {
         ]);
     });
 
+    it("measures the header as the first row with content, as the table does", () => {
+        const result = capDelimitedColumns(`\n\n${wideRow(200)}\n`, 50);
+
+        expect(result.hiddenColumns).toBe(150);
+        expect(Papa.parse(result.content).data[0] as string[]).toHaveLength(50);
+    });
+
     it("bounds a table with 200,000 columns to the cap", () => {
         const result = capDelimitedColumns(`${wideRow(200_000)}\n${wideRow(200_000)}\n`, 50);
 

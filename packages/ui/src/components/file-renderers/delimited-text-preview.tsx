@@ -30,16 +30,16 @@ export interface DelimitedTextPreviewProps {
 /** Columns shown. Each costs a header cell and a cell per row, and a file can have hundreds of thousands. */
 const MAX_PREVIEW_COLUMNS = 50;
 
-const DelimitedTable: FC<{ text: string }> = ({ text }) => {
+const DelimitedTable: FC<{ filename?: string; text: string }> = ({ filename, text }) => {
     const { t } = useLingui();
     const { content, hiddenColumns } = useMemo(() => capDelimitedColumns(text, MAX_PREVIEW_COLUMNS), [text]);
 
     // Not `compact`: the compact table renders every row, while this one pages (50 rows) and searches.
-    // The frame already names the file, so the toolbar title is generic: it would read "CSV Data" for a .tsv.
+    // Titled with the file name: the default would read "CSV Data" for a .tsv.
     return (
         <>
             <div className="h-[420px]">
-                <CsvRenderer content={content} labels={{ title: t`Table` }} />
+                <CsvRenderer content={content} labels={{ title: filename || t`Table` }} />
             </div>
             {hiddenColumns > 0 && (
                 <p className="text-muted-foreground border-t px-3 py-2 text-xs">
@@ -55,7 +55,7 @@ const DelimitedTextPreview: FC<DelimitedTextPreviewProps> = memo(({ className, f
 
     return (
         <FetchedTextPreview className={className} fallbackName={t`Table`} filename={filename} url={url}>
-            {(text) => <DelimitedTable text={text} />}
+            {(text) => <DelimitedTable filename={filename} text={text} />}
         </FetchedTextPreview>
     );
 });
