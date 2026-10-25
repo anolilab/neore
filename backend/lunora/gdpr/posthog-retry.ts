@@ -6,7 +6,8 @@
  * (idempotent); no step that deletes the user's own data does. The confirmation email is NOT
  * sent from here: `minimiseGdprRecords` already erased the address, and carrying it in the job
  * would keep it in the scheduler. Every scheduling, attempt and outcome is a `gdprAuditLog` row
- * and a structured event; the attempt count rides in the job args and the audit details.
+ * and a structured event; the attempt count rides in the job args and the audit details. A request
+ * is completed only after `minimiseGdprRecords` succeeded; if that fails the attempt fails.
  */
 import { v } from "lunorash/server";
 
@@ -223,6 +224,10 @@ export const retryPostHogErasure = internalAction
 
         try {
             posthog = await erasePostHogPerson(args.userId, process.env);
+            // Before the request can be completed, and not swallowed: a request must never end
+            // `completed` while the email an earlier failed minimisation left is still on it. A
+            // failure here counts as a failed attempt, so the next one erases and minimises again.
+            await context.runMutation(internal.gdpr.steps.residual_deletion_steps.minimiseGdprRecords, { userId: args.userId });
         } catch (error) {
             // The failed request must not keep the email either: a minimisation that failed on the
             // workflow's failure branch is retried by every attempt. Best-effort, and before the
@@ -242,13 +247,6 @@ export const retryPostHogErasure = internalAction
         // Not caught: a failure here leaves the request `processing`, and the scheduler's redelivery
         // of this job resumes it (`startPostHogRetry`). It must never be recorded as a failed erasure.
         await context.runMutation(internal.gdpr.posthog_retry.recordPostHogRetrySuccess, { ...args, posthog });
-
-        // As on the workflow's success path, after the final audit write. Best-effort: the request is complete.
-        try {
-            await context.runMutation(internal.gdpr.steps.residual_deletion_steps.minimiseGdprRecords, { userId: args.userId });
-        } catch (error) {
-            gdprLogger.warn(`Minimising the records of request ${args.requestId} failed after its analytics erasure retry`, error);
-        }
 
         return null;
     });

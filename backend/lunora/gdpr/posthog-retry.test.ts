@@ -27,6 +27,8 @@ const USER = "user-1";
 const FAILED_MESSAGE = "Your account data was erased, but deleting your analytics profile failed.";
 
 const deleteAuthRecordsSpy = vi.fn();
+const minimiseSpy = vi.fn();
+let realMinimise: (...handlerArgs: unknown[]) => unknown;
 
 let harness: ReturnType<typeof lunoraTest>;
 let requestId: string;
@@ -59,7 +61,15 @@ const attempt = async (n: number) =>
 beforeAll(async () => {
     registerModule(registry, "gdpr_functions", await import("./functions"));
     registerModule(registry, "gdpr_posthog_retry", await import("./posthog-retry"));
-    registerModule(registry, "gdpr_steps_residual_deletion_steps", await import("./steps/residual-deletion-steps"));
+    const residualSteps = await import("./steps/residual-deletion-steps");
+
+    registerModule(registry, "gdpr_steps_residual_deletion_steps", residualSteps);
+    // Delegates to the real minimisation; a test makes it fail to see what the retry does then.
+    realMinimise = (residualSteps.minimiseGdprRecords as unknown as { handler: typeof realMinimise }).handler;
+    registry.set("gdpr_steps_residual_deletion_steps:minimiseGdprRecords", {
+        ...residualSteps.minimiseGdprRecords,
+        handler: (...handlerArgs: unknown[]) => minimiseSpy(...handlerArgs),
+    });
 
     const deletionSteps = await import("./steps/deletion-steps");
 
@@ -74,6 +84,8 @@ beforeEach(async () => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     vi.mocked(erasePostHogPerson).mockReset();
     deleteAuthRecordsSpy.mockReset();
+    minimiseSpy.mockReset();
+    minimiseSpy.mockImplementation((...handlerArgs: unknown[]) => realMinimise(...handlerArgs));
     harness = lunoraTest(schema as never);
     requestId = await run(
         async (ctx) =>
@@ -256,6 +268,35 @@ describe("minimising the failed request", () => {
         // Minimisation clears the free-text reason; the fixed one is put back.
         expect(row.errorMessage).toBe(FAILED_MESSAGE);
         expect(jobs()).toHaveLength(1);
+    });
+});
+
+describe("a retry whose minimisation fails", () => {
+    it("is not completed with the address still on it: the attempt fails, and the next one minimises again", async () => {
+        await run(async (ctx) => await ctx.db.patch(requestId, { userEmail: "a@example.com" }));
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+        minimiseSpy.mockRejectedValue(new Error("db busy"));
+
+        await attempt(1);
+
+        const failed = await request();
+
+        expect(failed.status).toBe("failed");
+        expect(failed.errorMessage).toBe(FAILED_MESSAGE);
+        expect(await actions()).not.toContain("deletion_completed");
+        expect(await actions()).toContain("deletion_retry_failed");
+        expect(jobs()).toHaveLength(1);
+        expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, requestId, userId: USER });
+        expect(jobs()[0]?.scheduledFor).toBe(NOW + 6 * HOUR);
+
+        minimiseSpy.mockImplementation((...handlerArgs: unknown[]) => realMinimise(...handlerArgs));
+        await attempt(2);
+
+        const done = await request();
+
+        expect(done.status).toBe("completed");
+        expect(done.userEmail).toBe("");
+        expect(erasePostHogPerson).toHaveBeenCalledTimes(2);
     });
 });
 

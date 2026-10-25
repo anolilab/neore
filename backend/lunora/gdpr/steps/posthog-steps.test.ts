@@ -38,6 +38,16 @@ describe(erasePostHogPerson, () => {
         expect(JSON.parse(init.body as string)).toStrictEqual({ delete_events: true, distinct_ids: ["user-1"] });
     });
 
+    it("cancels the body of a 2xx answer instead of leaving it unread", async () => {
+        const cancelled = vi.fn();
+        const body = new ReadableStream({ cancel: cancelled, pull() {} });
+
+        stubFetch(new Response(body, { status: 200 }));
+
+        await expect(erasePostHogPerson("user-1", CONFIGURED)).resolves.toBe("deleted");
+        expect(cancelled).toHaveBeenCalledTimes(1);
+    });
+
     it("reports no_profile, not deleted, on a 404 when the project check passes", async () => {
         const fetchMock = stubFetchByUrl({ person: new Response("not found", { status: 404 }), project: new Response("{}", { status: 200 }) });
 

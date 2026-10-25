@@ -90,6 +90,8 @@ export const erasePostHogPerson = async (userId: string, env: PostHogErasureEnv)
         throw error;
     }
 
+    await response.body?.cancel();
+
     return "deleted";
 };
 
