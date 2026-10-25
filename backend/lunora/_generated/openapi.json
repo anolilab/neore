@@ -32078,11 +32078,223 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
+                  "items": {
+                    "properties": {
+                      "color": {
+                        "type": "string"
+                      },
+                      "context": {
+                        "type": "string"
+                      },
+                      "defaultEnabledFeatures": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "defaultModel": {
+                        "type": "string"
+                      },
+                      "defaultReasoningEffort": {
+                        "type": "number"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "forkedFromId": {
+                        "type": "string"
+                      },
+                      "galleryCategory": {
+                        "type": "string"
+                      },
+                      "galleryFeatured": {
+                        "type": "boolean"
+                      },
+                      "galleryForkCount": {
+                        "type": "number"
+                      },
+                      "galleryPublishedAt": {
+                        "type": "number"
+                      },
+                      "galleryTags": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "galleryViewCount": {
+                        "type": "number"
+                      },
+                      "icon": {
+                        "type": "string"
+                      },
+                      "isPublic": {
+                        "type": "boolean"
+                      },
+                      "order": {
+                        "type": "number"
+                      },
+                      "organizationId": {
+                        "type": "string"
+                      },
+                      "pinnedAt": {
+                        "type": "number"
+                      },
+                      "projectType": {
+                        "anyOf": [
+                          {
+                            "const": "chat",
+                            "type": "string"
+                          },
+                          {
+                            "const": "workflow",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "publicAccessToken": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "userId": {
+                        "type": "string"
+                      },
+                      "workflowContent": {
+                        "properties": {
+                          "edges": {
+                            "items": {
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "type": "string"
+                                },
+                                "sourceHandle": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "target": {
+                                  "type": "string"
+                                },
+                                "targetHandle": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "type": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "target"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "nodes": {
+                            "items": {
+                              "properties": {
+                                "data": {},
+                                "id": {
+                                  "type": "string"
+                                },
+                                "position": {
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "position",
+                                "type"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "viewport": {
+                            "properties": {
+                              "x": {
+                                "type": "number"
+                              },
+                              "y": {
+                                "type": "number"
+                              },
+                              "zoom": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "zoom"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "edges",
+                          "nodes"
+                        ],
+                        "type": "object"
+                      },
+                      "_creationTime": {
+                        "type": "number"
+                      },
+                      "_id": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "_creationTime",
+                      "_id",
+                      "createdAt"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
                 }
               }
             },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
+            "description": "Successful response."
           },
           "default": {
             "$ref": "#/components/responses/LunoraError"
@@ -32174,11 +32386,271 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Return shape is TS-inferred (no `.output()` declared); best-effort — any JSON."
+                  "properties": {
+                    "continueCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "isDone": {
+                      "type": "boolean"
+                    },
+                    "page": {
+                      "items": {
+                        "properties": {
+                          "color": {
+                            "type": "string"
+                          },
+                          "context": {
+                            "type": "string"
+                          },
+                          "defaultEnabledFeatures": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "defaultModel": {
+                            "type": "string"
+                          },
+                          "defaultReasoningEffort": {
+                            "type": "number"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "forkedFromId": {
+                            "type": "string"
+                          },
+                          "galleryCategory": {
+                            "type": "string"
+                          },
+                          "galleryFeatured": {
+                            "type": "boolean"
+                          },
+                          "galleryForkCount": {
+                            "type": "number"
+                          },
+                          "galleryPublishedAt": {
+                            "type": "number"
+                          },
+                          "galleryTags": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "galleryViewCount": {
+                            "type": "number"
+                          },
+                          "icon": {
+                            "type": "string"
+                          },
+                          "isPublic": {
+                            "type": "boolean"
+                          },
+                          "order": {
+                            "type": "number"
+                          },
+                          "organizationId": {
+                            "type": "string"
+                          },
+                          "pinnedAt": {
+                            "type": "number"
+                          },
+                          "projectType": {
+                            "anyOf": [
+                              {
+                                "const": "chat",
+                                "type": "string"
+                              },
+                              {
+                                "const": "workflow",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "publicAccessToken": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "userId": {
+                            "type": "string"
+                          },
+                          "workflowContent": {
+                            "properties": {
+                              "edges": {
+                                "items": {
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "source": {
+                                      "type": "string"
+                                    },
+                                    "sourceHandle": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "target": {
+                                      "type": "string"
+                                    },
+                                    "targetHandle": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "source",
+                                    "target"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "nodes": {
+                                "items": {
+                                  "properties": {
+                                    "data": {},
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "position": {
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "position",
+                                    "type"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "viewport": {
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "zoom": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "zoom"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "edges",
+                              "nodes"
+                            ],
+                            "type": "object"
+                          },
+                          "_creationTime": {
+                            "type": "number"
+                          },
+                          "_id": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          },
+                          "updatedAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "_creationTime",
+                          "_id",
+                          "createdAt"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "pageStatus": {
+                      "anyOf": [
+                        {
+                          "const": "SplitRecommended",
+                          "type": "string"
+                        },
+                        {
+                          "const": "SplitRequired",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "splitCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "continueCursor",
+                    "isDone",
+                    "page"
+                  ],
+                  "type": "object"
                 }
               }
             },
-            "description": "Successful response. The return shape is TypeScript-inferred and not declared via `.output()`, so it is documented best-effort."
+            "description": "Successful response."
           },
           "default": {
             "$ref": "#/components/responses/LunoraError"
