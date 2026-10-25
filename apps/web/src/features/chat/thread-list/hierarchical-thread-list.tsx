@@ -1081,24 +1081,17 @@ const HierarchicalThreadList: FC<
 
     // Keyboard shortcuts - extracted to dedicated hook
     useThreadListKeyboard({
-        currentThreadId,
-        flattenedThreads,
         handleArrowDown,
         handleArrowUp,
-        handleCreateBranch,
-        handleDeleteThread,
         handleEnter,
         handleKeyboardEscape,
-        handlePinThread,
         handleSelectAll,
-        handleUnpinThread,
         isKeyboardNavigating,
         isSelectionMode,
         navigate,
         onExitSelectionMode,
         selectedThreadIndex,
         setShowKeyboardHelp,
-        updateThread,
     });
 
     // Reset keyboard navigation on mouse interaction

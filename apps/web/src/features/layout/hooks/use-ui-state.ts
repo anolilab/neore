@@ -118,17 +118,12 @@ type UserPreferencesHookReturn = UserPreferences & {
 type KeyboardShortcutsHookReturn = {
     keyboardShortcuts: KeyboardShortcuts;
     resetKeyboardShortcuts: () => void;
-    setArchiveThread: (shortcut: string) => void;
     setAudioRecord: (shortcut: string) => void;
-    setCreateBranch: (shortcut: string) => void;
-    setDeleteThread: (shortcut: string) => void;
     setEscape: (shortcut: string) => void;
     setHelp: (shortcut: string) => void;
     setKeyboardShortcuts: (shortcuts: Partial<KeyboardShortcuts>) => void;
     setNewChat: (shortcut: string) => void;
     setNewTemporaryChat: (shortcut: string) => void;
-    setPinThread: (shortcut: string) => void;
-    setSearch: (shortcut: string) => void;
     setShortcut: (key: keyof KeyboardShortcuts, shortcut: string) => void;
     setSidebarLeft: (shortcut: string) => void;
     setSidebarRight: (shortcut: string) => void;
@@ -551,17 +546,12 @@ export const useKeyboardShortcuts = (): KeyboardShortcutsHookReturn => {
     return {
         keyboardShortcuts,
         resetKeyboardShortcuts,
-        setArchiveThread: (shortcut: string) => setKeyboardShortcuts({ archiveThread: shortcut }),
         setAudioRecord: (shortcut: string) => setKeyboardShortcuts({ audioRecord: shortcut }),
-        setCreateBranch: (shortcut: string) => setKeyboardShortcuts({ createBranch: shortcut }),
-        setDeleteThread: (shortcut: string) => setKeyboardShortcuts({ deleteThread: shortcut }),
         setEscape: (shortcut: string) => setKeyboardShortcuts({ escape: shortcut }),
         setHelp: (shortcut: string) => setKeyboardShortcuts({ help: shortcut }),
         setKeyboardShortcuts,
         setNewChat: (shortcut: string) => setKeyboardShortcuts({ newChat: shortcut }),
         setNewTemporaryChat: (shortcut: string) => setKeyboardShortcuts({ newTemporaryChat: shortcut }),
-        setPinThread: (shortcut: string) => setKeyboardShortcuts({ pinThread: shortcut }),
-        setSearch: (shortcut: string) => setKeyboardShortcuts({ search: shortcut }),
         setShortcut: (key: keyof KeyboardShortcuts, shortcut: string) => setKeyboardShortcuts({ [key]: shortcut }),
         // Specific shortcut setters
         setSidebarLeft: (shortcut: string) => setKeyboardShortcuts({ sidebarLeft: shortcut }),

@@ -392,7 +392,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     };
 
     useHotkeys(
-        convertShortcutToHotkeysHook(keyboardShortcuts.commandPalette || "ctrl+k"),
+        convertShortcutToHotkeysHook(keyboardShortcuts.commandPalette ?? "ctrl+k"),
         handleCommandPaletteToggle,
         {
             enabled: isMounted,
