@@ -53,10 +53,38 @@ pub struct Settings {
     pub roots: Vec<String>,
 }
 
+/// Reads the settings file. A missing file is the first run and gives the defaults. A file that cannot be read or
+/// parsed is moved aside (not overwritten) before the defaults are used: the next save would otherwise replace the
+/// only copy of the pairing, the folders and the rules.
 fn read_file(path: &Path) -> Option<Settings> {
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok())
+    match fs::read_to_string(path) {
+        Ok(text) => match serde_json::from_str(&text) {
+            Ok(settings) => Some(settings),
+            Err(error) => {
+                move_aside(path, &error.to_string());
+                None
+            }
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => {
+            move_aside(path, &error.to_string());
+            None
+        }
+    }
+}
+
+fn move_aside(path: &Path, reason: &str) {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|age| age.as_nanos())
+        .unwrap_or_default();
+    let aside = path.with_extension(format!("json.corrupt-{stamp}"));
+
+    eprintln!(
+        "[device-core] device.json could not be read ({reason}); moved to {}",
+        aside.display()
+    );
+    let _ = fs::rename(path, aside);
 }
 
 fn keychain_set(device_id: &str, secret: &str) -> Result<(), String> {
@@ -405,5 +433,24 @@ mod tests {
             load(Path::new("/nonexistent/neore/device.json")),
             Settings::default()
         );
+    }
+
+    #[test]
+    fn a_damaged_file_is_moved_aside_before_the_defaults_are_used() {
+        let path = temp_file("damaged");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "{ not json").unwrap();
+
+        assert_eq!(load(&path), Settings::default());
+        assert!(!path.exists());
+
+        let aside = fs::read_dir(path.parent().unwrap())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with("device.json.corrupt-"))
+            .count();
+        assert_eq!(aside, 1);
+
+        let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 }
