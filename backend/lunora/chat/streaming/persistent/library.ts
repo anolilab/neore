@@ -13,6 +13,7 @@ import { internal } from "../../../_generated/internal";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx } from "../../../_generated/server";
 import { patchRow } from "../../../lib/patch";
+import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { MAX_LENGTH } from "../../../lib/validators";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
@@ -389,6 +390,12 @@ export const getChunksAfter = internalQuery
                 }),
             ),
             /**
+             * The stream's thread was locked after the stream started. Answered in
+             * this query so the poll needs no second round trip; a locked stream
+             * returns no chunks.
+             */
+            locked: v.boolean(),
+            /**
              * Read in the SAME query as the chunks, so the two agree: a stream
              * seen `done` has its final chunk in `chunks`. Two separate queries
              * could see the final chunk's mutation land between them and report
@@ -403,6 +410,12 @@ export const getChunksAfter = internalQuery
         // One indexed row, not an un-hinted `db.get` (which probes every table).
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
         const status = (stream?.status ?? "error") as StreamStatus;
+        const locked = await streamLockedAfterStart(ctx, stream);
+
+        if (locked) {
+            return { chunks: [], locked, status, totalChunks: afterIndex };
+        }
+
         const toChunk = (c: { reasoning?: string | null; speaker?: { name: string; skillId: string } | null; text: string }) => {
             return { reasoning: c.reasoning ?? undefined, ...(c.speaker && { speaker: c.speaker }), text: c.text };
         };
@@ -415,5 +428,5 @@ export const getChunksAfter = internalQuery
         });
         const lastChunk = page.at(-1);
 
-        return { chunks: page.map((chunk) => toChunk(chunk)), status, totalChunks: lastChunk ? lastChunk.seq + 1 : afterIndex };
+        return { chunks: page.map((chunk) => toChunk(chunk)), locked, status, totalChunks: lastChunk ? lastChunk.seq + 1 : afterIndex };
     });

@@ -4,7 +4,7 @@ import type { ChunkRead } from "./http-api";
 import { CHUNKS_MAX_READS, CHUNKS_MAX_WAIT_MS, CHUNKS_WAIT_TICK_MS, readChunksWhenReady, toChunkWaitMs } from "./http-api";
 
 const empty = (status: ChunkRead["status"] = "pending"): ChunkRead => {
-    return { chunks: [], status, totalChunks: 0 };
+    return { chunks: [], locked: false, status, totalChunks: 0 };
 };
 
 /** A fake clock the fake `sleep` advances, so waits are counted, not slept. */
@@ -29,9 +29,19 @@ describe(readChunksWhenReady, () => {
         expect(clock.sleep).not.toHaveBeenCalled();
     });
 
+    it("answers a locked stream at once, without holding for chunks", async () => {
+        const clock = fakeClock();
+        const locked: ChunkRead = { chunks: [], locked: true, status: "streaming", totalChunks: 0 };
+        const read = vi.fn(async () => locked);
+
+        await expect(readChunksWhenReady(read, CHUNKS_MAX_WAIT_MS, clock)).resolves.toBe(locked);
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(clock.sleep).not.toHaveBeenCalled();
+    });
+
     it("holds until a chunk arrives, re-reading every tick", async () => {
         const clock = fakeClock();
-        const withChunk: ChunkRead = { chunks: [{ text: "Hi" }], status: "streaming", totalChunks: 1 };
+        const withChunk: ChunkRead = { chunks: [{ text: "Hi" }], locked: false, status: "streaming", totalChunks: 1 };
         const read = vi.fn(async () => (read.mock.calls.length < 4 ? empty() : withChunk));
 
         await expect(readChunksWhenReady(read, 5000, clock)).resolves.toBe(withChunk);

@@ -11,7 +11,7 @@ import { vThreadDoc } from "../../agent/validators";
 import { optionalAuthQuery } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { throwThreadLocked } from "../../lib/thread-lock";
-import { lockedAfterCreation } from "../lib/thread-gate";
+import { lockedAfterCreation, streamLockedAfterStart } from "../lib/thread-gate";
 
 /**
  * Persistent Text Streaming Helper
@@ -218,16 +218,5 @@ export const streamRunThread = internalQuery
 export const streamLockedSinceStartHandler = async (ctx: QueryCtx, args: { streamId: Id<"persistentStreams"> }): Promise<boolean> => {
     const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
 
-    if (!stream) {
-        return true;
-    }
-
-    const thread = await ctx.db.get(stream.threadId as Id<"threads">);
-
-    return thread !== null && lockedAfterCreation(thread, stream._creationTime);
+    return await streamLockedAfterStart(ctx, stream);
 };
-
-export const streamLockedSinceStart = internalQuery
-    .input({ streamId: v.id("persistentStreams") })
-    .output(v.boolean())
-    .query(async ({ args, ctx }) => await streamLockedSinceStartHandler(ctx, args));

@@ -69,6 +69,23 @@ export const lockedAfterCreation = (thread: { lockedAt?: number | null }, create
     isThreadLocked(thread) && (thread.lockedAt ?? 0) >= createdAt;
 
 /**
+ * True when a stream's thread was locked after the stream was created. A missing
+ * stream answers true: nothing is read from it. Pass the stream row you already
+ * have, so the caller reads it once.
+ */
+export const streamLockedAfterStart = async (ctx: QueryContext, stream: { _creationTime: number; threadId: string } | null): Promise<boolean> => {
+    if (!stream) {
+        return true;
+    }
+
+    // One indexed read by id, not an un-hinted `db.get`, which probes every table
+    // when the id is not in the shard's local set.
+    const thread = await ctx.db.threads.findFirst({ where: { _id: stream.threadId as Id<"threads"> } });
+
+    return thread !== null && lockedAfterCreation(thread, stream._creationTime);
+};
+
+/**
  * A thread row as a list shows it: a locked row becomes its stub, anything else
  * passes through. The stub drops the content keys, so the typed row is only as
  * complete as the output validators allow (they all treat those keys as optional).

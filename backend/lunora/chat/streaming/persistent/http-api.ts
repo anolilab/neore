@@ -34,13 +34,14 @@ const TERMINAL_STATUSES: ReadonlySet<StreamStatus> = new Set(["done", "error", "
 
 export interface ChunkRead {
     chunks: { reasoning?: string; speaker?: { name: string; skillId: string }; text: string }[];
+    locked: boolean;
     status: StreamStatus;
     totalChunks: number;
 }
 
 /**
  * Read the stream until it has something new — a chunk past the caller's index,
- * or a terminal status — or `waitMs` has passed or {@link CHUNKS_MAX_READS}
+ * a terminal status, or a lock — or `waitMs` has passed or {@link CHUNKS_MAX_READS}
  * reads were made, then answer with the last read.
  * `waitMs: 0` is one read, which is what a caller that sends no `waitMs` (an
  * older gateway) gets. Exported for the test.
@@ -61,7 +62,13 @@ export const readChunksWhenReady = async (
     for (let reads = 1; ; reads += 1) {
         const result = await read();
 
-        if (result.chunks.length > 0 || TERMINAL_STATUSES.has(result.status) || reads >= CHUNKS_MAX_READS || now() + CHUNKS_WAIT_TICK_MS > deadline) {
+        if (
+            result.locked ||
+            result.chunks.length > 0 ||
+            TERMINAL_STATUSES.has(result.status) ||
+            reads >= CHUNKS_MAX_READS ||
+            now() + CHUNKS_WAIT_TICK_MS > deadline
+        ) {
             return result;
         }
 
@@ -114,18 +121,13 @@ export const getChunksHttpAction = async (context: HttpActionCtx, request: Reque
         context = shardContext(context, await threadShardFor(context, userId, threadId));
     }
 
-    // This poll carries no passcode proof. A thread locked after the stream was
-    // created (see `streamLockedSinceStart`) is refused: the reply was started
-    // before the lock, and nothing may read on from it.
-    if (await context.runQuery(internal.chat.streaming.streamLockedSinceStart, { streamId: streamId as Id<"persistentStreams"> })) {
-        return Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
-    }
-
     const waitMs = toChunkWaitMs(body.waitMs);
 
     try {
-        // Chunks and status in ONE query (see `getChunksAfter`), so a `done`
-        // answer always carries the final chunk.
+        // Chunks, status and the lock in ONE query (see `getChunksAfter`), so a
+        // `done` answer always carries the final chunk. This poll carries no
+        // passcode proof: a thread locked after the stream was created is refused
+        // at once, and nothing may read on from it.
         const result = await readChunksWhenReady(
             async () =>
                 await context.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, {
@@ -134,6 +136,10 @@ export const getChunksHttpAction = async (context: HttpActionCtx, request: Reque
                 }),
             waitMs,
         );
+
+        if (result.locked) {
+            return Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
+        }
 
         return Response.json({
             chunks: result.chunks,

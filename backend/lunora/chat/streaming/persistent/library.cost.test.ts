@@ -14,15 +14,17 @@ const CHUNKS = 60;
 
 const setup = async () => {
     const harness = lunoraTest(schema as never);
-    const streamId = (await harness.run(
-        async (context: any) =>
-            await context.runMutation(createStream, {
-                messageId: "m1",
-                streamingConfig: { contentType: "text", model: "m" },
-                threadId: "t1",
-                userId: "u1",
-            }),
-    )) as string;
+    const streamId = (await harness.run(async (context: any) => {
+        // A real thread: every poll checks its lock, so the row must exist to be read.
+        const threadId = await context.db.insert("threads", { model: "m", status: "running", title: "t", userId: "u1" });
+
+        return await context.runMutation(createStream, {
+            messageId: "m1",
+            streamingConfig: { contentType: "text", model: "m" },
+            threadId,
+            userId: "u1",
+        });
+    })) as string;
 
     for (let index = 0; index < CHUNKS; index += 1) {
         await harness.run(async (context: any) => await context.runMutation(addChunk, { final: false, streamId, text: `c${String(index)} ` }));
@@ -48,10 +50,30 @@ describe("persistent stream cost", () => {
         try {
             const { cost, result } = await poll(harness, streamId, CHUNKS);
 
-            expect(result).toStrictEqual({ chunks: [], status: "streaming", totalChunks: CHUNKS });
-            // The stream row, plus an index range past the cursor that is empty.
-            expect(cost.statements, JSON.stringify(cost.byTable)).toBe(2);
-            expect(cost.rowsRead).toBe(1);
+            expect(result).toStrictEqual({ chunks: [], locked: false, status: "streaming", totalChunks: CHUNKS });
+            // The stream row, the thread's lock state (read in this query, so the
+            // poll needs no second round trip), and an index range past the cursor
+            // that is empty.
+            expect(cost.statements, JSON.stringify(cost.byTable)).toBe(3);
+            expect(cost.rowsRead).toBe(2);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a poll on a stream whose thread was locked after it started, with no chunks", async () => {
+        const { harness, streamId } = await setup();
+
+        try {
+            await harness.run(async (context: any) => {
+                const thread = await context.db.threads.findFirst({ where: { userId: "u1" } });
+
+                await context.db.patch(thread._id, { lockedAt: Date.now() + 60_000 });
+            });
+
+            const { result } = await poll(harness, streamId, 0);
+
+            expect(result).toStrictEqual({ chunks: [], locked: true, status: "streaming", totalChunks: 0 });
         } finally {
             harness.close();
         }
@@ -65,9 +87,9 @@ describe("persistent stream cost", () => {
 
             expect(result.chunks.map((chunk) => chunk.text)).toStrictEqual([`c${String(CHUNKS - 3)} `, `c${String(CHUNKS - 2)} `, `c${String(CHUNKS - 1)} `]);
             expect(result.totalChunks).toBe(CHUNKS);
-            expect(cost.statements, JSON.stringify(cost.byTable)).toBe(2);
-            // The stream row plus the three new chunks — not all sixty.
-            expect(cost.rowsRead).toBe(1 + 3);
+            expect(cost.statements, JSON.stringify(cost.byTable)).toBe(3);
+            // The stream row, the thread's lock row, plus the three new chunks — not all sixty.
+            expect(cost.rowsRead).toBe(1 + 1 + 3);
         } finally {
             harness.close();
         }
