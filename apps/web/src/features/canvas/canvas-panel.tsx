@@ -16,6 +16,7 @@ import { Button } from "@neore/ui/components/button";
 import type { FabricCanvasEditorProps } from "@neore/ui/components/canvas-editor/fabric-canvas-editor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import type { ChangeCommit } from "@neore/ui/components/tiptap-canvas-editor";
+import useFocusTrap from "@neore/ui/hooks/use-focus-trap";
 import cn from "@neore/ui/utils/cn";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { JSONContent } from "@tiptap/core";
@@ -36,7 +37,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { ChangeEvent, ComponentProps, FC } from "react";
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
@@ -402,6 +403,14 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
     const crpc = useCRPC();
     const [isCopied, setIsCopied] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const panelRef = useRef<HTMLDivElement>(null);
+    const titleId = useId();
+
+    // Fullscreen covers the page, so it behaves as a modal: focus moves in, Tab wraps, Escape and closing hand focus back.
+    const exitFullscreen = useCallback(() => setIsFullscreen(false), []);
+
+    // Same condition as the early return below: the panel stays mounted while hidden, and `isFullscreen` outlives it.
+    useFocusTrap(panelRef, { active: isFullscreen && isCanvasOpen && Boolean(activeDocumentId), onEscape: exitFullscreen });
     const [showAiDiffBanner, setShowAiDiffBanner] = useState(false);
     const [codeView, setCodeView] = useState<"code" | "preview">("code");
 
@@ -704,13 +713,22 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
     const showCodePreview = canPreviewCode && codeView === "preview" && canvasViewMode !== "history";
 
     return (
-        <div className={cn("bg-background flex h-full flex-col border-l", isFullscreen && "fixed inset-0 z-50 border-l-0", className)}>
+        <div
+            aria-labelledby={isFullscreen ? titleId : undefined}
+            aria-modal={isFullscreen ? "true" : undefined}
+            className={cn("bg-background flex h-full flex-col border-l", isFullscreen && "fixed inset-0 z-50 border-l-0 outline-none", className)}
+            ref={panelRef}
+            role={isFullscreen ? "dialog" : undefined}
+            tabIndex={isFullscreen ? -1 : undefined}
+        >
             {/* Header */}
             <div className="flex items-center justify-between border-b px-4 py-3">
                 <div className="flex items-center gap-2 overflow-hidden">
                     <div className="flex flex-col gap-0.5 overflow-hidden">
                         <div className="flex items-center gap-1.5">
-                            <h3 className="truncate text-sm font-medium">{document?.title ?? t`Loading...`}</h3>
+                            <h3 className="truncate text-sm font-medium" id={titleId}>
+                                {document?.title ?? t`Loading...`}
+                            </h3>
                             {canvasDirty && <span className="bg-primary size-2 shrink-0 rounded-full" title={t`Unsaved changes`} />}
                         </div>
                         {document && (
