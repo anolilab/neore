@@ -41,26 +41,6 @@
       "to": "table:cleanupLogs"
     },
     {
-      "from": "function:agent_api_keys:destroy",
-      "kind": "read",
-      "to": "table:playgroundApiKeys"
-    },
-    {
-      "from": "function:agent_api_keys:destroy",
-      "kind": "write",
-      "to": "table:playgroundApiKeys"
-    },
-    {
-      "from": "function:agent_api_keys:issue",
-      "kind": "read",
-      "to": "table:playgroundApiKeys"
-    },
-    {
-      "from": "function:agent_api_keys:issue",
-      "kind": "write",
-      "to": "table:playgroundApiKeys"
-    },
-    {
       "from": "function:agent_auto_archive:archiveIfStillIdle",
       "kind": "read",
       "to": "table:persistentStreams"
@@ -6818,27 +6798,6 @@
       "kind": "function",
       "name": "admin.gateway_analytics.getGatewayAnalytics",
       "module": "admin"
-    },
-    {
-      "detail": "mutation",
-      "id": "function:agent_api_keys:destroy",
-      "kind": "function",
-      "name": "agent.api_keys.destroy",
-      "module": "agent"
-    },
-    {
-      "detail": "mutation",
-      "id": "function:agent_api_keys:issue",
-      "kind": "function",
-      "name": "agent.api_keys.issue",
-      "module": "agent"
-    },
-    {
-      "detail": "query",
-      "id": "function:agent_api_keys:validate",
-      "kind": "function",
-      "name": "agent.api_keys.validate",
-      "module": "agent"
     },
     {
       "detail": "mutation",

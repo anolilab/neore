@@ -652,7 +652,7 @@ for a schema table that is neither policed nor listed:
 | procedure | was | now | why |
 | --- | --- | --- | --- |
 | `agent_vector.paginate` | bare `query` | `internalQuery` | paged EVERY user's embedding ids with no identity check at all; unbounded `limit` on the root shard; no caller |
-| `agent_api_keys.validate` | bare `query` | `internalQuery` | an existence oracle over playground key ids (the id is the credential); no caller |
+| `agent_api_keys.validate` | bare `query` | deleted | an existence oracle over playground key ids (the id is the credential); was internal with no caller. `issue` and `destroy` (internal, no caller) went with it; the `playgroundApiKeys` table stays |
 
 ## HTTP routes
 
