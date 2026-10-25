@@ -344,7 +344,9 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
 
         // --- Phase 5: Delete external analytics data ---
 
-        await context.step.do(
+        // Throws on a PostHog failure, so the step retries and the request is never
+        // marked completed (nor the confirmation mailed) while the person may remain.
+        const postHogOutcome = await context.step.do(
             "delete-post-hog-person",
             async () => await context.run(internal.gdpr.steps.posthog_steps.deletePostHogPerson, { userId: args.userId }),
         );
@@ -368,7 +370,8 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             async () =>
                 await context.run(internal.gdpr.functions.logAudit, {
                     action: "deletion_completed",
-                    details: JSON.stringify({ requestId: args.requestId }),
+                    // "skipped" = PostHog deletion is not configured here; nothing was erased there.
+                    details: JSON.stringify({ postHog: postHogOutcome, requestId: args.requestId }),
                     performedBy: "system",
                     userId: args.userId,
                 }),

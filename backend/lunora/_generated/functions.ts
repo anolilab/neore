@@ -8717,7 +8717,7 @@ export interface Caller {
                 sendDeletionConfirmedEmailAction: (args: { userEmail: string }) => Promise<null>;
             };
             posthog_steps: {
-                deletePostHogPerson: (args: { userId: string }) => Promise<null>;
+                deletePostHogPerson: (args: { userId: string }) => Promise<"deleted" | "not_found" | "skipped">;
             };
             residual_deletion_steps: {
                 anonymiseGatewayUsageDeductions: (args: { userId: string }) => Promise<{ hasMore: boolean }>;

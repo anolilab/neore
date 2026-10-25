@@ -578,7 +578,7 @@ export interface InternalApiTypes {
                 sendDeletionConfirmedEmailAction: FunctionReference<"action", { userEmail: string }, null>;
             };
             posthog_steps: {
-                deletePostHogPerson: FunctionReference<"action", { userId: string }, null>;
+                deletePostHogPerson: FunctionReference<"action", { userId: string }, "deleted" | "not_found" | "skipped">;
             };
             residual_deletion_steps: {
                 anonymiseGatewayUsageDeductions: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
