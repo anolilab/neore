@@ -33,7 +33,7 @@ export const CHUNKS_MAX_WAIT_MS = (CHUNKS_MAX_READS - 1) * CHUNKS_WAIT_TICK_MS;
 const TERMINAL_STATUSES: ReadonlySet<StreamStatus> = new Set(["done", "error", "timeout"]);
 
 export interface ChunkRead {
-    chunks: { reasoning?: string; speaker?: { name: string; skillId: string }; text: string }[];
+    chunks: { reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }[];
     locked: boolean;
     status: StreamStatus;
     totalChunks: number;

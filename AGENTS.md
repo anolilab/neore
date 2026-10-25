@@ -1898,7 +1898,10 @@ error")` (any transport, including the SSRF-guarded tool
   the maps are deleted un-uploaded; a failed upload only warns. There are three different
   keys: the public project key (`VITE_POSTHOG_API_KEY`, events), the CI key above, and
   `POSTHOG_PERSONAL_API_KEY` (a runtime key bound to the Workers: local feature-flag
-  evaluation and the GDPR person-delete, both OFF while it is unset). Keep them separate.
+  evaluation and the GDPR person-delete, both OFF while it is unset). It needs the person
+  write scope AND `project:read`: the delete answers 404 for an unknown person and for a wrong
+  project id alike, so a 404 is believed only after reading the project, and a 401/403 there fails the
+  step with a "lacks the project:read scope" error in the log. Keep them separate.
 - **A Worker cannot fetch another Worker of the same account on `workers.dev` unless it sets
   `global_fetch_strictly_public`.** The runtime answers with a **404** ("error code: 1042") in a few
   milliseconds, which looks like a missing route. Every non-production stage lives on workers.dev,

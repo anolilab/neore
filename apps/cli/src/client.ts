@@ -165,7 +165,7 @@ export interface StreamEvent {
     skillId?: string;
     status?: string;
     text?: string;
-    type: "done" | "error" | "reasoning" | "resume" | "speaker" | "text";
+    type: "done" | "error" | "reasoning" | "reply.restart" | "resume" | "speaker" | "text";
 }
 
 /** Split an NDJSON byte stream into parsed events. Tolerates chunk boundaries anywhere, including mid-character. */

@@ -25,6 +25,7 @@ import {
     removeQueuedPrompt,
     restorePromptQueue,
     serializePromptQueue,
+    settleQueuedSteer,
 } from "@/features/chat/core/utils/prompt-queue";
 
 import type { PendingAttachment } from "./chat-ui-store";
@@ -39,6 +40,8 @@ interface PromptQueueStore {
     queues: Record<string, ThreadQueue>;
     remove: (threadId: string, id: string) => void;
     setPaused: (threadId: string, paused: boolean) => void;
+    /** `steerRun` answered: keeps the steer (`accepted`) or makes it an ordinary queued message (`refused`). */
+    settleSteer: (threadId: string, steerId: string, outcome: "accepted" | "refused") => void;
     /** Removes and returns the oldest queued prompt. */
     shift: (threadId: string) => QueuedChatPrompt | undefined;
 }
@@ -114,6 +117,7 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
         queues: {},
         remove: (threadId, id) => update(threadId, (queue) => removeQueuedPrompt(queue, id)),
         setPaused: (threadId, paused) => update(threadId, (queue) => (queue.paused === paused ? queue : { ...queue, paused })),
+        settleSteer: (threadId, steerId, outcome) => update(threadId, (queue) => settleQueuedSteer(queue, steerId, outcome)),
         shift: (threadId) => {
             const { next, state } = dequeuePrompt(get().queues[threadId] ?? EMPTY_PROMPT_QUEUE);
 

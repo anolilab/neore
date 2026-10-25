@@ -28,11 +28,13 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    createRunSteering,
     endStoppedRun,
     failRun,
     finishRun,
     isAgentRunError,
     loadRunContext,
+    memoryToCarry,
     resolveRunModel,
     resumeApprovedRun,
     setResearchDepth,
@@ -329,6 +331,9 @@ export const runStreamingAgent = internalAction
                 streamTextArgs.system = baseInstructions ? `${baseInstructions}\n\n${additionalContext}` : additionalContext;
             }
 
+            // Messages the user sends into the reply while it streams (`chat/steering.ts`).
+            const steering = createRunSteering(ctx, { streamId, threadId, userId });
+
             // Stream text
             // Admitted by `streamRunThread` above: the run reads its context without a proof.
             // Aborted only after a sidebar stop's reply is saved (see the catch below).
@@ -339,6 +344,7 @@ export const runStreamingAgent = internalAction
             const result = await threadObject.streamText(streamTextArgs, {
                 admittedRun: true,
                 statelessMode: threadStatelessMode,
+                takeSteer: steering.takeSteer,
             });
 
             // Write chunks to persistent storage (DB only, no HTTP response)
@@ -352,6 +358,7 @@ export const runStreamingAgent = internalAction
                     retrievedMemories: runContext.retrievedMemories,
                     savedMessages: result.savedMessages,
                     ...(invokedSkill && { skill: { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } }),
+                    steeredTexts: steering.steeredTexts(),
                     threadId,
                     ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
                     timingStart,
@@ -374,7 +381,7 @@ export const runStreamingAgent = internalAction
             };
 
             try {
-                piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream);
+                piped = await pipeToPersistentChunks(ctx, streamId, result.fullStream, { steeredBefore: steering.steeredBefore });
             } catch (error) {
                 await stoppedAt(error);
 
@@ -392,6 +399,9 @@ export const runStreamingAgent = internalAction
 
             // Record the approval snapshot (if the run paused) and flush. The
             // snapshot is what the continuation rebuilds this exact run from.
+            // A locked chat's content is never mined into memory.
+            const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread);
+
             try {
                 await finishRun(ctx, {
                     mcpLabels: toolResult.mcpLabels,
@@ -401,6 +411,8 @@ export const runStreamingAgent = internalAction
                         autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                         instructions: streamTextArgs.system ?? agent.options.instructions,
                         mcpServerNames: toolResult.mcpServerNames,
+                        // A run that pauses extracts at the pause; its continuation extracts only the steers it takes.
+                        memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt }),
                         model,
                         reasoningEffort: threadReasoningEffort,
                         researchDepth: effectiveResearchDepth,
@@ -424,8 +436,7 @@ export const runStreamingAgent = internalAction
             // Post-stream work: timing and memory extraction, then follow-ups.
             recordRun({
                 botId: runContext.botId,
-                // A locked chat's content is never mined into memory.
-                extractMemory: runContext.memoryEnabled && !isThreadLocked(thread),
+                extractMemory,
                 firstTokenTime,
                 prompt,
             });
@@ -524,7 +535,11 @@ export const continueAfterToolApproval = internalAction
             }
 
             // The gate above admitted this continuation, so its knowledge search may read the chat's own files.
-            await resumeApprovedRun(ctx, { answer, approvalId, approved, config, denyReason, streamId, threadId, userId }, { admittedRun: true });
+            await resumeApprovedRun(
+                ctx,
+                { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
+                { admittedRun: true, steerable: true },
+            );
 
             await setThreadStatus(ctx, threadId, "active");
         } catch (error) {

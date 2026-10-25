@@ -289,7 +289,7 @@ export interface InternalApiTypes {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
+            continueAfterToolApproval: FunctionReference<"action", { answer?: string; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
@@ -361,6 +361,9 @@ export interface InternalApiTypes {
                 updateSlide: FunctionReference<"mutation", { htmlContent?: string; presentationId: Id<"presentations">; slideNumber: number; threadId: Id<"threads">; title?: string; userId: string }, { slideId: Id<"presentationSlides"> }>;
             };
         };
+        steering: {
+            deliverSteers: FunctionReference<"mutation", { pendingMessageId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; userId: string }, null | { messageId: string; text: string }>;
+        };
         streaming: {
             createStreamWithMessage: FunctionReference<"mutation", { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, string>;
             streamRunThread: FunctionReference<"query", { streamId: Id<"persistentStreams">; userId: string }, ({ activeLeafMessageId?: string | undefined; botId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; lockedAt?: number | undefined; order?: number | undefined; tagIds?: string[] | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "image" | "text" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "error" | "running" | "active" | "archived" | "abort" | "finish"; }) | null>;
@@ -369,11 +372,11 @@ export interface InternalApiTypes {
                     cleanupExpiredStreams: FunctionReference<"mutation", {}, void>;
                 };
                 library: {
-                    addChunk: FunctionReference<"mutation", { final: boolean; reasoning?: string; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }, void>;
+                    addChunk: FunctionReference<"mutation", { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }, void>;
                     claimStreamRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, boolean>;
                     createStream: FunctionReference<"mutation", { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, Id<"persistentStreams">>;
                     finishStoppedReply: FunctionReference<"mutation", { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }, { messageId?: Id<"messages">; stopped: boolean }>;
-                    getChunksAfter: FunctionReference<"query", { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams"> }, { chunks: Array<{ reasoning?: string; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
+                    getChunksAfter: FunctionReference<"query", { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams"> }, { chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, "streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, { messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: FunctionReference<"mutation", { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }, void>;
@@ -384,7 +387,7 @@ export interface InternalApiTypes {
         tool_permissions: {
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
-            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }, null>;
+            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; reasoningEffort?: number; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; toolNames: Array<string>; toolPermissionKeys?: Record<string, string> }; threadId: string; userId: string }, null>;
         };
         tools: {
             browser_node: {
@@ -533,7 +536,18 @@ export interface InternalApiTypes {
             getExportRequest: FunctionReference<"query", { userId: string }, import("./dataModel.js").Doc_gdprRequests | null>;
             getRequestById: FunctionReference<"query", { requestId: Id<"gdprRequests"> }, import("./dataModel.js").Doc_gdprRequests | null>;
             logAudit: FunctionReference<"mutation", { action: string; details: string; performedBy: string; userId: string }, null>;
-            updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, null>;
+            updateRequestProgress: FunctionReference<"mutation", { currentStep?: string; downloadUrl?: string; errorMessage?: string; fromStatus?: Array<"pending" | "processing" | "completed" | "failed" | "cancelled">; progress?: number; requestId: Id<"gdprRequests">; status?: "pending" | "processing" | "completed" | "failed" | "cancelled"; storageId?: Id<"_storage"> }, boolean>;
+        };
+        posthog_retry: {
+            expireStalePostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, null>;
+            failPostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; errorClass: string; requestId: Id<"gdprRequests">; userId: string }, null>;
+            getRetryConfirmationEmail: FunctionReference<"query", { requestId: Id<"gdprRequests">; userId: string }, string>;
+            recordPostHogErased: FunctionReference<"mutation", { attempt: number; chain: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }, null>;
+            recordPostHogRetrySuccess: FunctionReference<"mutation", { attempt: number; chain: number; posthog: "deleted" | "no_profile"; requestId: Id<"gdprRequests">; userId: string }, boolean>;
+            retryPostHogErasure: FunctionReference<"action", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, null>;
+            schedulePostHogRetry: FunctionReference<"mutation", { failureId: string; requestId: Id<"gdprRequests">; userEmail: string; userId: string }, boolean>;
+            settleRetryConfirmation: FunctionReference<"mutation", { isSent: boolean; requestId: Id<"gdprRequests">; userId: string }, null>;
+            startPostHogRetry: FunctionReference<"mutation", { attempt: number; chain: number; requestId: Id<"gdprRequests">; userId: string }, "skip" | "erase" | "deleted" | "no_profile" | "confirm">;
         };
         request_sweeps: {
             cleanupExpiredExports: FunctionReference<"mutation", {}, null>;
@@ -575,7 +589,7 @@ export interface InternalApiTypes {
                 sendDeletionConfirmedEmailAction: FunctionReference<"action", { userEmail: string }, null>;
             };
             posthog_steps: {
-                deletePostHogPerson: FunctionReference<"action", { userId: string }, null>;
+                deletePostHogPerson: FunctionReference<"action", { userId: string }, "deleted" | "no_profile" | "skipped">;
             };
             residual_deletion_steps: {
                 anonymiseGatewayUsageDeductions: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
@@ -591,7 +605,7 @@ export interface InternalApiTypes {
                 killUserSandboxes: FunctionReference<"action", { userId: string }, null>;
                 listMessengerConnectionsForDeletion: FunctionReference<"query", { userId: string }, Array<{ platform: string }>>;
                 listSandboxIdsForDeletion: FunctionReference<"query", { userId: string }, Array<string>>;
-                minimiseGdprRecords: FunctionReference<"mutation", { userId: string }, null>;
+                minimiseGdprRecords: FunctionReference<"mutation", { retainEmailOf?: Id<"gdprRequests">; userId: string }, null>;
                 purgeUserDocumentHistory: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 revokeUserConnectorGrants: FunctionReference<"action", { userId: string }, null>;
             };
@@ -674,10 +688,11 @@ export interface InternalApiTypes {
         };
         claim_once: {
             claimKey: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, boolean>;
+            claimKeyFenced: FunctionReference<"mutation", { key: string; leaseMs?: number; onLapse?: { args?: string; target: string }; scope: string; ttlMs: number; userId?: string }, null | number>;
             completeKey: FunctionReference<"mutation", { key: string; scope: string }, null>;
             purgeExpiredClaims: FunctionReference<"mutation", {}, number>;
             reapLapsedClaims: FunctionReference<"mutation", {}, number>;
-            releaseKey: FunctionReference<"mutation", { key: string; scope: string }, null>;
+            releaseKey: FunctionReference<"mutation", { claimedAt?: number; key: string; scope: string }, null>;
         };
         document_history: {
             getDocumentAtTime: FunctionReference<"query", { documentId: string; tableName: string; timestamp: number }, unknown | null>;
@@ -715,7 +730,7 @@ export interface InternalApiTypes {
             tryStartCompression: FunctionReference<"mutation", { threadId: Id<"threads"> }, boolean>;
         };
         extract: {
-            extractMemories: FunctionReference<"action", { assistantResponse: string; botId?: string; threadId?: Id<"threads">; toolResults?: Array<{ summary: string; toolName: string }>; userId: string; userMessage: string }, void>;
+            extractMemories: FunctionReference<"action", { assistantResponse: string; botId?: string; steeredFrom?: number; threadId?: Id<"threads">; toolResults?: Array<{ summary: string; toolName: string }>; userId: string; userMessage: string }, void>;
             regenerateMemoryEmbedding: FunctionReference<"action", { memoryId: Id<"memories">; userId: string }, void>;
         };
         functions: {
@@ -947,11 +962,11 @@ export interface InternalApiTypes {
     };
     triggers: {
         execute: {
-            default: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            executeTrigger: FunctionReference<"action", { claim?: { claimedAt: number; key: string; scope: string }; ignoreDisabled?: boolean; invalidUtf8?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
-            admitTriggerRun: FunctionReference<"mutation", { triggerId: Id<"triggers"> }, null | string>;
+            admitTriggerRun: FunctionReference<"mutation", { claim?: { claimedAt: number; key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
             createExecution: FunctionReference<"mutation", { payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
@@ -1360,6 +1375,9 @@ export const internal: InternalApiTypes = {
                 updateSlide: { __lunoraRef: "chat_slides_internal:updateSlide" },
             },
         },
+        steering: {
+            deliverSteers: { __lunoraRef: "chat_steering:deliverSteers" },
+        },
         streaming: {
             createStreamWithMessage: { __lunoraRef: "chat_streaming:createStreamWithMessage" },
             streamRunThread: { __lunoraRef: "chat_streaming:streamRunThread" },
@@ -1534,6 +1552,17 @@ export const internal: InternalApiTypes = {
             logAudit: { __lunoraRef: "gdpr_functions:logAudit" },
             updateRequestProgress: { __lunoraRef: "gdpr_functions:updateRequestProgress" },
         },
+        posthog_retry: {
+            expireStalePostHogRetry: { __lunoraRef: "gdpr_posthog_retry:expireStalePostHogRetry" },
+            failPostHogRetry: { __lunoraRef: "gdpr_posthog_retry:failPostHogRetry" },
+            getRetryConfirmationEmail: { __lunoraRef: "gdpr_posthog_retry:getRetryConfirmationEmail" },
+            recordPostHogErased: { __lunoraRef: "gdpr_posthog_retry:recordPostHogErased" },
+            recordPostHogRetrySuccess: { __lunoraRef: "gdpr_posthog_retry:recordPostHogRetrySuccess" },
+            retryPostHogErasure: { __lunoraRef: "gdpr_posthog_retry:retryPostHogErasure" },
+            schedulePostHogRetry: { __lunoraRef: "gdpr_posthog_retry:schedulePostHogRetry" },
+            settleRetryConfirmation: { __lunoraRef: "gdpr_posthog_retry:settleRetryConfirmation" },
+            startPostHogRetry: { __lunoraRef: "gdpr_posthog_retry:startPostHogRetry" },
+        },
         request_sweeps: {
             cleanupExpiredExports: { __lunoraRef: "gdpr_request_sweeps:cleanupExpiredExports" },
             handleGdprRequestTimeouts: { __lunoraRef: "gdpr_request_sweeps:handleGdprRequestTimeouts" },
@@ -1673,6 +1702,7 @@ export const internal: InternalApiTypes = {
         },
         claim_once: {
             claimKey: { __lunoraRef: "lib_claim_once:claimKey" },
+            claimKeyFenced: { __lunoraRef: "lib_claim_once:claimKeyFenced" },
             completeKey: { __lunoraRef: "lib_claim_once:completeKey" },
             purgeExpiredClaims: { __lunoraRef: "lib_claim_once:purgeExpiredClaims" },
             reapLapsedClaims: { __lunoraRef: "lib_claim_once:reapLapsedClaims" },

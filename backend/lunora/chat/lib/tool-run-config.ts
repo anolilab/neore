@@ -21,6 +21,12 @@ export const vToolRunConfig = v.object({
     group: v.optional(vGroupRunSnapshot),
     instructions: v.optional(v.string()),
     mcpServerNames: v.array(v.string()),
+    /**
+     * Set when the run that paused fed memory extraction (it extracted its own prompt
+     * and steers at the pause). The continuation then extracts only what it adds: the
+     * messages steered into it after the pause.
+     */
+    memory: v.optional(v.object({ botId: v.optional(v.string()) })),
     model: v.string(),
     reasoningEffort: v.optional(v.number()),
     researchDepth: v.union(v.literal("speed"), v.literal("balanced"), v.literal("thorough")),

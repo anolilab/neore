@@ -11,9 +11,14 @@
  *   {"type":"text","text":"Hel"}
  *   {"type":"reasoning","text":"…"}
  *   {"type":"speaker","name":"Researcher","skillId":"…"}
+ *   {"type":"reply.restart"}                   (the reply was steered; see below)
  *   {"type":"done","status":"done"}
  *   {"type":"error","error":{"code":"…","message":"…"}}
  *   {"type":"resume","lastChunkIndex":40}      (only with `resumable: true`)
+ *
+ * `reply.restart` marks the cut when the user steered the reply from the app: everything before it
+ * is the text of the reply as it stood, everything after continues below the steering message. A
+ * client that wants one text just keeps appending ({@link collectStream} does).
  *
  * `done` or `error` is always the last line — or, for a caller that sent
  * `resumable: true`, `resume`: the relay used up its read budget and the caller
@@ -36,12 +41,15 @@ export type StreamEvent =
     | { error: { code: string; message: string }; type: "error" }
     | { lastChunkIndex: number; type: "resume" }
     | { name: string; skillId: string; type: "speaker" }
+    | { type: "reply.restart" }
     | { status: string; type: "done" }
     | { text: string; type: "reasoning" }
     | { text: string; type: "text" };
 
 export interface StreamChunk {
     reasoning?: string;
+    /** The reply continues below a message the user steered into it. */
+    restart?: boolean;
     speaker?: { name: string; skillId: string };
     text: string;
 }
@@ -104,6 +112,11 @@ export const chunkToEvents = (chunk: StreamChunk): StreamEvent[] => {
 
     if (chunk.speaker) {
         events.push({ name: chunk.speaker.name, skillId: chunk.speaker.skillId, type: "speaker" });
+    }
+
+    // Before the chunk's own text: what it carries belongs after the cut.
+    if (chunk.restart) {
+        events.push({ type: "reply.restart" });
     }
 
     if (chunk.reasoning) {
@@ -217,6 +230,10 @@ export const collectStream = async (source: StreamSource, options: PollOptions =
             }
             case "reasoning": {
                 reasoning += event.text;
+                break;
+            }
+            case "reply.restart": {
+                // One text: a steered reply's two halves are joined, the boundary is for streaming consumers.
                 break;
             }
             case "resume": {
