@@ -3,14 +3,14 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@ui/components/button";
 import cn from "@ui/utils/cn";
-import type { Point, Size, ZoomView } from "@ui/utils/zoom-pan";
+import type { Frame, Point, ZoomView } from "@ui/utils/zoom-pan";
 import {
-    arrowKeyPan,
     BUTTON_ZOOM_FACTOR,
     CENTRE,
     clampPan,
     doubleClickZoom,
     INITIAL_ZOOM_VIEW,
+    keyAction,
     MIN_ZOOM,
     panBy,
     wheelDeltaInPixels,
@@ -18,7 +18,7 @@ import {
     zoomAround,
 } from "@ui/utils/zoom-pan";
 import { Maximize, ZoomIn, ZoomOut } from "lucide-react";
-import type { MouseEvent, PointerEvent } from "react";
+import type { MouseEvent, PointerEvent, ReactNode } from "react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 interface ZoomableImageProps {
@@ -29,12 +29,18 @@ interface ZoomableImageProps {
 }
 
 interface DragState {
-    originX: number;
-    originY: number;
+    lastX: number;
+    lastY: number;
     pointerId: number;
-    startX: number;
-    startY: number;
 }
+
+interface ZoomState {
+    /** Set by the discrete steps (buttons, keys, double-click) and nothing else. */
+    eased: boolean;
+    view: ZoomView;
+}
+
+const INITIAL_STATE: ZoomState = { eased: false, view: INITIAL_ZOOM_VIEW };
 
 const cursorClass = (isDragging: boolean, isZoomed: boolean): string => {
     if (isDragging) {
@@ -43,6 +49,19 @@ const cursorClass = (isDragging: boolean, isZoomed: boolean): string => {
 
     return isZoomed ? "cursor-grab" : "cursor-zoom-in";
 };
+
+// Pointer position from the viewport centre, the transform origin.
+const pointerFromCentre = (event: { clientX: number; clientY: number }, surface: HTMLElement): Point => {
+    const rect = surface.getBoundingClientRect();
+
+    return { x: event.clientX - rect.left - rect.width / 2, y: event.clientY - rect.top - rect.height / 2 };
+};
+
+const ToolbarButton = ({ children, label, onClick }: { children: ReactNode; label: string; onClick: () => void }) => (
+    <Button aria-label={label} className="text-white hover:bg-white/20" onClick={onClick} size="icon-sm" variant="ghost">
+        {children}
+    </Button>
+);
 
 /**
  * An image that zooms about the cursor (wheel, trackpad pinch, double-click),
@@ -57,74 +76,43 @@ const cursorClass = (isDragging: boolean, isZoomed: boolean): string => {
  * component by it to reset the view.
  */
 const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => {
-    const { t } = useLingui();
-    const [view, setView] = useState<ZoomView>(INITIAL_ZOOM_VIEW);
-    // Mirrors `view` synchronously, so several wheel events in one frame
-    // each build on the last instead of on a stale render.
-    const viewRef = useRef<ZoomView>(INITIAL_ZOOM_VIEW);
+    const { i18n, t } = useLingui();
+    const [{ eased, view }, setState] = useState<ZoomState>(INITIAL_STATE);
+    const [isDragging, setIsDragging] = useState(false);
+    const isZoomed = view.scale > MIN_ZOOM;
     const rootRef = useRef<HTMLDivElement>(null);
     const surfaceRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
     const dragRef = useRef<DragState | null>(null);
-    const [isDragging, setIsDragging] = useState(false);
-    // Eased only for the discrete steps (buttons, keys, double-click); continuous
-    // input (wheel, pinch, drag) must track the pointer without lag.
-    const [isEased, setIsEased] = useState(false);
     const hintId = useId();
 
-    const commit = useCallback((next: ZoomView) => {
-        viewRef.current = next;
-        setView(next);
-    }, []);
-
-    const measure = useCallback((): { content: Size; viewport: Size } | null => {
+    // The one way the view changes: measure once, then apply `step` to the latest view.
+    // A functional update, so several wheel events in one frame each build on the last.
+    // Eased only for the discrete steps; continuous input (wheel, pinch, drag) must
+    // track the pointer without lag.
+    const apply = useCallback((step: (current: ZoomView, frame: Frame) => ZoomView, isEased = false) => {
         const surface = surfaceRef.current;
         const image = imageRef.current;
 
         if (!surface || !image) {
-            return null;
+            return;
         }
 
         // offsetWidth/offsetHeight ignore transforms: the fitted, unscaled size.
-        return {
+        const frame: Frame = {
             content: { height: image.offsetHeight, width: image.offsetWidth },
             viewport: { height: surface.clientHeight, width: surface.clientWidth },
         };
+
+        setState((current) => {
+            return { eased: isEased, view: step(current.view, frame) };
+        });
     }, []);
 
-    // Pointer position from the viewport centre, the transform origin.
-    const pointerFromCentre = useCallback((clientX: number, clientY: number): Point | null => {
-        const surface = surfaceRef.current;
+    const zoomBy = useCallback((factor: number) => apply((current, frame) => zoomAround(current, current.scale * factor, CENTRE, frame), true), [apply]);
+    const reset = useCallback(() => apply(() => INITIAL_ZOOM_VIEW, true), [apply]);
 
-        if (!surface) {
-            return null;
-        }
-
-        const rect = surface.getBoundingClientRect();
-
-        return { x: clientX - rect.left - rect.width / 2, y: clientY - rect.top - rect.height / 2 };
-    }, []);
-
-    const zoomTo = useCallback(
-        (nextScale: number, pointer: Point, eased: boolean) => {
-            const measured = measure();
-
-            if (!measured) {
-                return;
-            }
-
-            setIsEased(eased);
-            commit(zoomAround(viewRef.current, nextScale, pointer, measured.content, measured.viewport));
-        },
-        [commit, measure],
-    );
-
-    const reset = useCallback(() => {
-        setIsEased(true);
-        commit(INITIAL_ZOOM_VIEW);
-    }, [commit]);
-
-    // Native listeners, because React's wheel listener is passive and cannot
+    // Native listener, because React's wheel listener is passive and cannot
     // cancel the browser's own zoom on a pinch.
     useEffect(() => {
         const surface = surfaceRef.current;
@@ -136,15 +124,10 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
         const onWheel = (event: WheelEvent) => {
             event.preventDefault();
 
-            const pointer = pointerFromCentre(event.clientX, event.clientY);
-
-            if (!pointer) {
-                return;
-            }
-
+            const pointer = pointerFromCentre(event, surface);
             const factor = wheelZoomFactor(wheelDeltaInPixels(event.deltaY, event.deltaMode), event.ctrlKey);
 
-            zoomTo(viewRef.current.scale * factor, pointer, false);
+            apply((current, frame) => zoomAround(current, current.scale * factor, pointer, frame));
         };
 
         surface.addEventListener("wheel", onWheel, { passive: false });
@@ -152,8 +135,28 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
         return () => {
             surface.removeEventListener("wheel", onWheel);
         };
-    }, [pointerFromCentre, zoomTo]);
+    }, [apply]);
 
+    // A resize changes the pan limits, so a view that was in range may no longer be.
+    useEffect(() => {
+        const surface = surfaceRef.current;
+
+        if (!surface) {
+            return undefined;
+        }
+
+        const observer = new ResizeObserver(() => apply(clampPan));
+
+        observer.observe(surface);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [apply]);
+
+    // A native listener rather than `onKeyDown`: the group has no interactive role, so jsx-a11y
+    // rejects a React key handler on it. It also runs before React's root listener, so
+    // `stopPropagation` keeps the key from the page's document-level shortcuts.
     useEffect(() => {
         const root = rootRef.current;
 
@@ -167,49 +170,29 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
                 return;
             }
 
-            const { scale } = viewRef.current;
-            const pan = arrowKeyPan(event.key);
+            const action = keyAction(event.key);
 
-            if (pan) {
-                // Arrows only pan a zoomed image; unzoomed, they keep their page-scroll meaning.
-                const measured = measure();
-
-                if (!measured || scale <= MIN_ZOOM) {
-                    return;
-                }
-
-                setIsEased(false);
-                commit(panBy(viewRef.current, pan.x, pan.y, measured.content, measured.viewport));
-                event.preventDefault();
-
+            // Escape and every other key stay with the dialog and the page.
+            if (!action) {
                 return;
             }
 
-            switch (event.key) {
-                case "0": {
-                    reset();
-
-                    break;
-                }
-                case "+":
-                case "=": {
-                    zoomTo(scale * BUTTON_ZOOM_FACTOR, CENTRE, true);
-
-                    break;
-                }
-                case "-":
-                case "_": {
-                    zoomTo(scale / BUTTON_ZOOM_FACTOR, CENTRE, true);
-
-                    break;
-                }
-                default: {
-                    // Escape and every other key stay with the dialog and the page.
-                    return;
-                }
+            // Arrows only pan a zoomed image; unzoomed, they keep their page-scroll meaning.
+            if (!isZoomed && action.kind === "pan") {
+                return;
             }
 
+            // The page's arrow-key shortcuts listen on the document and ignore defaultPrevented.
             event.preventDefault();
+            event.stopPropagation();
+
+            if (action.kind === "pan") {
+                apply((current, frame) => panBy(current, action.dx, action.dy, frame));
+            } else if (action.kind === "reset") {
+                reset();
+            } else {
+                zoomBy(action.factor);
+            }
         };
 
         root.addEventListener("keydown", onKeyDown);
@@ -217,47 +200,38 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
         return () => {
             root.removeEventListener("keydown", onKeyDown);
         };
-    }, [commit, measure, reset, zoomTo]);
+    }, [apply, isZoomed, reset, zoomBy]);
 
     const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
         // Focus the group so its keys work after a click; it is not in the tab order.
         rootRef.current?.focus({ preventScroll: true });
 
-        if (event.button !== 0 || viewRef.current.scale <= MIN_ZOOM) {
+        if (event.button !== 0 || view.scale <= MIN_ZOOM) {
             return;
         }
 
-        dragRef.current = {
-            originX: viewRef.current.x,
-            originY: viewRef.current.y,
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-        };
-        setIsEased(false);
+        // Each move pans by its distance from the last, so a zoom in mid-drag cannot leave a stale start.
+        dragRef.current = { lastX: event.clientX, lastY: event.clientY, pointerId: event.pointerId };
+        setState((current) => {
+            return { ...current, eased: false };
+        });
         setIsDragging(true);
         event.currentTarget.setPointerCapture(event.pointerId);
     };
 
     const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
         const drag = dragRef.current;
-        const measured = measure();
 
-        if (!measured || !drag || drag.pointerId !== event.pointerId) {
+        if (!drag || drag.pointerId !== event.pointerId) {
             return;
         }
 
-        commit(
-            clampPan(
-                {
-                    scale: viewRef.current.scale,
-                    x: drag.originX + event.clientX - drag.startX,
-                    y: drag.originY + event.clientY - drag.startY,
-                },
-                measured.content,
-                measured.viewport,
-            ),
-        );
+        const dx = event.clientX - drag.lastX;
+        const dy = event.clientY - drag.lastY;
+
+        drag.lastX = event.clientX;
+        drag.lastY = event.clientY;
+        apply((current, frame) => panBy(current, dx, dy, frame));
     };
 
     const endDrag = (event: PointerEvent<HTMLDivElement>) => {
@@ -270,25 +244,16 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
     };
 
     const handleDoubleClick = (event: MouseEvent<HTMLDivElement>) => {
-        const pointer = pointerFromCentre(event.clientX, event.clientY);
-        const measured = measure();
+        const pointer = pointerFromCentre(event, event.currentTarget);
 
-        if (!pointer || !measured) {
-            return;
-        }
-
-        setIsEased(true);
-        commit(doubleClickZoom(viewRef.current, pointer, measured.content, measured.viewport));
+        apply((current, frame) => doubleClickZoom(current, pointer, frame), true);
     };
 
-    const isZoomed = view.scale > MIN_ZOOM;
-    const percent = Math.round(view.scale * 100);
-    const easeImage = isEased && !isDragging;
+    const percent = i18n.number(view.scale, { style: "percent" });
 
     return (
         <div
             aria-describedby={hintId}
-            aria-label={alt}
             aria-roledescription={t`Zoomable image`}
             className={cn("relative h-full w-full outline-none", className)}
             ref={rootRef}
@@ -296,7 +261,12 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
             tabIndex={-1}
         >
             <div
-                className={cn("absolute inset-0 flex touch-none items-center justify-center overflow-hidden", cursorClass(isDragging, isZoomed))}
+                className={cn(
+                    "absolute inset-0 flex items-center justify-center overflow-hidden",
+                    // Pinch is the browser's at scale 1; pan needs the touches once zoomed.
+                    isZoomed && "touch-none",
+                    cursorClass(isDragging, isZoomed),
+                )}
                 onDoubleClick={handleDoubleClick}
                 onPointerCancel={endDrag}
                 onPointerDown={handlePointerDown}
@@ -308,7 +278,7 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
                     alt={alt}
                     className={cn(
                         "max-h-full max-w-full origin-center object-contain select-none",
-                        easeImage && "motion-safe:transition-transform motion-safe:duration-150",
+                        eased && "motion-safe:transition-transform motion-safe:duration-150",
                     )}
                     draggable={false}
                     onError={onError}
@@ -323,29 +293,21 @@ const ZoomableImage = ({ alt, className, onError, src }: ZoomableImageProps) => 
 
             {/* Outside the pan surface, so its pointer capture cannot swallow these clicks. */}
             <div className="absolute top-3 left-3 flex items-center gap-1 rounded-md bg-black/60 p-1">
-                <Button
-                    aria-label={t`Zoom out`}
-                    className="text-white hover:bg-white/20"
-                    onClick={() => zoomTo(viewRef.current.scale / BUTTON_ZOOM_FACTOR, CENTRE, true)}
-                    size="icon-sm"
-                    variant="ghost"
-                >
+                <ToolbarButton label={t`Zoom out`} onClick={() => zoomBy(1 / BUTTON_ZOOM_FACTOR)}>
                     <ZoomOut aria-hidden="true" className="size-4" />
-                </Button>
-                <Button aria-label={t`Reset zoom`} className="text-white hover:bg-white/20" onClick={reset} size="icon-sm" variant="ghost">
+                </ToolbarButton>
+                <ToolbarButton label={t`Reset zoom`} onClick={reset}>
                     <Maximize aria-hidden="true" className="size-4" />
-                </Button>
-                <Button
-                    aria-label={t`Zoom in`}
-                    className="text-white hover:bg-white/20"
-                    onClick={() => zoomTo(viewRef.current.scale * BUTTON_ZOOM_FACTOR, CENTRE, true)}
-                    size="icon-sm"
-                    variant="ghost"
-                >
+                </ToolbarButton>
+                <ToolbarButton label={t`Zoom in`} onClick={() => zoomBy(BUTTON_ZOOM_FACTOR)}>
                     <ZoomIn aria-hidden="true" className="size-4" />
-                </Button>
-                <span aria-live="polite" className="min-w-12 text-center text-xs text-white/80 tabular-nums" role="status">
-                    {t`${percent}%`}
+                </ToolbarButton>
+                <span aria-hidden="true" className="min-w-12 text-center text-xs text-white/80 tabular-nums">
+                    {percent}
+                </span>
+                {/* Announced on the discrete steps only; a wheel or pinch step clears it, so it never floods a screen reader. */}
+                <span aria-live="polite" className="sr-only" role="status">
+                    {eased ? percent : ""}
                 </span>
             </div>
         </div>
