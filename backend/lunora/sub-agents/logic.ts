@@ -3,7 +3,7 @@
  * model it runs on and the message its result becomes. No I/O, so every rule
  * is unit-tested directly (`logic.test.ts`).
  */
-import type { ToolSet } from "ai";
+import type { StopCondition, ToolSet } from "ai";
 
 /**
  * How deep delegation may nest. A user's own thread is depth 0; its sub-agent
@@ -62,7 +62,7 @@ export const SUB_AGENT_NAME = "Sub-agent";
 
 const TOOL_NAME_RE = /^[\w.:-]{1,128}$/;
 
-export type SubAgentStatus = "failed" | "queued" | "running" | "succeeded";
+export type SubAgentStatus = "cancelled" | "failed" | "queued" | "running" | "succeeded";
 
 export const isActiveSubAgentStatus = (status: SubAgentStatus): boolean => status === "queued" || status === "running";
 
@@ -154,18 +154,53 @@ export const resolveSubAgentModel = (input: {
 
 export const truncateResult = (text: string): string => (text.length > SUB_AGENT_RESULT_MAX ? `${text.slice(0, SUB_AGENT_RESULT_MAX - 1)}…` : text);
 
+/**
+ * The stop condition that ends a sub-agent's loop once `isStopRequested` says
+ * so. The agent client evaluates a condition twice per step (once to decide
+ * whether to open a pending message, once inside the AI SDK), so the answer is
+ * read once per step count and reused — the two must agree, or a cancel landing
+ * between them leaves a pending message behind.
+ */
+export const stopWhenRequested = (isStopRequested: () => Promise<boolean>): StopCondition<any, any> => {
+    let answered: { steps: number; stop: boolean } | undefined;
+
+    return async ({ steps }) => {
+        if (answered?.steps !== steps.length) {
+            answered = { steps: steps.length, stop: await isStopRequested() };
+        }
+
+        return answered.stop;
+    };
+};
+
 /** The follow-up message posted to the parent thread when a run ends. */
 export const buildResultMessage = (input: {
     childThreadId?: string;
     error?: string;
     result?: string;
-    status: "failed" | "succeeded";
+    /** Whether the run had been claimed — a cancelled one that had not ran nothing. */
+    started?: boolean;
+    status: "cancelled" | "failed" | "succeeded";
     task: string;
 }): string => {
     const taskLine = input.task.split("\n", 1)[0]?.trim().slice(0, 160) ?? "";
-    const heading = input.status === "succeeded" ? `**Sub-agent finished:** ${taskLine}` : `**Sub-agent failed:** ${taskLine}`;
-    const body =
-        input.status === "succeeded" ? input.result?.trim() || "(The sub-agent returned no text.)" : (input.error ?? "The sub-agent stopped without a result.");
+    const heading = {
+        cancelled: `**Sub-agent stopped:** ${taskLine}`,
+        failed: `**Sub-agent failed:** ${taskLine}`,
+        succeeded: `**Sub-agent finished:** ${taskLine}`,
+    }[input.status];
+    let body: string;
+
+    if (input.status === "succeeded") {
+        body = input.result?.trim() || "(The sub-agent returned no text.)";
+    } else if (input.status === "cancelled") {
+        body = input.started
+            ? "This sub-agent was stopped before it finished. The step it was working on when it was stopped still ran to its end and was billed; no further steps ran. Its work so far is in its thread."
+            : "This sub-agent was stopped before it started, so nothing ran.";
+    } else {
+        body = input.error ?? "The sub-agent stopped without a result.";
+    }
+
     const link = input.childThreadId ? `\n\n[Open the sub-agent's thread](/chat/${input.childThreadId})` : "";
 
     return `${heading}\n\n${body}${link}`;

@@ -652,7 +652,8 @@ export interface ApiTypes {
     };
     sub_agents: {
         functions: {
-            getRunByToolCall: FunctionReference<"query", { toolCallId: string }, { _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed"; task: string } | null>;
+            cancelRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { cancelled: boolean }>;
+            getRunByToolCall: FunctionReference<"query", { toolCallId: string }, { _id: Id<"subAgentRuns">; childThreadId: string | null; completedAt: number | null; createdAt: number; depth: number; error: string | null; result: string | null; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; task: string } | null>;
         };
     };
     system_prompts: {
@@ -1412,6 +1413,7 @@ export const api: ApiTypes = {
     },
     sub_agents: {
         functions: {
+            cancelRun: { __lunoraRef: "sub_agents_functions:cancelRun" },
             getRunByToolCall: { __lunoraRef: "sub_agents_functions:getRunByToolCall" },
         },
     },

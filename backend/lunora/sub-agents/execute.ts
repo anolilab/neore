@@ -5,7 +5,9 @@
  * On the jobs queue (at-least-once): the run claims its row first
  * (`claimRun`), so only one delivery ever runs it, and reports once at the end
  * (`completeRun`), which posts once. A delivery killed mid-run leaves the row
- * `running` until the reaper fails it. Enqueued from the parent run's shard —
+ * `running` until the reaper fails it. A run the owner cancels is ended by
+ * `cancelRun` at once; this loop sees it between steps (`shouldRunStop`) and
+ * stops, and its own `completeRun` then finds the run already ended. Enqueued from the parent run's shard —
  * the owner's — so the child thread, its messages and the post-back all live
  * there.
  */
@@ -13,6 +15,7 @@ import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_LOOKUP } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
@@ -67,14 +70,36 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
                 if (!(await ctx.runQuery(internal.tasks.internal.canRunForUser, { userId }))) {
                     throw new SubAgentRunError("This account is being deleted.");
                 }
+
+                // Cancelled between the claim and now: no thread, no first step.
+                if (await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId })) {
+                    throw new SubAgentRunError("This sub-agent was stopped.");
+                }
             },
             memory: false,
             model,
             onThread: async (childThreadId) => {
-                await ctx.runMutation(internal.sub_agents.functions.attachChildThread, { childThreadId, runId });
+                const linked = await ctx.runMutation(internal.sub_agents.functions.attachChildThread, { childThreadId, runId });
+
+                // Stopped after the check in `beforeThread`: nothing points at the
+                // new thread, so remove it and run no step.
+                if (!linked) {
+                    await ctx
+                        .runAction(internal.agent.threads.deleteAllForThreadIdSync, { threadId: childThreadId as Id<"threads"> })
+                        .catch((error: unknown) => console.error(`[SubAgent] Run ${runId}: could not remove the unlinked thread ${childThreadId}:`, error));
+
+                    throw new SubAgentRunError("This sub-agent was stopped.");
+                }
             },
             personalization: "full",
             prompt: buildSubAgentPrompt(claim.task),
+            // A failed read is not a stop request: the run goes on and asks again after the next step.
+            shouldStop: async () =>
+                await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId }).catch((error: unknown) => {
+                    console.warn(`[SubAgent] Run ${runId}: could not check for a stop request:`, error);
+
+                    return false;
+                }),
             skill,
             system: SUB_AGENT_SYSTEM,
             thread: { tags: ["sub-agent"], title: `Sub-agent: ${claim.task}`.split("\n", 1)[0]!.slice(0, 120) },

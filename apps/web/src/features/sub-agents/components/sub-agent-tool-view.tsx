@@ -6,21 +6,25 @@
  *
  * The run outlives the tool call (which returns as soon as it has started), so
  * the card finds the run by the call's id and follows it through a live query.
- * The result itself is posted to the thread as a separate message.
+ * The result itself is posted to the thread as a separate message. While the
+ * run is working the card offers Stop; the child finishes the step it is in
+ * (billed) and runs no more.
  */
 
 import { useLingui } from "@lingui/react/macro";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { Badge } from "@neore/ui/components/badge";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { Button } from "@neore/ui/components/button";
+import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Bot, ExternalLink, Loader2 } from "lucide-react";
+import { Bot, CircleStop, ExternalLink, Loader2 } from "lucide-react";
 import type { FC } from "react";
 import { useId } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
+import { showError } from "@/lib/toast";
 
-type RunStatus = "failed" | "queued" | "running" | "succeeded";
+type RunStatus = "cancelled" | "failed" | "queued" | "running" | "succeeded";
 
 const TASK_PREVIEW_MAX = 200;
 
@@ -33,11 +37,18 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
         crpc.sub_agents.functions.getRunByToolCall.queryOptions(isDenied || !part.toolCallId ? skipToken : { toolCallId: part.toolCallId }),
     );
 
+    const stop = useMutation(
+        crpc.sub_agents.functions.cancelRun.mutationOptions({
+            onError: (error: unknown) => showError(error instanceof Error ? error : t`Could not stop the sub-agent.`),
+        }),
+    );
+
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as { task?: string };
     const task = run?.task ?? input.task ?? "";
     const output = part.state === "output-available" ? (part.output as { error?: string } | undefined) : undefined;
 
     const statusLabels: Record<RunStatus, string> = {
+        cancelled: t`Stopped`,
         failed: t`Failed`,
         queued: t`Queued`,
         running: t`Working`,
@@ -93,6 +104,13 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
             </div>
 
             {notice && <p className="text-muted-foreground mt-2 text-xs">{notice}</p>}
+
+            {(run?.status === "running" || run?.status === "queued") && (
+                <Button className="mt-2" disabled={stop.isPending} onClick={() => stop.mutate({ runId: run._id })} size="sm" type="button" variant="outline">
+                    <CircleStop aria-hidden="true" />
+                    {t`Stop`}
+                </Button>
+            )}
 
             {run?.childThreadId && (
                 <Link

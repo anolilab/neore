@@ -1208,7 +1208,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     resultPostedAt: real("resultPostedAt"),
     skillSlug: text("skillSlug"),
     startedAt: real("startedAt"),
-    status: text("status", { mode: "json" }).$type<"queued" | "running" | "succeeded" | "failed">().notNull(),
+    status: text("status", { mode: "json" }).$type<"queued" | "running" | "succeeded" | "failed" | "cancelled">().notNull(),
     task: text("task").notNull(),
     toolAllowlist: text("toolAllowlist", { mode: "json" }).$type<Array<string>>(),
     toolCallId: text("toolCallId"),

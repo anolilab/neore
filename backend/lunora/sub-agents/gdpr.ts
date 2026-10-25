@@ -29,14 +29,14 @@ export const eraseSubAgentRunsForUser = async (ctx: MutationCtx, userId: string)
 };
 
 /**
- * Retention (`gdpr/retention.ts`): finished runs (`succeeded` / `failed`) created
+ * Retention (`gdpr/retention.ts`): finished runs (`succeeded` / `failed` / `cancelled`) created
  * before `cutoff`, oldest first, at most `limit`. Returns how many were deleted.
  */
 export const pruneSubAgentRunsBefore = async (ctx: MutationCtx, cutoff: number, limit: number): Promise<number> => {
     const { page: runs } = await ctx.db.subAgentRuns.findMany({
         limit,
         orderBy: [{ createdAt: "asc" }],
-        where: { createdAt: { lt: cutoff }, status: { in: ["succeeded", "failed"] } },
+        where: { createdAt: { lt: cutoff }, status: { in: ["succeeded", "failed", "cancelled"] } },
     });
 
     await Promise.all(runs.map(async (row) => await ctx.db.delete(row._id)));

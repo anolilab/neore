@@ -8,8 +8,8 @@
  * posted back to the parent thread as a follow-up assistant message, as a
  * coding agent's is.
  *
- * A run is `queued` → `running` → `succeeded` | `failed`. Only `claimRun`
- * starts one and only {@link finishRun} ends one, each checking the current
+ * A run is `queued` → `running` → `succeeded` | `failed` | `cancelled`. Only
+ * `claimRun` starts one and only {@link finishRun} ends one, each checking the current
  * status first — so a redelivered job, or a late finish racing the reaper, is a
  * no-op rather than a second run or a second post.
  *
@@ -19,17 +19,17 @@
  * charge to the task quotas (`tasks/account.ts:chargeRound`). Everything
  * enqueued lands on the calling shard — the thread owner's.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
-import { insertThreadRelationship } from "../agent/table-writes";
+import { insertThreadRelationship, patchThread } from "../agent/table-writes";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
-import { authQuery } from "../lib/crpc";
+import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
 import { patchById } from "../lib/patch";
 import { createRatelimit } from "../lib/rate-limiter";
@@ -79,7 +79,7 @@ const SUB_AGENT_MAX_SCAN = 10;
 const countChildren = async (
     ctx: Pick<MutationCtx, "db">,
     parentThreadId: string,
-    statuses: ReadonlyArray<"failed" | "queued" | "running" | "succeeded">,
+    statuses: ReadonlyArray<"cancelled" | "failed" | "queued" | "running" | "succeeded">,
 ): Promise<number> => {
     let count = 0;
 
@@ -149,7 +149,7 @@ export const admitSubAgentRun = async (
     const capProblem = subAgentCapProblem({
         activeChildren: await countChildren(ctx, parent._id, ["queued", "running"]),
         parentDepth: depth - 1,
-        ...(depth > 1 && { totalChildren: await countChildren(ctx, parent._id, ["queued", "running", "succeeded", "failed"]) }),
+        ...(depth > 1 && { totalChildren: await countChildren(ctx, parent._id, ["queued", "running", "succeeded", "failed", "cancelled"]) }),
     });
 
     if (capProblem) {
@@ -281,6 +281,14 @@ export const linkChildThread = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     const now = Date.now();
 
     await patchById(ctx.db, run._id, { childThreadId, updatedAt: now });
+
+    // "running" is what the thread list reads to offer its Stop; `finishRun` puts it back.
+    const child = await ctx.db.get(childThreadId as Id<"threads">);
+
+    if (child?.status === "active") {
+        await patchThread(ctx.db, child._id, { status: "running", updatedAt: now });
+    }
+
     await insertThreadRelationship(ctx.db, {
         branchPoint: 0,
         branchType: "subagent",
@@ -296,15 +304,13 @@ export const linkChildThread = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
 /**
  * Records the child thread the run created and links it under the parent, so
  * the "open thread" link works while the run is still going. Once per run.
+ * Returns whether it linked: `false` means the run ended first (stopped), and
+ * the caller must not generate into a thread nothing points at.
  */
 export const attachChildThread = internalMutation
     .input({ childThreadId: v.string(), runId: v.id("subAgentRuns") })
-    .output(v.null())
-    .mutation(async ({ args, ctx }) => {
-        await linkChildThread(ctx, args.runId, args.childThreadId);
-
-        return null;
-    });
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await linkChildThread(ctx, args.runId, args.childThreadId));
 
 /**
  * The result as a follow-up assistant message in the parent thread, under the
@@ -335,7 +341,7 @@ const postToParent = async (ctx: MutationCtx, run: RunDoc, text: string): Promis
     await patchById(ctx.db, thread._id, { updatedAt: Date.now() });
 };
 
-export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "succeeded"; result: string };
+export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "cancelled" } | { kind: "succeeded"; result: string };
 
 /** Streams of one thread checked for activity — its latest few, never its history. */
 const RECENT_STREAMS_CHECKED = 5;
@@ -379,7 +385,8 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
             childThreadId: run.childThreadId,
             error: run.error,
             result: run.result,
-            status: run.status as "failed" | "succeeded",
+            started: run.startedAt !== undefined,
+            status: run.status as "cancelled" | "failed" | "succeeded",
             task: run.task,
         }),
     );
@@ -392,6 +399,9 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
  * redelivered finish, the reaper after a late success) is left alone. Ending
  * frees the run's fan-out slot at once; the post may wait for the parent's
  * stream ({@link postRunResult}). Returns whether this call ended it.
+ *
+ * A cancelled run (the owner stopped it) is not notified: the person who
+ * ended it is the one who would read the notification.
  */
 export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, outcome: SubAgentOutcome): Promise<boolean> => {
     const run = await ctx.db.get(runId);
@@ -405,16 +415,28 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     const error = outcome.kind === "failed" ? outcome.error.slice(0, 1000) : undefined;
 
     await patchById(ctx.db, run._id, { completedAt: now, error, result, status: outcome.kind, updatedAt: now });
+
+    // The child thread was marked "running" when it was linked (`linkChildThread`). A chat reply
+    // the user started there meanwhile holds that status too, so it stays while one is live.
+    const child = run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+
+    if (child?.status === "running" && !(await isThreadStreaming(ctx, child._id))) {
+        await patchThread(ctx.db, child._id, { status: "active", updatedAt: now });
+    }
+
     await postRunResult(ctx, run._id, 0);
-    await notifyQuietly(ctx, {
-        dedupeKey: `sub_agent:${run._id}`,
-        link: `/chat/${run.parentThreadId}`,
-        outcome: outcome.kind === "succeeded" ? "success" : "failure",
-        title: run.task.split("\n", 1)[0]!.slice(0, 200),
-        type: "sub_agent",
-        userId: run.userId,
-        ...(error && { body: error }),
-    });
+
+    if (outcome.kind !== "cancelled") {
+        await notifyQuietly(ctx, {
+            dedupeKey: `sub_agent:${run._id}`,
+            link: `/chat/${run.parentThreadId}`,
+            outcome: outcome.kind === "succeeded" ? "success" : "failure",
+            title: run.task.split("\n", 1)[0]!.slice(0, 200),
+            type: "sub_agent",
+            userId: run.userId,
+            ...(error && { body: error }),
+        });
+    }
 
     return true;
 };
@@ -446,6 +468,93 @@ export const reapRun = internalMutation
 
         return null;
     });
+
+/**
+ * Whether the child's loop must stop: the run is no longer `running` — the
+ * owner cancelled it, the reaper failed it, or it is gone.
+ */
+export const runShouldStop = async (ctx: Pick<MutationCtx | QueryCtx, "db">, runId: Id<"subAgentRuns">): Promise<boolean> => {
+    const run = await ctx.db.get(runId);
+
+    return !run || run.status !== "running";
+};
+
+/** {@link runShouldStop}, read by the child between steps (`execute.ts`). */
+export const shouldRunStop = internalQuery
+    .input({ runId: v.id("subAgentRuns") })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => await runShouldStop(ctx, args.runId));
+
+/**
+ * Cancels one run through {@link finishRun}, whatever it is doing: a queued run
+ * is never claimed (`claimQueuedRun` refuses it), a running one stops at its
+ * next step boundary (`shouldRunStop`). Returns whether this call ended it; an
+ * ended run is a no-op, so a second cancel changes and posts nothing.
+ */
+export const cancelSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<boolean> => await finishRun(ctx, runId, { kind: "cancelled" });
+
+/** Runs read per stop; the fan-out cap keeps real ones to a handful, the bound is for a runaway. */
+const CANCEL_THREAD_MAX = 20;
+
+/**
+ * What stopping `threadId` cancels, for the chat Stop paths. A sub-agent's own
+ * thread, while its run is active, cancels only that run — not siblings, not the
+ * sub-agents it started itself. Any other thread cancels every queued or running run it delegated and, below those,
+ * what they delegated (depth is capped), so a stopped parent does not leave the cost running. Only the caller's own
+ * runs count: a collaborator's Stop on someone's thread never reaches them.
+ * Returns how many runs this call ended.
+ */
+export const cancelSubAgentRunsForStop = async (ctx: MutationCtx, threadId: string, userId: string): Promise<number> => {
+    const own = await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_childThreadId", (q) => q.eq("childThreadId", threadId))
+        .first();
+
+    const targets: RunDoc[] = [];
+
+    const activeRunsOf = async (parentThreadId: string): Promise<RunDoc[]> => {
+        const runs: RunDoc[] = [];
+
+        for (const status of ["queued", "running"] as const) {
+            runs.push(
+                ...(await ctx.db
+                    .query("subAgentRuns")
+                    .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", parentThreadId).eq("status", status))
+                    .take(CANCEL_THREAD_MAX)),
+            );
+        }
+
+        return runs;
+    };
+
+    // Once its own run has ended, the thread is an ordinary one again: a reply the
+    // user got there may have delegated runs of its own.
+    if (own && isActiveSubAgentStatus(own.status)) {
+        targets.push(own);
+    } else {
+        // A stopped parent takes the whole tree down: what a cancelled run delegated
+        // would otherwise keep billing and post back into a thread nobody waits on.
+        let level = await activeRunsOf(threadId);
+
+        while (level.length > 0 && targets.length < CANCEL_THREAD_MAX) {
+            targets.push(...level);
+
+            const below = await Promise.all(level.flatMap((run) => (run.childThreadId ? [activeRunsOf(run.childThreadId)] : [])));
+
+            level = below.flat();
+        }
+    }
+
+    let cancelled = 0;
+
+    for (const run of targets) {
+        if (run.userId === userId && (await cancelSubAgentRun(ctx, run._id))) {
+            cancelled += 1;
+        }
+    }
+
+    return cancelled;
+};
 
 // ─── Public ──────────────────────────────────────────────────────────────────
 
@@ -486,4 +595,33 @@ export const getRunByToolCall = authQuery
             status: run.status,
             task: run.task,
         };
+    });
+
+/**
+ * Cancels a run for the owner of its parent thread ({@link cancelSubAgentRun}): anyone
+ * else, and a run that does not exist, answers NOT_FOUND so ids cannot be
+ * probed. Returns whether this call ended the run.
+ */
+export const cancelOwnedSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, userId: string): Promise<boolean> => {
+    const run = await ctx.db.get(runId);
+    const parent = run ? await ctx.db.get(run.parentThreadId as Id<"threads">) : null;
+
+    if (!run || !parent || parent.userId !== userId || run.userId !== userId) {
+        throw new LunoraError("NOT_FOUND", "Run not found");
+    }
+
+    return await cancelSubAgentRun(ctx, run._id);
+};
+
+/**
+ * Stops one sub-agent run, from its card. Ends the run at once (its slot is
+ * free, the parent gets the post-back); a running child finishes the step it
+ * is in, which is billed, and runs no more. Cancelling an ended run is a no-op.
+ */
+export const cancelRun = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ runId: v.id("subAgentRuns") })
+    .output(v.object({ cancelled: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        return { cancelled: await cancelOwnedSubAgentRun(ctx, args.runId, ctx.user.userId) };
     });

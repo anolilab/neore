@@ -7,9 +7,19 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
+import { pruneSubAgentRunsBefore } from "./gdpr";
 import type { CreateSubAgentRunArgs } from "./functions";
-import { admitSubAgentRun, claimQueuedRun, finishRun, linkChildThread, postRunResult } from "./functions";
-import { SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_PER_RUN, SUB_AGENT_POST_MAX_ATTEMPTS } from "./logic";
+import {
+    admitSubAgentRun,
+    cancelOwnedSubAgentRun,
+    cancelSubAgentRunsForStop,
+    claimQueuedRun,
+    finishRun,
+    linkChildThread,
+    postRunResult,
+    runShouldStop,
+} from "./functions";
+import { SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_PER_RUN, SUB_AGENT_POST_MAX_ATTEMPTS, stopWhenRequested } from "./logic";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -227,6 +237,79 @@ describe("linkChildThread", () => {
         expect(relationships[0]).toMatchObject({ branchType: "subagent", parentThreadId: threadId, threadId: child, userId });
         expect(await firstRun()).toMatchObject({ childThreadId: child });
     });
+
+    it("marks the child thread running while the run is active, and active again when it ends", async () => {
+        await admit();
+
+        const [run] = await runs();
+        const child = await insertThread(userId);
+        const statusOf = async () => {
+            const row = await harness.run(async (ctx: any) => await ctx.db.get(child));
+
+            return row.status;
+        };
+
+        await harness.run(async (ctx: any) => await linkChildThread(ctx, run._id, child));
+        expect(await statusOf()).toBe("running");
+
+        await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "cancelled" }));
+        expect(await statusOf()).toBe("active");
+    });
+
+    it("keeps the child thread running when a chat reply is streaming there as the run ends", async () => {
+        await admit();
+
+        const [run] = await runs();
+        const child = await insertThread(userId);
+
+        await harness.run(async (ctx: any) => await linkChildThread(ctx, run._id, child));
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "m",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId: child,
+                    userId,
+                }),
+        );
+        await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "cancelled" }));
+
+        const row = await harness.run(async (ctx: any) => await ctx.db.get(child));
+
+        expect(row.status).toBe("running");
+    });
+
+    it("refuses a run that was cancelled first, so the caller can drop the new thread", async () => {
+        await admit();
+
+        const [run] = await runs();
+        const child = await insertThread(userId);
+
+        await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "cancelled" }));
+
+        expect(await harness.run(async (ctx: any) => await linkChildThread(ctx, run._id, child))).toBe(false);
+        expect(await firstRun()).not.toHaveProperty("childThreadId");
+    });
+});
+
+describe("pruneSubAgentRunsBefore", () => {
+    it("purges cancelled runs with the other finished ones, and leaves active runs", async () => {
+        await admit();
+        await admit();
+        await admit();
+
+        const [first, second] = await runs();
+
+        await harness.run(async (ctx: any) => await finishRun(ctx, first._id, { kind: "cancelled" }));
+        await harness.run(async (ctx: any) => await finishRun(ctx, second._id, { error: "x", kind: "failed" }));
+
+        const deleted = await harness.run(async (ctx: any) => await pruneSubAgentRunsBefore(ctx, Date.now() + 1000, 10));
+
+        expect(deleted).toBe(2);
+        expect(await runs()).toHaveLength(1);
+    });
 });
 
 describe("finishRun", () => {
@@ -321,3 +404,180 @@ describe("finishRun", () => {
         });
     });
 });
+
+const NOT_FOUND = /Run not found/u;
+
+describe("cancelling a run", () => {
+    const cancel = async (runId: string, caller: string = userId) =>
+        await harness.run(async (ctx: any) => await cancelOwnedSubAgentRun(ctx, runId as never, caller));
+
+    it("cancels a queued run: its slot is free, it is never claimed, and the parent hears it never started", async () => {
+        await admit();
+
+        const [run] = await runs();
+
+        expect(await cancel(run._id)).toBe(true);
+        expect(await firstRun()).toMatchObject({ status: "cancelled" });
+        expect(await harness.run(async (ctx: any) => await claimQueuedRun(ctx, run._id))).toBeNull();
+
+        const posted = await messagesIn(threadId);
+
+        expect(posted).toHaveLength(1);
+        expect(posted[0].message.content).toContain("**Sub-agent stopped:**");
+        expect(posted[0].message.content).toContain("before it started");
+
+        // The slot is free again.
+        for (let index = 0; index < SUB_AGENT_MAX_CONCURRENT; index += 1) {
+            expect(await admit()).toHaveProperty("runId");
+        }
+    });
+
+    it("cancels a running run between steps: the loop sees it, a late success cannot overwrite it, one post says the step was billed", async () => {
+        await admit();
+
+        const [run] = await runs();
+
+        await harness.run(async (ctx: any) => await claimQueuedRun(ctx, run._id));
+
+        const stop = stopWhenRequested(async () => await harness.run(async (ctx: any) => await runShouldStop(ctx, run._id)));
+        const step = { finishReason: "tool-calls" } as never;
+
+        expect(await stop({ steps: [step] })).toBe(false);
+
+        await cancel(run._id);
+
+        // The same step count answers the same (the agent asks twice per step); the next step sees the cancel.
+        expect(await stop({ steps: [step] })).toBe(false);
+        expect(await stop({ steps: [step, step] })).toBe(true);
+
+        // The child's own report arrives after the cancel and changes nothing.
+        expect(await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "succeeded", result: "late" }))).toBe(false);
+        expect(await firstRun()).toMatchObject({ status: "cancelled" });
+        expect(await firstRun()).not.toHaveProperty("result");
+
+        const posted = await messagesIn(threadId);
+
+        expect(posted).toHaveLength(1);
+        expect(posted[0].message.content).toContain("still ran to its end and was billed");
+    });
+
+    it("a second cancel is a no-op", async () => {
+        await admit();
+
+        const [run] = await runs();
+
+        expect(await cancel(run._id)).toBe(true);
+        expect(await cancel(run._id)).toBe(false);
+        expect(await messagesIn(threadId)).toHaveLength(1);
+    });
+
+    it("refuses anyone but the owner of the parent thread, and says nothing about whether the run exists", async () => {
+        await admit();
+
+        const [run] = await runs();
+        const stranger = (await insertUser()) as string;
+
+        await expect(cancel(run._id, stranger)).rejects.toThrow(NOT_FOUND);
+        expect(await firstRun()).toMatchObject({ status: "queued" });
+    });
+
+    describe("a Stop on a thread", () => {
+        const forStop = async (target: string, caller: string = userId) =>
+            await harness.run(async (ctx: any) => await cancelSubAgentRunsForStop(ctx, target, caller));
+
+        it("cancels the queued and running runs the stopped parent delegated", async () => {
+            await admit();
+            await admit();
+            await admit();
+
+            const [first, second] = await runs();
+
+            await harness.run(async (ctx: any) => await claimQueuedRun(ctx, first._id));
+            await harness.run(async (ctx: any) => await finishRun(ctx, second._id, { kind: "succeeded", result: "done" }));
+
+            expect(await forStop(threadId)).toBe(2);
+
+            const all = await runs();
+            const statuses = all.map((run: any) => run.status as string).toSorted((a: string, b: string) => a.localeCompare(b));
+
+            expect(statuses).toStrictEqual(["cancelled", "cancelled", "succeeded"]);
+        });
+
+        it("cancels only a sub-agent's own run when its own thread is stopped", async () => {
+            await admit();
+
+            const [parentRun] = await runs();
+            const childThread = await insertThread(userId);
+
+            await harness.run(async (ctx: any) => await ctx.db.patch(parentRun._id, { childThreadId: childThread }));
+            await harness.run(async (ctx: any) => await claimQueuedRun(ctx, parentRun._id));
+            await harness.run(async (ctx: any) => await admitAndInsert(ctx, childThread));
+            // A sibling under the same parent thread.
+            await admit();
+
+            expect(await forStop(childThread)).toBe(1);
+
+            const all = await runs();
+            const byStatus = all.map((run: any) => [run.parentThreadId === childThread ? "grandchild" : "child", run.status]);
+
+            expect(byStatus).toStrictEqual([
+                ["child", "cancelled"],
+                ["grandchild", "queued"],
+                ["child", "queued"],
+            ]);
+        });
+
+        it("stops the runs a sub-agent's thread delegated after its own run has ended", async () => {
+            await admit();
+
+            const [parentRun] = await runs();
+            const childThread = await insertThread(userId);
+
+            await harness.run(async (ctx: any) => await ctx.db.patch(parentRun._id, { childThreadId: childThread }));
+            await harness.run(async (ctx: any) => await finishRun(ctx, parentRun._id, { kind: "succeeded", result: "done" }));
+            await harness.run(async (ctx: any) => await admitAndInsert(ctx, childThread));
+
+            expect(await forStop(childThread)).toBe(1);
+
+            const allRuns = await runs();
+            const grandchild = allRuns.find((run: any) => run.parentThreadId === childThread);
+
+            expect(grandchild).toMatchObject({ status: "cancelled" });
+        });
+
+        it("takes down what a stopped parent's sub-agents delegated too", async () => {
+            await admit();
+
+            const [parentRun] = await runs();
+            const childThread = await insertThread(userId);
+
+            await harness.run(async (ctx: any) => await ctx.db.patch(parentRun._id, { childThreadId: childThread }));
+            await harness.run(async (ctx: any) => await claimQueuedRun(ctx, parentRun._id));
+            await harness.run(async (ctx: any) => await admitAndInsert(ctx, childThread));
+
+            expect(await forStop(threadId)).toBe(2);
+
+            const all = await runs();
+
+            expect(all.map((run: any) => run.status as string)).toStrictEqual(["cancelled", "cancelled"]);
+        });
+
+        it("never reaches another user's runs", async () => {
+            await admit();
+
+            const stranger = (await insertUser()) as string;
+
+            expect(await forStop(threadId, stranger)).toBe(0);
+            expect(await firstRun()).toMatchObject({ status: "queued" });
+        });
+    });
+});
+
+/** A queued run under `parentThreadId`, inserted past admission (the caps are not under test). */
+const admitAndInsert = async (ctx: any, parentThreadId: string) => {
+    const result = await admitSubAgentRun(ctx, { parentThreadId, task: "Nested", toolCallId: "nested", userId });
+
+    if ("row" in result) {
+        await ctx.db.insert("subAgentRuns", result.row);
+    }
+};

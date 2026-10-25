@@ -5933,6 +5933,11 @@
     {
       "from": "function:sub_agents_execute:runSubAgent",
       "kind": "call",
+      "to": "function:agent_threads:deleteAllForThreadIdSync"
+    },
+    {
+      "from": "function:sub_agents_execute:runSubAgent",
+      "kind": "call",
       "to": "function:skills_executor:resolveSkillsForRun"
     },
     {
@@ -5949,6 +5954,11 @@
       "from": "function:sub_agents_execute:runSubAgent",
       "kind": "call",
       "to": "function:sub_agents_functions:completeRun"
+    },
+    {
+      "from": "function:sub_agents_execute:runSubAgent",
+      "kind": "call",
+      "to": "function:sub_agents_functions:shouldRunStop"
     },
     {
       "from": "function:sub_agents_execute:runSubAgent",
@@ -13854,6 +13864,13 @@
     },
     {
       "detail": "mutation",
+      "id": "function:sub_agents_functions:cancelRun",
+      "kind": "function",
+      "name": "sub_agents.functions.cancelRun",
+      "module": "sub-agents"
+    },
+    {
+      "detail": "mutation",
       "id": "function:sub_agents_functions:claimRun",
       "kind": "function",
       "name": "sub_agents.functions.claimRun",
@@ -13892,6 +13909,13 @@
       "id": "function:sub_agents_functions:reapRun",
       "kind": "function",
       "name": "sub_agents.functions.reapRun",
+      "module": "sub-agents"
+    },
+    {
+      "detail": "query",
+      "id": "function:sub_agents_functions:shouldRunStop",
+      "kind": "function",
+      "name": "sub_agents.functions.shouldRunStop",
       "module": "sub-agents"
     },
     {
@@ -17407,25 +17431,25 @@
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 120,
+      "line": 128,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 181,
+      "line": 190,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "call",
-      "line": 194,
+      "line": 203,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
       "file": "chat/lib/headless-run",
       "kind": "schedule",
-      "line": 200,
+      "line": 209,
       "reason": "\"runHeadlessAgent\" is not a registered function"
     },
     {
@@ -19657,14 +19681,32 @@
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 345,
+      "line": 351,
+      "reason": "\"finishRun\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/functions",
+      "kind": "read",
+      "line": 351,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 369,
+      "line": 375,
       "reason": "\"postRunResult\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/functions",
+      "kind": "read",
+      "line": 508,
+      "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
+    },
+    {
+      "file": "sub-agents/functions",
+      "kind": "read",
+      "line": 520,
+      "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
       "file": "sub-agents/gdpr",
@@ -19735,13 +19777,13 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 187,
+      "line": 192,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 202,
+      "line": 207,
       "reason": "the default export is not a registered function"
     },
     {

@@ -38062,6 +38062,77 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#sub_agents_functions:cancelRun": {
+      "post": {
+        "description": "Invoke the `mutation` `sub_agents_functions:cancelRun` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:cancelRun",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "runId": {
+                        "description": "Id<\"subAgentRuns\">",
+                        "type": "string",
+                        "x-lunora-table": "subAgentRuns"
+                      }
+                    },
+                    "required": [
+                      "runId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:cancelRun",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "cancelled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "cancelled"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: sub_agents_functions:cancelRun",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#sub_agents_functions:getRunByToolCall": {
       "post": {
         "description": "Invoke the `query` `sub_agents_functions:getRunByToolCall` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -38176,6 +38247,10 @@
                             },
                             {
                               "const": "failed",
+                              "type": "string"
+                            },
+                            {
+                              "const": "cancelled",
                               "type": "string"
                             }
                           ]
