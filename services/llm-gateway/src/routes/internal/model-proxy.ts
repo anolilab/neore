@@ -227,7 +227,7 @@ modelProxyRouter.openapi(
 
             if (body.action === "generate") {
                 // ── Non-streaming: doGenerate() ──────────────────────────
-                // The pricing read overlaps the model call; its rejection surfaces at the await below.
+                // Overlaps the model call; a rejection surfaces at the await below.
                 const pricingRead = policy.pricing();
 
                 pricingRead.catch(() => undefined);
@@ -297,7 +297,7 @@ modelProxyRouter.openapi(
             }
 
             // ── Streaming: doStream() ────────────────────────────────
-            // The pricing read overlaps the stream; its rejection surfaces at the await after the last chunk.
+            // Overlaps the stream; a rejection surfaces at the await after the last chunk.
             const pricingRead = policy.pricing();
 
             pricingRead.catch(() => undefined);

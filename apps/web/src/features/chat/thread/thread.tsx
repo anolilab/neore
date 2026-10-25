@@ -91,9 +91,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
 
     const { jwtToken } = useChatActions();
 
-    // Detect comparison parent instantly from the already-loaded thread doc. Child threads
-    // are only read for a comparison parent: a thread without the flag has no comparison
-    // children, since no data predates it.
+    // Detect comparison parent instantly from the already-loaded thread doc.
     const isMultiChatThread = thread?.multiChat === true;
 
     const crpc = useCRPC();
