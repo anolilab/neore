@@ -4,9 +4,9 @@
  * finished step, and what was buffered but not written.
  */
 import { LunoraError } from "lunorash/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { isStreamWriteRefused, originalWriteError, pipeToPersistentChunks } from "./persist-stream";
+import { isStreamStopped, isStreamWriteRefused, originalWriteError, pipeToPersistentChunks } from "./persist-stream";
 
 /** A fake action context: the first `accepted` chunk writes succeed, the next one is refused as a stop. */
 const ctxAccepting = (accepted: number) => {
@@ -106,5 +106,83 @@ describe(pipeToPersistentChunks, () => {
         };
 
         await expect(pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. "]))).rejects.toBe(boom);
+    });
+
+    describe("a stop during a quiet stretch (a long tool step)", () => {
+        /** A context that accepts writes and answers the stream's status from `status.current`. */
+        const ctxWithStatus = (status: { current: string }) => {
+            const polls: number[] = [];
+            const ctx = {
+                runMutation: async () => undefined,
+                runQuery: async () => {
+                    polls.push(Date.now());
+
+                    return status.current;
+                },
+            };
+
+            return { ctx, polls };
+        };
+
+        /** A model stream that writes some text, then goes quiet inside a tool step until `signal` aborts. */
+        async function* quietAfterText(signal: AbortSignal, ran: { toolSignalAborted: boolean }) {
+            yield { text: "Let me look. ", type: "text-delta" };
+            await new Promise<void>((resolve) => {
+                signal.addEventListener("abort", () => resolve(), { once: true });
+            });
+            ran.toolSignalAborted = signal.aborted;
+        }
+
+        it("is found by polling while no part arrives, with the text it owed", async () => {
+            const status = { current: "streaming" };
+            const { ctx } = ctxWithStatus(status);
+            const tool = new AbortController();
+            const ran = { toolSignalAborted: false };
+            const piping = pipeToPersistentChunks(ctx as never, "stream-1", quietAfterText(tool.signal, ran), { stopPollMs: 10 }).catch(
+                (error: unknown) => error,
+            );
+
+            status.current = "done";
+
+            const error = await piping;
+
+            expect(isStreamWriteRefused(error)).toBe(true);
+            expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "Let me look. " });
+
+            // The caller's `endStoppedRun` aborts next; the quiet step then ends, it was not left running.
+            tool.abort();
+            await vi.waitFor(() => expect(ran.toolSignalAborted).toBe(true));
+        });
+
+        it("does not poll while parts keep arriving, nor after the stream ended", async () => {
+            const { ctx, polls } = ctxWithStatus({ current: "done" });
+
+            await pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. ", "Two. "]), { stopPollMs: 10 });
+            await new Promise((resolve) => setTimeout(resolve, 50));
+
+            expect(polls).toHaveLength(0);
+        });
+
+        it("a stream that ends normally is not reported as stopped, whatever its row says afterwards", async () => {
+            const status = { current: "streaming" };
+            const { ctx } = ctxWithStatus(status);
+            const piped = await pipeToPersistentChunks(ctx as never, "stream-1", parts(["One. "]), { stopPollMs: 10 });
+
+            status.current = "done";
+            await new Promise((resolve) => setTimeout(resolve, 30));
+
+            expect(piped.pending).toStrictEqual({ reasoning: "", text: "" });
+        });
+
+        it("a failed status read is not a stop", async () => {
+            const ctx = {
+                runMutation: async () => undefined,
+                runQuery: async () => {
+                    throw new Error("shard busy");
+                },
+            };
+
+            await expect(isStreamStopped(ctx as never, "stream-1")).resolves.toBe(false);
+        });
     });
 });

@@ -57,7 +57,7 @@ import { buildAgentTools } from "../lib/agent-tools";
 import { getMaxSteps } from "../lib/auto-continue";
 import getAgent from "../lib/get-agent";
 import { closeMCPClients } from "../lib/mcp-tools";
-import { pipeToPersistentChunks, type PipedStream } from "../lib/persist-stream";
+import { pipeToPersistentChunks, type PipedStream, stopWhenStopped } from "../lib/persist-stream";
 import type { SearchMode } from "../lib/tool-builder";
 import type { ToolRunConfig } from "../lib/tool-run-config";
 import type { GroupHistoryRow, GroupParticipantInfo } from "./logic";
@@ -312,6 +312,7 @@ const runSpeaker = async (
         const stopping = new AbortController();
 
         streamTextArgs.abortSignal = stopping.signal;
+        streamTextArgs.stopWhen = stopWhenStopped(ctx, turn.streamId, getMaxSteps(turn.shouldAutoContinue));
 
         // Admitted by the stream this turn runs on (`streamRunThread`): the context is read without a proof.
         const result = await agent.streamText(ctx, { threadId: turn.threadId, userId: turn.userId }, streamTextArgs as never, {

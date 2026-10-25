@@ -166,7 +166,9 @@ export const setStreamStatus = internalMutation
  * leaves `running` the way a legacy abort does: `abort`, then back to `active` a
  * second later. Returns whether anything was stopped.
  *
- * ponytail: the stop lands at the run's next chunk write, so a long tool step keeps running (and billing) until then. Abort the in-flight call if that bites.
+ * The run learns of the stop at its next chunk write, or, while a tool step keeps it quiet, when `pipeToPersistentChunks`
+ * polls the stream (`STOP_POLL_MS`) and at each finished step. Either way `endStoppedRun` then aborts the model call
+ * and the signal its tools get. A tool that ignores that signal still runs to its end, but no further step starts.
  */
 export const stopActiveForThread = internalMutation
     .input({ messageId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.string().max(MAX_LENGTH.id) })

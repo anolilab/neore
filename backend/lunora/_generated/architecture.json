@@ -16976,73 +16976,61 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 324,
+      "line": 325,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 324,
+      "line": 325,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 500,
+      "line": 501,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 500,
+      "line": 501,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 509,
+      "line": 510,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 509,
+      "line": 510,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 539,
+      "line": 540,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 539,
+      "line": 540,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 547,
+      "line": 548,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "schedule",
-      "line": 547,
-      "reason": "\"runGroupTurn\" is not a registered function"
-    },
-    {
-      "file": "chat/group/run",
-      "kind": "call",
-      "line": 575,
-      "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
-    },
-    {
-      "file": "chat/group/run",
-      "kind": "call",
-      "line": 575,
+      "line": 548,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
@@ -17060,25 +17048,37 @@
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 624,
+      "line": 577,
+      "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
+    },
+    {
+      "file": "chat/group/run",
+      "kind": "call",
+      "line": 577,
       "reason": "\"runGroupTurn\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 712,
+      "line": 625,
+      "reason": "\"runGroupTurn\" is not a registered function"
+    },
+    {
+      "file": "chat/group/run",
+      "kind": "call",
+      "line": 713,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 730,
+      "line": 731,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
       "file": "chat/group/run",
       "kind": "call",
-      "line": 740,
+      "line": 741,
       "reason": "\"continueGroupAfterToolApproval\" is not a registered function"
     },
     {
@@ -17204,43 +17204,37 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 107,
+      "line": 115,
       "reason": "\"readRunPlan\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 108,
+      "line": 116,
       "reason": "\"readRunPlan\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 157,
+      "line": 165,
       "reason": "\"resolveRunModel\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 208,
+      "line": 216,
       "reason": "\"loadUserProviderKeys\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 299,
+      "line": 307,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 335,
-      "reason": "\"loadRunContext\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "call",
-      "line": 336,
+      "line": 343,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
@@ -17252,44 +17246,44 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 363,
+      "line": 352,
       "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 483,
-      "reason": "\"afterRun\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "schedule",
-      "line": 495,
-      "reason": "\"afterRun\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "schedule",
-      "line": 504,
-      "reason": "\"afterRun\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "schedule",
-      "line": 516,
-      "reason": "\"afterRun\" is not a registered function"
-    },
-    {
-      "file": "chat/lib/agent-run",
-      "kind": "schedule",
-      "line": 534,
-      "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
+      "line": 371,
+      "reason": "\"loadRunContext\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 630,
-      "reason": "\"finishRun\" is not a registered function"
+      "line": 491,
+      "reason": "\"afterRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "schedule",
+      "line": 503,
+      "reason": "\"afterRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "schedule",
+      "line": 512,
+      "reason": "\"afterRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "schedule",
+      "line": 524,
+      "reason": "\"afterRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "schedule",
+      "line": 542,
+      "reason": "the scheduled function is not a static api.* / internal.* chain or a \"namespace:export\" key"
     },
     {
       "file": "chat/lib/agent-run",
@@ -17300,43 +17294,49 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 650,
+      "line": 646,
       "reason": "\"finishRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 695,
+      "line": 658,
+      "reason": "\"finishRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 703,
       "reason": "\"endStoppedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 790,
+      "line": 798,
       "reason": "\"resumeApprovedRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 915,
+      "line": 924,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 935,
+      "line": 944,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 942,
+      "line": 951,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 953,
+      "line": 962,
       "reason": "\"failRun\" is not a registered function"
     },
     {
@@ -17420,7 +17420,13 @@
     {
       "file": "chat/lib/persist-stream",
       "kind": "call",
-      "line": 114,
+      "line": 106,
+      "reason": "\"isStreamStopped\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/persist-stream",
+      "kind": "call",
+      "line": 201,
       "reason": "\"pipeToPersistentChunks\" is not a registered function"
     },
     {
