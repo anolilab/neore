@@ -30,6 +30,14 @@ export interface QueuedPrompt<A> {
 
 export interface QueuedSteer {
     id: string;
+
+    /**
+     * `steerRun` has not answered yet. The chip holds its place in the queue from
+     * the moment the text leaves the draft, but is neither sent nor withdrawn
+     * until the call settles; not stored, so a reload leaves a plain steer that
+     * the withdrawal reconciles by id.
+     */
+    pending?: boolean;
     streamId: string;
 }
 
@@ -49,6 +57,36 @@ export const removeQueuedPrompt = <A>(state: PromptQueueState<A>, id: string): P
 
     // An emptied queue has nothing left to hold back.
     return { items, paused: items.length === 0 ? false : state.paused };
+};
+
+/**
+ * `steerRun` answered for the steer `steerId`: `accepted` keeps it as a steer
+ * (also for a call whose outcome is unknown, which the withdrawal reconciles by
+ * id); a refusal turns it into an ordinary queued message, in the same place.
+ */
+export const settleQueuedSteer = <A>(state: PromptQueueState<A>, steerId: string, outcome: "accepted" | "refused"): PromptQueueState<A> => {
+    const target = state.items.find((item) => item.steer?.id === steerId);
+
+    if (!target?.steer) {
+        return state;
+    }
+
+    const { id, streamId } = target.steer;
+
+    return {
+        ...state,
+        items: state.items.map((item): QueuedPrompt<A> => {
+            if (item !== target) {
+                return item;
+            }
+
+            const plain: QueuedPrompt<A> = { ...item };
+
+            delete plain.steer;
+
+            return outcome === "refused" ? plain : { ...plain, steer: { id, streamId } };
+        }),
+    };
 };
 
 export const dequeuePrompt = <A>(state: PromptQueueState<A>): { next: QueuedPrompt<A> | undefined; state: PromptQueueState<A> } => {
@@ -102,7 +140,7 @@ export const serializePromptQueue = <A>(state: PromptQueueState<A>): string | un
             return {
                 droppedAttachments: item.attachments.length + (item.droppedAttachments ?? 0),
                 id: item.id,
-                ...(item.steer && { steer: item.steer }),
+                ...(item.steer && { steer: { id: item.steer.id, streamId: item.steer.streamId } }),
                 text: item.text,
             };
         });
@@ -133,7 +171,8 @@ export type SteerWithdrawal = "delivered" | "unknown" | "withdrawn";
  * the reply already has it, so it is dropped and the next one is tried;
  * `withdrawn` (never taken) and `unknown` (its stream is gone) send it. A
  * withdrawal that throws returns `failed` with the prompt still at the head, so
- * it is neither lost, reordered nor sent twice. A prompt that left the queue
+ * it is neither lost, reordered nor sent twice. A steer whose call is still out
+ * (`pending`) holds the head: `blocked`. A prompt that left the queue
  * while the call was out (the reply's delivery retired it, or the user removed
  * it) is not ours to send.
  *
@@ -155,6 +194,12 @@ export const takeNextToSend = async <A>({
     withdraw: (steer: QueuedSteer) => Promise<SteerWithdrawal>;
 }): Promise<{ kind: "blocked" } | { kind: "failed" } | { kind: "send"; prompt: QueuedPrompt<A> } | undefined> => {
     for (let next = peek(); next; next = peek()) {
+        // Its call is still out: nothing can be said about the run yet, and what
+        // follows must not overtake it. The settling re-runs the queue.
+        if (next.steer?.pending) {
+            return { kind: "blocked" };
+        }
+
         let outcome: SteerWithdrawal | undefined;
 
         if (next.steer) {

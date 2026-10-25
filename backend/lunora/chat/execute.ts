@@ -357,6 +357,7 @@ export const runStreamingAgent = internalAction
                     retrievedMemories: runContext.retrievedMemories,
                     savedMessages: result.savedMessages,
                     ...(invokedSkill && { skill: { name: `/${invokedSkill.slug}`, ...(invokedSkill.skillId && { id: invokedSkill.skillId }) } }),
+                    steeredTexts: steering.steeredTexts(),
                     threadId,
                     ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
                     timingStart,

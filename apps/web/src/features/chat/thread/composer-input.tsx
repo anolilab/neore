@@ -754,21 +754,21 @@ const ComposerInput = ({
         promptHistory.reset();
         clear();
 
-        const { enqueue } = usePromptQueueStore.getState();
+        const { enqueue, settleSteer } = usePromptQueueStore.getState();
 
         // The id is ours, so a call whose answer never came back can still be told
         // apart from a refusal: the chip stays as a steer and the queue's withdrawal
         // (`composer-prompt-queue.tsx`) learns whether the run took it before anything is sent.
         const steerId = crypto.randomUUID();
 
+        // The chip exists before the call is made: the text is in the (persisted)
+        // queue the moment it leaves the draft, and a prompt queued while the call
+        // is out lands behind it. `pending` keeps the queue from acting on it.
+        enqueue(threadId, { attachments: [], steer: { id: steerId, pending: true, streamId }, text: steerText });
+
         void steerRun({ steerId, streamId: streamId as Id<"persistentStreams">, text: steerText, threadId: threadId as Id<"threads"> })
-            .then(() => enqueue(threadId, { attachments: [], steer: { id: steerId, streamId }, text: steerText }))
-            .catch((error: unknown) => {
-                enqueue(
-                    threadId,
-                    wasRefused(error) ? { attachments: [], text: steerText } : { attachments: [], steer: { id: steerId, streamId }, text: steerText },
-                );
-            });
+            .then(() => settleSteer(threadId, steerId, "accepted"))
+            .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"));
     }, [canSteer, clear, disabled, promptHistory, sseStreamState, steerRun, text, threadId]);
 
     // Handle submit — fully synchronous, fire-and-forget network call.

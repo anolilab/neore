@@ -179,7 +179,8 @@ const useQueueActions = () => {
                 return;
             }
 
-            if (busyRef.current) {
+            // Its call is still out: a withdrawal now could miss it, and the run would take it after all.
+            if (busyRef.current || prompt.steer.pending) {
                 return;
             }
 
@@ -237,6 +238,7 @@ const QueueChip: FC<{ onRemove: (id: string) => void; position: number; prompt: 
             <button
                 aria-label={t`Remove queued message ${position}`}
                 className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5"
+                disabled={Boolean(prompt.steer?.pending)}
                 onClick={() => onRemove(prompt.id)}
                 type="button"
             >
@@ -315,23 +317,33 @@ const ComposerPromptQueue: FC = () => {
     // the streaming -> idle transition above, so nothing else would send it. What was
     // queued before this thread mounted is not "new": coming back to an old queue
     // never sends by surprise.
-    const seenRef = useRef<{ ids: Set<string>; threadId: string | undefined }>({ ids: new Set(), threadId: undefined });
+    const seenRef = useRef<{ ids: Set<string>; pending: Set<string>; threadId: string | undefined }>({
+        ids: new Set(),
+        pending: new Set(),
+        threadId: undefined,
+    });
 
     useEffect(() => {
+        const pendingNow = new Set(queue.items.filter((item) => item.steer?.pending).map((item) => item.id));
+
         if (seenRef.current.threadId !== threadId) {
-            seenRef.current = { ids: new Set(queue.items.map((item) => item.id)), threadId };
+            seenRef.current = { ids: new Set(queue.items.map((item) => item.id)), pending: pendingNow, threadId };
 
             return;
         }
 
-        const { ids } = seenRef.current;
-        const arrived = queue.items.some((item) => !ids.has(item.id));
+        const { ids, pending } = seenRef.current;
+        const arrived = queue.items.some((item) => !ids.has(item.id) && !pendingNow.has(item.id));
+        // A steer whose call just answered: the queue was held at it, and the reply may be over by now.
+        const settled = queue.items.some((item) => pending.has(item.id) && !pendingNow.has(item.id));
 
         for (const item of queue.items) {
             ids.add(item.id);
         }
 
-        if (arrived && !isStreaming && !queue.paused && !error && threadId) {
+        seenRef.current.pending = pendingNow;
+
+        if (!isStreaming && !error && threadId && !queue.paused && (arrived || settled)) {
             void sendNextPrompt(threadId);
         }
     }, [error, isStreaming, queue.items, queue.paused, sendNextPrompt, threadId]);

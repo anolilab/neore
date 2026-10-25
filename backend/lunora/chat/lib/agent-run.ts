@@ -477,6 +477,8 @@ export const afterRun = (
         savedMessages: ReadonlyArray<MessageDoc> | undefined;
         /** The skill that answered, for the usage page's per-skill breakdown; absent for the plain assistant. */
         skill?: ReplySkill;
+        /** What the user sent into the reply while it ran (`createRunSteering`); memory extraction reads it with the prompt. */
+        steeredTexts?: ReadonlyArray<string>;
         threadId: string;
         /** The user's IANA zone, so the usage heatmap files the reply under their calendar day. */
         timeZone?: string;
@@ -484,7 +486,7 @@ export const afterRun = (
         userId: string;
     },
 ): void => {
-    const { firstTokenTime, prompt, savedMessages = [], threadId, timingStart, userId } = args;
+    const { firstTokenTime, prompt, savedMessages = [], steeredTexts = [], threadId, timingStart, userId } = args;
     const lastAssistantMessage = savedMessages.findLast((m) => !m.tool);
 
     if (lastAssistantMessage) {
@@ -564,7 +566,8 @@ export const afterRun = (
         assistantResponse: assistantText.slice(0, 4000),
         threadId: threadId as Id<"threads">,
         userId,
-        userMessage: prompt,
+        // A steer can carry the very fact worth keeping ("actually, I'm vegetarian").
+        userMessage: [prompt, ...steeredTexts].join("\n\n"),
         ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
     });
 };
@@ -620,8 +623,9 @@ export const buildRunStreamArgs = (options: { model: string; reasoningEffort: nu
 export const createRunSteering = (
     ctx: Pick<ActionCtx, "runMutation">,
     run: { streamId: string; threadId: string; userId: string },
-): { steeredBefore: () => boolean; takeSteer: TakeSteer } => {
+): { steeredBefore: () => boolean; steeredTexts: () => string[]; takeSteer: TakeSteer } => {
     let restartDue = false;
+    const texts: string[] = [];
 
     return {
         steeredBefore: () => {
@@ -631,6 +635,7 @@ export const createRunSteering = (
 
             return due;
         },
+        steeredTexts: () => [...texts],
         takeSteer: async ({ pendingMessageId }) => {
             try {
                 const delivered = await ctx.runMutation(internal.chat.steering.deliverSteers, {
@@ -641,6 +646,10 @@ export const createRunSteering = (
                 });
 
                 restartDue ||= delivered !== null;
+
+                if (delivered) {
+                    texts.push(delivered.text);
+                }
 
                 return delivered;
             } catch (error) {

@@ -10,6 +10,7 @@ import {
     removeQueuedPrompt,
     restorePromptQueue,
     serializePromptQueue,
+    settleQueuedSteer,
     takeNextToSend,
 } from "./prompt-queue";
 
@@ -251,5 +252,55 @@ describe("takeNextToSend", () => {
         const queue = queueOf([{ attachments: [], id: "a", steer, text: "go left" }]);
 
         expect(await takeNextToSend({ ...queue, withdraw: async () => "delivered" })).toBeUndefined();
+    });
+
+    it("holds at a steer whose call is still out, without withdrawing or sending behind it", async () => {
+        const withdraw = vi.fn();
+        const queue = queueOf([
+            { attachments: [], id: "a", steer: { ...steer, pending: true }, text: "go left" },
+            { attachments: [], id: "b", text: "later" },
+        ]);
+
+        expect(await takeNextToSend({ ...queue, withdraw })).toStrictEqual({ kind: "blocked" });
+        expect(withdraw).not.toHaveBeenCalled();
+        expect(queue.items).toHaveLength(2);
+    });
+});
+
+describe(settleQueuedSteer, () => {
+    const pendingQueue = (): PromptQueueState<never> => {
+        return {
+            items: [
+                { attachments: [], id: "a", steer: { id: "s1", pending: true, streamId: "stream-1" }, text: "go left" },
+                { attachments: [], id: "b", text: "later" },
+            ],
+            paused: false,
+        };
+    };
+
+    it("keeps an answered steer in its place, no longer pending", () => {
+        const settled = settleQueuedSteer(pendingQueue(), "s1", "accepted");
+
+        expect(settled.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
+        expect(settled.items[0]?.steer).toStrictEqual({ id: "s1", streamId: "stream-1" });
+    });
+
+    it("turns a refused steer into a plain queued message in the same place", () => {
+        const settled = settleQueuedSteer(pendingQueue(), "s1", "refused");
+
+        expect(settled.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
+        expect(settled.items[0]).toStrictEqual({ attachments: [], id: "a", text: "go left" });
+    });
+
+    it("leaves the queue alone when the steer is gone", () => {
+        const queue = pendingQueue();
+
+        expect(settleQueuedSteer(queue, "other", "refused")).toBe(queue);
+    });
+
+    it("stores a pending steer as a plain one, so a reload reconciles it by id", () => {
+        const restored = restorePromptQueue(serializePromptQueue(pendingQueue()));
+
+        expect(restored?.items[0]?.steer).toStrictEqual({ id: "s1", streamId: "stream-1" });
     });
 });
