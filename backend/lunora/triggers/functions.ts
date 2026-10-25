@@ -721,6 +721,12 @@ export const recordFilteredExecution = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { reason, triggerId }, ctx }) => {
+        // The trigger may have been deleted after the webhook read it. Its
+        // deletion cleared the history, so a row written now would outlive it.
+        if (!(await ctx.db.get(triggerId))) {
+            return null;
+        }
+
         const latest = await ctx.db
             .query("triggerExecutions")
             .withIndex("by_triggerId_status", (q) => q.eq("triggerId", triggerId).eq("status", "filtered"))
