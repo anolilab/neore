@@ -1,7 +1,8 @@
 /**
  * The thread-title field of `<PersonalizationSettings>`: text typed while an earlier save is still
  * pending must survive that save's cache update, and a saved value must be there after a remount.
- * The settings hooks are replaced by a small in-memory store with a controllable save.
+ * The settings hooks are replaced by a small in-memory store with a controllable save. The ordering of
+ * queued writes belongs to `updateLatest` and is covered in `use-user-settings.test.tsx`.
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
@@ -36,7 +37,11 @@ vi.mock("@/lib/analytics", () => {
 });
 
 vi.mock("@/features/layout/hooks/use-ui-state", () => {
-    return { useUserPreferences: () => ({ onboardingCompleted: false, setOnboardingCompleted: vi.fn() }) };
+    return {
+        useUserPreferences: () => {
+            return { onboardingCompleted: false, setOnboardingCompleted: vi.fn() };
+        },
+    };
 });
 
 vi.mock("@/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog", () => {
@@ -54,8 +59,9 @@ vi.mock("@/features/auth/hooks/use-user-settings", async () => {
     return {
         useUpdateUserSettings: () => {
             return {
-                mutateAsync: (patch: { threadTitleInstructions?: string }) => {
-                    // `onMutate` awaits before it writes the cache, so the optimistic update (`land`) trails the call.
+                updateLatest: (build: () => { threadTitleInstructions?: string }) => {
+                    const patch = build();
+                    // The cache update (`land`) is held back here, so a blur can run before the cache shows the last save.
                     const land = () => {
                         store.settings = { ...store.settings, ...patch };
 
@@ -130,8 +136,32 @@ describe("PersonalizationSettings thread title instructions", () => {
         expect(harness.store.pendingSaves.map((save) => save.value)).toEqual(["Short titles", "Short titles, no emoji"]);
     });
 
+    it("sends a reversal made before the cache shows the pending save", () => {
+        render(<PersonalizationSettings />);
+
+        fireEvent.change(field(), { target: { value: "Short titles" } });
+        fireEvent.blur(field());
+        fireEvent.focus(field());
+        // Back to the stored value (none) while the first save has not reached the cache.
+        fireEvent.change(field(), { target: { value: "" } });
+        fireEvent.blur(field());
+
+        expect(harness.store.pendingSaves.map((save) => save.value)).toEqual(["Short titles", ""]);
+    });
+
+    it("does not send a blur that repeats the pending save", () => {
+        render(<PersonalizationSettings />);
+
+        fireEvent.change(field(), { target: { value: "Short titles" } });
+        fireEvent.blur(field());
+        fireEvent.focus(field());
+        fireEvent.blur(field());
+
+        expect(harness.store.pendingSaves).toHaveLength(1);
+    });
+
     it("keeps a saved value after the card is mounted again", async () => {
-        const first = render(<PersonalizationSettings />);
+        const view = render(<PersonalizationSettings />);
 
         fireEvent.change(field(), { target: { value: "  Start with a verb  " } });
         fireEvent.blur(field());
@@ -142,7 +172,7 @@ describe("PersonalizationSettings thread title instructions", () => {
 
         expect(harness.store.pendingSaves[0]?.value).toBe("Start with a verb");
 
-        first.unmount();
+        view.unmount();
         render(<PersonalizationSettings />);
 
         expect(field().value).toBe("Start with a verb");

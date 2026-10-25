@@ -9,7 +9,7 @@ import { Input } from "@neore/ui/components/input";
 import { Textarea } from "@neore/ui/components/textarea";
 import { RotateCcw, Sparkles } from "lucide-react";
 import type { FC } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
@@ -43,6 +43,9 @@ const PersonalizationSettings: FC = () => {
     // Not part of the render-time sync below: a draft (`null` = not editing) shadows the stored value, so a
     // cache update from an earlier save can never replace text typed since.
     const [titleInstructionsDraft, setTitleInstructionsDraft] = useState<string | null>(null);
+    // The value of the newest save that has not settled yet. The cached setting may not show it for a moment,
+    // so a blur compares against this first: changing the text and changing it back must still send the reversal.
+    const submittedTitleInstructions = useRef<string | null>(null);
     const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
 
     const handleOptimizedSystemPrompt = useCallback(
@@ -136,24 +139,39 @@ const PersonalizationSettings: FC = () => {
     const threadTitleInstructions = titleInstructionsDraft ?? userSettings?.threadTitleInstructions ?? "";
 
     // Sent as "" to clear: `handleUpdateSetting` maps blank to `undefined`, which the wire drops, so the old text would stay.
+    // `updateLatest` queues the write behind earlier ones and sends the newest value, so a slow save cannot land last.
     const handleThreadTitleInstructionsBlur = useCallback(async () => {
-        const draft = titleInstructionsDraft;
-        const trimmed = (draft ?? "").trim();
+        if (titleInstructionsDraft === null) {
+            return;
+        }
 
-        if (draft === null || trimmed === (userSettings?.threadTitleInstructions ?? "")) {
-            setTitleInstructionsDraft(null);
+        const trimmed = titleInstructionsDraft.trim();
+        const current = submittedTitleInstructions.current ?? userSettings?.threadTitleInstructions ?? "";
+
+        if (trimmed === current) {
+            if (submittedTitleInstructions.current === null) {
+                setTitleInstructionsDraft(null);
+            }
 
             return;
         }
 
+        submittedTitleInstructions.current = trimmed;
+
         try {
-            await updateSettingsMutation.mutateAsync({ threadTitleInstructions: trimmed });
+            await updateSettingsMutation.updateLatest(() => {
+                return { threadTitleInstructions: trimmed };
+            });
             trackEvent("settings_changed", { section: "personalization", setting_key: "threadTitleInstructions" });
             toast.success(t`Settings saved`);
             // Drop the draft only if nothing was typed while the save was pending.
-            setTitleInstructionsDraft((current) => (current !== null && current.trim() === trimmed ? null : current));
+            setTitleInstructionsDraft((latest) => (latest !== null && latest.trim() === trimmed ? null : latest));
         } catch {
             toast.error(t`Failed to save settings`);
+        } finally {
+            if (submittedTitleInstructions.current === trimmed) {
+                submittedTitleInstructions.current = null;
+            }
         }
     }, [titleInstructionsDraft, userSettings?.threadTitleInstructions, updateSettingsMutation, t]);
 
