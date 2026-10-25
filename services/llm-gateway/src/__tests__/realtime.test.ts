@@ -244,6 +244,51 @@ describe("GET /v1/realtime", () => {
 
     // ── Successful WebSocket setup ────────────────────────────────────────
 
+    it("gives the upstream handshake a deadline, aborts it, and frees the session slot", async () => {
+        // Never answers; rejects only when the request's signal aborts.
+        mockFetch.mockImplementationOnce(
+            async (_url: string, init: RequestInit) =>
+                new Promise((_resolve, reject) => {
+                    init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+                }),
+        );
+
+        const timers = vi.spyOn(globalThis, "setTimeout");
+        const rateLimitKv = new MockKVNamespace();
+        const { env } = await buildEnv({ rateLimitKv });
+        const pending = app.fetch(realtimeRequest(), env, createMockCtx());
+
+        await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
+
+        // Fire the handshake deadline by hand instead of waiting 10 s.
+        const deadline = timers.mock.calls.find(([, delay]) => delay === 10_000);
+
+        timers.mockRestore();
+        expect(deadline).toBeDefined();
+        (deadline![0] as () => void)();
+
+        const res = await pending;
+
+        expect(res.status).toBe(502);
+        expect((mockFetch.mock.calls[0] as [string, RequestInit])[1].signal?.aborted).toBe(true);
+        const remaining = await rateLimitKv.list({ prefix: "realtime:session:" });
+
+        expect(remaining.keys).toHaveLength(0);
+    });
+
+    it("does not abort a handshake that answers in time", async () => {
+        const upstream = makeUpstreamWs();
+
+        mockFetch.mockResolvedValueOnce(makeUpstream101(upstream));
+
+        const { env } = await buildEnv();
+        const res = await app.fetch(realtimeRequest(), env, createMockCtx());
+        const signal = (mockFetch.mock.calls[0] as [string, RequestInit])[1].signal!;
+
+        expect(res.status).toBe(101);
+        expect(signal.aborted).toBe(false);
+    });
+
     it("returns 101 and connects to upstream on success", async () => {
         const upstream = makeUpstreamWs();
 
