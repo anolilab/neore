@@ -15,11 +15,12 @@ import { Reasoning, ReasoningContent, ReasoningTrigger } from "@neore/ui/compone
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@neore/ui/components/ai-elements/sources";
 import AnimatedTiles from "@neore/ui/components/animated-tiles";
 import { chatMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
-import { isDelimitedTable, isJsonl, isMermaid } from "@neore/ui/components/file-renderers/file-type-utilities";
+import type { FileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
+import { getFileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
 import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
 import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
-import type { FC, ReactNode } from "react";
+import type { ComponentType, FC, LazyExoticComponent, ReactNode } from "react";
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 
@@ -33,38 +34,23 @@ import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
 import PageContextChip from "./page-context-chip";
 
-// Lazy-loaded file renderers (code-split per file type)
+// Lazy-loaded file renderers (code-split per file type). The type predicates live in
+// `file-type-utilities`, a small module with no heavy dependencies, so importing it statically is free.
 const LazyGenericFileCard = lazy(() => import("@neore/ui/components/file-renderers/generic-file-card"));
-const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer"));
-const VideoPlayer = lazy(() => import("@neore/ui/components/file-renderers/video-player"));
-const AudioWaveformPlayer = lazy(() => import("@neore/ui/components/file-renderers/audio-waveform-player"));
-const DocxPreview = lazy(() => import("@neore/ui/components/file-renderers/docx-preview"));
-const JsonlViewer = lazy(() => import("@neore/ui/components/file-renderers/jsonl-viewer"));
-const MermaidPreview = lazy(() => import("@neore/ui/components/file-renderers/mermaid-preview"));
-const DelimitedTextPreview = lazy(() => import("@neore/ui/components/file-renderers/delimited-text-preview"));
 
-// Inline file type predicates (avoids static import from lazy-loaded library)
-const isPdfFile = (mediaType?: string, filename?: string): boolean => mediaType === "application/pdf" || filename?.toLowerCase().endsWith(".pdf") === true;
-const isVideoFile = (mediaType?: string, filename?: string): boolean => {
-    if (mediaType?.startsWith("video/") || mediaType === "application/vnd.apple.mpegurl") {
-        return true;
-    }
+type FileRenderer = LazyExoticComponent<ComponentType<{ filename?: string; mediaType?: string; url: string }>>;
 
-    const extension = filename?.split(".").pop()?.toLowerCase() ?? "";
-
-    return ["avi", "m3u8", "mkv", "mov", "mp4", "ogg", "webm"].includes(extension);
+/** Every file type the chat previews except images, which are the overridable `Image` component. */
+const FILE_RENDERERS: Record<Exclude<FileRendererType, "image">, FileRenderer> = {
+    audio: lazy(() => import("@neore/ui/components/file-renderers/audio-waveform-player")),
+    docx: lazy(() => import("@neore/ui/components/file-renderers/docx-preview")),
+    generic: LazyGenericFileCard,
+    jsonl: lazy(() => import("@neore/ui/components/file-renderers/jsonl-viewer")),
+    mermaid: lazy(() => import("@neore/ui/components/file-renderers/mermaid-preview")),
+    pdf: lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer")),
+    table: lazy(() => import("@neore/ui/components/file-renderers/delimited-text-preview")),
+    video: lazy(() => import("@neore/ui/components/file-renderers/video-player")),
 };
-const isAudioFile = (mediaType?: string, filename?: string): boolean => {
-    if (mediaType?.startsWith("audio/")) {
-        return true;
-    }
-
-    const extension = filename?.split(".").pop()?.toLowerCase() ?? "";
-
-    return ["aac", "flac", "m4a", "mp3", "ogg", "wav", "webm"].includes(extension);
-};
-const isDocxFile = (mediaType?: string, filename?: string): boolean =>
-    mediaType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || filename?.toLowerCase().endsWith(".docx") === true;
 
 /** A `[1]`–`[99]` citation marker in a text node. */
 const CITATION_MARKER_PATTERN = /\[\d{1,2}\]/;
@@ -123,10 +109,7 @@ interface MessageContentProps {
 const DefaultText: FC<{ isAnimating: boolean; text: string }> = memo(({ isAnimating, text }) => {
     const plugins = useStreamdownPlugins(text);
     // The user's code / diagram themes and code-block display (Appearance settings), provided by the app.
-    const { codeLineNumbers, mermaidTheme, shikiTheme } = useStreamdownAppearance();
-    const mermaid = useMemo(() => {
-        return { config: { theme: mermaidTheme } };
-    }, [mermaidTheme]);
+    const { codeLineNumbers, mermaid, shikiTheme } = useStreamdownAppearance();
 
     // `codeBlockMaxHeight="none"`: the 24-line cap is per block (`chatMarkdownComponents`), not Streamdown's global 400px.
     return (
@@ -335,6 +318,31 @@ const FileLoadingFallback: FC<{ name?: string }> = memo(({ name }) => {
 });
 
 FileLoadingFallback.displayName = "FileLoadingFallback";
+
+/** One file part: an image, or the preview its type maps to (`FILE_RENDERERS`), falling back to the download card. */
+const FilePartView: FC<{ generationPrompt?: string; Image: FC<{ part: ImagePart }>; part: FilePart }> = ({ generationPrompt, Image, part }) => {
+    const { filename, mediaType, nsfwStatus } = part;
+    const fileUrl = part.url || part.data;
+    const type = fileUrl ? getFileRendererType(mediaType, filename) : "generic";
+
+    if (type === "image") {
+        return <Image part={{ filename, image: fileUrl ?? "", nsfwStatus, prompt: generationPrompt, type: "image" }} />;
+    }
+
+    const Renderer = FILE_RENDERERS[type];
+
+    return (
+        <div className="message-text-fixed contents">
+            <Suspense fallback={<FileLoadingFallback name={filename} />}>
+                {fileUrl ? (
+                    <Renderer filename={filename} mediaType={mediaType} url={fileUrl} />
+                ) : (
+                    <LazyGenericFileCard filename={filename} mediaType={mediaType} />
+                )}
+            </Suspense>
+        </div>
+    );
+};
 
 const AiGeneratedLabel: FC = memo(() => {
     const { t } = useLingui();
@@ -764,91 +772,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                 const filePart = part as FilePart;
                 const fileUrl = filePart.url || filePart.data;
 
-                // Image — existing handler
-                if (filePart.mediaType?.startsWith("image/") && fileUrl) {
-                    renderedParts.push(
-                        <Image
-                            key={key}
-                            part={{
-                                filename: filePart.filename,
-                                image: filePart.url || filePart.data || "",
-                                nsfwStatus: filePart.nsfwStatus,
-                                prompt: generationPrompt,
-                                type: "image",
-                            }}
-                        />,
-                    );
-                    // PDF
-                } else if (isPdfFile(filePart.mediaType, filePart.filename) && fileUrl) {
-                    renderedParts.push(
-                        <div className="message-text-fixed contents" key={key}>
-                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
-                                <PdfViewer filename={filePart.filename} url={fileUrl} />
-                            </Suspense>
-                        </div>,
-                    );
-                    // Video
-                } else if (isVideoFile(filePart.mediaType, filePart.filename) && fileUrl) {
-                    renderedParts.push(
-                        <div className="message-text-fixed contents" key={key}>
-                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
-                                <VideoPlayer filename={filePart.filename} mediaType={filePart.mediaType} url={fileUrl} />
-                            </Suspense>
-                        </div>,
-                    );
-                    // Audio
-                } else if (isAudioFile(filePart.mediaType, filePart.filename) && fileUrl) {
-                    renderedParts.push(
-                        <div className="message-text-fixed contents" key={key}>
-                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
-                                <AudioWaveformPlayer filename={filePart.filename} url={fileUrl} />
-                            </Suspense>
-                        </div>,
-                    );
-                    // DOCX
-                } else if (isDocxFile(filePart.mediaType, filePart.filename) && fileUrl) {
-                    renderedParts.push(
-                        <div className="message-text-fixed contents" key={key}>
-                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
-                                <DocxPreview filename={filePart.filename} url={fileUrl} />
-                            </Suspense>
-                        </div>,
-                    );
-                    // JSON Lines, Mermaid and CSV/TSV: by name, since the stored type is `text/plain`
-                } else if (isJsonl(filePart.filename) && fileUrl) {
-                    renderedParts.push(
-                        <div className="message-text-fixed contents" key={key}>
-                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
-                                <JsonlViewer filename={filePart.filename} url={fileUrl} />
-                            </Suspense>
-                        </div>,
-                    );
-                } else if (isMermaid(filePart.filename) && fileUrl) {
-                    renderedParts.push(
-                        <div className="message-text-fixed contents" key={key}>
-                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
-                                <MermaidPreview filename={filePart.filename} url={fileUrl} />
-                            </Suspense>
-                        </div>,
-                    );
-                } else if (isDelimitedTable(filePart.filename) && fileUrl) {
-                    renderedParts.push(
-                        <div className="message-text-fixed contents" key={key}>
-                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
-                                <DelimitedTextPreview filename={filePart.filename} url={fileUrl} />
-                            </Suspense>
-                        </div>,
-                    );
-                    // Fallback: enhanced file card (also lazy-loaded)
-                } else {
-                    renderedParts.push(
-                        <div className="message-text-fixed contents" key={key}>
-                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
-                                <LazyGenericFileCard filename={filePart.filename} mediaType={filePart.mediaType} url={fileUrl} />
-                            </Suspense>
-                        </div>,
-                    );
-                }
+                renderedParts.push(<FilePartView generationPrompt={generationPrompt} Image={Image} key={key} part={filePart} />);
 
                 // Art. 50(4): assistant output is labelled where it is shown, not only on hover.
                 if (message.role === "assistant" && fileUrl) {
@@ -1074,6 +998,9 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                         }
                     }
 
+                    // The type is memoised above on purpose (a new one per render would remount every row),
+                    // which the compiler rule cannot see.
+                    // eslint-disable-next-line react-hooks/static-components
                     renderedParts.push(<ResolvedToolCall key={key} part={toolPart} />);
 
                     if (sandboxOutputs && SandboxFiles) {
