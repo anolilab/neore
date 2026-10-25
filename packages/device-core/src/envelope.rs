@@ -225,16 +225,23 @@ mod tests {
         dir.join("device-nonces.json")
     }
 
+    /// A nonce unique to this run: the tests share a nonce file, so the value is built at run time, not written as a literal.
+    fn run_nonce(tag: &str) -> String {
+        format!("{tag}-{}", std::process::id())
+    }
+
     #[test]
     fn a_stored_nonce_is_still_refused_after_a_restart() {
         let path = nonce_file("reload");
+        let first = run_nonce("n1");
+        let second = run_nonce("n2");
         let mut before = NonceSet::persisted(&path, 1_000);
 
-        assert!(before.insert("n1", 10_000, 1_000));
+        assert!(before.insert(&first, 10_000, 1_000));
 
         let mut after = NonceSet::persisted(&path, 2_000);
-        assert!(!after.insert("n1", 10_000, 2_000));
-        assert!(after.insert("n2", 10_000, 2_000));
+        assert!(!after.insert(&first, 10_000, 2_000));
+        assert!(after.insert(&second, 10_000, 2_000));
 
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
@@ -242,12 +249,13 @@ mod tests {
     #[test]
     fn an_expired_nonce_is_pruned_on_load() {
         let path = nonce_file("prune");
+        let old = run_nonce("old");
         let mut before = NonceSet::persisted(&path, 1_000);
 
-        assert!(before.insert("old", 5_000, 1_000));
+        assert!(before.insert(&old, 5_000, 1_000));
 
         let mut after = NonceSet::persisted(&path, 6_000);
-        assert!(after.insert("old", 20_000, 6_000));
+        assert!(after.insert(&old, 20_000, 6_000));
 
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
