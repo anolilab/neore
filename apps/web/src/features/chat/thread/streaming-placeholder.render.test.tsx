@@ -175,6 +175,21 @@ describe("streaming placeholder render cost", () => {
         await vi.waitFor(() => expect(harness.lastText).toBe("cd"));
     });
 
+    it("keeps the streamed text inside .message-text and the metrics bar outside it", async () => {
+        mount();
+
+        harness.push?.(JSON.stringify({ text: "hello" }));
+        await vi.waitFor(() => expect(harness.lastText).toBe("hello"));
+
+        // eslint-disable-next-line testing-library/no-node-access -- the assertion is about DOM ancestry
+        expect(screen.getByTestId("content").closest(".message-text")).not.toBeNull();
+        // The metrics bar's idle row; the count first proves it rendered, so the next check is not vacuous.
+        // eslint-disable-next-line testing-library/no-node-access -- the assertion is about DOM ancestry
+        expect(document.querySelectorAll(".text-xs").length).toBeGreaterThan(0);
+        // eslint-disable-next-line testing-library/no-node-access -- the assertion is about DOM ancestry
+        expect(document.querySelectorAll(".message-text .text-xs")).toHaveLength(0);
+    });
+
     it("shows the final text when the stream ends", async () => {
         mount();
 

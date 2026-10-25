@@ -49,3 +49,19 @@ describe("message content tool call rows", () => {
         expect(screen.getByRole("button", { name: LOOKUP_BUTTON }).getAttribute("aria-expanded")).toBe("true");
     });
 });
+
+describe("message content file previews", () => {
+    it("wraps an embedded file in .message-text-fixed, so the chat text size does not resize its controls", () => {
+        const withFile = {
+            id: "m2",
+            parts: [{ filename: "notes.bin", mediaType: "application/octet-stream", type: "file", url: "https://files.test/notes.bin" }],
+            role: "user",
+            status: "success",
+        } as unknown as ChatMessage;
+
+        const { container } = render(<MessageContentUI message={withFile} />);
+
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the assertion is about DOM structure
+        expect(container.querySelector(".message-text-fixed")).not.toBeNull();
+    });
+});

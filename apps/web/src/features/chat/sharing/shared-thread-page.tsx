@@ -150,7 +150,7 @@ const SharedThread: FC<{ thread: PublicThread }> = ({ thread }) => {
                             {speakerName && <SpeakerChip name={speakerName} />}
                             <PlaceholderChips attachments={attachments} tools={tools} />
                             {message.parts.length > 0 && (
-                                <div className="w-full">
+                                <div className="message-text w-full">
                                     <MessageItem message={message} />
                                 </div>
                             )}

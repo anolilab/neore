@@ -5,7 +5,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import type { Context, ReactNode } from "react";
 import { createElement, useLayoutEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -174,14 +174,18 @@ const Host = (): ReactNode => {
     );
 };
 
-const mount = () => {
+const mountInto = () => {
     const queryClient = new QueryClient();
 
-    render(
+    return render(
         <QueryClientProvider client={queryClient}>
             <Host />
         </QueryClientProvider>,
     );
+};
+
+const mount = () => {
+    mountInto();
 };
 
 /** Pushes a live update whose only change is the last message's text; returns the rows it re-rendered. */
@@ -253,4 +257,35 @@ describe("message list render cost", () => {
         },
         RENDER_TEST_TIMEOUT_MS,
     );
+});
+
+/* eslint-disable testing-library/no-node-access, testing-library/no-container -- the assertion is about DOM ancestry */
+describe("message list text size hook", () => {
+    it("marks the message text with .message-text and keeps timestamps outside it", () => {
+        harness.messages = Array.from({ length: 4 }, (_, index) => makeMessage(index));
+        harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
+
+        const { container } = mountInto();
+
+        for (const index of [0, 1, 2, 3]) {
+            expect(screen.getByText(`message ${index}`).closest(".message-text")).not.toBeNull();
+        }
+
+        const timestamps = container.querySelectorAll("time");
+
+        expect(timestamps.length).toBeGreaterThan(0);
+
+        for (const timestamp of timestamps) {
+            expect(timestamp.closest(".message-text")).toBeNull();
+        }
+    });
+
+    it("marks a system note as message text too", () => {
+        harness.messages = [{ ...makeMessage(0, "system note"), role: "system" } as UIMessage];
+        harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
+
+        mountInto();
+
+        expect(screen.getByText("system note").closest(".message-text")).not.toBeNull();
+    });
 });

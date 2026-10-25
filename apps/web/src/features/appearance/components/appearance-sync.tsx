@@ -11,6 +11,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 import { applyAccentAttribute, applyContrastAttribute, applyRootAttribute } from "../lib/accent-boot-script";
 import { DEFAULT_ACCENT, isAccentId } from "../lib/accent-presets";
+import { applyChatTextSize } from "../lib/chat-text-size";
 import { CODE_HIGHLIGHT_THEMES, isCodeHighlightThemeId, isMermaidThemeId } from "../lib/code-themes";
 import {
     DEFAULT_CONTRAST,
@@ -31,6 +32,7 @@ import {
  * - The accent, density and font go on `<html>` as `data-accent`,
  *   `data-density` and `data-font` (the boot script already did so before first
  *   paint; this keeps them in step with later changes).
+ * - The chat text size goes on `<html data-chat-text-size>` the same way.
  * - The code / Mermaid themes are pushed to the Streamdown renderers.
  * - The account's stored choice (`userSettings`) is adopted when it arrives or
  *   changes, so it follows the user across devices. Deferred past first paint
@@ -42,6 +44,11 @@ const AppearanceSync = () => {
         (state) => state.appearance,
     );
     const setAppearance = useUIStateStore((state) => state.setAppearance);
+    const chatTextSize = useUIStateStore((state) => state.layout.fontSize);
+
+    useEffect(() => {
+        applyChatTextSize(chatTextSize);
+    }, [chatTextSize]);
 
     useEffect(() => {
         applyAccentAttribute(isAccentId(accentColor) ? accentColor : DEFAULT_ACCENT);

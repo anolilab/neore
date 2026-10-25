@@ -777,37 +777,47 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                     // PDF
                 } else if (isPdfFile(filePart.mediaType, filePart.filename) && fileUrl) {
                     renderedParts.push(
-                        <Suspense fallback={<FileLoadingFallback name={filePart.filename} />} key={key}>
-                            <PdfViewer filename={filePart.filename} url={fileUrl} />
-                        </Suspense>,
+                        <div className="message-text-fixed contents" key={key}>
+                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
+                                <PdfViewer filename={filePart.filename} url={fileUrl} />
+                            </Suspense>
+                        </div>,
                     );
                     // Video
                 } else if (isVideoFile(filePart.mediaType, filePart.filename) && fileUrl) {
                     renderedParts.push(
-                        <Suspense fallback={<FileLoadingFallback name={filePart.filename} />} key={key}>
-                            <VideoPlayer filename={filePart.filename} mediaType={filePart.mediaType} url={fileUrl} />
-                        </Suspense>,
+                        <div className="message-text-fixed contents" key={key}>
+                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
+                                <VideoPlayer filename={filePart.filename} mediaType={filePart.mediaType} url={fileUrl} />
+                            </Suspense>
+                        </div>,
                     );
                     // Audio
                 } else if (isAudioFile(filePart.mediaType, filePart.filename) && fileUrl) {
                     renderedParts.push(
-                        <Suspense fallback={<FileLoadingFallback name={filePart.filename} />} key={key}>
-                            <AudioWaveformPlayer filename={filePart.filename} url={fileUrl} />
-                        </Suspense>,
+                        <div className="message-text-fixed contents" key={key}>
+                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
+                                <AudioWaveformPlayer filename={filePart.filename} url={fileUrl} />
+                            </Suspense>
+                        </div>,
                     );
                     // DOCX
                 } else if (isDocxFile(filePart.mediaType, filePart.filename) && fileUrl) {
                     renderedParts.push(
-                        <Suspense fallback={<FileLoadingFallback name={filePart.filename} />} key={key}>
-                            <DocxPreview filename={filePart.filename} url={fileUrl} />
-                        </Suspense>,
+                        <div className="message-text-fixed contents" key={key}>
+                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
+                                <DocxPreview filename={filePart.filename} url={fileUrl} />
+                            </Suspense>
+                        </div>,
                     );
                     // Fallback: enhanced file card (also lazy-loaded)
                 } else {
                     renderedParts.push(
-                        <Suspense fallback={<FileLoadingFallback name={filePart.filename} />} key={key}>
-                            <LazyGenericFileCard filename={filePart.filename} mediaType={filePart.mediaType} url={fileUrl} />
-                        </Suspense>,
+                        <div className="message-text-fixed contents" key={key}>
+                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
+                                <LazyGenericFileCard filename={filePart.filename} mediaType={filePart.mediaType} url={fileUrl} />
+                            </Suspense>
+                        </div>,
                     );
                 }
 
