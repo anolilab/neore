@@ -46,14 +46,13 @@ describe(erasePostHogPerson, () => {
         await expect(erasePostHogPerson("user-1", CONFIGURED)).rejects.toThrow("fetch failed");
     });
 
-    it.each([
-        { POSTHOG_PERSONAL_API_KEY: undefined, POSTHOG_PROJECT_ID: "42" },
-        { POSTHOG_PERSONAL_API_KEY: "phx_key", POSTHOG_PROJECT_ID: undefined },
-        {},
-    ])("reports skipped, without calling PostHog, when unconfigured (%j)", async (env) => {
-        const fetchMock = stubFetch(new Response(null, { status: 200 }));
+    it.each([{ POSTHOG_PERSONAL_API_KEY: undefined, POSTHOG_PROJECT_ID: "42" }, { POSTHOG_PERSONAL_API_KEY: "phx_key", POSTHOG_PROJECT_ID: undefined }, {}])(
+        "reports skipped, without calling PostHog, when unconfigured (%j)",
+        async (env) => {
+            const fetchMock = stubFetch(new Response(null, { status: 200 }));
 
-        await expect(erasePostHogPerson("user-1", env)).resolves.toBe("skipped");
-        expect(fetchMock).not.toHaveBeenCalled();
-    });
+            await expect(erasePostHogPerson("user-1", env)).resolves.toBe("skipped");
+            expect(fetchMock).not.toHaveBeenCalled();
+        },
+    );
 });
