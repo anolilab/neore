@@ -36,7 +36,7 @@ const Harness = () => {
                 Open slides
             </button>
             <button type="button">Behind the viewer</button>
-            <FullScreenPresentationViewer isOpen={open} onClose={() => setOpen(false)} presentationTitle="Roadmap" slides={slides} />
+            <FullScreenPresentationViewer isOpen={open} onClose={() => setOpen(false)} onDownload={vi.fn()} presentationTitle="Roadmap" slides={slides} />
         </>
     );
 };
@@ -84,6 +84,33 @@ describe("full-screen presentation viewer focus management", () => {
         close.focus();
 
         expect(fireEvent.keyDown(close, { key: " " })).toBe(true);
+    });
+
+    it("leaves ArrowDown on the export trigger to the menu but still turns the slide elsewhere", () => {
+        // The trigger really opens its menu on ArrowDown here, and the popup positions itself with a ResizeObserver.
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                disconnect = vi.fn();
+
+                observe = vi.fn();
+
+                unobserve = vi.fn();
+            },
+        );
+        render(<Harness />);
+        fireEvent.click(screen.getByRole("button", { name: "Open slides" }));
+        const dialog = screen.getByRole("dialog");
+        const trigger = screen.getByRole("button", { name: "Export presentation" });
+
+        trigger.focus();
+        fireEvent.keyDown(trigger, { key: "ArrowDown" });
+        expect(dialog.textContent).toContain("Slide 1 of 2");
+
+        // Focus on the viewer itself keeps arrow-key navigation.
+        dialog.focus();
+        fireEvent.keyDown(dialog, { key: "ArrowDown" });
+        expect(dialog.textContent).toContain("Slide 2 of 2");
     });
 
     it("restores focus to the opener on Escape", () => {

@@ -38,6 +38,22 @@ export const latestAssistantId = (messages: ReadonlyArray<SpeakableMessage>): st
     return null;
 };
 
+/**
+ * Id of the newest assistant reply that has settled. A reply still being written
+ * is not history: it is the one a watcher should react to when it finishes.
+ */
+export const latestSettledAssistantId = (messages: ReadonlyArray<SpeakableMessage>): string | null => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index];
+
+        if (message?.role === "assistant" && !UNFINISHED_STATUSES.has(message.status)) {
+            return message.id;
+        }
+    }
+
+    return null;
+};
+
 export type FinishedReply = { failed: boolean; message: SpeakableMessage };
 
 /**

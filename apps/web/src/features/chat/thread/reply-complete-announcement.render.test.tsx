@@ -111,4 +111,38 @@ describe("reply complete announcement", () => {
         view.rerender(<ReplyCompleteAnnouncement />);
         expect(region().textContent).toBe("");
     });
+
+    it("stays silent when a send fails and the earlier reply is last again", () => {
+        const view = render(<ReplyCompleteAnnouncement />);
+
+        setChat(true, [reply("old"), { id: "prompt", role: "user", status: "success", text: "hi" }]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        setChat(false, [reply("old")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        expect(region().textContent).toBe("");
+    });
+
+    it("stays silent when a regenerate fails and the hidden reply comes back", () => {
+        setChat(false, [reply("first"), reply("second")]);
+        const view = render(<ReplyCompleteAnnouncement />);
+
+        setChat(true, [reply("first")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        setChat(false, [reply("first"), reply("second")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        expect(region().textContent).toBe("");
+    });
+
+    it("uses history that loads after mount as the baseline", () => {
+        setChat(false, []);
+        const view = render(<ReplyCompleteAnnouncement />);
+
+        setChat(false, [reply("old")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        setChat(true, [reply("old")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        setChat(false, [reply("old")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        expect(region().textContent).toBe("");
+    });
 });

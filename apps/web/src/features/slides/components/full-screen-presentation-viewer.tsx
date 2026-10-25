@@ -183,9 +183,20 @@ const FullScreenPresentationViewer = ({
         }
 
         // Focus now lives inside the viewer, so keys aimed at a control are that control's: an open menu keeps its
-        // arrows and Escape, and Space activates a focused button instead of turning the slide.
-        if (target instanceof HTMLElement && (target.closest('[role="menu"]') || (e.key === " " && target.closest('button, a[href], [role="button"]')))) {
-            return;
+        // arrows and Escape, Space activates a focused button instead of turning the slide, and ArrowUp/ArrowDown
+        // on a menu trigger open its menu.
+        if (target instanceof HTMLElement) {
+            if (target.closest('[role="menu"]')) {
+                return;
+            }
+
+            if ((e.key === "ArrowDown" || e.key === "ArrowUp") && target.closest('[aria-haspopup="menu"]')) {
+                return;
+            }
+
+            if (e.key === " " && target.closest('button, a[href], [role="button"]')) {
+                return;
+            }
         }
 
         const handledKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Home", "End", "Escape"];
@@ -265,7 +276,7 @@ const FullScreenPresentationViewer = ({
         <div
             aria-label={presentationTitle ?? t`Presentation`}
             aria-modal="true"
-            className="fixed inset-0 z-50 flex flex-col bg-black/90 outline-none backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-sm outline-none"
             ref={dialogRef}
             role="dialog"
             tabIndex={-1}

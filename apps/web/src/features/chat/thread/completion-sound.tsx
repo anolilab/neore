@@ -12,28 +12,10 @@ import type { FC } from "react";
 import { useEffect, useEffectEvent, useRef } from "react";
 
 import { useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
-import { findFinishedReply } from "@/features/chat/voice-mode/reply-speech";
+import { findFinishedReply, latestSettledAssistantId } from "@/features/chat/voice-mode/reply-speech";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
 import playCompletionPing from "./completion-ping";
-
-const UNSETTLED_STATUSES = new Set(["pending", "streaming"]);
-
-/**
- * The newest assistant reply that has settled. A reply still streaming when the
- * watcher mounts is not history: it is the one this watcher should ping for.
- */
-const latestSettledAssistantId = (messages: ReadonlyArray<{ id: string; role: string; status: string }>): string | null => {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-        const message = messages[index];
-
-        if (message?.role === "assistant" && !UNSETTLED_STATUSES.has(message.status)) {
-            return message.id;
-        }
-    }
-
-    return null;
-};
 
 const CompletionSoundWatcher: FC = () => {
     const { isStreaming, messages } = useChatMessages();
