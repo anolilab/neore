@@ -361,6 +361,9 @@ export interface InternalApiTypes {
                 updateSlide: FunctionReference<"mutation", { htmlContent?: string; presentationId: Id<"presentations">; slideNumber: number; threadId: Id<"threads">; title?: string; userId: string }, { slideId: Id<"presentationSlides"> }>;
             };
         };
+        steering: {
+            deliverSteers: FunctionReference<"mutation", { pendingMessageId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; userId: string }, null | { messageId: string; text: string }>;
+        };
         streaming: {
             createStreamWithMessage: FunctionReference<"mutation", { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, string>;
             streamRunThread: FunctionReference<"query", { streamId: Id<"persistentStreams">; userId: string }, ({ activeLeafMessageId?: string | undefined; botId?: string | undefined; createdAt?: number | undefined; groupChat?: ({ debateRounds?: number | undefined; stopRequestedAt?: number | undefined; synthesizerSkillId?: string | undefined; } & { mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: ({} & { addedAt: number; skillId: string; })[]; }) | undefined; lockedAt?: number | undefined; order?: number | undefined; tagIds?: string[] | undefined; category?: string | undefined; createdBy?: string | undefined; customSystemPrompt?: string | undefined; deleted?: boolean | undefined; deletedAt?: number | undefined; dictationLanguage?: string | undefined; enabledFeatures?: string[] | undefined; externalThreadId?: string | undefined; isPublic?: boolean | undefined; isTemporary?: boolean | undefined; language?: string | undefined; lastCompressionStartedAt?: number | undefined; messengerConnectionId?: string | undefined; mode?: "image" | "text" | "video" | undefined; model?: string | undefined; multiChat?: boolean | undefined; organizationId?: string | undefined; parentThreadIds?: string[] | undefined; pinnedAt?: number | undefined; projectId?: string | undefined; publicAccessToken?: string | undefined; reasoningEffort?: number | undefined; source?: string | undefined; statelessMode?: boolean | undefined; summary?: string | undefined; tags?: string[] | undefined; teamId?: string | undefined; title?: string | undefined; updatedAt?: number | undefined; userId?: string | undefined; } & { _creationTime: number; _id: string; status: "error" | "running" | "active" | "archived" | "abort" | "finish"; }) | null>;
@@ -369,11 +372,11 @@ export interface InternalApiTypes {
                     cleanupExpiredStreams: FunctionReference<"mutation", {}, void>;
                 };
                 library: {
-                    addChunk: FunctionReference<"mutation", { final: boolean; reasoning?: string; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }, void>;
+                    addChunk: FunctionReference<"mutation", { final: boolean; reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; streamId: Id<"persistentStreams">; text: string }, void>;
                     claimStreamRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, boolean>;
                     createStream: FunctionReference<"mutation", { messageId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; threadId: string; userId: string }, Id<"persistentStreams">>;
                     finishStoppedReply: FunctionReference<"mutation", { agentName?: string; continuation: boolean; order: number; pendingReasoning: string; pendingText: string; promptMessageId: string; streamId: Id<"persistentStreams"> }, { messageId?: Id<"messages">; stopped: boolean }>;
-                    getChunksAfter: FunctionReference<"query", { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams"> }, { chunks: Array<{ reasoning?: string; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
+                    getChunksAfter: FunctionReference<"query", { afterIndex: number; checkLock?: boolean; streamId: Id<"persistentStreams"> }, { chunks: Array<{ reasoning?: string; restart?: boolean; speaker?: { name: string; skillId: string }; text: string }>; locked: boolean; status: "pending" | "streaming" | "done" | "error" | "timeout"; totalChunks: number }>;
                     getStreamStatus: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, "streaming" | "pending" | "error" | "done" | "timeout">;
                     getStreamText: FunctionReference<"query", { streamId: Id<"persistentStreams"> }, { messageId?: string; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; streamingConfig?: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; statelessMode?: boolean }; text: string; threadId?: string; userId?: string }>;
                     setStreamStatus: FunctionReference<"mutation", { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }, void>;
@@ -1359,6 +1362,9 @@ export const internal: InternalApiTypes = {
                 updatePresentationStatus: { __lunoraRef: "chat_slides_internal:updatePresentationStatus" },
                 updateSlide: { __lunoraRef: "chat_slides_internal:updateSlide" },
             },
+        },
+        steering: {
+            deliverSteers: { __lunoraRef: "chat_steering:deliverSteers" },
         },
         streaming: {
             createStreamWithMessage: { __lunoraRef: "chat_streaming:createStreamWithMessage" },
