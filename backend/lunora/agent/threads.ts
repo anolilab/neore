@@ -451,14 +451,15 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         // Approval snapshots hold the run's system prompt; they go with the thread.
         await deleteToolApprovalRunsForThread(context, args.threadId);
 
-        // Steered messages still waiting on a run of this thread have nobody left to take them.
-        await dropQueuedSteersForThread(context, args.threadId);
-
         // One batch of links per call. While links remain this page reports "not done" and the
         // chain re-runs it, so the thread row (deleted last) and its links never outlive a partial delete.
         if (await deleteChatFileLinksForThread(context, args.threadId)) {
             return { cursor: messages.continueCursor, isDone: false };
         }
+
+        // Steered messages still waiting on a run of this thread have nobody left to take them.
+        // Here, not above the link batches: this page re-runs once per batch of links.
+        await dropQueuedSteersForThread(context, args.threadId);
 
         const thread = await context.db.get(args.threadId);
 

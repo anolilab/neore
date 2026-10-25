@@ -179,9 +179,10 @@ export function useChat(threadId: string | null, onThreadCreated: (threadId: str
 
                     // Group chat: a speaker marker starts the next participant's reply.
                     // The previous one is saved by now, so the live copy shows only the
-                    // participant talking.
-                    if (delta.speaker) {
-                        return { promptMessageId, reasoning: delta.reasoning, speaker: delta.speaker, text: delta.text };
+                    // participant talking. A steering restart works the same way: the text
+                    // before it is saved above the message the user sent into the reply.
+                    if (delta.speaker || delta.restart) {
+                        return { promptMessageId, reasoning: delta.reasoning, ...(delta.speaker && { speaker: delta.speaker }), text: delta.text };
                     }
 
                     return { ...current, reasoning: current.reasoning + delta.reasoning, text: current.text + delta.text };

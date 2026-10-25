@@ -85,11 +85,25 @@ const useQueueActions = () => {
     const latestRef = useRef({ hasError: Boolean(error), isStreaming, threadId: currentThreadId });
     // A thread whose send was asked for while a removal held `busyRef`.
     const sendRequestedRef = useRef<string | undefined>(undefined);
+    // Chips whose removal was asked for while another call held `busyRef`.
+    const removalsRequestedRef = useRef<{ id: string; threadId: string }[]>([]);
+    const removePromptRef = useRef<(threadId: string, id: string) => Promise<void>>(async () => {});
     const sendNextPromptRef = useRef<(threadId: string, options?: { explicit?: boolean }) => Promise<void>>(async () => {});
 
     useEffect(() => {
         latestRef.current = { hasError: Boolean(error), isStreaming, threadId: currentThreadId };
     }, [currentThreadId, error, isStreaming]);
+
+    /** Once `busyRef` is free: runs the removals asked for meanwhile, one after the other (each re-queues the rest while it holds the flag). */
+    const removeRequestedMeanwhile = useCallback(() => {
+        const requested = removalsRequestedRef.current;
+
+        removalsRequestedRef.current = [];
+
+        for (const { id, threadId } of requested) {
+            void removePromptRef.current(threadId, id);
+        }
+    }, []);
 
     const withdraw = useCallback(
         async (threadId: string, steer: QueuedSteer): Promise<SteerWithdrawal> => {
@@ -121,7 +135,7 @@ const useQueueActions = () => {
             busyRef.current = true;
 
             try {
-                const { remove, setPaused } = usePromptQueueStore.getState();
+                const { remove, settleSteer, setPaused } = usePromptQueueStore.getState();
                 const next = await takeNextToSend({
                     // A reply that started meanwhile owns the thread: a message sent from the
                     // composer is `isSubmitting` before its stream exists, so that counts too.
@@ -131,6 +145,11 @@ const useQueueActions = () => {
                         return latest.threadId === threadId && !latest.isStreaming && (explicit || !latest.hasError) && !useChatUIStore.getState().isSubmitting;
                     },
                     peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
+                    plain: ({ steer }) => {
+                        if (steer) {
+                            settleSteer(threadId, steer.id, "refused");
+                        }
+                    },
                     remove: (id) => remove(threadId, id),
                     withdraw: async (steer) => await withdraw(threadId, steer),
                 });
@@ -144,9 +163,10 @@ const useQueueActions = () => {
                 busyRef.current = false;
                 // A send starts a reply, and the next one waits for its end.
                 sendRequestedRef.current = undefined;
+                removeRequestedMeanwhile();
             }
         },
-        [sendQueuedPrompt, withdraw],
+        [removeRequestedMeanwhile, sendQueuedPrompt, withdraw],
     );
 
     useEffect(() => {
@@ -188,7 +208,14 @@ const useQueueActions = () => {
             }
 
             // Its call is still out: a withdrawal now could miss it, and the run would take it after all.
-            if (busyRef.current || prompt.steer.pending) {
+            if (prompt.steer.pending) {
+                return;
+            }
+
+            // Another call is settling the queue: not dropped, the call that holds the flag runs it once it lets go.
+            if (busyRef.current) {
+                removalsRequestedRef.current.push({ id, threadId });
+
                 return;
             }
 
@@ -202,11 +229,16 @@ const useQueueActions = () => {
                 showError(t`Could not cancel the message. It is still queued.`);
             } finally {
                 busyRef.current = false;
+                removeRequestedMeanwhile();
                 sendRequestedMeanwhile();
             }
         },
-        [sendRequestedMeanwhile, t, withdraw],
+        [removeRequestedMeanwhile, sendRequestedMeanwhile, t, withdraw],
     );
+
+    useEffect(() => {
+        removePromptRef.current = removePrompt;
+    }, [removePrompt]);
 
     return { removePrompt, sendNextPrompt };
 };

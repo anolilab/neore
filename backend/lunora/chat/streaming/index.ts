@@ -141,10 +141,14 @@ export const createStreamWithMessage = internalMutation
  * Returns the streamId if there's an active stream, null otherwise
  * Used by the client to show streaming placeholder reactively.
  *
- * LIVE, so it re-runs whenever `persistentStreams` is written. Its answer only
- * changes when a stream starts or ends, and the stream row is written only
- * then (`addChunk` keeps the chunk position on the chunks, not on this row) —
- * keep it that way, or every token re-runs this for every viewer.
+ * LIVE, so it re-runs whenever `persistentStreams` is written. Its answer
+ * changes when a stream starts or ends, and when a steered message is
+ * delivered (`deliveredSteerIds`). Besides those, the row is written only by
+ * steering (`chat/steering.ts`: `steerRun`, `withdrawSteer`, `deliverSteers`),
+ * a few writes per run, bounded by `MAX_STEERS_PER_RUN` and the withdrawals —
+ * each one re-runs this for every viewer. `addChunk` keeps the chunk position
+ * on the chunks, not on this row: no per-token write may land here, or every
+ * token re-runs this for every viewer.
  */
 export const getActiveStreamForThread = optionalAuthQuery
     .input({

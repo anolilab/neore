@@ -140,6 +140,15 @@ describe("takeNextToSend", () => {
         return {
             items,
             peek: () => items[0],
+            plain: (head: { id: string }) => {
+                items.splice(
+                    0,
+                    items.length,
+                    ...items.map((entry) =>
+                        entry.id === head.id ? (Object.fromEntries(Object.entries(entry).filter(([key]) => key !== "steer")) as T) : entry,
+                    ),
+                );
+            },
             remove: (id: string) => {
                 const index = items.findIndex((entry) => entry.id === id);
 
@@ -232,6 +241,23 @@ describe("takeNextToSend", () => {
             }),
         ).toStrictEqual({ kind: "blocked" });
         expect(queue.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
+    });
+
+    it("turns a withdrawn steer into a plain prompt when a reply started while the withdrawal was out", async () => {
+        const queue = queueOf([
+            { attachments: [], id: "a", steer, text: "go left" },
+            { attachments: [], id: "b", text: "then this" },
+        ]);
+        const withdraw = vi.fn(async () => "withdrawn" as const);
+
+        expect(await takeNextToSend({ ...queue, canSend: () => false, withdraw })).toStrictEqual({ kind: "blocked" });
+        expect(queue.items).toStrictEqual([
+            { attachments: [], id: "a", text: "go left" },
+            { attachments: [], id: "b", text: "then this" },
+        ]);
+        // The head is plain now, so a later pass does not ask the server about it again.
+        expect(await takeNextToSend({ ...queue, canSend: () => false, withdraw })).toStrictEqual({ kind: "blocked" });
+        expect(withdraw).toHaveBeenCalledTimes(1);
     });
 
     it("leaves the head in place when the reply errored while the withdrawal was out", async () => {

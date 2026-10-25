@@ -180,16 +180,22 @@ export type SteerWithdrawal = "delivered" | "unknown" | "withdrawn";
  * withdrawal has answered: false (a reply started meanwhile, say a message sent
  * from the composer) returns `blocked` with the prompt still at the head, where
  * the next finished reply finds it. Sending it then would run two turns at once;
- * putting it back after removing it would send it behind later prompts.
+ * putting it back after removing it would send it behind later prompts. A steer
+ * left there after its withdrawal answered `withdrawn` or `unknown` is no longer
+ * held by any run, so `plain` is told the head and turns a steered one into an
+ * ordinary queued message: its chip must not claim to steer the reply that
+ * started meanwhile.
  */
 export const takeNextToSend = async <A>({
     canSend = () => true,
     peek,
+    plain,
     remove,
     withdraw,
 }: {
     canSend?: () => boolean;
     peek: () => QueuedPrompt<A> | undefined;
+    plain: (head: QueuedPrompt<A>) => void;
     remove: (id: string) => void;
     withdraw: (steer: QueuedSteer) => Promise<SteerWithdrawal>;
 }): Promise<{ kind: "blocked" } | { kind: "failed" } | { kind: "send"; prompt: QueuedPrompt<A> } | undefined> => {
@@ -221,6 +227,8 @@ export const takeNextToSend = async <A>({
         }
 
         if (!canSend()) {
+            plain(next);
+
             return { kind: "blocked" };
         }
 
