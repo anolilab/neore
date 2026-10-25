@@ -20,8 +20,10 @@ import type { WorkflowConfig } from "@lunora/workflow";
 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
+import { gdprLogger } from "../../lib/logger";
 import { ROOT_SHARD_KEY } from "../../lib/shard-context";
 import { onUserShard } from "../../lib/workflow-shard";
+import { DELETION_CONFIRMATION_CLAIM_TTL_MS, DELETION_CONFIRMATION_EMAIL_SCOPE, POSTHOG_FAILED_MESSAGE } from "../constants";
 
 export interface DeletionParams {
     requestId: Id<"gdprRequests">;
@@ -31,6 +33,9 @@ export interface DeletionParams {
 
 /** Upper bound on batches per drained step — a guard against a row that never stops matching. */
 const MAX_DRAIN_ROUNDS = 10_000;
+
+/** Scheduling the analytics retry is the only thing that finishes a failed erasure, so it gets a longer budget than a default step (30 s doubling, about an hour in total). */
+const SCHEDULE_RETRY_STEP_CONFIG = { retries: { backoff: "exponential", delay: "30 seconds", limit: 7 } } as const;
 
 export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void> = {
     handler: async (workflowContext): Promise<void> => {
@@ -58,12 +63,24 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             });
         };
 
-        await context.run(internal.gdpr.functions.updateRequestProgress, {
-            currentStep: "revoking_sessions",
-            progress: 3,
-            requestId: args.requestId,
-            status: "processing",
-        });
+        // A re-run may start over a `failed` request, never over one that already ended: a completed
+        // request would be reopened, its erasure repeated and `deletion_completed` written twice. A
+        // step, so a replay of this instance reads the first answer instead of writing again.
+        const isOpen = await context.step.do(
+            "open-deletion-request",
+            async () =>
+                await context.run(internal.gdpr.functions.updateRequestProgress, {
+                    currentStep: "revoking_sessions",
+                    fromStatus: ["pending", "processing", "failed"],
+                    progress: 3,
+                    requestId: args.requestId,
+                    status: "processing",
+                }),
+        );
+
+        if (isOpen === false) {
+            return;
+        }
 
         await context.step.do(
             "revoke-user-sessions",
@@ -344,31 +361,137 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
 
         // --- Phase 5: Delete external analytics data ---
 
-        await context.step.do(
-            "delete-post-hog-person",
-            async () => await context.run(internal.gdpr.steps.posthog_steps.deletePostHogPerson, { userId: args.userId }),
-        );
+        // Throws on a PostHog failure, so the step retries and the request is never
+        // marked completed (nor the confirmation mailed) while the person may remain.
+        // Not "delete-post-hog-person": the old action returned null even on a failed
+        // delete, and a run that cached that result would replay it instead of erasing.
+        let postHogOutcome: unknown;
 
-        await context.run(internal.gdpr.functions.updateRequestProgress, {
-            progress: 100,
-            requestId: args.requestId,
-            status: "completed",
-        });
+        try {
+            postHogOutcome = await context.step.do(
+                "erase-post-hog-person",
+                async () => await context.run(internal.gdpr.steps.posthog_steps.deletePostHogPerson, { userId: args.userId }),
+            );
+        } catch (error) {
+            // Retries are exhausted. Everything else is already erased, so leaving the request
+            // `processing` would hide this until the 30-day sweep: mark it failed and audit it
+            // (a fixed message; the raw error carries the provider response), then rethrow so the
+            // instance errors and never reaches completion. Unlike the export workflow this does not
+            // return: the data is already gone, so the operator must see a failed instance, and a
+            // re-run is safe (every step is idempotent) and ends in `completed` once PostHog works,
+            // as does the scheduled retry. Both `failed` writes are conditional (`fromStatus`): a retry
+            // or a re-run may have completed the request meanwhile, and that must not be reversed.
+            try {
+                await context.run(internal.gdpr.functions.updateRequestProgress, {
+                    errorMessage: POSTHOG_FAILED_MESSAGE,
+                    fromStatus: ["processing", "failed"],
+                    requestId: args.requestId,
+                    status: "failed",
+                });
+            } catch {
+                // Best-effort, as below: a failing status write must not skip the minimisation that follows.
+            }
 
-        await context.step.do(
-            "send-deletion-confirmed-email-action",
+            try {
+                await context.step.do(
+                    "log-audit-posthog-failed",
+                    async () =>
+                        await context.run(internal.gdpr.functions.logAudit, {
+                            action: "deletion_failed",
+                            details: JSON.stringify({ requestId: args.requestId }),
+                            performedBy: "system",
+                            userId: args.userId,
+                        }),
+                );
+            } catch {
+                // Best-effort: the data is already erased, and a failing audit must neither skip the
+                // minimisation below nor replace the PostHog error the instance reports.
+            }
+
+            // Only the analytics erasure is retried, from the scheduler (`gdpr/posthog-retry.ts`): the
+            // user can no longer sign in to ask again, and nothing else is left to do. The step gets
+            // a long retry budget of its own, and `dedupId` keeps a retried attempt from queueing a
+            // second job. The step also moves a still-`processing` request to `failed`, so the
+            // status writes above being swallowed cannot strand the first attempt. If even that is
+            // exhausted the error is logged at error level, never allowed to mask `error`.
+            // `dedupId` must differ per FAILURE, not per request: the workflow's dedup table answers
+            // a reused id with the first call's cached result without executing, so a re-run that
+            // failed again would never start its own chain. The id comes from a step of its own,
+            // which is durable, so a retried scheduling step still reuses it.
+            let isEmailKept = false;
+
+            try {
+                const failureId = await context.step.do("post-hog-retry-failure-id", async () => crypto.randomUUID());
+
+                // The mutation numbers the chain itself, from rows it writes in the same transaction. It
+                // answers `false` when the request had already ended (a retry may have just completed it
+                // and still owe the confirmation), so any answer, not only `true`, keeps the address.
+                await context.step.do(
+                    "schedule-post-hog-retry",
+                    SCHEDULE_RETRY_STEP_CONFIG,
+                    async () =>
+                        await context.run(
+                            internal.gdpr.posthog_retry.schedulePostHogRetry,
+                            { failureId: String(failureId), requestId: args.requestId, userEmail: args.userEmail, userId: args.userId },
+                            { dedupId: `post-hog-retry:${args.requestId}:${String(failureId)}` },
+                        ),
+                );
+
+                isEmailKept = true;
+            } catch (scheduleError) {
+                gdprLogger.error(`Analytics erasure retry for request ${args.requestId} could not be scheduled`, scheduleError);
+            }
+
+            // Minimise after the failure audit, as on the success path. A retry (queued, or one that
+            // completed the request meanwhile) still needs the address for the confirmation email, and
+            // clears it when its confirmation is settled or its chain ends: this request keeps it until
+            // then. Without a retry nothing ever would, so the address goes now. Its own failure must not replace the PostHog error the instance
+            // reports; a re-run minimises again (the step is idempotent).
+            try {
+                await context.step.do(
+                    "minimise-gdpr-records-posthog-failed",
+                    async () => await context.run(steps.minimiseGdprRecords, { userId: args.userId, ...(isEmailKept && { retainEmailOf: args.requestId }) }),
+                );
+                // Minimisation clears every request's free-text `errorMessage`. This one is a fixed,
+                // non-personal string, so put it back: the user's status must still say what failed.
+                await context.run(internal.gdpr.functions.updateRequestProgress, {
+                    errorMessage: POSTHOG_FAILED_MESSAGE,
+                    fromStatus: ["processing", "failed"],
+                    requestId: args.requestId,
+                    status: "failed",
+                });
+            } catch {
+                // Deliberately swallowed: `error` below is the root cause.
+            }
+
+            throw error;
+        }
+
+        // Only the transition from an open request is this run's: a scheduled retry that completed the
+        // request first has written its own `deletion_completed` and owes its own confirmation, so a
+        // second audit row, minimisation and mail would double it (and clear the address it still needs).
+        const isCompleted = await context.step.do(
+            "complete-deletion-request",
             async () =>
-                await context.run(internal.gdpr.steps.email_steps.sendDeletionConfirmedEmailAction, {
-                    userEmail: args.userEmail,
+                await context.run(internal.gdpr.functions.updateRequestProgress, {
+                    fromStatus: ["processing", "failed"],
+                    progress: 100,
+                    requestId: args.requestId,
+                    status: "completed",
                 }),
         );
+
+        if (isCompleted === false) {
+            return;
+        }
 
         await context.step.do(
             "log-audit",
             async () =>
                 await context.run(internal.gdpr.functions.logAudit, {
                     action: "deletion_completed",
-                    details: JSON.stringify({ requestId: args.requestId }),
+                    // deleted | no_profile (verified project, no such person) | skipped (not configured: nothing was erased there).
+                    details: JSON.stringify({ posthog: postHogOutcome, requestId: args.requestId }),
                     performedBy: "system",
                     userId: args.userId,
                 }),
@@ -376,6 +499,36 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
 
         // After the final audit write: keep the compliance record, minus the PII.
         await context.step.do("minimise-gdpr-records", async () => await context.run(steps.minimiseGdprRecords, { userId: args.userId }));
+
+        // Last, and best effort: the deletion is complete and minimised whether or not this goes out, so
+        // a failing mail must not fail the instance after the fact. The address comes from the workflow's
+        // own params (the request row is minimised by now); the claim is shared with the scheduled retry,
+        // so a re-run of a request the retry already confirmed mails nothing while the claim lasts (a
+        // re-run no longer starts over a completed request at all). A send that is exhausted keeps the
+        // claim: nothing keeps the address afterwards, so there is nothing a later sender could send.
+        try {
+            const isEmailClaimed = await context.step.do(
+                "claim-deletion-confirmed-email",
+                async () =>
+                    await context.run(internal.lib.claim_once.claimKey, {
+                        key: args.requestId,
+                        scope: DELETION_CONFIRMATION_EMAIL_SCOPE,
+                        ttlMs: DELETION_CONFIRMATION_CLAIM_TTL_MS,
+                    }),
+            );
+
+            if (isEmailClaimed) {
+                await context.step.do(
+                    "send-deletion-confirmed-email-action",
+                    async () =>
+                        await context.run(internal.gdpr.steps.email_steps.sendDeletionConfirmedEmailAction, {
+                            userEmail: args.userEmail,
+                        }),
+                );
+            }
+        } catch (error) {
+            gdprLogger.error(`Deletion confirmation email for request ${args.requestId} was not sent (${error instanceof Error ? error.name : "unknown"})`);
+        }
     },
 };
 

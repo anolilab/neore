@@ -122,6 +122,7 @@ const optionalEnvSchema = z.object({
     OIDC_ISSUER: z.string().trim().optional(),
     POSTHOG_API_KEY: z.string().trim().optional(),
     POSTHOG_HOST: z.string().trim().optional(),
+    // Person write (GDPR delete) plus project:read: the delete verifies the project before it trusts a 404.
     POSTHOG_PERSONAL_API_KEY: z.string().trim().optional(),
     POSTHOG_PROJECT_ID: z.string().trim().optional(),
     // "false"/"0" opens registration; anything else (incl. unset) keeps it invite-only (`env.ts`).
