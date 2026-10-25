@@ -38,16 +38,15 @@ vi.mock("@/lib/lunora/crpc", () => {
 
             return {
                 queryFn: async () => {
+                    const query = (args as { searchQuery: string }).searchQuery;
+                    const [id, text] = query.startsWith("beta")
+                        ? ["message-7", "The beta cohort starts in May"]
+                        : ["message-9", "We agreed on the alpha rollout date"];
+
                     return {
                         continueCursor: "",
                         isDone: true,
-                        page: [
-                            {
-                                _id: "thread-2",
-                                relevantMessages: [{ _id: "message-9", order: 3, stepOrder: 0, text: "We agreed on the alpha rollout date" }],
-                                title: "Launch notes",
-                            },
-                        ],
+                        page: [{ _id: "thread-2", relevantMessages: [{ _id: id, order: 3, stepOrder: 0, text }], title: "Launch notes" }],
                     };
                 },
                 queryKey: ["searchMessages", args],
@@ -124,6 +123,7 @@ vi.mock("@/features/layout/hooks/use-ui-state", () => {
 });
 
 const RESULT_TEXT = /alpha rollout date/;
+const BETA_TEXT = /beta cohort starts/;
 
 /** True when `later` comes after `earlier` in document order. */
 const isBefore = (earlier: Node, later: Node): boolean => earlier.compareDocumentPosition(later) === Node.DOCUMENT_POSITION_FOLLOWING;
@@ -219,6 +219,50 @@ describe("command palette message search", () => {
 
         fireEvent.change(input, { target: { value: "alpha" } });
         fireEvent.click(await screen.findByText(RESULT_TEXT, undefined, { timeout: 3000 }));
+
+        await waitFor(() => expect(harness.navigate).toHaveBeenCalledTimes(1));
+        expect(harness.navigate).toHaveBeenCalledWith({ hash: "message-message-9", params: { threadId: "thread-2" }, search: {}, to: "/chat/$threadId" });
+        expect(harness.scrollToMessage).toHaveBeenCalledWith("message-9", { position: { order: 3, stepOrder: 0 }, threadId: "thread-2" });
+    });
+
+    it("shows no message hits while the debounce is pending", async () => {
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "alpha" } });
+        await screen.findByText(RESULT_TEXT, undefined, { timeout: 3000 });
+
+        fireEvent.change(input, { target: { value: "alphab" } });
+
+        // The input has moved on; the earlier query's hits must not stay selectable.
+        expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+        expect(screen.queryByText("Messages")).toBeNull();
+    });
+
+    it("replaces the previous query's hits with the current query's", async () => {
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "alpha" } });
+        await screen.findByText(RESULT_TEXT, undefined, { timeout: 3000 });
+
+        fireEvent.change(input, { target: { value: "beta" } });
+
+        expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+        expect(await screen.findByText(BETA_TEXT, undefined, { timeout: 3000 })).toBeTruthy();
+        expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+    });
+
+    it("opens a highlighted message hit with Enter", async () => {
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "alpha" } });
+        await screen.findByText(RESULT_TEXT, undefined, { timeout: 3000 });
+
+        fireEvent.keyDown(input, { key: "ArrowDown" });
+        expect(screen.getByRole("option", { name: RESULT_TEXT }).dataset.highlighted).toBeDefined();
+        fireEvent.keyDown(input, { key: "Enter" });
 
         await waitFor(() => expect(harness.navigate).toHaveBeenCalledTimes(1));
         expect(harness.navigate).toHaveBeenCalledWith({ hash: "message-message-9", params: { threadId: "thread-2" }, search: {}, to: "/chat/$threadId" });

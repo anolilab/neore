@@ -167,6 +167,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const trimmedSearch = searchInput.trim();
     const debouncedSearch = useDebouncedValue(trimmedSearch, MESSAGE_SEARCH_DEBOUNCE_MS);
     const canSearchMessages = shouldQuery && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && debouncedSearch.length >= MESSAGE_SEARCH_MIN_CHARS;
+    // While the input and the debounced query differ, any result belongs to an older query: show none.
+    const isMessageSearchCurrent = canSearchMessages && trimmedSearch === debouncedSearch;
     const { data: messageSearchResults } = useQuery(
         crpc.chat.functions.searchMessages.queryOptions(
             canSearchMessages ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS, searchQuery: debouncedSearch } : skipToken,
@@ -455,7 +457,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             }
         }
 
-        const messageHits = canSearchMessages ? collectMessageHits(messageSearchResults?.page as MessageSearchThread[] | undefined) : [];
+        const messageHits = isMessageSearchCurrent ? collectMessageHits(messageSearchResults?.page as MessageSearchThread[] | undefined) : [];
 
         if (messageHits.length > 0) {
             groups.push({
