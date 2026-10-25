@@ -16573,7 +16573,7 @@
     {
       "file": "agent/threads",
       "kind": "read",
-      "line": 1431,
+      "line": 1444,
       "reason": "\"getThreadUsageHandler\" is not a registered function"
     },
     {
@@ -19729,19 +19729,19 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 63,
+      "line": 82,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 168,
+      "line": 187,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 183,
+      "line": 202,
       "reason": "the default export is not a registered function"
     },
     {
@@ -20053,7 +20053,7 @@
     {
       "file": "workflow/media-billing",
       "kind": "call",
-      "line": 95,
+      "line": 94,
       "reason": "\"withMediaCharge\" is not a registered function"
     },
     {

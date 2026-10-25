@@ -1760,6 +1760,7 @@ export interface Doc_triggers {
     updatedAt: number;
     userId: string;
     webhookSecret?: string;
+    webhookSignatureScheme?: "timestamped" | "native";
 }
 
 export interface Doc_twoFactor {
@@ -4486,6 +4487,7 @@ export interface Insert_triggers {
     updatedAt: number;
     userId: string;
     webhookSecret?: string;
+    webhookSignatureScheme?: "timestamped" | "native";
 }
 
 export interface Insert_twoFactor {

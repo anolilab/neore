@@ -28,6 +28,9 @@ import { isTaskModelAllowed } from "../tasks/logic";
 
 const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
 
+/** How a webhook delivery is signed; see `triggers/http.ts`. Absent on a row means "timestamped". */
+const vSignatureScheme = v.union(v.literal("timestamped"), v.literal("native"));
+
 /**
  * A schedule must be a 5-field cron that fires at most hourly. An unchecked
  * expression fires every minute (`getNextCronTime` reads garbage as a wildcard),
@@ -96,6 +99,7 @@ const vGetTriggersOutput = v.array(
         triggerCount: v.number(),
         type: v.string(),
         updatedAt: v.number(),
+        webhookSignatureScheme: v.union(v.literal("timestamped"), v.literal("native"), v.null()),
     }),
 );
 
@@ -129,6 +133,7 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
             triggerCount: t.triggerCount ?? 0,
             type: t.type,
             updatedAt: t.updatedAt,
+            webhookSignatureScheme: t.type === "webhook" ? (t.webhookSignatureScheme ?? "timestamped") : null,
         };
     });
 });
@@ -148,6 +153,8 @@ export const createTrigger = authMutation
         systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
         timezone: v.optional(v.string().max(MAX_LENGTH.short)),
         type: v.from(triggerTypeSchema),
+        // Webhook triggers only; unset means "timestamped". Fixed at creation, with the secret.
+        webhookSignatureScheme: v.optional(vSignatureScheme),
     })
     .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
     .mutation(async ({ args, ctx: context }) => {
@@ -175,6 +182,10 @@ export const createTrigger = authMutation
 
         assertComputerRoutine({ botComputer: args.botComputer === true, botId: args.botId, type: triggerType });
 
+        if (args.webhookSignatureScheme !== undefined && triggerType !== "webhook") {
+            throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a signature scheme.");
+        }
+
         const inserted = await context.db.insert("triggers", {
             botComputer: args.botComputer === true ? true : undefined,
             botId: args.botId as Id<"bots"> | undefined,
@@ -193,6 +204,7 @@ export const createTrigger = authMutation
             updatedAt: now,
             userId,
             webhookSecret,
+            webhookSignatureScheme: triggerType === "webhook" ? (args.webhookSignatureScheme ?? "timestamped") : undefined,
         });
 
         // A webhook names only the trigger; this is how it finds the shard.

@@ -39498,7 +39498,19 @@
                       "timezone": {
                         "type": "string"
                       },
-                      "type": {}
+                      "type": {},
+                      "webhookSignatureScheme": {
+                        "anyOf": [
+                          {
+                            "const": "timestamped",
+                            "type": "string"
+                          },
+                          {
+                            "const": "native",
+                            "type": "string"
+                          }
+                        ]
+                      }
                     },
                     "required": [
                       "model",

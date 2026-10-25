@@ -51,6 +51,9 @@ const PAYLOAD_TOKEN = "{{payload}}";
 
 type TriggerType = "event" | "schedule" | "webhook";
 
+/** How a webhook sender signs its requests; fixed when the trigger is created, with its secret. */
+type WebhookSignatureScheme = "native" | "timestamped";
+
 interface TriggerFormData {
     botComputer: boolean;
     botId: string;
@@ -62,6 +65,7 @@ interface TriggerFormData {
     systemPrompt: string;
     timezone: string;
     type: TriggerType;
+    webhookSignatureScheme: WebhookSignatureScheme;
 }
 
 /**
@@ -96,6 +100,7 @@ interface TriggerRow {
     triggerCount: number;
     type: string;
     updatedAt: number;
+    webhookSignatureScheme: WebhookSignatureScheme | null;
 }
 
 interface TriggerExecutionRow {
@@ -121,6 +126,7 @@ const EMPTY_FORM: TriggerFormData = {
     systemPrompt: "",
     timezone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
     type: "schedule",
+    webhookSignatureScheme: "timestamped",
 };
 
 const CRON_PRESETS: { expression: string; label: MessageDescriptor }[] = [
@@ -148,19 +154,43 @@ const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
 
 // ─── Shared Trigger Form ────────────────────────────────────────────────────
 
+/** What a sender must send for each scheme. Requests of the other scheme are rejected. */
+const WebhookSigningInstructions: FC<{ scheme: WebhookSignatureScheme }> = ({ scheme }) =>
+    scheme === "native" ? (
+        <p className="text-muted-foreground mt-2">
+            <Trans>
+                Send <code className="font-mono">X-Hub-Signature-256: sha256=&lt;hex&gt;</code>, the HMAC-SHA256 of the raw request body keyed with the secret
+                (the format GitHub webhooks use). This signature has no timestamp, so a captured request can be replayed once the 15-minute duplicate window has
+                passed. Requests with the neore headers are rejected.
+            </Trans>
+        </p>
+    ) : (
+        <p className="text-muted-foreground mt-2">
+            <Trans>
+                Every request must be signed. Send <code className="font-mono">X-Neore-Timestamp</code> (the current Unix time in seconds) and{" "}
+                <code className="font-mono">X-Signature-256: sha256=&lt;hex&gt;</code>, the HMAC-SHA256 of{" "}
+                <code className="font-mono">&lt;timestamp&gt;.&lt;raw body&gt;</code> keyed with the secret. Requests more than 5 minutes old, unsigned, or
+                replayed are rejected, as is <code className="font-mono">X-Hub-Signature-256</code>.
+            </Trans>
+        </p>
+    );
+
 interface TriggerFormProps {
     formData: TriggerFormData;
     isPending: boolean;
     onCancel: () => void;
     onChange: (data: TriggerFormData) => void;
     onSubmit: () => void;
+    /** An existing trigger keeps the scheme its secret was issued for. */
+    schemeLocked?: boolean;
     title: string;
 }
 
-const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onChange, onSubmit, title }) => {
+const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onChange, onSubmit, schemeLocked = false, title }) => {
     // Generated ids: the create and edit forms can be open together, and fixed ids would make their labels ambiguous.
     const botPickerId = useId();
     const botComputerId = useId();
+    const schemeId = useId();
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const { data: bots = [] } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
@@ -303,14 +333,23 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                                 (Zapier, n8n, your own code, etc.).
                             </Trans>
                         </p>
-                        <p className="text-muted-foreground mt-2">
-                            <Trans>
-                                Every request must be signed. Send <code className="font-mono">X-Neore-Timestamp</code> (the current Unix time in seconds) and{" "}
-                                <code className="font-mono">X-Signature-256: sha256=&lt;hex&gt;</code>, the HMAC-SHA256 of{" "}
-                                <code className="font-mono">&lt;timestamp&gt;.&lt;raw body&gt;</code> keyed with the secret. Requests more than 5 minutes old,
-                                unsigned, or replayed are rejected.
-                            </Trans>
-                        </p>
+                        <div className="mt-3 space-y-1.5">
+                            <Label htmlFor={schemeId}>{t`Signature`}</Label>
+                            <Select
+                                disabled={schemeLocked}
+                                onValueChange={(value) => onChange({ ...formData, webhookSignatureScheme: value === "native" ? "native" : "timestamped" })}
+                                value={formData.webhookSignatureScheme}
+                            >
+                                <SelectTrigger id={schemeId}>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="timestamped">{t`Neore (timestamped)`}</SelectItem>
+                                    <SelectItem value="native">{t`GitHub-style (X-Hub-Signature-256)`}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <WebhookSigningInstructions scheme={formData.webhookSignatureScheme} />
                     </div>
                 )}
 
@@ -478,6 +517,7 @@ const TriggerSettings: FC = () => {
                 systemPrompt: formData.systemPrompt || undefined,
                 timezone: formData.type === "schedule" ? formData.timezone : undefined,
                 type: formData.type,
+                webhookSignatureScheme: formData.type === "webhook" ? formData.webhookSignatureScheme : undefined,
             },
             {
                 onError: () => toast.error(t`Failed to create trigger`),
@@ -601,6 +641,7 @@ const TriggerSettings: FC = () => {
             systemPrompt: trigger.systemPrompt ?? "",
             timezone: trigger.timezone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone,
             type: trigger.type as TriggerType,
+            webhookSignatureScheme: trigger.webhookSignatureScheme ?? "timestamped",
         });
     }, []);
 
@@ -703,6 +744,7 @@ const TriggerSettings: FC = () => {
                                         onCancel={() => setEditingTriggerId(null)}
                                         onChange={setEditFormData}
                                         onSubmit={handleUpdate}
+                                        schemeLocked
                                         title={t`Edit Trigger`}
                                     />
                                 );
@@ -760,6 +802,11 @@ const TriggerSettings: FC = () => {
                                                         >
                                                             <Copy className="size-3" />
                                                         </button>
+                                                    </div>
+                                                )}
+                                                {trigger.type === "webhook" && (
+                                                    <div className="text-xs">
+                                                        <WebhookSigningInstructions scheme={trigger.webhookSignatureScheme ?? "timestamped"} />
                                                     </div>
                                                 )}
 

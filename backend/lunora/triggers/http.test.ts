@@ -34,9 +34,9 @@ type Harness = ReturnType<typeof lunoraTest>;
 
 let harness: Harness;
 
-const hmacHex = async (payload: string): Promise<string> => {
+const hmacHex = async (payload: string | Uint8Array): Promise<string> => {
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SECRET), { hash: "SHA-256", name: "HMAC" }, false, ["sign"]);
-    const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+    const signature = await crypto.subtle.sign("HMAC", key, typeof payload === "string" ? new TextEncoder().encode(payload) : (payload as BufferSource));
 
     return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
@@ -74,11 +74,15 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
         },
     };
 
-    const post = async (body: string, headers: Record<string, string>) =>
-        await handleTriggerWebhook(context as never, new Request("https://x/triggers/webhook/t", { body, headers, method: "POST" }), triggerId);
+    const post = async (body: string | Uint8Array, headers: Record<string, string>) =>
+        await handleTriggerWebhook(
+            context as never,
+            new Request("https://x/triggers/webhook/t", { body: body as BodyInit, headers, method: "POST" }),
+            triggerId,
+        );
 
     /** Just the status code of a delivery. */
-    const statusOf = async (body: string, headers: Record<string, string>): Promise<number> => {
+    const statusOf = async (body: string | Uint8Array, headers: Record<string, string>): Promise<number> => {
         const response = await post(body, headers);
 
         return response.status;
@@ -122,6 +126,16 @@ describe("trigger webhook signing", () => {
         expect(scheduled).toHaveLength(1);
     });
 
+    it("verifies a timestamped delivery over the raw bytes too, for a body that is not valid UTF-8", async () => {
+        const { scheduled, statusOf } = await setup();
+        const body = new Uint8Array([0x7b, 0xff, 0xfe, 0x7d]);
+        const timestamp = String(Math.floor(NOW / 1000));
+        const signed = new Uint8Array([...new TextEncoder().encode(`${timestamp}.`), ...body]);
+
+        expect(await statusOf(body, { "x-neore-timestamp": timestamp, "x-signature-256": `sha256=${await hmacHex(signed)}` })).toBe(200);
+        expect(scheduled).toHaveLength(1);
+    });
+
     it("refuses a timestamp outside the window, even when correctly signed", async () => {
         const { scheduled, statusOf } = await setup();
         const body = "{}";
@@ -159,6 +173,116 @@ describe("trigger webhook signing", () => {
         expect(await statusOf(body, await signedHeaders(body))).toBe(429);
         expect(rateLimit.charged).toBe(1);
         expect(scheduled).toHaveLength(0);
+    });
+
+    describe("native body-only signature (X-Hub-Signature-256)", () => {
+        const NATIVE_TRIGGER = { ...SIGNED_TRIGGER, webhookSignatureScheme: "native" };
+        const nativeHeaders = async (body: string, extra: Record<string, string> = {}) => {
+            return { "x-hub-signature-256": `sha256=${await hmacHex(body)}`, ...extra };
+        };
+
+        it("accepts GitHub-style signing with the raw secret and runs the trigger once", async () => {
+            const { scheduled, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = '{"action":"opened"}';
+
+            expect(await statusOf(body, await nativeHeaders(body))).toBe(200);
+            expect(scheduled).toHaveLength(1);
+        });
+
+        it("verifies the signature over the raw bytes, so a body that is not valid UTF-8 is accepted", async () => {
+            const { scheduled, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = new Uint8Array([0x7b, 0x22, 0x61, 0x22, 0x3a, 0x22, 0xff, 0xfe, 0x22, 0x7d]);
+
+            expect(await statusOf(body, { "x-hub-signature-256": `sha256=${await hmacHex(body)}` })).toBe(200);
+            expect(scheduled).toHaveLength(1);
+        });
+
+        it("verifies a body that starts with a byte-order mark against the bytes as sent", async () => {
+            const { scheduled, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = new Uint8Array([0xef, 0xbb, 0xbf, 0x7b, 0x7d]);
+
+            expect(await statusOf(body, { "x-hub-signature-256": `sha256=${await hmacHex(body)}` })).toBe(200);
+            expect(scheduled).toHaveLength(1);
+        });
+
+        it("refuses a wrong signature, a tampered body, a bare-hex value and a missing secret", async () => {
+            const { scheduled, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = '{"action":"opened"}';
+            const wrong = `sha256=${"0".repeat(64)}`;
+
+            expect(await statusOf(body, { "x-hub-signature-256": wrong })).toBe(401);
+            expect(await statusOf('{"action":"closed"}', await nativeHeaders(body))).toBe(401);
+
+            const signed = await nativeHeaders(body);
+
+            expect(await statusOf(body, { "x-hub-signature-256": signed["x-hub-signature-256"].slice(7) })).toBe(401);
+            expect(scheduled).toHaveLength(0);
+
+            const legacy = await setup({ enabled: true, type: "webhook", webhookSignatureScheme: "native" });
+
+            expect(await legacy.statusOf(body, await nativeHeaders(body))).toBe(401);
+            expect(legacy.scheduled).toHaveLength(0);
+        });
+
+        it("answers a replay of the same body as a duplicate, even under a fresh delivery id", async () => {
+            const { post, scheduled } = await setup(NATIVE_TRIGGER);
+            const body = '{"action":"opened"}';
+            const first = await post(body, await nativeHeaders(body, { "x-github-delivery": "one" }));
+
+            expect(first.status).toBe(200);
+
+            const replay = await post(body, await nativeHeaders(body, { "x-github-delivery": "two" }));
+
+            expect(replay.status).toBe(200);
+            expect(await replay.json()).toMatchObject({ duplicate: true });
+            expect(scheduled).toHaveLength(1);
+        });
+        it("refuses a timestamped delivery on a native trigger", async () => {
+            const { scheduled, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = '{"event":"x"}';
+
+            expect(await statusOf(body, await signedHeaders(body))).toBe(401);
+            expect(scheduled).toHaveLength(0);
+        });
+
+        it('does not let a captured timestamped signature pass as the native signature of "ts.body"', async () => {
+            const { scheduled, statusOf } = await setup();
+            const body = '{"event":"x"}';
+            const captured = await signedHeaders(body);
+
+            expect(await statusOf(`${captured["x-neore-timestamp"]}.${body}`, { "x-hub-signature-256": captured["x-signature-256"] })).toBe(401);
+            expect(scheduled).toHaveLength(0);
+        });
+
+        it("is refused by a timestamped trigger, with or without the timestamped headers alongside", async () => {
+            const { scheduled, statusOf } = await setup();
+            const body = "{}";
+
+            expect(await statusOf(body, await nativeHeaders(body))).toBe(401);
+            expect(await statusOf(body, { ...(await nativeHeaders(body)), ...(await signedHeaders(body)) })).toBe(401);
+
+            const explicit = await setup({ ...SIGNED_TRIGGER, webhookSignatureScheme: "timestamped" });
+
+            expect(await explicit.statusOf(body, await nativeHeaders(body))).toBe(401);
+            expect(await explicit.statusOf(body, await signedHeaders(body))).toBe(200);
+            expect(scheduled).toHaveLength(0);
+        });
+
+        it("refuses a native trigger's delivery that also carries timestamped headers", async () => {
+            const { scheduled, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = "{}";
+
+            expect(await statusOf(body, { ...(await nativeHeaders(body)), "x-neore-timestamp": String(Math.floor(NOW / 1000)) })).toBe(401);
+            expect(scheduled).toHaveLength(0);
+        });
+
+        it("charges the delivery limit only after the native signature verifies", async () => {
+            const { statusOf } = await setup(NATIVE_TRIGGER);
+
+            rateLimit.ok = false;
+            expect(await statusOf("{}", { "x-hub-signature-256": `sha256=${"0".repeat(64)}` })).toBe(401);
+            expect(rateLimit.charged).toBe(0);
+        });
     });
 
     it("gives the replay claim back when scheduling fails, so the sender's retry runs", async () => {

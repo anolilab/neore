@@ -2728,6 +2728,9 @@ export const schema = defineSchema({
         updatedAt: v.number(),
         userId: v.string(),
         webhookSecret: v.optional(v.string()),
+        // How a webhook delivery is signed; unset = "timestamped" (`triggers/http.ts`).
+        // A trigger accepts only its own scheme's headers.
+        webhookSignatureScheme: v.optional(v.union(v.literal("timestamped"), v.literal("native"))),
     })
         .shardBy("userId")
         .index("by_userId_organizationId", ["userId", "organizationId"])
