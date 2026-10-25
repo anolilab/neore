@@ -27,6 +27,15 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+const { platform } = vi.hoisted(() => {
+    return { platform: { modifier: "ctrl" as "cmd" | "ctrl" } };
+});
+
+// Only the registration side reads the platform here; the recorder inside the module keeps its own.
+vi.mock("@neore/ui/utils/keyboard-shortcuts", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("@neore/ui/utils/keyboard-shortcuts")>()), getPlatformModifierForEvents: () => platform.modifier };
+});
+
 vi.mock("sonner", () => {
     return { toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() } };
 });
@@ -90,6 +99,24 @@ describe("KeyboardShortcutsSettings effort commands", () => {
         await waitFor(() => {
             expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toStrictEqual([DUPLICATE_MESSAGE, DUPLICATE_MESSAGE]);
         });
+    });
+
+    it("refuses a Control chord that a Command binding of another command overlaps on a Mac", async () => {
+        platform.modifier = "cmd";
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, newChat: "cmd+j" } });
+        });
+
+        try {
+            renderForm();
+            record("Increase Reasoning Effort", { ctrlKey: true, key: "j" });
+
+            await waitFor(() => {
+                expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toStrictEqual([DUPLICATE_MESSAGE]);
+            });
+        } finally {
+            platform.modifier = "ctrl";
+        }
     });
 
     it("saves a free chord", async () => {

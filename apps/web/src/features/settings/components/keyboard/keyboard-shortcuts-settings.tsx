@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import * as z from "zod";
 
+import { findEffortConflicts } from "@/features/keyboard/lib/recorded-shortcut-converter";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 import { defaultKeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
@@ -64,12 +65,12 @@ const keyboardShortcutSchema = z
             owners.set(identity, [...(owners.get(identity) ?? []), key]);
         }
 
-        for (const keys of owners.values()) {
-            if (keys.length > 1) {
-                for (const key of keys) {
-                    context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
-                }
-            }
+        // A recorded Control chord also answers to Command on a Mac, so the effort commands are judged by what they register.
+        const effortConflicts = Object.keys(findEffortConflicts(context.value));
+        const conflicting = new Set([...[...owners.values()].filter((keys) => keys.length > 1).flat(), ...effortConflicts]);
+
+        for (const key of conflicting) {
+            context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
         }
     });
 

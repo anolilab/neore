@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
-import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { useModelStore, withoutEffort } from "@/features/chat/core/stores/model-store";
 import { EFFORT_LABEL_MESSAGES } from "@/features/chat/model-settings/reasoning-effort-selector";
 import type { EffortDirection } from "@/features/chat/model-settings/reasoning-effort-steps";
 import { stepReasoningEffort, supportsReasoningEffort } from "@/features/chat/model-settings/reasoning-effort-steps";
@@ -40,14 +40,26 @@ const ComposerEffortShortcuts: FC = () => {
     // In a comparison the value goes to each child that reasons, so one is enough.
     const supportsReasoning = (comparisonModels?.length ? comparisonModels : [model as string]).some((id) => supportsReasoningEffort(models, id));
     const threadEffortRef = useRef(thread?.reasoningEffort);
-    // The last step, with the stored effort it started from. A send consumes the pending value but does not save it to
-    // the thread, so the next press continues from here until the thread's own effort changes. The component remounts
-    // per thread (`assistant.tsx` keys the provider), so this never crosses threads.
-    const lastStepRef = useRef<{ effort: number; storedEffort: number | undefined }>(undefined);
+    const threadId = thread?._id;
+    // The last step, with the thread and the stored effort it started from. A send consumes the pending value but does
+    // not save it to the thread, so the next press continues from here until the thread or its own effort changes.
+    const lastStepRef = useRef<{ effort: number; storedEffort: number | undefined; threadId: string | undefined }>(undefined);
+    const threadIdRef = useRef(threadId);
 
     useEffect(() => {
         threadEffortRef.current = thread?.reasoningEffort;
+        threadIdRef.current = threadId;
     });
+
+    // A model that cannot reason takes no effort: one stepped on the previous model must not ride along with the next send.
+    useEffect(() => {
+        if (supportsReasoning) {
+            return;
+        }
+
+        lastStepRef.current = undefined;
+        useModelStore.getState().setPendingSettings(withoutEffort);
+    }, [supportsReasoning]);
 
     useEffect(() => {
         const step = (direction: EffortDirection) => {
@@ -60,10 +72,11 @@ const ComposerEffortShortcuts: FC = () => {
             const { pendingSettings, setPendingSettings } = useModelStore.getState();
             const storedEffort = threadEffortRef.current;
             const last = lastStepRef.current;
-            const current = pendingSettings?.reasoningEffort ?? (last?.storedEffort === storedEffort ? last?.effort : storedEffort);
+            const lastApplies = last?.threadId === threadIdRef.current && last?.storedEffort === storedEffort;
+            const current = pendingSettings?.reasoningEffort ?? (lastApplies ? last?.effort : storedEffort);
             const next = stepReasoningEffort(current, direction);
 
-            lastStepRef.current = { effort: next, storedEffort };
+            lastStepRef.current = { effort: next, storedEffort, threadId: threadIdRef.current };
             const message = EFFORT_LABEL_MESSAGES[next];
 
             setPendingSettings((previous) => {

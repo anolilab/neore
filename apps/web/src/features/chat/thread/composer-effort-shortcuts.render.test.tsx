@@ -41,7 +41,7 @@ vi.mock("sonner", () => {
 const { models, thread } = vi.hoisted(() => {
     return {
         models: { current: [] as unknown[] },
-        thread: { current: undefined as { reasoningEffort?: number } | undefined },
+        thread: { current: undefined as { _id?: string; reasoningEffort?: number } | undefined },
     };
 });
 
@@ -142,6 +142,34 @@ describe("composer effort shortcuts", () => {
         press("increaseEffort");
 
         expect(pendingEffort()).toBe(25);
+    });
+
+    it("does not carry the last step into another thread with the same stored effort", () => {
+        thread.current = { _id: "thread-a", reasoningEffort: 50 };
+        const { rerender } = render(<ComposerEffortShortcuts />);
+
+        press("increaseEffort");
+        expect(pendingEffort()).toBe(75);
+
+        useModelStore.getState().setPendingSettings(undefined);
+        thread.current = { _id: "thread-b", reasoningEffort: 50 };
+        rerender(<ComposerEffortShortcuts />);
+        press("increaseEffort");
+
+        expect(pendingEffort()).toBe(75);
+    });
+
+    it("drops a stepped effort when the model changes to one without reasoning", () => {
+        useModelStore.getState().setPendingSettings({ language: "de" });
+        const { rerender } = render(<ComposerEffortShortcuts />);
+
+        press("increaseEffort");
+        expect(pendingEffort()).toBe(75);
+
+        models.current = [{ filterCapabilities: [], id: "reasoner" }];
+        rerender(<ComposerEffortShortcuts />);
+
+        expect(useModelStore.getState().pendingSettings).toStrictEqual({ language: "de" });
     });
 
     it("keeps the other pending settings", () => {

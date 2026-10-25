@@ -224,7 +224,7 @@ const createInitialState = (): ModelStoreState => {
 // Store Creation
 // ============================================================================
 /** The pending settings without the composer's reasoning effort (`undefined` once nothing else is pending). */
-const withoutEffort = (pending: PendingSettings | undefined): PendingSettings | undefined => {
+export const withoutEffort = (pending: PendingSettings | undefined): PendingSettings | undefined => {
     if (pending?.reasoningEffort === undefined) {
         return pending;
     }

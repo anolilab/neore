@@ -424,6 +424,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
     const isNewThread = !threadId;
     const hasResetRef = useRef(false);
+    // The new-chat route and the thread route mount separate providers, so this tells a late failed send whether its composer is still on screen.
+    const isMountedRef = useRef(true);
     const previousThreadIdRef = useRef<string | undefined>(undefined);
 
     // Reset model and language when mounting a new thread view
@@ -431,6 +433,14 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // Read off the store object first: the effect depends on these two members, not
     // on the store snapshot's identity.
     const { resetForNewThread, selectedModelThreadId } = modelStore;
+
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     useEffect(() => {
         // Only reset once on mount, and only if this is a new thread with stale store data
@@ -886,12 +896,13 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             const { attachedReferences } = useChatUIStore.getState();
             // The pending settings are taken out of the store before the request; a send that fails puts them back with the draft.
             let consumedSettings: PendingSettings | null = null;
-            // The thread the composer showed when the settings were taken: a late failure must not hand them to another thread.
+            // The thread the composer showed when the settings were taken: a late failure must not hand them to another thread,
+            // nor to another new-chat composer (which has no thread id either; this provider is gone by then).
             const consumedFromThread = useModelStore.getState().selectedModelThreadId;
             const restoreSettings = () => {
                 const consumed = consumedSettings;
 
-                if (!consumed || useModelStore.getState().selectedModelThreadId !== consumedFromThread) {
+                if (!consumed || !isMountedRef.current || useModelStore.getState().selectedModelThreadId !== consumedFromThread) {
                     return;
                 }
 
