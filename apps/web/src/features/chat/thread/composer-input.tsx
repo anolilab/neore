@@ -15,6 +15,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { isThreadLockedError } from "@neore/client-runtime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { formatNumber } from "@neore/ui/utils/locale-format";
@@ -46,7 +47,6 @@ import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { isThreadLockedError } from "@/lib/lunora/unlock-proofs";
 import { showError } from "@/lib/toast";
 
 import type { ChatReference } from "./chat-reference";
