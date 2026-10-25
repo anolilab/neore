@@ -57,7 +57,7 @@ import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, sha256Hex, tim
 import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
-import { evaluateFilters } from "./filters";
+import { decodeStrict, evaluateFilters, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import type { WebhookSignatureScheme } from "./presets";
 
 const DIGITS_ONLY = /^\d{1,12}$/u;
@@ -157,9 +157,8 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 
         // 2. Read the request body (enforce 1MB size limit to prevent DoS)
         const contentLength = request.headers.get("content-length");
-        const MAX_PAYLOAD_SIZE = 1024 * 1024; // 1MB
 
-        if (contentLength && Number.parseInt(contentLength, 10) > MAX_PAYLOAD_SIZE) {
+        if (contentLength && Number.parseInt(contentLength, 10) > MAX_WEBHOOK_BODY_BYTES) {
             return Response.json(
                 { error: "Payload too large" },
                 {
@@ -174,7 +173,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         // not clean UTF-8 would never match the signature it was signed with.
         const rawBody = new Uint8Array(await request.arrayBuffer());
 
-        if (rawBody.byteLength > MAX_PAYLOAD_SIZE) {
+        if (rawBody.byteLength > MAX_WEBHOOK_BODY_BYTES) {
             return Response.json(
                 { error: "Payload too large" },
                 {
@@ -223,12 +222,19 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         // deliver it once) and run nothing.
         // A bearer token is the same on every delivery, so its claim is keyed on the body.
         const claimDigest = delivery.scheme === "gitlab-token" ? `body:${await sha256Hex(rawBody)}` : normalizeSignature(delivery.presented);
-        const claim = { key: `${triggerId}:${claimDigest}`, scope: "trigger-webhook" };
-        const firstDelivery = await context.runMutation(internal.lib.claim_once.claimKey, { ...claim, ttlMs: TRIGGER_CLAIM_TTL_MS, userId: trigger.userId });
+        const claimKey = { key: `${triggerId}:${claimDigest}`, scope: "trigger-webhook" };
+        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
+            ...claimKey,
+            ttlMs: TRIGGER_CLAIM_TTL_MS,
+            userId: trigger.userId,
+        });
 
-        if (!firstDelivery) {
+        if (claimedAt === null) {
             return Response.json({ duplicate: true, ok: true }, { headers: { "Content-Type": "application/json" }, status: 200 });
         }
+
+        // Every release names the claim it took: a step that outlives the TTL must not clear a redelivery's replacement.
+        const claim = { ...claimKey, claimedAt };
 
         // 4. Payload filters, on the body only now that its signature is proven. A
         //    filtered delivery RELEASES its claim once recorded: the owner may fix the
@@ -236,11 +242,15 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    replay must be evaluated again. A replay that still misses writes only the
         //    one collapsed history row. It runs nothing, so it is not charged
         //    (`admitTriggerRun` lives in the execution) and does not count as a run.
+        //    The claim travels to the execution, which gives it back too if admission
+        //    refuses the delivery against filters saved after this check.
         //    202, not 200: the delivery was accepted and deliberately not acted on.
         //    The body is decoded strictly for this: the lossy decode above turns invalid
         //    UTF-8 into U+FFFD, which could let bytes that are not JSON parse as JSON.
         //    A body that does not decode is evaluated as the empty (non-JSON) string.
-        const verdict = evaluateFilters(trigger.filters, decodeStrict(rawBody));
+        //        The run carries `invalidUtf8` so admission evaluates the same text.
+        const strictBody = decodeStrict(rawBody);
+        const verdict = evaluateFilters(trigger.filters, strictBody ?? "");
 
         if (!verdict.matched) {
             try {
@@ -272,6 +282,8 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    this same delivery reads as a replay, and it never runs at all.
         try {
             await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, {
+                claim,
+                invalidUtf8: strictBody === null ? true : undefined,
                 payload: body || undefined,
                 triggerId: triggerId as Id<"triggers">,
             });
@@ -302,15 +314,6 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 };
 
 const MISSING_SIGNATURE = "Missing or invalid signature headers";
-
-/** UTF-8 text of `bytes`, or `""` when they are not valid UTF-8 (which no JSON parser accepts). */
-const decodeStrict = (bytes: Uint8Array): string => {
-    try {
-        return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
-    } catch {
-        return "";
-    }
-};
 
 /**
  * What a delivery presented, read from the headers of the trigger's scheme.
@@ -391,7 +394,7 @@ const linearTimestampIsFresh = (body: Uint8Array): boolean => {
     let parsed: unknown;
 
     try {
-        parsed = JSON.parse(decodeStrict(body));
+        parsed = JSON.parse(decodeStrict(body) ?? "");
     } catch {
         return false;
     }

@@ -18,6 +18,26 @@ export const MAX_PATH_DEPTH = 8;
 /** Characters in one path. */
 export const MAX_PATH_LENGTH = 200;
 
+/** Bytes in a webhook delivery's body. The handler refuses a larger one, so no admitted payload is longer (in characters either). */
+export const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
+
+/** UTF-8 text of `bytes`, or `null` when they are not valid UTF-8. A lossy decode would let bytes that are not JSON parse as JSON. */
+export const decodeStrict = (bytes: Uint8Array): string | null => {
+    try {
+        return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * The text the filters of a webhook delivery are evaluated against, both when the
+ * handler receives it and when the run is admitted: the body, or the empty
+ * (non-JSON) string when its bytes were not valid UTF-8. The handler flags that
+ * (`invalidUtf8`) because the payload it hands on is the lossy decode.
+ */
+export const filterTextOf = (payload: string | undefined, invalidUtf8: boolean | undefined): string => (invalidUtf8 === true ? "" : (payload ?? ""));
+
 /** Characters in a filter's comparison value. */
 export const MAX_FILTER_VALUE_LENGTH = 500;
 

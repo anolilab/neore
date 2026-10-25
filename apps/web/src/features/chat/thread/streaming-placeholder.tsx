@@ -45,7 +45,8 @@ type StreamId = string & { __isStreamId: true };
 type StreamStatus = "pending" | "streaming" | "done" | "error" | "timeout";
 /** `speaker`: group chat — the participant talking now; `text`/`reasoning` are theirs only. */
 type StreamBody = { reasoning: string; speaker?: StreamSpeaker; status: StreamStatus; text: string };
-type StreamDelta = { reasoning: string; speaker?: StreamSpeaker; text: string };
+/** `restart`: steering — the reply continues below a message the user sent into it. */
+type StreamDelta = { reasoning: string; restart?: true; speaker?: StreamSpeaker; text: string };
 
 const STREAM_BODY_POLL_MS = 1000;
 
@@ -55,7 +56,7 @@ const MAX_RECONNECT_ATTEMPTS = 3;
 /** Base delay for exponential backoff (ms) */
 const RECONNECT_BASE_DELAY = 1000;
 
-/** Chunks received since the last frame, merged; `reset` when a group-chat speaker change is among them. */
+/** Chunks received since the last frame, merged; `reset` when a group-chat speaker change or a steering restart is among them. */
 interface PendingDelta extends StreamDelta {
     reset: boolean;
 }
@@ -64,7 +65,8 @@ interface PendingDelta extends StreamDelta {
 const applyPendingDelta = (previous: StreamDelta, pending: PendingDelta): StreamDelta => {
     // Group chat: a speaker marker starts the next participant's reply. The
     // previous one is a saved message by now, so the placeholder shows only the
-    // participant talking.
+    // participant talking. A steering restart works the same way: the text
+    // before it is saved above the message the user sent into the reply.
     if (pending.reset) {
         return { reasoning: pending.reasoning, speaker: pending.speaker, text: pending.text };
     }
@@ -112,10 +114,10 @@ const createFrameBatcher = (onFlush: (pending: PendingDelta) => void): FrameBatc
             pending = null;
         },
         flush,
-        push: ({ reasoning, speaker, text }) => {
+        push: ({ reasoning, restart, speaker, text }) => {
             pending =
-                speaker || !pending
-                    ? { reasoning, reset: Boolean(speaker), speaker, text }
+                speaker || restart || !pending
+                    ? { reasoning, reset: Boolean(speaker || restart), speaker, text }
                     : { ...pending, reasoning: pending.reasoning + reasoning, text: pending.text + text };
 
             frame ??= requestAnimationFrame(flush);
@@ -189,7 +191,7 @@ const attemptStream = async (
 
         // Called once per relayed chunk, even an empty one: the caller counts calls
         // to resume at the right `lastChunkIndex` after a reconnect.
-        onUpdate({ reasoning: parsed.reasoning, speaker: parsed.speaker, text: parsed.text });
+        onUpdate({ reasoning: parsed.reasoning, restart: parsed.restart, speaker: parsed.speaker, text: parsed.text });
 
         return true;
     };
