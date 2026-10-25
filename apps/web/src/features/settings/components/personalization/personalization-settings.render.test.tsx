@@ -15,6 +15,7 @@ const harness = vi.hoisted(() => {
         listeners: new Set<() => void>(),
         pendingSaves: [] as { land: () => void; resolve: () => void; value: string }[],
         settings: { threadTitleInstructions: undefined as string | undefined },
+        userId: "user-1",
     };
 
     return { store };
@@ -24,6 +25,22 @@ vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
             return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+        },
+    };
+});
+
+vi.mock("@/features/auth/lib/auth-ui-provider", () => {
+    return {
+        useAuth: () => {
+            return { authClient: {} };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/session-user-management", () => {
+    return {
+        useSession: () => {
+            return { data: { user: { id: harness.store.userId } } };
         },
     };
 });
@@ -97,6 +114,7 @@ describe("PersonalizationSettings thread title instructions", () => {
     beforeEach(() => {
         harness.store.settings = { threadTitleInstructions: undefined };
         harness.store.pendingSaves = [];
+        harness.store.userId = "user-1";
     });
 
     it("shows the stored value", () => {
@@ -176,5 +194,28 @@ describe("PersonalizationSettings thread title instructions", () => {
         render(<PersonalizationSettings />);
 
         expect(field().value).toBe("Start with a verb");
+    });
+
+    it("drops text typed for one account when another signs in, instead of saving it there", () => {
+        harness.store.userId = "guest-1";
+
+        const view = render(<PersonalizationSettings />);
+
+        fireEvent.change(field(), { target: { value: "Guest wording" } });
+
+        // Signing in over the guest keeps this page mounted, with the new account's settings.
+        harness.store.userId = "user-2";
+        view.rerender(<PersonalizationSettings />);
+
+        expect(field().value).toBe("");
+
+        fireEvent.blur(field());
+
+        expect(harness.store.pendingSaves).toHaveLength(0);
+
+        fireEvent.change(field(), { target: { value: "Short titles" } });
+        fireEvent.blur(field());
+
+        expect(harness.store.pendingSaves.map((save) => save.value)).toEqual(["Short titles"]);
     });
 });

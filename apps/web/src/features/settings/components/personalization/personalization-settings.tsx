@@ -13,7 +13,9 @@ import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import SystemPromptOptimizerDialog from "@/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { trackEvent } from "@/lib/analytics";
@@ -29,8 +31,18 @@ const SYNCED_FIELDS = ["nickname", "profession", "aboutMe", "customInstructions"
 
 type SyncedField = (typeof SYNCED_FIELDS)[number];
 
+/** Text typed into the title field, with the account it was typed for. */
+interface TitleInstructions {
+    ownerId: string | null;
+    text: string;
+}
+
 const PersonalizationSettings: FC = () => {
     const { t } = useLingui();
+    const { authClient } = useAuth();
+    const { data: sessionData } = useSession(authClient);
+    // Whose settings the page is showing. Text and saves belong to one account: signing in over a guest keeps this page mounted.
+    const ownerId = sessionData?.user?.id ?? null;
     const { data: userSettings, isLoading } = useUserSettings();
     const updateSettingsMutation = useUpdateUserSettings();
     const { onboardingCompleted, setOnboardingCompleted } = useUserPreferences();
@@ -41,11 +53,11 @@ const PersonalizationSettings: FC = () => {
     const [aboutMe, setAboutMe] = useState("");
     const [customInstructions, setCustomInstructions] = useState("");
     // Not part of the render-time sync below: a draft (`null` = not editing) shadows the stored value, so a
-    // cache update from an earlier save can never replace text typed since.
-    const [titleInstructionsDraft, setTitleInstructionsDraft] = useState<string | null>(null);
+    // cache update from an earlier save can never replace text typed since. It is dropped when the account changes.
+    const [draftState, setDraftState] = useState<TitleInstructions | null>(null);
     // The value of the newest save that has not settled yet. The cached setting may not show it for a moment,
     // so a blur compares against this first: changing the text and changing it back must still send the reversal.
-    const submittedTitleInstructions = useRef<string | null>(null);
+    const submittedTitleInstructions = useRef<TitleInstructions | null>(null);
     const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
 
     const handleOptimizedSystemPrompt = useCallback(
@@ -136,6 +148,11 @@ const PersonalizationSettings: FC = () => {
         }
     }, [customInstructions, userSettings?.customInstructions, handleUpdateSetting]);
 
+    if (draftState && draftState.ownerId !== ownerId) {
+        setDraftState(null);
+    }
+
+    const titleInstructionsDraft = draftState && draftState.ownerId === ownerId ? draftState.text : null;
     const threadTitleInstructions = titleInstructionsDraft ?? userSettings?.threadTitleInstructions ?? "";
 
     // Sent as "" to clear: `handleUpdateSetting` maps blank to `undefined`, which the wire drops, so the old text would stay.
@@ -146,17 +163,20 @@ const PersonalizationSettings: FC = () => {
         }
 
         const trimmed = titleInstructionsDraft.trim();
-        const current = submittedTitleInstructions.current ?? userSettings?.threadTitleInstructions ?? "";
+        const submitted = submittedTitleInstructions.current?.ownerId === ownerId ? submittedTitleInstructions.current : null;
+        const current = submitted?.text ?? userSettings?.threadTitleInstructions ?? "";
 
         if (trimmed === current) {
-            if (submittedTitleInstructions.current === null) {
-                setTitleInstructionsDraft(null);
+            if (submitted === null) {
+                setDraftState(null);
             }
 
             return;
         }
 
-        submittedTitleInstructions.current = trimmed;
+        const own = { ownerId, text: trimmed };
+
+        submittedTitleInstructions.current = own;
 
         try {
             await updateSettingsMutation.updateLatest(() => {
@@ -165,15 +185,15 @@ const PersonalizationSettings: FC = () => {
             trackEvent("settings_changed", { section: "personalization", setting_key: "threadTitleInstructions" });
             toast.success(t`Settings saved`);
             // Drop the draft only if nothing was typed while the save was pending.
-            setTitleInstructionsDraft((latest) => (latest !== null && latest.trim() === trimmed ? null : latest));
+            setDraftState((latest) => (latest !== null && latest.ownerId === ownerId && latest.text.trim() === trimmed ? null : latest));
         } catch {
             toast.error(t`Failed to save settings`);
         } finally {
-            if (submittedTitleInstructions.current === trimmed) {
+            if (submittedTitleInstructions.current === own) {
                 submittedTitleInstructions.current = null;
             }
         }
-    }, [titleInstructionsDraft, userSettings?.threadTitleInstructions, updateSettingsMutation, t]);
+    }, [titleInstructionsDraft, ownerId, userSettings?.threadTitleInstructions, updateSettingsMutation, t]);
 
     if (isLoading) {
         return (
@@ -293,7 +313,7 @@ const PersonalizationSettings: FC = () => {
                             id="thread-title-instructions"
                             maxLength={MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
                             onBlur={handleThreadTitleInstructionsBlur}
-                            onChange={(e) => setTitleInstructionsDraft(e.target.value)}
+                            onChange={(e) => setDraftState({ ownerId, text: e.target.value })}
                             placeholder={t`Enter your title instructions...`}
                             value={threadTitleInstructions}
                         />
