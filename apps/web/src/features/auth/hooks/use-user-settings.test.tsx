@@ -117,4 +117,36 @@ describe("useUpdateUserSettings.updateLatest", () => {
 
         expect(harness.sent.at(-1)?.value).toBe("");
     });
+
+    it("drops a queued write when the account changed while it waited", async () => {
+        const { queryClient, result } = setup();
+
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "", userId: "guest" });
+
+        let second: Promise<void> = Promise.resolve();
+
+        act(() => {
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "First" };
+            });
+            second = result.current.updateLatest(() => {
+                return { threadTitleInstructions: "Second" };
+            });
+        });
+        await flush();
+
+        // Signing in over the guest replaces the cache with the new account's row.
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "", userId: "member" });
+
+        const outcome = expect(second).rejects.toThrow("account changed");
+
+        await act(async () => {
+            harness.sent[0]?.release();
+            await Promise.resolve();
+        });
+        await outcome;
+
+        // Only the first request, made before the switch, ever left.
+        expect(harness.sent).toHaveLength(1);
+    });
 });

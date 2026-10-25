@@ -88,6 +88,8 @@ export const useUpdateUserSettings = () => {
         const before = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
         const patch = build(before);
         const fields = Object.keys(patch) as (keyof UserSettingsRow)[];
+        // Whose settings this edit was made on. The row carries the owner; a brand-new account has none yet, so no check is possible then.
+        const owner = before?.userId;
 
         if (before !== undefined) {
             queryClient.setQueryData(queryOptions.queryKey, { ...before, ...patch });
@@ -97,6 +99,13 @@ export const useUpdateUserSettings = () => {
 
         const run = settingsWrites.tail.then(() => {
             const latest = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
+
+            // The account changed while this write waited (sign-in over a guest clears the cache): sending it now would store
+            // the old account's edit on the new one. The caller sees a failed save.
+            if (owner !== undefined && latest?.userId !== owner) {
+                throw new Error("The signed-in account changed before this setting was saved.");
+            }
+
             const body = latest ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
 
             return mutation.mutateAsync(body as Patch);
