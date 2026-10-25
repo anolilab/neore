@@ -398,7 +398,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             // user can no longer sign in to ask again, and nothing else is left to do. The step gets
             // a long retry budget of its own, and `dedupId` keeps a retried attempt from queueing a
             // second job. If even that is exhausted the error is logged at error level, never allowed
-            // to mask `error`; a re-run of this instance schedules it again.
+            // to mask `error`.
             try {
                 await context.step.do(
                     "schedule-post-hog-retry",
