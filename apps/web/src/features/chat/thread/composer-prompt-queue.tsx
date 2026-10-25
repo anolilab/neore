@@ -119,8 +119,9 @@ const useQueueActions = () => {
             try {
                 const { remove, setPaused } = usePromptQueueStore.getState();
                 const next = await takeNextToSend({
-                    // A reply that started meanwhile (a message sent from the composer) owns the thread.
-                    canSend: () => latestRef.current.threadId === threadId && !latestRef.current.isStreaming,
+                    // A reply that started meanwhile owns the thread: a message sent from the
+                    // composer is `isSubmitting` before its stream exists, so that counts too.
+                    canSend: () => latestRef.current.threadId === threadId && !latestRef.current.isStreaming && !useChatUIStore.getState().isSubmitting,
                     peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
                     remove: (id) => remove(threadId, id),
                     withdraw: async (steer) => await withdraw(threadId, steer),

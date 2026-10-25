@@ -1,7 +1,7 @@
 /**
  * `stream-text.ts` delivers a steered message by returning it in a step's
- * `prepareStep` `messages` override and relies on the AI SDK carrying that
- * override into every later step. This pins that, so an SDK that rebuilt each
+ * `prepareStep` `messages` override and relies on `streamText` carrying that
+ * override into every later step. This pins that, so a version that rebuilt each
  * step from the initial prompt would fail here instead of silently making the
  * model forget the steer after one step.
  */
