@@ -23,7 +23,7 @@ import type { PendingSignIn, SignInHandoff } from "./sign-in.js";
 import { beginSignIn, completeSignIn, isBlockedOauthUrl, parseSignInCallback } from "./sign-in.js";
 import { clampText, isSameOrigin, MAX_COMPOSE_CHARS, newChatUrl, parseDeepLink, SCHEME, siteOrigin } from "./site.js";
 import { threadWindowUrl } from "./thread-window.js";
-import { isLocalPage, isTrustedUrl } from "./trust.js";
+import { isArtifactPreview, isLocalPage, isTrustedUrl } from "./trust.js";
 import { createDebouncer, DEFAULT_SIZE, readWindowState, restorableState, SAVE_DEBOUNCE_MS, WINDOW_STATE_FILE, writeWindowState } from "./window-state.js";
 
 interface ShellState {
@@ -97,6 +97,13 @@ const showNotification = (title: string, body?: string): void => {
 
 const isTrusted = (event: IpcMainInvokeEvent): boolean => isTrustedUrl(origin, event.senderFrame?.url);
 
+/**
+ * The hand-offs (dropped files, compose text, the sign-in code) are sent to the main window only, so
+ * only the main window may take them. A thread window that drained one would keep it from the page.
+ */
+const isMainWindow = (event: IpcMainInvokeEvent): boolean =>
+    isTrusted(event) && state.mainWindow !== undefined && event.sender.id === state.mainWindow.webContents.id;
+
 /** Only the Quick Composer's own page, from its own window: not the site, not another local page. */
 const isFromComposer = (event: IpcMainInvokeEvent): boolean =>
     isLocalPage(composerPage, event.senderFrame?.url) && state.composer !== undefined && event.sender.id === state.composer.webContents.id;
@@ -138,12 +145,17 @@ const guardNavigation = (event: { preventDefault: () => void }, url: string): vo
 
     const parsed = URL.parse(url) ?? undefined;
 
-    if (parsed !== undefined && isSameOrigin(origin, parsed)) {
+    if (parsed !== undefined && isSameOrigin(origin, parsed) && !isArtifactPreview(parsed)) {
         return;
     }
 
     event.preventDefault();
-    openWebLinkExternally(parsed);
+
+    if (parsed !== undefined && isSameOrigin(origin, parsed)) {
+        openArtifactWindow(parsed);
+    } else {
+        openWebLinkExternally(parsed);
+    }
 };
 
 /**
@@ -202,9 +214,11 @@ const guardSiteWindow = (win: BrowserWindow): void => {
 
         if (isBlockedOauthUrl(url)) {
             startBrowserSignIn();
+        } else if (parsed !== undefined && isSameOrigin(origin, parsed) && isArtifactPreview(parsed)) {
+            openArtifactWindow(parsed);
         } else if (parsed !== undefined && isSameOrigin(origin, parsed)) {
-            // Same-origin popups stay in the app; other web links go to the system browser.
-            contents.loadURL(url);
+            // A same-origin popup gets its own window: the opener keeps its page, its draft and its state.
+            openSiteWindow(parsed);
         } else {
             openWebLinkExternally(parsed);
         }
@@ -226,8 +240,25 @@ const guardSiteWindow = (win: BrowserWindow): void => {
     }
 };
 
-/** A thread in its own window: no state file, no tray, closing it really closes it. */
-const openThreadWindow = (url: URL): void => {
+/**
+ * Without a tray nothing hides, so the last site window to close ends the app. The Quick Composer is
+ * hidden rather than closed, so it does not count: `window-all-closed` never fires while it exists.
+ */
+const quitWhenNoSiteWindow = (): void => {
+    if (state.isQuitting || canHideOnClose()) {
+        return;
+    }
+
+    if (BrowserWindow.getAllWindows().every((win) => win === state.composer)) {
+        app.quit();
+    }
+};
+
+/**
+ * A site page in its own window (a thread, or a same-origin popup): no state file, no tray, and
+ * closing it really closes it.
+ */
+const openSiteWindow = (url: URL): void => {
     const win = new BrowserWindow({
         height: DEFAULT_SIZE.height,
         minHeight: 560,
@@ -239,6 +270,39 @@ const openThreadWindow = (url: URL): void => {
     });
 
     guardSiteWindow(win);
+    win.loadURL(url.href);
+};
+
+/**
+ * The canvas artifact preview: model-written HTML, on its own page. It gets no preload, so it never has the
+ * bridge; a link it opens leaves for the system browser. Its URL carries the whole artifact, which is longer
+ * than Windows passes to the system browser, so the page cannot be handed over that way.
+ */
+const openArtifactWindow = (url: URL): void => {
+    const win = new BrowserWindow({
+        height: DEFAULT_SIZE.height,
+        minHeight: 560,
+        minWidth: 420,
+        title: "Neore preview",
+        webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+            webSecurity: true,
+            webviewTag: false,
+        },
+        width: DEFAULT_SIZE.width,
+    });
+    const contents = win.webContents;
+
+    contents.setWindowOpenHandler(({ url: target }) => {
+        openWebLinkExternally(URL.parse(target) ?? undefined);
+
+        return { action: "deny" };
+    });
+    contents.on("will-navigate", (event) => event.preventDefault());
+    contents.on("will-redirect", (event) => event.preventDefault());
+    contents.on("will-attach-webview", (event) => event.preventDefault());
     win.loadURL(url.href);
 };
 
@@ -254,9 +318,10 @@ const createMainWindow = (): BrowserWindow => {
         minWidth: 420,
         title: "Neore",
         ...macTitleBar,
-        ...saved !== undefined && { x: saved.bounds.x, y: saved.bounds.y },
         webPreferences: siteWebPreferences(),
         width: saved?.bounds.width ?? DEFAULT_SIZE.width,
+        x: saved?.bounds.x,
+        y: saved?.bounds.y,
     });
 
     if (saved?.maximized) {
@@ -556,11 +621,11 @@ const registerIpc = (): void => {
             throw new Error("open-thread-window: invalid thread id");
         }
 
-        openThreadWindow(url);
+        openSiteWindow(url);
     });
 
     ipcMain.handle(CHANNEL.takePendingCompose, (event): string | undefined => {
-        if (!isTrusted(event)) {
+        if (!isMainWindow(event)) {
             return undefined;
         }
 
@@ -572,7 +637,7 @@ const registerIpc = (): void => {
     });
 
     ipcMain.handle(CHANNEL.takePendingFiles, (event): DroppedFile[] => {
-        if (!isTrusted(event)) {
+        if (!isMainWindow(event)) {
             return [];
         }
 
@@ -592,7 +657,7 @@ const registerIpc = (): void => {
     });
 
     ipcMain.handle(CHANNEL.takePendingSignIn, (event): SignInHandoff | undefined => {
-        if (!isTrusted(event)) {
+        if (!isMainWindow(event)) {
             return undefined;
         }
 
@@ -711,17 +776,45 @@ if (!app.requestSingleInstanceLock()) {
 
 app.on("ready", start);
 
+// Every window is covered (the main window, thread and preview windows, the device window): whichever closes last ends the app.
+app.on("browser-window-created", (_event, win) => {
+    win.on("closed", quitWhenNoSiteWindow);
+});
+
 // macOS delivers deep links through this event, possibly before `ready`.
 app.on("open-url", (event, url) => {
     event.preventDefault();
     handleDeepLink(url);
 });
 
-// macOS: a file dragged onto the dock icon. Waits for `ready`, because the window it may open needs the app ready.
-app.on("open-file", async (event, filePath) => {
+/** Each task starts after the one before it has finished, so work queued in order also finishes in order. */
+const createInOrderRunner = () => {
+    let previous: Promise<void> = Promise.resolve();
+
+    return (task: () => Promise<void>): void => {
+        previous = (async () => {
+            await previous;
+            await task();
+        })();
+    };
+};
+
+const runDropInOrder = createInOrderRunner();
+
+/** Waits for `ready`, because the window a drop may open needs the app ready. A failure is logged; it never stops the next drop. */
+const takeDroppedFile = async (filePath: string): Promise<void> => {
+    try {
+        await app.whenReady();
+        handOffFiles(await readDroppedFiles([filePath]));
+    } catch (error) {
+        log(`could not take a dropped file: ${String(error)}`);
+    }
+};
+
+// macOS: a file dragged onto the dock icon. Each drop is read in turn, so a file that reads faster cannot overtake an earlier one.
+app.on("open-file", (event, filePath) => {
     event.preventDefault();
-    await app.whenReady();
-    handOffFiles(await readDroppedFiles([filePath]));
+    runDropInOrder(() => takeDroppedFile(filePath));
 });
 
 app.on("second-instance", (_event, argv) => {

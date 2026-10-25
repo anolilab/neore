@@ -9,11 +9,30 @@ export interface DroppedFile {
     name: string;
 }
 
-/** Files waiting for the page: the ones already held, then the new drop, in the order they arrived. */
-export const queueDroppedFiles = (pending: ReadonlyArray<DroppedFile> | undefined, incoming: ReadonlyArray<DroppedFile>): DroppedFile[] => [
-    ...pending ?? [],
-    ...incoming,
-];
+/**
+ * The page may never take what it was sent (a window closed, a site not loaded), so the held files are
+ * capped in count and in bytes. Arrival order is kept, and the first file that does not fit ends the
+ * drop: the earliest files win.
+ */
+const MAX_PENDING_FILES = 20;
+const MAX_PENDING_BYTES = 100 * 1024 * 1024;
+
+/** Files waiting for the page: the ones already held, then the new drop, in the order they arrived, up to the caps. */
+export const queueDroppedFiles = (pending: ReadonlyArray<DroppedFile> | undefined, incoming: ReadonlyArray<DroppedFile>): DroppedFile[] => {
+    const held = pending === undefined ? [] : [...pending];
+    let bytes = held.reduce((total, file) => total + file.data.byteLength, 0);
+
+    for (const file of incoming) {
+        if (held.length >= MAX_PENDING_FILES || bytes + file.data.byteLength > MAX_PENDING_BYTES) {
+            break;
+        }
+
+        held.push(file);
+        bytes += file.data.byteLength;
+    }
+
+    return held;
+};
 
 /** Reads the paths the OS hands over. Skips anything that is not a regular file within the cap, or cannot be read. */
 export const readDroppedFiles = async (paths: ReadonlyArray<string>, maxBytes = MAX_DROPPED_FILE_BYTES): Promise<DroppedFile[]> => {

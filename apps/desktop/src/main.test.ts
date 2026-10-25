@@ -62,7 +62,9 @@ vi.mock("electron", () => {
             center: () => {},
             focus: () => {},
             focused: true,
-            getNormalBounds: () => { return { height: 820, width: 1200, x: 0, y: 0 }; },
+            getNormalBounds: () => {
+                return { height: 820, width: 1200, x: 0, y: 0 };
+            },
             handlers,
             hide: () => {
                 window.shown = false;
@@ -208,7 +210,10 @@ const BLANK = " ".repeat(3);
 const sender = (url: string) => {
     return { senderFrame: { url } };
 };
-const siteSender = () => sender(`${SITE}/chat`);
+/** The main window is the only window the hand-offs are sent to, so only its frame may take them. */
+const siteSender = () => {
+    return { sender: { id: mainWindow().webContents.id }, senderFrame: { url: `${SITE}/chat` } };
+};
 const mainWindow = (): FakeWindow => fake().windows[0];
 const composer = (): FakeWindow => fake().windows[1];
 
@@ -243,11 +248,20 @@ describe("main window", () => {
         expect(fake().windows).toHaveLength(2);
     });
 
-    it("keeps a same-origin popup in the main window", () => {
+    it("opens a same-origin popup in its own window and leaves the main window on its page", () => {
         const result = mainWindow().webContents.windowOpen?.({ url: `${SITE}/chat/thread-1` });
 
         expect(result).toStrictEqual({ action: "deny" });
-        expect(mainWindow().loaded).toContain(`${SITE}/chat/thread-1`);
+        expect(mainWindow().loaded).not.toContain(`${SITE}/chat/thread-1`);
+        expect(fake().windows.at(-1)?.loaded).toContain(`${SITE}/chat/thread-1`);
+    });
+
+    it("opens the artifact preview on a page of its own, never in a site window", () => {
+        const result = mainWindow().webContents.windowOpen?.({ url: `${SITE}/artifact-preview#abc` });
+
+        expect(result).toStrictEqual({ action: "deny" });
+        expect(fake().windows.at(-1)?.loaded).toContain(`${SITE}/artifact-preview#abc`);
+        expect(mainWindow().loaded).not.toContain(`${SITE}/artifact-preview#abc`);
     });
 
     it("cancels Google sign-in inside the window, with or without a redirect", () => {
@@ -405,6 +419,18 @@ describe("IPC", () => {
         expect(take?.(siteSender())).toBe("hello there");
         expect(take?.(siteSender())).toBeUndefined();
         expect(mainWindow().sent).toContain("neore:compose");
+    });
+
+    it("refuses a hand-off to a thread window, which is a site page but not the main window", () => {
+        fake().ipc.get("neore:open-thread-window")?.(siteSender(), "thread-1");
+
+        const threadWindow = fake().windows.at(-1);
+        const threadSender = { sender: { id: threadWindow?.webContents.id }, senderFrame: { url: `${SITE}/chat/thread-1` } };
+
+        fake().appHandlers.get("second-instance")?.({}, ["neore://new?text=hello"]);
+
+        expect(fake().ipc.get("neore:take-pending-compose")?.(threadSender)).toBeUndefined();
+        expect(fake().ipc.get("neore:take-pending-compose")?.(siteSender())).toBe("hello");
     });
 });
 

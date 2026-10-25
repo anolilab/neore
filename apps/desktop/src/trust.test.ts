@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isLocalPage, isTrustedUrl } from "./trust";
+import { isArtifactPreview, isLocalPage, isTrustedUrl } from "./trust";
 
 const SITE = new URL("https://app.example.com/");
 const COMPOSER = new URL("file:///Applications/Neore.app/Contents/Resources/app.asar/dist/quick-composer/index.html");
@@ -11,6 +11,12 @@ describe("isTrustedUrl", () => {
         expect(isTrustedUrl(SITE, "https://app.example.com.evil.test/")).toBe(false);
         expect(isTrustedUrl(SITE, "file:///Applications/Neore.app/x/index.html")).toBe(false);
         expect(isTrustedUrl(SITE, undefined)).toBe(false);
+    });
+
+    it("refuses the artifact preview even on the site origin", () => {
+        expect(isTrustedUrl(SITE, "https://app.example.com/artifact-preview#abc")).toBe(false);
+        expect(isArtifactPreview(new URL("https://app.example.com/artifact-preview?x=1"))).toBe(true);
+        expect(isArtifactPreview(new URL("https://app.example.com/chat"))).toBe(false);
     });
 });
 

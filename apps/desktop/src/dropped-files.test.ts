@@ -15,6 +15,26 @@ describe("queueDroppedFiles", () => {
 
         expect(queueDroppedFiles(held, second).map((file) => file.name)).toEqual(["a.txt", "b.txt"]);
     });
+
+    it("caps the held files in count, keeping the earliest", () => {
+        const drop = Array.from({ length: 25 }, (_, index) => {
+            return { data: new Uint8Array([index]), name: `${index}.txt` };
+        });
+
+        const held = queueDroppedFiles(undefined, drop);
+
+        expect(held).toHaveLength(20);
+        expect(held.at(-1)?.name).toBe("19.txt");
+    });
+
+    it("caps the held files in bytes: the first file that does not fit ends the drop", () => {
+        const big = { data: new Uint8Array(60 * 1024 * 1024), name: "big.bin" };
+        const small = { data: new Uint8Array(1), name: "small.txt" };
+
+        const held = queueDroppedFiles([big], [big, small]);
+
+        expect(held.map((file) => file.name)).toEqual(["big.bin"]);
+    });
 });
 
 describe("readDroppedFiles", () => {
