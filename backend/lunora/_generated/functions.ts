@@ -9261,7 +9261,7 @@ export interface Caller {
             runSubAgent: (args: { runId: Id<"subAgentRuns"> }) => Promise<void>;
         };
         functions: {
-            attachChildThread: (args: { childThreadId: string; runId: Id<"subAgentRuns"> }) => Promise<null>;
+            attachChildThread: (args: { childThreadId: string; runId: Id<"subAgentRuns"> }) => Promise<boolean>;
             cancelRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ cancelled: boolean }>;
             claimRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<{ depth: number; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeRun: (args: { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }) => Promise<boolean>;

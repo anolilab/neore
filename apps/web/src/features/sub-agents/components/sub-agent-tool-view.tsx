@@ -105,7 +105,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
 
             {notice && <p className="text-muted-foreground mt-2 text-xs">{notice}</p>}
 
-            {run?.status === "running" && (
+            {(run?.status === "running" || run?.status === "queued") && (
                 <Button className="mt-2" disabled={stop.isPending} onClick={() => stop.mutate({ runId: run._id })} size="sm" type="button" variant="outline">
                     <CircleStop aria-hidden="true" />
                     {t`Stop`}

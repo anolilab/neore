@@ -27,7 +27,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
-import { insertThreadRelationship } from "../agent/table-writes";
+import { insertThreadRelationship, patchThread } from "../agent/table-writes";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
@@ -281,6 +281,14 @@ export const linkChildThread = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     const now = Date.now();
 
     await patchById(ctx.db, run._id, { childThreadId, updatedAt: now });
+
+    // "running" is what the thread list reads to offer its Stop; `finishRun` puts it back.
+    const child = await ctx.db.get(childThreadId as Id<"threads">);
+
+    if (child?.status === "active") {
+        await patchThread(ctx.db, child._id, { status: "running", updatedAt: now });
+    }
+
     await insertThreadRelationship(ctx.db, {
         branchPoint: 0,
         branchType: "subagent",
@@ -296,15 +304,13 @@ export const linkChildThread = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
 /**
  * Records the child thread the run created and links it under the parent, so
  * the "open thread" link works while the run is still going. Once per run.
+ * Returns whether it linked: `false` means the run ended first (stopped), and
+ * the caller must not generate into a thread nothing points at.
  */
 export const attachChildThread = internalMutation
     .input({ childThreadId: v.string(), runId: v.id("subAgentRuns") })
-    .output(v.null())
-    .mutation(async ({ args, ctx }) => {
-        await linkChildThread(ctx, args.runId, args.childThreadId);
-
-        return null;
-    });
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await linkChildThread(ctx, args.runId, args.childThreadId));
 
 /**
  * The result as a follow-up assistant message in the parent thread, under the
@@ -409,6 +415,14 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     const error = outcome.kind === "failed" ? outcome.error.slice(0, 1000) : undefined;
 
     await patchById(ctx.db, run._id, { completedAt: now, error, result, status: outcome.kind, updatedAt: now });
+
+    // The child thread was marked "running" when it was linked (`linkChildThread`).
+    const child = run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
+
+    if (child?.status === "running") {
+        await patchThread(ctx.db, child._id, { status: "active", updatedAt: now });
+    }
+
     await postRunResult(ctx, run._id, 0);
 
     if (outcome.kind !== "cancelled") {

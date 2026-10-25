@@ -5933,6 +5933,11 @@
     {
       "from": "function:sub_agents_execute:runSubAgent",
       "kind": "call",
+      "to": "function:agent_threads:deleteAllForThreadIdSync"
+    },
+    {
+      "from": "function:sub_agents_execute:runSubAgent",
+      "kind": "call",
       "to": "function:skills_executor:resolveSkillsForRun"
     },
     {
@@ -19676,25 +19681,25 @@
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 345,
+      "line": 351,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "schedule",
-      "line": 369,
+      "line": 375,
       "reason": "\"postRunResult\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 493,
+      "line": 507,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 505,
+      "line": 519,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {

@@ -921,7 +921,7 @@ export interface InternalApiTypes {
             runSubAgent: FunctionReference<"action", { runId: Id<"subAgentRuns"> }, void>;
         };
         functions: {
-            attachChildThread: FunctionReference<"mutation", { childThreadId: string; runId: Id<"subAgentRuns"> }, null>;
+            attachChildThread: FunctionReference<"mutation", { childThreadId: string; runId: Id<"subAgentRuns"> }, boolean>;
             claimRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { depth: number; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeRun: FunctionReference<"mutation", { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }, boolean>;
             createRun: FunctionReference<"mutation", { parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns"> } | { error: string }>;

@@ -7,6 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
+import { pruneSubAgentRunsBefore } from "./gdpr";
 import type { CreateSubAgentRunArgs } from "./functions";
 import {
     admitSubAgentRun,
@@ -235,6 +236,50 @@ describe("linkChildThread", () => {
         expect(relationships).toHaveLength(1);
         expect(relationships[0]).toMatchObject({ branchType: "subagent", parentThreadId: threadId, threadId: child, userId });
         expect(await firstRun()).toMatchObject({ childThreadId: child });
+    });
+
+    it("marks the child thread running while the run is active, and active again when it ends", async () => {
+        await admit();
+
+        const [run] = await runs();
+        const child = await insertThread(userId);
+        const statusOf = async () => (await harness.run(async (ctx: any) => await ctx.db.get(child))).status;
+
+        await harness.run(async (ctx: any) => await linkChildThread(ctx, run._id, child));
+        expect(await statusOf()).toBe("running");
+
+        await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "cancelled" }));
+        expect(await statusOf()).toBe("active");
+    });
+
+    it("refuses a run that was cancelled first, so the caller can drop the new thread", async () => {
+        await admit();
+
+        const [run] = await runs();
+        const child = await insertThread(userId);
+
+        await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "cancelled" }));
+
+        expect(await harness.run(async (ctx: any) => await linkChildThread(ctx, run._id, child))).toBe(false);
+        expect(await firstRun()).not.toHaveProperty("childThreadId");
+    });
+});
+
+describe("pruneSubAgentRunsBefore", () => {
+    it("purges cancelled runs with the other finished ones, and leaves active runs", async () => {
+        await admit();
+        await admit();
+        await admit();
+
+        const [first, second] = await runs();
+
+        await harness.run(async (ctx: any) => await finishRun(ctx, first._id, { kind: "cancelled" }));
+        await harness.run(async (ctx: any) => await finishRun(ctx, second._id, { error: "x", kind: "failed" }));
+
+        const deleted = await harness.run(async (ctx: any) => await pruneSubAgentRunsBefore(ctx, Date.now() + 1000, 10));
+
+        expect(deleted).toBe(2);
+        expect(await runs()).toHaveLength(1);
     });
 });
 
