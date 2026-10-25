@@ -83,8 +83,8 @@ const useQueueActions = () => {
     const busyRef = useRef(false);
     // What an `await` in here must re-read afterwards, not close over.
     const latestRef = useRef({ hasError: Boolean(error), isStreaming, threadId: currentThreadId });
-    // A thread whose send was asked for while a removal held `busyRef`.
-    const sendRequestedRef = useRef<string | undefined>(undefined);
+    // A thread whose send was asked for while a removal held `busyRef`; `explicit` is the Send next button, which outranks a reply's error.
+    const sendRequestedRef = useRef<{ explicit: boolean; threadId: string } | undefined>(undefined);
     // Chips whose removal was asked for while another call held `busyRef`.
     const removalsRequestedRef = useRef<{ id: string; threadId: string }[]>([]);
     const removePromptRef = useRef<(threadId: string, id: string) => Promise<void>>(async () => {});
@@ -127,7 +127,7 @@ const useQueueActions = () => {
         async (threadId: string, { explicit = false }: { explicit?: boolean } = {}): Promise<void> => {
             if (busyRef.current) {
                 // Not dropped: the call that holds the flag runs it once it lets go.
-                sendRequestedRef.current = threadId;
+                sendRequestedRef.current = { explicit: explicit || sendRequestedRef.current?.explicit === true, threadId };
 
                 return;
             }
@@ -175,19 +175,21 @@ const useQueueActions = () => {
 
     /** After a removal: runs the send that was asked for meanwhile, if the thread still allows one. */
     const sendRequestedMeanwhile = useCallback(() => {
-        const threadId = sendRequestedRef.current;
+        const requested = sendRequestedRef.current;
 
         sendRequestedRef.current = undefined;
 
-        if (!threadId) {
+        if (!requested) {
             return;
         }
+
+        const { explicit, threadId } = requested;
 
         const { hasError, isStreaming: streaming, threadId: shown } = latestRef.current;
         const queue = usePromptQueueStore.getState().queues[threadId];
 
-        if (shown === threadId && !streaming && !hasError && queue && !queue.paused && queue.items.length > 0) {
-            void sendNextPromptRef.current(threadId);
+        if (shown === threadId && !streaming && queue && !queue.paused && queue.items.length > 0 && (explicit || !hasError)) {
+            void sendNextPromptRef.current(threadId, { explicit });
         }
     }, []);
 
