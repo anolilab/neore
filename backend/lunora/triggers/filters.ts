@@ -162,7 +162,11 @@ export const evaluateFilters = (filters: ReadonlyArray<PayloadFilter> | undefine
     let payload: unknown;
 
     try {
-        payload = JSON.parse(body);
+        // An integer past the safe range would round to a neighbour and equal the wrong filter value,
+        // so it is kept as its source text.
+        payload = JSON.parse(body, (_key, value: unknown, context?: { source?: string }) =>
+            typeof value === "number" && Math.abs(value) > Number.MAX_SAFE_INTEGER && context?.source !== undefined ? context.source : value,
+        );
     } catch {
         payload = undefined;
     }

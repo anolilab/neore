@@ -97,6 +97,19 @@ describe("evaluateFilters", () => {
     });
 });
 
+describe("integers past the safe range", () => {
+    const equalsId = (value: string): PayloadFilter => {
+        return { op: "equals", path: "id", value };
+    };
+
+    it("match only their own digits, not a neighbour that rounds to the same number", () => {
+        const body = '{"id":9007199254740993}';
+
+        expect(evaluateFilters([equalsId("9007199254740993")], body).matched).toBe(true);
+        expect(evaluateFilters([equalsId("9007199254740992")], body).matched).toBe(false);
+    });
+});
+
 describe("assertValidFilters", () => {
     it("accepts a full, well-formed set", () => {
         const filters = Array.from({ length: MAX_FILTERS }, () => ({ op: "equals", path: pathOf(MAX_PATH_DEPTH), value: "x" }) satisfies PayloadFilter);

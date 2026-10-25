@@ -510,9 +510,6 @@ const vGetTriggerExecutionsOutput = v.array(
     }),
 );
 
-/** How many of a trigger's newest rows the history query reads before hiding all but one filtered row. */
-const FILTERED_LOOKBACK = 50;
-
 export const getTriggerExecutions = authQuery
     .input({
         limit: v.optional(v.number().check((value) => Number.isSafeInteger(value) && value >= 1 && value <= 100, { message: "Invalid limit" })),
@@ -533,7 +530,8 @@ export const getTriggerExecutions = authQuery
             .query("triggerExecutions")
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
             .order("desc")
-            .take(Math.max(args.limit ?? 20, FILTERED_LOOKBACK));
+            // One row over the limit: a trigger keeps one filtered row, so the extra one only covers a racing duplicate.
+            .take((args.limit ?? 20) + 1);
 
         // At most one filtered row is shown (the newest), so misses never push real runs out of the list.
         let seenFiltered = false;

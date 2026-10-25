@@ -377,6 +377,16 @@ describe("trigger webhook signing", () => {
             expect(scheduled).toHaveLength(0);
         });
 
+        it("evaluates filters on a signed body that starts with a byte-order mark", async () => {
+            const { scheduled, statusOf } = await setup({ ...SIGNED_TRIGGER, filters: [{ op: "equals", path: "action", value: "opened" }] });
+            const body = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode('{"action":"opened"}')]);
+            const timestamp = String(Math.floor(NOW / 1000));
+            const signed = new Uint8Array([...new TextEncoder().encode(`${timestamp}.`), ...body]);
+
+            expect(await statusOf(body, { "x-neore-timestamp": timestamp, "x-signature-256": `sha256=${await hmacHex(signed)}` })).toBe(200);
+            expect(scheduled).toHaveLength(1);
+        });
+
         it("never evaluates an unsigned body, and charges nothing for it", async () => {
             const { history, statusOf } = await setup(FILTERED_TRIGGER);
 
