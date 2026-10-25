@@ -246,10 +246,10 @@ export const completeNativeSignIn = async (signIn: NativeSignIn, fetchImpl: type
 
 // ─── Device execution ───────────────────────────────────────────────────────
 //
-// Not in the Electron shell yet (the Rust core is being ported; see the plan's
-// step 3). Every function below answers "not available" and advertises nothing,
-// so the devices UI shows pairing as unavailable instead of failing a call.
-// The contract (the page only relays signed envelopes) is unchanged for when it lands.
+// The shell's relay: the main process (`registerDeviceIpc`), the preload's `deviceRelay`, and
+// the Rust core. Each function forwards to it when the shell advertises `device`, and answers
+// "not available" otherwise, so the devices UI shows pairing as unavailable instead of failing a
+// call. The page only relays signed envelopes; the core verifies them and asks the user locally.
 
 export type NativeDevicePlatform = "linux" | "macos" | "windows";
 
