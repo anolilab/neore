@@ -11,9 +11,28 @@ interface ThreadRow {
     title: string;
 }
 
+/** Threads per request. The list asks for the next page when its end comes into view. */
+const PAGE_SIZE = 100;
+
+const fetchThreadPage = async (cursor: string | null) => {
+    const data = await getClient().query(api.chat.composite.getThreadListData, { paginationOpts: { cursor, numItems: PAGE_SIZE } });
+
+    return {
+        continueCursor: data.threads.continueCursor,
+        isDone: data.threads.isDone,
+        rows: data.threads.page.map((thread) => {
+            // eslint-disable-next-line no-underscore-dangle -- `_id` is the Lunora document id, not a private field
+            return { id: thread._id, title: thread.title || "Untitled" };
+        }),
+    };
+};
+
 const ThreadListScreen = () => {
     const { status } = useAuth();
     const [threads, setThreads] = useState<ThreadRow[]>([]);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const [isDone, setIsDone] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -25,15 +44,12 @@ const ThreadListScreen = () => {
 
         const load = async () => {
             try {
-                const data = await getClient().query(api.chat.composite.getThreadListData, { paginationOpts: { cursor: null, numItems: 100 } });
+                const page = await fetchThreadPage(null);
 
                 if (!isCancelled) {
-                    setThreads(
-                        data.threads.page.map((thread) => {
-                            // eslint-disable-next-line no-underscore-dangle -- `_id` is the Lunora document id, not a private field
-                            return { id: thread._id, title: thread.title || "Untitled" };
-                        }),
-                    );
+                    setThreads(page.rows);
+                    setCursor(page.continueCursor);
+                    setIsDone(page.isDone);
                 }
             } catch (error_: unknown) {
                 if (!isCancelled) {
@@ -57,6 +73,30 @@ const ThreadListScreen = () => {
         );
     }
 
+    const loadMore = async () => {
+        if (isDone || isLoadingMore) {
+            return;
+        }
+
+        setIsLoadingMore(true);
+
+        try {
+            const page = await fetchThreadPage(cursor);
+
+            setThreads((current) => {
+                const known = new Set(current.map((thread) => thread.id));
+
+                return [...current, ...page.rows.filter((thread) => !known.has(thread.id))];
+            });
+            setCursor(page.continueCursor);
+            setIsDone(page.isDone);
+        } catch (error_: unknown) {
+            setError(error_ instanceof Error ? error_.message : "Could not load chats.");
+        } finally {
+            setIsLoadingMore(false);
+        }
+    };
+
     return (
         <FlatList
             data={threads}
@@ -68,6 +108,8 @@ const ThreadListScreen = () => {
                     </Pressable>
                 </Link>
               )}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
             renderItem={({ item }) => (
                 <Link asChild href={`/chat/${item.id}`}>
                     <Pressable accessibilityRole="link" style={{ padding: 16 }}>

@@ -23,13 +23,15 @@ interface Row {
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
 
-/** The text of one stored message part. Other part kinds are not shown in this slice. */
+/** What one stored message part shows: its text, or a label for an attachment (the preview is not in this slice yet). */
 const partText = (part: unknown): string => {
-    if (typeof part !== "object" || part === null || (part as { type?: unknown }).type !== "text") {
-        return "";
+    const kind = typeof part === "object" && part !== null ? (part as { type?: unknown }).type : undefined;
+
+    if (kind === "text") {
+        return String((part as { text?: unknown }).text ?? "");
     }
 
-    return String((part as { text?: unknown }).text ?? "");
+    return kind === "image" || kind === "file" ? "[Attachment]" : "";
 };
 
 const toRow = (message: { id: string; parts: unknown[]; role: string }): Row => {
@@ -62,35 +64,55 @@ const ChatScreen = () => {
     const { status } = useAuth();
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
     const [rows, setRows] = useState<Row[]>([]);
+    // Where the next older page starts; null once the whole history is loaded.
+    const [olderCursor, setOlderCursor] = useState<string | null>(null);
+    const [isLoadingOlder, setIsLoadingOlder] = useState(false);
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
     const loadMessages = useCallback(async (id: string) => {
         try {
-            // ponytail: first 10 pages (200 messages, the server returns 20 per page); older history needs a load-more control.
             const pages: Row[][] = [];
             let cursor: string | null = null;
+            let isDone = false;
 
-            for (let index = 0; index < MAX_HISTORY_PAGES; index += 1) {
+            for (let index = 0; !isDone && index < MAX_HISTORY_PAGES; index += 1) {
                 // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
                 const page = await fetchMessagePage(id, cursor);
 
                 // The server returns each page newest first; the rows are shown oldest first.
                 pages.unshift(page.page.map((message) => toRow(message)).toReversed());
-
-                if (page.isDone) {
-                    break;
-                }
-
+                isDone = page.isDone;
                 cursor = page.continueCursor;
             }
 
             setRows(pages.flat());
+            setOlderCursor(isDone ? null : cursor);
         } catch (error_: unknown) {
             setError(error_ instanceof Error ? error_.message : "Could not load messages.");
         }
     }, []);
+
+    const loadOlder = async () => {
+        if (!threadId || olderCursor === null || isLoadingOlder) {
+            return;
+        }
+
+        setIsLoadingOlder(true);
+
+        try {
+            const page = await fetchMessagePage(threadId, olderCursor);
+
+            setRows((current) => [...page.page.map((message) => toRow(message)).toReversed(), ...current]);
+            setOlderCursor(page.isDone ? null : page.continueCursor);
+        } catch (error_: unknown) {
+            setError(error_ instanceof Error ? error_.message : "Could not load messages.");
+        } finally {
+            setIsLoadingOlder(false);
+        }
+    };
 
     useEffect(() => {
         if (status === "signed-in" && threadId && !sending) {
@@ -163,6 +185,13 @@ const ChatScreen = () => {
                 data={rows}
                 estimatedItemSize={72}
                 keyExtractor={(row) => row.id}
+                ListHeaderComponent={olderCursor === null
+                    ? undefined
+                    : (
+                    <Pressable accessibilityRole="button" accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }} disabled={isLoadingOlder} onPress={loadOlder} style={{ padding: 12 }}>
+                        <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
+                    </Pressable>
+                    )}
                 renderItem={({ item }) => (
                     <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
                         <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
