@@ -5331,16 +5331,6 @@
       "to": "function:agent_projects:getProject"
     },
     {
-      "from": "function:projects_functions:listPinnedProjects",
-      "kind": "call",
-      "to": "function:agent_projects:listPinnedProjects"
-    },
-    {
-      "from": "function:projects_functions:listProjects",
-      "kind": "call",
-      "to": "function:agent_projects:listProjects"
-    },
-    {
       "from": "function:projects_functions:listThreadsByProject",
       "kind": "call",
       "to": "function:agent_projects:getProject"
