@@ -16,6 +16,7 @@ import { Button } from "@neore/ui/components/button";
 import type { FabricCanvasEditorProps } from "@neore/ui/components/canvas-editor/fabric-canvas-editor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import type { ChangeCommit } from "@neore/ui/components/tiptap-canvas-editor";
+import { ZoomableImage } from "@neore/ui/components/zoomable-image";
 import useFocusTrap from "@neore/ui/hooks/use-focus-trap";
 import cn from "@neore/ui/utils/cn";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -347,8 +348,8 @@ const CanvasContent: FC<{
 
             if (isStreaming || editMode === "preview") {
                 return (
-                    <div className="flex h-full items-center justify-center p-4">
-                        <img alt={document.title} className="max-h-full max-w-full object-contain" src={rasterSource} />
+                    <div className="h-full p-4">
+                        <ZoomableImage alt={document.title} key={document._id} src={rasterSource} />
                     </div>
                 );
             }
