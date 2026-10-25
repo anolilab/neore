@@ -37,6 +37,23 @@ const isUserTypingInInput = (event: KeyboardEvent): boolean => {
 // editable target. Such a keystroke belongs to the field, so the shortcut must not take it.
 const isTextEntryKeystroke = (event: KeyboardEvent): boolean => isUserTypingInInput(event) && !event.ctrlKey && !event.metaKey && !event.altKey;
 
+const isBound = (shortcut: string | undefined): boolean => typeof shortcut === "string" && shortcut !== "";
+
+/** Bound, and on a different chord than `other`: a chord shared by two commands would run both on one press. */
+const isBoundApart = (shortcut: string | undefined, converted: string, other: string): boolean => isBound(shortcut) && converted !== other;
+
+// The effort commands are bound with modifier chords that work from the composer; a bare key stays with the field.
+const createEffortHandler =
+    (command: "decreaseEffort" | "increaseEffort", onShortcut?: (action: keyof KeyboardShortcutsConfig, event: KeyboardEvent) => void) =>
+    (event: KeyboardEvent): void => {
+        if (isTextEntryKeystroke(event)) {
+            return;
+        }
+
+        event.preventDefault();
+        onShortcut?.(command, event);
+    };
+
 // Internal component that registers hotkeys
 const KeyboardShortcutsHandler: React.FC<{
     onShortcut?: (action: keyof KeyboardShortcutsConfig, event: KeyboardEvent) => void;
@@ -108,18 +125,6 @@ const KeyboardShortcutsHandler: React.FC<{
         [onShortcut],
     );
 
-    const handleDecreaseEffort = useCallback(
-        (event: KeyboardEvent) => {
-            if (isTextEntryKeystroke(event)) {
-                return;
-            }
-
-            event.preventDefault();
-            onShortcut?.("decreaseEffort", event);
-        },
-        [onShortcut],
-    );
-
     const handleEscape = useCallback(
         (event: KeyboardEvent) => {
             event.preventDefault();
@@ -157,17 +162,8 @@ const KeyboardShortcutsHandler: React.FC<{
         [onShortcut],
     );
 
-    const handleIncreaseEffort = useCallback(
-        (event: KeyboardEvent) => {
-            if (isTextEntryKeystroke(event)) {
-                return;
-            }
-
-            event.preventDefault();
-            onShortcut?.("increaseEffort", event);
-        },
-        [onShortcut],
-    );
+    const handleDecreaseEffort = useMemo(() => createEffortHandler("decreaseEffort", onShortcut), [onShortcut]);
+    const handleIncreaseEffort = useMemo(() => createEffortHandler("increaseEffort", onShortcut), [onShortcut]);
 
     const handleLastItem = useCallback(
         (event: KeyboardEvent) => {
@@ -376,7 +372,7 @@ const KeyboardShortcutsHandler: React.FC<{
         handleDecreaseEffort,
         {
             description: "Decrease the composer's reasoning effort",
-            enabled: !!shortcuts.decreaseEffort && typeof shortcuts.decreaseEffort === "string",
+            enabled: isBound(shortcuts.decreaseEffort),
             // Like the model picker: a modifier chord must work from the composer, a bare key must not be taken from a field.
             enableOnContentEditable: true,
             enableOnFormTags: true,
@@ -390,7 +386,8 @@ const KeyboardShortcutsHandler: React.FC<{
         handleIncreaseEffort,
         {
             description: "Increase the composer's reasoning effort",
-            enabled: !!shortcuts.increaseEffort && typeof shortcuts.increaseEffort === "string",
+            // Saved bindings can reach us from elsewhere than the settings form: one chord must not step both ways.
+            enabled: isBoundApart(shortcuts.increaseEffort, convertedShortcuts.increaseEffort, convertedShortcuts.decreaseEffort),
             enableOnContentEditable: true,
             enableOnFormTags: true,
             preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),

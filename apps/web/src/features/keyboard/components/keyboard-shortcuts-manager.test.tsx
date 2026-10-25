@@ -176,6 +176,21 @@ describe("KeyboardShortcutsManager", () => {
         expect(downNotPrevented).toBe(false);
     });
 
+    it("runs only the decrease command when both effort commands hold the same chord", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ decreaseEffort: "alt+arrowdown", increaseEffort: "alt+arrowdown" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        fireEvent.keyDown(screen.getByLabelText("composer"), { altKey: true, code: "ArrowDown", key: "ArrowDown" });
+
+        expect(onShortcut).toHaveBeenCalledTimes(1);
+        expect(onShortcut).toHaveBeenCalledWith("decreaseEffort", expect.anything());
+    });
+
     it("leaves the arrow chords to the editor while the effort commands are unbound", () => {
         const onShortcut = vi.fn();
 
