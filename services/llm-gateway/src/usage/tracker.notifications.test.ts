@@ -176,9 +176,9 @@ describe(sendNotifications, () => {
 });
 
 /** A D1 stand-in: one active rule that has fired, every other statement a no-op. */
-const firingDatabase = () => {
+const firingDatabase = (action = "notify") => {
     const rule = {
-        action: "notify",
+        action,
         id: "rule-1",
         last_triggered_at: null,
         metric: "request_count",
@@ -239,5 +239,42 @@ describe("UsageTracker.recordAndEvaluate", () => {
         await tracker.recordAndEvaluate({ userId: "user-1" } as UsageLogEntry);
 
         expect(order).toEqual(["deadline", "record"]);
+    });
+});
+
+describe("UsageTracker.recordAndEvaluate blocking alerts", () => {
+    const send = async (put: () => Promise<void>) => {
+        const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response("{}", { status: 200 }));
+
+        vi.stubGlobal("fetch", fetchMock);
+
+        const tracker = new UsageTracker({ ...env, RATE_LIMIT_KV: { put }, USAGE_DB: firingDatabase("notify_and_block") } as unknown as AppEnv);
+
+        vi.spyOn(tracker, "record").mockResolvedValue(undefined);
+
+        const result = await tracker.recordAndEvaluate({ userId: "user-1" } as UsageLogEntry);
+        const sent = fetchMock.mock.calls.flatMap(([, init]) => (JSON.parse(String(init.body)) as { notifications: NotificationEvent[] }).notifications);
+
+        return { result, sent };
+    };
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    it("alerts with the blocking action once the marker is stored", async () => {
+        const { sent } = await send(async () => undefined);
+
+        expect(sent).toEqual([expect.objectContaining({ action: "notify_and_block", firedAt: expect.any(Number), ruleId: "rule-1" })]);
+    });
+
+    it("alerts as a plain notification when the marker cannot be stored, since nothing is then blocked", async () => {
+        const { result, sent } = await send(async () => {
+            throw new Error("kv down");
+        });
+
+        expect(sent).toEqual([expect.objectContaining({ action: "notify", firedAt: expect.any(Number), ruleId: "rule-1" })]);
+        expect(result.blocked).toBe(true);
     });
 });

@@ -233,6 +233,7 @@ export class UsageTracker {
 
 const evaluateAndNotify = async (env: AppEnv, db: D1Database, entry: UsageLogEntry, deadline: AbortSignal): Promise<RecordResult> => {
     const result = await evaluateRules(env, entry.userId, entry.orgId, entry);
+    let { notifications } = result;
 
     // If blocked, store in KV for pre-request checks (1-hour TTL) and fire budget_exceeded webhook
     if (result.blocked) {
@@ -241,7 +242,10 @@ const evaluateAndNotify = async (env: AppEnv, db: D1Database, entry: UsageLogEnt
         try {
             await kv.put(`blocked:${entry.userId}`, new Date(Date.now() + 3_600_000).toISOString(), { expirationTtl: 3600 });
         } catch {
-            // Non-critical
+            // Block checks read this marker, so without it nothing is enforced: the alert must not say it is.
+            notifications = notifications.map((notification) =>
+                notification.action === "notify_and_block" ? { ...notification, action: "notify" } : notification,
+            );
         }
 
         // Fire budget_exceeded webhook (non-blocking, best-effort)
@@ -263,9 +267,9 @@ const evaluateAndNotify = async (env: AppEnv, db: D1Database, entry: UsageLogEnt
     }
 
     // Forward notifications to the backend if any were triggered
-    if (result.notifications.length > 0) {
+    if (notifications.length > 0) {
         try {
-            await sendNotifications(env, entry.userId, result.notifications, deadline);
+            await sendNotifications(env, entry.userId, notifications, deadline);
         } catch {
             // Non-critical — notifications are best-effort
         }
