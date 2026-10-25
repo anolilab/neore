@@ -89,6 +89,32 @@ export const resolveJumpMessageId = (
     return owner;
 };
 
+/** Older pages a jump may pull in when it does not know where its target sits. */
+export const JUMP_MAX_PAGES = 10;
+
+/** Older pages a jump may pull in when it knows its target's position, so a deep search hit is still reachable. */
+export const JUMP_MAX_PAGES_WITH_POSITION = 200;
+
+/**
+ * Whether a jump that has not found its target should load another older page.
+ * With a position the history is paged until it reaches turns older than the
+ * target (then the message is gone, not just unloaded), within a larger cap;
+ * without one only the small default budget applies.
+ */
+export const shouldLoadOlderForJump = (pagesLoaded: number, messages: ReadonlyArray<{ order?: number }>, position?: { order: number }): boolean => {
+    if (!position) {
+        return pagesLoaded < JUMP_MAX_PAGES;
+    }
+
+    const oldestOrder = messages[0]?.order;
+
+    if (oldestOrder !== undefined && oldestOrder < position.order) {
+        return false;
+    }
+
+    return pagesLoaded < JUMP_MAX_PAGES_WITH_POSITION;
+};
+
 /**
  * Only the newest message animates in. It must be the last one AND must not
  * have been present when the list first rendered — so opening a thread animates

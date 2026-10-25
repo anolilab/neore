@@ -44,6 +44,7 @@ import type { UIMessage } from "../agent/ui-messages";
 import { docsToModelMessages, listMessagesByThreadIdHandler, storeFile, toUIMessages } from "../agent/client";
 import { autoRepairJsonMiddleware } from "../agent/client/middleware";
 import { listActivePathPage, withBranchInfo } from "../agent/branches";
+import { candidatesOnActivePath } from "../agent/branch-rows";
 import {
     redactThreadForPublicViewer,
     requireOwnedThread,
@@ -2386,6 +2387,9 @@ export const searchThreads = liteAuthQuery
         }
     });
 
+const SEARCH_WINDOW = 100;
+const SEARCH_WINDOW_MAX = 400;
+
 export const searchMessages = authQuery
     .input({
         paginationOpts: v.object({
@@ -2408,36 +2412,85 @@ export const searchMessages = authQuery
             };
         }
 
-        const searchResults = await context.runQuery(internal.agent.messages.textSearch, {
-            limit: 100,
-            searchAllMessagesForUserId: userId,
-            text: searchQuery.trim(),
-        });
+        const text = searchQuery.trim();
 
-        const threadIds = [...new Set(searchResults.map((message) => message.threadId))];
+        // The index returns its best `limit` hits before the branch filter runs, so inactive replies
+        // can fill the window and hide a displayable hit behind them. Widen the window while hits
+        // were dropped and the page is not yet full.
+        const collect = async (limit: number) => {
+            const { filled, messages: searchResults } = await context.runQuery(internal.agent.messages.textSearch, {
+                limit,
+                searchAllMessagesForUserId: userId,
+                text,
+            });
 
-        // Batch fetch all threads in parallel to avoid N+1 queries
-        const threadPromises = threadIds.map(
-            (threadId) => context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }).catch(() => null), // Return null for threads that don't exist or can't be accessed
-        );
-        const threads = await Promise.all(threadPromises);
+            const threadIds = [...new Set(searchResults.map((message) => message.threadId))];
 
-        const threadsWithMessages: (ThreadDoc & {
-            relevantMessages?: MessageDoc[];
-        })[] = [];
+            // Batch fetch all threads in parallel to avoid N+1 queries
+            const threadPromises = threadIds.map(
+                (threadId) => context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }).catch(() => null), // Return null for threads that don't exist or can't be accessed
+            );
+            const threads = await Promise.all(threadPromises);
 
-        for (const [i, threadId] of threadIds.entries()) {
-            const thread = threads[i];
+            // A locked thread's messages are never returned here, with or without a proof;
+            // a trashed one has no page to open.
+            const isSearchable = (thread: (typeof threads)[number] | undefined): thread is NonNullable<(typeof threads)[number]> =>
+                Boolean(thread && thread.userId === userId && !thread.deleted && !isThreadLocked(thread));
 
-            // A locked thread's messages are never returned here, with or without a proof.
-            if (thread && thread.userId === userId && !isThreadLocked(thread)) {
-                const relevantMessages = searchResults.filter((message) => message.threadId === threadId);
+            // A branched thread displays only its active path, so a hit in an inactive reply
+            // is not one the reader can open: it would jump to a sibling at the same `order`.
+            // Only the stretch of the path between the leaf and the oldest hit is walked.
+            const activePaths = await Promise.all(
+                threadIds.map(async (threadId, i) => {
+                    const thread = threads[i];
 
-                threadsWithMessages.push({
-                    ...thread,
-                    relevantMessages,
-                });
+                    if (!isSearchable(thread) || !thread.activeLeafMessageId) {
+                        return undefined;
+                    }
+
+                    return await candidatesOnActivePath(
+                        context,
+                        threadId as Id<"threads">,
+                        thread.activeLeafMessageId,
+                        searchResults.filter((message) => message.threadId === threadId),
+                    );
+                }),
+            );
+
+            const found: (ThreadDoc & {
+                relevantMessages?: MessageDoc[];
+            })[] = [];
+
+            for (const [i, threadId] of threadIds.entries()) {
+                const thread = threads[i];
+
+                if (isSearchable(thread)) {
+                    const activePath = activePaths[i];
+                    const relevantMessages = searchResults.filter(
+                        (message) => message.threadId === threadId && (!activePath || activePath.has(message._id as string)),
+                    );
+
+                    if (relevantMessages.length > 0) {
+                        found.push({
+                            ...thread,
+                            relevantMessages,
+                        });
+                    }
+                }
             }
+
+            return { filled, found };
+        };
+
+        let window = SEARCH_WINDOW;
+        let { filled, found: threadsWithMessages } = await collect(window);
+
+        // Widen only while the caller's page is short of threads: a full index window whose survivors
+        // already fill the page needs no second pass. `filled` stops the loop once the index has nothing
+        // more to give: a repeat would redo the fetches and the path walks for the same rows.
+        while (filled && threadsWithMessages.length < paginationOpts.numItems && window < SEARCH_WINDOW_MAX) {
+            window *= 4;
+            ({ filled, found: threadsWithMessages } = await collect(window));
         }
 
         // Sort by relevance (threads with more matching messages first, then by creation time)

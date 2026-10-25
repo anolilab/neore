@@ -1,3 +1,4 @@
+import { Autocomplete } from "@base-ui/react/autocomplete";
 import { useLingui } from "@lingui/react/macro";
 import {
     Command,
@@ -19,13 +20,14 @@ import { Kbd, KbdGroup } from "@neore/ui/components/kbd";
 import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
     Archive,
     ArchiveRestore,
     ArrowDownIcon,
     ArrowUpIcon,
     CornerDownLeftIcon,
+    CornerDownRightIcon,
     File,
     FileText,
     GitBranch,
@@ -37,14 +39,17 @@ import {
     Trash2,
 } from "lucide-react";
 import type { FC } from "react";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
+import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import useAllThreadsData from "@/features/chat/core/hooks/use-all-threads-data";
 import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { useCurrentThreadId, useThreadMetadata } from "@/features/chat/core/stores/thread-store-hooks";
+import { scrollToMessage } from "@/features/chat/thread/message-list";
 import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-handlers";
+import { buildMatchSnippet } from "@/features/chat/thread-list/utilities";
 import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-converter";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
@@ -53,9 +58,67 @@ import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore }
 
 ("use client");
 
+/** Fewer characters match too much to be worth a full-text query per pause. */
+const MESSAGE_SEARCH_MIN_CHARS = 2;
+const MESSAGE_SEARCH_DEBOUNCE_MS = 250;
+const MAX_MESSAGE_HITS = 8;
+
+const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
+    const [debounced, setDebounced] = useState(value);
+
+    useEffect(() => {
+        const timer = setTimeout(setDebounced, delayMs, value);
+
+        return () => clearTimeout(timer);
+    }, [value, delayMs]);
+
+    return debounced;
+};
+
+interface MessageSearchThread {
+    _id: string;
+    relevantMessages?: { _id: string; order: number; stepOrder: number; text?: string }[];
+    title?: string;
+}
+
+interface MessageHit {
+    message: { _id: string; order: number; stepOrder: number; text: string };
+    threadId: string;
+    threadTitle?: string;
+}
+
+/**
+ * The matching messages that have text, capped for a palette. The server groups hits by thread and orders the threads by match count, so
+ * taking the first few would let one busy thread fill every slot; instead each thread gets a slot per round, keeping its own relevance order.
+ */
+const collectMessageHits = (threads: MessageSearchThread[] = []): MessageHit[] => {
+    const queues = threads.map((thread) =>
+        (thread.relevantMessages ?? [])
+            .filter((message) => message.text?.trim())
+            .map((message) => {
+                return { message, thread };
+            }),
+    );
+    const hits: MessageHit[] = [];
+
+    for (let round = 0; hits.length < MAX_MESSAGE_HITS && queues.some((queue) => round < queue.length); round += 1) {
+        for (const queue of queues) {
+            const entry = queue[round];
+
+            if (entry && hits.length < MAX_MESSAGE_HITS) {
+                hits.push({ message: { ...entry.message, text: entry.message.text as string }, threadId: entry.thread._id, threadTitle: entry.thread.title });
+            }
+        }
+    }
+
+    return hits;
+};
+
 interface Item {
+    detail?: string;
     icon?: React.ReactNode;
     isCurrent?: boolean;
+    isMessageHit?: boolean;
     label: string;
     onClick?: () => void;
     shortcut?: string;
@@ -92,6 +155,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const threadMetadata = useThreadMetadata();
     const currentThreadModel = useCurrentModel();
     const { isAuthenticated, isLoading: isAuthLoading } = useLunoraAuth();
+    const router = useRouter();
+    const { contains } = Autocomplete.useFilter();
 
     const isAuthReady = isAuthenticated && !isAuthLoading;
     const shouldQuery = isOpen && isAuthReady;
@@ -99,6 +164,25 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const allThreadsData = useAllThreadsData(shouldQuery);
     const { deleteBranch, switchToBranch } = useThreadManager(shouldQuery);
     const { data: pinnedThreads } = useQuery(crpc.chat.functions.getPinnedThreads.queryOptions(shouldQuery ? {} : skipToken));
+
+    // The palette's input is uncontrolled; mirror it so message search can follow it.
+    const [searchInput, setSearchInput] = useState("");
+
+    if (!isOpen && searchInput !== "") {
+        setSearchInput("");
+    }
+
+    // Message search is a full-text query: it waits for the palette to be open, for
+    // two characters and for the typing to pause, and is never live (NEVER_LIVE).
+    // While the input and the debounced query differ, the query is skipped and no hits show.
+    const trimmedSearch = searchInput.trim();
+    const debouncedSearch = useDebouncedValue(trimmedSearch, MESSAGE_SEARCH_DEBOUNCE_MS);
+    const isMessageSearchCurrent = shouldQuery && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
+    const { data: messageSearchResults } = useQuery(
+        crpc.chat.functions.searchMessages.queryOptions(
+            isMessageSearchCurrent ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS, searchQuery: debouncedSearch } : skipToken,
+        ),
+    );
 
     const setLoadingStates = () => {};
     const { handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } = useThreadHandlers(setLoadingStates);
@@ -252,6 +336,12 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         }
     };
 
+    const handleOpenMessage = (threadId: string, message: { _id: string; order: number; stepOrder: number }) => {
+        void router.navigate({ hash: `message-${message._id}`, params: { threadId }, search: {}, to: "/chat/$threadId" });
+        scrollToMessage(message._id, { position: { order: message.order, stepOrder: message.stepOrder }, threadId });
+        close();
+    };
+
     const groupedItems = (() => {
         const groups: Group[] = [];
 
@@ -376,8 +466,34 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             }
         }
 
+        const messageHits = isMessageSearchCurrent ? collectMessageHits(messageSearchResults?.page as MessageSearchThread[] | undefined) : [];
+
+        if (messageHits.length > 0) {
+            groups.push({
+                items: messageHits.map((hit) => {
+                    return {
+                        detail: hit.threadTitle || t`Untitled Thread`,
+                        icon: <CornerDownRightIcon aria-hidden="true" className="size-4" />,
+                        isMessageHit: true,
+                        label: buildMatchSnippet(hit.message.text, debouncedSearch),
+                        onClick: () => handleOpenMessage(hit.threadId, hit.message),
+                        value: `message-${hit.message._id}`,
+                    };
+                }),
+                value: t`Messages`,
+            });
+        }
+
         return groups;
     })();
+
+    // Message hits come from the server's full-text match, which need not contain the
+    // typed text verbatim, so only the local items are narrowed by the input.
+    const filterItem = (item: unknown, query: string) => {
+        const candidate = item as Item;
+
+        return candidate.isMessageHit === true || contains(candidate, query, (value) => value.label);
+    };
 
     const handleCommandPaletteToggle = (event: KeyboardEvent) => {
         event.preventDefault();
@@ -412,7 +528,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             open={isOpen}
         >
             <CommandDialogPopup>
-                <Command items={groupedItems}>
+                <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput}>
                     <CommandInput placeholder={t`Search threads, navigate, or perform actions...`} />
                     <CommandPanel>
                         <CommandEmpty>{t`No results found.`}</CommandEmpty>
@@ -425,7 +541,12 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                                             {(item: Item) => (
                                                 <CommandItem key={item.value} onClick={item.onClick} value={item.value}>
                                                     {item.icon}
-                                                    <span className="ml-2 flex-1">{item.label}</span>
+                                                    <span className={item.isMessageHit ? "ml-2 line-clamp-2 flex-1 break-words" : "ml-2 flex-1"}>
+                                                        {item.label}
+                                                    </span>
+                                                    {item.detail && (
+                                                        <CommandShortcut className="max-w-40 truncate tracking-normal">{item.detail}</CommandShortcut>
+                                                    )}
                                                     {item.shortcut && <CommandShortcut>{formatShortcutForDisplay(item.shortcut)}</CommandShortcut>}
                                                     {item.isCurrent && <CommandShortcut>{t`Current`}</CommandShortcut>}
                                                     {item.threadId && (

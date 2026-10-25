@@ -315,7 +315,7 @@ describe("message reads", () => {
     });
 
     it("textSearch never returns a locked chat's message to a user-wide search, even with its proof", async () => {
-        const hits: any[] = await run(
+        const { messages: hits }: { messages: { threadId: string }[] } = await run(
             async (ctx) => await ctx.runQuery(textSearch, { limit: 10, searchAllMessagesForUserId: OWNER, text: "salary", unlockProof: await proofFor() }),
         );
 
@@ -323,8 +323,10 @@ describe("message reads", () => {
     });
 
     it("textSearch scoped to a locked thread is empty without the proof and returns its rows with it", async () => {
-        const skipped: any[] = await run(async (ctx) => await ctx.runQuery(textSearch, { limit: 10, text: "salary", threadId: lockedId }));
-        const read: any[] = await run(
+        const { messages: skipped }: { messages: { threadId: string }[] } = await run(
+            async (ctx) => await ctx.runQuery(textSearch, { limit: 10, text: "salary", threadId: lockedId }),
+        );
+        const { messages: read }: { messages: { threadId: string }[] } = await run(
             async (ctx) => await ctx.runQuery(textSearch, { limit: 10, text: "salary", threadId: lockedId, unlockProof: await proofFor() }),
         );
 
