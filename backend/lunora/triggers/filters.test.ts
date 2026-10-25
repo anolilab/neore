@@ -119,4 +119,12 @@ describe("assertValidFilters", () => {
         expect(() => assertValidFilters([{ op: "contains", path: "a", value: "x".repeat(501) }])).toThrow();
         expect(() => assertValidFilters([{ op: "exists", path: "a" }])).not.toThrow();
     });
+
+    it("accepts an empty value, which only an empty string equals", () => {
+        const equalsEmpty: PayloadFilter = { op: "equals", path: "note", value: "" };
+
+        expect(() => assertValidFilters([equalsEmpty])).not.toThrow();
+        expect(evaluateFilters([equalsEmpty], JSON.stringify({ note: "" })).matched).toBe(true);
+        expect(evaluateFilters([equalsEmpty], JSON.stringify({ note: "x" })).matched).toBe(false);
+    });
 });

@@ -42,6 +42,16 @@ import type { FC } from "react";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
+import type { FilterOp, PayloadFilterRow } from "@/features/settings/lib/trigger-filters";
+import {
+    filtersToSend,
+    hasIncompleteFilters,
+    isValidFilterPath,
+    MAX_FILTER_PATH_LENGTH,
+    MAX_FILTER_VALUE_LENGTH,
+    MAX_FILTERS,
+    opTakesValue,
+} from "@/features/settings/lib/trigger-filters";
 import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
@@ -57,21 +67,6 @@ type TriggerType = "event" | "schedule" | "webhook";
 /** How a webhook sender signs its requests; fixed when the trigger is created, with its secret. */
 type WebhookSignatureScheme = "native" | "timestamped";
 
-type FilterOp = "contains" | "equals" | "exists" | "not_equals" | "not_exists" | "starts_with";
-
-/** One payload filter as the form edits it; `value` is unused by `exists` / `not_exists`. */
-interface PayloadFilterRow {
-    op: FilterOp;
-    path: string;
-    value: string;
-}
-
-/** Mirror the backend caps (`backend/lunora/triggers/filters.ts`), which are the ones enforced. */
-const MAX_FILTERS = 10;
-const MAX_FILTER_PATH_DEPTH = 8;
-const MAX_FILTER_PATH_LENGTH = 200;
-const MAX_FILTER_VALUE_LENGTH = 500;
-
 const FILTER_OP_LABELS: Record<FilterOp, MessageDescriptor> = {
     contains: msg`contains`,
     equals: msg`equals`,
@@ -80,26 +75,6 @@ const FILTER_OP_LABELS: Record<FilterOp, MessageDescriptor> = {
     not_exists: msg`does not exist`,
     starts_with: msg`starts with`,
 };
-
-const opTakesValue = (op: FilterOp): boolean => op !== "exists" && op !== "not_exists";
-
-const isValidFilterPath = (path: string): boolean => {
-    const segments = path.split(".");
-
-    return (
-        path.length > 0 && path.length <= MAX_FILTER_PATH_LENGTH && segments.length <= MAX_FILTER_PATH_DEPTH && segments.every((segment) => segment.length > 0)
-    );
-};
-
-/** A filter the backend would accept: a dotted path within the caps, and a value where the op compares. */
-const isCompleteFilter = (filter: PayloadFilterRow): boolean =>
-    isValidFilterPath(filter.path) && (!opTakesValue(filter.op) || (filter.value.length > 0 && filter.value.length <= MAX_FILTER_VALUE_LENGTH));
-
-/** The filters to send: `value` only for the ops that use it. */
-const filtersToSend = (filters: PayloadFilterRow[]) =>
-    filters.map((filter) => {
-        return { op: filter.op, path: filter.path, ...(opTakesValue(filter.op) && { value: filter.value }) };
-    });
 
 interface TriggerFormData {
     botComputer: boolean;
@@ -500,7 +475,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         {t`Cancel`}
                     </Button>
                     <Button
-                        disabled={isPending || !formData.name.trim() || formData.type === "event" || formData.filters.some((filter) => !isCompleteFilter(filter))}
+                        disabled={isPending || !formData.name.trim() || formData.type === "event" || hasIncompleteFilters(formData.type, formData.filters)}
                         onClick={onSubmit}
                     >
                         {isPending && <Loader2 aria-hidden="true" className="mr-1.5 size-4 animate-spin" />}
