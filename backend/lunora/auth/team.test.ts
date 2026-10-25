@@ -26,7 +26,9 @@ const { sessionFrom, sessions, users } = vi.hoisted(() => {
         sessionFrom: async (context: { auth: { userId?: string | null } }) => {
             const { userId } = context.auth;
 
-            return userId ? { activeOrganization: sessions.get(userId) ?? null, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, userId } : null;
+            return userId
+                ? { activeOrganization: sessions.get(userId) ?? null, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, userId }
+                : null;
         },
         sessions,
         users: new Set<string>(),
@@ -49,12 +51,24 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 vi.mock("./lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./lib/better-auth-queries")>()),
-        getUser: async (_context: unknown, userId: string) => (users.has(userId) ? { _id: userId, email: `${userId}@example.com`, image: null, name: userId } : null),
+        getUser: async (_context: unknown, userId: string) =>
+            users.has(userId) ? { _id: userId, email: `${userId}@example.com`, image: null, name: userId } : null,
     };
 });
 
-const { addTeamMember, createTeam, deleteTeam, getTeam, leaveTeam, listTeamMembers, removeTeamMember, setActiveTeam, updateTeam, updateTeamMemberRole, updateTeamSettings } =
-    await import("./team");
+const {
+    addTeamMember,
+    createTeam,
+    deleteTeam,
+    getTeam,
+    leaveTeam,
+    listTeamMembers,
+    removeTeamMember,
+    setActiveTeam,
+    updateTeam,
+    updateTeamMemberRole,
+    updateTeamSettings,
+} = await import("./team");
 
 let harness: ReturnType<typeof lunoraTest>;
 
@@ -77,7 +91,8 @@ const insertTeamMember = async (teamId: string, userId: string, role?: "admin" |
 const teamMembers = async (teamId: string): Promise<Array<{ role?: string; userId: string }>> =>
     await seed(async (db) => (await db.teamMember.findMany({ where: { teamId } })).page);
 
-const memberCountOf = async (teamId: string): Promise<number | undefined> => await seed(async (db) => (await db.team.findFirst({ where: { _id: teamId } })).memberCount);
+const memberCountOf = async (teamId: string): Promise<number | undefined> =>
+    await seed(async (db) => (await db.team.findFirst({ where: { _id: teamId } })).memberCount);
 
 beforeEach(() => {
     harness = lunoraTest(schema as never);

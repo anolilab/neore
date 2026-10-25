@@ -82,7 +82,15 @@ beforeEach(() => {
     }
 
     session.current = sessionOf();
-    gateway.getUserUsageFromGateway.mockResolvedValue({ byModel: {}, dailyBreakdown: [], period: "30d", totalCompletionTokens: 0, totalCostMicrodollars: 0, totalPromptTokens: 0, totalRequests: 0 });
+    gateway.getUserUsageFromGateway.mockResolvedValue({
+        byModel: {},
+        dailyBreakdown: [],
+        period: "30d",
+        totalCompletionTokens: 0,
+        totalCostMicrodollars: 0,
+        totalPromptTokens: 0,
+        totalRequests: 0,
+    });
 });
 
 describe("getMyUsage", () => {
@@ -113,7 +121,15 @@ describe("getMyUsage", () => {
     });
 
     it("returns what the gateway answered", async () => {
-        const usage = { byModel: { m: { cost: 1, requests: 1, tokens: 2 } }, dailyBreakdown: [], period: "7d", totalCompletionTokens: 1, totalCostMicrodollars: 5, totalPromptTokens: 1, totalRequests: 1 };
+        const usage = {
+            byModel: { m: { cost: 1, requests: 1, tokens: 2 } },
+            dailyBreakdown: [],
+            period: "7d",
+            totalCompletionTokens: 1,
+            totalCostMicrodollars: 5,
+            totalPromptTokens: 1,
+            totalRequests: 1,
+        };
 
         gateway.getUserUsageFromGateway.mockResolvedValue(usage);
 

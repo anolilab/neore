@@ -15,9 +15,7 @@ import { accountDeletionWorkflowConfig } from "./deletion-workflow";
 const USER = "user-1";
 const PARAMS = { requestId: "request-1", userEmail: "user@example.com", userId: USER };
 
-type Entry =
-    | { args: Record<string, unknown>; kind: "run"; ref: string; shardKey?: string }
-    | { kind: "step"; name: string };
+type Entry = { args: Record<string, unknown>; kind: "run"; ref: string; shardKey?: string } | { kind: "step"; name: string };
 
 let trace: Entry[];
 let failOn: ((entry: Entry) => boolean) | undefined;
@@ -227,7 +225,9 @@ describe("account deletion workflow: batched steps", () => {
 
     it("walks the thread cascade with the cursor each round returned", async () => {
         answer = (ref, round) => {
-            return ref === "gdpr_steps_deletion_steps:deleteUserThreadCascade" ? { cursor: `c${String(round)}`, hasMore: round < 3 } : { cursor: null, hasMore: false };
+            return ref === "gdpr_steps_deletion_steps:deleteUserThreadCascade"
+                ? { cursor: `c${String(round)}`, hasMore: round < 3 }
+                : { cursor: null, hasMore: false };
         };
 
         await execute();
