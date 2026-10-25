@@ -139,9 +139,12 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             );
         }
 
-        const body = await request.text();
+        // The signature covers the bytes the sender sent. Verify those, not a decoded
+        // string: `text()` strips a BOM and replaces invalid UTF-8, so a body that is
+        // not clean UTF-8 would never match the signature it was signed with.
+        const rawBody = new Uint8Array(await request.arrayBuffer());
 
-        if (body.length > MAX_PAYLOAD_SIZE) {
+        if (rawBody.byteLength > MAX_PAYLOAD_SIZE) {
             return Response.json(
                 { error: "Payload too large" },
                 {
@@ -151,10 +154,12 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             );
         }
 
+        const body = new TextDecoder().decode(rawBody);
+
         // 3. Verify the HMAC-SHA256 signature. A trigger without a secret
         //    (legacy rows) is refused: unsigned delivery is no delivery.
         const encryptedSecret = trigger.webhookSecret;
-        const delivery = readSignedDelivery(request.headers, body, trigger.webhookSignatureScheme ?? "timestamped");
+        const delivery = readSignedDelivery(request.headers, rawBody, trigger.webhookSignatureScheme ?? "timestamped");
 
         if (!encryptedSecret || "error" in delivery) {
             return Response.json(
@@ -226,7 +231,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 
 const MISSING_SIGNATURE = "Missing or invalid signature headers";
 
-type SignedDelivery = { presented: string; signedPayload: string } | { error: string };
+type SignedDelivery = { presented: string; signedPayload: Uint8Array } | { error: string };
 
 /**
  * Read the signature the trigger's configured scheme expects, and say what was
@@ -234,7 +239,7 @@ type SignedDelivery = { presented: string; signedPayload: string } | { error: st
  * one scheme's signature is never tried as the other's. The timestamp is checked
  * here; the HMAC itself by the caller.
  */
-const readSignedDelivery = (headers: Headers, body: string, scheme: "native" | "timestamped"): SignedDelivery => {
+const readSignedDelivery = (headers: Headers, body: Uint8Array, scheme: "native" | "timestamped"): SignedDelivery => {
     const signature = headers.get("x-signature-256");
     const timestamp = headers.get("x-neore-timestamp");
     const native = headers.get("x-hub-signature-256");
@@ -255,7 +260,13 @@ const readSignedDelivery = (headers: Headers, body: string, scheme: "native" | "
         return { error: "Stale or future timestamp" };
     }
 
-    return { presented: signature, signedPayload: `${timestamp}.${body}` };
+    const prefix = new TextEncoder().encode(`${timestamp}.`);
+    const signedPayload = new Uint8Array(prefix.byteLength + body.byteLength);
+
+    signedPayload.set(prefix);
+    signedPayload.set(body, prefix.byteLength);
+
+    return { presented: signature, signedPayload };
 };
 
 /** `sha256=<hex>` or bare hex, lower-cased — also the dedupe key. */
@@ -265,7 +276,7 @@ const normalizeSignature = (signature: string): string => (signature.startsWith(
  * Verify HMAC-SHA256 signature.
  * Supports both raw hex and "sha256=hex" format (GitHub-style).
  */
-export const verifyHmacSignature = async (secret: string, payload: string, signature: string): Promise<boolean> =>
+export const verifyHmacSignature = async (secret: string, payload: string | Uint8Array, signature: string): Promise<boolean> =>
     timingSafeEqual(await hmacSha256Hex(secret, payload), normalizeSignature(signature));
 
 export default handleTriggerWebhook;

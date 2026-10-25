@@ -34,9 +34,9 @@ type Harness = ReturnType<typeof lunoraTest>;
 
 let harness: Harness;
 
-const hmacHex = async (payload: string): Promise<string> => {
+const hmacHex = async (payload: string | Uint8Array): Promise<string> => {
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SECRET), { hash: "SHA-256", name: "HMAC" }, false, ["sign"]);
-    const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+    const signature = await crypto.subtle.sign("HMAC", key, typeof payload === "string" ? new TextEncoder().encode(payload) : (payload as BufferSource));
 
     return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
@@ -74,11 +74,11 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
         },
     };
 
-    const post = async (body: string, headers: Record<string, string>) =>
-        await handleTriggerWebhook(context as never, new Request("https://x/triggers/webhook/t", { body, headers, method: "POST" }), triggerId);
+    const post = async (body: string | Uint8Array, headers: Record<string, string>) =>
+        await handleTriggerWebhook(context as never, new Request("https://x/triggers/webhook/t", { body: body as BodyInit, headers, method: "POST" }), triggerId);
 
     /** Just the status code of a delivery. */
-    const statusOf = async (body: string, headers: Record<string, string>): Promise<number> => {
+    const statusOf = async (body: string | Uint8Array, headers: Record<string, string>): Promise<number> => {
         const response = await post(body, headers);
 
         return response.status;
@@ -119,6 +119,16 @@ describe("trigger webhook signing", () => {
 
         expect(replay.status).toBe(200);
         expect(await replay.json()).toMatchObject({ duplicate: true });
+        expect(scheduled).toHaveLength(1);
+    });
+
+    it("verifies a timestamped delivery over the raw bytes too, for a body that is not valid UTF-8", async () => {
+        const { scheduled, statusOf } = await setup();
+        const body = new Uint8Array([0x7b, 0xff, 0xfe, 0x7d]);
+        const timestamp = String(Math.floor(NOW / 1000));
+        const signed = new Uint8Array([...new TextEncoder().encode(`${timestamp}.`), ...body]);
+
+        expect(await statusOf(body, { "x-neore-timestamp": timestamp, "x-signature-256": `sha256=${await hmacHex(signed)}` })).toBe(200);
         expect(scheduled).toHaveLength(1);
     });
 
@@ -172,6 +182,22 @@ describe("trigger webhook signing", () => {
             const body = '{"action":"opened"}';
 
             expect(await statusOf(body, await nativeHeaders(body))).toBe(200);
+            expect(scheduled).toHaveLength(1);
+        });
+
+        it("verifies the signature over the raw bytes, so a body that is not valid UTF-8 is accepted", async () => {
+            const { scheduled, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = new Uint8Array([0x7b, 0x22, 0x61, 0x22, 0x3a, 0x22, 0xff, 0xfe, 0x22, 0x7d]);
+
+            expect(await statusOf(body, { "x-hub-signature-256": `sha256=${await hmacHex(body)}` })).toBe(200);
+            expect(scheduled).toHaveLength(1);
+        });
+
+        it("verifies a body that starts with a byte-order mark against the bytes as sent", async () => {
+            const { scheduled, statusOf } = await setup(NATIVE_TRIGGER);
+            const body = new Uint8Array([0xef, 0xbb, 0xbf, 0x7b, 0x7d]);
+
+            expect(await statusOf(body, { "x-hub-signature-256": `sha256=${await hmacHex(body)}` })).toBe(200);
             expect(scheduled).toHaveLength(1);
         });
 
