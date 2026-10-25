@@ -100,6 +100,11 @@ export const streamReply = async (gatewayOrigin: string, streamToken: string, on
                 return;
             }
 
+            // The end line closes a finished reply. It carries no text, so it is not a chunk either.
+            if (parsed.kind === "end") {
+                return;
+            }
+
             chunkCount += 1;
             onDelta({ reasoning: parsed.reasoning, speaker: parsed.speaker, text: parsed.text });
         };
