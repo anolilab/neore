@@ -19,7 +19,7 @@ import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
-import { assertValidFilters, MAX_FILTER_VALUE_LENGTH, MAX_PATH_LENGTH } from "./filters";
+import { assertValidFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH } from "./filters";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
@@ -192,22 +192,24 @@ export const createTrigger = authMutation
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
         description: v.optional(v.string().max(MAX_LENGTH.long)),
         // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
-        // At most MAX_FILTERS entries, checked by `assertValidFilters` (an array validator has no length cap).
+        // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
         filters: v.optional(
-            v.array(
-                v.object({
-                    op: v.union(
-                        v.literal("equals"),
-                        v.literal("not_equals"),
-                        v.literal("contains"),
-                        v.literal("starts_with"),
-                        v.literal("exists"),
-                        v.literal("not_exists"),
-                    ),
-                    path: v.string().max(MAX_PATH_LENGTH),
-                    value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
-                }),
-            ),
+            v
+                .array(
+                    v.object({
+                        op: v.union(
+                            v.literal("equals"),
+                            v.literal("not_equals"),
+                            v.literal("contains"),
+                            v.literal("starts_with"),
+                            v.literal("exists"),
+                            v.literal("not_exists"),
+                        ),
+                        path: v.string().max(MAX_PATH_LENGTH),
+                        value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
+                    }),
+                )
+                .check((value) => value.length <= MAX_FILTERS, { message: `at most ${String(MAX_FILTERS)} payload filters` }),
         ),
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
         model: v.string().max(MAX_LENGTH.short),
@@ -304,22 +306,24 @@ export const updateTrigger = authMutation
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
         description: v.optional(v.string().max(MAX_LENGTH.long)),
         // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
-        // At most MAX_FILTERS entries, checked by `assertValidFilters` (an array validator has no length cap).
+        // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
         filters: v.optional(
-            v.array(
-                v.object({
-                    op: v.union(
-                        v.literal("equals"),
-                        v.literal("not_equals"),
-                        v.literal("contains"),
-                        v.literal("starts_with"),
-                        v.literal("exists"),
-                        v.literal("not_exists"),
-                    ),
-                    path: v.string().max(MAX_PATH_LENGTH),
-                    value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
-                }),
-            ),
+            v
+                .array(
+                    v.object({
+                        op: v.union(
+                            v.literal("equals"),
+                            v.literal("not_equals"),
+                            v.literal("contains"),
+                            v.literal("starts_with"),
+                            v.literal("exists"),
+                            v.literal("not_exists"),
+                        ),
+                        path: v.string().max(MAX_PATH_LENGTH),
+                        value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
+                    }),
+                )
+                .check((value) => value.length <= MAX_FILTERS, { message: `at most ${String(MAX_FILTERS)} payload filters` }),
         ),
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
         model: v.optional(v.string().max(MAX_LENGTH.short)),

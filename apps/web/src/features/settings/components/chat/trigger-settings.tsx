@@ -271,16 +271,16 @@ const WebhookSigningInstructions: FC<{ scheme: WebhookSignatureScheme }> = ({ sc
 
 interface TriggerFormProps {
     formData: TriggerFormData;
+    /** An existing trigger keeps its type and the scheme its secret was issued for. */
+    isExisting?: boolean;
     isPending: boolean;
     onCancel: () => void;
     onChange: (data: TriggerFormData) => void;
     onSubmit: () => void;
-    /** An existing trigger keeps the scheme its secret was issued for. */
-    schemeLocked?: boolean;
     title: string;
 }
 
-const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onChange, onSubmit, schemeLocked = false, title }) => {
+const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onChange, onSubmit, isExisting = false, title }) => {
     // Generated ids: the create and edit forms can be open together, and fixed ids would make their labels ambiguous.
     const botPickerId = useId();
     const botComputerId = useId();
@@ -361,7 +361,11 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 {/* Type */}
                 <div className="space-y-1.5">
                     <Label>{t`Trigger Type`}</Label>
-                    <TriggerTypePicker disabled={formData.type === "event"} onSelect={(type) => onChange({ ...formData, type })} value={formData.type} />
+                    <TriggerTypePicker
+                        disabled={isExisting || formData.type === "event"}
+                        onSelect={(type) => onChange({ ...formData, type })}
+                        value={formData.type}
+                    />
                 </div>
 
                 {/* Schedule config */}
@@ -412,7 +416,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         <div className="mt-3 space-y-1.5">
                             <Label htmlFor={schemeId}>{t`Signature`}</Label>
                             <Select
-                                disabled={schemeLocked}
+                                disabled={isExisting}
                                 onValueChange={(value) => onChange({ ...formData, webhookSignatureScheme: value === "native" ? "native" : "timestamped" })}
                                 value={formData.webhookSignatureScheme}
                             >
@@ -833,12 +837,12 @@ const TriggerSettings: FC = () => {
                                 return (
                                     <TriggerForm
                                         formData={editFormData}
+                                        isExisting
                                         isPending={updateMutation.isPending}
                                         key={trigger._id}
                                         onCancel={() => setEditingTriggerId(null)}
                                         onChange={setEditFormData}
                                         onSubmit={handleUpdate}
-                                        schemeLocked
                                         title={t`Edit Trigger`}
                                     />
                                 );
