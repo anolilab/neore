@@ -246,6 +246,9 @@ impl DeviceState {
         if let Some(servers) = update.mcp_servers {
             validate_servers(&servers)?;
             settings.mcp_servers = servers;
+            // The cached `readOnly` flags describe the old servers. Dropping them makes every MCP call
+            // fail closed until the next manifest, so none can skip its prompt on stale metadata.
+            self.mcp_tools.lock().unwrap().clear();
         }
 
         if let Some(required) = update.require_shell_sandbox {
@@ -1015,6 +1018,30 @@ pub fn validate_servers(servers: &[McpServerConfig]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn changing_the_mcp_servers_forgets_the_cached_tool_metadata() {
+        let dir =
+            std::env::temp_dir().join(format!("neore-device-mcp-cache-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let state = DeviceState::new(&dir, Box::new(|_| {}));
+
+        state.mcp_tools.lock().unwrap().insert(
+            "docs__search".to_owned(),
+            ("docs".to_owned(), "search".to_owned(), true),
+        );
+
+        let unchanged: SettingsUpdate =
+            serde_json::from_str(r#"{"allowShellNetwork":true}"#).unwrap();
+        state.settings_update(unchanged).unwrap();
+        assert_eq!(state.mcp_tools.lock().unwrap().len(), 1);
+
+        let replaced: SettingsUpdate = serde_json::from_str(r#"{"mcpServers":[]}"#).unwrap();
+        state.settings_update(replaced).unwrap();
+        assert!(state.mcp_tools.lock().unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn the_shell_network_setting_is_a_boolean_on_the_wire() {
