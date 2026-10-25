@@ -32,7 +32,7 @@ export interface JsonlParseLimits {
 }
 
 const PREVIEW_CHARS = 160;
-const BYTE_ORDER_MARK = "﻿";
+const BYTE_ORDER_MARK = "\uFEFF";
 
 export const parseJsonLines = (text: string, limits: JsonlParseLimits): JsonlParseResult => {
     const source = text.startsWith(BYTE_ORDER_MARK) ? text.slice(BYTE_ORDER_MARK.length) : text;
@@ -43,12 +43,6 @@ export const parseJsonLines = (text: string, limits: JsonlParseLimits): JsonlPar
     let line = 0;
 
     while (start < source.length) {
-        if (records.length >= limits.maxRecords || problems.length >= limits.maxProblems) {
-            truncated = true;
-
-            break;
-        }
-
         const newline = source.indexOf("\n", start);
         const end = newline === -1 ? source.length : newline;
         // `trim` drops the `\r` of a CRLF line; JSON.parse tolerates the rest of the whitespace.
@@ -57,8 +51,15 @@ export const parseJsonLines = (text: string, limits: JsonlParseLimits): JsonlPar
         line += 1;
         start = end + 1;
 
+        // Blank lines never count toward a cap, so trailing ones cannot read as unread content.
         if (content === "") {
             continue;
+        }
+
+        if (records.length >= limits.maxRecords || problems.length >= limits.maxProblems) {
+            truncated = true;
+
+            break;
         }
 
         try {
