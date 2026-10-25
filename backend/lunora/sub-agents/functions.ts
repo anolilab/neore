@@ -416,10 +416,11 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
 
     await patchById(ctx.db, run._id, { completedAt: now, error, result, status: outcome.kind, updatedAt: now });
 
-    // The child thread was marked "running" when it was linked (`linkChildThread`).
+    // The child thread was marked "running" when it was linked (`linkChildThread`). A chat reply
+    // the user started there meanwhile holds that status too, so it stays while one is live.
     const child = run.childThreadId ? await ctx.db.get(run.childThreadId as Id<"threads">) : null;
 
-    if (child?.status === "running") {
+    if (child?.status === "running" && !(await isThreadStreaming(ctx, child._id))) {
         await patchThread(ctx.db, child._id, { status: "active", updatedAt: now });
     }
 

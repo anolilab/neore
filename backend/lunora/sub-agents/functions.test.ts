@@ -243,13 +243,42 @@ describe("linkChildThread", () => {
 
         const [run] = await runs();
         const child = await insertThread(userId);
-        const statusOf = async () => (await harness.run(async (ctx: any) => await ctx.db.get(child))).status;
+        const statusOf = async () => {
+            const row = await harness.run(async (ctx: any) => await ctx.db.get(child));
+
+            return row.status;
+        };
 
         await harness.run(async (ctx: any) => await linkChildThread(ctx, run._id, child));
         expect(await statusOf()).toBe("running");
 
         await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "cancelled" }));
         expect(await statusOf()).toBe("active");
+    });
+
+    it("keeps the child thread running when a chat reply is streaming there as the run ends", async () => {
+        await admit();
+
+        const [run] = await runs();
+        const child = await insertThread(userId);
+
+        await harness.run(async (ctx: any) => await linkChildThread(ctx, run._id, child));
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "m",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "m" },
+                    threadId: child,
+                    userId,
+                }),
+        );
+        await harness.run(async (ctx: any) => await finishRun(ctx, run._id, { kind: "cancelled" }));
+
+        const row = await harness.run(async (ctx: any) => await ctx.db.get(child));
+
+        expect(row.status).toBe("running");
     });
 
     it("refuses a run that was cancelled first, so the caller can drop the new thread", async () => {
@@ -510,7 +539,8 @@ describe("cancelling a run", () => {
 
             expect(await forStop(childThread)).toBe(1);
 
-            const grandchild = (await runs()).find((run: any) => run.parentThreadId === childThread);
+            const allRuns = await runs();
+            const grandchild = allRuns.find((run: any) => run.parentThreadId === childThread);
 
             expect(grandchild).toMatchObject({ status: "cancelled" });
         });
