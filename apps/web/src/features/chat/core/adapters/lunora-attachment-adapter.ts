@@ -68,17 +68,30 @@ export interface AttachmentSizeLimit {
 }
 
 /**
+ * Delimited and line-oriented text. The browser's type for these is empty,
+ * `application/octet-stream`, or one the chat allowlist does not take
+ * (`text/csv`, `text/tab-separated-values`, `application/x-ndjson`, a Mermaid
+ * type), so they are sent as `text/plain`: allowlisted, sniffed as text, and
+ * previewed by file name.
+ */
+const TEXT_PLAIN_EXTENSIONS = [".csv", ".tsv", ".jsonl", ".ndjson", ".mmd", ".mermaid"] as const;
+
+/**
  * The type an attachment is uploaded — and checked — as. Browsers leave
  * `file.type` empty for some extensions (`.md` on most systems), so those are
  * named here; anything still unknown is `application/octet-stream`, which the
  * backend refuses with a readable error.
  */
 export const attachmentContentType = (file: Pick<File, "name" | "type">): string => {
+    const name = file.name.toLowerCase();
+
+    if (TEXT_PLAIN_EXTENSIONS.some((extension) => name.endsWith(extension))) {
+        return "text/plain";
+    }
+
     if (file.type) {
         return file.type;
     }
-
-    const name = file.name.toLowerCase();
 
     if (name.endsWith(".md") || name.endsWith(".markdown")) {
         return "text/markdown";
@@ -86,10 +99,6 @@ export const attachmentContentType = (file: Pick<File, "name" | "type">): string
 
     if (name.endsWith(".txt")) {
         return "text/plain";
-    }
-
-    if (name.endsWith(".csv")) {
-        return "text/csv";
     }
 
     if (name.endsWith(".docx")) {
@@ -243,7 +252,7 @@ const isTextAttachment = (contentType: string | undefined, name: string): boolea
 export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentAdapter => {
     // Accept common file types - images, text, documents, PDFs, video, audio, DOCX
     const accept =
-        "image/*,text/*,video/*,audio/*,application/pdf,application/json,application/xml,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.md,.csv,.txt,.docx,.mp4,.mp3,.wav,.webm,.ogg,.m4a,.mov";
+        "image/*,text/*,video/*,audio/*,application/pdf,application/json,application/xml,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.md,.csv,.tsv,.jsonl,.ndjson,.mmd,.mermaid,.txt,.docx,.mp4,.mp3,.wav,.webm,.ogg,.m4a,.mov";
 
     const add = async (state: ProgressState): Promise<PendingAttachment> => {
         const contentType = attachmentContentType(state.file);

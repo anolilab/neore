@@ -153,6 +153,14 @@ describe(createLunoraAttachmentAdapter, () => {
         await expect(adapter.upload({ file: new File(["x"], "a.exe", { type: "application/x-msdownload" }) })).rejects.toMatchObject({ reason: "unsupported" });
     });
 
+    it("accepts a dropped JSON Lines file whose browser type is empty, and uploads it as text", async () => {
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const result = await adapter.upload({ file: new File(['{"a":1}\n'], "rows.jsonl", { type: "" }) });
+
+        expect(result.metadata?.fileId).toBe("file-1");
+        expect(uploadFile).toHaveBeenLastCalledWith(expect.any(File), expect.objectContaining({ contentType: "text/plain" }));
+    });
+
     it("passes progress through and returns the file id", async () => {
         const adapter = createLunoraAttachmentAdapter(client().lunora);
         const progress: number[] = [];
@@ -175,6 +183,18 @@ describe(attachmentContentType, () => {
         [{ name: "a.docx", type: "" }, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
         [{ name: "a.bin", type: "" }, "application/octet-stream"],
         [{ name: "a.pdf", type: "application/pdf" }, "application/pdf"],
+        [{ name: "rows.jsonl", type: "" }, "text/plain"],
+        [{ name: "rows.jsonl", type: "application/x-ndjson" }, "text/plain"],
+        [{ name: "rows.jsonl", type: "application/octet-stream" }, "text/plain"],
+        [{ name: "rows.ndjson", type: "" }, "text/plain"],
+        [{ name: "flow.mmd", type: "" }, "text/plain"],
+        [{ name: "flow.mmd", type: "application/octet-stream" }, "text/plain"],
+        [{ name: "flow.mermaid", type: "text/vnd.mermaid" }, "text/plain"],
+        [{ name: "data.tsv", type: "" }, "text/plain"],
+        [{ name: "data.tsv", type: "text/tab-separated-values" }, "text/plain"],
+        [{ name: "sheet.csv", type: "" }, "text/plain"],
+        [{ name: "sheet.csv", type: "text/csv" }, "text/plain"],
+        [{ name: "a.bin", type: "application/x-ndjson" }, "application/x-ndjson"],
     ])("%o is uploaded as %s", (file, expected) => {
         expect(attachmentContentType(file)).toBe(expected);
     });

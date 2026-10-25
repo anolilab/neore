@@ -26,6 +26,7 @@ Phases 1–5 below are partly shipped. In the tree today:
 - PDF viewer (`pdf-viewer.tsx`), video player (`video-player.tsx`, media-chrome with hls.js loaded only for HLS), audio waveform player (`audio-waveform-player.tsx`, wavesurfer.js), DOCX preview (`docx-preview.tsx`, mammoth + DOMPurify), and the generic file card (`generic-file-card.tsx`).
 - File-type predicates and `formatFileSize` in `file-type-utilities.tsx`.
 - Inline routing by type in `message-content.tsx`, with every renderer lazy-loaded.
+- Text previews routed by file name, since they are stored as `text/plain`: JSON Lines (`jsonl-viewer.tsx`, parser in `jsonl-parse.ts`), Mermaid (`mermaid-preview.tsx`, through the Streamdown plugin hook), and CSV/TSV (`delimited-text-preview.tsx`, the paginated `CsvRenderer`). The composer sends `.jsonl`, `.ndjson`, `.mmd`, `.mermaid`, `.csv` and `.tsv` as `text/plain` (`attachmentContentType`), because the chat allowlist has no type for them.
 
 Not in the tree: the thumbnail components (`pdf-thumbnail`, `video-thumbnail`, `docx-thumbnail`), the mime-to-icon component (`file-type-icon`), and PDF / video / DOCX viewers in the canvas panel. Check each existing renderer against its phase below before extending it.
 

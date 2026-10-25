@@ -15,6 +15,7 @@ import { Reasoning, ReasoningContent, ReasoningTrigger } from "@neore/ui/compone
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@neore/ui/components/ai-elements/sources";
 import AnimatedTiles from "@neore/ui/components/animated-tiles";
 import { chatMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
+import { isDelimitedTable, isJsonl, isMermaid } from "@neore/ui/components/file-renderers/file-type-utilities";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
 import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
 import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
@@ -38,6 +39,9 @@ const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-vie
 const VideoPlayer = lazy(() => import("@neore/ui/components/file-renderers/video-player"));
 const AudioWaveformPlayer = lazy(() => import("@neore/ui/components/file-renderers/audio-waveform-player"));
 const DocxPreview = lazy(() => import("@neore/ui/components/file-renderers/docx-preview"));
+const JsonlViewer = lazy(() => import("@neore/ui/components/file-renderers/jsonl-viewer"));
+const MermaidPreview = lazy(() => import("@neore/ui/components/file-renderers/mermaid-preview"));
+const DelimitedTextPreview = lazy(() => import("@neore/ui/components/file-renderers/delimited-text-preview"));
 
 // Inline file type predicates (avoids static import from lazy-loaded library)
 const isPdfFile = (mediaType?: string, filename?: string): boolean => mediaType === "application/pdf" || filename?.toLowerCase().endsWith(".pdf") === true;
@@ -807,6 +811,31 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                         <div className="message-text-fixed contents" key={key}>
                             <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
                                 <DocxPreview filename={filePart.filename} url={fileUrl} />
+                            </Suspense>
+                        </div>,
+                    );
+                    // JSON Lines, Mermaid and CSV/TSV: by name, since the stored type is `text/plain`
+                } else if (isJsonl(filePart.filename) && fileUrl) {
+                    renderedParts.push(
+                        <div className="message-text-fixed contents" key={key}>
+                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
+                                <JsonlViewer filename={filePart.filename} url={fileUrl} />
+                            </Suspense>
+                        </div>,
+                    );
+                } else if (isMermaid(filePart.filename) && fileUrl) {
+                    renderedParts.push(
+                        <div className="message-text-fixed contents" key={key}>
+                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
+                                <MermaidPreview filename={filePart.filename} url={fileUrl} />
+                            </Suspense>
+                        </div>,
+                    );
+                } else if (isDelimitedTable(filePart.filename) && fileUrl) {
+                    renderedParts.push(
+                        <div className="message-text-fixed contents" key={key}>
+                            <Suspense fallback={<FileLoadingFallback name={filePart.filename} />}>
+                                <DelimitedTextPreview filename={filePart.filename} url={fileUrl} />
                             </Suspense>
                         </div>,
                     );

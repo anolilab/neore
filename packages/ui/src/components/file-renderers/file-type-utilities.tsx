@@ -61,6 +61,15 @@ export const isDocx = (mediaType?: string, filename?: string): boolean =>
 
 export const isImage = (mediaType?: string): boolean => mediaType?.startsWith("image/") === true;
 
+/** JSON Lines / NDJSON: one JSON value per line. Recognised by name, since the stored type is `text/plain`. */
+export const isJsonl = (filename?: string): boolean => ["jsonl", "ndjson"].includes(getExtension(filename));
+
+/** A Mermaid diagram source. Recognised by name, since the stored type is `text/plain`. */
+export const isMermaid = (filename?: string): boolean => ["mermaid", "mmd"].includes(getExtension(filename));
+
+/** Delimited tables: comma- or tab-separated (`.csv`, `.tsv`). Recognised by name. */
+export const isDelimitedTable = (filename?: string): boolean => ["csv", "tsv"].includes(getExtension(filename));
+
 const getExtension = (filename?: string): string => filename?.split(".").pop()?.toLowerCase() ?? "";
 
 /** Format file size in human-readable units. */
