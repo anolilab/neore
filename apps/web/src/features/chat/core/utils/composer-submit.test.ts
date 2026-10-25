@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { onComposerSubmitRequest, requestComposerSubmit } from "./composer-submit";
+import { onComposerAttachRequest, onComposerSubmitRequest, requestComposerAttach, requestComposerSubmit } from "./composer-submit";
 
 describe(requestComposerSubmit, () => {
     it("holds a request until the composer subscribes, then delivers it once", () => {
@@ -30,6 +30,23 @@ describe(requestComposerSubmit, () => {
         requestComposerSubmit({ text: "a" });
 
         expect(handler).toHaveBeenCalledTimes(2);
+
+        stop();
+    });
+});
+
+describe(requestComposerAttach, () => {
+    it("joins drops that arrive before the composer takes them, so none is lost", () => {
+        const first = new File(["a"], "a.txt");
+        const second = new File(["b"], "b.txt");
+
+        requestComposerAttach({ files: [first] });
+        requestComposerAttach({ files: [second] });
+
+        const handler = vi.fn();
+        const stop = onComposerAttachRequest(handler);
+
+        expect(handler).toHaveBeenCalledExactlyOnceWith({ files: [first, second] });
 
         stop();
     });
