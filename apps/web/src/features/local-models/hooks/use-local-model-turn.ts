@@ -10,9 +10,9 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import type { NewChatTemporaryFields } from "@/features/chat/core/utils/new-chat-temporary";
 import type { LocalModelTarget } from "@/features/settings/lib/custom-models";
 import { findLocalModelTarget } from "@/features/settings/lib/custom-models";
-import { useUnloadGuard } from "@/hooks/use-unload-guard";
 import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { acquireUnloadGuard } from "@/lib/unload-guard";
 
 import { describeLocalError } from "../lib/local-errors";
 import type { HistoryMessage } from "../lib/run-local-turn";
@@ -108,6 +108,11 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
 
             let assistantMessageId: string | undefined;
 
+            // The reply streams to this tab and is saved from it, so closing the tab loses it. The guard
+            // belongs to this send, not to the component: it outlives an unmount (the chat route can
+            // unmount while the request runs) and does not depend on another send's state.
+            const releaseUnloadGuard = acquireUnloadGuard();
+
             try {
                 const result = await runLocalTurn({
                     baseUrl: target.baseUrl,
@@ -151,6 +156,8 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
                 setLive(null);
                 onNotSaved(error instanceof Error ? error.message : undefined);
             } finally {
+                releaseUnloadGuard();
+
                 if (abortRef.current === controller) {
                     abortRef.current = null;
                 }
@@ -184,9 +191,6 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
     }, [live, target?.modelId]);
 
     const isStreaming = live !== null && !live.persistedId;
-
-    // The reply streams to this tab and is saved from it, so closing the tab loses it.
-    useUnloadGuard(isStreaming);
 
     return { cancel, isStreaming, send, streamingMessage, target };
 };

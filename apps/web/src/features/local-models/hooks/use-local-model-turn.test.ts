@@ -123,3 +123,121 @@ describe("useLocalModelTurn temporary choice", () => {
         expect(saveLocalTurn.mock.calls[0]?.[0]).toMatchObject({ threadId: "t0" });
     });
 });
+
+/** Whether a `beforeunload` is cancelled, i.e. whether a close warning is registered. */
+const isGuarded = (): boolean => {
+    const event = new Event("beforeunload", { cancelable: true });
+
+    globalThis.dispatchEvent(event);
+
+    return event.defaultPrevented;
+};
+
+/** A turn that stays in flight until `finish` is called. */
+const heldTurn = () => {
+    let finish!: () => void;
+    // The tsconfig lib predates `Promise.withResolvers`.
+    // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+    const gate = new Promise<void>((resolve) => {
+        finish = resolve;
+    });
+
+    runLocalTurn.mockImplementationOnce(async () => {
+        await gate;
+
+        return { outcome: "complete", saved: true, threadId: "t1" };
+    });
+
+    return finish;
+};
+
+describe("useLocalModelTurn close warning", () => {
+    it("guards the tab while a reply is in flight and releases it once saved", async () => {
+        const finish = heldTurn();
+        const { result } = renderHook(() => useLocalModelTurn(MODEL, new Set()));
+        let sent!: Promise<void>;
+
+        act(() => {
+            sent = result.current.send(sendOptions({}));
+        });
+
+        expect(isGuarded()).toBe(true);
+
+        await act(async () => {
+            finish();
+            await sent;
+        });
+
+        expect(isGuarded()).toBe(false);
+    });
+
+    it("keeps the warning while a second reply runs after the first one finished", async () => {
+        const finishFirst = heldTurn();
+        const finishSecond = heldTurn();
+        const { result } = renderHook(() => useLocalModelTurn(MODEL, new Set()));
+        let first!: Promise<void>;
+        let second!: Promise<void>;
+
+        act(() => {
+            first = result.current.send(sendOptions({}));
+            second = result.current.send(sendOptions({ branch: { kind: "regenerate", messageId: "m1" } }));
+        });
+
+        await act(async () => {
+            finishFirst();
+            await first;
+        });
+
+        expect(isGuarded()).toBe(true);
+
+        await act(async () => {
+            finishSecond();
+            await second;
+        });
+
+        expect(isGuarded()).toBe(false);
+    });
+
+    it("keeps the warning after the provider unmounts, until the reply ends", async () => {
+        const finish = heldTurn();
+        const { result, unmount } = renderHook(() => useLocalModelTurn(MODEL, new Set()));
+        let sent!: Promise<void>;
+
+        act(() => {
+            sent = result.current.send(sendOptions({}));
+        });
+        unmount();
+
+        expect(isGuarded()).toBe(true);
+
+        finish();
+        await sent;
+
+        expect(isGuarded()).toBe(false);
+    });
+
+    it("releases the warning when the save fails, leaving another reply's guard alone", async () => {
+        const finishOther = heldTurn();
+        const { result } = renderHook(() => useLocalModelTurn(MODEL, new Set()));
+        let other!: Promise<void>;
+
+        act(() => {
+            other = result.current.send(sendOptions({}));
+        });
+
+        saveLocalTurn.mockRejectedValueOnce(new Error("rate limited"));
+
+        await act(async () => {
+            await result.current.send(sendOptions({}));
+        });
+
+        expect(isGuarded()).toBe(true);
+
+        await act(async () => {
+            finishOther();
+            await other;
+        });
+
+        expect(isGuarded()).toBe(false);
+    });
+});
