@@ -120,6 +120,23 @@ export const createNotification = internalMutation
     });
 
 /**
+ * {@link createNotification} for several rows in ONE transaction, so a caller with a batch
+ * (the gateway's rule alerts) pays one shard round trip instead of one per row. Each row is
+ * still idempotent on its `dedupeKey`; a throw rolls the whole batch back, and a redelivery
+ * writes it again.
+ */
+export const createNotifications = internalMutation
+    .input({ notifications: v.array(v.object({ ...notificationInputFields })) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        for (const notification of args.notifications) {
+            await notify(ctx, notification);
+        }
+
+        return null;
+    });
+
+/**
  * Retention: deletes this shard's notifications older than
  * {@link NOTIFICATION_RETENTION_MS}. Runs from the housekeeping fan-out
  * (`lib/shard-housekeeping.ts`), which the one-minute cron tick drives, so no

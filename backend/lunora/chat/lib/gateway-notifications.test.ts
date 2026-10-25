@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../../_generated/internal";
 import { hmacSha256Hex, sha256Hex } from "../../lib/crypto";
-import { createNotification } from "../../notifications/functions";
+import { createNotifications } from "../../notifications/functions";
 import schema from "../../schema";
 import { gatewayNotificationsHttpAction, toUsageAlert } from "./gateway-notifications";
 
@@ -44,7 +44,7 @@ const context = () =>
                 runMutation: async (reference: unknown, args: unknown) => {
                     runMutation(reference, args);
 
-                    return await harness.run(async (ctx: any) => await ctx.runMutation(createNotification, args));
+                    return await harness.run(async (ctx: any) => await ctx.runMutation(createNotifications, args));
                 },
             };
         },
@@ -107,8 +107,8 @@ describe(gatewayNotificationsHttpAction, () => {
 
         expect(response.status).toBe(200);
         expect(runMutation).toHaveBeenCalledExactlyOnceWith(
-            internal.notifications.functions.createNotification,
-            expect.objectContaining({ type: "usage_alert", userId: "user-a" }),
+            internal.notifications.functions.createNotifications,
+            { notifications: [expect.objectContaining({ type: "usage_alert", userId: "user-a" })] },
         );
 
         const { page } = await rows();
@@ -133,6 +133,21 @@ describe(gatewayNotificationsHttpAction, () => {
         const { page } = await rows();
 
         expect(page).toHaveLength(1);
+    });
+
+    it("writes a full batch of 50 firings in a single shard mutation", async () => {
+        const many = Array.from({ length: 50 }, (_, index) => {
+            return { ...firing, ruleId: `rule-${index}` };
+        });
+
+        const response = await gatewayNotificationsHttpAction(context(), await signedRequest({ notifications: many, userId: "user-a" }));
+
+        expect(response.status).toBe(200);
+        expect(runMutation).toHaveBeenCalledTimes(1);
+
+        const { page } = await rows();
+
+        expect(page).toHaveLength(50);
     });
 
     it("skips a block-only rule", async () => {

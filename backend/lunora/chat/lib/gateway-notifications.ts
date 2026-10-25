@@ -101,15 +101,13 @@ export const gatewayNotificationsHttpAction = async (context: HttpActionCtx, req
     // Verified above, so this is the gateway's own clock.
     const signedAtMs = Number(request.headers.get("X-Timestamp"));
 
-    try {
-        for (const notification of notifications) {
-            // A `block`-only rule is enforced, not announced; the gateway does not send it, and a stray one is skipped.
-            if (notification.action === "block") {
-                continue;
-            }
+    // A `block`-only rule is enforced, not announced; the gateway does not send it, and a stray one is skipped.
+    const alerts = notifications.filter((notification) => notification.action !== "block").map((notification) => toUsageAlert(userId, notification, signedAtMs));
 
-            // The notification is the user's: it goes on their shard.
-            await context.forShard(userId).runMutation(internal.notifications.functions.createNotification, toUsageAlert(userId, notification, signedAtMs));
+    try {
+        if (alerts.length > 0) {
+            // One mutation on the user's shard for the whole batch: it fits the gateway's request deadline however many rules fired.
+            await context.forShard(userId).runMutation(internal.notifications.functions.createNotifications, { notifications: alerts });
         }
     } catch (error) {
         console.error("[GatewayNotifications] Failed to write notifications:", error);

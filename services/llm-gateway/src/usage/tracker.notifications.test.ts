@@ -50,7 +50,7 @@ describe(sendNotifications, () => {
     });
 
     it("splits a large batch into signed requests of at most 50 and sends every rule", async () => {
-        const many = Array.from({ length: 120 }, (_, index): NotificationEvent => ({ ...notifications[0]!, ruleId: `r${index}` }));
+        const many = Array.from({ length: 120 }, (_, index): NotificationEvent => {return { ...notifications[0]!, ruleId: `r${index}` }});
         const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response("{}", { status: 200 }));
 
         vi.stubGlobal("fetch", fetchMock);
