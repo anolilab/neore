@@ -196,11 +196,58 @@ const firingDatabase = (action = "notify") => {
             return { total: 5 };
         },
         run: async () => {
-            return {};
+            return { meta: { changes: 1 } };
         },
     };
 
     return { prepare: () => statement } as unknown as D1Database;
+};
+
+/** A D1 stand-in with one shared rule row: reads see a snapshot, the cooldown update is conditional like the real statement. */
+const racingDatabase = () => {
+    const state = { lastTriggeredAt: null as string | null };
+    const rule = () => {
+        return {
+            action: "notify",
+            id: "rule-1",
+            last_triggered_at: state.lastTriggeredAt,
+            metric: "request_count",
+            model_filter: null,
+            name: "Budget",
+            period: "day",
+            threshold: 1,
+        };
+    };
+
+    return {
+        prepare: (sql: string) => {
+            const statement = {
+                all: async () => {
+                    const snapshot = rule();
+
+                    // Yield so a concurrent evaluation reads before either one writes.
+                    await Promise.resolve();
+
+                    return { results: [snapshot] };
+                },
+                bind: () => statement,
+                first: async () => {
+                    return { total: 5 };
+                },
+                run: async () => {
+                    if (!sql.startsWith("UPDATE notification_rules")) return { meta: { changes: 0 } };
+
+                    if (sql.includes("last_triggered_at IS NULL") && state.lastTriggeredAt !== null) return { meta: { changes: 0 } };
+
+                    state.lastTriggeredAt = "2026-01-01 10:59:58";
+
+                    return { meta: { changes: 1 } };
+                },
+            };
+
+            return statement;
+        },
+    } as unknown as D1Database;
 };
 
 describe(evaluateRules, () => {
@@ -214,6 +261,18 @@ describe(evaluateRules, () => {
         const result = await evaluateRules({ USAGE_DB: firingDatabase() } as AppEnv, "user-1", undefined, {} as UsageLogEntry);
 
         expect(result.notifications).toEqual([expect.objectContaining({ firedAt: Date.UTC(2026, 0, 1, 10, 59, 58), ruleId: "rule-1" })]);
+    });
+});
+
+describe("evaluateRules concurrency", () => {
+    it("lets only one of two concurrent evaluations of the same rule fire", async () => {
+        const appEnv = { USAGE_DB: racingDatabase() } as AppEnv;
+        const results = await Promise.all([
+            evaluateRules(appEnv, "user-1", undefined, {} as UsageLogEntry),
+            evaluateRules(appEnv, "user-1", undefined, {} as UsageLogEntry),
+        ]);
+
+        expect(results.flatMap((result) => result.notifications)).toHaveLength(1);
     });
 });
 
