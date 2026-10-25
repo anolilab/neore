@@ -13,8 +13,13 @@ import { useUpdateUserSettings } from "./use-user-settings";
 const QUERY_KEY = ["getUserSettings"];
 
 const harness = vi.hoisted(() => {
-    return { sent: [] as { release: () => void; value: string | undefined }[] };
+    return { sent: [] as { fail: () => void; release: () => void; value: string | undefined }[] };
 });
+
+const sendSave = (body: { threadTitleInstructions?: string }) =>
+    new Promise<void>((resolve, reject) => {
+        harness.sent.push({ fail: () => reject(new Error("save failed")), release: resolve, value: body.threadTitleInstructions });
+    });
 
 vi.mock("@/lib/lunora/crpc", () => {
     return {
@@ -30,10 +35,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                         updateUserSettings: {
                             mutationOptions: () => {
                                 return {
-                                    mutationFn: (body: { threadTitleInstructions?: string }) =>
-                                        new Promise<void>((resolve) => {
-                                            harness.sent.push({ release: resolve, value: body.threadTitleInstructions });
-                                        }),
+                                    mutationFn: sendSave,
                                 };
                             },
                         },
@@ -207,5 +209,35 @@ describe("useUpdateUserSettings.updateLatest", () => {
         await flush();
 
         expect(harness.sent).toHaveLength(2);
+    });
+
+    it("leaves the new account's cache alone when a save of the previous account fails", async () => {
+        const { queryClient, result } = setup();
+
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "Old", userId: "guest" });
+
+        let outcome: Promise<void> = Promise.resolve();
+
+        act(() => {
+            outcome = result.current.updateLatest(() => {
+                return { threadTitleInstructions: "New" };
+            });
+        });
+        await flush();
+
+        // Signing in over the guest rebuilds the cache with the new account's row while the save is out.
+        await vi.waitFor(() => expect(harness.sent).toHaveLength(1));
+        queryClient.clear();
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "Member's", userId: "member" });
+
+        const rejected = expect(outcome).rejects.toThrow("save failed");
+
+        await act(async () => {
+            harness.sent[0]?.fail();
+            await Promise.resolve();
+        });
+        await rejected;
+
+        expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "Member's", userId: "member" });
     });
 });

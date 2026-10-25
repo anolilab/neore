@@ -52,13 +52,16 @@ export const useUpdateUserSettings = () => {
                 });
             }
 
-            // Return a context object with the snapshotted value
-            return { previousSettings };
+            // Return a context object with the snapshotted value, and the cache entry it came from
+            return { previousSettings, cacheEntry: queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }) };
         },
-        onError: (_error, _args, context: { previousSettings?: UserSettingsRow } | undefined) => {
+        onError: (_error, _args, context: { cacheEntry?: unknown; previousSettings?: UserSettingsRow } | undefined) => {
             // If the mutation fails, use the context returned from onMutate to roll back. Not while a queued write is behind
             // this one: the snapshot predates the edits it queued, so restoring it would drop them. The last write to settle refetches.
-            if (settingsWrites.pending <= 1 && context?.previousSettings) {
+            // Not either when the cache was rebuilt meanwhile (a sign-in clears it): the snapshot is the previous account's row.
+            const sameEntry = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }) === context?.cacheEntry;
+
+            if (sameEntry && settingsWrites.pending <= 1 && context?.previousSettings) {
                 queryClient.setQueryData(queryOptions.queryKey, context.previousSettings);
             }
         },
