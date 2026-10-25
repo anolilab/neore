@@ -149,4 +149,35 @@ describe("useUpdateUserSettings.updateLatest", () => {
         // Only the first request, made before the switch, ever left.
         expect(harness.sent).toHaveLength(1);
     });
+
+    it("drops a queued write when the cache was cleared and the new account has no settings row yet", async () => {
+        const { queryClient, result } = setup();
+
+        queryClient.setQueryData(QUERY_KEY, null);
+
+        let second: Promise<void> = Promise.resolve();
+
+        act(() => {
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "First" };
+            });
+            second = result.current.updateLatest(() => {
+                return { threadTitleInstructions: "Second" };
+            });
+        });
+        await flush();
+
+        queryClient.clear();
+        queryClient.setQueryData(QUERY_KEY, null);
+
+        const outcome = expect(second).rejects.toThrow("account changed");
+
+        await act(async () => {
+            harness.sent[0]?.release();
+            await Promise.resolve();
+        });
+        await outcome;
+
+        expect(harness.sent).toHaveLength(1);
+    });
 });
