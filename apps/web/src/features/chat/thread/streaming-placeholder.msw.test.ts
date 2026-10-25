@@ -34,7 +34,7 @@ const linesStream = (lines: string[], options: { failAfter?: number; gapMs?: num
     let index = 0;
 
     return new ReadableStream<Uint8Array>({
-        async pull(controller) {
+        async pull(controller: ReadableStreamDefaultController<Uint8Array>) {
             if (options.failAfter !== undefined && index === options.failAfter) {
                 controller.error(new Error("connection reset"));
 
@@ -79,7 +79,7 @@ const start = (options: { onReconnecting?: (attempt: number) => void; onUpdate?:
     return startStreaming(
         new URL(GATEWAY),
         "s1" as never,
-        (delta) => {
+        (delta: { text: string }) => {
             text += delta.text;
             options.onUpdate?.(delta.text);
         },
@@ -88,7 +88,7 @@ const start = (options: { onReconnecting?: (attempt: number) => void; onUpdate?:
         options.onReconnecting,
         "token",
         options.signal ?? new AbortController().signal,
-    ).then((done) => {
+    ).then((done: boolean) => {
         return { done, text };
     });
 };
@@ -189,7 +189,7 @@ describe(startStreaming, () => {
         );
 
         const pending = start({
-            onUpdate: (chunk) => {
+            onUpdate: (chunk: string) => {
                 received += chunk;
                 controller.abort();
             },

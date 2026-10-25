@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 
 import { cloudflare } from "@cloudflare/vite-plugin";
@@ -54,7 +55,7 @@ const mswServiceWorker = (): Plugin => {
     return {
         apply: "serve",
         configureServer(server) {
-            server.middlewares.use("/mockServiceWorker.js", (_request, response) => {
+            server.middlewares.use("/mockServiceWorker.js", (_request: IncomingMessage, response: ServerResponse) => {
                 response.setHeader("Content-Type", "application/javascript");
                 response.end(readFileSync(join(server.config.root, "node_modules/msw/lib/mockServiceWorker.js")));
             });
