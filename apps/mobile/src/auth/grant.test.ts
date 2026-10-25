@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Fetch, GrantStore, StoredGrant } from "./grant";
 import { buildAuthorizeUrl, createPkce, exchangeGrant, fetchAccessToken, parseAuthorizeResponse, SignInError, signOutGrant, toBase64Url } from "./grant";
@@ -117,6 +117,27 @@ describe("grant storage", () => {
 
         await expect(exchangeGrant({ code: "c", fetch, lunoraUrl: LUNORA, redirectUri: REDIRECT, store, verifier: "v" })).rejects.toThrow("Code expired.");
         expect(store.value).toBeNull();
+    });
+
+    it("an exchange that never answers times out, stores nothing and says so", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const store = memoryStore();
+            const fetch: Fetch = (_url, init) =>
+                new Promise((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+                });
+
+            const pending = exchangeGrant({ code: "c", fetch, lunoraUrl: LUNORA, redirectUri: REDIRECT, store, verifier: "v" });
+            const failure = expect(pending).rejects.toThrow("Sign-in timed out. Try again.");
+
+            await vi.advanceTimersByTimeAsync(15_000);
+            await failure;
+            expect(store.value).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("a 401 from the token route clears the grant", async () => {

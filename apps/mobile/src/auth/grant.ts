@@ -155,14 +155,32 @@ const readError = async (response: Response): Promise<string> => {
     }
 };
 
-const postJson = async (fetch: Fetch, url: string, body: unknown): Promise<Response> =>
-    await fetch(url, {
-        body: JSON.stringify(body),
-        // No cookies: the grant path is bearer-only, like the Firefox extension.
-        credentials: "omit",
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-    });
+/** Bounds every auth request: a stalled exchange, refresh or revoke would otherwise leave sign-in or sign-out pending forever. */
+const AUTH_REQUEST_TIMEOUT_MS = 15_000;
+
+const postJson = async (fetch: Fetch, url: string, body: unknown): Promise<Response> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS);
+
+    try {
+        return await fetch(url, {
+            body: JSON.stringify(body),
+            // No cookies: the grant path is bearer-only, like the Firefox extension.
+            credentials: "omit",
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+            signal: controller.signal,
+        });
+    } catch (error) {
+        if (controller.signal.aborted) {
+            throw new SignInError("Sign-in timed out. Try again.");
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timer);
+    }
+};
 
 /**
  * Trade the code for the session token and keep ONLY that token and the user.
