@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useCallback } from "react";
 
 export type NotificationType =
-    "ask_user" | "chat_import" | "coding_agent" | "daily_brief" | "data_export" | "eval" | "sub_agent" | "task" | "tool_approval" | "trigger";
+    "ask_user" | "chat_import" | "coding_agent" | "daily_brief" | "data_export" | "eval" | "sub_agent" | "task" | "tool_approval" | "trigger" | "usage_alert";
 
 export interface NotificationLike {
     outcome?: "failure" | "success";
@@ -52,6 +52,9 @@ const useNotificationHeadline = (): ((notification: NotificationLike) => string)
                 }
                 case "trigger": {
                     return failed ? t`Trigger run failed` : t`Trigger run finished`;
+                }
+                case "usage_alert": {
+                    return t`A usage alert was triggered`;
                 }
                 default: {
                     return t`Notification`;

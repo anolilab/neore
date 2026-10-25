@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import {
     createNotification,
+    createNotifications,
     getNotificationInbox,
     markAllNotificationsRead,
     markNotificationRead,
@@ -15,6 +16,7 @@ import {
     pruneOldNotifications,
 } from "./functions";
 import { normalizeNotification, safeNotificationLink } from "./notify";
+import { MAX_NOTIFICATIONS_PER_BATCH } from "./validators";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -169,6 +171,32 @@ describe("retention", () => {
         const items = await itemsOf(USER);
 
         expect(items.map((item) => item.title)).toEqual(["New"]);
+    });
+});
+
+describe("createNotifications", () => {
+    const batch = (size: number) =>
+        Array.from({ length: size }, (_, index) => {
+            return { dedupeKey: `batch:${index}`, title: "Alert", type: "usage_alert", userId: USER };
+        });
+
+    /** Every row, unlike the inbox, which lists only its newest {@link INBOX_LIMIT}. */
+    const stored = async (): Promise<number> => {
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.notifications.findMany({ where: { userId: USER } }));
+
+        return page.length;
+    };
+
+    it("writes a full batch in one call", async () => {
+        await runInternal(createNotifications, { notifications: batch(MAX_NOTIFICATIONS_PER_BATCH) });
+
+        await expect(stored()).resolves.toBe(MAX_NOTIFICATIONS_PER_BATCH);
+    });
+
+    it("refuses a batch past the cap and writes none of it", async () => {
+        await expect(runInternal(createNotifications, { notifications: batch(MAX_NOTIFICATIONS_PER_BATCH + 1) })).rejects.toThrow();
+
+        await expect(stored()).resolves.toBe(0);
     });
 });
 

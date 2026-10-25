@@ -58,12 +58,54 @@ const signRequest = async (method: string, url: string, body: ArrayBuffer, secre
 };
 
 /**
+ * The body's bytes, or `null` once it runs past `maxBytes`. Counts as it
+ * streams, so a body that lies about (or omits) its Content-Length is cut off at
+ * the cap instead of being buffered whole.
+ */
+const readBodyWithin = async (body: ReadableStream<Uint8Array> | null, maxBytes: number): Promise<Uint8Array | null> => {
+    const reader = body?.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+
+    while (reader) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+            break;
+        }
+
+        total += value.byteLength;
+
+        if (total > maxBytes) {
+            // Not awaited: this reader is one branch of a tee, and a branch's cancel settles only once the other branch (the caller's body) is cancelled too.
+            reader.cancel().catch(() => {});
+
+            return null;
+        }
+
+        chunks.push(value);
+    }
+
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+
+    return bytes;
+};
+
+/**
  * Verify a request signed by {@link signRequest} (or a service's twin of it):
  * the timestamp is inside {@link SERVICE_REQUEST_WINDOW_MS} and the signature
  * covers method, canonical path+query, timestamp and body hash. Reads the body
- * from a clone, so the caller can still consume it.
+ * from a clone, so the caller can still consume it. With `maxBodyBytes`, a body
+ * past that size is not verified (`false`) and never buffered whole; only the
+ * caller that knows its payload's bound can set it.
  */
-const verifySignedRequest = async (request: Request, secret: string): Promise<boolean> => {
+const verifySignedRequest = async (request: Request, secret: string, maxBodyBytes?: number): Promise<boolean> => {
     const signature = request.headers.get("X-Signature");
     const timestamp = request.headers.get("X-Timestamp");
 
@@ -71,7 +113,16 @@ const verifySignedRequest = async (request: Request, secret: string): Promise<bo
         return false;
     }
 
-    const bodyHash = await sha256Hex(await request.clone().arrayBuffer());
+    const body = maxBodyBytes === undefined ? await request.clone().arrayBuffer() : await readBodyWithin(request.clone().body, maxBodyBytes);
+
+    if (body === null) {
+        // Release the caller's branch so the cancelled clone can settle; the 401 follows at once.
+        request.body?.cancel().catch(() => {});
+
+        return false;
+    }
+
+    const bodyHash = await sha256Hex(body);
     const message = `${request.method}\n${canonicalPathAndQuery(request.url)}\n${timestamp}\n${bodyHash}`;
 
     return timingSafeEqual(signature, await hmacSha256Hex(secret, message));

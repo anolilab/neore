@@ -12626,6 +12626,13 @@
       "module": "notifications"
     },
     {
+      "detail": "mutation",
+      "id": "function:notifications_functions:createNotifications",
+      "kind": "function",
+      "name": "notifications.functions.createNotifications",
+      "module": "notifications"
+    },
+    {
       "detail": "query",
       "id": "function:notifications_functions:getNotificationInbox",
       "kind": "function",
@@ -17404,6 +17411,12 @@
       "reason": "\"buildDeviceTools\" is not a registered function"
     },
     {
+      "file": "chat/lib/gateway-notifications",
+      "kind": "call",
+      "line": 114,
+      "reason": "\"gatewayNotificationsHttpAction\" is not a registered function"
+    },
+    {
       "file": "chat/lib/gateway-usage",
       "kind": "call",
       "line": 48,
@@ -19764,19 +19777,25 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 211,
+      "line": 213,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 216,
+      "line": 218,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 241,
+      "line": 223,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "triggers/http",
+      "kind": "call",
+      "line": 245,
       "reason": "the default export is not a registered function"
     },
     {

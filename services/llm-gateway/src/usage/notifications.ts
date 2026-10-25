@@ -12,6 +12,8 @@ import type { UsageLogEntry } from "./tracker.js";
 export interface NotificationEvent {
     action: "notify" | "block" | "notify_and_block";
     currentValue: number;
+    /** When the rule fired (epoch ms): the backend keys the inbox row on it, so one firing is one row however often it is delivered. */
+    firedAt: number;
     metric: string;
     ruleId: string;
     ruleName: string;
@@ -62,6 +64,12 @@ export const evaluateRules = async (
             const currentValue = await getMetricValue(database, userId, metric, period);
 
             if (currentValue >= threshold) {
+                // Claim the cooldown slot before acting: the read above is not serialised with other requests of the same
+                // user, so only the evaluation whose conditional update changes a row may fire.
+                if (!(await claimCooldown(database, ruleId))) {
+                    continue;
+                }
+
                 if (action === "block" || action === "notify_and_block") {
                     isBlocked = true;
                 }
@@ -70,15 +78,13 @@ export const evaluateRules = async (
                     notifications.push({
                         action,
                         currentValue,
+                        firedAt: Date.now(),
                         metric,
                         ruleId,
                         ruleName: rule["name"] as string,
                         threshold,
                     });
                 }
-
-                // Update last_triggered_at
-                await database.prepare("UPDATE notification_rules SET last_triggered_at = datetime('now') WHERE id = ?").bind(ruleId).run();
             }
         }
     } catch (error) {
@@ -87,6 +93,18 @@ export const evaluateRules = async (
     }
 
     return { blocked: isBlocked, notifications };
+};
+
+/** Compare-and-set on `last_triggered_at`: true only for the caller whose update changed the row. */
+const claimCooldown = async (database: D1Database, ruleId: string): Promise<boolean> => {
+    const result = await database
+        .prepare(
+            "UPDATE notification_rules SET last_triggered_at = datetime('now') WHERE id = ? AND (last_triggered_at IS NULL OR last_triggered_at <= datetime('now', ?))",
+        )
+        .bind(ruleId, `-${COOLDOWN_MS / 1000} seconds`)
+        .run();
+
+    return (result.meta?.changes ?? 0) > 0;
 };
 
 const getMetricValue = async (database: D1Database, userId: string, metric: string, period: string): Promise<number> => {

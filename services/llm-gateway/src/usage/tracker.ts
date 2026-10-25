@@ -203,10 +203,13 @@ export class UsageTracker {
     async recordAndEvaluate(entry: UsageLogEntry, telemetry?: RequestTelemetry): Promise<RecordResult> {
         if (telemetry) UsageTracker.recordMetrics(telemetry, entry);
 
+        // Started here, not at delivery: recording and rule evaluation spend the same background window.
+        const deadline = AbortSignal.timeout(NOTIFICATIONS_DEADLINE_MS);
+
         try {
             await this.record(entry);
 
-            return await evaluateAndNotify(this.env, this.db, entry);
+            return await evaluateAndNotify(this.env, this.db, entry, deadline);
         } finally {
             await flushQuietly(telemetry);
         }
@@ -228,8 +231,9 @@ export class UsageTracker {
     }
 }
 
-const evaluateAndNotify = async (env: AppEnv, db: D1Database, entry: UsageLogEntry): Promise<RecordResult> => {
+const evaluateAndNotify = async (env: AppEnv, db: D1Database, entry: UsageLogEntry, deadline: AbortSignal): Promise<RecordResult> => {
     const result = await evaluateRules(env, entry.userId, entry.orgId, entry);
+    let { notifications } = result;
 
     // If blocked, store in KV for pre-request checks (1-hour TTL) and fire budget_exceeded webhook
     if (result.blocked) {
@@ -238,7 +242,10 @@ const evaluateAndNotify = async (env: AppEnv, db: D1Database, entry: UsageLogEnt
         try {
             await kv.put(`blocked:${entry.userId}`, new Date(Date.now() + 3_600_000).toISOString(), { expirationTtl: 3600 });
         } catch {
-            // Non-critical
+            // Block checks read this marker, so without it nothing is enforced: the alert must not say it is.
+            notifications = notifications.map((notification) =>
+                notification.action === "notify_and_block" ? { ...notification, action: "notify" } : notification,
+            );
         }
 
         // Fire budget_exceeded webhook (non-blocking, best-effort)
@@ -260,9 +267,9 @@ const evaluateAndNotify = async (env: AppEnv, db: D1Database, entry: UsageLogEnt
     }
 
     // Forward notifications to the backend if any were triggered
-    if (result.notifications.length > 0) {
+    if (notifications.length > 0) {
         try {
-            await sendNotifications(env, entry.userId, result.notifications);
+            await sendNotifications(env, entry.userId, notifications, deadline);
         } catch {
             // Non-critical — notifications are best-effort
         }
@@ -280,12 +287,22 @@ const flushQuietly = async (telemetry: RequestTelemetry | undefined): Promise<vo
     }
 };
 
-const sendNotifications = async (env: AppEnv, userId: string, notifications: NotificationEvent[]): Promise<void> => {
-    const lunoraUrl = env.LUNORA_URL;
-    const secret = env.SIGNING_SECRET;
+/** The backend refuses a larger batch (`MAX_NOTIFICATIONS_PER_BATCH`), so a user with many firing rules is sent in slices. */
+const NOTIFICATIONS_PER_REQUEST = 50;
 
-    if (!lunoraUrl || !secret) return;
+/** Slices in flight at once: the backend writes each in its own transaction on the user's shard, so a few at a time is enough. */
+const NOTIFICATION_CONCURRENCY = 4;
 
+/** Recording, rule evaluation and delivery together must end inside the 30 s `waitUntil` window, whatever the number of slices; later slices are abandoned, and logged, after it. */
+const NOTIFICATIONS_DEADLINE_MS = 25_000;
+
+const postNotifications = async (
+    lunoraUrl: string,
+    secret: string,
+    userId: string,
+    notifications: NotificationEvent[],
+    deadline: AbortSignal,
+): Promise<void> => {
     const body = JSON.stringify({ notifications, userId });
     const timestamp = Date.now().toString();
     const bodyHash = await sha256Hex(new TextEncoder().encode(body));
@@ -296,11 +313,56 @@ const sendNotifications = async (env: AppEnv, userId: string, notifications: Not
         body,
         headers: { "Content-Type": "application/json", "X-Signature": signature, "X-Timestamp": timestamp },
         method: "POST",
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.any([deadline, AbortSignal.timeout(10_000)]),
     });
 
-    // Nothing reads the reply; cancel it so the Worker releases the connection.
-    await response.body?.cancel();
+    // Log before the body is released, so a cancel that throws cannot hide the status.
+    // Status and rule actions only — the payload names a user and their spend.
+    if (!response.ok) {
+        console.error("[Notifications] Backend rejected usage notifications", { actions: notifications.map((n) => n.action), status: response.status });
+    }
+
+    // Nothing reads the reply; cancel it so the Worker releases the connection. The backend has answered, so a failed release is not a failed delivery.
+    await response.body?.cancel().catch(() => {});
+};
+
+export const sendNotifications = async (
+    env: AppEnv,
+    userId: string,
+    notifications: NotificationEvent[],
+    deadline: AbortSignal = AbortSignal.timeout(NOTIFICATIONS_DEADLINE_MS),
+): Promise<void> => {
+    const lunoraUrl = env.LUNORA_URL;
+    const secret = env.SIGNING_SECRET;
+
+    if (!lunoraUrl || !secret) return;
+
+    const slices: NotificationEvent[][] = [];
+
+    for (let offset = 0; offset < notifications.length; offset += NOTIFICATIONS_PER_REQUEST) {
+        slices.push(notifications.slice(offset, offset + NOTIFICATIONS_PER_REQUEST));
+    }
+
+    let next = 0;
+
+    // A small pool of workers drains the slices, so one slow slice delays only its own worker and the deadline bounds the rest.
+    const worker = async (): Promise<void> => {
+        for (let slice = slices[next++]; slice; slice = slices[next++]) {
+            try {
+                if (deadline.aborted) throw new DOMException("delivery deadline reached", "TimeoutError");
+
+                await postNotifications(lunoraUrl, secret, userId, slice, deadline);
+            } catch (error) {
+                // Best-effort, but never silent: a timeout or a dropped connection is otherwise lost. No retry, no payload.
+                console.error("[Notifications] Failed to deliver usage notifications", {
+                    actions: slice.map((n) => n.action),
+                    error: error instanceof Error ? `${error.name}: ${error.message}` : "unknown error",
+                });
+            }
+        }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(NOTIFICATION_CONCURRENCY, slices.length) }, worker));
 };
 
 const sha256Hex = async (data: ArrayBuffer | Uint8Array): Promise<string> => {

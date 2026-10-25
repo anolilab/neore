@@ -952,7 +952,7 @@ export interface Doc_notifications {
     link?: string;
     outcome?: "success" | "failure";
     title: string;
-    type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief";
+    type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert";
     userId: string;
     createdAt: number;
     readAt?: number;
@@ -3681,7 +3681,7 @@ export interface Insert_notifications {
     link?: string;
     outcome?: "success" | "failure";
     title: string;
-    type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief";
+    type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert";
     userId: string;
     createdAt: number;
     readAt?: number;

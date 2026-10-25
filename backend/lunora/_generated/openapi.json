@@ -25204,6 +25204,10 @@
                               {
                                 "const": "daily_brief",
                                 "type": "string"
+                              },
+                              {
+                                "const": "usage_alert",
+                                "type": "string"
                               }
                             ]
                           }
@@ -28885,6 +28889,10 @@
                               },
                               {
                                 "const": "daily_brief",
+                                "type": "string"
+                              },
+                              {
+                                "const": "usage_alert",
                                 "type": "string"
                               }
                             ]

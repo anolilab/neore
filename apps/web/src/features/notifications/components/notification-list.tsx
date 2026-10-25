@@ -46,6 +46,7 @@ const TYPE_ICONS: Record<NotificationType, ComponentType<{ className?: string }>
     task: ListChecks,
     tool_approval: ShieldQuestion,
     trigger: Zap,
+    usage_alert: Bell,
 };
 
 const OUTCOME_ICONS: Record<"failure" | "success", ComponentType<{ className?: string }>> = {

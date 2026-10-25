@@ -1090,6 +1090,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "notifications_daily_brief:setDailyBriefEnabled": lunora_notifications_daily_brief_128.setDailyBriefEnabled as unknown as RegisteredLunoraFunction,
     "notifications_daily_brief:writeDailyBrief": lunora_notifications_daily_brief_128.writeDailyBrief as unknown as RegisteredLunoraFunction,
     "notifications_functions:createNotification": lunora_notifications_functions_129.createNotification as unknown as RegisteredLunoraFunction,
+    "notifications_functions:createNotifications": lunora_notifications_functions_129.createNotifications as unknown as RegisteredLunoraFunction,
     "notifications_functions:getNotificationInbox": lunora_notifications_functions_129.getNotificationInbox as unknown as RegisteredLunoraFunction,
     "notifications_functions:markAllNotificationsRead": lunora_notifications_functions_129.markAllNotificationsRead as unknown as RegisteredLunoraFunction,
     "notifications_functions:markNotificationRead": lunora_notifications_functions_129.markNotificationRead as unknown as RegisteredLunoraFunction,
@@ -8721,7 +8722,7 @@ export interface Caller {
     };
     home: {
         overview: {
-            getHomeOverview: (args?: {}) => Promise<{ approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
+            getHomeOverview: (args?: {}) => Promise<{ approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
         };
     };
     init: {
@@ -8955,8 +8956,9 @@ export interface Caller {
             writeDailyBrief: (args: { localDay: string; summary: string; userId: string }) => Promise<null>;
         };
         functions: {
-            createNotification: (args: { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief"; userId: string }) => Promise<null>;
-            getNotificationInbox: (args?: {}) => Promise<{ items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" }>; unreadCount: number }>;
+            createNotification: (args: { body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }) => Promise<null>;
+            createNotifications: (args: { notifications: Array<{ body?: string; dedupeKey?: string; emailOutcome?: boolean; link?: string; outcome?: "success" | "failure"; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert"; userId: string }> }) => Promise<null>;
+            getNotificationInbox: (args?: {}) => Promise<{ items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; unreadCount: number }>;
             markAllNotificationsRead: (args?: {}) => Promise<{ hasMore: boolean }>;
             markNotificationRead: (args: { notificationId: Id<"notifications"> }) => Promise<null>;
             pruneOldNotifications: (args?: {}) => Promise<null>;
@@ -10580,6 +10582,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
         },
         functions: {
             createNotification: (args) => callRegistered(context, "notifications_functions:createNotification", args),
+            createNotifications: (args) => callRegistered(context, "notifications_functions:createNotifications", args),
             getNotificationInbox: (args) => callRegistered(context, "notifications_functions:getNotificationInbox", args),
             markAllNotificationsRead: (args) => callRegistered(context, "notifications_functions:markAllNotificationsRead", args),
             markNotificationRead: (args) => callRegistered(context, "notifications_functions:markNotificationRead", args),

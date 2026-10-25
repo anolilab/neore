@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import signRequest from "./sign-request";
+import signRequest, { verifySignedRequest } from "./sign-request";
 
 const HEX_RE = /^[\da-f]+$/;
 
@@ -76,5 +76,40 @@ describe("signRequest", () => {
 
         expect(result["X-Signature"]).toBeDefined();
         expect(result["X-Signature"].length).toBeGreaterThan(0);
+    });
+});
+
+describe("verifySignedRequest with a body cap", () => {
+    const secret = "test-secret-key-12345";
+    const url = "https://api.example.com/gateway/notifications";
+
+    const signed = async (body: ArrayBuffer): Promise<Request> => {
+        const headers = await signRequest("POST", url, body, secret);
+
+        return new Request(url, { body, headers, method: "POST" });
+    };
+
+    it("accepts a body inside the cap and leaves it readable for the caller", async () => {
+        const request = await signed(new TextEncoder().encode("small").buffer as ArrayBuffer);
+
+        await expect(verifySignedRequest(request, secret, 1024)).resolves.toBeTruthy();
+        await expect(request.text()).resolves.toBe("small");
+    });
+
+    it("answers false for a body past the cap without waiting for the stream to end", async () => {
+        const chunk = new Uint8Array(64);
+        const body = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                controller.enqueue(chunk);
+            },
+        });
+        const request = new Request(url, {
+            body,
+            duplex: "half",
+            headers: { "X-Signature": "00", "X-Timestamp": Date.now().toString() },
+            method: "POST",
+        } as RequestInit);
+
+        await expect(verifySignedRequest(request, secret, 256)).resolves.toBeFalsy();
     });
 });
