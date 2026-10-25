@@ -202,6 +202,8 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    replay must be evaluated again. A replay that still misses writes only the
         //    one collapsed history row. It runs nothing, so it is not charged
         //    (`admitTriggerRun` lives in the execution) and does not count as a run.
+        //    The claim travels to the execution, which gives it back too if admission
+        //    refuses the delivery against filters saved after this check.
         //    202, not 200: the delivery was accepted and deliberately not acted on.
         //    The body is decoded strictly for this: the lossy decode above turns invalid
         //    UTF-8 into U+FFFD, which could let bytes that are not JSON parse as JSON.
@@ -238,6 +240,7 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
         //    this same delivery reads as a replay, and it never runs at all.
         try {
             await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, {
+                claim,
                 payload: body || undefined,
                 triggerId: triggerId as Id<"triggers">,
             });

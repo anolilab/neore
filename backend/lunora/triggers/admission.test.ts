@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
 import schema from "../schema";
-import { claimKey } from "../lib/claim-once";
+import { claimKey, releaseKey } from "../lib/claim-once";
 import { hmacSha256Hex } from "../lib/crypto";
 import { admitTriggerRun, createExecution } from "./functions";
 import handleTriggerWebhook from "./http";
@@ -76,17 +76,18 @@ const insertTrigger = async (): Promise<string> =>
 const executions = async (): Promise<{ status: string }[]> => await harness.run(async (ctx: any) => await ctx.db.query("triggerExecutions").collect());
 
 /** The webhook handler against a trigger snapshot taken BEFORE the owner saved filters; returns what it scheduled. */
-const deliver = async (triggerId: string): Promise<{ payload?: string }> => {
-    const scheduled: { payload?: string }[] = [];
+const deliver = async (triggerId: string): Promise<{ claim?: { key: string; scope: string }; payload?: string }> => {
+    const scheduled: { claim?: { key: string; scope: string }; payload?: string }[] = [];
     const timestamp = String(Math.floor(NOW / 1000));
     const signature = await hmacSha256Hex(SECRET, `${timestamp}.${BODY}`);
     const context = {
-        runMutation: async (_reference: unknown, args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(claimKey, args)),
+        runMutation: async (reference: unknown, args: unknown) =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(reference === internal.lib.claim_once.releaseKey ? releaseKey : claimKey, args)),
         runQuery: async () => {
             return { enabled: true, type: "webhook", userId: "u", webhookSecret: SECRET };
         },
         scheduler: {
-            runAfter: async (_delay: number, reference: unknown, args: { payload?: string }) => {
+            runAfter: async (_delay: number, reference: unknown, args: { claim?: { key: string; scope: string }; payload?: string }) => {
                 expect(reference).toBe(internal.triggers.execute.executeTrigger);
                 scheduled.push(args);
             },
@@ -104,14 +105,14 @@ const deliver = async (triggerId: string): Promise<{ payload?: string }> => {
 
     expect(response.status).toBe(200);
 
-    return scheduled[0] as { payload?: string };
+    return scheduled[0] as { claim?: { key: string; scope: string }; payload?: string };
 };
 
-const admit = async (triggerId: string, payload: string | undefined) =>
+const admit = async (triggerId: string, payload: string | undefined, claim?: { key: string; scope: string }) =>
     await harness.run(async (ctx: any) => {
         const executionId = await ctx.runMutation(createExecution, { payload, triggerId });
 
-        return await ctx.runMutation(admitTriggerRun, { executionId, filterPayload: payload ?? "", triggerId });
+        return await ctx.runMutation(admitTriggerRun, { claim, executionId, filterPayload: payload ?? "", triggerId });
     });
 
 beforeEach(() => {
@@ -138,6 +139,32 @@ describe("admitTriggerRun filter recheck", () => {
         expect(charged.rounds).toBe(0);
         // The running row the execution created is replaced by the one filtered row.
         expect(await executions()).toEqual([expect.objectContaining({ error: 'branch equals "main"', status: "filtered" })]);
+    });
+
+    it("gives the replay claim back, so the same signed body redelivered after the filters are fixed runs", async () => {
+        const triggerId = await insertTrigger();
+        const first = await deliver(triggerId);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: MAIN_ONLY }));
+
+        expect(first.claim).toBeDefined();
+        expect(await admit(triggerId, first.payload, first.claim)).toEqual({ filtered: 'branch equals "main"' });
+
+        await harness.run(async (ctx: any) => await ctx.db.patch(triggerId, { filters: [{ op: "equals", path: "branch", value: "dev" }] }));
+
+        // A duplicate would schedule nothing, so `deliver` would return `undefined`.
+        const redelivery = await deliver(triggerId);
+
+        expect(redelivery).toMatchObject({ payload: first.payload });
+        expect(await admit(triggerId, redelivery.payload, redelivery.claim)).toBeNull();
+    });
+
+    it("keeps the claim of a delivery that is admitted", async () => {
+        const triggerId = await insertTrigger();
+        const first = await deliver(triggerId);
+
+        expect(await admit(triggerId, first.payload, first.claim)).toBeNull();
+        expect(await deliver(triggerId)).toBeUndefined();
     });
 
     it("admits and charges a delivery that still matches", async () => {

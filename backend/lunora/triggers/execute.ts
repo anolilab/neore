@@ -11,16 +11,19 @@ import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
+import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 
 export const executeTrigger = internalAction
     .input({
+        // The webhook delivery's replay claim, given back if admission refuses the delivery. A manual run has none.
+        claim: v.optional(v.object({ key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
         // A manual test run ("Run now") fires a disabled trigger too.
         ignoreDisabled: v.optional(v.boolean()),
         payload: v.optional(v.string()), // Webhook payload or scheduled input
         triggerId: v.id("triggers"),
     })
-    .action(async ({ args: { ignoreDisabled, payload, triggerId }, ctx }) => {
+    .action(async ({ args: { claim, ignoreDisabled, payload, triggerId }, ctx }) => {
         // 1. Fetch trigger config
         const trigger = await ctx.runQuery(internal.triggers.functions.getTriggerInternal, { triggerId });
 
@@ -58,6 +61,7 @@ export const executeTrigger = internalAction
             // A webhook delivery (not a manual "Run now") has its filters checked again at admission,
             // because the owner may have saved stricter ones since the webhook handler evaluated them.
             const refusal = await ctx.runMutation(internal.triggers.functions.admitTriggerRun, {
+                claim,
                 executionId,
                 filterPayload: triggerType === "webhook" && ignoreDisabled !== true ? (payload ?? "") : undefined,
                 triggerId,

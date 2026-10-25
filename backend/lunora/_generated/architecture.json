@@ -20095,7 +20095,7 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 245,
+      "line": 246,
       "reason": "the default export is not a registered function"
     },
     {

@@ -17,6 +17,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { releaseClaim } from "../lib/claim-once";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import type { PayloadFilter } from "./filters";
@@ -685,12 +686,15 @@ const recordFiltered = async (ctx: MutationCtx, triggerId: Id<"triggers">, reaso
  */
 export const admitTriggerRun = internalMutation
     .input({
+        // The webhook delivery's replay claim. A delivery refused here gives it back, as the handler does for one
+        // that misses the filters, so the owner can fix them and redeliver the same signed body.
+        claim: v.optional(v.object({ key: v.string().max(MAX_LENGTH.key), scope: v.string().max(MAX_LENGTH.short) })),
         executionId: v.optional(v.id("triggerExecutions")),
         filterPayload: v.optional(v.string()),
         triggerId: v.id("triggers"),
     })
     .output(v.union(v.null(), v.string(), v.object({ filtered: v.string() })))
-    .mutation(async ({ args: { executionId, filterPayload, triggerId }, ctx }) => {
+    .mutation(async ({ args: { claim, executionId, filterPayload, triggerId }, ctx }) => {
         const trigger = await ctx.db.get(triggerId);
 
         if (!trigger) {
@@ -709,6 +713,15 @@ export const admitTriggerRun = internalMutation
 
                 if (running && running.triggerId === triggerId && running.status === "running") {
                     await ctx.db.delete(running._id);
+                }
+
+                if (claim) {
+                    try {
+                        await releaseClaim(ctx, claim.scope, claim.key);
+                    } catch (error) {
+                        // The refusal stands; a claim left behind only makes a redelivery read as a replay until its TTL.
+                        console.error(`[Triggers] Could not release the replay claim of trigger ${triggerId}:`, error);
+                    }
                 }
 
                 return { filtered: reason };

@@ -961,11 +961,11 @@ export interface InternalApiTypes {
     };
     triggers: {
         execute: {
-            default: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
-            executeTrigger: FunctionReference<"action", { ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            default: FunctionReference<"action", { claim?: { key: string; scope: string }; ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
+            executeTrigger: FunctionReference<"action", { claim?: { key: string; scope: string }; ignoreDisabled?: boolean; payload?: string; triggerId: Id<"triggers"> }, void>;
         };
         functions: {
-            admitTriggerRun: FunctionReference<"mutation", { executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
+            admitTriggerRun: FunctionReference<"mutation", { claim?: { key: string; scope: string }; executionId?: Id<"triggerExecutions">; filterPayload?: string; triggerId: Id<"triggers"> }, null | string | { filtered: string }>;
             createExecution: FunctionReference<"mutation", { payload?: string; triggerId: Id<"triggers"> }, Id<"triggerExecutions">>;
             getDueScheduleTriggers: FunctionReference<"query", { now: number }, import("./dataModel.js").Doc_triggers[]>;
             getTriggerInternal: FunctionReference<"query", { triggerId: Id<"triggers"> }, import("./dataModel.js").Doc_triggers | null>;
