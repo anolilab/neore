@@ -14,8 +14,9 @@
  * - Its explicit parent is the reply's last saved row: the tree parent of the
  *   run's pending row, which is the placeholder the previous step saved for the
  *   next one.
- * - That pending row moves to `(steer order, 1)` and loses any explicit parent,
- *   so it follows the steer row implicitly. The run saves its later steps with
+ * - That pending row moves to `(steer order, 1)`, just after the steer row in
+ *   creation time too, and loses any explicit parent, so it follows the steer
+ *   row implicitly. The run saves its later steps with
  *   the steer row as their prompt, after it (`agent/client/start.ts`).
  * - The reply's rows before the steer keep their place. No other row changes
  *   parent: a row after the pending row in storage order was pinned when the
@@ -83,6 +84,8 @@ export const insertSteerRow = async (ctx: MutationCtx, args: SteerRowArgs): Prom
     }
 
     await patchRow(ctx.db, pending, {
+        // Readers that order by creation time (the extension) must see the continuation after the steer, as storage does.
+        createdAt: (steerRow.createdAt ?? steerRow._creationTime) + 1,
         order: steerRow.order,
         stepOrder: steerRow.stepOrder + 1,
         ...(pending.parentMessageId !== undefined && { parentMessageId: undefined }),

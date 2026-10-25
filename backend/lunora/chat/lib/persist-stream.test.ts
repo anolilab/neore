@@ -157,6 +157,25 @@ describe(pipeToPersistentChunks, () => {
         expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "" });
     });
 
+    it("owes only the text after the restart marker when a stop comes later: the steps before it were saved", async () => {
+        // "Reading." and the marker are accepted; the flush of the continuation is the refused write.
+        const { ctx, written } = ctxAccepting(2);
+        const steered = [false, true];
+
+        async function* continued() {
+            yield* steps();
+            yield { text: " Next.", type: "text-delta" };
+        }
+
+        const error = await pipeToPersistentChunks(ctx as never, "stream-1", continued(), { steeredBefore: () => steered.shift() ?? false }).catch(
+            (error_: unknown) => error_,
+        );
+
+        expect(written).toStrictEqual(["Reading.", ""]);
+        expect(isStreamWriteRefused(error)).toBe(true);
+        expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "The other one Next." });
+    });
+
     it("rethrows any other write failure as it was", async () => {
         const boom = new Error("database down");
         const ctx = {

@@ -104,6 +104,18 @@ describe("insertSteerRow in a thread that never branched", () => {
         expect(await rowById(ids.result!)).toMatchObject({ order: 1, stepOrder: 2 });
     });
 
+    it("stamps the moved pending row after the steer in creation time, which clients ordering by it follow", async () => {
+        const steered = await steer(ids.pending!);
+        const created = async (id: string) => {
+            const row = (await rowById(id)) as StoredRow & { _creationTime: number; createdAt?: number };
+
+            return row.createdAt ?? row._creationTime;
+        };
+
+        expect(await created(ids.pending!)).toBeGreaterThan(await created(steered!.messageId));
+        expect(await created(steered!.messageId)).toBeGreaterThanOrEqual(await created(ids.result!));
+    });
+
     it("saves the run's later steps after the moved pending row, on one line", async () => {
         const steered = await steer(ids.pending!);
         // `start.ts` after the retarget: the pending row is patched, the steer row is the prompt.
