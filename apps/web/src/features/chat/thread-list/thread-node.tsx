@@ -467,6 +467,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
             {hasChildren && (
                 <Button
+                    aria-expanded={isExpanded}
+                    aria-label={isExpanded ? t`Collapse branches` : t`Expand branches`}
                     className="h-4 w-4 p-0"
                     onClick={(e) => {
                         e.stopPropagation();
@@ -475,7 +477,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     size="icon-sm"
                     variant="ghost"
                 >
-                    {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    {isExpanded ? <ChevronDown aria-hidden="true" className="h-3 w-3" /> : <ChevronRight aria-hidden="true" className="h-3 w-3" />}
                 </Button>
             )}
 
@@ -570,6 +572,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         <TooltipTrigger
                             render={
                                 <Button
+                                    aria-label={i18n._(getPinTooltip(isPinning, node.isPinned))}
                                     className="hover:text-primary h-6 w-6 p-0"
                                     disabled={isPinning}
                                     onClick={(e) => {
@@ -590,8 +593,9 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                     type="button"
                                     variant="ghost"
                                 >
-                                    {isPinning && <Loader2 className="h-3 w-3 animate-spin" />}
-                                    {!isPinning && (node.isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />)}
+                                    {isPinning && <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />}
+                                    {!isPinning &&
+                                        (node.isPinned ? <PinOff aria-hidden="true" className="h-3 w-3" /> : <Pin aria-hidden="true" className="h-3 w-3" />)}
                                 </Button>
                             }
                         />
@@ -603,6 +607,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <TooltipTrigger
                         render={
                             <Button
+                                aria-label={isBranching ? t`Creating branch...` : t`Create branch`}
                                 className="hover:text-primary h-6 w-6 p-0"
                                 disabled={isBranching}
                                 onClick={(e) => {
@@ -617,7 +622,11 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 size="icon-sm"
                                 variant="ghost"
                             >
-                                {isBranching ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitBranch className="h-3 w-3" />}
+                                {isBranching ? (
+                                    <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                ) : (
+                                    <GitBranch aria-hidden="true" className="h-3 w-3" />
+                                )}
                             </Button>
                         }
                     />
@@ -628,6 +637,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <TooltipTrigger
                         render={
                             <Button
+                                aria-label={t`Move to project`}
                                 className="hover:text-primary h-6 w-6 p-0"
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -636,7 +646,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 size="icon-sm"
                                 variant="ghost"
                             >
-                                <Folder className="h-3 w-3" />
+                                <Folder aria-hidden="true" className="h-3 w-3" />
                             </Button>
                         }
                     />
@@ -731,6 +741,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 <DropdownMenuTrigger
                                     render={
                                         <Button
+                                            aria-label={isDownloading ? t`Downloading...` : t`Download thread`}
                                             className="hover:text-primary h-6 w-6 p-0"
                                             disabled={isDownloading}
                                             onClick={(e) => {
@@ -739,7 +750,11 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                             size="icon-sm"
                                             variant="ghost"
                                         >
-                                            {isDownloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <DownloadIcon className="h-3 w-3" />}
+                                            {isDownloading ? (
+                                                <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                                <DownloadIcon aria-hidden="true" className="h-3 w-3" />
+                                            )}
                                         </Button>
                                     }
                                 />
@@ -762,6 +777,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <TooltipTrigger
                         render={
                             <Button
+                                aria-label={i18n._(getArchiveTooltip(isArchiving, node.status))}
                                 className="hover:text-primary h-6 w-6 p-0"
                                 disabled={isArchiving}
                                 onClick={(e) => {
@@ -782,7 +798,11 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 size="icon-sm"
                                 variant="ghost"
                             >
-                                {isArchiving ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArchiveIcon className="h-3 w-3" />}
+                                {isArchiving ? (
+                                    <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                ) : (
+                                    <ArchiveIcon aria-hidden="true" className="h-3 w-3" />
+                                )}
                             </Button>
                         }
                     />
@@ -794,6 +814,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         <TooltipTrigger
                             render={
                                 <Button
+                                    aria-label={isConverting ? t`Converting...` : t`Convert to permanent`}
                                     className="hover:text-primary h-6 w-6 p-0"
                                     disabled={isConverting}
                                     onClick={async (e) => {
@@ -816,7 +837,11 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                     size="icon-sm"
                                     variant="ghost"
                                 >
-                                    {isConverting ? <Loader2 className="h-3 w-3 animate-spin" /> : <HourglassIcon className="h-3 w-3" />}
+                                    {isConverting ? (
+                                        <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <HourglassIcon aria-hidden="true" className="h-3 w-3" />
+                                    )}
                                 </Button>
                             }
                         />
@@ -828,6 +853,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <TooltipTrigger
                         render={
                             <Button
+                                aria-label={isDeleting ? t`Deleting...` : t`Delete thread`}
                                 className="hover:text-destructive h-6 w-6 p-0"
                                 disabled={isDeleting}
                                 onClick={(e) => {
@@ -837,7 +863,11 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 size="icon-sm"
                                 variant="ghost"
                             >
-                                {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <TrashIcon className="h-3 w-3" />}
+                                {isDeleting ? (
+                                    <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                ) : (
+                                    <TrashIcon aria-hidden="true" className="h-3 w-3" />
+                                )}
                             </Button>
                         }
                     />

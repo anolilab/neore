@@ -192,8 +192,8 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
                     placeholder={t`Variable name...`}
                     value={newVariableName}
                 />
-                <Button disabled={!newVariableName.trim()} onClick={handleAddVariable} size="icon" variant="outline">
-                    <Plus className="size-4" />
+                <Button aria-label={t`Add variable`} disabled={!newVariableName.trim()} onClick={handleAddVariable} size="icon" variant="outline">
+                    <Plus aria-hidden="true" className="size-4" />
                 </Button>
             </div>
 
@@ -229,8 +229,8 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
                                     <Label className="text-xs" htmlFor={`var-${index}`}>
                                         <code className="bg-primary/10 text-primary rounded px-1">{`{{${variable.name}}}`}</code>
                                     </Label>
-                                    <Button onClick={() => handleRemoveVariable(index)} size="icon-sm" variant="ghost">
-                                        <X className="size-3" />
+                                    <Button aria-label={t`Remove ${variable.name}`} onClick={() => handleRemoveVariable(index)} size="icon-sm" variant="ghost">
+                                        <X aria-hidden="true" className="size-3" />
                                     </Button>
                                 </div>
                                 <Input

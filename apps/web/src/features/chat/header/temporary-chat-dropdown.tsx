@@ -259,11 +259,12 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
                             <PopoverTrigger
                                 render={
                                     <Button
+                                        aria-label={getTooltipText()}
                                         className={cn(className, (isTemporary || nextChatTemporary) && "text-orange-500 hover:text-orange-600")}
                                         size="icon"
                                         variant="ghost"
                                     >
-                                        <HourglassIcon className="size-4" />
+                                        <HourglassIcon aria-hidden="true" className="size-4" />
                                     </Button>
                                 }
                             />

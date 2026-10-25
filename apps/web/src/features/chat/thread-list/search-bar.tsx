@@ -67,6 +67,7 @@ const SearchBar: FC<SearchBarProperties> = ({
             </div>
             <div className="relative">
                 <Input
+                    aria-label={searchType === "threads" ? t`Search thread titles` : t`Search message content`}
                     autoFocus
                     className="border-sidebar-border bg-sidebar text-brand-black dark:text-brand-white placeholder:text-brand-black/60 placeholder:dark:text-brand-white/60 pr-8"
                     data-search-input=""
@@ -78,6 +79,7 @@ const SearchBar: FC<SearchBarProperties> = ({
                 />
                 {searchQuery && (
                     <Button
+                        aria-label={t`Clear search`}
                         className="absolute top-1/2 right-1 h-6 w-6 -translate-y-1/2 p-0"
                         onClick={() => {
                             onSearchQueryChange("");
@@ -85,7 +87,7 @@ const SearchBar: FC<SearchBarProperties> = ({
                         size="icon"
                         variant="ghost"
                     >
-                        <X className="h-3 w-3" />
+                        <X aria-hidden="true" className="h-3 w-3" />
                     </Button>
                 )}
                 {isSearchLoading && (

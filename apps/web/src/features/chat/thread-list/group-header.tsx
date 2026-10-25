@@ -123,10 +123,11 @@ const GroupHeader: FC<GroupHeaderProperties> = ({
                                         <DropdownMenuTrigger
                                             render={
                                                 <Button
+                                                    aria-label={t`Project actions`}
                                                     className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white h-6 w-6 shrink-0 p-0"
                                                     variant="ghost"
                                                 >
-                                                    <MoreVertical className="size-3" />
+                                                    <MoreVertical aria-hidden="true" className="size-3" />
                                                 </Button>
                                             }
                                         />

@@ -351,7 +351,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                 <Tooltip>
                     <TooltipTrigger
                         render={
-                            <Button className="size-8" onClick={() => applyAutoLayout()} size="icon" variant="ghost">
+                            <Button aria-label={t`Auto-layout`} className="size-8" onClick={() => applyAutoLayout()} size="icon" variant="ghost">
                                 <LayoutGrid aria-hidden="true" className="size-4" />
                             </Button>
                         }
@@ -368,7 +368,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                     <Tooltip>
                         <TooltipTrigger
                             render={
-                                <Button className="size-8" onClick={onShowShortcuts} size="icon" variant="ghost">
+                                <Button aria-label={t`Keyboard shortcuts`} className="size-8" onClick={onShowShortcuts} size="icon" variant="ghost">
                                     <Keyboard aria-hidden="true" className="size-4" />
                                 </Button>
                             }
@@ -414,8 +414,14 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                         <Tooltip>
                             <TooltipTrigger
                                 render={
-                                    <Button className="size-8" onClick={handleDuplicateSelected} size="icon" variant="ghost">
-                                        <Copy className="size-4" />
+                                    <Button
+                                        aria-label={t`Duplicate selected (${selectedNonGroupCount})`}
+                                        className="size-8"
+                                        onClick={handleDuplicateSelected}
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        <Copy aria-hidden="true" className="size-4" />
                                     </Button>
                                 }
                             />
@@ -430,8 +436,14 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                         <Tooltip>
                             <TooltipTrigger
                                 render={
-                                    <Button className="size-8" onClick={handleDeleteSelected} size="icon" variant="ghost">
-                                        <Trash2 className="size-4" />
+                                    <Button
+                                        aria-label={t`Delete selected (${selectedNonGroupCount})`}
+                                        className="size-8"
+                                        onClick={handleDeleteSelected}
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        <Trash2 aria-hidden="true" className="size-4" />
                                     </Button>
                                 }
                             />
@@ -448,8 +460,14 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                                 <Tooltip>
                                     <TooltipTrigger
                                         render={
-                                            <Button className="size-8" onClick={handleGroupSelected} size="icon" variant="ghost">
-                                                <BoxSelect className="size-4" />
+                                            <Button
+                                                aria-label={t`Group (${selectedNonGroupCount})`}
+                                                className="size-8"
+                                                onClick={handleGroupSelected}
+                                                size="icon"
+                                                variant="ghost"
+                                            >
+                                                <BoxSelect aria-hidden="true" className="size-4" />
                                             </Button>
                                         }
                                     />
@@ -466,8 +484,14 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                                         <Tooltip>
                                             <TooltipTrigger
                                                 render={
-                                                    <Button className="size-8" onClick={() => alignSelectedNodes("horizontal")} size="icon" variant="ghost">
-                                                        <AlignHorizontalDistributeCenter className="size-4" />
+                                                    <Button
+                                                        aria-label={t`Align horizontally`}
+                                                        className="size-8"
+                                                        onClick={() => alignSelectedNodes("horizontal")}
+                                                        size="icon"
+                                                        variant="ghost"
+                                                    >
+                                                        <AlignHorizontalDistributeCenter aria-hidden="true" className="size-4" />
                                                     </Button>
                                                 }
                                             />
@@ -482,8 +506,14 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                                         <Tooltip>
                                             <TooltipTrigger
                                                 render={
-                                                    <Button className="size-8" onClick={() => alignSelectedNodes("vertical")} size="icon" variant="ghost">
-                                                        <AlignVerticalDistributeCenter className="size-4" />
+                                                    <Button
+                                                        aria-label={t`Align vertically`}
+                                                        className="size-8"
+                                                        onClick={() => alignSelectedNodes("vertical")}
+                                                        size="icon"
+                                                        variant="ghost"
+                                                    >
+                                                        <AlignVerticalDistributeCenter aria-hidden="true" className="size-4" />
                                                     </Button>
                                                 }
                                             />
@@ -501,8 +531,14 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                                     <Tooltip>
                                         <TooltipTrigger
                                             render={
-                                                <Button className="size-8" onClick={() => distributeSelectedNodes()} size="icon" variant="ghost">
-                                                    <AlignHorizontalDistributeCenter className="size-4 rotate-90" />
+                                                <Button
+                                                    aria-label={t`Distribute evenly`}
+                                                    className="size-8"
+                                                    onClick={() => distributeSelectedNodes()}
+                                                    size="icon"
+                                                    variant="ghost"
+                                                >
+                                                    <AlignHorizontalDistributeCenter aria-hidden="true" className="size-4 rotate-90" />
                                                 </Button>
                                             }
                                         />
@@ -549,8 +585,14 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                         <Tooltip>
                             <TooltipTrigger
                                 render={
-                                    <Button className="size-8" onClick={onToggleHistory} size="icon" variant={showHistory ? "default" : "ghost"}>
-                                        <History className="size-4" />
+                                    <Button
+                                        aria-label={showHistory ? t`Hide run history` : t`Show run history`}
+                                        className="size-8"
+                                        onClick={onToggleHistory}
+                                        size="icon"
+                                        variant={showHistory ? "default" : "ghost"}
+                                    >
+                                        <History aria-hidden="true" className="size-4" />
                                     </Button>
                                 }
                             />
@@ -614,8 +656,8 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                             <Tooltip>
                                 <TooltipTrigger
                                     render={
-                                        <Button className="size-8" onClick={handleReset} size="icon" variant="ghost">
-                                            <RotateCcw className="size-4" />
+                                        <Button aria-label={t`Reset execution state`} className="size-8" onClick={handleReset} size="icon" variant="ghost">
+                                            <RotateCcw aria-hidden="true" className="size-4" />
                                         </Button>
                                     }
                                 />

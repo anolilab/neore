@@ -103,6 +103,7 @@ const NodeButton = ({
             <TooltipTrigger
                 render={
                     <button
+                        aria-label={i18n._(config.label)}
                         className={cn(buttonVariants({ size: "icon", variant: "ghost" }), "size-9 cursor-grab active:cursor-grabbing", indented && "ml-2")}
                         draggable
                         onDragStart={(e) => onDragStart(e, type)}
@@ -115,7 +116,7 @@ const NodeButton = ({
                                 color: config.color,
                             }}
                         >
-                            <Icon className="size-3.5" />
+                            <Icon aria-hidden="true" className="size-3.5" />
                         </div>
                     </button>
                 }
@@ -129,7 +130,7 @@ const NodeButton = ({
 };
 
 const WorkflowToolbar = () => {
-    const { i18n } = useLingui();
+    const { i18n, t } = useLingui();
     const [expandedGroups, setExpandedGroups] = useState<Set<WorkflowNodeType>>(new Set());
 
     const onDragStart = (event: React.DragEvent, nodeType: WorkflowNodeType) => {
@@ -177,6 +178,8 @@ const WorkflowToolbar = () => {
                                     <TooltipTrigger
                                         render={
                                             <button
+                                                aria-expanded={isExpanded}
+                                                aria-label={isExpanded ? t`Collapse ${groupLabel} operations` : t`Expand ${groupLabel} operations`}
                                                 className={cn(
                                                     buttonVariants({ variant: "ghost" }),
                                                     "h-5 w-5 rounded p-0",
@@ -186,7 +189,7 @@ const WorkflowToolbar = () => {
                                                 onClick={() => toggleGroup(group.type)}
                                                 type="button"
                                             >
-                                                <Chevron className="size-3" />
+                                                <Chevron aria-hidden="true" className="size-3" />
                                             </button>
                                         }
                                     />

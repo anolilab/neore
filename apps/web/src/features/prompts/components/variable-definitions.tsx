@@ -94,8 +94,14 @@ const VariableDefinitions = ({ onChange, variables }: VariableDefinitionsProps) 
                                         {t`Required`}
                                     </Label>
                                 </div>
-                                <Button onClick={() => handleRemoveVariable(index)} size="icon-sm" type="button" variant="ghost">
-                                    <Trash2 className="size-4" />
+                                <Button
+                                    aria-label={t`Remove variable`}
+                                    onClick={() => handleRemoveVariable(index)}
+                                    size="icon-sm"
+                                    type="button"
+                                    variant="ghost"
+                                >
+                                    <Trash2 aria-hidden="true" className="size-4" />
                                 </Button>
                             </div>
                         </div>

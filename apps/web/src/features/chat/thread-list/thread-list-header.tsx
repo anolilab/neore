@@ -115,12 +115,13 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                             <TooltipTrigger
                                 render={
                                     <Button
+                                        aria-label={t`Create project`}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                         onClick={openCreateProjectDialog}
                                         size="sm"
                                         variant="ghost"
                                     >
-                                        <FolderPlus className="h-5 w-5" />
+                                        <FolderPlus aria-hidden="true" className="h-5 w-5" />
                                     </Button>
                                 }
                             />
@@ -133,12 +134,13 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                             <TooltipTrigger
                                 render={
                                     <Button
+                                        aria-label={t`Keyboard shortcuts`}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                         onClick={toggleShowKeyboardHelp}
                                         size="sm"
                                         variant="ghost"
                                     >
-                                        <HelpCircle className="h-5 w-5" />
+                                        <HelpCircle aria-hidden="true" className="h-5 w-5" />
                                     </Button>
                                 }
                             />
@@ -153,11 +155,12 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                         <DropdownMenuTrigger
                                             render={
                                                 <Button
+                                                    aria-label={t`Bulk actions`}
                                                     className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
                                                     size="sm"
                                                     variant="ghost"
                                                 >
-                                                    <MoreVertical className="h-5 w-5" />
+                                                    <MoreVertical aria-hidden="true" className="h-5 w-5" />
                                                 </Button>
                                             }
                                         />

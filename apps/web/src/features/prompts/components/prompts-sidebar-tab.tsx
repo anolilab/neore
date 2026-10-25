@@ -480,6 +480,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                         )}
                     </div>
                     <Button
+                        aria-label={t`Add prompt`}
                         disabled={!isLoggedIn || (promptCount ? !promptCount.canCreate : false)}
                         onClick={() => {
                             if (!isLoggedIn) {
@@ -499,7 +500,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                         size="icon-sm"
                         variant="ghost"
                     >
-                        <Plus className="size-4" />
+                        <Plus aria-hidden="true" className="size-4" />
                     </Button>
                 </div>
 
@@ -509,6 +510,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                         <div className="relative">
                             <Search className="text-muted-foreground absolute top-1/2 left-2 size-4 -translate-y-1/2" />
                             <Input
+                                aria-label={t`Search prompts`}
                                 className="pr-8 pl-8"
                                 onChange={(e) => handleSearchChange(e.target.value)}
                                 placeholder={t`Search prompts...`}
@@ -516,12 +518,13 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                             />
                             {searchQuery && (
                                 <Button
+                                    aria-label={t`Clear search`}
                                     className="absolute top-1/2 right-1 h-6 w-6 -translate-y-1/2 p-0"
                                     onClick={() => handleSearchChange("")}
                                     size="sm"
                                     variant="ghost"
                                 >
-                                    <X className="size-3" />
+                                    <X aria-hidden="true" className="size-3" />
                                 </Button>
                             )}
                         </div>
@@ -639,6 +642,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                                                                 <TooltipTrigger
                                                                     render={
                                                                         <Button
+                                                                            aria-label={t`Copy to clipboard`}
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 handleCopy(prompt);
@@ -659,8 +663,13 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                                                             <DropdownMenu>
                                                                 <DropdownMenuTrigger
                                                                     render={
-                                                                        <Button onClick={(e) => e.stopPropagation()} size="icon-xs" variant="ghost">
-                                                                            <MoreVertical className="size-3" />
+                                                                        <Button
+                                                                            aria-label={t`More actions`}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            size="icon-xs"
+                                                                            variant="ghost"
+                                                                        >
+                                                                            <MoreVertical aria-hidden="true" className="size-3" />
                                                                         </Button>
                                                                     }
                                                                 />
@@ -772,6 +781,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                                                                 <TooltipTrigger
                                                                     render={
                                                                         <Button
+                                                                            aria-label={t`Copy to clipboard`}
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 handleCopy(prompt);
@@ -792,8 +802,13 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                                                             <DropdownMenu>
                                                                 <DropdownMenuTrigger
                                                                     render={
-                                                                        <Button onClick={(e) => e.stopPropagation()} size="icon-xs" variant="ghost">
-                                                                            <MoreVertical className="size-3" />
+                                                                        <Button
+                                                                            aria-label={t`More actions`}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            size="icon-xs"
+                                                                            variant="ghost"
+                                                                        >
+                                                                            <MoreVertical aria-hidden="true" className="size-3" />
                                                                         </Button>
                                                                     }
                                                                 />
@@ -852,20 +867,22 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <Button
+                                            aria-label={t`Previous page`}
                                             disabled={currentPage === 1}
                                             onClick={() => setCurrentPage((previous) => Math.max(1, previous - 1))}
                                             size="icon-xs"
                                             variant="ghost"
                                         >
-                                            <ChevronLeft className="size-3" />
+                                            <ChevronLeft aria-hidden="true" className="size-3" />
                                         </Button>
                                         <Button
+                                            aria-label={t`Next page`}
                                             disabled={!paginatedGroups.hasMoreAll}
                                             onClick={() => setCurrentPage((previous) => previous + 1)}
                                             size="icon-xs"
                                             variant="ghost"
                                         >
-                                            <ChevronRight className="size-3" />
+                                            <ChevronRight aria-hidden="true" className="size-3" />
                                         </Button>
                                     </div>
                                 </div>

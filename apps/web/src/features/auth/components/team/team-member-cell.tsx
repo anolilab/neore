@@ -172,7 +172,7 @@ const TeamMemberCell = ({ canManageRoles, className, classNames, isOwner, member
             )}
 
             {isOwner && (
-                <Button disabled={isRemoving} onClick={handleRemoveMember} size="icon" variant="ghost">
+                <Button aria-label={t`Remove member`} disabled={isRemoving} onClick={handleRemoveMember} size="icon" variant="ghost">
                     {isRemoving ? <Loader2 className="size-4 animate-spin" /> : <XIcon className="size-4" />}
                 </Button>
             )}
