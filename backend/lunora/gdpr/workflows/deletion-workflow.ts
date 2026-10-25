@@ -32,6 +32,9 @@ export interface DeletionParams {
 /** Upper bound on batches per drained step — a guard against a row that never stops matching. */
 const MAX_DRAIN_ROUNDS = 10_000;
 
+/** Fixed and non-personal (no error text, email or user id), so it survives `minimiseGdprRecords`. */
+const POSTHOG_FAILED_MESSAGE = "Your account data was erased, but deleting your analytics profile failed.";
+
 export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void> = {
     handler: async (workflowContext): Promise<void> => {
         // Every step works on this user's rows, which live on their shard.
@@ -363,7 +366,7 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             // return: the data is already gone, so the operator must see a failed instance, and a
             // re-run is safe (every step is idempotent) and ends in `completed` once PostHog works.
             await context.run(internal.gdpr.functions.updateRequestProgress, {
-                errorMessage: "Your account data was erased, but deleting your analytics profile failed.",
+                errorMessage: POSTHOG_FAILED_MESSAGE,
                 requestId: args.requestId,
                 status: "failed",
             });
@@ -386,6 +389,13 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     "minimise-gdpr-records-posthog-failed",
                     async () => await context.run(steps.minimiseGdprRecords, { userId: args.userId }),
                 );
+                // Minimisation clears every request's free-text `errorMessage`. This one is a fixed,
+                // non-personal string, so put it back: the user's status must still say what failed.
+                await context.run(internal.gdpr.functions.updateRequestProgress, {
+                    errorMessage: POSTHOG_FAILED_MESSAGE,
+                    requestId: args.requestId,
+                    status: "failed",
+                });
             } catch {
                 // Deliberately swallowed: `error` below is the root cause.
             }

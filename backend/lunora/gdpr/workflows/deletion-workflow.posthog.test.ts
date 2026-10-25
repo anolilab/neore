@@ -16,18 +16,28 @@ interface Call {
 const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error, minimiseFails = false) => {
     const calls: Call[] = [];
     let current = "";
+    // The stored request, as `updateRequestProgress` and `minimiseGdprRecords` would leave it.
+    const request: { errorMessage?: string | null; status: string; userEmail: string } = { status: "processing", userEmail: "a@example.com" };
 
     const run = async (reference: unknown, args: Record<string, unknown> = {}) => {
         const name = `${current}|${String((reference as { name?: string }).name ?? "")}`;
 
         calls.push({ args, name });
 
+        if (typeof args.status === "string") {
+            request.status = args.status;
+            request.errorMessage = (args.errorMessage as string | undefined) ?? request.errorMessage;
+        }
+
         // Batched steps are drained until `hasMore` is false; everything else returns null.
         if (minimiseFails && current === "minimise-gdpr-records-posthog-failed") {
             throw new Error("minimise failed");
         }
 
-        if (current === "erase-post-hog-person") {
+        if (current === "minimise-gdpr-records-posthog-failed") {
+            request.errorMessage = null;
+            request.userEmail = "";
+        } else if (current === "erase-post-hog-person") {
             if (postHog instanceof Error) {
                 throw postHog;
             }
@@ -65,7 +75,7 @@ const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error
         }
     })();
 
-    return { calls, outcome };
+    return { calls, outcome, request };
 };
 
 const stepNames = (calls: Call[]) => calls.filter((call) => call.name.startsWith("step:")).map((call) => call.name.slice("step:".length));
@@ -119,6 +129,16 @@ describe("account deletion workflow, PostHog step", () => {
         const failed = calls.find((call) => call.args.status === "failed");
 
         expect(String(failed?.args.errorMessage)).not.toContain("a@example.com");
+    });
+
+    it("leaves the failed request minimised but still carrying the fixed failure reason", async () => {
+        const failure = new Error("[GDPR/PostHog] Failed to delete person user-1: 503 Service Unavailable");
+        const { outcome, request } = await runWorkflow(failure);
+
+        expect(outcome).toBe(failure);
+        expect(request.status).toBe("failed");
+        expect(request.userEmail).toBe("");
+        expect(request.errorMessage).toBe("Your account data was erased, but deleting your analytics profile failed.");
     });
 
     it("still reports the PostHog error when the minimisation step fails too", async () => {
