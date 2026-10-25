@@ -2418,7 +2418,7 @@ export const searchMessages = authQuery
         // can fill the window and hide a displayable hit behind them. Widen the window while hits
         // were dropped and the page is not yet full.
         const collect = async (limit: number) => {
-            const searchResults = await context.runQuery(internal.agent.messages.textSearch, {
+            const { filled, messages: searchResults } = await context.runQuery(internal.agent.messages.textSearch, {
                 limit,
                 searchAllMessagesForUserId: userId,
                 text,
@@ -2481,15 +2481,17 @@ export const searchMessages = authQuery
                 }
             }
 
-            return { found, hits, scanned: searchResults.length };
+            return { filled, found, hits, scanned: searchResults.length };
         };
 
         let window = SEARCH_WINDOW;
-        let { found: threadsWithMessages, hits, scanned } = await collect(window);
+        let { filled, found: threadsWithMessages, hits, scanned } = await collect(window);
 
-        while (hits < SEARCH_WINDOW && scanned > hits && window < SEARCH_WINDOW_MAX) {
+        // `filled` stops the loop once the index has nothing more to give: a repeat would redo the
+        // fetches and the path walks for the same rows.
+        while (filled && hits < SEARCH_WINDOW && scanned > hits && window < SEARCH_WINDOW_MAX) {
             window *= 4;
-            ({ found: threadsWithMessages, hits, scanned } = await collect(window));
+            ({ filled, found: threadsWithMessages, hits, scanned } = await collect(window));
         }
 
         // Sort by relevance (threads with more matching messages first, then by creation time)

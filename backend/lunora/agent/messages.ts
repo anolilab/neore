@@ -1024,14 +1024,14 @@ export const searchMessages = internalAction
         let textSearchMessages: MessageDoc[] | undefined;
 
         if (args.textSearch) {
-            textSearchMessages = await ctx.runQuery(internal.agent.messages.textSearch, {
+            ({ messages: textSearchMessages } = await ctx.runQuery(internal.agent.messages.textSearch, {
                 limit,
                 searchAllMessagesForUserId: args.searchAllMessagesForUserId,
                 targetMessageId: args.targetMessageId,
                 text: args.text,
                 threadId: args.threadId,
                 unlockProof: args.unlockProof,
-            });
+            }));
         }
 
         if (args.vectorSearch) {
@@ -1215,6 +1215,7 @@ export const _fetchSearchMessages = internalQuery
         return sorted(messages);
     });
 
+/** The matches, and whether a larger `limit` could return more (for callers that widen the window). */
 export const textSearch = internalQuery
     .input({
         limit: v.number(),
@@ -1224,7 +1225,7 @@ export const textSearch = internalQuery
         threadId: v.optional(v.id("threads")),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
-    .output(v.from(v.array(vMessageDocument)))
+    .output(v.object({ filled: v.boolean(), messages: v.from(v.array(vMessageDocument)) }))
     .query(async ({ args, ctx }) => {
         assert(args.searchAllMessagesForUserId || args.threadId, "Specify userId or threadId");
         const targetMessage = args.targetMessageId && (await ctx.db.get(args.targetMessageId));
@@ -1234,7 +1235,7 @@ export const textSearch = internalQuery
         if (!text) {
             console.warn("No text to search", targetMessage, args.text);
 
-            return [];
+            return { filled: false, messages: [] };
         }
 
         const messages = await ctx.db
@@ -1249,9 +1250,12 @@ export const textSearch = internalQuery
 
         const visible = await withoutLockedThreads(ctx, messages, { threadId: args.threadId, unlockProof: args.unlockProof });
 
-        return visible
-            .filter((m) => !targetMessage || m.order < targetMessage.order || (m.order === targetMessage.order && m.stepOrder < targetMessage.stepOrder))
-            .map((item) => publicMessage(item));
+        return {
+            filled: messages.length >= args.limit,
+            messages: visible
+                .filter((m) => !targetMessage || m.order < targetMessage.order || (m.order === targetMessage.order && m.stepOrder < targetMessage.stepOrder))
+                .map((item) => publicMessage(item)),
+        };
     });
 
 export const getMessageSearchFields = internalQuery

@@ -7,6 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { textSearch } from "../agent/messages";
 import schema from "../schema";
 import { searchMessages } from "./functions";
 
@@ -145,6 +146,32 @@ describe("searchMessages", () => {
             expect(hitIds).toContain(ids.active);
             expect(hitIds).toContain(ids.prompt);
             expect(hitIds.some((id) => ids.inactive.includes(id))).toBe(false);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("reports whether the index may hold more than the window returned", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const thread = await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "T", userId: OWNER });
+
+                for (let i = 0; i < 3; i += 1) {
+                    await insertMessage(context, thread, i);
+                }
+            });
+
+            const reach = (limit: number) =>
+                harness.run(async (context: any) => await context.runQuery(textSearch, { limit, searchAllMessagesForUserId: OWNER, text: "needle" }));
+
+            const everything: { filled: boolean; messages: unknown[] } = await reach(10);
+            const capped: { filled: boolean; messages: unknown[] } = await reach(3);
+
+            expect(everything.messages).toHaveLength(3);
+            expect(everything.filled).toBe(false);
+            expect(capped.filled).toBe(true);
         } finally {
             harness.close();
         }
