@@ -25,6 +25,8 @@ const EFFORT_EVENTS: Record<EffortDirection, string> = {
  * setting). A model without reasoning is left alone. The store drops the value when the thread
  * changes (`loadThreadData`). Renders nothing.
  *
+ * Steps continue from the last step, not the thread's stored effort, once a send has consumed it.
+ *
  * Mounted once per thread view (`thread.tsx`), not inside `Composer`: the landing page mounts
  * several composers, and each listener would step the value again.
  */
@@ -38,6 +40,10 @@ const ComposerEffortShortcuts: FC = () => {
     // In a comparison the value goes to each child that reasons, so one is enough.
     const supportsReasoning = (comparisonModels?.length ? comparisonModels : [model as string]).some((id) => supportsReasoningEffort(models, id));
     const threadEffortRef = useRef(thread?.reasoningEffort);
+    // The last step, with the stored effort it started from. A send consumes the pending value but does not save it to
+    // the thread, so the next press continues from here until the thread's own effort changes. The component remounts
+    // per thread (`assistant.tsx` keys the provider), so this never crosses threads.
+    const lastStepRef = useRef<{ effort: number; storedEffort: number | undefined }>(undefined);
 
     useEffect(() => {
         threadEffortRef.current = thread?.reasoningEffort;
@@ -52,7 +58,12 @@ const ComposerEffortShortcuts: FC = () => {
             }
 
             const { pendingSettings, setPendingSettings } = useModelStore.getState();
-            const next = stepReasoningEffort(pendingSettings?.reasoningEffort ?? threadEffortRef.current, direction);
+            const storedEffort = threadEffortRef.current;
+            const last = lastStepRef.current;
+            const current = pendingSettings?.reasoningEffort ?? (last?.storedEffort === storedEffort ? last?.effort : storedEffort);
+            const next = stepReasoningEffort(current, direction);
+
+            lastStepRef.current = { effort: next, storedEffort };
             const message = EFFORT_LABEL_MESSAGES[next];
 
             setPendingSettings((previous) => {

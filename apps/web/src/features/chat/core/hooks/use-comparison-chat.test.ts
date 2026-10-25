@@ -194,6 +194,29 @@ describe("useComparisonChat reasoning effort", () => {
         expect(sentBodies().find((body) => body.model === "model-b")?.reasoningEffort).toBeUndefined();
     });
 
+    it("gives the comparison parent the effort its reasoning children got, and none when no child reasons", async () => {
+        useModelStore.getState().setPendingSettings({ reasoningEffort: 75 });
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt" }));
+
+        await act(async () => {
+            await result.current.sendComparisonMessage("hi", ["model-a", "model-b"]);
+        });
+
+        expect(createdThreads().find((args) => args.multiChat === true)).toMatchObject({ reasoningEffort: 75 });
+
+        mutations.length = 0;
+        useModelStore.getState().setPendingSettings({ reasoningEffort: 75 });
+
+        const { result: secondResult } = renderHook(() => useComparisonChat({ jwtToken: "jwt" }));
+
+        await act(async () => {
+            await secondResult.current.sendComparisonMessage("hi", ["model-b", "model-b"]);
+        });
+
+        expect(createdThreads().find((args) => args.multiChat === true)?.reasoningEffort).toBeUndefined();
+    });
+
     it("keeps the pending effort for a model that only advertises effort control", async () => {
         useModelStore.getState().setPendingSettings({ reasoningEffort: 50 });
 

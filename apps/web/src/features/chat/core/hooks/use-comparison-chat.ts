@@ -138,6 +138,10 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                         language: pendingSettings?.language,
                         model: models[0] ?? "unknown",
                         multiChat: true, // Flag for instant detection without querying children
+                        // The comparison view's effort shortcuts start from the parent's effort, so it carries what the children got.
+                        reasoningEffort: models.some((model) => effortFor(model, pendingSettings?.reasoningEffort) !== undefined)
+                            ? pendingSettings?.reasoningEffort
+                            : undefined,
                         ...temporaryFields,
                     });
                     setParentThread(comparisonParentId);

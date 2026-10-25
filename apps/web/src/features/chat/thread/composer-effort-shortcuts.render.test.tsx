@@ -117,6 +117,33 @@ describe("composer effort shortcuts", () => {
         expect(pendingEffort()).toBe(50);
     });
 
+    it("continues from the last step once a send has consumed it, not from the thread's stored effort", () => {
+        thread.current = { reasoningEffort: 50 };
+        render(<ComposerEffortShortcuts />);
+
+        press("increaseEffort");
+        expect(pendingEffort()).toBe(75);
+
+        // A send takes the pending value without saving it to the thread.
+        useModelStore.getState().setPendingSettings(undefined);
+        press("increaseEffort");
+
+        expect(pendingEffort()).toBe(100);
+    });
+
+    it("goes back to the thread's effort when that changes after the last step", () => {
+        thread.current = { reasoningEffort: 50 };
+        const { rerender } = render(<ComposerEffortShortcuts />);
+
+        press("increaseEffort");
+        useModelStore.getState().setPendingSettings(undefined);
+        thread.current = { reasoningEffort: 0 };
+        rerender(<ComposerEffortShortcuts />);
+        press("increaseEffort");
+
+        expect(pendingEffort()).toBe(25);
+    });
+
     it("keeps the other pending settings", () => {
         useModelStore.getState().setPendingSettings({ language: "de" });
         render(<ComposerEffortShortcuts />);
