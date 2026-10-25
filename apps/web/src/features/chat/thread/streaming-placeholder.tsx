@@ -348,7 +348,7 @@ const useStream = (
 
     // `StreamId` is the local brand for a `persistentStreams` id, from `getActiveStreamForThread`.
     // Polled rather than live: a live push re-reads every chunk on each write.
-    const { data: persistentBody } = useQuery({
+    const { data: persistentBody, isError: persistentReadFailed } = useQuery({
         ...crpc.chat.streaming.getStreamBody.queryOptions(
             isUsePersistence && streamId ? { streamId: streamId as unknown as Id<"persistentStreams"> } : skipToken,
             { live: false },
@@ -433,7 +433,12 @@ const useStream = (
         let status: StreamStatus;
 
         if (streamEnded === null) {
-            status = streamBody.text.length > 0 || streamBody.reasoning.length > 0 ? "streaming" : "pending";
+            if (streamBody.text.length > 0 || streamBody.reasoning.length > 0) {
+                status = "streaming";
+            } else {
+                // A viewer whose persisted read failed has nothing to wait for: polling has stopped, so say so.
+                status = persistentReadFailed ? "error" : "pending";
+            }
         } else {
             status = streamEnded ? "done" : "error";
         }
@@ -445,7 +450,7 @@ const useStream = (
             status: status as StreamStatus,
             text: streamBody.text,
         };
-    }, [persistentBody, streamBody, streamEnded, isReconnecting]);
+    }, [persistentBody, persistentReadFailed, streamBody, streamEnded, isReconnecting]);
 
     return body;
 };
