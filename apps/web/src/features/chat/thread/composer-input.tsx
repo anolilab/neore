@@ -99,6 +99,20 @@ const errorMessage = (error: unknown, fallback: string, describe?: (error: Attac
     return error instanceof Error ? error.message : fallback;
 };
 
+/**
+ * The server answered with an error code, so it did not queue the steer. An error
+ * without one (a dropped connection, a timeout) leaves it unknown whether it did.
+ */
+const wasRefused = (error: unknown): boolean => {
+    if (typeof error !== "object" || error === null) {
+        return false;
+    }
+
+    const { code, data } = error as { code?: unknown; data?: { code?: unknown } | null };
+
+    return typeof data?.code === "string" || typeof code === "string";
+};
+
 const TEXT_ATTACHMENT_TYPE = /^(?:text\/|application\/(?:json|xml)$)/u;
 const TEXT_ATTACHMENT_NAME = /\.(?:md|txt|csv)$/iu;
 
@@ -742,13 +756,19 @@ const ComposerInput = ({
 
         const { enqueue } = usePromptQueueStore.getState();
 
-        void steerRun({ streamId: streamId as Id<"persistentStreams">, text: steerText, threadId: threadId as Id<"threads"> })
-            .then(({ steerId }) => {
-                enqueue(threadId, { attachments: [], steer: { id: steerId, streamId }, text: steerText });
+        // The id is ours, so a call whose answer never came back can still be told
+        // apart from a refusal: the chip stays as a steer and the queue's withdrawal
+        // (`composer-prompt-queue.tsx`) learns whether the run took it before anything is sent.
+        const steerId = crypto.randomUUID();
 
-                return undefined;
-            })
-            .catch(() => enqueue(threadId, { attachments: [], text: steerText }));
+        void steerRun({ steerId, streamId: streamId as Id<"persistentStreams">, text: steerText, threadId: threadId as Id<"threads"> })
+            .then(() => enqueue(threadId, { attachments: [], steer: { id: steerId, streamId }, text: steerText }))
+            .catch((error: unknown) => {
+                enqueue(
+                    threadId,
+                    wasRefused(error) ? { attachments: [], text: steerText } : { attachments: [], steer: { id: steerId, streamId }, text: steerText },
+                );
+            });
     }, [canSteer, clear, disabled, promptHistory, sseStreamState, steerRun, text, threadId]);
 
     // Handle submit — fully synchronous, fire-and-forget network call.

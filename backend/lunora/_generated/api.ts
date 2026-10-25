@@ -314,7 +314,7 @@ export interface ApiTypes {
             };
         };
         steering: {
-            steerRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams">; text: string; threadId: Id<"threads">; unlockProof?: string }, { steerId: string }>;
+            steerRun: FunctionReference<"mutation", { steerId?: string; streamId: Id<"persistentStreams">; text: string; threadId: Id<"threads">; unlockProof?: string }, { steerId: string }>;
             withdrawSteer: FunctionReference<"mutation", { steerId: string; streamId: Id<"persistentStreams">; threadId: Id<"threads">; unlockProof?: string }, { outcome: "withdrawn" | "delivered" | "unknown" }>;
         };
         streaming: {

@@ -39,6 +39,11 @@ const isLive = (status: string): boolean => status === "pending" || status === "
 export const steerRun = authMutation
     .use(rateLimit("chat/steer"))
     .input({
+        /**
+         * The client's id for this steer. Sending the same id again queues nothing
+         * more, so a call whose answer was lost can be reconciled instead of repeated.
+         */
+        steerId: v.optional(v.string().max(MAX_LENGTH.id)),
         streamId: v.id("persistentStreams"),
         text: v.string().max(MAX_LENGTH.text),
         threadId: v.id("threads"),
@@ -46,7 +51,7 @@ export const steerRun = authMutation
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ steerId: v.string() }))
-    .mutation(async ({ args: { streamId, text: rawText, threadId, unlockProof }, ctx }) => {
+    .mutation(async ({ args: { steerId: requestedId, streamId, text: rawText, threadId, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
         const text = rawText.trim();
 
@@ -76,7 +81,12 @@ export const steerRun = authMutation
             throw new LunoraError("CONFLICT", "This reply is no longer running");
         }
 
-        const steerId = crypto.randomUUID();
+        // A repeat of a steer the run already holds (queued or taken) is answered, not queued again.
+        if (requestedId && stream.steers?.some((entry) => entry.id === requestedId)) {
+            return { steerId: requestedId };
+        }
+
+        const steerId = requestedId ?? crypto.randomUUID();
         const steers = queueSteer(stream.steers ?? [], { id: steerId, text });
 
         if (!steers) {

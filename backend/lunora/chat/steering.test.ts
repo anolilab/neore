@@ -71,8 +71,8 @@ let promptId: string;
 
 const as = (userId: string) => harness.withIdentity({ userId } as never);
 
-const steer = async (text: string, userId = OWNER, stream = streamId): Promise<{ steerId: string }> =>
-    (await as(userId).mutation(steerRun as never, { streamId: stream, text, threadId } as never)) as { steerId: string };
+const steer = async (text: string, userId = OWNER, stream = streamId, steerId?: string): Promise<{ steerId: string }> =>
+    (await as(userId).mutation(steerRun as never, { steerId, streamId: stream, text, threadId } as never)) as { steerId: string };
 
 const withdraw = async (steerId: string, userId = OWNER, unlockProof?: string): Promise<{ outcome: string }> =>
     (await as(userId).mutation(withdrawSteer as never, { steerId, streamId, threadId, unlockProof } as never)) as { outcome: string };
@@ -146,6 +146,19 @@ describe("steerRun", () => {
         const { steerId } = await steer("  use the other file  ");
 
         expect(await steersOnStream()).toStrictEqual([{ id: steerId, status: "queued", text: "use the other file" }]);
+    });
+
+    it("queues a repeated steer id once, whether it is still queued or already taken", async () => {
+        const { steerId } = await steer("use the other file", OWNER, streamId, "client-steer-1");
+
+        expect(steerId).toBe("client-steer-1");
+        expect(await steer("use the other file", OWNER, streamId, "client-steer-1")).toStrictEqual({ steerId });
+        expect(await steersOnStream()).toStrictEqual([{ id: steerId, status: "queued", text: "use the other file" }]);
+
+        const delivered = await deliver();
+
+        expect(await steer("use the other file", OWNER, streamId, "client-steer-1")).toStrictEqual({ steerId });
+        expect(await steersOnStream()).toStrictEqual([{ id: steerId, messageId: delivered!.messageId, status: "delivered" }]);
     });
 
     it("refuses a run someone else asked for", async () => {

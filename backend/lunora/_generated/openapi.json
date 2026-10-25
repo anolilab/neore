@@ -18922,6 +18922,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "steerId": {
+                        "type": "string"
+                      },
                       "streamId": {
                         "description": "Id<\"persistentStreams\">",
                         "type": "string",
