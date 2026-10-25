@@ -79,7 +79,7 @@ describe("account deletion workflow: order", () => {
         await execute();
 
         const authRecords = indexOfStep("delete-auth-records");
-        const postHog = indexOfStep("delete-post-hog-person");
+        const postHog = indexOfStep("erase-post-hog-person");
         const completed = completionIndex();
 
         expect(authRecords).toBeGreaterThan(-1);
@@ -170,7 +170,7 @@ describe("account deletion workflow: order", () => {
         before("delete-user-workflow-data", "delete-user-projects");
         before("delete-auth-records", "delete-user-identity");
         before("delete-user-identity", "purge-user-document-history");
-        before("purge-user-document-history", "delete-post-hog-person");
+        before("purge-user-document-history", "erase-post-hog-person");
     });
 
     it("uses each durable step name once, since the names key the durable log", async () => {
@@ -262,7 +262,7 @@ describe("account deletion workflow: failure", () => {
         await expect(execute()).rejects.toThrow("deleteUserFiles failed");
 
         expect(stepNames()).not.toContain("delete-auth-records");
-        expect(stepNames()).not.toContain("delete-post-hog-person");
+        expect(stepNames()).not.toContain("erase-post-hog-person");
         expect(completionIndex()).toBe(-1);
     });
 });

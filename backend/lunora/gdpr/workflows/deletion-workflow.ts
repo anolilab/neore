@@ -346,8 +346,10 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
 
         // Throws on a PostHog failure, so the step retries and the request is never
         // marked completed (nor the confirmation mailed) while the person may remain.
+        // Not "delete-post-hog-person": the old action returned null even on a failed
+        // delete, and a run that cached that result would replay it instead of erasing.
         const postHogOutcome = await context.step.do(
-            "delete-post-hog-person",
+            "erase-post-hog-person",
             async () => await context.run(internal.gdpr.steps.posthog_steps.deletePostHogPerson, { userId: args.userId }),
         );
 

@@ -23,7 +23,7 @@ const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error
         calls.push({ args, name });
 
         // Batched steps are drained until `hasMore` is false; everything else returns null.
-        if (current === "delete-post-hog-person") {
+        if (current === "erase-post-hog-person") {
             if (postHog instanceof Error) {
                 throw postHog;
             }
@@ -74,7 +74,7 @@ describe("account deletion workflow, PostHog step", () => {
         const { calls, outcome } = await runWorkflow(failure);
 
         expect(outcome).toBe(failure);
-        expect(stepNames(calls)).toContain("delete-post-hog-person");
+        expect(stepNames(calls)).toContain("erase-post-hog-person");
         expect(completionMarked(calls)).toBe(false);
         expect(stepNames(calls)).not.toContain("send-deletion-confirmed-email-action");
         expect(stepNames(calls)).not.toContain("log-audit");
