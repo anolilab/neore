@@ -17,8 +17,8 @@ const MANIFEST = join(CLIENT_DIRECTORY, ".vite", "manifest.json");
 
 /** gzip KiB. Set just above the measured size, so a regression is caught and a
  * small change is not. Raise it in the same commit as the change that grows it. */
-const ENTRY_GZIP_BUDGET_KIB = 320;
-const CLOSURE_GZIP_BUDGET_KIB = 640;
+const ENTRY_GZIP_BUDGET_KIB = 285;
+const CLOSURE_GZIP_BUDGET_KIB = 600;
 
 interface ManifestChunk {
     file: string;
