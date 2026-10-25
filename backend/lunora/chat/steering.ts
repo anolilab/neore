@@ -32,7 +32,7 @@ import { insertSteerRow } from "../agent/steer-rows";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { queueSteer, type SteerEntry, takeQueuedSteers, withdrawQueuedSteer } from "./lib/steer-queue";
-import { threadGateOutcome, throwUnlessGranted } from "./lib/thread-gate";
+import { lockedAfterCreation, threadGateOutcome, throwUnlessGranted } from "./lib/thread-gate";
 
 const isLive = (status: string): boolean => status === "pending" || status === "streaming";
 
@@ -140,8 +140,8 @@ export const withdrawSteer = authMutation
 /**
  * The run's step-boundary hook: every queued steer, written as one user message
  * under the reply so far, with the run's pending row moved after it. `null`
- * when nothing is queued, when the stream is not the run's, or when the rows
- * refuse the move (`insertSteerRow`); the steers then stay queued.
+ * when nothing is queued, when the stream is not the run's, when the chat was
+ * locked after the run started, or when the rows refuse the move (`insertSteerRow`); the steers then stay queued.
  */
 export const deliverSteers = internalMutation
     .input({
@@ -155,6 +155,14 @@ export const deliverSteers = internalMutation
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
 
         if (!stream?.steers || stream.threadId !== threadId || stream.userId !== userId || !isLive(stream.status)) {
+            return null;
+        }
+
+        // A chat locked after this run started has no proof behind the run any more: the
+        // steer stays queued, for the client to withdraw with a proof.
+        const thread = await ctx.db.get(threadId);
+
+        if (!thread || lockedAfterCreation(thread, stream._creationTime)) {
             return null;
         }
 

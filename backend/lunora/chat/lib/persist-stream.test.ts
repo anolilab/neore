@@ -122,6 +122,28 @@ describe(pipeToPersistentChunks, () => {
         expect(piped.pending).toStrictEqual({ reasoning: "", text: "The other one" });
     });
 
+    it("marks the cut before the error when the model call after a steered message fails before its step starts", async () => {
+        const chunks: { restart?: boolean; text: string }[] = [];
+        const ctx = {
+            runMutation: async (_ref: unknown, args: { restart?: boolean; text: string }) => {
+                chunks.push({ ...(args.restart && { restart: true }), text: args.text });
+            },
+        };
+        const steered = [false, true];
+
+        async function* failing() {
+            yield { type: "start-step" };
+            yield { text: "Reading.", type: "text-delta" };
+            yield { type: "finish-step" };
+            yield { error: new Error("provider down"), type: "error" };
+        }
+
+        await expect(pipeToPersistentChunks(ctx as never, "stream-1", failing(), { steeredBefore: () => steered.shift() ?? false })).rejects.toThrow(
+            "provider down",
+        );
+        expect(chunks).toStrictEqual([{ text: "Reading." }, { restart: true, text: "" }]);
+    });
+
     it("owes nothing when a stop refuses the restart marker: the steps before it are saved", async () => {
         const { ctx, written } = ctxAccepting(1);
         const steered = [false, true];

@@ -234,6 +234,15 @@ describe("deliverSteers and withdrawSteer", () => {
         expect(await steersOnStream()).toMatchObject([{ status: "queued" }]);
     });
 
+    it("keeps a steer queued when the chat was locked after the run started", async () => {
+        await steer("use the other file");
+        await harness.run(async (ctx: any) => await ctx.db.patch(threadId, { lockedAt: Date.now() + 1 }));
+
+        expect(await deliver()).toBeNull();
+        expect(await userRows()).toHaveLength(1);
+        expect(await steersOnStream()).toMatchObject([{ status: "queued" }]);
+    });
+
     it("tells another user nothing about the run", async () => {
         const { steerId } = await steer("use the other file");
 
