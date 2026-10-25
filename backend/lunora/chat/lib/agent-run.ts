@@ -625,7 +625,8 @@ export const memoryToCarry = (run: { botId?: string; extractMemory: boolean; pro
  * Steering for one interactive run (`chat/steering.ts`). `takeSteer` is the
  * agent's step-boundary hook; `steeredBefore` tells the stream pipe that a
  * message was delivered before the step now starting, so it writes the
- * `restart` marker (`persist-stream.ts`) once per delivery.
+ * `restart` marker (`persist-stream.ts`) once per delivery. Deliveries made
+ * before the pipe reached their step are counted: each call answers one.
  *
  * A failed delivery is logged and the run carries on: its steers stay queued,
  * and the client sends them after the reply as ordinary messages.
@@ -634,14 +635,16 @@ export const createRunSteering = (
     ctx: Pick<ActionCtx, "runMutation">,
     run: { streamId: string; threadId: string; userId: string },
 ): { steeredBefore: () => boolean; steeredTexts: () => string[]; takeSteer: TakeSteer } => {
-    let restartDue = false;
+    let restartsDue = 0;
     const texts: string[] = [];
 
     return {
         steeredBefore: () => {
-            const due = restartDue;
+            const due = restartsDue > 0;
 
-            restartDue = false;
+            if (due) {
+                restartsDue -= 1;
+            }
 
             return due;
         },
@@ -655,9 +658,8 @@ export const createRunSteering = (
                     userId: run.userId,
                 });
 
-                restartDue ||= delivered !== null;
-
                 if (delivered) {
+                    restartsDue += 1;
                     texts.push(delivered.text);
                 }
 

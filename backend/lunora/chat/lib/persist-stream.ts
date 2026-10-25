@@ -348,7 +348,7 @@ export const pipeToPersistentChunks = async (
 
         // A model call that failed before its step started never reached `start-step`: mark the cut here, so readers do not show the
         // steps above the steered message as this reply's text.
-        if (steeredBefore?.()) {
+        while (steeredBefore?.()) {
             await restartAfterSteer();
         }
 

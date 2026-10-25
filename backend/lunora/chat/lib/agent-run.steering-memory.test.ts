@@ -21,6 +21,20 @@ describe(createRunSteering, () => {
     });
 });
 
+describe("restart markers owed to the stream pipe", () => {
+    it("owes one per delivery, even when several land before the pipe reads the next step", async () => {
+        const deliveries = [{ messageId: "m1", text: "one" }, null, { messageId: "m2", text: "two" }];
+        const ctx = { runMutation: vi.fn(async () => deliveries.shift() ?? null) };
+        const steering = createRunSteering(ctx as never, { streamId: "s", threadId: "t", userId: "u" });
+
+        await steering.takeSteer({ pendingMessageId: "p1" } as never);
+        await steering.takeSteer({ pendingMessageId: "p2" } as never);
+        await steering.takeSteer({ pendingMessageId: "p3" } as never);
+
+        expect([steering.steeredBefore(), steering.steeredBefore(), steering.steeredBefore()]).toStrictEqual([true, true, false]);
+    });
+});
+
 describe(afterRun, () => {
     it("extracts memory from the prompt together with what was steered in", () => {
         const runAfter = vi.fn(async () => "job");

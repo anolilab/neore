@@ -224,6 +224,19 @@ describe("deliverSteers and withdrawSteer", () => {
         expect(await withdraw(steerId)).toStrictEqual({ outcome: "unknown" });
     });
 
+    it("keeps a withdrawn id closed, so a retried steerRun with it queues nothing while the run is live", async () => {
+        const { steerId } = await steer("use the other file");
+
+        expect(await withdraw(steerId)).toStrictEqual({ outcome: "withdrawn" });
+        expect(await steersOnStream()).toStrictEqual([{ id: steerId, status: "withdrawn" }]);
+
+        // The admission request is retried after the withdrawal: answered, not queued again.
+        expect(await steer("use the other file", OWNER, streamId, steerId)).toStrictEqual({ steerId });
+        expect(await steersOnStream()).toStrictEqual([{ id: steerId, status: "withdrawn" }]);
+        expect(await deliver()).toBeNull();
+        expect(await userRows()).toHaveLength(1);
+    });
+
     it("closes an id withdrawn before the run held it, so a steerRun still on its way queues nothing", async () => {
         expect(await withdraw("late-steer")).toStrictEqual({ outcome: "unknown" });
         expect(await steersOnStream()).toStrictEqual([{ id: "late-steer", status: "withdrawn" }]);
@@ -312,7 +325,7 @@ describe("deliverSteers and withdrawSteer", () => {
         const { proof } = await mintUnlockProof({ epoch, threadId, userId: OWNER }, secret, Date.now());
 
         expect(await withdraw(steerId, OWNER, proof)).toStrictEqual({ outcome: "withdrawn" });
-        expect(await steersOnStream()).toStrictEqual([]);
+        expect(await steersOnStream()).toStrictEqual([{ id: steerId, status: "withdrawn" }]);
     });
 });
 

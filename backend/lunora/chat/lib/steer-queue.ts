@@ -1,9 +1,10 @@
 /**
  * The steer queue on a `persistentStreams` row (`chat/steering.ts`), as pure
  * transitions. An entry is `queued` until the run takes it at a step boundary,
- * then `delivered` with its text dropped. A withdrawn entry is removed. An id
- * the client withdrew before the run ever held it leaves a text-free `withdrawn`
- * marker, so a `steerRun` that was still in flight cannot queue it afterwards.
+ * then `delivered` with its text dropped. A withdrawn entry keeps its id as a
+ * text-free `withdrawn` marker, as does an id the client withdrew before the run
+ * ever held it, so a `steerRun` that is retried or still in flight cannot queue
+ * it afterwards.
  *
  * Each entry changes state exactly once, and every transition runs inside one
  * mutation on the stream's shard. So a take and a withdrawal of the same entry
@@ -100,7 +101,7 @@ export const withdrawQueuedSteer = (
         return { changed: false, entries: [...entries], outcome: "unknown" };
     }
 
-    return { changed: true, entries: entries.filter((item) => item.id !== id), outcome: "withdrawn" };
+    return { changed: true, entries: entries.map((item) => (item.id === id ? { id, status: "withdrawn" } : item)), outcome: "withdrawn" };
 };
 
 /**
