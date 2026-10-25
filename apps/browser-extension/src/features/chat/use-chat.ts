@@ -182,7 +182,13 @@ export function useChat(threadId: string | null, onThreadCreated: (threadId: str
                     // participant talking. A steering restart works the same way: the text
                     // before it is saved above the message the user sent into the reply.
                     if (delta.speaker || delta.restart) {
-                        return { promptMessageId, reasoning: delta.reasoning, ...(delta.speaker && { speaker: delta.speaker }), text: delta.text };
+                        return {
+                            promptMessageId,
+                            reasoning: delta.reasoning,
+                            ...(delta.speaker && { speaker: delta.speaker }),
+                            ...((delta.restart || current.steered) && { steered: true as const }),
+                            text: delta.text,
+                        };
                     }
 
                     return { ...current, reasoning: current.reasoning + delta.reasoning, text: current.text + delta.text };

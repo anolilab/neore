@@ -80,6 +80,35 @@ describe("live reply merging", () => {
     });
 });
 
+describe("steered reply", () => {
+    const steered = toChatMessages([
+        { _creationTime: 1, _id: "prompt", parts: [{ text: "hi", type: "text" }], role: "user" },
+        { _creationTime: 2, _id: "first", parts: [{ text: "Before.", type: "text" }], role: "assistant", status: "success" },
+        { _creationTime: 3, _id: "steer", parts: [{ text: "also this", type: "text" }], role: "user" },
+        { _creationTime: 4, _id: "pending", parts: [], role: "assistant", status: "pending" },
+    ]);
+
+    it("keeps the live continuation visible while only the first half is saved", () => {
+        const live = { promptMessageId: "prompt", reasoning: "", steered: true as const, text: "After" };
+
+        expect(isReplyPersisted(steered, live)).toBe(false);
+        expect(withLiveReply(steered, live).map((message) => message.id)).toEqual(["prompt", "first", "steer", "live-prompt"]);
+        // Without the marker, the saved first half would count as the finished reply.
+        expect(isReplyPersisted(steered, { promptMessageId: "prompt" })).toBe(true);
+    });
+
+    it("drops the live copy once the continuation below the steering message is saved", () => {
+        const done = toChatMessages([
+            { _creationTime: 1, _id: "prompt", parts: [{ text: "hi", type: "text" }], role: "user" },
+            { _creationTime: 2, _id: "first", parts: [{ text: "Before.", type: "text" }], role: "assistant", status: "success" },
+            { _creationTime: 3, _id: "steer", parts: [{ text: "also this", type: "text" }], role: "user" },
+            { _creationTime: 4, _id: "second", parts: [{ text: "After.", type: "text" }], role: "assistant", status: "success" },
+        ]);
+
+        expect(isReplyPersisted(done, { promptMessageId: "prompt", steered: true })).toBe(true);
+    });
+});
+
 describe("group chat speakers", () => {
     const writer = { name: "Writer", skillId: "skill-writer" };
     const critic = { name: "Critic", skillId: "skill-critic" };
