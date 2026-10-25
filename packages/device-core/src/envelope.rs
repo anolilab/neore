@@ -225,7 +225,6 @@ mod tests {
         dir.join("device-nonces.json")
     }
 
-    /// A nonce unique to this run: the tests share a nonce file, so the value is built at run time, not written as a literal.
     fn run_nonce(tag: &str) -> String {
         format!("{tag}-{}", std::process::id())
     }
