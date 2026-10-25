@@ -15,6 +15,7 @@ const HEADLINES: Record<string, { failure?: string; success: string }> = {
     task: { failure: "Task failed", success: "Task finished" },
     tool_approval: { success: "A tool call needs your approval" },
     trigger: { failure: "Trigger run failed", success: "Trigger run finished" },
+    usage_alert: { success: "A usage alert was triggered" },
 };
 
 export const pushTitle = (type: string, outcome: "failure" | "success" | undefined): string => {

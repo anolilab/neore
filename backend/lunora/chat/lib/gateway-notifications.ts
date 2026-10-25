@@ -1,0 +1,121 @@
+import type { HttpActionCtx, Infer } from "lunorash/server";
+import { v } from "lunorash/server";
+
+import { internal } from "../../_generated/internal";
+import { MAX_LENGTH } from "../../lib/validators";
+import { verifySignedRequest } from "../../lib/sign-request";
+import type { NotificationInput } from "../../notifications/notify";
+
+/** One rule firing, as the gateway's rules engine reports it (`usage/notifications.ts`). */
+const vGatewayNotification = v.object({
+    action: v.union(v.literal("notify"), v.literal("block"), v.literal("notify_and_block")),
+    currentValue: v.number(),
+    metric: v.string().max(MAX_LENGTH.short),
+    ruleId: v.string().max(MAX_LENGTH.id),
+    ruleName: v.string().max(MAX_LENGTH.short),
+    threshold: v.number(),
+});
+
+const vGatewayNotifications = v.object({
+    notifications: v.array(vGatewayNotification),
+    userId: v.string().max(MAX_LENGTH.id),
+});
+
+type GatewayNotification = Infer<typeof vGatewayNotification>;
+
+/** More than a user has rules for; a bigger batch is not ours. */
+const MAX_NOTIFICATIONS_PER_REQUEST = 50;
+
+const HOUR_MS = 3_600_000;
+
+const MICRODOLLARS_PER_DOLLAR = 1_000_000;
+
+const USAGE_LINK = "/dashboard/settings/chat/usage";
+
+const describeMetric = (metric: string, value: number): string => {
+    switch (metric) {
+        case "daily_cost":
+        case "monthly_cost": {
+            return `$${(value / MICRODOLLARS_PER_DOLLAR).toFixed(2)}`;
+        }
+        case "request_count": {
+            return `${Math.round(value)} requests`;
+        }
+        case "token_count": {
+            return `${Math.round(value)} tokens`;
+        }
+        default: {
+            return String(value);
+        }
+    }
+};
+
+/**
+ * The inbox row for one firing. The key is the rule plus the hour of the
+ * request's signed timestamp: the gateway re-arms a rule only after an hour, so
+ * a replay or a re-sent request lands on the same key while the next firing of
+ * the rule lands on a new one.
+ */
+export const toUsageAlert = (userId: string, notification: GatewayNotification, signedAtMs: number): NotificationInput => {
+    const reached = describeMetric(notification.metric, notification.currentValue);
+    const limit = describeMetric(notification.metric, notification.threshold);
+    const blocked = notification.action === "notify_and_block" ? " Requests are blocked until the period resets." : "";
+
+    return {
+        body: `Usage reached ${reached} (limit ${limit}).${blocked}`,
+        dedupeKey: `usage_alert:${notification.ruleId}:${Math.floor(signedAtMs / HOUR_MS)}`,
+        link: USAGE_LINK,
+        title: notification.ruleName,
+        type: "usage_alert",
+        userId,
+    };
+};
+
+/**
+ * HTTP action handler for POST /gateway/notifications.
+ * Called by the LLM Gateway when a user's usage rule fires; each firing becomes
+ * one inbox notification (`notify()`, idempotent on its dedupe key).
+ */
+export const gatewayNotificationsHttpAction = async (context: HttpActionCtx, request: Request): Promise<Response> => {
+    const secret = process.env.LLM_GATEWAY_SIGNING_SECRET;
+
+    if (!secret || !(await verifySignedRequest(request, secret))) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    let json: unknown;
+
+    try {
+        json = await request.json();
+    } catch {
+        return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const parsed = vGatewayNotifications.safeParse(json);
+
+    if (!parsed.ok || parsed.value.notifications.length > MAX_NOTIFICATIONS_PER_REQUEST) {
+        return Response.json({ error: "Invalid notifications payload" }, { status: 400 });
+    }
+
+    const { notifications, userId } = parsed.value;
+    // Verified above, so this is the gateway's own clock.
+    const signedAtMs = Number(request.headers.get("X-Timestamp"));
+
+    try {
+        for (const notification of notifications) {
+            // A `block`-only rule is enforced, not announced; the gateway does not send it, and a stray one is skipped.
+            if (notification.action === "block") {
+                continue;
+            }
+
+            // The notification is the user's: it goes on their shard.
+            await context.forShard(userId).runMutation(internal.notifications.functions.createNotification, toUsageAlert(userId, notification, signedAtMs));
+        }
+    } catch (error) {
+        console.error("[GatewayNotifications] Failed to write notifications:", error);
+
+        return Response.json({ error: "Failed to write notifications" }, { status: 500 });
+    }
+
+    return Response.json({ ok: true }, { status: 200 });
+};

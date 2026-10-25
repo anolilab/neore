@@ -280,7 +280,7 @@ const flushQuietly = async (telemetry: RequestTelemetry | undefined): Promise<vo
     }
 };
 
-const sendNotifications = async (env: AppEnv, userId: string, notifications: NotificationEvent[]): Promise<void> => {
+export const sendNotifications = async (env: AppEnv, userId: string, notifications: NotificationEvent[]): Promise<void> => {
     const lunoraUrl = env.LUNORA_URL;
     const secret = env.SIGNING_SECRET;
 
@@ -301,6 +301,12 @@ const sendNotifications = async (env: AppEnv, userId: string, notifications: Not
 
     // Nothing reads the reply; cancel it so the Worker releases the connection.
     await response.body?.cancel();
+
+    // Best-effort, but never silent: a rejected alert (bad signature, backend down) is otherwise lost.
+    // Status and rule actions only — the payload names a user and their spend.
+    if (!response.ok) {
+        console.error("[Notifications] Backend rejected usage notifications", { actions: notifications.map((n) => n.action), status: response.status });
+    }
 };
 
 const sha256Hex = async (data: ArrayBuffer | Uint8Array): Promise<string> => {

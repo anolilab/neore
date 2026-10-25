@@ -428,7 +428,7 @@ export interface ApiTypes {
     };
     home: {
         overview: {
-            getHomeOverview: FunctionReference<"query", {}, { approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
+            getHomeOverview: FunctionReference<"query", {}, { approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; createdAt: number; parentThreadId: string; status: "queued" | "running"; task: string }>; unreadCount: number }>;
         };
     };
     knowledge: {
@@ -502,7 +502,7 @@ export interface ApiTypes {
             setDailyBriefEnabled: FunctionReference<"mutation", { enabled: boolean }, null>;
         };
         functions: {
-            getNotificationInbox: FunctionReference<"query", {}, { items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" }>; unreadCount: number }>;
+            getNotificationInbox: FunctionReference<"query", {}, { items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" }>; unreadCount: number }>;
             markAllNotificationsRead: FunctionReference<"mutation", {}, { hasMore: boolean }>;
             markNotificationRead: FunctionReference<"mutation", { notificationId: Id<"notifications"> }, null>;
         };

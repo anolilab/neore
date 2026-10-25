@@ -16,6 +16,7 @@ export const vNotificationType = v.union(
     v.literal("chat_import"),
     v.literal("data_export"),
     v.literal("daily_brief"),
+    v.literal("usage_alert"),
 );
 
 export const vNotificationOutcome = v.union(v.literal("success"), v.literal("failure"));

@@ -21,6 +21,7 @@ import {
     mediaGenerationHttpAction,
     optimizeSystemPromptHttpAction,
 } from "./chat/http";
+import { gatewayNotificationsHttpAction } from "./chat/lib/gateway-notifications";
 import { gatewayUsageReportHttpAction } from "./chat/lib/gateway-usage";
 import { callMCPToolFromAppHttpAction, readMCPResourceHttpAction } from "./chat/lib/mcp-apps";
 import { getChunksHttpAction } from "./chat/streaming/persistent/http-api";
@@ -265,6 +266,9 @@ app.post("/chat/chunks", httpAction(getChunksHttpAction));
 
 // LLM Gateway usage report webhook (HMAC-signed by gateway)
 app.post("/gateway/usage-report", httpAction(gatewayUsageReportHttpAction));
+
+// Usage-rule alerts from the gateway (HMAC-signed by gateway) — land in the user's inbox.
+app.post("/gateway/notifications", httpAction(gatewayNotificationsHttpAction));
 
 // Operator bootstrap for invite-only sign-up; bearer `LUNORA_ADMIN_TOKEN`.
 app.post("/admin/seed-invitations", httpAction(seedInvitationsHttpAction));

@@ -17404,6 +17404,12 @@
       "reason": "\"buildDeviceTools\" is not a registered function"
     },
     {
+      "file": "chat/lib/gateway-notifications",
+      "kind": "call",
+      "line": 112,
+      "reason": "\"gatewayNotificationsHttpAction\" is not a registered function"
+    },
+    {
       "file": "chat/lib/gateway-usage",
       "kind": "call",
       "line": 48,

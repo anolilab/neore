@@ -865,7 +865,7 @@ export const notifications = sqliteTable("notifications", {
     link: text("link"),
     outcome: text("outcome", { mode: "json" }).$type<"success" | "failure">(),
     title: text("title").notNull(),
-    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief">().notNull(),
+    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert">().notNull(),
     userId: text("userId").notNull(),
     createdAt: real("createdAt").notNull(),
     readAt: real("readAt"),
