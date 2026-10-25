@@ -1001,6 +1001,7 @@ export const getUserPreferencesQuery = internalQuery
             memoryEnabled: v.boolean(),
             nickname: v.optional(v.string()),
             profession: v.optional(v.string()),
+            threadTitleInstructions: v.optional(v.string()),
             timezone: v.optional(v.string()),
         }),
     )
@@ -1020,6 +1021,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: userSettings?.memoryEnabled ?? false, // Opt-in; see memory/functions.ts#isMemoryEnabled
                 nickname: userSettings?.nickname ?? undefined,
                 profession: userSettings?.profession ?? undefined,
+                threadTitleInstructions: userSettings?.threadTitleInstructions ?? undefined,
                 timezone: userSettings?.timezone ?? undefined,
             };
         } catch {
@@ -1032,6 +1034,7 @@ export const getUserPreferencesQuery = internalQuery
                 memoryEnabled: false,
                 nickname: undefined,
                 profession: undefined,
+                threadTitleInstructions: undefined,
                 timezone: undefined,
             };
         }

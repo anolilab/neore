@@ -10,6 +10,8 @@ export const DEFAULT_SYSTEM_PROMPT_OPTIMIZATION_MODEL = "moonshotai/kimi-k2-0905
 export const DEFAULT_PROMPT_ITERATION_MODEL = "moonshotai/kimi-k2-0905";
 export const DEFAULT_SUMMARIZATION_MODEL = "moonshotai/kimi-k2-0905";
 export const DEFAULT_TITLE_GENERATION_MODEL = "moonshotai/kimi-k2-0905";
+/** Longest user-written instruction for how thread titles are worded (`userSettings.threadTitleInstructions`). */
+export const MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH = 200;
 export const DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL = "google/gemini-2.0-flash-001";
 export const DEFAULT_MEMORY_EXTRACTION_MODEL = "google/gemini-2.0-flash-001";
 

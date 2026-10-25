@@ -1,6 +1,7 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { Button } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
 import { Field, FieldDescription, FieldLabel } from "@neore/ui/components/field";
@@ -8,11 +9,13 @@ import { Input } from "@neore/ui/components/input";
 import { Textarea } from "@neore/ui/components/textarea";
 import { RotateCcw, Sparkles } from "lucide-react";
 import type { FC } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import SystemPromptOptimizerDialog from "@/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { trackEvent } from "@/lib/analytics";
@@ -28,8 +31,18 @@ const SYNCED_FIELDS = ["nickname", "profession", "aboutMe", "customInstructions"
 
 type SyncedField = (typeof SYNCED_FIELDS)[number];
 
+/** Text typed into the title field, with the account it was typed for. */
+interface TitleInstructions {
+    ownerId: string | null;
+    text: string;
+}
+
 const PersonalizationSettings: FC = () => {
     const { t } = useLingui();
+    const { authClient } = useAuth();
+    const { data: sessionData } = useSession(authClient);
+    // Whose settings the page is showing. Text and saves belong to one account: signing in over a guest keeps this page mounted.
+    const ownerId = sessionData?.user?.id ?? null;
     const { data: userSettings, isLoading } = useUserSettings();
     const updateSettingsMutation = useUpdateUserSettings();
     const { onboardingCompleted, setOnboardingCompleted } = useUserPreferences();
@@ -39,6 +52,12 @@ const PersonalizationSettings: FC = () => {
     const [profession, setProfession] = useState("");
     const [aboutMe, setAboutMe] = useState("");
     const [customInstructions, setCustomInstructions] = useState("");
+    // Not part of the render-time sync below: a draft (`null` = not editing) shadows the stored value, so a
+    // cache update from an earlier save can never replace text typed since. It is dropped when the account changes.
+    const [draftState, setDraftState] = useState<TitleInstructions | null>(null);
+    // The value of the newest save that has not settled yet. The cached setting may not show it for a moment,
+    // so a blur compares against this first: changing the text and changing it back must still send the reversal.
+    const submittedTitleInstructions = useRef<TitleInstructions | null>(null);
     const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
 
     const handleOptimizedSystemPrompt = useCallback(
@@ -128,6 +147,53 @@ const PersonalizationSettings: FC = () => {
             handleUpdateSetting("customInstructions", trimmed);
         }
     }, [customInstructions, userSettings?.customInstructions, handleUpdateSetting]);
+
+    if (draftState && draftState.ownerId !== ownerId) {
+        setDraftState(null);
+    }
+
+    const titleInstructionsDraft = draftState && draftState.ownerId === ownerId ? draftState.text : null;
+    const threadTitleInstructions = titleInstructionsDraft ?? userSettings?.threadTitleInstructions ?? "";
+
+    // Sent as "" to clear: `handleUpdateSetting` maps blank to `undefined`, which the wire drops, so the old text would stay.
+    // `updateLatest` queues the write behind earlier ones and sends the newest value, so a slow save cannot land last.
+    const handleThreadTitleInstructionsBlur = useCallback(async () => {
+        if (titleInstructionsDraft === null) {
+            return;
+        }
+
+        const trimmed = titleInstructionsDraft.trim();
+        const submitted = submittedTitleInstructions.current?.ownerId === ownerId ? submittedTitleInstructions.current : null;
+        const current = submitted?.text ?? userSettings?.threadTitleInstructions ?? "";
+
+        if (trimmed === current) {
+            if (submitted === null) {
+                setDraftState(null);
+            }
+
+            return;
+        }
+
+        const own = { ownerId, text: trimmed };
+
+        submittedTitleInstructions.current = own;
+
+        try {
+            await updateSettingsMutation.updateLatest(() => {
+                return { threadTitleInstructions: trimmed };
+            });
+            trackEvent("settings_changed", { section: "personalization", setting_key: "threadTitleInstructions" });
+            toast.success(t`Settings saved`);
+            // Drop the draft only if nothing was typed while the save was pending.
+            setDraftState((latest) => (latest !== null && latest.ownerId === ownerId && latest.text.trim() === trimmed ? null : latest));
+        } catch {
+            toast.error(t`Failed to save settings`);
+        } finally {
+            if (submittedTitleInstructions.current === own) {
+                submittedTitleInstructions.current = null;
+            }
+        }
+    }, [titleInstructionsDraft, ownerId, userSettings?.threadTitleInstructions, updateSettingsMutation, t]);
 
     if (isLoading) {
         return (
@@ -230,6 +296,32 @@ const PersonalizationSettings: FC = () => {
                         />
                         <div className="text-muted-foreground mt-1 text-right text-xs">
                             {customInstructions.length} /{MAX_CUSTOM_INSTRUCTIONS_LENGTH}
+                        </div>
+                    </Field>
+                </CardContent>
+            </SettingsCard>
+
+            <SettingsCard
+                description={t`Tell the AI how to word the titles it gives new conversations. This adds to the default title style.`}
+                title={t`Thread Titles`}
+            >
+                <CardContent className="space-y-4">
+                    <Field>
+                        <FieldLabel htmlFor="thread-title-instructions">{t`How should titles be written?`}</FieldLabel>
+                        <FieldDescription>{t`For example: "Keep titles under four words", "Write titles in German", or "Start with a verb".`}</FieldDescription>
+                        <Input
+                            // The draft belongs to an account; until the session names it, typed text would be dropped when it does.
+                            // `undefined` settings mean the load failed (an account with no row reads `null`): a save would overwrite unseen text.
+                            disabled={ownerId === null || userSettings === undefined}
+                            id="thread-title-instructions"
+                            maxLength={MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
+                            onBlur={handleThreadTitleInstructionsBlur}
+                            onChange={(e) => setDraftState({ ownerId, text: e.target.value })}
+                            placeholder={t`Enter your title instructions...`}
+                            value={threadTitleInstructions}
+                        />
+                        <div className="text-muted-foreground mt-1 text-right text-xs">
+                            {threadTitleInstructions.length} /{MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
                         </div>
                     </Field>
                 </CardContent>

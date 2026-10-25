@@ -1631,6 +1631,7 @@ export const userSettings = sqliteTable("userSettings", {
     sendBehavior: text("sendBehavior"),
     taskEmailEnabled: integer("taskEmailEnabled", { mode: "boolean" }),
     temporaryChatRetentionHours: real("temporaryChatRetentionHours"),
+    threadTitleInstructions: text("threadTitleInstructions"),
     timezone: text("timezone"),
     userId: text("userId").notNull(),
     voiceModeVoice: text("voiceModeVoice"),

@@ -6707,6 +6707,9 @@
                       "temporaryChatRetentionHours": {
                         "type": "number"
                       },
+                      "threadTitleInstructions": {
+                        "type": "string"
+                      },
                       "timezone": {
                         "type": "string"
                       },

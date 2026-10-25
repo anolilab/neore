@@ -1519,6 +1519,7 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
     let language: string | undefined;
     let location: string | undefined;
     let timezone: string | undefined;
+    let titleInstructions: string | undefined;
 
     if (userId) {
         const userPreferences = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
@@ -1526,6 +1527,7 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
         language = threadLanguage || userPreferences.language;
         location = userPreferences.location;
         timezone = userPreferences.timezone;
+        titleInstructions = userPreferences.threadTitleInstructions;
     } else {
         language = threadLanguage;
     }
@@ -1545,7 +1547,7 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
     }
 
     // Pass timezone/location/language to getThreadTitlePrompt for context (date/time formatting, language)
-    const threadTitlePrompt = getThreadTitlePrompt(timezone, location, language);
+    const threadTitlePrompt = getThreadTitlePrompt(timezone, location, language, titleInstructions);
     const textResult = await thread.generateText(
         {
             prompt: `${threadTitlePrompt}\nHere is the user's prompt:\n"${arguments_.prompt}"\nGenerate a title that accurately represents what this conversation is about based on the prompt provided.`,

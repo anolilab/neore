@@ -52,13 +52,16 @@ export const useUpdateUserSettings = () => {
                 });
             }
 
-            // Return a context object with the snapshotted value
-            return { previousSettings };
+            // Return a context object with the snapshotted value, and the cache entry it came from
+            return { previousSettings, cacheEntry: queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }) };
         },
-        onError: (_error, _args, context: { previousSettings?: UserSettingsRow } | undefined) => {
+        onError: (_error, _args, context: { cacheEntry?: unknown; previousSettings?: UserSettingsRow } | undefined) => {
             // If the mutation fails, use the context returned from onMutate to roll back. Not while a queued write is behind
             // this one: the snapshot predates the edits it queued, so restoring it would drop them. The last write to settle refetches.
-            if (settingsWrites.pending <= 1 && context?.previousSettings) {
+            // Not either when the cache was rebuilt meanwhile (a sign-in clears it): the snapshot is the previous account's row.
+            const sameEntry = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }) === context?.cacheEntry;
+
+            if (sameEntry && settingsWrites.pending <= 1 && context?.previousSettings) {
                 queryClient.setQueryData(queryOptions.queryKey, context.previousSettings);
             }
         },
@@ -88,6 +91,11 @@ export const useUpdateUserSettings = () => {
         const before = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
         const patch = build(before);
         const fields = Object.keys(patch) as (keyof UserSettingsRow)[];
+        // Whose settings this edit was made on. The row carries the owner; a brand-new account has none yet, so the cache entry
+        // itself stands in: a sign-in clears the cache, and the entry that is rebuilt afterwards is a different object.
+        // With an owner known the entry proves nothing: switching to another session of the same account rebuilds it too.
+        const owner = before?.userId;
+        const cacheEntry = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey });
 
         if (before !== undefined) {
             queryClient.setQueryData(queryOptions.queryKey, { ...before, ...patch });
@@ -95,9 +103,23 @@ export const useUpdateUserSettings = () => {
 
         settingsWrites.pending += 1;
 
-        const run = settingsWrites.tail.then(() => {
-            const latest = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
-            const body = latest ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
+        const run = settingsWrites.tail.then(async () => {
+            const entryNow = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey });
+            const rebuilt = cacheEntry !== undefined && entryNow !== cacheEntry;
+            const cached = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
+            // A rebuilt cache may not have its row yet. The server's row for this session says whose settings they are.
+            const latest = owner !== undefined && cached === undefined ? await queryClient.fetchQuery(queryOptions) : cached;
+
+            // The account changed while this write waited (sign-in over a guest clears the cache): sending it now would store
+            // the old account's edit on the new one. The caller sees a failed save.
+            const accountChanged = owner === undefined ? rebuilt : latest?.userId !== owner;
+
+            if (accountChanged) {
+                throw new Error("The signed-in account changed before this setting was saved.");
+            }
+
+            // A rebuilt cache holds the server's row, which lacks this edit: send the edit itself.
+            const body = latest && !rebuilt ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
 
             return mutation.mutateAsync(body as Patch);
         });

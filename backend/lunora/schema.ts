@@ -10,6 +10,7 @@
  * by `userId`, not `threadId`).
  */
 import { paymentExtension } from "@lunora/payment";
+import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vGroupChat } from "./chat/group/validators";
@@ -2926,6 +2927,8 @@ export const schema = defineSchema({
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),
+        // How the user wants thread titles worded; appended to the title prompt (`chat/functions.ts#createTitleChat`). Blank or absent = none.
+        threadTitleInstructions: v.optional(v.string().max(MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH)),
         timezone: v.optional(v.string()),
         userId: v.string(),
         // Default voice for spoken replies (`voice/speech.ts`); a skill's own voice wins. Absent = the model's default.
