@@ -23,11 +23,22 @@ const rootDir = path.resolve(__dirname, "..");
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+// Piped stdin is read whole: readline drops lines that arrive before their question.
+const pipedAnswers = process.stdin.isTTY ? null : fs.readFileSync(0, "utf8").split("\n");
+const rl = pipedAnswers ? null : readline.createInterface({ input: process.stdin, output: process.stdout });
 
 const ask = async (question, defaultValue) => {
     const suffix = defaultValue ? ` (${defaultValue})` : "";
-    const answer = await rl.question(`${question}${suffix}: `);
+    let answer;
+
+    if (rl) {
+        answer = await rl.question(`${question}${suffix}: `);
+    } else {
+        process.stdout.write(`${question}${suffix}: `);
+        answer = pipedAnswers.shift() ?? "";
+        process.stdout.write(`${answer}\n`);
+    }
+
     return answer.trim() || defaultValue || "";
 };
 
@@ -372,15 +383,11 @@ const main = async () => {
         console.log("  [keep]  VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY");
     }
 
-    // JWKS
-    if (!backendEnv["JWKS"]) {
-        console.log("\n  JWKS not set — will use dynamic JWKS fetching (slower, ~100-400ms overhead per query).");
-        console.log("  Run 'pnpm env:sync:auth' after configuring auth to generate static JWKS.");
-    } else if (backendEnv["JWKS"] === '{"keys":[]}') {
-        console.log("\n  JWKS placeholder is empty — removing it (breaks JWT validation).");
-        console.log("  Run 'pnpm env:sync:auth' to generate valid JWKS.");
-        delete backendEnv["JWKS"];
+    // The schema needs JWKS present; empty means dynamic fetching, as CI writes it.
+    if (!backendEnv["JWKS"] || backendEnv["JWKS"] === '{"keys":[]}') {
+        backendEnv["JWKS"] = "";
         backendChanged = true;
+        console.log("\n  [set]   JWKS empty (the backend fetches keys dynamically)");
     } else {
         console.log("\n  [keep]  JWKS");
     }
@@ -606,7 +613,8 @@ const main = async () => {
 
     console.log("Backend core:");
     for (const key of coreKeys) {
-        const status = backendEnv[key] ? "configured" : "MISSING";
+        // Presence, not truthiness: ADMIN and JWKS may be empty but must exist.
+        const status = backendEnv[key] !== undefined ? "configured" : "MISSING";
         console.log(`  ${status === "configured" ? "[ok]" : "[!!]"} ${key}: ${status}`);
     }
 
@@ -648,16 +656,15 @@ const main = async () => {
 
     console.log("\n=== Next Steps ===\n");
     console.log("1. If you haven't generated the backend types yet:");
-    console.log("   pnpm --filter @neore/backend run codegen   # Generate lunora/_generated");
-    console.log("   pnpm env:sync:auth       # Generate proper JWKS\n");
+    console.log("   pnpm --filter @neore/backend run codegen   # Generate lunora/_generated\n");
     console.log("2. Start the development stack (web on :5173, backend + its services on :8788, public gateway on :8787):");
     console.log("   pnpm dev\n");
 
-    rl.close();
+    rl?.close();
 };
 
 main().catch((error) => {
     console.error("Setup failed:", error);
-    rl.close();
+    rl?.close();
     process.exit(1);
 });
