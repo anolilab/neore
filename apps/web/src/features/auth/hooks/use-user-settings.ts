@@ -109,13 +109,15 @@ export const useUpdateUserSettings = () => {
             // The account changed while this write waited (sign-in over a guest clears the cache): sending it now would store
             // the old account's edit on the new one. The caller sees a failed save.
             const entryNow = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey });
-            const accountChanged = owner === undefined ? cacheEntry !== undefined && entryNow !== cacheEntry : latest?.userId !== owner;
+            const rebuilt = cacheEntry !== undefined && entryNow !== cacheEntry;
+            const accountChanged = owner === undefined ? rebuilt : latest?.userId !== owner;
 
             if (accountChanged) {
                 throw new Error("The signed-in account changed before this setting was saved.");
             }
 
-            const body = latest ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
+            // A rebuilt cache holds the server's row, which lacks this edit: send the edit itself.
+            const body = latest && !rebuilt ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
 
             return mutation.mutateAsync(body as Patch);
         });

@@ -211,6 +211,35 @@ describe("useUpdateUserSettings.updateLatest", () => {
         expect(harness.sent).toHaveLength(2);
     });
 
+    it("sends the queued edit, not the server's old value, when the same account's cache was rebuilt", async () => {
+        const { queryClient, result } = setup();
+
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "", userId: "member" });
+
+        act(() => {
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "First" };
+            });
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "Edited" };
+            });
+        });
+        await flush();
+
+        // The rebuilt row is the server's, from before the queued edit: it must not be sent back in place of the edit.
+        queryClient.clear();
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "Server", userId: "member" });
+
+        await act(async () => {
+            harness.sent[0]?.release();
+            await Promise.resolve();
+        });
+        await flush();
+
+        // Each write sends the newest cached value when its turn comes, so both carry "Edited".
+        expect(harness.sent.map((request) => request.value)).toEqual(["Edited", "Edited"]);
+    });
+
     it("leaves the new account's cache alone when a save of the previous account fails", async () => {
         const { queryClient, result } = setup();
 
