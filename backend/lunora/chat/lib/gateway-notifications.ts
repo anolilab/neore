@@ -5,6 +5,7 @@ import { internal } from "../../_generated/internal";
 import { MAX_LENGTH } from "../../lib/validators";
 import { verifySignedRequest } from "../../lib/sign-request";
 import type { NotificationInput } from "../../notifications/notify";
+import { MAX_NOTIFICATIONS_PER_BATCH } from "../../notifications/validators";
 
 /** One rule firing, as the gateway's rules engine reports it (`usage/notifications.ts`). */
 const vGatewayNotification = v.object({
@@ -22,9 +23,6 @@ const vGatewayNotifications = v.object({
 });
 
 type GatewayNotification = Infer<typeof vGatewayNotification>;
-
-/** More than a user has rules for; a bigger batch is not ours. */
-const MAX_NOTIFICATIONS_PER_REQUEST = 50;
 
 /** 50 firings at their validators' caps is ~100 KB; anything bigger is not the gateway's. */
 const MAX_BODY_BYTES = 256 * 1024;
@@ -103,7 +101,7 @@ export const gatewayNotificationsHttpAction = async (context: HttpActionCtx, req
 
     const parsed = vGatewayNotifications.safeParse(json);
 
-    if (!parsed.ok || parsed.value.notifications.length > MAX_NOTIFICATIONS_PER_REQUEST) {
+    if (!parsed.ok || parsed.value.notifications.length > MAX_NOTIFICATIONS_PER_BATCH) {
         return Response.json({ error: "Invalid notifications payload" }, { status: 400 });
     }
 

@@ -21,6 +21,9 @@ export const vNotificationType = v.union(
 
 export const vNotificationOutcome = v.union(v.literal("success"), v.literal("failure"));
 
+/** Rows one `createNotifications` call writes in a single transaction; the gateway sends larger sets in slices of this size. */
+export const MAX_NOTIFICATIONS_PER_BATCH = 50;
+
 /** The fields a writer supplies, spread into the table's doc fields (see `schema.ts`). */
 export const notificationInputFields = {
     body: v.optional(v.string()),

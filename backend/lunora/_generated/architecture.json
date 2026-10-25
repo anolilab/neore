@@ -17413,7 +17413,7 @@
     {
       "file": "chat/lib/gateway-notifications",
       "kind": "call",
-      "line": 122,
+      "line": 120,
       "reason": "\"gatewayNotificationsHttpAction\" is not a registered function"
     },
     {

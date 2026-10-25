@@ -283,7 +283,7 @@ const flushQuietly = async (telemetry: RequestTelemetry | undefined): Promise<vo
     }
 };
 
-/** The backend refuses a larger batch (`MAX_NOTIFICATIONS_PER_REQUEST`), so a user with many firing rules is sent in slices. */
+/** The backend refuses a larger batch (`MAX_NOTIFICATIONS_PER_BATCH`), so a user with many firing rules is sent in slices. */
 const NOTIFICATIONS_PER_REQUEST = 50;
 
 /** Slices in flight at once: the backend writes each in its own transaction on the user's shard, so a few at a time is enough. */

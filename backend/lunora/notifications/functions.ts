@@ -11,7 +11,7 @@ import { internalMutation } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { notify } from "./notify";
 import { linksToLockedThread, redactForLockedThread } from "./locked-link";
-import { notificationInputFields, vNotificationView } from "./validators";
+import { MAX_NOTIFICATIONS_PER_BATCH, notificationInputFields, vNotificationView } from "./validators";
 
 /** Rows the bell lists: the newest, read or not. */
 export const INBOX_LIMIT = 30;
@@ -123,10 +123,14 @@ export const createNotification = internalMutation
  * {@link createNotification} for several rows in ONE transaction, so a caller with a batch
  * (the gateway's rule alerts) pays one shard round trip instead of one per row. Each row is
  * still idempotent on its `dedupeKey`; a throw rolls the whole batch back, and a redelivery
- * writes it again.
+ * writes it again. At most {@link MAX_NOTIFICATIONS_PER_BATCH} rows, so a transaction stays bounded.
  */
 export const createNotifications = internalMutation
-    .input({ notifications: v.array(v.object({ ...notificationInputFields })) })
+    .input({
+        notifications: v.array(v.object({ ...notificationInputFields })).check((value) => value.length <= MAX_NOTIFICATIONS_PER_BATCH, {
+            message: "Too many notifications",
+        }),
+    })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         for (const notification of args.notifications) {
