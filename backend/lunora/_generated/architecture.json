@@ -17413,7 +17413,7 @@
     {
       "file": "chat/lib/gateway-notifications",
       "kind": "call",
-      "line": 120,
+      "line": 114,
       "reason": "\"gatewayNotificationsHttpAction\" is not a registered function"
     },
     {
@@ -19777,19 +19777,25 @@
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 211,
+      "line": 213,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 216,
+      "line": 218,
       "reason": "the default export is not a registered function"
     },
     {
       "file": "triggers/http",
       "kind": "call",
-      "line": 241,
+      "line": 223,
+      "reason": "the default export is not a registered function"
+    },
+    {
+      "file": "triggers/http",
+      "kind": "call",
+      "line": 245,
       "reason": "the default export is not a registered function"
     },
     {
