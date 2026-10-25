@@ -49,6 +49,7 @@ jobs:
             - name: "Build the web client"
               shell: "bash"
               env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
                   VITE_LUNORA_URL: "http://localhost:8788"
                   VITE_SITE_URL: "http://localhost:5173"
                   VITE_LLM_GATEWAY_URL: "http://localhost:5173/llm-gateway"
