@@ -11,7 +11,7 @@ import { MAX_NOTIFICATIONS_PER_BATCH } from "../../notifications/validators";
 const vGatewayNotification = v.object({
     action: v.union(v.literal("notify"), v.literal("block"), v.literal("notify_and_block")),
     currentValue: v.number(),
-    firedAt: v.number(),
+    firedAt: v.optional(v.number()),
     metric: v.string().max(MAX_LENGTH.short),
     ruleId: v.string().max(MAX_LENGTH.id),
     ruleName: v.string().max(MAX_LENGTH.short),
@@ -27,6 +27,8 @@ type GatewayNotification = Infer<typeof vGatewayNotification>;
 
 /** 50 firings at their validators' caps is ~100 KB; anything bigger is not the gateway's. */
 const MAX_BODY_BYTES = 256 * 1024;
+
+const MS_PER_HOUR = 3_600_000;
 
 const MICRODOLLARS_PER_DOLLAR = 1_000_000;
 
@@ -62,15 +64,19 @@ const describeMetric = (metric: string, value: number): string => {
  * (the gateway's `firedAt`), not the request's own clock: a re-sent request
  * carries the same `firedAt` and lands on the same key, while the rule's next
  * firing, at least an hour later, never does however late either is delivered.
+ * A gateway that predates `firedAt` sends none; its firing is keyed on the hour
+ * of the request's signed timestamp (`requestedAt`), as it was before.
  */
-export const toUsageAlert = (userId: string, notification: GatewayNotification): NotificationInput => {
+export const toUsageAlert = (userId: string, notification: GatewayNotification, requestedAt: number): NotificationInput => {
     const reached = describeMetric(notification.metric, notification.currentValue);
     const limit = describeMetric(notification.metric, notification.threshold);
     const blocked = notification.action === "notify_and_block" ? " Requests are blocked for now." : "";
 
+    const firing = notification.firedAt ?? Math.floor(requestedAt / MS_PER_HOUR);
+
     return {
         body: `Usage reached ${reached} (limit ${limit}).${blocked}`,
-        dedupeKey: `usage_alert:${notification.ruleId}:${notification.firedAt}`,
+        dedupeKey: `usage_alert:${notification.ruleId}:${firing}`,
         link: USAGE_LINK,
         title: notification.ruleName,
         type: "usage_alert",
@@ -105,8 +111,12 @@ export const gatewayNotificationsHttpAction = async (context: HttpActionCtx, req
     }
 
     const { notifications, userId } = parsed.value;
+    // Signed, so it passed the replay window above: a number by construction.
+    const requestedAt = Number(request.headers.get("X-Timestamp"));
     // A `block`-only rule is enforced, not announced; the gateway does not send it, and a stray one is skipped.
-    const alerts = notifications.filter((notification) => notification.action !== "block").map((notification) => toUsageAlert(userId, notification));
+    const alerts = notifications
+        .filter((notification) => notification.action !== "block")
+        .map((notification) => toUsageAlert(userId, notification, requestedAt));
 
     try {
         if (alerts.length > 0) {
