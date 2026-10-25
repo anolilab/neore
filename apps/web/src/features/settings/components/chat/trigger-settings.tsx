@@ -27,6 +27,7 @@ import {
     Clock,
     Copy,
     ExternalLink,
+    Filter,
     Globe,
     Loader2,
     Pencil,
@@ -41,6 +42,16 @@ import type { FC } from "react";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
+import type { FilterOp, PayloadFilterRow } from "@/features/settings/lib/trigger-filters";
+import {
+    filtersToSend,
+    hasIncompleteFilters,
+    isValidFilterPath,
+    MAX_FILTER_PATH_LENGTH,
+    MAX_FILTER_VALUE_LENGTH,
+    MAX_FILTERS,
+    opTakesValue,
+} from "@/features/settings/lib/trigger-filters";
 import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
@@ -56,11 +67,21 @@ type TriggerType = "event" | "schedule" | "webhook";
 /** How a webhook sender signs its requests; fixed when the trigger is created, with its secret. */
 type WebhookSignatureScheme = "native" | "timestamped";
 
+const FILTER_OP_LABELS: Record<FilterOp, MessageDescriptor> = {
+    contains: msg`contains`,
+    equals: msg`equals`,
+    exists: msg`exists`,
+    not_equals: msg`does not equal`,
+    not_exists: msg`does not exist`,
+    starts_with: msg`starts with`,
+};
+
 interface TriggerFormData {
     botComputer: boolean;
     botId: string;
     cronExpression: string;
     description: string;
+    filters: PayloadFilterRow[];
     inputTemplate: string;
     model: string;
     name: string;
@@ -90,6 +111,7 @@ interface TriggerRow {
     cronExpression: string | null;
     description: string | null;
     enabled: boolean;
+    filters: { op: FilterOp; path: string; value: string | null }[];
     inputTemplate: string | null;
     lastError: string | null;
     lastTriggeredAt: number | null;
@@ -122,6 +144,7 @@ const EMPTY_FORM: TriggerFormData = {
     botId: "",
     cronExpression: "0 8 * * *",
     description: "",
+    filters: [],
     inputTemplate: "",
     model: "",
     name: "",
@@ -142,6 +165,7 @@ const CRON_PRESETS: { expression: string; label: MessageDescriptor }[] = [
 const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
     completed: msg`Completed`,
     failed: msg`Failed`,
+    filtered: msg`Filtered`,
     pending: msg`Pending`,
     running: msg`Running`,
 };
@@ -149,6 +173,80 @@ const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
 // ─── Component ─────────────────────────────────────────────────────────────
 
 // ─── Shared Trigger Form ────────────────────────────────────────────────────
+
+/** Edits a webhook trigger's payload filters: every filter must match the JSON body for a delivery to run. */
+const PayloadFiltersEditor: FC<{ filters: PayloadFilterRow[]; onChange: (filters: PayloadFilterRow[]) => void }> = ({ filters, onChange }) => {
+    const { i18n, t } = useLingui();
+    // Generated id: the create and edit forms can be open together.
+    const labelId = useId();
+    const update = (index: number, patch: Partial<PayloadFilterRow>) =>
+        onChange(filters.map((filter, at) => (at === index ? { ...filter, ...patch } : filter)));
+
+    return (
+        <div aria-labelledby={labelId} className="space-y-2" role="group">
+            <Label id={labelId}>{t`Payload filters (optional)`}</Label>
+            <p className="text-muted-foreground text-xs">
+                {t`Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Filtered in the history, and does not run or count against your quota.`}
+            </p>
+            {filters.map((filter, index) => (
+                // The rows have no identity of their own; they are only ever added at the end or removed.
+
+                <div className="flex items-start gap-2" key={index}>
+                    <Input
+                        aria-invalid={filter.path.length > 0 && !isValidFilterPath(filter.path)}
+                        aria-label={t`Filter path`}
+                        className="min-w-0 flex-1 font-mono text-xs"
+                        maxLength={MAX_FILTER_PATH_LENGTH}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => update(index, { path: e.target.value })}
+                        placeholder="action"
+                        value={filter.path}
+                    />
+                    <Select onValueChange={(value) => update(index, { op: value as FilterOp })} value={filter.op}>
+                        <SelectTrigger aria-label={t`Filter condition`} className="w-40 shrink-0">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {(Object.keys(FILTER_OP_LABELS) as FilterOp[]).map((op) => (
+                                <SelectItem key={op} value={op}>
+                                    {i18n._(FILTER_OP_LABELS[op])}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {opTakesValue(filter.op) && (
+                        <Input
+                            aria-label={t`Filter value`}
+                            className="min-w-0 flex-1 text-xs"
+                            maxLength={MAX_FILTER_VALUE_LENGTH}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => update(index, { value: e.target.value })}
+                            placeholder="opened"
+                            value={filter.value}
+                        />
+                    )}
+                    <Button
+                        aria-label={t`Remove filter`}
+                        onClick={() => onChange(filters.filter((_, at) => at !== index))}
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                    >
+                        <X aria-hidden="true" className="size-4" />
+                    </Button>
+                </div>
+            ))}
+            <Button
+                disabled={filters.length >= MAX_FILTERS}
+                onClick={() => onChange([...filters, { op: "equals", path: "", value: "" }])}
+                size="sm"
+                type="button"
+                variant="outline"
+            >
+                <Plus aria-hidden="true" className="mr-1.5 size-3" />
+                {t`Add filter`}
+            </Button>
+        </div>
+    );
+};
 
 /** What a sender must send for each scheme. Requests of the other scheme are rejected. */
 const WebhookSigningInstructions: FC<{ scheme: WebhookSignatureScheme }> = ({ scheme }) =>
@@ -173,16 +271,16 @@ const WebhookSigningInstructions: FC<{ scheme: WebhookSignatureScheme }> = ({ sc
 
 interface TriggerFormProps {
     formData: TriggerFormData;
+    /** An existing trigger keeps its type and the scheme its secret was issued for. */
+    isExisting?: boolean;
     isPending: boolean;
     onCancel: () => void;
     onChange: (data: TriggerFormData) => void;
     onSubmit: () => void;
-    /** An existing trigger keeps the scheme its secret was issued for. */
-    schemeLocked?: boolean;
     title: string;
 }
 
-const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onChange, onSubmit, schemeLocked = false, title }) => {
+const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onChange, onSubmit, isExisting = false, title }) => {
     // Generated ids: the create and edit forms can be open together, and fixed ids would make their labels ambiguous.
     const botPickerId = useId();
     const botComputerId = useId();
@@ -263,7 +361,11 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 {/* Type */}
                 <div className="space-y-1.5">
                     <Label>{t`Trigger Type`}</Label>
-                    <TriggerTypePicker disabled={formData.type === "event"} onSelect={(type) => onChange({ ...formData, type })} value={formData.type} />
+                    <TriggerTypePicker
+                        disabled={isExisting || formData.type === "event"}
+                        onSelect={(type) => onChange({ ...formData, type })}
+                        value={formData.type}
+                    />
                 </div>
 
                 {/* Schedule config */}
@@ -314,7 +416,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                         <div className="mt-3 space-y-1.5">
                             <Label htmlFor={schemeId}>{t`Signature`}</Label>
                             <Select
-                                disabled={schemeLocked}
+                                disabled={isExisting}
                                 onValueChange={(value) => onChange({ ...formData, webhookSignatureScheme: value === "native" ? "native" : "timestamped" })}
                                 value={formData.webhookSignatureScheme}
                             >
@@ -328,6 +430,9 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                             </Select>
                         </div>
                         <WebhookSigningInstructions scheme={formData.webhookSignatureScheme} />
+                        <div className="mt-4">
+                            <PayloadFiltersEditor filters={formData.filters} onChange={(filters) => onChange({ ...formData, filters })} />
+                        </div>
                     </div>
                 )}
 
@@ -373,7 +478,10 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                     <Button onClick={onCancel} variant="outline">
                         {t`Cancel`}
                     </Button>
-                    <Button disabled={isPending || !formData.name.trim() || formData.type === "event"} onClick={onSubmit}>
+                    <Button
+                        disabled={isPending || !formData.name.trim() || formData.type === "event" || hasIncompleteFilters(formData.type, formData.filters)}
+                        onClick={onSubmit}
+                    >
                         {isPending && <Loader2 aria-hidden="true" className="mr-1.5 size-4 animate-spin" />}
                         {title}
                     </Button>
@@ -392,6 +500,9 @@ const ExecutionStatusIcon = ({ status }: { status: string }) => {
         }
         case "failed": {
             return <XCircle aria-hidden="true" className="size-3 text-red-500" />;
+        }
+        case "filtered": {
+            return <Filter aria-hidden="true" className="text-muted-foreground size-3" />;
         }
         case "running": {
             return <Loader2 aria-hidden="true" className="size-3 animate-spin text-blue-500" />;
@@ -492,6 +603,7 @@ const TriggerSettings: FC = () => {
                 botId: formData.botId || undefined,
                 cronExpression: formData.type === "schedule" ? formData.cronExpression : undefined,
                 description: formData.description || undefined,
+                filters: formData.type === "webhook" && formData.filters.length > 0 ? filtersToSend(formData.filters) : undefined,
                 inputTemplate: formData.inputTemplate || undefined,
                 model: formData.model || "anthropic/claude-sonnet-4-20250514",
                 name: formData.name,
@@ -524,6 +636,8 @@ const TriggerSettings: FC = () => {
                 botId: editFormData.botId || null,
                 cronExpression: editFormData.type === "schedule" ? editFormData.cronExpression : undefined,
                 description: editFormData.description || undefined,
+                // The whole set replaces the stored one; an empty set clears it.
+                filters: editFormData.type === "webhook" ? filtersToSend(editFormData.filters) : undefined,
                 inputTemplate: editFormData.inputTemplate || undefined,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
@@ -616,6 +730,9 @@ const TriggerSettings: FC = () => {
             botId: trigger.botId ?? "",
             cronExpression: trigger.cronExpression ?? "0 8 * * *",
             description: trigger.description ?? "",
+            filters: trigger.filters.map((filter) => {
+                return { op: filter.op, path: filter.path, value: filter.value ?? "" };
+            }),
             inputTemplate: trigger.inputTemplate ?? "",
             model: trigger.model,
             name: trigger.name,
@@ -720,12 +837,12 @@ const TriggerSettings: FC = () => {
                                 return (
                                     <TriggerForm
                                         formData={editFormData}
+                                        isExisting
                                         isPending={updateMutation.isPending}
                                         key={trigger._id}
                                         onCancel={() => setEditingTriggerId(null)}
                                         onChange={setEditFormData}
                                         onSubmit={handleUpdate}
-                                        schemeLocked
                                         title={t`Edit Trigger`}
                                     />
                                 );
@@ -888,7 +1005,10 @@ const TriggerSettings: FC = () => {
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 {exec.error && (
-                                                                    <span className="max-w-[200px] truncate text-red-500" title={exec.error}>
+                                                                    <span
+                                                                        className={`max-w-[200px] truncate ${exec.status === "filtered" ? "text-muted-foreground" : "text-red-500"}`}
+                                                                        title={exec.error}
+                                                                    >
                                                                         {exec.error}
                                                                     </span>
                                                                 )}

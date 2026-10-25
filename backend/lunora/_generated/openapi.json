@@ -40036,6 +40036,52 @@
                       "description": {
                         "type": "string"
                       },
+                      "filters": {
+                        "items": {
+                          "properties": {
+                            "op": {
+                              "anyOf": [
+                                {
+                                  "const": "equals",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_equals",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "contains",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "starts_with",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "exists",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_exists",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "path": {
+                              "type": "string"
+                            },
+                            "value": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "path"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
                       "inputTemplate": {
                         "type": "string"
                       },
@@ -40469,6 +40515,52 @@
                       },
                       "description": {
                         "type": "string"
+                      },
+                      "filters": {
+                        "items": {
+                          "properties": {
+                            "op": {
+                              "anyOf": [
+                                {
+                                  "const": "equals",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_equals",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "contains",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "starts_with",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "exists",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "not_exists",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "path": {
+                              "type": "string"
+                            },
+                            "value": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "path"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
                       },
                       "inputTemplate": {
                         "type": "string"

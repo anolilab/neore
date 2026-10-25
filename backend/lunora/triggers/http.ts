@@ -40,6 +40,7 @@ import { hmacSha256Hex, isWithinWindow, SIGNED_REQUEST_WINDOW_MS, timingSafeEqua
 import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
+import { evaluateFilters } from "./filters";
 
 const DIGITS_ONLY = /^\d{1,12}$/u;
 
@@ -54,7 +55,7 @@ const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
  * at the call site, instead of re-casting at every field access — and keeps the field
  * types (the `type` union, `enabled: boolean`) from the generated `Doc<"triggers">`.
  */
-type WebhookTrigger = Pick<Doc<"triggers">, "enabled" | "type" | "userId" | "webhookSecret" | "webhookSignatureScheme">;
+type WebhookTrigger = Pick<Doc<"triggers">, "enabled" | "filters" | "type" | "userId" | "webhookSecret" | "webhookSignatureScheme">;
 
 /**
  * Handle an incoming webhook request for a trigger.
@@ -195,7 +196,44 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             return Response.json({ duplicate: true, ok: true }, { headers: { "Content-Type": "application/json" }, status: 200 });
         }
 
-        // 4. Schedule trigger execution. The claim is already committed, so a
+        // 4. Payload filters, on the body only now that its signature is proven. A
+        //    filtered delivery RELEASES its claim once recorded: the owner may fix the
+        //    filters and redeliver the same signed body within the claim's TTL, and that
+        //    replay must be evaluated again. A replay that still misses writes only the
+        //    one collapsed history row. It runs nothing, so it is not charged
+        //    (`admitTriggerRun` lives in the execution) and does not count as a run.
+        //    202, not 200: the delivery was accepted and deliberately not acted on.
+        //    The body is decoded strictly for this: the lossy decode above turns invalid
+        //    UTF-8 into U+FFFD, which could let bytes that are not JSON parse as JSON.
+        //    A body that does not decode is evaluated as the empty (non-JSON) string.
+        const verdict = evaluateFilters(trigger.filters, decodeStrict(rawBody));
+
+        if (!verdict.matched) {
+            try {
+                await context.runMutation(internal.triggers.functions.recordFilteredExecution, {
+                    reason: verdict.reason.slice(0, 500),
+                    triggerId: triggerId as Id<"triggers">,
+                });
+            } catch (error) {
+                await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+
+                throw error;
+            }
+
+            await context.runMutation(internal.lib.claim_once.releaseKey, claim);
+
+            return Response.json(
+                {
+                    filter: { op: verdict.filter.op, path: verdict.filter.path, value: verdict.filter.value ?? null },
+                    ok: true,
+                    outcome: "filtered",
+                    reason: verdict.reason,
+                },
+                { headers: { "Content-Type": "application/json" }, status: 202 },
+            );
+        }
+
+        // 5. Schedule trigger execution. The claim is already committed, so a
         //    failure here must give it back — otherwise the sender's retry of
         //    this same delivery reads as a replay, and it never runs at all.
         try {
@@ -230,6 +268,15 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
 };
 
 const MISSING_SIGNATURE = "Missing or invalid signature headers";
+
+/** UTF-8 text of `bytes`, or `""` when they are not valid UTF-8 (which no JSON parser accepts). */
+const decodeStrict = (bytes: Uint8Array): string => {
+    try {
+        return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
+    } catch {
+        return "";
+    }
+};
 
 type SignedDelivery = { presented: string; signedPayload: Uint8Array } | { error: string };
 

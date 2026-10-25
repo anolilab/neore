@@ -18,6 +18,8 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
+import type { PayloadFilter } from "./filters";
+import { assertValidFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH } from "./filters";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardDue } from "../lib/shard-housekeeping";
@@ -63,6 +65,24 @@ const firstRunOf = (trigger: Doc<"triggers">, now: number): number | undefined =
         : undefined;
 
 /**
+ * The filters to store: validated, webhook triggers only, and `undefined` for
+ * none (an empty set is stored as no field, so the row stays as it was).
+ */
+const checkedFilters = (filters: PayloadFilter[] | undefined, type: Doc<"triggers">["type"]): PayloadFilter[] | undefined => {
+    if (!filters || filters.length === 0) {
+        return undefined;
+    }
+
+    if (type !== "webhook") {
+        throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has payload filters.");
+    }
+
+    assertValidFilters(filters);
+
+    return filters;
+};
+
+/**
  * A routine may use its bot's computer only when it has a bot and runs on a
  * schedule. A webhook payload is untrusted input, so it never drives a shell.
  */
@@ -95,6 +115,20 @@ const vGetTriggersOutput = v.array(
         cronExpression: v.union(v.string(), v.null()),
         description: v.union(v.string(), v.null()),
         enabled: v.boolean(),
+        filters: v.array(
+            v.object({
+                op: v.union(
+                    v.literal("equals"),
+                    v.literal("not_equals"),
+                    v.literal("contains"),
+                    v.literal("starts_with"),
+                    v.literal("exists"),
+                    v.literal("not_exists"),
+                ),
+                path: v.string(),
+                value: v.union(v.string(), v.null()),
+            }),
+        ),
         inputTemplate: v.union(v.string(), v.null()),
         lastError: v.union(v.string(), v.null()),
         lastTriggeredAt: v.union(v.number(), v.null()),
@@ -129,6 +163,9 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
             cronExpression: t.cronExpression ?? null,
             description: t.description ?? null,
             enabled: t.enabled === true,
+            filters: (t.filters ?? []).map((filter) => {
+                return { op: filter.op, path: filter.path, value: filter.value ?? null };
+            }),
             inputTemplate: t.inputTemplate ?? null,
             lastError: t.lastError ?? null,
             lastTriggeredAt: t.lastTriggeredAt ?? null,
@@ -154,6 +191,26 @@ export const createTrigger = authMutation
         botId: v.optional(v.string().max(MAX_LENGTH.id)),
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
         description: v.optional(v.string().max(MAX_LENGTH.long)),
+        // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
+        // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
+        filters: v.optional(
+            v
+                .array(
+                    v.object({
+                        op: v.union(
+                            v.literal("equals"),
+                            v.literal("not_equals"),
+                            v.literal("contains"),
+                            v.literal("starts_with"),
+                            v.literal("exists"),
+                            v.literal("not_exists"),
+                        ),
+                        path: v.string().max(MAX_PATH_LENGTH),
+                        value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
+                    }),
+                )
+                .check((value) => value.length <= MAX_FILTERS, { message: `at most ${String(MAX_FILTERS)} payload filters` }),
+        ),
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
         model: v.string().max(MAX_LENGTH.short),
         name: v.string().max(MAX_LENGTH.short),
@@ -196,6 +253,8 @@ export const createTrigger = authMutation
             throw new LunoraError("INVALID_ARGUMENT", "Only a webhook trigger has a signature scheme.");
         }
 
+        const filters = checkedFilters(args.filters, triggerType);
+
         const inserted = await context.db.insert("triggers", {
             botComputer: args.botComputer === true ? true : undefined,
             botId: args.botId as Id<"bots"> | undefined,
@@ -203,6 +262,7 @@ export const createTrigger = authMutation
             cronExpression: args.cronExpression,
             description: args.description,
             enabled: false, // Start disabled — user must explicitly enable
+            filters,
             inputTemplate: args.inputTemplate,
             model: args.model,
             name: args.name,
@@ -245,6 +305,26 @@ export const updateTrigger = authMutation
         botId: v.optional(v.union(v.string().max(MAX_LENGTH.id), v.null())),
         cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
         description: v.optional(v.string().max(MAX_LENGTH.long)),
+        // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
+        // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
+        filters: v.optional(
+            v
+                .array(
+                    v.object({
+                        op: v.union(
+                            v.literal("equals"),
+                            v.literal("not_equals"),
+                            v.literal("contains"),
+                            v.literal("starts_with"),
+                            v.literal("exists"),
+                            v.literal("not_exists"),
+                        ),
+                        path: v.string().max(MAX_PATH_LENGTH),
+                        value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
+                    }),
+                )
+                .check((value) => value.length <= MAX_FILTERS, { message: `at most ${String(MAX_FILTERS)} payload filters` }),
+        ),
         inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
         model: v.optional(v.string().max(MAX_LENGTH.short)),
         name: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -325,6 +405,8 @@ export const updateTrigger = authMutation
 
         assertComputerRoutine({ botComputer: nextComputer === true, botId: nextBotId, type: trigger.type });
 
+        const filters = checkedFilters(args.filters, trigger.type);
+
         // `patchRow` removes a field set to `undefined`, which a plain patch cannot do.
         await patchRow(context.db, trigger, {
             ...withoutUndefined(patch),
@@ -332,6 +414,8 @@ export const updateTrigger = authMutation
             // Also clears a time a non-schedule trigger stored before this check existed.
             ...((args.cronExpression !== undefined || !isSchedule) && { nextTriggerAt }),
             ...(args.botId !== undefined && { botId: nextBotId }),
+            // An empty array removes the filters; leaving the argument out leaves them as they are.
+            ...(args.filters !== undefined && { filters }),
             ...((args.botId !== undefined || args.botComputer !== undefined) && { botComputer: nextComputer === true ? true : undefined }),
         });
 
@@ -428,7 +512,7 @@ const vGetTriggerExecutionsOutput = v.array(
 
 export const getTriggerExecutions = authQuery
     .input({
-        limit: v.optional(v.number()),
+        limit: v.optional(v.number().check((value) => Number.isSafeInteger(value) && value >= 1 && value <= 100, { message: "Invalid limit" })),
         triggerId: v.id("triggers"),
     })
     .output(v.from(vGetTriggerExecutionsOutput))
@@ -446,9 +530,24 @@ export const getTriggerExecutions = authQuery
             .query("triggerExecutions")
             .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", args.triggerId as Id<"triggers">))
             .order("desc")
-            .take(args.limit ?? 20);
+            // One row over the limit: a trigger keeps one filtered row, so the extra one only covers a racing duplicate.
+            .take((args.limit ?? 20) + 1);
 
-        return executions.map((entry) => {
+        // At most one filtered row is shown (the newest), so misses never push real runs out of the list.
+        let seenFiltered = false;
+        const visible = executions.filter((entry) => {
+            if (entry.status !== "filtered") {
+                return true;
+            }
+
+            const keep = !seenFiltered;
+
+            seenFiltered = true;
+
+            return keep;
+        });
+
+        return visible.slice(0, args.limit ?? 20).map((entry) => {
             return {
                 _id: entry._id as string,
                 completedAt: entry.completedAt ?? null,
@@ -603,6 +702,45 @@ export const createExecution = internalMutation
         });
 
         return insertedId as Id<"triggerExecutions">;
+    });
+
+/**
+ * Record a verified delivery that failed the trigger's payload filters. It ran
+ * nothing: no `admitTriggerRun` charge, no `triggerCount` / `lastTriggeredAt`
+ * change, no notification (`updateExecution` would send one). The payload is
+ * NOT stored: it is untrusted, up to 1 MB, and can be replayed at the delivery
+ * limit. A trigger keeps ONE filtered row, found by `by_triggerId_status` however
+ * many runs followed it and moved to the front by each miss, so a sender
+ * whose events miss the filters (even alternating with runs) cannot fill the
+ * history or push the real runs out of the list.
+ */
+export const recordFilteredExecution = internalMutation
+    .input({
+        reason: v.string().max(MAX_LENGTH.short),
+        triggerId: v.id("triggers"),
+    })
+    .output(v.null())
+    .mutation(async ({ args: { reason, triggerId }, ctx }) => {
+        // The trigger may have been deleted after the webhook read it. Its
+        // deletion cleared the history, so a row written now would outlive it.
+        if (!(await ctx.db.get(triggerId))) {
+            return null;
+        }
+
+        const latest = await ctx.db
+            .query("triggerExecutions")
+            .withIndex("by_triggerId_status", (q) => q.eq("triggerId", triggerId).eq("status", "filtered"))
+            .first();
+
+        if (latest) {
+            await ctx.db.patch(latest._id, { completedAt: ctx.now, error: reason, startedAt: ctx.now });
+
+            return null;
+        }
+
+        await ctx.db.insert("triggerExecutions", { completedAt: ctx.now, error: reason, startedAt: ctx.now, status: "filtered", triggerId });
+
+        return null;
     });
 
 export const updateExecution = internalMutation

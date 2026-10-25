@@ -11,7 +11,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { assertComputerRoutine, createTrigger, setTriggerEnabled, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
+import { assertComputerRoutine, createTrigger, getTriggerExecutions, setTriggerEnabled, testRunTrigger, updateTrigger, updateTriggerStats } from "./functions";
 import { findNextCronTime } from "./schedule";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
@@ -311,5 +311,97 @@ describe("updateTrigger on a new schedule", () => {
         await as.mutation(updateTrigger as never, { cronExpression: "0 9 30 2 *", triggerId: disabledId } as never);
 
         expect("nextTriggerAt" in (await readTrigger(disabledId))).toBe(false);
+    });
+});
+
+describe("webhook payload filters", () => {
+    const as = () => harness.withIdentity({ userId: "user-a" } as never);
+    const webhook = { model: "m", name: "Hook", type: "webhook" };
+    const filter = { op: "equals", path: "action", value: "opened" };
+
+    it("stores a valid set on create, replaces it on update and clears it with an empty set", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { ...webhook, filters: [filter] } as never)) as { triggerId: string };
+
+        const storedFilters = async () => {
+            const row = await readTrigger(triggerId);
+
+            return row.filters;
+        };
+
+        expect(await storedFilters()).toEqual([filter]);
+
+        const next = { op: "exists", path: "pull_request.number" };
+
+        await as().mutation(updateTrigger as never, { filters: [next], triggerId } as never);
+        expect(await storedFilters()).toEqual([next]);
+
+        await as().mutation(updateTrigger as never, { name: "Renamed", triggerId } as never);
+        expect(await storedFilters()).toEqual([next]);
+
+        await as().mutation(updateTrigger as never, { filters: [], triggerId } as never);
+        expect(await storedFilters()).toBeUndefined();
+    });
+
+    it("refuses more than 10 filters, a path past 8 segments, and a comparison without a value", async () => {
+        const tooMany = Array.from({ length: 11 }, (_, index) => {
+            return { ...filter, value: String(index) };
+        });
+
+        await expect(as().mutation(createTrigger as never, { ...webhook, filters: tooMany } as never)).rejects.toThrow("at most 10");
+        await expect(as().mutation(createTrigger as never, { ...webhook, filters: [{ op: "exists", path: "a.b.c.d.e.f.g.h.i" }] } as never)).rejects.toThrow(
+            "8 deep",
+        );
+        await expect(as().mutation(createTrigger as never, { ...webhook, filters: [{ op: "equals", path: "a" }] } as never)).rejects.toThrow("needs a value");
+    });
+
+    it("refuses a path longer than the argument cap", async () => {
+        await expect(as().mutation(createTrigger as never, { ...webhook, filters: [{ op: "exists", path: "a".repeat(201) }] } as never)).rejects.toThrow();
+    });
+
+    it("keeps filters to webhook triggers", async () => {
+        const schedule = { cronExpression: "0 9 * * 1", model: "m", name: "Daily", type: "schedule" };
+
+        await expect(as().mutation(createTrigger as never, { ...schedule, filters: [filter] } as never)).rejects.toThrow("Only a webhook trigger");
+
+        const { triggerId } = (await as().mutation(createTrigger as never, schedule as never)) as { triggerId: string };
+
+        await expect(as().mutation(updateTrigger as never, { filters: [filter], triggerId } as never)).rejects.toThrow("Only a webhook trigger");
+    });
+});
+
+describe("getTriggerExecutions", () => {
+    const as = () => harness.withIdentity({ userId: "user-a" } as never);
+
+    const seed = async (completed: number) => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("triggerExecutions", { startedAt: completed + 1, status: "filtered", triggerId });
+
+            for (let n = 1; n <= completed; n += 1) {
+                await ctx.db.insert("triggerExecutions", { startedAt: n, status: "completed", triggerId });
+            }
+        });
+
+        return triggerId;
+    };
+
+    it("returns the full 100 rows at the top of the range, the filtered row among them", async () => {
+        const triggerId = await seed(110);
+        const rows = (await as().query(getTriggerExecutions as never, { limit: 100, triggerId } as never)) as { status: string }[];
+
+        expect(rows).toHaveLength(100);
+        expect(rows[0]?.status).toBe("filtered");
+    });
+
+    it("accepts the bounds 1 and 100 and refuses 0, 101, fractions and non-finite limits", async () => {
+        const triggerId = await seed(2);
+
+        expect(await as().query(getTriggerExecutions as never, { limit: 1, triggerId } as never)).toHaveLength(1);
+        expect(await as().query(getTriggerExecutions as never, { limit: 100, triggerId } as never)).toHaveLength(3);
+
+        for (const limit of [0, 101, -1, 1.5, NaN, Infinity]) {
+            await expect(as().query(getTriggerExecutions as never, { limit, triggerId } as never)).rejects.toThrow();
+        }
     });
 });
