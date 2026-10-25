@@ -74,11 +74,10 @@ const ChatLoadingSkeleton: FC = () => {
                     <div className="h-full pb-2">
                         <div className="thread-viewport h-full">
                             <div className="flex h-full flex-col items-center overflow-x-auto overflow-y-scroll bg-inherit px-4 pt-8">
-                                {isStalled && (
-                                    <p className="text-muted-foreground pb-4 text-sm" role="status">
-                                        <Trans>Still connecting to the server...</Trans>
-                                    </p>
-                                )}
+                                {/* Mounted from the start, so the live region exists before its text changes; visually hidden until the stall. */}
+                                <p className={isStalled ? "text-muted-foreground pb-4 text-sm" : "sr-only"} role="status">
+                                    {isStalled && <Trans>Still connecting to the server...</Trans>}
+                                </p>
                                 <div aria-hidden="true" className="message-list flex w-full max-w-(--thread-max-width) flex-col">
                                     <div className="message-item pb-6" data-message-role="user">
                                         <div className="relative grid w-full max-w-(--thread-max-width) auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 [&:where(>*)]:col-start-2">
