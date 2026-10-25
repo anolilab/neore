@@ -23,21 +23,50 @@ const rootDir = path.resolve(__dirname, "..");
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
-// Piped stdin is read whole: readline drops lines that arrive before their question.
-const pipedAnswers = process.stdin.isTTY ? null : fs.readFileSync(0, "utf8").split("\n");
-const rl = pipedAnswers ? null : readline.createInterface({ input: process.stdin, output: process.stdout });
+// Lines queue as they arrive, so a burst of piped answers is kept until asked for.
+const lines = [];
+const waiting = [];
+let closed = false;
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) });
+
+rl.on("line", (line) => {
+    const resolve = waiting.shift();
+
+    if (resolve) {
+        resolve(line);
+    } else {
+        lines.push(line);
+    }
+});
+
+rl.on("close", () => {
+    closed = true;
+
+    for (const resolve of waiting.splice(0)) {
+        resolve("");
+    }
+});
+
+const nextLine = () => {
+    if (lines.length > 0) {
+        return Promise.resolve(lines.shift());
+    }
+
+    if (closed) {
+        return Promise.resolve("");
+    }
+
+    return new Promise((resolve) => {
+        waiting.push(resolve);
+    });
+};
 
 const ask = async (question, defaultValue) => {
     const suffix = defaultValue ? ` (${defaultValue})` : "";
-    let answer;
 
-    if (rl) {
-        answer = await rl.question(`${question}${suffix}: `);
-    } else {
-        process.stdout.write(`${question}${suffix}: `);
-        answer = pipedAnswers.shift() ?? "";
-        process.stdout.write(`${answer}\n`);
-    }
+    process.stdout.write(`${question}${suffix}: `);
+
+    const answer = await nextLine();
 
     return answer.trim() || defaultValue || "";
 };
@@ -660,11 +689,11 @@ const main = async () => {
     console.log("2. Start the development stack (web on :5173, backend + its services on :8788, public gateway on :8787):");
     console.log("   pnpm dev\n");
 
-    rl?.close();
+    rl.close();
 };
 
 main().catch((error) => {
     console.error("Setup failed:", error);
-    rl?.close();
+    rl.close();
     process.exit(1);
 });
