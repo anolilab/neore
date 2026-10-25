@@ -85,7 +85,7 @@ const useQueueActions = () => {
     const latestRef = useRef({ hasError: Boolean(error), isStreaming, threadId: currentThreadId });
     // A thread whose send was asked for while a removal held `busyRef`.
     const sendRequestedRef = useRef<string | undefined>(undefined);
-    const sendNextPromptRef = useRef<(threadId: string) => Promise<void>>(async () => {});
+    const sendNextPromptRef = useRef<(threadId: string, options?: { explicit?: boolean }) => Promise<void>>(async () => {});
 
     useEffect(() => {
         latestRef.current = { hasError: Boolean(error), isStreaming, threadId: currentThreadId };
@@ -104,9 +104,13 @@ const useQueueActions = () => {
         [withdrawSteer],
     );
 
-    /** Sends the thread's next prompt. One whose withdrawal failed stays first, and the queue pauses. */
+    /**
+     * Sends the thread's next prompt. One whose withdrawal failed stays first, and the queue pauses.
+     * An automatic send leaves the queue for the user to review when the reply ended in an error,
+     * even if that error arrived during the withdrawal; `explicit` (the Send next button) sends anyway.
+     */
     const sendNextPrompt = useCallback(
-        async (threadId: string): Promise<void> => {
+        async (threadId: string, { explicit = false }: { explicit?: boolean } = {}): Promise<void> => {
             if (busyRef.current) {
                 // Not dropped: the call that holds the flag runs it once it lets go.
                 sendRequestedRef.current = threadId;
@@ -121,7 +125,11 @@ const useQueueActions = () => {
                 const next = await takeNextToSend({
                     // A reply that started meanwhile owns the thread: a message sent from the
                     // composer is `isSubmitting` before its stream exists, so that counts too.
-                    canSend: () => latestRef.current.threadId === threadId && !latestRef.current.isStreaming && !useChatUIStore.getState().isSubmitting,
+                    canSend: () => {
+                        const latest = latestRef.current;
+
+                        return latest.threadId === threadId && !latest.isStreaming && (explicit || !latest.hasError) && !useChatUIStore.getState().isSubmitting;
+                    },
                     peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
                     remove: (id) => remove(threadId, id),
                     withdraw: async (steer) => await withdraw(threadId, steer),
@@ -363,7 +371,7 @@ const ComposerPromptQueue: FC = () => {
         }
 
         usePromptQueueStore.getState().setPaused(threadId, false);
-        void sendNextPrompt(threadId);
+        void sendNextPrompt(threadId, { explicit: true });
     }, [sendNextPrompt, threadId]);
 
     if (queue.items.length === 0) {

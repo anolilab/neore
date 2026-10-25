@@ -234,6 +234,24 @@ describe("takeNextToSend", () => {
         expect(queue.items.map((entry) => entry.id)).toStrictEqual(["a", "b"]);
     });
 
+    it("leaves the head in place when the reply errored while the withdrawal was out", async () => {
+        const queue = queueOf([{ attachments: [], id: "a", steer, text: "go left" }]);
+        let hasError = false;
+
+        expect(
+            await takeNextToSend({
+                ...queue,
+                canSend: () => !hasError,
+                withdraw: async () => {
+                    hasError = true;
+
+                    return "withdrawn";
+                },
+            }),
+        ).toStrictEqual({ kind: "blocked" });
+        expect(queue.items.map((entry) => entry.id)).toStrictEqual(["a"]);
+    });
+
     it("leaves a plain head in place while sending is not allowed", async () => {
         const queue = queueOf([{ attachments: [], id: "a", text: "hi" }]);
 
