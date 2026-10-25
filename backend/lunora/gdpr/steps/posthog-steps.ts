@@ -34,6 +34,16 @@ const assertProjectExists = async (host: string, projectId: string, personalApiK
         timeoutMs: FETCH_TIMEOUT_SHORT_MS,
     });
 
+    if (response.status === 401 || response.status === 403) {
+        await response.body?.cancel();
+        // The key can delete persons but cannot read the project: a configuration fault to fix, not an outage to wait out.
+        const message = `[GDPR/PostHog] POSTHOG_PERSONAL_API_KEY lacks the project:read scope, so project ${projectId} could not be verified and a 404 on the person is not trusted`;
+
+        gdprLogger.error(message);
+
+        throw new HttpError(message, response.status, response.statusText);
+    }
+
     await assertOk(response, `[GDPR/PostHog] Project ${projectId} could not be verified, so a 404 on the person is not trusted`);
     await response.body?.cancel();
 };

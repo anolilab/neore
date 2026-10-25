@@ -26,3 +26,9 @@ export const POSTHOG_RETRY_MAX_ATTEMPTS = POSTHOG_RETRY_DELAYS_MS.length;
 
 /** How long after an attempt starts the watchdog fails it if it recorded no outcome (crash or timeout mid-run). */
 export const POSTHOG_RETRY_WATCHDOG_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * How long a running attempt owns its claim. A delivery that finds the lease held leaves the attempt
+ * alone; one that finds it lapsed (the first delivery died mid-run) takes the attempt over.
+ */
+export const POSTHOG_RETRY_LEASE_MS = 10 * 60 * 1000;

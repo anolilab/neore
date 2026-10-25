@@ -61,7 +61,17 @@ describe(erasePostHogPerson, () => {
         expect(init.signal).toBeInstanceOf(AbortSignal);
     });
 
-    it.each([401, 403, 404, 500])("throws on a 404 when the project check answers %i, so a wrong project id is never a success", async (status) => {
+    it.each([401, 403])("names the missing project:read scope and logs it when the project lookup answers %i", async (status) => {
+        const logSpy = vi.spyOn(gdprLogger, "error").mockImplementation(() => {});
+
+        stubFetchByUrl({ person: new Response("not found", { status: 404 }), project: new Response("forbidden", { status }) });
+
+        await expect(erasePostHogPerson("user-1", CONFIGURED)).rejects.toThrow("lacks the project:read scope");
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("project:read"));
+        logSpy.mockRestore();
+    });
+
+    it.each([404, 500])("throws on a 404 when the project check answers %i, so a wrong project id is never a success", async (status) => {
         stubFetchByUrl({ person: new Response("not found", { status: 404 }), project: new Response("nope", { status }) });
 
         await expect(erasePostHogPerson("user-1", CONFIGURED)).rejects.toThrow(`Project 42 could not be verified`);

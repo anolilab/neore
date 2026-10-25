@@ -30,7 +30,14 @@ import { HttpError } from "../lib/fetch-timeout";
 import { gdprLogger } from "../lib/logger";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
-import { EXPORT_EXPIRY_MS, POSTHOG_FAILED_MESSAGE, POSTHOG_RETRY_DELAYS_MS, POSTHOG_RETRY_MAX_ATTEMPTS, POSTHOG_RETRY_WATCHDOG_MS } from "./constants";
+import {
+    EXPORT_EXPIRY_MS,
+    POSTHOG_FAILED_MESSAGE,
+    POSTHOG_RETRY_DELAYS_MS,
+    POSTHOG_RETRY_LEASE_MS,
+    POSTHOG_RETRY_MAX_ATTEMPTS,
+    POSTHOG_RETRY_WATCHDOG_MS,
+} from "./constants";
 import { erasePostHogPerson } from "./steps/posthog-steps";
 import { minimiseUserRecords } from "./steps/residual-deletion-steps";
 
@@ -66,6 +73,8 @@ const SCHEDULED_SCOPE = "posthog-retry-scheduled";
 const STARTED_SCOPE = "posthog-retry-started";
 /** How an attempt ends: once its outcome is claimed (failed, succeeded or exhausted), that attempt never runs again. */
 const OUTCOME_SCOPE = "posthog-retry-outcome";
+/** Who is running an attempt right now: held for `POSTHOG_RETRY_LEASE_MS`, so a second delivery stays out and a dead one can be replaced. */
+const LEASE_SCOPE = "posthog-retry-lease";
 /** Past the whole retry chain (about 79 hours) plus the scheduler's redelivery window. */
 const ATTEMPT_CLAIM_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -145,9 +154,10 @@ export const schedulePostHogRetry = internalMutation
  * (a re-run workflow) or cancelled is left alone. An attempt that already has its outcome row
  * (failed, succeeded, exhausted) never runs again: a redelivery after that commit would otherwise
  * call the provider a second time and fork the chain with a second successor. A `processing`
- * request is taken over only when THIS attempt claimed it, i.e. the job was redelivered after the action stopped mid-run: the
- * erasure is idempotent, so a concurrent duplicate is harmless. A request a workflow re-run holds
- * as `processing` has no such row and is left alone.
+ * request is taken over only when THIS attempt claimed it, i.e. the job was redelivered after the action stopped mid-run, and
+ * only once the running delivery's lease has lapsed: a delivery that arrives while the lease is
+ * held does nothing, so two deliveries never race to record the outcome. A request a workflow
+ * re-run holds as `processing` has no such row and is left alone.
  */
 export const startPostHogRetry = internalMutation
     .input({ attempt: v.number(), chain: v.number(), requestId: v.id("gdprRequests"), userId: v.string().max(MAX_LENGTH.id) })
@@ -170,6 +180,10 @@ export const startPostHogRetry = internalMutation
                 return false;
             }
 
+            if (!(await claimOnce(context, LEASE_SCOPE, key, POSTHOG_RETRY_LEASE_MS))) {
+                return false;
+            }
+
             await record(context, "deletion_retry_resumed", userId, { attempt, chain, requestId });
 
             return true;
@@ -180,6 +194,7 @@ export const startPostHogRetry = internalMutation
         }
 
         await claimOnce(context, STARTED_SCOPE, key, ATTEMPT_CLAIM_TTL_MS);
+        await claimOnce(context, LEASE_SCOPE, key, POSTHOG_RETRY_LEASE_MS);
         await context.db.patch(request._id, { status: "processing" });
         await record(context, "deletion_retry_started", userId, { attempt, chain, requestId });
         // Only a fresh start: a resume is the same attempt, already watched. The job and the claim

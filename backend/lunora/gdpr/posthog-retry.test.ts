@@ -9,9 +9,16 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { POSTHOG_RETRY_DELAYS_MS, POSTHOG_RETRY_MAX_ATTEMPTS, POSTHOG_RETRY_WATCHDOG_MS } from "./constants";
+import { POSTHOG_RETRY_DELAYS_MS, POSTHOG_RETRY_LEASE_MS, POSTHOG_RETRY_MAX_ATTEMPTS, POSTHOG_RETRY_WATCHDOG_MS } from "./constants";
 import { updateRequestProgress } from "./functions";
-import { expireStalePostHogRetry, retryPostHogErasure, schedulePostHogRetry, startPostHogRetry } from "./posthog-retry";
+import {
+    expireStalePostHogRetry,
+    failPostHogRetry,
+    recordPostHogRetrySuccess,
+    retryPostHogErasure,
+    schedulePostHogRetry,
+    startPostHogRetry,
+} from "./posthog-retry";
 import { erasePostHogPerson } from "./steps/posthog-steps";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -501,6 +508,7 @@ describe("a redelivered attempt", () => {
     it("finishes a request its own interrupted attempt left processing", async () => {
         expect(await claim(1)).toBe(true);
         expect(await statusOf()).toBe("processing");
+        vi.setSystemTime(NOW + POSTHOG_RETRY_LEASE_MS + 1);
         vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
 
         await attempt(1);
@@ -545,6 +553,7 @@ describe("a redelivered attempt", () => {
 
     it("keeps the schedule going when the resumed attempt fails", async () => {
         await claim(1);
+        vi.setSystemTime(NOW + POSTHOG_RETRY_LEASE_MS + 1);
         vi.mocked(erasePostHogPerson).mockRejectedValue(new Error("down"));
 
         await attempt(1);
@@ -552,6 +561,53 @@ describe("a redelivered attempt", () => {
         expect(await statusOf()).toBe("failed");
         expect(jobs()).toHaveLength(1);
         expect(jobs()[0]?.args).toStrictEqual({ attempt: 2, chain: 1, requestId, userId: USER });
+    });
+
+    it("does not call PostHog from a second delivery while the first holds a fresh lease", async () => {
+        expect(await claim(1)).toBe(true);
+        vi.setSystemTime(NOW + POSTHOG_RETRY_LEASE_MS - 1);
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+
+        await attempt(1);
+
+        expect(erasePostHogPerson).not.toHaveBeenCalled();
+        expect(await statusOf()).toBe("processing");
+        expect(await actions()).toStrictEqual(["deletion_retry_started"]);
+    });
+
+    it("takes an attempt over once the running delivery's lease has lapsed, and only one delivery does", async () => {
+        expect(await claim(1)).toBe(true);
+        vi.setSystemTime(NOW + POSTHOG_RETRY_LEASE_MS + 1);
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+
+        expect(await claim(1)).toBe(true);
+        // The takeover holds a new lease of its own.
+        expect(await claim(1)).toBe(false);
+
+        const names = await actions();
+
+        expect(names.filter((name) => name === "deletion_retry_resumed")).toHaveLength(1);
+    });
+
+    it("lets a failure that arrives after the success change nothing", async () => {
+        vi.mocked(erasePostHogPerson).mockResolvedValue("deleted");
+        await attempt(1);
+
+        await run(async (ctx) => await ctx.runMutation(failPostHogRetry, { attempt: 1, chain: 1, errorClass: "late", requestId, userId: USER }));
+
+        expect(await statusOf()).toBe("completed");
+        expect(jobs()).toHaveLength(0);
+        expect(await actions()).not.toContain("deletion_retry_failed");
+    });
+
+    it("lets a success that arrives after the failure change nothing: the attempt has one outcome", async () => {
+        await claim(1);
+        await run(async (ctx) => await ctx.runMutation(failPostHogRetry, { attempt: 1, chain: 1, errorClass: "down", requestId, userId: USER }));
+
+        await run(async (ctx) => await ctx.runMutation(recordPostHogRetrySuccess, { attempt: 1, chain: 1, posthog: "deleted", requestId, userId: USER }));
+
+        expect(await statusOf()).toBe("failed");
+        expect(jobs()).toHaveLength(1);
     });
 
     it("leaves a processing request alone when no attempt of this number claimed it", async () => {
@@ -564,6 +620,7 @@ describe("a redelivered attempt", () => {
         // Attempt 1's claim does not entitle attempt 2.
         await run(async (ctx) => await ctx.db.patch(requestId, { status: "failed" }));
         await claim(1);
+        vi.setSystemTime(NOW + POSTHOG_RETRY_LEASE_MS + 1);
         await attempt(2);
 
         expect(erasePostHogPerson).not.toHaveBeenCalled();
@@ -632,6 +689,7 @@ describe("attempt deduplication", () => {
         const rows = await claims();
 
         expect(rows.map((row) => `${row.scope}|${row.key}`).toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
+            `posthog-retry-lease|${requestId}:1:1`,
             `posthog-retry-outcome|${requestId}:1:1`,
             `posthog-retry-scheduled|${requestId}:1:1`,
             `posthog-retry-scheduled|${requestId}:1:2`,
