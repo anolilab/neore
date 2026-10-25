@@ -41,6 +41,8 @@ const INSTALLERS: Installer[] = [
 const noopSubscribe = (): (() => void) => () => {};
 const getServerUserAgent = (): string => "";
 const getClientUserAgent = (): string => navigator.userAgent;
+const getServerTouchPoints = (): number => 0;
+const getClientTouchPoints = (): number => navigator.maxTouchPoints;
 
 const DownloadPage = () => {
     const { t } = useLingui();
@@ -48,7 +50,8 @@ const DownloadPage = () => {
     // Server render has no UA, so it renders the "other" layout and the client swaps in the
     // detected platform after hydration (useSyncExternalStore keeps the UA a stable string).
     const userAgent = useSyncExternalStore(noopSubscribe, getClientUserAgent, getServerUserAgent);
-    const detected = useMemo(() => detectPlatform(userAgent), [userAgent]);
+    const maxTouchPoints = useSyncExternalStore(noopSubscribe, getClientTouchPoints, getServerTouchPoints);
+    const detected = useMemo(() => detectPlatform(userAgent, maxTouchPoints), [userAgent, maxTouchPoints]);
 
     const primaryPlatform = detected.platform === "other" ? null : detected.platform;
 

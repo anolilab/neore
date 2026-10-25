@@ -24,9 +24,11 @@ const ARM64_RE = /aarch64|arm64/i;
  *   Callers should offer every installer for these.
  *
  * Mobile UAs (iPhone/iPad, Android) map to "other" even though iPadOS and
- * Android carry the Mac and Linux tokens.
+ * Android carry the Mac and Linux tokens. iPadOS in desktop mode sends a Mac UA
+ * with no mobile token, so the caller passes `navigator.maxTouchPoints`: a Mac
+ * has none, an iPad has several.
  */
-export const detectPlatform = (userAgent: string): DetectedPlatform => {
+export const detectPlatform = (userAgent: string, maxTouchPoints = 0): DetectedPlatform => {
     if (IPHONE_OR_IPAD_RE.test(userAgent) || ANDROID_RE.test(userAgent)) {
         return { platform: "other" };
     }
@@ -36,7 +38,7 @@ export const detectPlatform = (userAgent: string): DetectedPlatform => {
     }
 
     if (MAC_RE.test(userAgent)) {
-        return { platform: "macos" };
+        return maxTouchPoints > 1 ? { platform: "other" } : { platform: "macos" };
     }
 
     if (LINUX_RE.test(userAgent)) {

@@ -43,6 +43,13 @@ describe("detectPlatform", () => {
         expect(detectPlatform(ua)).toEqual({ platform: "other" });
     });
 
+    it("iPadOS in desktop mode (a Mac UA with touch points) -> other; a real Mac stays macos", () => {
+        const desktopModeIpad = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
+
+        expect(detectPlatform(desktopModeIpad, 5)).toStrictEqual({ platform: "other" });
+        expect(detectPlatform(desktopModeIpad, 0)).toStrictEqual({ platform: "macos" });
+    });
+
     it("empty or unknown UA -> other", () => {
         expect(detectPlatform("")).toEqual({ platform: "other" });
         expect(detectPlatform("curl/8.4.0")).toEqual({ platform: "other" });
