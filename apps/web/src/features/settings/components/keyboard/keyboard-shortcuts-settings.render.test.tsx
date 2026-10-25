@@ -101,6 +101,15 @@ describe("KeyboardShortcutsSettings effort commands", () => {
         });
     });
 
+    it("refuses a chord a fixed binding the form does not edit already has", async () => {
+        renderForm();
+        record("Increase Reasoning Effort", { ctrlKey: true, key: "r", shiftKey: true });
+
+        await waitFor(() => {
+            expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toStrictEqual([DUPLICATE_MESSAGE]);
+        });
+    });
+
     it("refuses a Control chord that a Command binding of another command overlaps on a Mac", async () => {
         platform.modifier = "cmd";
         act(() => {

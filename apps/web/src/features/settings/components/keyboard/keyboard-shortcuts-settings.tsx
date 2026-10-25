@@ -19,7 +19,7 @@ import * as z from "zod";
 import { findEffortConflicts } from "@/features/keyboard/lib/recorded-shortcut-converter";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
-import { defaultKeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
+import { defaultKeyboardShortcuts, useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Same rule the backend applies on save (`@neore/backend/auth/shortcut`); "" is a cleared binding.
@@ -66,7 +66,8 @@ const keyboardShortcutSchema = z
         }
 
         // A recorded Control chord also answers to Command on a Mac, so the effort commands are judged by what they register.
-        const effortConflicts = Object.keys(findEffortConflicts(context.value));
+        // The fixed bindings (audio, list navigation) are not in the form but register at runtime, so they count too.
+        const effortConflicts = Object.keys(findEffortConflicts({ ...useUIStateStore.getState().keyboardShortcuts, ...context.value }));
         const conflicting = new Set([...[...owners.values()].filter((keys) => keys.length > 1).flat(), ...effortConflicts]);
 
         for (const key of conflicting) {
