@@ -264,6 +264,43 @@ describe(evaluateRules, () => {
     });
 });
 
+describe("evaluateRules when the cooldown claim throws", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("still delivers the alert and logs the error", async () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        const failure = new Error("D1 unavailable");
+        const database = firingDatabase();
+        const prepare = database.prepare.bind(database);
+
+        vi.spyOn(database, "prepare").mockImplementation(((sql: string) => {
+            const statement = prepare(sql);
+
+            if (sql.startsWith("UPDATE notification_rules")) {
+                return {
+                    ...statement,
+                    bind: () => {
+                        return {
+                            run: async () => {
+                                throw failure;
+                            },
+                        };
+                    },
+                };
+            }
+
+            return statement;
+        }) as never);
+
+        const result = await evaluateRules({ USAGE_DB: database } as AppEnv, "user-1", undefined, {} as UsageLogEntry);
+
+        expect(result.notifications).toEqual([expect.objectContaining({ ruleId: "rule-1" })]);
+        expect(error).toHaveBeenCalledWith(expect.stringContaining("Cooldown claim failed"), failure);
+    });
+});
+
 describe("evaluateRules concurrency", () => {
     it("lets only one of two concurrent evaluations of the same rule fire", async () => {
         const appEnv = { USAGE_DB: racingDatabase() } as AppEnv;

@@ -66,7 +66,7 @@ export const evaluateRules = async (
             if (currentValue >= threshold) {
                 // Claim the cooldown slot before acting: the read above is not serialised with other requests of the same
                 // user, so only the evaluation whose conditional update changes a row may fire.
-                if (!(await claimCooldown(database, ruleId))) {
+                if (!(await claimOrDeliver(database, ruleId))) {
                     continue;
                 }
 
@@ -105,6 +105,20 @@ const claimCooldown = async (database: D1Database, ruleId: string): Promise<bool
         .run();
 
     return (result.meta?.changes ?? 0) > 0;
+};
+
+/**
+ * Claim the cooldown slot, treating a claim that could not be made at all as won.
+ * A missed usage or budget alert costs the user more than a duplicate one, which the backend's dedupe key absorbs anyway.
+ */
+const claimOrDeliver = async (database: D1Database, ruleId: string): Promise<boolean> => {
+    try {
+        return await claimCooldown(database, ruleId);
+    } catch (error) {
+        console.error("[Notifications] Cooldown claim failed, delivering anyway:", error);
+
+        return true;
+    }
 };
 
 const getMetricValue = async (database: D1Database, userId: string, metric: string, period: string): Promise<number> => {
