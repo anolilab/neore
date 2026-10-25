@@ -8,6 +8,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import AccountSettings from "./account-settings";
+
+const HIDE_PERSONAL_INFO = /Hide Personal Information/;
+const VIM_KEYS = /Vim keys in the composer/;
+
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
 vi.mock("@lingui/core/macro", () => {
     return {
@@ -49,7 +54,11 @@ vi.mock("@/features/auth/hooks/use-user-settings", () => {
 });
 
 vi.mock("@/features/auth/hooks/use-is-anonymous", () => {
-    return { default: () => ({ isAnonymous: true }) };
+    return {
+        default: () => {
+            return { isAnonymous: true };
+        },
+    };
 });
 
 vi.mock("@/features/layout/hooks/use-ui-state", () => {
@@ -85,8 +94,6 @@ vi.mock("@/features/settings/components/chat/chat-lifecycle-settings", () => {
     return { default: () => null };
 });
 
-import AccountSettings from "./account-settings";
-
 describe("AccountSettings", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -120,7 +127,7 @@ describe("AccountSettings", () => {
     it("still saves a client-side preference", () => {
         render(<AccountSettings />);
 
-        fireEvent.click(screen.getByRole("switch", { name: /Hide Personal Information/ }));
+        fireEvent.click(screen.getByRole("switch", { name: HIDE_PERSONAL_INFO }));
 
         expect(setHidePersonalInfo).toHaveBeenCalledWith(true);
     });
@@ -128,7 +135,7 @@ describe("AccountSettings", () => {
     it("still saves a server-side setting", () => {
         render(<AccountSettings />);
 
-        fireEvent.click(screen.getByRole("switch", { name: /Vim keys in the composer/ }));
+        fireEvent.click(screen.getByRole("switch", { name: VIM_KEYS }));
 
         expect(mutate).toHaveBeenCalledWith({ composerVimMode: true }, expect.objectContaining({ onSuccess: expect.any(Function) }));
     });
