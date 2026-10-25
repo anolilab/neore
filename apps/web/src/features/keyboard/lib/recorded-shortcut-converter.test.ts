@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { convertRecordedShortcutToHotkeysHook, findEffortConflicts } from "./recorded-shortcut-converter";
+import { convertRecordedShortcutToHotkeysHook, effortCommandsToRegister, findEffortConflicts } from "./recorded-shortcut-converter";
 import convertShortcutToHotkeysHook from "./shortcut-converter";
 
 describe("convertRecordedShortcutToHotkeysHook", () => {
@@ -49,5 +49,23 @@ describe("findEffortConflicts", () => {
     it("sees a recorded Control chord collide with the Command default on a Mac only", () => {
         expect(findEffortConflicts({ increaseEffort: "ctrl+n", newChat: "cmd+n" }, "cmd")).toStrictEqual({ increaseEffort: "command" });
         expect(findEffortConflicts({ increaseEffort: "ctrl+n", newChat: "cmd+n" }, "ctrl")).toStrictEqual({});
+    });
+});
+
+describe("effortCommandsToRegister", () => {
+    it("registers only the bound commands", () => {
+        expect(effortCommandsToRegister({ decreaseEffort: "", newChat: "ctrl+n" }, "ctrl")).toStrictEqual({ decreaseEffort: false, increaseEffort: false });
+        expect(effortCommandsToRegister({ increaseEffort: "alt+arrowup" }, "ctrl")).toStrictEqual({ decreaseEffort: false, increaseEffort: true });
+    });
+
+    it("lets decrease keep a chord both effort commands hold, and another command keep its own", () => {
+        expect(effortCommandsToRegister({ decreaseEffort: "alt+e", increaseEffort: "alt+e" }, "ctrl")).toStrictEqual({
+            decreaseEffort: true,
+            increaseEffort: false,
+        });
+        expect(effortCommandsToRegister({ decreaseEffort: "ctrl+n", increaseEffort: "alt+e", newChat: "ctrl+n" }, "ctrl")).toStrictEqual({
+            decreaseEffort: false,
+            increaseEffort: true,
+        });
     });
 });

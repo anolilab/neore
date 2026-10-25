@@ -75,3 +75,19 @@ export const findEffortConflicts = (
 
     return conflicts;
 };
+
+/**
+ * Which effort commands to register: bound, and not on a chord another command has (that command
+ * keeps it). Between the two effort commands, decrease keeps a shared chord.
+ */
+export const effortCommandsToRegister = (
+    shortcuts: Readonly<Record<string, string | undefined>>,
+    platformModifier: "cmd" | "ctrl" = getPlatformModifierForEvents(),
+): Record<EffortCommand, boolean> => {
+    const conflicts = findEffortConflicts(shortcuts, platformModifier);
+
+    return {
+        decreaseEffort: Boolean(shortcuts.decreaseEffort) && conflicts.decreaseEffort !== "command",
+        increaseEffort: Boolean(shortcuts.increaseEffort) && conflicts.increaseEffort === undefined,
+    };
+};
