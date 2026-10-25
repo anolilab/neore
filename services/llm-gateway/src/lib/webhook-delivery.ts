@@ -103,7 +103,8 @@ export const deliverEvent = async (db: D1Database, event: GatewayEvent, timeout 
 
                 status = resp.status;
                 // The reply is never read; an unconsumed body on a customer-controlled URL holds the connection.
-                await resp.body?.cancel().catch(() => {});
+                // Not awaited: a cancel that never settles must not stall the status update or the next webhook.
+                resp.body?.cancel().catch(() => {});
             } catch {
                 status = 0; // Network error or timeout
             }
