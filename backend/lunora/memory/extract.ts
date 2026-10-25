@@ -137,6 +137,8 @@ type GateOutcome = GateDecision | { reason: "opt_out"; verdict: "skip" };
 
 interface GateArgs {
     assistantResponse: string;
+    /** Where the messages sent into the reply start in `userMessage`. */
+    steeredFrom?: number;
     threadId?: Id<"threads">;
     userId: string;
     userMessage: string;
@@ -152,7 +154,7 @@ const classifyExtractionWorthiness = async (gateway: ServiceFetch, args: GateArg
         const result = await generateText({
             model,
             output: Output.object({ schema: z.object({ remember: z.boolean() }) }),
-            prompt: buildClassifierPrompt(args.userMessage, assistantQuestion),
+            prompt: buildClassifierPrompt(args.userMessage, assistantQuestion, args.steeredFrom),
             system: CLASSIFIER_SYSTEM_PROMPT,
         });
 

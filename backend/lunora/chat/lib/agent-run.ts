@@ -956,13 +956,14 @@ export const resumeApprovedRun = async (
 
         // The continuation's rows are replies of their own (an `order` of their own, and a second one after a steer):
         // the usage page counts them, as its backfill does. Only the interactive path, where `steerable` is set; a group
-        // participant's reply is keyed to its speaker by the group run. The snapshot carries no skill or time zone, so the
-        // reply counts as the plain assistant's, on the UTC day.
+        // participant's reply is keyed to its speaker by the group run. The snapshot carries no skill, so the
+        // reply counts as the plain assistant's; the day is the user's own, read from their settings as `afterRun` is given it.
         if (options.steerable === true) {
             const replies = repliesByOrder(result.savedMessages ?? []);
+            const { timezone } = replies.length > 0 ? await ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }) : { timezone: undefined };
 
             for (const reply of replies) {
-                scheduleReplyUsage(ctx.scheduler as never, replyUsageArgs(reply, { at: Date.now(), userId }));
+                scheduleReplyUsage(ctx.scheduler as never, replyUsageArgs(reply, { at: Date.now(), userId, ...(timezone && { timeZone: timezone }) }));
             }
         }
 

@@ -277,6 +277,10 @@ describe(resumeApprovedRun, () => {
                 return { approvalId: "approval-1", toolName: null };
             }
 
+            if (ref === internal.auth.functions.getUserPreferencesQuery) {
+                return { timezone: "Pacific/Auckland" };
+            }
+
             return ref === internal.auth.functions.getDecryptedProviderKeysQuery ? {} : null;
         });
         const row = (id: string, order: number, role: string) => {
@@ -296,6 +300,8 @@ describe(resumeApprovedRun, () => {
         };
 
         vi.mocked(getAgent).mockResolvedValue(agent as never);
+        // 23:30 UTC on the 24th is already the 25th in Auckland.
+        vi.useFakeTimers({ now: Date.UTC(2026, 9, 24, 23, 30), toFake: ["Date"] });
 
         await resumeApprovedRun(
             { runMutation, runQuery, scheduler: { runAfter } } as never,
@@ -310,11 +316,13 @@ describe(resumeApprovedRun, () => {
             { steerable: true },
         );
 
+        vi.useRealTimers();
+
         const recorded = runAfter.mock.calls.filter((call) => (call as unknown[])[1] === internal.usage.activity.recordReplyUsage);
 
         expect(recorded.map((call) => (call as unknown[])[2])).toMatchObject([
-            { replyKey: "r1", tokens: 10 },
-            { replyKey: "r2", tokens: 10 },
+            { date: "2026-10-25", replyKey: "r1", tokens: 10 },
+            { date: "2026-10-25", replyKey: "r2", tokens: 10 },
         ]);
     });
 });
