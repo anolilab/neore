@@ -24,6 +24,7 @@ import type { ContextHandler, TakeSteer } from "../../agent/client/types";
 import type { ResearchDepth } from "../../agent/client/create-tool";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
+import { EXTRACTION_USER_MESSAGE_CHARS } from "../../memory/gate";
 import { buildAgentTools } from "./agent-tools";
 import { byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getMaxSteps, getModelContextWindow } from "./auto-continue";
@@ -613,6 +614,17 @@ export const buildRunStreamArgs = (options: { model: string; reasoningEffort: nu
 };
 
 /**
+ * What a run that may pause carries in its approval snapshot so its continuation can extract memory
+ * from the whole exchange: the run that paused does not (`afterRun` with `extractMemory: false`), because
+ * a second extraction of the same prompt would run when the continuation finishes. The prompt is cut to
+ * what extraction reads; `afterRun` places the steered texts after it. Nothing when the run is not mined.
+ */
+export const memoryToCarry = (run: { botId?: string; extractMemory: boolean; prompt: string; steeredTexts: ReadonlyArray<string> }): ToolRunConfig["memory"] =>
+    run.extractMemory && run.prompt
+        ? { ...(run.botId && { botId: run.botId }), prompt: run.prompt.slice(0, EXTRACTION_USER_MESSAGE_CHARS), steeredTexts: [...run.steeredTexts] }
+        : undefined;
+
+/**
  * Steering for one interactive run (`chat/steering.ts`). `takeSteer` is the
  * agent's step-boundary hook; `steeredBefore` tells the stream pipe that a
  * message was delivered before the step now starting, so it writes the
@@ -926,6 +938,35 @@ export const resumeApprovedRun = async (
                   runOptions,
               );
 
+        // The interactive path (`steerable`) does the bookkeeping of an ordinary run (`afterRun`): usage of each reply it
+        // saved (a steered continuation saves a second one), timing and, once it is not paused again, memory extraction
+        // from the exchange the snapshot carried plus this continuation's text. A group participant's reply is keyed to
+        // its speaker by the group run. The snapshot carries no skill, so a reply counts as the plain assistant's; the day
+        // is the user's own, read from their settings.
+        const timingStart = Date.now();
+        let firstTokenTime: number | undefined;
+        const recordRun = async (extractMemory: boolean): Promise<void> => {
+            if (options.steerable !== true) {
+                return;
+            }
+
+            const savedMessages = result.savedMessages ?? [];
+            const prefs = await ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
+
+            afterRun(ctx, {
+                ...(config.memory?.botId && { botId: config.memory.botId }),
+                extractMemory: extractMemory && config.memory !== undefined && prefs.memoryEnabled,
+                firstTokenTime,
+                prompt: config.memory?.prompt ?? "",
+                savedMessages,
+                steeredTexts: [...(config.memory?.steeredTexts ?? []), ...(steering?.steeredTexts() ?? [])],
+                threadId,
+                ...(prefs.timezone && { timeZone: prefs.timezone }),
+                timingStart,
+                userId,
+            });
+        };
+
         // A stop during this continuation ends it here, after its owed text is saved (`endStoppedRun`).
         // After a steer the reply continues below the steered message; `finishStoppedReply` reads that off the stream.
         const stoppedAt = async (error: unknown) => {
@@ -939,6 +980,9 @@ export const resumeApprovedRun = async (
                 streamId,
             });
 
+            // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
+            await recordRun(false);
+
             return { lastMessageId: undefined, paused: false, stopped: true };
         };
 
@@ -950,22 +994,11 @@ export const resumeApprovedRun = async (
             return await stoppedAt(error);
         }
 
+        firstTokenTime = piped.firstTokenTime;
+
         await result.consumeStream();
 
         const messageIds = (result.savedMessages ?? []).map((m) => m._id as string);
-
-        // The continuation's rows are replies of their own (an `order` of their own, and a second one after a steer):
-        // the usage page counts them, as its backfill does. Only the interactive path, where `steerable` is set; a group
-        // participant's reply is keyed to its speaker by the group run. The snapshot carries no skill, so the
-        // reply counts as the plain assistant's; the day is the user's own, read from their settings as `afterRun` is given it.
-        if (options.steerable === true) {
-            const replies = repliesByOrder(result.savedMessages ?? []);
-            const { timezone } = replies.length > 0 ? await ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }) : { timezone: undefined };
-
-            for (const reply of replies) {
-                scheduleReplyUsage(ctx.scheduler as never, replyUsageArgs(reply, { at: Date.now(), userId, ...(timezone && { timeZone: timezone }) }));
-            }
-        }
 
         if (messageIds.length > 0) {
             await options.afterSaved?.({
@@ -974,7 +1007,8 @@ export const resumeApprovedRun = async (
             });
         }
 
-        // Paused again: the next approval inherits this snapshot unchanged.
+        // Paused again: the next approval inherits this snapshot, with the steers this continuation took added to
+        // what memory extraction will read.
         let paused: boolean;
 
         try {
@@ -983,7 +1017,10 @@ export const resumeApprovedRun = async (
                 mcpLabels: toolResult.mcpLabels,
                 pending: piped.pending,
                 savedMessages: result.savedMessages,
-                snapshot: config,
+                snapshot:
+                    config.memory && steering
+                        ? { ...config, memory: { ...config.memory, steeredTexts: [...config.memory.steeredTexts, ...steering.steeredTexts()] } }
+                        : config,
                 streamId,
                 threadId,
                 unsaved: piped.unsaved,
@@ -992,6 +1029,8 @@ export const resumeApprovedRun = async (
         } catch (error) {
             return await stoppedAt(error);
         }
+
+        await recordRun(!paused);
 
         return { lastMessageId: messageIds.at(-1), paused, stopped: false };
     } finally {

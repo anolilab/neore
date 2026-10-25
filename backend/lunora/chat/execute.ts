@@ -34,6 +34,7 @@ import {
     finishRun,
     isAgentRunError,
     loadRunContext,
+    memoryToCarry,
     resolveRunModel,
     resumeApprovedRun,
     setResearchDepth,
@@ -398,8 +399,12 @@ export const runStreamingAgent = internalAction
 
             // Record the approval snapshot (if the run paused) and flush. The
             // snapshot is what the continuation rebuilds this exact run from.
+            // A locked chat's content is never mined into memory.
+            const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread);
+            let paused: boolean;
+
             try {
-                await finishRun(ctx, {
+                ({ paused } = await finishRun(ctx, {
                     mcpLabels: toolResult.mcpLabels,
                     pending,
                     savedMessages: result.savedMessages,
@@ -407,6 +412,8 @@ export const runStreamingAgent = internalAction
                         autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                         instructions: streamTextArgs.system ?? agent.options.instructions,
                         mcpServerNames: toolResult.mcpServerNames,
+                        // A run that pauses hands its memory extraction to the continuation.
+                        memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt, steeredTexts: steering.steeredTexts() }),
                         model,
                         reasoningEffort: threadReasoningEffort,
                         researchDepth: effectiveResearchDepth,
@@ -419,7 +426,7 @@ export const runStreamingAgent = internalAction
                     threadId,
                     unsaved,
                     userId,
-                });
+                }));
             } catch (error) {
                 // A stop landed after the pipe ended: the final write is refused, the owed text is saved.
                 await stoppedAt(error);
@@ -430,8 +437,8 @@ export const runStreamingAgent = internalAction
             // Post-stream work: timing and memory extraction, then follow-ups.
             recordRun({
                 botId: runContext.botId,
-                // A locked chat's content is never mined into memory.
-                extractMemory: runContext.memoryEnabled && !isThreadLocked(thread),
+                // A paused run is mined by its continuation, once it has the whole exchange.
+                extractMemory: extractMemory && !paused,
                 firstTokenTime,
                 prompt,
             });
