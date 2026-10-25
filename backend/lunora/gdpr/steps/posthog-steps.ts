@@ -6,12 +6,14 @@ import { posthogAppHost } from "../posthog-host";
 
 /**
  * - `deleted`: PostHog accepted the bulk delete.
- * - `not_found`: PostHog has no such person, so there is nothing to erase.
+ * - `no_profile`: PostHog answered 404 for the person AND the configured project exists, so
+ *   the person has no PostHog profile and there is nothing to erase. This completes the
+ *   deletion workflow: an erasure cannot remove data that is not there.
  * - `skipped`: PostHog deletion is not configured here; NOTHING was erased.
  */
-export type PostHogErasureOutcome = "deleted" | "not_found" | "skipped";
+export type PostHogErasureOutcome = "deleted" | "no_profile" | "skipped";
 
-const vPostHogErasureOutcome = v.union(v.literal("deleted"), v.literal("not_found"), v.literal("skipped"));
+const vPostHogErasureOutcome = v.union(v.literal("deleted"), v.literal("no_profile"), v.literal("skipped"));
 
 interface PostHogErasureEnv {
     POSTHOG_HOST?: string;
@@ -20,9 +22,24 @@ interface PostHogErasureEnv {
 }
 
 /**
- * Deletes the person and their events. Any failure other than "no such person"
- * THROWS, so the workflow step retries and the deletion is never reported as
- * done while data may remain.
+ * PostHog answers 404 both for a person it does not know and for a project id that does not
+ * exist, so a 404 on the person proves nothing alone. Throws unless the configured project
+ * resolves, which keeps a wrong `POSTHOG_PROJECT_ID` from passing as "nothing to erase".
+ */
+const assertProjectExists = async (host: string, projectId: string, personalApiKey: string): Promise<void> => {
+    const response = await fetchWithDeadline(`${host}/api/projects/${projectId}/`, {
+        headers: { Authorization: `Bearer ${personalApiKey}` },
+        timeoutMs: FETCH_TIMEOUT_SHORT_MS,
+    });
+
+    await assertOk(response, `[GDPR/PostHog] Project ${projectId} could not be verified, so a 404 on the person is not trusted`);
+    await response.body?.cancel();
+};
+
+/**
+ * Deletes the person and their events. Anything but a clean answer THROWS, so the workflow
+ * step retries and the deletion is never reported as done while data may remain. The one
+ * non-2xx that does not throw is a 404 on the person from a verified project (`no_profile`).
  */
 export const erasePostHogPerson = async (userId: string, env: PostHogErasureEnv): Promise<PostHogErasureOutcome> => {
     const personalApiKey = env.POSTHOG_PERSONAL_API_KEY;
@@ -53,8 +70,11 @@ export const erasePostHogPerson = async (userId: string, env: PostHogErasureEnv)
 
     if (response.status === 404) {
         await response.body?.cancel();
+        // Checked only on a 404 (so at most once per run): every other status already
+        // proves the project id resolves or throws below.
+        await assertProjectExists(host, projectId, personalApiKey);
 
-        return "not_found";
+        return "no_profile";
     }
 
     await assertOk(response, `[GDPR/PostHog] Failed to delete person ${userId}`, { includeBody: true });

@@ -13,7 +13,7 @@ interface Call {
 }
 
 /** Runs the real handler against a context whose steps record calls; the PostHog step returns `postHog`, or throws it when it is an Error. */
-const runWorkflow = async (postHog: "deleted" | "skipped" | Error) => {
+const runWorkflow = async (postHog: "deleted" | "no_profile" | "skipped" | Error) => {
     const calls: Call[] = [];
     let current = "";
 
@@ -90,7 +90,18 @@ describe("account deletion workflow, PostHog step", () => {
 
         const audit = calls.find((call) => call.args.action === "deletion_completed");
 
-        expect(JSON.parse(audit?.args.details as string)).toStrictEqual({ postHog: "deleted", requestId: "req-1" });
+        expect(JSON.parse(audit?.args.details as string)).toStrictEqual({ posthog: "deleted", requestId: "req-1" });
+    });
+
+    it("completes on no_profile (nothing to erase) and records it as such, not as deleted", async () => {
+        const { calls, outcome } = await runWorkflow("no_profile");
+
+        expect(outcome).toBe("resolved");
+        expect(completionMarked(calls)).toBe(true);
+
+        const audit = calls.find((call) => call.args.action === "deletion_completed");
+
+        expect(JSON.parse(audit?.args.details as string)).toStrictEqual({ posthog: "no_profile", requestId: "req-1" });
     });
 
     it("records an intentional skip as skipped, not as a PostHog deletion", async () => {
@@ -100,6 +111,6 @@ describe("account deletion workflow, PostHog step", () => {
 
         const audit = calls.find((call) => call.args.action === "deletion_completed");
 
-        expect(JSON.parse(audit?.args.details as string)).toStrictEqual({ postHog: "skipped", requestId: "req-1" });
+        expect(JSON.parse(audit?.args.details as string)).toStrictEqual({ posthog: "skipped", requestId: "req-1" });
     });
 });

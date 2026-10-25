@@ -370,8 +370,8 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             async () =>
                 await context.run(internal.gdpr.functions.logAudit, {
                     action: "deletion_completed",
-                    // "skipped" = PostHog deletion is not configured here; nothing was erased there.
-                    details: JSON.stringify({ postHog: postHogOutcome, requestId: args.requestId }),
+                    // deleted | no_profile (verified project, no such person) | skipped (not configured: nothing was erased there).
+                    details: JSON.stringify({ posthog: postHogOutcome, requestId: args.requestId }),
                     performedBy: "system",
                     userId: args.userId,
                 }),
