@@ -56,7 +56,7 @@ const mswServiceWorker = (): Plugin => {
         configureServer(server) {
             server.middlewares.use("/mockServiceWorker.js", (_request, response) => {
                 response.setHeader("Content-Type", "application/javascript");
-                response.end(readFileSync(new URL("node_modules/msw/lib/mockServiceWorker.js", import.meta.url)));
+                response.end(readFileSync(join(server.config.root, "node_modules/msw/lib/mockServiceWorker.js")));
             });
         },
         name: "msw-service-worker",

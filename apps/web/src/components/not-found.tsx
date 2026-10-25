@@ -67,7 +67,7 @@ const NotFound = () => {
             {/* Main content */}
             <div className="relative z-10 flex flex-col items-center gap-6 px-6 text-center">
                 {/* Pixel 404 */}
-                <div className="animate-in fade-in slide-in-from-bottom-8 fill-mode-both relative duration-700 ease-out select-none">
+                <div className="animate-in fade-in slide-in-from-bottom-8 fill-mode-both relative duration-700 ease-out select-none motion-reduce:animate-none">
                     {/* Primary number */}
                     <span
                         className="block leading-none font-black"
@@ -120,10 +120,10 @@ const NotFound = () => {
                 </div>
 
                 {/* Thin separator */}
-                <div className="animate-in fade-in zoom-in-0 fill-mode-both h-px w-40 origin-center bg-[#caff00]/35 delay-400 duration-550" />
+                <div className="animate-in fade-in zoom-in-0 fill-mode-both h-px w-40 origin-center bg-[#caff00]/35 delay-400 duration-550 motion-reduce:animate-none" />
 
                 {/* Text */}
-                <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both flex flex-col items-center gap-2 delay-500 duration-500">
+                <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both flex flex-col items-center gap-2 delay-500 duration-500 motion-reduce:animate-none">
                     <p className="text-xl font-semibold tracking-tight" style={{ color: "#f2f2f2", fontFamily: '"Geist Variable", sans-serif' }}>
                         <Trans>Page not found</Trans>
                     </p>
@@ -133,7 +133,7 @@ const NotFound = () => {
                 </div>
 
                 {/* Navigation links */}
-                <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both flex flex-col items-center gap-3 delay-650 duration-500">
+                <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both flex flex-col items-center gap-3 delay-650 duration-500 motion-reduce:animate-none">
                     <p
                         className="text-xs tracking-widest uppercase"
                         style={{ color: "#3c3c3c", fontFamily: '"Geist Variable", sans-serif', letterSpacing: "0.15em" }}
@@ -171,7 +171,7 @@ const NotFound = () => {
                 </div>
 
                 {/* Divider */}
-                <div className="animate-in fade-in fill-mode-both flex w-48 items-center gap-3 delay-800 duration-400">
+                <div className="animate-in fade-in fill-mode-both flex w-48 items-center gap-3 delay-800 duration-400 motion-reduce:animate-none">
                     <div className="h-px flex-1" style={{ backgroundColor: "rgba(202,255,0,0.08)" }} />
                     <span className="text-xs" style={{ color: "#3c3c3c", fontFamily: '"Geist Variable", sans-serif' }}>
                         <Trans>or</Trans>
@@ -180,7 +180,7 @@ const NotFound = () => {
                 </div>
 
                 {/* Primary CTA */}
-                <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both delay-900 duration-500">
+                <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both delay-900 duration-500 motion-reduce:animate-none">
                     {/* A link styled as a button: it navigates, so it keeps link semantics. */}
                     <Link className={buttonVariants()} to="/">
                         <Trans>Return home</Trans>
