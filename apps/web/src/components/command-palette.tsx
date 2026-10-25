@@ -392,10 +392,11 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     };
 
     useHotkeys(
-        convertShortcutToHotkeysHook(keyboardShortcuts.commandPalette ?? "ctrl+k"),
+        convertShortcutToHotkeysHook(keyboardShortcuts.commandPalette || "ctrl+k"),
         handleCommandPaletteToggle,
         {
-            enabled: isMounted,
+            // A cleared binding means "unbound"; the default only stands in for an absent one.
+            enabled: isMounted && keyboardShortcuts.commandPalette !== "",
             enableOnContentEditable: true,
             enableOnFormTags: true,
             preventDefault: true,

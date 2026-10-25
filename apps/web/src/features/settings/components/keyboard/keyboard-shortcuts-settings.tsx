@@ -22,22 +22,54 @@ import { defaultKeyboardShortcuts } from "@/features/layout/stores/ui-state-stor
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Same rule the backend applies on save (`@neore/backend/auth/shortcut`); "" is a cleared binding.
+const DUPLICATE_SHORTCUT_MESSAGE = "Already used by another action";
 const shortcutValueSchema = z.string().refine(isValidShortcut, { error: "Not a valid shortcut" });
 
 // Exactly the shortcuts this page edits. The store holds more (navigation, audio) that stay fixed.
 // Strict, so a key added to the form without a schema entry fails instead of being saved unchecked.
-const keyboardShortcutSchema = z.strictObject({
-    commandPalette: shortcutValueSchema,
-    copyLastCodeBlock: shortcutValueSchema,
-    escape: shortcutValueSchema,
-    focusSearch: shortcutValueSchema,
-    help: shortcutValueSchema,
-    newChat: shortcutValueSchema,
-    newTemporaryChat: shortcutValueSchema,
-    openModelPicker: shortcutValueSchema,
-    sidebarLeft: shortcutValueSchema,
-    sidebarRight: shortcutValueSchema,
-});
+// Two actions on one chord would both fire, so a chord may be bound once; modifier spelling and order do not matter.
+const shortcutIdentity = (value: string): string => {
+    const parts = value.toLowerCase().split("+");
+    const key = parts.pop() ?? "";
+    const modifiers = new Set(parts.map((modifier) => (modifier === "cmd" ? "meta" : modifier)));
+
+    return [...[...modifiers].toSorted((a, b) => a.localeCompare(b)), key].join("+");
+};
+
+const keyboardShortcutSchema = z
+    .strictObject({
+        commandPalette: shortcutValueSchema,
+        copyLastCodeBlock: shortcutValueSchema,
+        escape: shortcutValueSchema,
+        focusSearch: shortcutValueSchema,
+        help: shortcutValueSchema,
+        newChat: shortcutValueSchema,
+        newTemporaryChat: shortcutValueSchema,
+        openModelPicker: shortcutValueSchema,
+        sidebarLeft: shortcutValueSchema,
+        sidebarRight: shortcutValueSchema,
+    })
+    .check((context) => {
+        const owners = new Map<string, string[]>();
+
+        for (const [key, value] of Object.entries(context.value)) {
+            if (!(value && isValidShortcut(value))) {
+                continue;
+            }
+
+            const identity = shortcutIdentity(value);
+
+            owners.set(identity, [...(owners.get(identity) ?? []), key]);
+        }
+
+        for (const keys of owners.values()) {
+            if (keys.length > 1) {
+                for (const key of keys) {
+                    context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
+                }
+            }
+        }
+    });
 
 type KeyboardShortcutForm = z.infer<typeof keyboardShortcutSchema>;
 
@@ -45,6 +77,9 @@ const EDITABLE_SHORTCUT_KEYS = Object.keys(keyboardShortcutSchema.shape) as (key
 
 const pickEditableShortcuts = (shortcuts: Partial<KeyboardShortcuts>): KeyboardShortcutForm =>
     Object.fromEntries(EDITABLE_SHORTCUT_KEYS.map((key) => [key, shortcuts[key] ?? ""])) as KeyboardShortcutForm;
+
+const isDuplicate = (errors: unknown[] | undefined): boolean =>
+    (errors ?? []).some((error) => (error as { message?: string } | undefined)?.message === DUPLICATE_SHORTCUT_MESSAGE);
 
 const MODIFIER_KEYS = new Set(["Alt", "Control", "Meta", "Shift"]);
 
@@ -237,6 +272,15 @@ const KeyboardShortcutsSettings: FC = () => {
                                                     {shortcutLabels[key]}
                                                 </Label>
                                                 <p className="text-muted-foreground text-xs">{shortcutDescriptions[key]}</p>
+                                                <form.Subscribe selector={(state) => isDuplicate(state.fieldMeta[key]?.errors)}>
+                                                    {(duplicate) =>
+                                                        duplicate && (
+                                                            <p className="text-destructive text-xs" role="alert">
+                                                                {t`Another action already uses this key combination. Change or clear one of them to save.`}
+                                                            </p>
+                                                        )
+                                                    }
+                                                </form.Subscribe>
                                             </div>
                                             <form.AppField name={key}>
                                                 {(field) => (

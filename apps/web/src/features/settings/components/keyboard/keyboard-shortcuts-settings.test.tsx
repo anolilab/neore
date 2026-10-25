@@ -117,6 +117,26 @@ describe("KeyboardShortcutsSettings", () => {
         });
     });
 
+    it("refuses Save while two actions share a key combination", async () => {
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, newChat: "ctrl+j", commandPalette: "meta+j" } });
+        });
+        renderSettings();
+
+        recordShortcut("Help", "h");
+
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Save Shortcuts" }) as HTMLButtonElement).disabled).toBe(false);
+        });
+
+        recordShortcut("Command Palette", "j");
+
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Save Shortcuts" }) as HTMLButtonElement).disabled).toBe(true);
+        });
+        expect(screen.getAllByRole("alert")).toHaveLength(2);
+    });
+
     it("saves the defaults to the server on reset", async () => {
         act(() => {
             useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, newChat: "ctrl+j" } });
