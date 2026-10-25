@@ -1,7 +1,14 @@
+import type { HttpActionCtx } from "lunorash/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { THREAD_LOCKED_CODE } from "../../../lib/thread-lock";
 import type { ChunkRead } from "./http-api";
-import { CHUNKS_MAX_READS, CHUNKS_MAX_WAIT_MS, CHUNKS_WAIT_TICK_MS, readChunksWhenReady, toChunkWaitMs } from "./http-api";
+import { CHUNKS_MAX_READS, CHUNKS_MAX_WAIT_MS, CHUNKS_WAIT_TICK_MS, getChunksHttpAction, readChunksWhenReady, toChunkWaitMs } from "./http-api";
+
+// The signature is not what these tests are about.
+vi.mock("../../../lib/sign-request", () => {
+    return { verifySignedRequest: async () => true };
+});
 
 const empty = (status: ChunkRead["status"] = "pending"): ChunkRead => {
     return { chunks: [], locked: false, status, totalChunks: 0 };
@@ -105,5 +112,28 @@ describe("the read budget of one /chat/chunks invocation", () => {
 
     it("stays well under the Free plan's subrequest cap", () => {
         expect(CHUNKS_MAX_READS + 1).toBeLessThanOrEqual(FREE_PLAN_SUBREQUESTS / 2);
+    });
+});
+
+describe(getChunksHttpAction, () => {
+    it("answers 403 when a thread locks during an idle long-poll", async () => {
+        let reads = 0;
+        // Idle reads skip the lock check, as the backend does; only the final checked read sees the lock.
+        const runQuery = vi.fn(async (_reference: unknown, args: { checkLock: boolean }) => {
+            reads += 1;
+
+            return { chunks: [], locked: args.checkLock && reads > 1, status: "streaming", totalChunks: 0 };
+        });
+        const request = new Request("https://backend.test/chat/chunks", {
+            body: JSON.stringify({ afterIndex: 0, streamId: "stream-1", waitMs: 250 }),
+            method: "POST",
+        });
+
+        const response = await getChunksHttpAction({ runQuery } as unknown as HttpActionCtx, request);
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toMatchObject({ code: THREAD_LOCKED_CODE });
+        expect(runQuery.mock.calls.at(-1)?.[1]).toMatchObject({ checkLock: true });
+        expect(runQuery.mock.calls.slice(1, -1).every(([, args]) => args.checkLock === false)).toBe(true);
     });
 });
