@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { AccessibilityInfo, Pressable, Text, View } from "react-native";
 
 import { useAuth } from "@/auth/auth-state";
 
@@ -11,6 +11,8 @@ const SignInScreen = () => {
     const onPress = async () => {
         setBusy(true);
         setError(null);
+        // The button's busy state is read only when it has focus; the announcement reaches VoiceOver and TalkBack either way.
+        AccessibilityInfo.announceForAccessibility("Opening sign-in");
 
         try {
             await signIn();
@@ -25,6 +27,7 @@ const SignInScreen = () => {
         <View style={{ flex: 1, gap: 16, justifyContent: "center", padding: 24 }}>
             <Pressable
                 accessibilityRole="button"
+                accessibilityState={{ busy, disabled: busy }}
                 disabled={busy}
                 onPress={onPress}
                 style={{ alignItems: "center", backgroundColor: "#111", borderRadius: 10, padding: 14 }}

@@ -3,7 +3,7 @@ import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { AccessibilityInfo, Pressable, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
@@ -76,7 +76,8 @@ const ChatScreen = () => {
                 // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
                 const page = await fetchMessagePage(id, cursor);
 
-                pages.unshift(page.page.map((message) => toRow(message)));
+                // The server returns each page newest first; the rows are shown oldest first.
+                pages.unshift(page.page.map((message) => toRow(message)).toReversed());
 
                 if (page.isDone) {
                     break;
@@ -106,6 +107,8 @@ const ChatScreen = () => {
 
         setSending(true);
         setError(null);
+        // Announced when a reply starts and when it finishes. The deltas stay silent: an announcement on each would flood the reader.
+        AccessibilityInfo.announceForAccessibility("Assistant is replying");
         setDraft("");
         const stamp = Date.now();
         const assistantId = `pending-${stamp}`;
@@ -145,6 +148,8 @@ const ChatScreen = () => {
             if (outcome === "failed") {
                 throw new ChatError("The reply did not finish. Try again.");
             }
+
+            AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
             setError(error_ instanceof Error ? error_.message : "Could not send.");
         } finally {
