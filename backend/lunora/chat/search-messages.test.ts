@@ -151,6 +151,32 @@ describe("searchMessages", () => {
         }
     });
 
+    it("finds an unlocked hit that sits behind a full window of locked-thread hits", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                // The index returns the newest rows first, so the locked thread's later rows fill the window.
+                const open = await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "T", userId: OWNER });
+                const message = await insertMessage(context, open, 0);
+                const locked = await context.db.insert("threads", { lockedAt: Date.now(), model: "gpt-4o", status: "active", title: "L", userId: OWNER });
+
+                for (let i = 0; i < 110; i += 1) {
+                    await insertMessage(context, locked, i);
+                }
+
+                return { locked, message, open };
+            });
+
+            const page = await search(harness);
+
+            expect(page.map((entry) => entry._id)).toEqual([ids.open]);
+            expect(page[0]?.relevantMessages.map((row) => row._id)).toEqual([ids.message]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("reports whether the index may hold more than the window returned", async () => {
         const harness = lunoraTest(schema as never);
 

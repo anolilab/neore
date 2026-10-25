@@ -2481,17 +2481,18 @@ export const searchMessages = authQuery
                 }
             }
 
-            return { filled, found, hits, scanned: searchResults.length };
+            return { filled, found, hits };
         };
 
         let window = SEARCH_WINDOW;
-        let { filled, found: threadsWithMessages, hits, scanned } = await collect(window);
+        let { filled, found: threadsWithMessages, hits } = await collect(window);
 
-        // `filled` stops the loop once the index has nothing more to give: a repeat would redo the
-        // fetches and the path walks for the same rows.
-        while (filled && hits < SEARCH_WINDOW && scanned > hits && window < SEARCH_WINDOW_MAX) {
+        // A full index window with fewer than a page of hits means rows were dropped (locked, trashed or
+        // inactive), so a larger window may reach more. `filled` stops the loop once the index has nothing
+        // more to give: a repeat would redo the fetches and the path walks for the same rows.
+        while (filled && hits < SEARCH_WINDOW && window < SEARCH_WINDOW_MAX) {
             window *= 4;
-            ({ filled, found: threadsWithMessages, hits, scanned } = await collect(window));
+            ({ filled, found: threadsWithMessages, hits } = await collect(window));
         }
 
         // Sort by relevance (threads with more matching messages first, then by creation time)
