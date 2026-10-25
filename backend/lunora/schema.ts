@@ -1713,6 +1713,8 @@ export const schema = defineSchema({
                     id: v.string(),
                     /** Set on delivery: the steered message's row, which a stopped run's owed text follows. */
                     messageId: v.optional(v.string()),
+                    /** Set on delivery: the run's pending row, moved under that message, so a stop finds it even when that message is gone. */
+                    pendingMessageId: v.optional(v.string()),
                     status: v.union(v.literal("queued"), v.literal("delivered"), v.literal("withdrawn")),
                     text: v.optional(v.string()),
                 }),

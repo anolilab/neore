@@ -15,7 +15,7 @@ import { internalMutation, internalQuery, type MutationCtx } from "../../../_gen
 import { patchRow } from "../../../lib/patch";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { MAX_LENGTH } from "../../../lib/validators";
-import { latestSteerMessageId, type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
+import { latestSteerMessageId, latestSteerPendingId, type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
 
@@ -278,10 +278,21 @@ export const finishStoppedReply = internalMutation
         const steerRow = steeredId ? await ctx.db.messages.findFirst({ where: { _id: steeredId as Id<"messages">, threadId } }) : null;
         const order = steerRow?.order ?? args.order;
 
-        const pending = await ctx.db.messages.findFirst({
+        let pending = await ctx.db.messages.findFirst({
             orderBy: [{ stepOrder: "desc" }],
             where: { order, status: "pending", threadId, tool: false },
         });
+
+        // The delivered steer's row is gone (deleted since), but `insertSteerRow` already moved the run's pending row
+        // into that row's order, so the run's own order finds nothing. The delivery recorded that row's id: saving into
+        // it keeps the owed text, and an empty one is removed instead of left pending.
+        const movedId = steeredId && !steerRow ? latestSteerPendingId(stream.steers as SteerEntry[] | undefined) : undefined;
+
+        if (!pending && movedId) {
+            const moved = await ctx.db.messages.findFirst({ where: { _id: movedId as Id<"messages">, threadId } });
+
+            pending = moved?.status === "pending" && !moved.tool ? moved : null;
+        }
 
         if (args.pendingText.length === 0 && args.pendingReasoning.length === 0) {
             // Nothing owed: the step in flight wrote no text, so its empty placeholder goes. Left pending, the abort

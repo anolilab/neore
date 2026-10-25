@@ -1019,7 +1019,7 @@ export const persistentStreams = sqliteTable("persistentStreams", {
     messageId: text("messageId").notNull(),
     runClaimedAt: real("runClaimedAt"),
     status: text("status").notNull(),
-    steers: text("steers", { mode: "json" }).$type<Array<{ id: string; messageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>>(),
+    steers: text("steers", { mode: "json" }).$type<Array<{ id: string; messageId?: string; pendingMessageId?: string; status: "queued" | "delivered" | "withdrawn"; text?: string }>>(),
     streamingConfig: text("streamingConfig", { mode: "json" }).$type<{ contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; model: string; reasoningEffort?: number; researchDepth?: "speed" | "balanced" | "thorough"; searchMode?: string; statelessMode?: boolean }>().notNull(),
     threadId: text("threadId").notNull(),
     userId: text("userId").notNull(),

@@ -17389,25 +17389,31 @@
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1002,
+      "line": 963,
+      "reason": "\"resumeApprovedRun\" is not a registered function"
+    },
+    {
+      "file": "chat/lib/agent-run",
+      "kind": "call",
+      "line": 1003,
       "reason": "\"setThreadStatus\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1022,
+      "line": 1023,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1029,
+      "line": 1030,
       "reason": "\"failRun\" is not a registered function"
     },
     {
       "file": "chat/lib/agent-run",
       "kind": "call",
-      "line": 1040,
+      "line": 1041,
       "reason": "\"failRun\" is not a registered function"
     },
     {

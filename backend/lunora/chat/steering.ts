@@ -178,7 +178,7 @@ export const deliverSteers = internalMutation
             return null;
         }
 
-        await ctx.db.patch(stream._id, { steers: taken.deliver(row.messageId) });
+        await ctx.db.patch(stream._id, { steers: taken.deliver(row.messageId, pendingMessageId) });
 
         return { messageId: row.messageId, text: taken.text };
     });

@@ -158,7 +158,7 @@ describe("steerRun", () => {
         const delivered = await deliver();
 
         expect(await steer("use the other file", OWNER, streamId, "client-steer-1")).toStrictEqual({ steerId });
-        expect(await steersOnStream()).toStrictEqual([{ id: steerId, messageId: delivered!.messageId, status: "delivered" }]);
+        expect(await steersOnStream()).toStrictEqual([{ id: steerId, messageId: delivered!.messageId, pendingMessageId: pendingId, status: "delivered" }]);
     });
 
     it("refuses a run someone else asked for", async () => {
@@ -205,8 +205,8 @@ describe("deliverSteers and withdrawSteer", () => {
 
         expect(rows.map((row) => row.text)).toStrictEqual(["summarise my file", "use the other file\n\nand keep it short"]);
         expect(await steersOnStream()).toStrictEqual([
-            { id: first.steerId, messageId: delivered!.messageId, status: "delivered" },
-            { id: second.steerId, messageId: delivered!.messageId, status: "delivered" },
+            { id: first.steerId, messageId: delivered!.messageId, pendingMessageId: pendingId, status: "delivered" },
+            { id: second.steerId, messageId: delivered!.messageId, pendingMessageId: pendingId, status: "delivered" },
         ]);
         expect(await withdraw(first.steerId)).toStrictEqual({ outcome: "delivered" });
 
@@ -434,6 +434,45 @@ describe("a stop after a steered message", () => {
             stepOrder: steerRow.stepOrder + 1,
             text: "Reading the other",
         });
+    });
+
+    it("still finds the moved pending row when the steered message was deleted since", async () => {
+        await steer("use the other file");
+
+        const delivered = await deliver();
+        const steerRow = await rowById(delivered!.messageId);
+
+        await harness.run(async (ctx: any) => await ctx.db.delete(delivered!.messageId));
+
+        const result = await stop("Reading the other");
+
+        expect(result.messageId).toBe(pendingId);
+        expect(await rowById(pendingId)).toMatchObject({ order: steerRow.order, status: "success", text: "Reading the other" });
+    });
+
+    it("removes the moved pending row when its steered message was deleted and nothing is owed", async () => {
+        await steer("use the other file");
+
+        const delivered = await deliver();
+
+        await harness.run(async (ctx: any) => await ctx.db.delete(delivered!.messageId));
+        await stop("");
+
+        expect(await rowById(pendingId)).toBeNull();
+    });
+
+    it("leaves another run's pending row alone when the steered message was deleted", async () => {
+        await steer("use the other file");
+
+        const delivered = await deliver();
+        const { _creationTime, _id, ...pendingRow } = await rowById(pendingId);
+        const otherId = await harness.run(async (ctx: any) => await ctx.db.insert("messages", { ...pendingRow, order: pendingRow.order + 5 }));
+
+        await harness.run(async (ctx: any) => await ctx.db.delete(delivered!.messageId));
+        await stop("");
+
+        expect(await rowById(pendingId)).toBeNull();
+        expect(await rowById(otherId)).toMatchObject({ status: "pending" });
     });
 
     it("removes the moved pending row when nothing is owed, leaving the reply before the steer alone", async () => {

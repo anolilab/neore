@@ -14,6 +14,8 @@ export interface SteerEntry {
     id: string;
     /** The row the entry was delivered as. */
     messageId?: string;
+    /** The run's pending row the delivery moved under `messageId`. */
+    pendingMessageId?: string;
     status: "delivered" | "queued" | "withdrawn";
     text?: string;
 }
@@ -37,12 +39,12 @@ export const queueSteer = (entries: ReadonlyArray<SteerEntry>, entry: { id: stri
 
 /**
  * Every queued entry, as the ONE message the run receives (texts in the order
- * they were sent, a blank line apart), and `deliver(messageId)`: the queue with
+ * they were sent, a blank line apart), and `deliver(messageId, pendingMessageId)`: the queue with
  * them delivered as that row. `undefined` when nothing is queued.
  */
 export const takeQueuedSteers = (
     entries: ReadonlyArray<SteerEntry>,
-): { deliver: (messageId: string) => SteerEntry[]; ids: string[]; text: string } | undefined => {
+): { deliver: (messageId: string, pendingMessageId: string) => SteerEntry[]; ids: string[]; text: string } | undefined => {
     const queued = entries.filter((item) => item.status === "queued" && item.text);
 
     if (queued.length === 0) {
@@ -50,7 +52,8 @@ export const takeQueuedSteers = (
     }
 
     return {
-        deliver: (messageId) => entries.map((item) => (item.status === "queued" ? { id: item.id, messageId, status: "delivered" } : item)),
+        deliver: (messageId, pendingMessageId) =>
+            entries.map((item) => (item.status === "queued" ? { id: item.id, messageId, pendingMessageId, status: "delivered" } : item)),
         ids: queued.map((item) => item.id),
         text: queued.map((item) => item.text).join("\n\n"),
     };
@@ -62,6 +65,10 @@ export const takeQueuedSteers = (
  */
 export const latestSteerMessageId = (entries: ReadonlyArray<SteerEntry> | undefined): string | undefined =>
     (entries ?? []).findLast((item) => item.status === "delivered" && item.messageId)?.messageId;
+
+/** The pending row the latest delivery moved under its steered message (see `latestSteerMessageId`). */
+export const latestSteerPendingId = (entries: ReadonlyArray<SteerEntry> | undefined): string | undefined =>
+    (entries ?? []).findLast((item) => item.status === "delivered" && item.messageId)?.pendingMessageId;
 
 /**
  * - `withdrawn`: it was still queued, and now never will be delivered.
