@@ -114,12 +114,7 @@ const PROMPT_RPM = 15;
  * Forward a request to a Lunora backend HTTP endpoint with HMAC signing.
  * Handles auth check, rate limiting, signing, error passthrough.
  */
-const forwardToBackend = async (
-    c: Context<HonoEnv>,
-    backendPath: string,
-    rateLimitPrefix: string,
-    rateLimitRpm: number,
-): Promise<Response> => {
+const forwardToBackend = async (c: Context<HonoEnv>, backendPath: string, rateLimitPrefix: string, rateLimitRpm: number): Promise<Response> => {
     const lunoraUrl = c.env.LUNORA_URL;
     const signingSecret = c.env.SIGNING_SECRET;
     const authHeader = c.req.header("Authorization");
