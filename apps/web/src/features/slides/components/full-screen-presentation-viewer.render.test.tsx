@@ -3,7 +3,7 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import FullScreenPresentationViewer from "./full-screen-presentation-viewer";
 
@@ -42,6 +42,10 @@ const Harness = () => {
 };
 
 describe("full-screen presentation viewer focus management", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
     it("is a named modal dialog that takes focus on open", () => {
         render(<Harness />);
         const opener = screen.getByRole("button", { name: "Open slides" });
