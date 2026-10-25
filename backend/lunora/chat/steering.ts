@@ -126,9 +126,9 @@ export const withdrawSteer = authMutation
             return { outcome: "unknown" as const };
         }
 
-        const { entries, outcome } = withdrawQueuedSteer(stream.steers ?? [], steerId);
+        const { changed, entries, outcome } = withdrawQueuedSteer(stream.steers ?? [], steerId, { live: isLive(stream.status) });
 
-        if (outcome === "withdrawn") {
+        if (changed) {
             await ctx.db.patch(stream._id, { steers: entries });
         }
 

@@ -36,6 +36,7 @@ import {
     hasPrivacyMarker,
     PROCESSED_EXCHANGE_TTL_MS,
     processedExchangeFingerprint,
+    truncateUserMessage,
 } from "./gate";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
@@ -237,6 +238,8 @@ export const extractMemories = internalAction
         // The bot whose chat produced the turn. Its memories are written and deduped in
         // that scope only (`getActiveMemoriesForUser`), never against the user's own.
         botId: v.optional(v.string()),
+        /** Where the messages sent into the reply start in `userMessage`; they are kept whole when it is cut. */
+        steeredFrom: v.optional(v.number()),
         threadId: v.optional(v.id("threads")),
         toolResults: v.optional(
             v.array(
@@ -279,7 +282,7 @@ export const extractMemories = internalAction
                 : "(No existing memories)";
 
         // 3. LLM extraction — truncate inputs to control cost
-        const truncatedUserMessage = args.userMessage.slice(0, 2000);
+        const truncatedUserMessage = truncateUserMessage(args.userMessage, args.steeredFrom);
         const truncatedAssistantResponse = args.assistantResponse.slice(0, 4000);
 
         // Include tool result summaries if provided (e.g., from web search, code execution).

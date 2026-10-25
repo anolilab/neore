@@ -117,6 +117,13 @@ const wasRefused = (error: unknown): boolean => {
     return typeof data?.code === "string" || typeof code === "string";
 };
 
+/**
+ * How long a `steerRun` call may stay unanswered before its chip stops holding the queue. The outcome is then
+ * unknown, like a dropped connection: the withdrawal reconciles by id, and closes the id on the run, so a call
+ * that lands late queues nothing (`withdrawQueuedSteer`).
+ */
+const STEER_ANSWER_MS = 15_000;
+
 const TEXT_ATTACHMENT_TYPE = /^(?:text\/|application\/(?:json|xml)$)/u;
 const TEXT_ATTACHMENT_NAME = /\.(?:md|txt|csv)$/iu;
 
@@ -770,9 +777,12 @@ const ComposerInput = ({
         // is out lands behind it. `pending` keeps the queue from acting on it.
         enqueue(threadId, { attachments: [], steer: { id: steerId, pending: true, streamId }, text: steerText });
 
+        const unanswered = setTimeout(settleSteer, STEER_ANSWER_MS, threadId, steerId, "accepted");
+
         void steerRun({ steerId, streamId: streamId as Id<"persistentStreams">, text: steerText, threadId: threadId as Id<"threads"> })
             .then(() => settleSteer(threadId, steerId, "accepted"))
-            .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"));
+            .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
+            .finally(() => clearTimeout(unanswered));
     }, [canSteer, clear, disabled, promptHistory, sseStreamState, steerRun, text, threadId]);
 
     // Handle submit — fully synchronous, fire-and-forget network call.

@@ -15,7 +15,7 @@ import { internalMutation, internalQuery, type MutationCtx } from "../../../_gen
 import { patchRow } from "../../../lib/patch";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { MAX_LENGTH } from "../../../lib/validators";
-import { latestSteerMessageId, type SteerEntry } from "../../lib/steer-queue";
+import { latestSteerMessageId, type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
 
@@ -137,7 +137,10 @@ export const addChunk = internalMutation
         }
 
         if (status !== stream.status) {
-            await ctx.db.patch(args.streamId, { status });
+            // The run is over: a steer it never took keeps no text on the row (`withoutQueuedText`).
+            const steers = args.final ? withoutQueuedText(stream.steers as SteerEntry[] | undefined) : undefined;
+
+            await ctx.db.patch(args.streamId, { status, ...(steers && { steers }) });
         }
     });
 
@@ -159,8 +162,12 @@ export const setStreamStatus = internalMutation
             return;
         }
 
+        // Any status past the live ones ends the run: a steer it never took keeps no text on the row.
+        const steers = args.status === "pending" || args.status === "streaming" ? undefined : withoutQueuedText(stream.steers as SteerEntry[] | undefined);
+
         await ctx.db.patch(args.streamId, {
             status: args.status,
+            ...(steers && { steers }),
         });
     });
 
@@ -200,7 +207,9 @@ export const stopActiveForThread = internalMutation
         const streams = named.length > 0 ? named : live;
 
         for (const stream of streams) {
-            await ctx.db.patch(stream._id, { status: "done" });
+            const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
+
+            await ctx.db.patch(stream._id, { status: "done", ...(steers && { steers }) });
         }
 
         // The thread leaves `running` only when no live reply is left to keep running.
@@ -374,8 +383,15 @@ export const getStreamText = internalQuery
             const chunks = lastMarker === -1 ? allChunks : allChunks.slice(lastMarker);
 
             speaker = lastMarker === -1 ? undefined : (allChunks[lastMarker]?.speaker ?? undefined);
-            text = chunks.map((chunk) => chunk.text).join("");
-            reasoning = chunks.map((chunk) => chunk.reasoning || "").join("");
+
+            // A steer delivered whose marker is not written yet (the next step never started: a stop or a failure came
+            // first): everything written so far is above the steered message, so nothing is the current reply's.
+            const deliveries = new Set((stream.steers ?? []).flatMap((entry) => (entry.status === "delivered" && entry.messageId ? [entry.messageId] : [])));
+
+            if (deliveries.size <= allChunks.filter((chunk) => chunk.restart).length) {
+                text = chunks.map((chunk) => chunk.text).join("");
+                reasoning = chunks.map((chunk) => chunk.reasoning || "").join("");
+            }
         }
 
         return {

@@ -5889,31 +5889,38 @@ __has1 = true;
 }
 let __has2 = false;
 let __val2;
-if (source["threadId"] !== undefined) {
-if (typeof source["threadId"] !== "string") return DEFER;
-__val2 = source["threadId"];
+if (source["steeredFrom"] !== undefined) {
+if (typeof source["steeredFrom"] !== "number" || !Number.isFinite(source["steeredFrom"])) return DEFER;
+__val2 = source["steeredFrom"];
 __has2 = true;
 }
-let __has5 = false;
-let __val5;
+let __has3 = false;
+let __val3;
+if (source["threadId"] !== undefined) {
+if (typeof source["threadId"] !== "string") return DEFER;
+__val3 = source["threadId"];
+__has3 = true;
+}
+let __has6 = false;
+let __val6;
 if (source["toolResults"] !== undefined) {
 if (!Array.isArray(source["toolResults"])) return DEFER;
-const __arr3 = new Array(source["toolResults"].length);
-for (let __i3 = 0; __i3 < source["toolResults"].length; __i3++) {
-const __e3 = source["toolResults"][__i3];
-if (typeof __e3 !== "object" || __e3 === null || Array.isArray(__e3)) return DEFER;
-if (Object.getPrototypeOf(__e3) !== Object.prototype && Object.getPrototypeOf(__e3) !== null) return DEFER;
-if (typeof __e3["summary"] !== "string") return DEFER;
-if (typeof __e3["toolName"] !== "string") return DEFER;
-const __obj4 = { "summary": __e3["summary"], "toolName": __e3["toolName"] };
-__arr3[__i3] = __obj4;
+const __arr4 = new Array(source["toolResults"].length);
+for (let __i4 = 0; __i4 < source["toolResults"].length; __i4++) {
+const __e4 = source["toolResults"][__i4];
+if (typeof __e4 !== "object" || __e4 === null || Array.isArray(__e4)) return DEFER;
+if (Object.getPrototypeOf(__e4) !== Object.prototype && Object.getPrototypeOf(__e4) !== null) return DEFER;
+if (typeof __e4["summary"] !== "string") return DEFER;
+if (typeof __e4["toolName"] !== "string") return DEFER;
+const __obj5 = { "summary": __e4["summary"], "toolName": __e4["toolName"] };
+__arr4[__i4] = __obj5;
 }
-__val5 = __arr3;
-__has5 = true;
+__val6 = __arr4;
+__has6 = true;
 }
 if (typeof source["userId"] !== "string") return DEFER;
 if (typeof source["userMessage"] !== "string") return DEFER;
-return { "assistantResponse": source["assistantResponse"], ...(__has1 ? { "botId": __val1 } : {}), ...(__has2 ? { "threadId": __val2 } : {}), ...(__has5 ? { "toolResults": __val5 } : {}), "userId": source["userId"], "userMessage": source["userMessage"] };
+return { "assistantResponse": source["assistantResponse"], ...(__has1 ? { "botId": __val1 } : {}), ...(__has2 ? { "steeredFrom": __val2 } : {}), ...(__has3 ? { "threadId": __val3 } : {}), ...(__has6 ? { "toolResults": __val6 } : {}), "userId": source["userId"], "userMessage": source["userMessage"] };
 });
 installCompiledValidatorMap(lunora_memory_extract_121.regenerateMemoryEmbedding.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -8868,7 +8875,7 @@ export interface Caller {
             tryStartCompression: (args: { threadId: Id<"threads"> }) => Promise<boolean>;
         };
         extract: {
-            extractMemories: (args: { assistantResponse: string; botId?: string; threadId?: Id<"threads">; toolResults?: Array<{ summary: string; toolName: string }>; userId: string; userMessage: string }) => Promise<void>;
+            extractMemories: (args: { assistantResponse: string; botId?: string; steeredFrom?: number; threadId?: Id<"threads">; toolResults?: Array<{ summary: string; toolName: string }>; userId: string; userMessage: string }) => Promise<void>;
             regenerateMemoryEmbedding: (args: { memoryId: Id<"memories">; userId: string }) => Promise<void>;
         };
         functions: {

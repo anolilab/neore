@@ -50,13 +50,13 @@ import { hashPasscode, mintUnlockProof, newPasscodeEpoch } from "../lib/thread-l
 // eslint-disable-next-line import/first
 import schema from "../schema";
 // eslint-disable-next-line import/first
-import { MAX_QUEUED_STEERS } from "./lib/steer-queue";
+import { MAX_QUEUED_STEERS, MAX_STEERS_PER_RUN } from "./lib/steer-queue";
 // eslint-disable-next-line import/first
 import { deliverSteers, steerRun, withdrawSteer } from "./steering";
 // eslint-disable-next-line import/first
 import { getActiveStreamForThread } from "./streaming";
 // eslint-disable-next-line import/first
-import { addChunk, finishStoppedReply, getChunksAfter, getStreamText } from "./streaming/persistent/library";
+import { addChunk, finishStoppedReply, getChunksAfter, getStreamText, setStreamStatus, stopActiveForThread } from "./streaming/persistent/library";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -224,6 +224,39 @@ describe("deliverSteers and withdrawSteer", () => {
         expect(await withdraw(steerId)).toStrictEqual({ outcome: "unknown" });
     });
 
+    it("closes an id withdrawn before the run held it, so a steerRun still on its way queues nothing", async () => {
+        expect(await withdraw("late-steer")).toStrictEqual({ outcome: "unknown" });
+        expect(await steersOnStream()).toStrictEqual([{ id: "late-steer", status: "withdrawn" }]);
+
+        // The call the withdrawal overtook now lands: answered, not queued.
+        expect(await steer("use the other file", OWNER, streamId, "late-steer")).toStrictEqual({ steerId: "late-steer" });
+        expect(await deliver()).toBeNull();
+        expect(await userRows()).toHaveLength(1);
+
+        // A second withdrawal does not reopen it.
+        expect(await withdraw("late-steer")).toStrictEqual({ outcome: "unknown" });
+        expect(await steersOnStream()).toStrictEqual([{ id: "late-steer", status: "withdrawn" }]);
+    });
+
+    it("leaves no marker on a settled run, for someone else's run, or past the run's cap", async () => {
+        expect(await withdraw("not-mine", OTHER)).toStrictEqual({ outcome: "unknown" });
+        expect(await steersOnStream()).toBeUndefined();
+
+        for (let index = 0; index < MAX_STEERS_PER_RUN; index += 1) {
+            await withdraw(`closed-${String(index)}`);
+        }
+
+        await withdraw("one-too-many");
+        expect(await steersOnStream()).toHaveLength(MAX_STEERS_PER_RUN);
+
+        const ended = await insertStream({ status: "done" });
+
+        await as(OWNER).mutation(withdrawSteer as never, { steerId: "after-end", streamId: ended, threadId } as never);
+        const endedRow = await harness.run(async (ctx: any) => await ctx.db.get(ended));
+
+        expect(endedRow.steers).toBeUndefined();
+    });
+
     it("delivers nothing when nothing is queued, and leaves the queue for a settled run", async () => {
         expect(await deliver()).toBeNull();
 
@@ -313,6 +346,57 @@ describe("the stream after a steered message", () => {
         expect(body).toMatchObject({ text: "The other one." });
         expect(body.speaker).toBeUndefined();
         expect(relayed.chunks).toStrictEqual([{ text: "Reading the file." }, { restart: true, text: "" }, { text: "The other one." }]);
+    });
+});
+
+describe("a run that ends with a steer untaken", () => {
+    const textsOnStream = async () => {
+        const entries = await steersOnStream();
+
+        return entries.map((entry) => entry.text);
+    };
+
+    it("keeps the entry but not the text, whichever way the run ends", async () => {
+        const ways: Record<string, () => Promise<unknown>> = {
+            "an error": async () => await harness.run(async (ctx: any) => await ctx.runMutation(setStreamStatus, { status: "error", streamId })),
+            "a stop": async () => await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId })),
+            "the final chunk": async () => await harness.run(async (ctx: any) => await ctx.runMutation(addChunk, { final: true, streamId, text: "Done." })),
+        };
+
+        for (const end of Object.values(ways)) {
+            const { steerId } = await steer("remember I am vegetarian");
+
+            await end();
+            expect(await steersOnStream()).toStrictEqual([{ id: steerId, status: "queued" }]);
+            expect(await textsOnStream()).toStrictEqual([undefined]);
+
+            // The client still reconciles it by id, and sends its own copy of the text.
+            expect(await withdraw(steerId)).toStrictEqual({ outcome: "withdrawn" });
+
+            streamId = await insertStream();
+        }
+    });
+
+    it("leaves a run that is still going alone", async () => {
+        await steer("use the other file");
+        await harness.run(async (ctx: any) => await ctx.runMutation(addChunk, { final: false, streamId, text: "Reading." }));
+
+        expect(await textsOnStream()).toStrictEqual(["use the other file"]);
+    });
+});
+
+describe("a steer delivered before its step started", () => {
+    it("leaves no pre-steer text as the stream's body until the marker is written", async () => {
+        await harness.run(async (ctx: any) => await ctx.runMutation(addChunk, { final: false, streamId, text: "Reading the file." }));
+        await steer("use the other file");
+        await deliver();
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(getStreamText, { streamId }))).toMatchObject({ text: "" });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(addChunk, { final: false, restart: true, streamId, text: "" }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(addChunk, { final: false, streamId, text: "The other one." }));
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(getStreamText, { streamId }))).toMatchObject({ text: "The other one." });
     });
 });
 

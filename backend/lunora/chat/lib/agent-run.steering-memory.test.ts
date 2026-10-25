@@ -39,6 +39,9 @@ describe(afterRun, () => {
 
         const extraction = runAfter.mock.calls.find((call) => (call as unknown[])[1] === internal.memory.extract.extractMemories);
 
-        expect((extraction as unknown[] | undefined)?.[2]).toMatchObject({ userMessage: "Plan my dinner\n\nactually, I'm vegetarian" });
+        expect((extraction as unknown[] | undefined)?.[2]).toMatchObject({
+            steeredFrom: "Plan my dinner".length + 2,
+            userMessage: "Plan my dinner\n\nactually, I'm vegetarian",
+        });
     });
 });

@@ -1,7 +1,9 @@
 /**
  * The steer queue on a `persistentStreams` row (`chat/steering.ts`), as pure
  * transitions. An entry is `queued` until the run takes it at a step boundary,
- * then `delivered` with its text dropped. A withdrawn entry is removed.
+ * then `delivered` with its text dropped. A withdrawn entry is removed. An id
+ * the client withdrew before the run ever held it leaves a text-free `withdrawn`
+ * marker, so a `steerRun` that was still in flight cannot queue it afterwards.
  *
  * Each entry changes state exactly once, and every transition runs inside one
  * mutation on the stream's shard. So a take and a withdrawal of the same entry
@@ -12,7 +14,7 @@ export interface SteerEntry {
     id: string;
     /** The row the entry was delivered as. */
     messageId?: string;
-    status: "delivered" | "queued";
+    status: "delivered" | "queued" | "withdrawn";
     text?: string;
 }
 
@@ -68,19 +70,39 @@ export const latestSteerMessageId = (entries: ReadonlyArray<SteerEntry> | undefi
  */
 export type SteerWithdrawal = "delivered" | "unknown" | "withdrawn";
 
-export const withdrawQueuedSteer = (entries: ReadonlyArray<SteerEntry>, id: string): { entries: SteerEntry[]; outcome: SteerWithdrawal } => {
+export const withdrawQueuedSteer = (
+    entries: ReadonlyArray<SteerEntry>,
+    id: string,
+    { live = false }: { live?: boolean } = {},
+): { changed: boolean; entries: SteerEntry[]; outcome: SteerWithdrawal } => {
     const entry = entries.find((item) => item.id === id);
 
     if (!entry) {
-        return { entries: [...entries], outcome: "unknown" };
+        // The call that would queue it may still be on its way (a restored chip, a request that outlived its
+        // page): on a live run the id is closed for good. At the cap `queueSteer` refuses anyway.
+        const marked = live && entries.length < MAX_STEERS_PER_RUN;
+
+        return { changed: marked, entries: marked ? [...entries, { id, status: "withdrawn" }] : [...entries], outcome: "unknown" };
     }
 
     if (entry.status === "delivered") {
-        return { entries: [...entries], outcome: "delivered" };
+        return { changed: false, entries: [...entries], outcome: "delivered" };
     }
 
-    return { entries: entries.filter((item) => item.id !== id), outcome: "withdrawn" };
+    if (entry.status === "withdrawn") {
+        return { changed: false, entries: [...entries], outcome: "unknown" };
+    }
+
+    return { changed: true, entries: entries.filter((item) => item.id !== id), outcome: "withdrawn" };
 };
+
+/**
+ * The entries of a run that has ended, without the text of any that is still queued: nothing will take
+ * it, and a message the user typed has no business staying on the row. The client still has the text and
+ * sends it after `withdrawSteer` answers. `undefined` when there is nothing to drop.
+ */
+export const withoutQueuedText = (entries: ReadonlyArray<SteerEntry> | undefined): SteerEntry[] | undefined =>
+    entries?.some((item) => item.text !== undefined) ? entries.map(({ text: _text, ...rest }) => rest) : undefined;
 
 /** The ids the run has taken, for the client to retire their chips. */
 export const deliveredSteerIds = (entries: ReadonlyArray<SteerEntry> | undefined): string[] =>

@@ -566,8 +566,9 @@ export const afterRun = (
         assistantResponse: assistantText.slice(0, 4000),
         threadId: threadId as Id<"threads">,
         userId,
-        // A steer can carry the very fact worth keeping ("actually, I'm vegetarian").
+        // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
         userMessage: [prompt, ...steeredTexts].join("\n\n"),
+        ...(steeredTexts.length > 0 && { steeredFrom: prompt.length + 2 }),
         ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
     });
 };
@@ -952,6 +953,18 @@ export const resumeApprovedRun = async (
         await result.consumeStream();
 
         const messageIds = (result.savedMessages ?? []).map((m) => m._id as string);
+
+        // The continuation's rows are replies of their own (an `order` of their own, and a second one after a steer):
+        // the usage page counts them, as its backfill does. Only the interactive path, where `steerable` is set; a group
+        // participant's reply is keyed to its speaker by the group run. The snapshot carries no skill or time zone, so the
+        // reply counts as the plain assistant's, on the UTC day.
+        if (options.steerable === true) {
+            const replies = repliesByOrder(result.savedMessages ?? []);
+
+            for (const reply of replies) {
+                scheduleReplyUsage(ctx.scheduler as never, replyUsageArgs(reply, { at: Date.now(), userId }));
+            }
+        }
 
         if (messageIds.length > 0) {
             await options.afterSaved?.({

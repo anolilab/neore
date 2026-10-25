@@ -60,6 +60,26 @@ export const MAX_ASSISTANT_QUESTION_CHARS = 300;
 /** Characters of the user message the stage-2 classifier sees. */
 export const CLASSIFIER_MAX_INPUT_CHARS = 1000;
 
+/** Characters of the user message the extraction model sees. */
+export const EXTRACTION_USER_MESSAGE_CHARS = 2000;
+
+/**
+ * The user message as the extraction model reads it. Messages the user sent
+ * INTO the reply sit at the end, from `steeredFrom`: they keep their room and
+ * the prompt gives way, so a long prompt cannot push a correction out of view.
+ */
+export const truncateUserMessage = (message: string, steeredFrom?: number): string => {
+    if (message.length <= EXTRACTION_USER_MESSAGE_CHARS || steeredFrom === undefined) {
+        return message.slice(0, EXTRACTION_USER_MESSAGE_CHARS);
+    }
+
+    const steered = message.slice(steeredFrom, steeredFrom + EXTRACTION_USER_MESSAGE_CHARS);
+    // The prompt ends two characters before them (the blank line `afterRun` joins with).
+    const room = EXTRACTION_USER_MESSAGE_CHARS - steered.length - 2;
+
+    return room > 0 ? `${message.slice(0, Math.min(steeredFrom - 2, room))}\n\n${steered}` : steered;
+};
+
 /**
  * How long a processed user statement is remembered for dedup. Short on purpose:
  * a user who clears their memories and restates a fact should not be ignored

@@ -718,7 +718,7 @@ export interface InternalApiTypes {
             tryStartCompression: FunctionReference<"mutation", { threadId: Id<"threads"> }, boolean>;
         };
         extract: {
-            extractMemories: FunctionReference<"action", { assistantResponse: string; botId?: string; threadId?: Id<"threads">; toolResults?: Array<{ summary: string; toolName: string }>; userId: string; userMessage: string }, void>;
+            extractMemories: FunctionReference<"action", { assistantResponse: string; botId?: string; steeredFrom?: number; threadId?: Id<"threads">; toolResults?: Array<{ summary: string; toolName: string }>; userId: string; userMessage: string }, void>;
             regenerateMemoryEmbedding: FunctionReference<"action", { memoryId: Id<"memories">; userId: string }, void>;
         };
         functions: {

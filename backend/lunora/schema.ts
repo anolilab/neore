@@ -1705,14 +1705,15 @@ export const schema = defineSchema({
         status: v.string(),
         // Messages the run's user sent into it while it streams (`chat/steering.ts`).
         // `queued` until the run takes them at a step boundary; a delivered entry
-        // keeps only its id, so the client can tell delivery from withdrawal.
+        // keeps only its id, so the client can tell delivery from withdrawal. `withdrawn`
+        // marks an id closed before the run held it, so a late `steerRun` queues nothing.
         steers: v.optional(
             v.array(
                 v.object({
                     id: v.string(),
                     /** Set on delivery: the steered message's row, which a stopped run's owed text follows. */
                     messageId: v.optional(v.string()),
-                    status: v.union(v.literal("queued"), v.literal("delivered")),
+                    status: v.union(v.literal("queued"), v.literal("delivered"), v.literal("withdrawn")),
                     text: v.optional(v.string()),
                 }),
             ),
