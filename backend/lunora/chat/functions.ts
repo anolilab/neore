@@ -44,6 +44,7 @@ import type { UIMessage } from "../agent/ui-messages";
 import { docsToModelMessages, listMessagesByThreadIdHandler, storeFile, toUIMessages } from "../agent/client";
 import { autoRepairJsonMiddleware } from "../agent/client/middleware";
 import { listActivePathPage, withBranchInfo } from "../agent/branches";
+import { loadActivePath } from "../agent/branch-rows";
 import {
     redactThreadForPublicViewer,
     requireOwnedThread,
@@ -2426,17 +2427,42 @@ export const searchMessages = authQuery
             relevantMessages?: MessageDoc[];
         })[] = [];
 
+        // A locked thread's messages are never returned here, with or without a proof;
+        // a trashed one has no page to open.
+        const isSearchable = (thread: (typeof threads)[number] | undefined): thread is NonNullable<(typeof threads)[number]> =>
+            Boolean(thread && thread.userId === userId && !thread.deleted && !isThreadLocked(thread));
+
+        // A branched thread displays only its active path, so a hit in an inactive reply
+        // is not one the reader can open: it would jump to a sibling at the same `order`.
+        const activePaths = await Promise.all(
+            threadIds.map(async (threadId, i) => {
+                const thread = threads[i];
+
+                if (!isSearchable(thread) || !thread.activeLeafMessageId) {
+                    return undefined;
+                }
+
+                const path = await loadActivePath(context, threadId as Id<"threads">, thread.activeLeafMessageId);
+
+                return new Set(path.map((row) => row._id as string));
+            }),
+        );
+
         for (const [i, threadId] of threadIds.entries()) {
             const thread = threads[i];
 
-            // A locked thread's messages are never returned here, with or without a proof.
-            if (thread && thread.userId === userId && !isThreadLocked(thread)) {
-                const relevantMessages = searchResults.filter((message) => message.threadId === threadId);
+            if (isSearchable(thread)) {
+                const activePath = activePaths[i];
+                const relevantMessages = searchResults.filter(
+                    (message) => message.threadId === threadId && (!activePath || activePath.has(message._id as string)),
+                );
 
-                threadsWithMessages.push({
-                    ...thread,
-                    relevantMessages,
-                });
+                if (relevantMessages.length > 0) {
+                    threadsWithMessages.push({
+                        ...thread,
+                        relevantMessages,
+                    });
+                }
             }
         }
 
