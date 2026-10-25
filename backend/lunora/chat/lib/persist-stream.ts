@@ -127,13 +127,19 @@ export interface PipedStream {
 }
 
 /**
- * Yields `source`'s parts, and throws `onStop()` once `isStopped` answers true after `pollMs` without a part.
- * A part still pending then is abandoned: the abort the caller issues next ends it, and returning the
- * iterator now would wait on that pending read.
+ * Yields `source`'s parts, and throws `onStop()` once `isStopped` answers true after `pollMs` without `lastActivityAt()`
+ * moving. The caller reports its last chunk write, not the last part: tool-input deltas and step markers never write one,
+ * so a stop during them has to be found here. A part still pending then is abandoned: the abort the caller issues
+ * next ends it, and returning the iterator now would wait on that pending read.
  */
-async function* untilStopped<T>(source: AsyncIterable<T>, isStopped: () => Promise<boolean>, onStop: () => Error, pollMs: number): AsyncGenerator<T> {
+async function* untilStopped<T>(
+    source: AsyncIterable<T>,
+    isStopped: () => Promise<boolean>,
+    onStop: () => Error,
+    pollMs: number,
+    lastActivityAt: () => number,
+): AsyncGenerator<T> {
     const iterator = source[Symbol.asyncIterator]();
-    let lastPartAt = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let watching = true;
     let stopFound = false;
@@ -141,7 +147,7 @@ async function* untilStopped<T>(source: AsyncIterable<T>, isStopped: () => Promi
     let wake: (() => void) | undefined;
     const tick = () => {
         timer = setTimeout(async () => {
-            if (watching && Date.now() - lastPartAt >= pollMs && (await isStopped())) {
+            if (watching && Date.now() - lastActivityAt() >= pollMs && (await isStopped())) {
                 stopFound = true;
                 wake?.();
 
@@ -158,15 +164,18 @@ async function* untilStopped<T>(source: AsyncIterable<T>, isStopped: () => Promi
 
     try {
         while (true) {
+            // A stop found while the consumer was busy ends the run before another read, so no part is taken and dropped.
+            if (stopFound) {
+                throw onStop();
+            }
+
             const next = iterator.next();
-            const step: IteratorResult<T> | typeof STOPPED = stopFound
-                ? STOPPED
-                : await new Promise<IteratorResult<T> | typeof STOPPED>((resolve, reject) => {
-                      wake = () => {
-                          resolve(STOPPED);
-                      };
-                      next.then(resolve).catch(reject);
-                  });
+            const step: IteratorResult<T> | typeof STOPPED = await new Promise<IteratorResult<T> | typeof STOPPED>((resolve, reject) => {
+                wake = () => {
+                    resolve(STOPPED);
+                };
+                next.then(resolve).catch(reject);
+            });
 
             wake = undefined;
 
@@ -180,8 +189,6 @@ async function* untilStopped<T>(source: AsyncIterable<T>, isStopped: () => Promi
             if (step.done) {
                 return;
             }
-
-            lastPartAt = Date.now();
 
             yield step.value;
         }
@@ -231,7 +238,8 @@ export const pipeToPersistentChunks = async (
 
     // `fullStream`, not `textStream`: reasoning deltas only exist on the full
     // stream, and the client renders them live from `persistentChunks.reasoning`.
-    const parts = ctx.runQuery === undefined ? fullStream : untilStopped(fullStream, isStopped, refusedByStop, stopPollMs);
+    const startedAt = Date.now();
+    const parts = ctx.runQuery === undefined ? fullStream : untilStopped(fullStream, isStopped, refusedByStop, stopPollMs, () => lastFlushAt ?? startedAt);
 
     for await (const part of parts) {
         let delta: string;

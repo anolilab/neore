@@ -154,6 +154,69 @@ describe(pipeToPersistentChunks, () => {
             await vi.waitFor(() => expect(ran.toolSignalAborted).toBe(true));
         });
 
+        it("finds a stop while the model streams parts that write no chunk, such as a tool's input", async () => {
+            const { ctx } = ctxWithStatus({ current: "done" });
+            const closed = { value: false };
+
+            async function* toolInput() {
+                yield { text: "Let me look. ", type: "text-delta" };
+
+                while (!closed.value) {
+                    yield { type: "tool-input-delta" };
+                    await new Promise((resolve) => {
+                        setTimeout(resolve, 2);
+                    });
+                }
+            }
+
+            const error = await pipeToPersistentChunks(ctx as never, "stream-1", toolInput(), { stopPollMs: 20 }).catch((error_: unknown) => error_);
+
+            closed.value = true;
+
+            expect(isStreamWriteRefused(error)).toBe(true);
+            expect((error as { pending: unknown }).pending).toStrictEqual({ reasoning: "", text: "Let me look. " });
+        });
+
+        it("reads no further part once a stop was found while a chunk write was still open", async () => {
+            const polls: number[] = [];
+            const write = { release: () => {} };
+            const reads = { count: 0 };
+            const ctx = {
+                runMutation: async () =>
+                    await new Promise<void>((resolve) => {
+                        write.release = resolve;
+                    }),
+                runQuery: async () => {
+                    polls.push(Date.now());
+
+                    return "done";
+                },
+            };
+            const source = {
+                [Symbol.asyncIterator]: () => {return {
+                    next: async () => {
+                        reads.count += 1;
+
+                        return reads.count === 1
+                            ? { done: false, value: { text: "One. ", type: "text-delta" } }
+                            : { done: false, value: { text: "Two. ", type: "text-delta" } };
+                    },
+                }},
+            };
+            const piping = pipeToPersistentChunks(ctx as never, "stream-1", source, { stopPollMs: 10 }).catch((error_: unknown) => error_);
+
+            await vi.waitFor(() => expect(polls.length).toBeGreaterThan(0));
+            await new Promise((resolve) => {
+                setTimeout(resolve, 5);
+            });
+            write.release();
+
+            const error = await piping;
+
+            expect(isStreamWriteRefused(error)).toBe(true);
+            expect(reads.count).toBe(1);
+        });
+
         it("does not poll while parts keep arriving, nor after the stream ended", async () => {
             const { ctx, polls } = ctxWithStatus({ current: "done" });
 
