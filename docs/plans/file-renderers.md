@@ -1,7 +1,7 @@
 # File Renderers — Implementation Plan
 
 **Created:** 2026-03-06
-**Status:** Planned
+**Status:** Partly shipped (the viewers and the generic card are in the tree; the thumbnails, the type icon and the canvas-panel integration remain, see "Current State")
 **Estimated Effort:** 20–28 hours
 
 ## Summary
