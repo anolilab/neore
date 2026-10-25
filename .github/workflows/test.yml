@@ -117,11 +117,12 @@ jobs:
             # 5 s, a 50 ms tokenizer taking 5.6 s). Two at a time keeps the run well inside the timeout.
             - name: "Run tests (affected)"
               shell: "bash"
-              run: 'pnpm exec vis affected test:coverage --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast --parallel 2'
+              run: 'pnpm exec vis affected test:coverage --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast --parallel 2'
 
             # The Rust Worker is the one project with a `test` target and no
             # `test:coverage` (cargo test has no v8 coverage), so it is not part
-            # of the step above.
+            # of the step above. `--if-present` keeps a change that touches only
+            # it from failing that step; this step runs its tests.
             - name: "Run the Rust Worker tests (affected)"
               shell: "bash"
               run: 'pnpm exec vis affected test --tag document-parser --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
