@@ -132,7 +132,7 @@ const KeyboardShortcutsSettings: FC = () => {
 
     // The one save path: Save and Reset to Defaults both go through it.
     const saveShortcuts = useCallback(
-        async (value: KeyboardShortcutForm, successMessage: string) => {
+        async (value: Partial<KeyboardShortcuts>, successMessage: string) => {
             try {
                 await updateUserSettings({ keyboardShortcuts: value });
 
@@ -234,7 +234,9 @@ const KeyboardShortcutsSettings: FC = () => {
 
         try {
             // The server keeps its own copy, so it is saved first; on failure the previous bindings stay in place.
-            await saveShortcuts(defaults, t`Keyboard shortcuts reset to defaults`);
+            // The whole default set goes, not just the form's keys: the server merges, so a fixed binding (audio,
+            // list navigation) it already holds would otherwise survive a reset the local store has applied.
+            await saveShortcuts(defaultKeyboardShortcuts, t`Keyboard shortcuts reset to defaults`);
 
             resetKeyboardShortcuts();
             form.reset(defaults);

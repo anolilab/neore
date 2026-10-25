@@ -82,7 +82,7 @@ describe("KeyboardShortcutsSettings", () => {
             expect(updateUserSettings).toHaveBeenCalledTimes(1);
         });
 
-        const { keyboardShortcuts } = updateUserSettings.mock.calls[0]![0];
+        const keyboardShortcuts = updateUserSettings.mock.lastCall?.[0].keyboardShortcuts ?? {};
 
         expect(keyboardShortcuts.newChat).toBe("ctrl+j");
         // Only what the page edits is sent, and the backend accepts every value, defaults included.
@@ -148,7 +148,9 @@ describe("KeyboardShortcutsSettings", () => {
         await waitFor(() => {
             expect(updateUserSettings).toHaveBeenCalledTimes(1);
         });
-        expect(updateUserSettings.mock.calls[0]![0].keyboardShortcuts.newChat).toBe(defaultKeyboardShortcuts.newChat);
+        expect((updateUserSettings.mock.lastCall?.[0].keyboardShortcuts ?? {}).newChat).toBe(defaultKeyboardShortcuts.newChat);
+        // The server merges, so the bindings the page does not edit (audio, list navigation) must be sent too.
+        expect(updateUserSettings.mock.lastCall?.[0].keyboardShortcuts ?? {}).toEqual(defaultKeyboardShortcuts);
         expect(useUIStateStore.getState().keyboardShortcuts).toEqual(defaultKeyboardShortcuts);
     });
 
