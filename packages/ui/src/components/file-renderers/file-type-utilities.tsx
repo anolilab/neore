@@ -3,10 +3,42 @@
  * Used by all renderers to determine which component should handle a given file.
  */
 
-export type FileRendererType = "audio" | "docx" | "generic" | "image" | "pdf" | "video";
+export type FileRendererType = "audio" | "docx" | "generic" | "image" | "jsonl" | "mermaid" | "pdf" | "table" | "video";
+
+/**
+ * Text files that get a preview of their own, recognised by name: the chat
+ * stores them as `text/plain`, so the type says nothing. The one list the
+ * predicates below, the composer's `accept` string and its upload type are
+ * derived from.
+ */
+export const TEXT_PREVIEW_EXTENSIONS = {
+    jsonl: ["jsonl", "ndjson"],
+    mermaid: ["mermaid", "mmd"],
+    table: ["csv", "tsv"],
+} as const;
+
+const getExtension = (filename?: string): string => filename?.split(".").pop()?.toLowerCase() ?? "";
+
+const hasExtension = (filename: string | undefined, extensions: readonly string[]): boolean => extensions.includes(getExtension(filename));
+
+/** JSON Lines / NDJSON: one JSON value per line. */
+export const isJsonl = (filename?: string): boolean => hasExtension(filename, TEXT_PREVIEW_EXTENSIONS.jsonl);
+
+/** A Mermaid diagram source. */
+export const isMermaid = (filename?: string): boolean => hasExtension(filename, TEXT_PREVIEW_EXTENSIONS.mermaid);
+
+/** Delimited tables: comma- or tab-separated (`.csv`, `.tsv`). */
+export const isDelimitedTable = (filename?: string): boolean => hasExtension(filename, TEXT_PREVIEW_EXTENSIONS.table);
+
+/** A name alone is not enough: a binary called `data.csv` must not be fetched and parsed as text. */
+const isTextLikeType = (mediaType?: string): boolean => !mediaType || mediaType.startsWith("text/") || mediaType === "application/octet-stream";
 
 /** Classify a file by its MIME type and/or filename extension. */
 export const getFileRendererType = (mediaType?: string, filename?: string): FileRendererType => {
+    if (isImage(mediaType)) {
+        return "image";
+    }
+
     if (isPdf(mediaType, filename)) {
         return "pdf";
     }
@@ -23,8 +55,18 @@ export const getFileRendererType = (mediaType?: string, filename?: string): File
         return "docx";
     }
 
-    if (isImage(mediaType)) {
-        return "image";
+    if (isTextLikeType(mediaType)) {
+        if (isJsonl(filename)) {
+            return "jsonl";
+        }
+
+        if (isMermaid(filename)) {
+            return "mermaid";
+        }
+
+        if (isDelimitedTable(filename)) {
+            return "table";
+        }
     }
 
     return "generic";
@@ -60,17 +102,6 @@ export const isDocx = (mediaType?: string, filename?: string): boolean =>
     mediaType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || filename?.toLowerCase().endsWith(".docx") === true;
 
 export const isImage = (mediaType?: string): boolean => mediaType?.startsWith("image/") === true;
-
-/** JSON Lines / NDJSON: one JSON value per line. Recognised by name, since the stored type is `text/plain`. */
-export const isJsonl = (filename?: string): boolean => ["jsonl", "ndjson"].includes(getExtension(filename));
-
-/** A Mermaid diagram source. Recognised by name, since the stored type is `text/plain`. */
-export const isMermaid = (filename?: string): boolean => ["mermaid", "mmd"].includes(getExtension(filename));
-
-/** Delimited tables: comma- or tab-separated (`.csv`, `.tsv`). Recognised by name. */
-export const isDelimitedTable = (filename?: string): boolean => ["csv", "tsv"].includes(getExtension(filename));
-
-const getExtension = (filename?: string): string => filename?.split(".").pop()?.toLowerCase() ?? "";
 
 /** Format file size in human-readable units. */
 export const formatFileSize = (bytes: number): string => {
