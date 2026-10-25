@@ -20,7 +20,12 @@ const harness = vi.hoisted(() => {
         liveReads: new Map<string, { key: unknown[]; read: () => unknown }>(),
         parentReads: [] as string[],
         relationship: null as Relationship,
+        settled: true,
     };
+});
+
+vi.mock("@/hooks/use-after-first-paint", () => {
+    return { default: () => harness.settled };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -127,6 +132,7 @@ afterEach(() => {
     harness.parent = null;
     harness.parentReads = [];
     harness.relationship = null;
+    harness.settled = true;
 });
 
 describe("sub-agent parent breadcrumb", () => {
@@ -140,6 +146,24 @@ describe("sub-agent parent breadcrumb", () => {
         expect(link.getAttribute("href")).toBe("/chat/parent-1");
         expect(within(link).getByText(LONG_TITLE).className).toContain("truncate");
         expect(screen.getByTestId("tooltip").textContent).toBe(LONG_TITLE);
+    });
+
+    it("reads nothing until first paint has settled", async () => {
+        harness.relationship = { branchType: "subagent", parentThreadId: "parent-1" };
+        harness.parent = { title: "Deferred parent" };
+        harness.settled = false;
+        const { container, rerender, queryClient } = mount();
+
+        await settle();
+
+        expect(harness.liveReads.size).toBe(0);
+        expect(harness.parentReads).toEqual([]);
+        expect(container.textContent).toBe("");
+
+        harness.settled = true;
+        rerender(createElement(QueryClientProvider, { client: queryClient }, createElement(SubAgentParentBreadcrumb, { threadId: "child-1" })));
+
+        expect(await screen.findByRole("link", { name: "Deferred parent" })).toBeTruthy();
     });
 
     it("is hidden for a root thread", async () => {

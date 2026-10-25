@@ -18,6 +18,7 @@ import { Link } from "@tanstack/react-router";
 import { ChevronLeftIcon } from "lucide-react";
 import type { FC } from "react";
 
+import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 interface SubAgentParentBreadcrumbProps {
@@ -28,12 +29,15 @@ interface SubAgentParentBreadcrumbProps {
 const SubAgentParentBreadcrumb: FC<SubAgentParentBreadcrumbProps> = ({ className, threadId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    // The breadcrumb is not needed to draw the thread, so its reads wait until first paint has
+    // settled and stay out of the first-paint query burst.
+    const afterFirstPaint = useAfterFirstPaint();
 
     // Live reads: a one-shot read keeps a relation that arrived after the child opened hidden,
     // and a renamed parent's old title. The parent read stays a skipToken (no subscription)
     // until the relation names a sub-agent parent, so only sub-agent children pay for it.
     const { data: relationship } = useQuery(
-        crpc.agent.threads.getThreadRelationship.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken),
+        crpc.agent.threads.getThreadRelationship.queryOptions(threadId && afterFirstPaint ? { threadId: threadId as Id<"threads"> } : skipToken),
     );
     const parentThreadId = relationship?.branchType === "subagent" ? relationship.parentThreadId : undefined;
     const { data: parent } = useQuery(crpc.chat.functions.getThread.queryOptions(parentThreadId ? { threadId: parentThreadId } : skipToken));
