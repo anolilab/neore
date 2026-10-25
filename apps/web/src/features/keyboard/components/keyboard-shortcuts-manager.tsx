@@ -34,8 +34,10 @@ const isUserTypingInInput = (event: KeyboardEvent): boolean => {
 };
 
 // A key with no ctrl/meta/alt (a bare letter, or shift alone) types a character into an
-// editable target. Such a keystroke belongs to the field, so the shortcut must not take it.
-const isTextEntryKeystroke = (event: KeyboardEvent): boolean => isUserTypingInInput(event) && !event.ctrlKey && !event.metaKey && !event.altKey;
+// editable target, or picks an option by typeahead in a select. Such a keystroke belongs to
+// the control, so the shortcut must not take it.
+const isTextEntryKeystroke = (event: KeyboardEvent): boolean =>
+    (isUserTypingInInput(event) || event.target instanceof HTMLSelectElement) && !event.ctrlKey && !event.metaKey && !event.altKey;
 
 // The effort commands are bound with modifier chords that work from the composer; a bare key stays with the field.
 const createEffortHandler =

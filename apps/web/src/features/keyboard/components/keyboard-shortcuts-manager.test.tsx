@@ -224,6 +224,28 @@ describe("KeyboardShortcutsManager", () => {
         expect(onShortcut).not.toHaveBeenCalledWith("decreaseEffort", expect.anything());
     });
 
+    it("leaves a bare-key effort binding to a focused select, and still takes its modifier chord", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ decreaseEffort: "alt+j", increaseEffort: "j" }}>
+                <select aria-label="language">
+                    <option>Japanese</option>
+                </select>
+            </KeyboardShortcutsManager>,
+        );
+
+        const select = screen.getByLabelText("language");
+
+        fireEvent.keyDown(select, { code: "KeyJ", key: "j" });
+
+        expect(onShortcut).not.toHaveBeenCalled();
+
+        fireEvent.keyDown(select, { altKey: true, code: "KeyJ", key: "j" });
+
+        expect(onShortcut).toHaveBeenCalledWith("decreaseEffort", expect.anything());
+    });
+
     describe("a recorded Control chord for the effort commands", () => {
         const pressChord = (modifier: "ctrlKey" | "metaKey") => {
             const onShortcut = vi.fn();

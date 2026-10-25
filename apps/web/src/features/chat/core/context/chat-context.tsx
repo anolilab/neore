@@ -884,12 +884,27 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             }
 
             const { attachedReferences } = useChatUIStore.getState();
+            // The pending settings are taken out of the store before the request; a send that fails puts them back with the draft.
+            let consumedSettings: PendingSettings | null = null;
+            const restoreSettings = () => {
+                const consumed = consumedSettings;
+
+                if (!consumed) {
+                    return;
+                }
+
+                useModelStore.getState().setPendingSettings((previous) => {
+                    return { ...consumed, ...previous };
+                });
+            };
 
             try {
                 // For new threads: send all pending settings
                 // For existing threads: only send settings that have changed from cached values
                 const pendingSettings = isCreatingNewThread ? getPendingSettingsFromStore() : null;
                 const changedSettings = isCreatingNewThread ? null : getChangedSettings(threadDataRef.current);
+
+                consumedSettings = pendingSettings ?? changedSettings;
 
                 let fileIds: string[] | undefined;
 
@@ -999,6 +1014,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                         setIsRegenerating(false);
                         setOptimisticMessages((previous) => previous.filter((m) => m.id !== optimisticId));
                         useChatUIStore.getState().setComposerText(text);
+                        restoreSettings();
                         useChatUIStore.getState().setComposerBannedContent({
                             message: errorData.message ?? t`Your message contains inappropriate content that cannot be sent.`,
                             words: errorData.bannedWords ?? [],
@@ -1142,6 +1158,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
                 // The composer was cleared before the request; hand the draft back unless a new one is there.
                 useChatUIStore.getState().restoreComposer({ attachedReferences, composerAttachments: attachments ?? [], composerText: text });
+                restoreSettings();
 
                 handleError(error_);
 

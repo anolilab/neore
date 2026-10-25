@@ -99,6 +99,12 @@ describe("saved keyboard shortcuts", () => {
         expect(shortcuts?.decreaseEffort).toBe("alt+arrowdown");
     });
 
+    it("save an effort binding next to the Help, Home and End defaults the settings form submits with it", async () => {
+        await save({ firstItem: "home", help: "ctrl+/", increaseEffort: "alt+arrowup", lastItem: "end" });
+
+        expect(await reload()).toMatchObject({ firstItem: "home", help: "ctrl+/", increaseEffort: "alt+arrowup", lastItem: "end" });
+    });
+
     it("refuse a malformed effort binding and keep what was saved", async () => {
         await save({ increaseEffort: "alt+arrowup" });
 
