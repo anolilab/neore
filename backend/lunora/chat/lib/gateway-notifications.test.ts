@@ -95,6 +95,27 @@ describe(gatewayNotificationsHttpAction, () => {
         expect(runMutation).not.toHaveBeenCalled();
     });
 
+    it("refuses a body past the byte cap before hashing it, whatever its Content-Length says", async () => {
+        const body = JSON.stringify({ notifications: [], padding: "x".repeat(300 * 1024), userId: "user-a" });
+        const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(new TextEncoder().encode(body));
+                controller.close();
+            },
+        });
+        const request = new Request(ENDPOINT, {
+            body: stream,
+            duplex: "half",
+            headers: { "X-Signature": "00", "X-Timestamp": String(Date.now()) },
+            method: "POST",
+        } as RequestInit);
+
+        const response = await gatewayNotificationsHttpAction(context(), request);
+
+        expect(response.status).toBe(401);
+        expect(runMutation).not.toHaveBeenCalled();
+    });
+
     it("rejects a signed body that is not a notification batch", async () => {
         const response = await gatewayNotificationsHttpAction(context(), await signedRequest({ notifications: [{ ruleId: "r" }], userId: "user-a" }));
 
@@ -167,6 +188,12 @@ describe(toUsageAlert, () => {
 
         expect(key(at)).toBe(key(at + 30_000));
         expect(key(at)).not.toBe(key(at + 3_600_000));
+    });
+
+    it("keeps the microdollars of a cost under half a cent instead of showing $0.00", () => {
+        const alert = toUsageAlert("u", { ...firing, currentValue: 1500, threshold: 1 } as never, 0);
+
+        expect(alert.body).toBe("Usage reached $0.0015 (limit $0.000001).");
     });
 
     it("words the blocked variant and non-cost metrics", () => {

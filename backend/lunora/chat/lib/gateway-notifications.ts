@@ -26,17 +26,27 @@ type GatewayNotification = Infer<typeof vGatewayNotification>;
 /** More than a user has rules for; a bigger batch is not ours. */
 const MAX_NOTIFICATIONS_PER_REQUEST = 50;
 
+/** 50 firings at their validators' caps is ~100 KB; anything bigger is not the gateway's. */
+const MAX_BODY_BYTES = 256 * 1024;
+
 const HOUR_MS = 3_600_000;
 
 const MICRODOLLARS_PER_DOLLAR = 1_000_000;
 
 const USAGE_LINK = "/dashboard/settings/chat/usage";
 
+/** Cents, except for a positive amount under half a cent, which would read as `$0.00`: that keeps its microdollars. */
+const formatDollars = (microdollars: number): string => {
+    const dollars = microdollars / MICRODOLLARS_PER_DOLLAR;
+
+    return `$${dollars > 0 && dollars < 0.005 ? String(Number(dollars.toFixed(6))) : dollars.toFixed(2)}`;
+};
+
 const describeMetric = (metric: string, value: number): string => {
     switch (metric) {
         case "daily_cost":
         case "monthly_cost": {
-            return `$${(value / MICRODOLLARS_PER_DOLLAR).toFixed(2)}`;
+            return formatDollars(value);
         }
         case "request_count": {
             return `${Math.round(value)} requests`;
@@ -79,7 +89,7 @@ export const toUsageAlert = (userId: string, notification: GatewayNotification, 
 export const gatewayNotificationsHttpAction = async (context: HttpActionCtx, request: Request): Promise<Response> => {
     const secret = process.env.LLM_GATEWAY_SIGNING_SECRET;
 
-    if (!secret || !(await verifySignedRequest(request, secret))) {
+    if (!secret || !(await verifySignedRequest(request, secret, MAX_BODY_BYTES))) {
         return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
