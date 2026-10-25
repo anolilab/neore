@@ -10,5 +10,5 @@
         "resolveJsonModule": true,
         "types": ["node"]
     },
-    "files": ["alchemy.run.ts", "scripts/worker-bundle.ts", "scripts/check-web-size.ts", "scripts/profile-worker-startup.ts"]
+    "files": ["alchemy.run.ts", "scripts/worker-bundle.ts", "scripts/check-web-size.ts", "scripts/check-web-bundle.ts", "scripts/profile-worker-startup.ts"]
 }
