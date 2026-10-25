@@ -35,13 +35,6 @@ auditConfig:
 autoInstallPeers: false
 
 blockExoticSubdeps: true
-catalog:
-  "@lunora/client": 1.0.0-alpha.243
-  "@lunora/react": 1.0.0-alpha.256
-  "@lunora/workflow": 1.0.0-alpha.92
-  '@visulima/vis': 4.2.0
-  "@visulima/yaml": 1.0.0
-  mediabunny: 1.61.6
 catalogMode: prefer
 
 catalogs:
@@ -169,6 +162,7 @@ catalogs:
     "@xyflow/react": 12.12.0
     recharts: 3.10.1
   cli:
+    "@visulima/vis": 6.1.3
     commitizen: ^4.3.2
     jiti: 2.7.0
     plop: 4.0.5
@@ -275,6 +269,7 @@ catalogs:
   lunora:
     "@lunora/auth": 1.0.0-alpha.226
     "@lunora/bindings": 1.0.0-alpha.131
+    "@lunora/client": 1.0.0-alpha.243
     "@lunora/cli": 1.0.0-alpha.423
     "@lunora/d1": 1.0.0-alpha.202
     "@lunora/mail": 1.0.0-alpha.120
@@ -282,6 +277,7 @@ catalogs:
     "@lunora/payment": 1.0.0-alpha.234
     "@lunora/queue": 1.0.0-alpha.124
     "@lunora/ratelimit": 1.0.0-alpha.163
+    "@lunora/react": 1.0.0-alpha.256
     "@lunora/scheduler": 1.0.0-alpha.147
     "@lunora/seed": 1.0.0-alpha.249
     "@lunora/server": 1.0.0-alpha.232
@@ -463,6 +459,7 @@ catalogs:
     "@toon-format/toon": 4.4.0
     "@ungap/structured-clone": 1.4.0
     "@visulima/pail": 5.0.0
+    "@visulima/yaml": 1.0.0
     ansi-to-react: ^6.2.6
     date-fns: 4.4.0
     embla-carousel-react: 8.6.0
@@ -473,6 +470,7 @@ catalogs:
     jspdf: 4.2.1
     jszip: ^3.10.2
     media-chrome: 4.19.3
+    mediabunny: 1.61.6
     my-ua-parser: ^2.0.4
     nanoid: 6.0.2
     pptxgenjs: 4.0.1

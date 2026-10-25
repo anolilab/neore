@@ -13,8 +13,8 @@
         "test": "vitest run"
     },
     "dependencies": {
-        "@lunora/client": "catalog:",
-        "@lunora/react": "catalog:",
+        "@lunora/client": "catalog:lunora",
+        "@lunora/react": "catalog:lunora",
         "@tanstack/react-query": "catalog:tanstack"
     },
     "devDependencies": {

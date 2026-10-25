@@ -16,7 +16,7 @@
     "dependencies": {
         "@expo/metro-runtime": "~58.0.14",
         "@legendapp/list": "^3.6.0",
-        "@lunora/client": "catalog:",
+        "@lunora/client": "catalog:lunora",
         "@neore/backend": "workspace:*",
         "@neore/chat-ui": "workspace:*",
         "@neore/client-runtime": "workspace:*",
