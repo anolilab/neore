@@ -47,6 +47,19 @@ vi.mock("../lib/audit-triggers", async (importOriginal) => {
 
 const OWNER = "user-owner";
 
+const insertMessage = (context: any, threadId: string, order: number, parentMessageId?: string) =>
+    context.db.insert("messages", {
+        message: { content: "needle", role: order === 0 ? "user" : "assistant" },
+        order,
+        parentMessageId,
+        status: "success",
+        stepOrder: 0,
+        text: "needle",
+        threadId,
+        tool: false,
+        userId: OWNER,
+    });
+
 const search = async (harness: ReturnType<typeof lunoraTest>) => {
     const result: any = await harness
         .withIdentity({ userId: OWNER } as never)
@@ -61,18 +74,7 @@ describe("searchMessages", () => {
 
         try {
             const ids = await harness.run(async (context: any) => {
-                const message = (threadId: string, order: number, parentMessageId?: string) =>
-                    context.db.insert("messages", {
-                        message: { content: "needle", role: order === 0 ? "user" : "assistant" },
-                        order,
-                        parentMessageId,
-                        status: "success",
-                        stepOrder: 0,
-                        text: "needle",
-                        threadId,
-                        tool: false,
-                        userId: OWNER,
-                    });
+                const message = (threadId: string, order: number, parentMessageId?: string) => insertMessage(context, threadId, order, parentMessageId);
                 const thread = (fields: { deleted?: boolean }) =>
                     context.db.insert("threads", { model: "gpt-4o", status: "active", title: "T", userId: OWNER, ...fields });
 
@@ -109,6 +111,40 @@ describe("searchMessages", () => {
             expect(byThread.get(ids.abandoned)).not.toContain(ids.abandonedReply);
             expect(byThread.get(ids.abandoned)).toContain(ids.kept);
             expect(byThread.get(ids.plain)).toEqual([ids.plainMessage]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("finds an active hit that sits behind a full window of inactive ones", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const message = (threadId: string, order: number, parentMessageId?: string) => insertMessage(context, threadId, order, parentMessageId);
+
+                const thread = await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "T", userId: OWNER });
+                const prompt = await message(thread, 0);
+                const inactive: string[] = [];
+
+                for (let i = 0; i < 110; i += 1) {
+                    inactive.push(await message(thread, 1, prompt));
+                }
+
+                const active = await message(thread, 1, prompt);
+
+                await context.db.patch(thread, { activeLeafMessageId: active });
+
+                return { active, inactive, prompt, thread };
+            });
+
+            const page = await search(harness);
+            const hit = page.find((entry) => entry._id === ids.thread);
+            const hitIds = hit?.relevantMessages.map((row) => row._id) ?? [];
+
+            expect(hitIds).toContain(ids.active);
+            expect(hitIds).toContain(ids.prompt);
+            expect(hitIds.some((id) => ids.inactive.includes(id))).toBe(false);
         } finally {
             harness.close();
         }

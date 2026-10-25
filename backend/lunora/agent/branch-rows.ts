@@ -175,14 +175,16 @@ export const resolveLeafRow = async (context: Reader, threadId: Id<"threads">, s
 
 /**
  * Walks up from `from` (inclusive), newest first, for at most `limit` rows,
- * stopping before `stopAtId`. `next` is where a further walk would resume —
- * the parent of the last row returned — or `null` past the top.
+ * stopping before `stopAtId` or before the first row whose `order` is below
+ * `stopBelowOrder` (orders never rise going up a path). `next` is where a
+ * further walk would resume — the parent of the last row returned — or `null`
+ * past the top.
  */
 export const walkPath = async (
     context: Reader,
     threadId: Id<"threads">,
     from: Row,
-    options: { limit: number; stopAtId?: string },
+    options: { limit: number; stopAtId?: string; stopBelowOrder?: number },
 ): Promise<{ next: Row | null; rows: Row[] }> => {
     const rows: Row[] = [];
     // Rows before `current` in storage order, newest first: its implicit
@@ -190,7 +192,7 @@ export const walkPath = async (
     let before: Row[] = [];
     let current: Row | null = from;
 
-    while (current && rows.length < options.limit && current._id !== options.stopAtId) {
+    while (current && rows.length < options.limit && current._id !== options.stopAtId && current.order >= (options.stopBelowOrder ?? -Infinity)) {
         rows.push(current);
 
         const explicit = await explicitParentOf(context, threadId, current);
@@ -258,4 +260,30 @@ export const loadActivePath = async (context: Reader, threadId: Id<"threads">, s
         .query("messages")
         .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
         .collect();
+};
+
+/**
+ * Which of `candidates` sit on the thread's displayed path. The walk starts at
+ * the leaf and ends at the oldest candidate, so it costs what lies between the
+ * two rather than the whole thread.
+ */
+export const candidatesOnActivePath = async (
+    context: Reader,
+    threadId: Id<"threads">,
+    storedLeafId: string,
+    candidates: ReadonlyArray<{ _id: string; order: number }>,
+): Promise<Set<string>> => {
+    const leaf = candidates.length > 0 ? await resolveLeafRow(context, threadId, storedLeafId) : null;
+
+    if (!leaf) {
+        return new Set();
+    }
+
+    const wanted = new Set(candidates.map((row) => row._id));
+    const { rows } = await walkPath(context, threadId, leaf, {
+        limit: Infinity,
+        stopBelowOrder: Math.min(...candidates.map((row) => row.order)),
+    });
+
+    return new Set(rows.map((row) => row._id as string).filter((id) => wanted.has(id)));
 };
