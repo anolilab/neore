@@ -48,7 +48,8 @@ export interface StreamChunk {
 
 /** One read of the stream: the chunks past `afterIndex` and the status, from ONE query, so they agree. */
 export interface StreamSource {
-    read: (afterIndex: number) => Promise<{ chunks: StreamChunk[]; status: string }>;
+    /** `locked`: the thread was locked after the stream started, so nothing more may be relayed. */
+    read: (afterIndex: number) => Promise<{ chunks: StreamChunk[]; locked?: boolean; status: string }>;
 }
 
 export const TERMINAL_STREAM_STATUSES: ReadonlySet<string> = new Set(["done", "error", "timeout"]);
@@ -134,7 +135,13 @@ export async function* pollStream(source: StreamSource, options: PollOptions = {
     let reads = 0;
 
     while (!options.signal?.aborted) {
-        const { chunks, status } = await source.read(afterIndex);
+        const { chunks, locked, status } = await source.read(afterIndex);
+
+        if (locked) {
+            yield { error: { code: "thread_locked", message: "This chat is locked." }, type: "error" };
+
+            return;
+        }
 
         reads += 1;
         afterIndex += chunks.length;

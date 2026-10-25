@@ -267,6 +267,17 @@ describe("stream relay", () => {
         ]);
     });
 
+    it("ends a relay at once when the thread is locked, without reading on", async () => {
+        const read = vi.fn(async () => {
+            return { chunks: [], locked: true, status: "streaming" };
+        });
+
+        const events = await Array.fromAsync(pollStream({ read }, { sleep: async () => {} }));
+
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(events).toEqual([{ error: { code: "thread_locked", message: "This chat is locked." }, type: "error" }]);
+    });
+
     it("reports a failed generation as an error event", async () => {
         const collected = await collectStream(source(["error"], [[{ text: "partial" }]]), { sleep: async () => {} });
 

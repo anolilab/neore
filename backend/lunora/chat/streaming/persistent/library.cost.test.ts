@@ -33,10 +33,12 @@ const setup = async () => {
     return { harness, streamId };
 };
 
-const poll = async (harness: ReturnType<typeof lunoraTest>, streamId: string, afterIndex: number) =>
+const poll = async (harness: ReturnType<typeof lunoraTest>, streamId: string, afterIndex: number, checkLock?: boolean) =>
     await measureDb(
         async () =>
-            (await harness.run(async (context: any) => await context.runQuery(getChunksAfter, { afterIndex, streamId }))) as {
+            (await harness.run(
+                async (context: any) => await context.runQuery(getChunksAfter, { afterIndex, streamId, ...(checkLock !== undefined && { checkLock }) }),
+            )) as {
                 chunks: { text: string }[];
                 status: string;
                 totalChunks: number;
@@ -56,6 +58,21 @@ describe("persistent stream cost", () => {
             // that is empty.
             expect(cost.statements, JSON.stringify(cost.byTable)).toBe(3);
             expect(cost.rowsRead).toBe(2);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("a later read of a long-poll with nothing new reads no thread row", async () => {
+        const { harness, streamId } = await setup();
+
+        try {
+            const { cost, result } = await poll(harness, streamId, CHUNKS, false);
+
+            expect(result).toStrictEqual({ chunks: [], locked: false, status: "streaming", totalChunks: CHUNKS });
+            // The stream row and the empty chunk range: no lock check on an idle read.
+            expect(cost.statements, JSON.stringify(cost.byTable)).toBe(2);
+            expect(cost.rowsRead).toBe(1);
         } finally {
             harness.close();
         }

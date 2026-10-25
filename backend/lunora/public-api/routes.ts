@@ -158,9 +158,9 @@ const streamSourceFor = (ctx: HttpActionCtx, streamId: string): StreamSource => 
 
     return {
         read: async (afterIndex) => {
-            const { chunks, status } = await ctx.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, { afterIndex, streamId: id });
+            const { chunks, locked, status } = await ctx.runQuery(internal.chat.streaming.persistent.library.getChunksAfter, { afterIndex, streamId: id });
 
-            return { chunks, status };
+            return { chunks, locked, status };
         },
     };
 };
