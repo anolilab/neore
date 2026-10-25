@@ -122,8 +122,8 @@ export const createNotification = internalMutation
 /**
  * {@link createNotification} for several rows in ONE transaction, so a caller with a batch
  * (the gateway's rule alerts) pays one shard round trip instead of one per row. Each row is
- * still idempotent on its `dedupeKey`; a throw rolls the whole batch back, and a redelivery
- * writes it again. At most {@link MAX_NOTIFICATIONS_PER_BATCH} rows, so a transaction stays bounded.
+ * still idempotent on its `dedupeKey`; a throw rolls the whole batch back, and a caller that
+ * sends it again writes only what is missing. At most {@link MAX_NOTIFICATIONS_PER_BATCH} rows, so a transaction stays bounded.
  */
 export const createNotifications = internalMutation
     .input({

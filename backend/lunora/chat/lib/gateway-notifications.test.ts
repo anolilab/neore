@@ -27,7 +27,15 @@ const signedRequest = async (payload: unknown, secret = SECRET, timestamp = Date
     return new Request(ENDPOINT, { body, headers: { "X-Signature": signature, "X-Timestamp": String(timestamp) }, method: "POST" });
 };
 
-const firing = { action: "notify", currentValue: 5_250_000, metric: "daily_cost", ruleId: "rule-1", ruleName: "Daily budget", threshold: 5_000_000 };
+const firing = {
+    action: "notify",
+    currentValue: 5_250_000,
+    firedAt: Date.UTC(2026, 0, 1, 10, 5),
+    metric: "daily_cost",
+    ruleId: "rule-1",
+    ruleName: "Daily budget",
+    threshold: 5_000_000,
+};
 const payload = { notifications: [firing], userId: "user-a" };
 
 const runMutation = vi.fn();
@@ -56,7 +64,6 @@ const rows = async () =>
     };
 
 beforeEach(() => {
-    // Mid-hour, so a re-sent request one second later cannot straddle the dedupe key's hour boundary.
     vi.useFakeTimers({ now: Date.UTC(2026, 0, 1, 10, 30), toFake: ["Date"] });
     vi.stubEnv("LLM_GATEWAY_SIGNING_SECRET", SECRET);
     harness = lunoraTest(schema as never);
@@ -142,17 +149,28 @@ describe(gatewayNotificationsHttpAction, () => {
         });
     });
 
-    it("creates no second notification when the same request is delivered again", async () => {
-        const timestamp = Date.now();
-
-        await gatewayNotificationsHttpAction(context(), await signedRequest(payload, SECRET, timestamp));
-        const again = await gatewayNotificationsHttpAction(context(), await signedRequest(payload, SECRET, timestamp + 1000));
+    it("creates no second notification when the same firing is delivered again, even across an hour boundary", async () => {
+        vi.setSystemTime(Date.UTC(2026, 0, 1, 10, 59, 59));
+        await gatewayNotificationsHttpAction(context(), await signedRequest(payload));
+        vi.setSystemTime(Date.UTC(2026, 0, 1, 11, 0, 1));
+        const again = await gatewayNotificationsHttpAction(context(), await signedRequest(payload));
 
         expect(again.status).toBe(200);
         expect(runMutation).toHaveBeenCalledTimes(2);
         const { page } = await rows();
 
         expect(page).toHaveLength(1);
+    });
+
+    it("keeps a second firing of the same rule delivered in the same hour as the first", async () => {
+        const later = { ...firing, firedAt: firing.firedAt + 3_599_000 };
+
+        await gatewayNotificationsHttpAction(context(), await signedRequest(payload));
+        await gatewayNotificationsHttpAction(context(), await signedRequest({ notifications: [later], userId: "user-a" }));
+
+        const { page } = await rows();
+
+        expect(page).toHaveLength(2);
     });
 
     it("writes a full batch of 50 firings in a single shard mutation", async () => {
@@ -182,22 +200,22 @@ describe(gatewayNotificationsHttpAction, () => {
 });
 
 describe(toUsageAlert, () => {
-    it("keys one firing per rule and hour, so the rule's next firing is a new row", () => {
-        const at = Date.UTC(2026, 0, 1, 10, 5);
-        const key = (ms: number) => toUsageAlert("u", firing as never, ms).dedupeKey;
+    it("keys a firing on its rule and the instant it fired", () => {
+        const key = (notification: unknown) => toUsageAlert("u", notification as never).dedupeKey;
 
-        expect(key(at)).toBe(key(at + 30_000));
-        expect(key(at)).not.toBe(key(at + 3_600_000));
+        expect(key(firing)).toBe(key({ ...firing }));
+        expect(key(firing)).not.toBe(key({ ...firing, firedAt: firing.firedAt + 1 }));
+        expect(key(firing)).not.toBe(key({ ...firing, ruleId: "rule-2" }));
     });
 
     it("keeps the microdollars of a cost under half a cent instead of showing $0.00", () => {
-        const alert = toUsageAlert("u", { ...firing, currentValue: 1500, threshold: 1 } as never, 0);
+        const alert = toUsageAlert("u", { ...firing, currentValue: 1500, threshold: 1 } as never);
 
         expect(alert.body).toBe("Usage reached $0.0015 (limit $0.000001).");
     });
 
     it("words the blocked variant and non-cost metrics", () => {
-        const alert = toUsageAlert("u", { ...firing, action: "notify_and_block", currentValue: 120, metric: "request_count", threshold: 100 } as never, 0);
+        const alert = toUsageAlert("u", { ...firing, action: "notify_and_block", currentValue: 120, metric: "request_count", threshold: 100 } as never);
 
         expect(alert.body).toBe("Usage reached 120 requests (limit 100 requests). Requests are blocked for now.");
     });

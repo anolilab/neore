@@ -11,6 +11,7 @@ import { MAX_NOTIFICATIONS_PER_BATCH } from "../../notifications/validators";
 const vGatewayNotification = v.object({
     action: v.union(v.literal("notify"), v.literal("block"), v.literal("notify_and_block")),
     currentValue: v.number(),
+    firedAt: v.number(),
     metric: v.string().max(MAX_LENGTH.short),
     ruleId: v.string().max(MAX_LENGTH.id),
     ruleName: v.string().max(MAX_LENGTH.short),
@@ -26,8 +27,6 @@ type GatewayNotification = Infer<typeof vGatewayNotification>;
 
 /** 50 firings at their validators' caps is ~100 KB; anything bigger is not the gateway's. */
 const MAX_BODY_BYTES = 256 * 1024;
-
-const HOUR_MS = 3_600_000;
 
 const MICRODOLLARS_PER_DOLLAR = 1_000_000;
 
@@ -59,19 +58,19 @@ const describeMetric = (metric: string, value: number): string => {
 };
 
 /**
- * The inbox row for one firing. The key is the rule plus the hour of the
- * request's signed timestamp: the gateway re-arms a rule only after an hour, so
- * a replay or a re-sent request lands on the same key while the next firing of
- * the rule lands on a new one.
+ * The inbox row for one firing. The key is the rule plus the instant it fired
+ * (the gateway's `firedAt`), not the request's own clock: a re-sent request
+ * carries the same `firedAt` and lands on the same key, while the rule's next
+ * firing, at least an hour later, never does however late either is delivered.
  */
-export const toUsageAlert = (userId: string, notification: GatewayNotification, signedAtMs: number): NotificationInput => {
+export const toUsageAlert = (userId: string, notification: GatewayNotification): NotificationInput => {
     const reached = describeMetric(notification.metric, notification.currentValue);
     const limit = describeMetric(notification.metric, notification.threshold);
     const blocked = notification.action === "notify_and_block" ? " Requests are blocked for now." : "";
 
     return {
         body: `Usage reached ${reached} (limit ${limit}).${blocked}`,
-        dedupeKey: `usage_alert:${notification.ruleId}:${Math.floor(signedAtMs / HOUR_MS)}`,
+        dedupeKey: `usage_alert:${notification.ruleId}:${notification.firedAt}`,
         link: USAGE_LINK,
         title: notification.ruleName,
         type: "usage_alert",
@@ -106,13 +105,8 @@ export const gatewayNotificationsHttpAction = async (context: HttpActionCtx, req
     }
 
     const { notifications, userId } = parsed.value;
-    // Verified above, so this is the gateway's own clock.
-    const signedAtMs = Number(request.headers.get("X-Timestamp"));
-
     // A `block`-only rule is enforced, not announced; the gateway does not send it, and a stray one is skipped.
-    const alerts = notifications
-        .filter((notification) => notification.action !== "block")
-        .map((notification) => toUsageAlert(userId, notification, signedAtMs));
+    const alerts = notifications.filter((notification) => notification.action !== "block").map((notification) => toUsageAlert(userId, notification));
 
     try {
         if (alerts.length > 0) {

@@ -12,6 +12,8 @@ import type { UsageLogEntry } from "./tracker.js";
 export interface NotificationEvent {
     action: "notify" | "block" | "notify_and_block";
     currentValue: number;
+    /** When the rule fired (epoch ms): the backend keys the inbox row on it, so one firing is one row however often it is delivered. */
+    firedAt: number;
     metric: string;
     ruleId: string;
     ruleName: string;
@@ -70,6 +72,7 @@ export const evaluateRules = async (
                     notifications.push({
                         action,
                         currentValue,
+                        firedAt: Date.now(),
                         metric,
                         ruleId,
                         ruleName: rule["name"] as string,

@@ -2,10 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppEnv } from "../env.js";
 import type { NotificationEvent } from "./notifications.js";
-import { sendNotifications } from "./tracker";
+import { evaluateRules } from "./notifications.js";
+import type { UsageLogEntry } from "./tracker";
+import { sendNotifications, UsageTracker } from "./tracker";
 
 const env = { LUNORA_URL: "https://backend.test", SIGNING_SECRET: "s3cret" } as AppEnv;
-const notifications: NotificationEvent[] = [{ action: "notify", currentValue: 5, metric: "daily_cost", ruleId: "r1", ruleName: "Budget", threshold: 4 }];
+const notifications: NotificationEvent[] = [
+    { action: "notify", currentValue: 5, firedAt: 1000, metric: "daily_cost", ruleId: "r1", ruleName: "Budget", threshold: 4 },
+];
 
 describe(sendNotifications, () => {
     beforeEach(() => {
@@ -168,5 +172,72 @@ describe(sendNotifications, () => {
 
         expect(console.error).toHaveBeenCalledOnce();
         expect(JSON.stringify(vi.mocked(console.error).mock.calls)).toContain("503");
+    });
+});
+
+/** A D1 stand-in: one active rule that has fired, every other statement a no-op. */
+const firingDatabase = () => {
+    const rule = {
+        action: "notify",
+        id: "rule-1",
+        last_triggered_at: null,
+        metric: "request_count",
+        model_filter: null,
+        name: "Budget",
+        period: "day",
+        threshold: 1,
+    };
+    const statement = {
+        all: async () => {
+            return { results: [rule] };
+        },
+        bind: () => statement,
+        first: async () => {
+            return { total: 5 };
+        },
+        run: async () => {
+            return {};
+        },
+    };
+
+    return { prepare: () => statement } as unknown as D1Database;
+};
+
+describe(evaluateRules, () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("stamps each firing with the instant it fired, so a later delivery cannot change its identity", async () => {
+        vi.useFakeTimers({ now: Date.UTC(2026, 0, 1, 10, 59, 58), toFake: ["Date"] });
+
+        const result = await evaluateRules({ USAGE_DB: firingDatabase() } as AppEnv, "user-1", undefined, {} as UsageLogEntry);
+
+        expect(result.notifications).toEqual([expect.objectContaining({ firedAt: Date.UTC(2026, 0, 1, 10, 59, 58), ruleId: "rule-1" })]);
+    });
+});
+
+describe("UsageTracker.recordAndEvaluate", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("starts the delivery deadline before it records, so recording spends the same window", async () => {
+        const order: string[] = [];
+        const tracker = new UsageTracker({ USAGE_DB: firingDatabase() } as AppEnv);
+        const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+
+        vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+            if (ms === 25_000) order.push("deadline");
+
+            return realTimeout(ms);
+        });
+        vi.spyOn(tracker, "record").mockImplementation(async () => {
+            order.push("record");
+        });
+
+        await tracker.recordAndEvaluate({ userId: "user-1" } as UsageLogEntry);
+
+        expect(order).toEqual(["deadline", "record"]);
     });
 });
