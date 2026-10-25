@@ -77,7 +77,8 @@ const readBodyWithin = async (body: ReadableStream<Uint8Array> | null, maxBytes:
         total += value.byteLength;
 
         if (total > maxBytes) {
-            await reader.cancel();
+            // Not awaited: this reader is one branch of a tee, and a branch's cancel settles only once the other branch (the caller's body) is cancelled too.
+            reader.cancel().catch(() => {});
 
             return null;
         }
@@ -115,6 +116,9 @@ const verifySignedRequest = async (request: Request, secret: string, maxBodyByte
     const body = maxBodyBytes === undefined ? await request.clone().arrayBuffer() : await readBodyWithin(request.clone().body, maxBodyBytes);
 
     if (body === null) {
+        // Release the caller's branch so the cancelled clone can settle; the 401 follows at once.
+        request.body?.cancel().catch(() => {});
+
         return false;
     }
 

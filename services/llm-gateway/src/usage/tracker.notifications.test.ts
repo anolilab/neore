@@ -141,7 +141,21 @@ describe(sendNotifications, () => {
         expect(logged).not.toContain("Budget");
     });
 
-    it("still logs the status when releasing the reply body throws", async () => {
+    it("does not report a delivered batch as failed when releasing the reply body throws", async () => {
+        const response = new Response("{}", { status: 200 });
+
+        vi.spyOn(response.body!, "cancel").mockRejectedValue(new Error("cancel failed"));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => response),
+        );
+
+        await sendNotifications(env, "user-1", notifications);
+
+        expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it("logs the status once when the backend refuses and releasing the reply body throws", async () => {
         const response = new Response("nope", { status: 503 });
 
         vi.spyOn(response.body!, "cancel").mockRejectedValue(new Error("cancel failed"));
@@ -152,6 +166,7 @@ describe(sendNotifications, () => {
 
         await sendNotifications(env, "user-1", notifications);
 
+        expect(console.error).toHaveBeenCalledOnce();
         expect(JSON.stringify(vi.mocked(console.error).mock.calls)).toContain("503");
     });
 });
