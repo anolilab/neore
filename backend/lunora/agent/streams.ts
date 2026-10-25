@@ -25,6 +25,8 @@ const MINUTE = 60 * SECOND;
 
 const MAX_DELTAS_PER_REQUEST = 2000;
 const MAX_DELTAS_PER_STREAM = 500;
+/** Streams one `listDeltas` call reads. A thread has a handful in flight; each cursor costs a `db.get`. */
+export const MAX_CURSORS_PER_REQUEST = 100;
 const TIMEOUT_INTERVAL = 10 * MINUTE;
 const DELETE_STREAM_DELAY = MINUTE * 5;
 
@@ -52,7 +54,9 @@ export const addDelta = internalMutation
 
 export const listDeltas = query
     .input({
-        cursors: v.array(v.object({ cursor: v.number(), streamId: v.id("streamingMessages") })),
+        cursors: v
+            .array(v.object({ cursor: v.number(), streamId: v.id("streamingMessages") }))
+            .check((value) => value.length <= MAX_CURSORS_PER_REQUEST, { message: `At most ${MAX_CURSORS_PER_REQUEST} stream cursors per request` }),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
@@ -91,7 +95,10 @@ export const listDeltasHandler = async (
     let totalDeltas = 0;
     const deltas: StreamDelta[] = [];
 
-    for (const cursor of args.cursors) {
+    // The handler is exported for callers that skip input validation, so the cap is
+    // enforced here too: a cursor naming no stream pushes no deltas and would never
+    // reach the `MAX_DELTAS_PER_REQUEST` break below.
+    for (const cursor of args.cursors.slice(0, MAX_CURSORS_PER_REQUEST)) {
         // Bind each streamId to args.threadId. Without this, an authenticated
         // caller with access to a public thread can pass cursors for streamIds
         // belonging to private threads and read the streaming output.
