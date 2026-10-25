@@ -6,6 +6,7 @@ import { UploadFailedError } from "@/lib/upload/upload-error";
 import {
     attachmentContentType,
     attachmentSizeLimit,
+    attachmentTextChars,
     AttachmentTooLargeError,
     AttachmentUploadError,
     createLunoraAttachmentAdapter,
@@ -195,6 +196,12 @@ describe(attachmentContentType, () => {
         [{ name: "sheet.csv", type: "" }, "text/plain"],
         [{ name: "sheet.csv", type: "text/csv" }, "text/plain"],
         [{ name: "a.bin", type: "application/x-ndjson" }, "application/x-ndjson"],
+        [{ name: "NOTES.MD", type: "" }, "text/markdown"],
+        [{ name: "notes.markdown", type: "text/x-markdown" }, "text/markdown"],
+        [{ name: "a.txt", type: "application/octet-stream" }, "text/plain"],
+        [{ name: "a.docx", type: "application/octet-stream" }, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+        [{ name: "photo.png", type: "image/png" }, "image/png"],
+        [{ name: "noextension", type: "" }, "application/octet-stream"],
     ])("%o is uploaded as %s", (file, expected) => {
         expect(attachmentContentType(file)).toBe(expected);
     });
@@ -202,5 +209,23 @@ describe(attachmentContentType, () => {
     it("sizes a document by the backend's 25 MB rule", () => {
         expect(attachmentSizeLimit({ name: "a.pdf", type: "application/pdf" })).toStrictEqual({ isDocument: true, maxBytes: 25 * MB });
         expect(attachmentSizeLimit({ name: "a.png", type: "image/png" })).toStrictEqual({ isDocument: false, maxBytes: 20 * MB });
+    });
+});
+
+describe(attachmentTextChars, () => {
+    it.each([
+        [{ name: "rows.jsonl", size: 120, type: "" }, 120],
+        [{ name: "rows.ndjson", size: 90, type: "application/x-ndjson" }, 90],
+        [{ name: "flow.mmd", size: 40, type: "" }, 40],
+        [{ name: "flow.mermaid", size: 41, type: "application/octet-stream" }, 41],
+        [{ name: "data.csv", size: 300, type: "text/csv" }, 300],
+        [{ name: "data.tsv", size: 301, type: "" }, 301],
+        [{ name: "notes.md", size: 50, type: "" }, 50],
+        [{ name: "config.json", size: 60, type: "application/json" }, 60],
+        [{ name: "photo.png", size: 5000, type: "image/png" }, 0],
+        [{ name: "report.pdf", size: 5000, type: "application/pdf" }, 0],
+        [{ name: "blob.bin", size: 5000, type: "" }, 0],
+    ])("%o adds %i characters to the prompt", (file, expected) => {
+        expect(attachmentTextChars(file)).toBe(expected);
     });
 });

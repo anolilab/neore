@@ -1,6 +1,7 @@
 import { api } from "@neore/backend/api";
 import { CHAT_UPLOAD_CONTENT_MISMATCH, CHAT_UPLOAD_EXPIRED, CHAT_UPLOAD_TOO_LARGE, CHAT_UPLOAD_UNSUPPORTED_TYPE } from "@neore/backend/chat-upload-codes";
 import { chatAttachmentLimit } from "@neore/backend/document-limits";
+import { TEXT_PREVIEW_EXTENSIONS } from "@neore/ui/components/file-renderers/file-type-utilities";
 
 import type { LunoraReactClient as LunoraClient } from "@/lib/lunora/crpc";
 import { UploadFailedError } from "@/lib/upload/upload-error";
@@ -67,46 +68,50 @@ export interface AttachmentSizeLimit {
     maxBytes: number;
 }
 
-/**
- * Delimited and line-oriented text. The browser's type for these is empty,
- * `application/octet-stream`, or one the chat allowlist does not take
- * (`text/csv`, `text/tab-separated-values`, `application/x-ndjson`, a Mermaid
- * type), so they are sent as `text/plain`: allowlisted, sniffed as text, and
- * previewed by file name.
- */
-const TEXT_PLAIN_EXTENSIONS = [".csv", ".tsv", ".jsonl", ".ndjson", ".mmd", ".mermaid"] as const;
+const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** The text previews' extensions, with the dot: `[".jsonl", ".ndjson", ".mermaid", ".mmd", ".csv", ".tsv"]`. */
+const TEXT_PREVIEW_SUFFIXES = Object.values(TEXT_PREVIEW_EXTENSIONS)
+    .flat()
+    .map((extension) => `.${extension}`);
 
 /**
- * The type an attachment is uploaded — and checked — as. Browsers leave
- * `file.type` empty for some extensions (`.md` on most systems), so those are
- * named here; anything still unknown is `application/octet-stream`, which the
- * backend refuses with a readable error.
+ * Extension to upload type, in order; the first match wins and the browser's
+ * own type is ignored. Browsers leave `file.type` empty for some extensions
+ * (`.md` on most systems) and name others by a type the chat allowlist does
+ * not take (`text/csv`, `text/tab-separated-values`, `application/x-ndjson`, a
+ * Mermaid type), so these are sent as a type the allowlist has, sniffed as
+ * text, and previewed by file name.
+ */
+const EXTENSION_TYPES: ReadonlyArray<readonly [extension: string, type: string]> = [
+    ...TEXT_PREVIEW_SUFFIXES.map((extension) => [extension, "text/plain"] as const),
+    [".md", "text/markdown"],
+    [".markdown", "text/markdown"],
+    [".txt", "text/plain"],
+    [".docx", DOCX_TYPE],
+];
+
+/**
+ * The type an attachment is uploaded — and checked — as: by extension where
+ * {@link EXTENSION_TYPES} knows it, otherwise the browser's own type. Anything
+ * still unknown is `application/octet-stream`, which the backend refuses with a
+ * readable error.
  */
 export const attachmentContentType = (file: Pick<File, "name" | "type">): string => {
     const name = file.name.toLowerCase();
 
-    if (TEXT_PLAIN_EXTENSIONS.some((extension) => name.endsWith(extension))) {
-        return "text/plain";
-    }
-
-    if (file.type) {
-        return file.type;
-    }
-
-    if (name.endsWith(".md") || name.endsWith(".markdown")) {
-        return "text/markdown";
-    }
-
-    if (name.endsWith(".txt")) {
-        return "text/plain";
-    }
-
-    if (name.endsWith(".docx")) {
-        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    }
-
-    return "application/octet-stream";
+    return EXTENSION_TYPES.find(([extension]) => name.endsWith(extension))?.[1] || file.type || "application/octet-stream";
 };
+
+/** A type whose bytes are text: sent inline with the prompt, and counted by the composer. */
+export const isTextContentType = (contentType: string | undefined): boolean =>
+    Boolean(contentType?.startsWith("text/")) || contentType === "application/json" || contentType === "application/xml";
+
+/**
+ * The characters an attachment adds to the prompt as typed text: its size for a text file, nothing for binary.
+ * Judged by the type it is uploaded as, not the browser's, which is empty or unlisted for `.jsonl`, `.mmd` and the like.
+ */
+export const attachmentTextChars = (file: Pick<File, "name" | "size" | "type">): number => (isTextContentType(attachmentContentType(file)) ? file.size : 0);
 
 /**
  * The most a chat attachment may weigh — the backend's own rule
@@ -237,31 +242,22 @@ const getFileLabel = (isVideo: boolean | undefined, isAudio: boolean | undefined
     return "Document";
 };
 
-const isTextAttachment = (contentType: string | undefined, name: string): boolean =>
-    Boolean(contentType?.startsWith("text/")) ||
-    contentType === "application/json" ||
-    contentType === "application/xml" ||
-    name.endsWith(".md") ||
-    name.endsWith(".txt") ||
-    name.endsWith(".csv");
-
 /**
  * A closure rather than a class: two of the three adapter members never touched
  * the instance, so `this` was buying nothing.
  */
 export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentAdapter => {
     // Accept common file types - images, text, documents, PDFs, video, audio, DOCX
-    const accept =
-        "image/*,text/*,video/*,audio/*,application/pdf,application/json,application/xml,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.md,.csv,.tsv,.jsonl,.ndjson,.mmd,.mermaid,.txt,.docx,.mp4,.mp3,.wav,.webm,.ogg,.m4a,.mov";
+    const accept = `image/*,text/*,video/*,audio/*,application/pdf,application/json,application/xml,${DOCX_TYPE},.md,${TEXT_PREVIEW_SUFFIXES.join(",")},.txt,.docx,.mp4,.mp3,.wav,.webm,.ogg,.m4a,.mov`;
 
     const add = async (state: ProgressState): Promise<PendingAttachment> => {
         const contentType = attachmentContentType(state.file);
         const isImage = contentType.startsWith("image/");
         const isVideo = contentType.startsWith("video/");
         const isAudio = contentType.startsWith("audio/");
-        const isText = isTextAttachment(contentType, state.file.name);
+        const isText = isTextContentType(contentType);
         const isPdf = contentType === "application/pdf";
-        const isDocx = contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        const isDocx = contentType === DOCX_TYPE;
 
         if (!isImage && !isText && !isPdf && !isVideo && !isAudio && !isDocx) {
             throw new AttachmentUploadError(state.file.name, "unsupported");
@@ -299,7 +295,7 @@ export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentA
         }
 
         // Text files: the content inline as well.
-        if (isTextAttachment(attachment.contentType, attachment.name)) {
+        if (isTextContentType(attachment.contentType)) {
             const textContent = await attachment.file.text();
 
             return {
