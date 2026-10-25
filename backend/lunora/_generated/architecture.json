@@ -19699,7 +19699,7 @@
     {
       "file": "sub-agents/functions",
       "kind": "read",
-      "line": 519,
+      "line": 521,
       "reason": "\"cancelSubAgentRunsForStop\" is not a registered function"
     },
     {

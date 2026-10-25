@@ -498,6 +498,23 @@ describe("cancelling a run", () => {
             ]);
         });
 
+        it("stops the runs a sub-agent's thread delegated after its own run has ended", async () => {
+            await admit();
+
+            const [parentRun] = await runs();
+            const childThread = await insertThread(userId);
+
+            await harness.run(async (ctx: any) => await ctx.db.patch(parentRun._id, { childThreadId: childThread }));
+            await harness.run(async (ctx: any) => await finishRun(ctx, parentRun._id, { kind: "succeeded", result: "done" }));
+            await harness.run(async (ctx: any) => await admitAndInsert(ctx, childThread));
+
+            expect(await forStop(childThread)).toBe(1);
+
+            const grandchild = (await runs()).find((run: any) => run.parentThreadId === childThread);
+
+            expect(grandchild).toMatchObject({ status: "cancelled" });
+        });
+
         it("never reaches another user's runs", async () => {
             await admit();
 

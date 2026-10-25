@@ -497,8 +497,8 @@ const CANCEL_THREAD_MAX = 20;
 
 /**
  * What stopping `threadId` cancels, for the chat Stop paths. A sub-agent's own
- * thread cancels only its run — not siblings, not the sub-agents it started
- * itself. Any other thread cancels every queued or running run it delegated,
+ * thread, while its run is active, cancels only that run — not siblings, not the
+ * sub-agents it started itself. Any other thread cancels every queued or running run it delegated,
  * so a stopped parent does not leave the cost running. Only the caller's own
  * runs count: a collaborator's Stop on someone's thread never reaches them.
  * Returns how many runs this call ended.
@@ -511,7 +511,9 @@ export const cancelSubAgentRunsForStop = async (ctx: MutationCtx, threadId: stri
 
     const targets: RunDoc[] = [];
 
-    if (own) {
+    // Once its own run has ended, the thread is an ordinary one again: a reply the
+    // user got there may have delegated runs of its own.
+    if (own && isActiveSubAgentStatus(own.status)) {
         targets.push(own);
     } else {
         for (const status of ["queued", "running"] as const) {
