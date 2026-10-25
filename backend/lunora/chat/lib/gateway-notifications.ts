@@ -102,7 +102,9 @@ export const gatewayNotificationsHttpAction = async (context: HttpActionCtx, req
     const signedAtMs = Number(request.headers.get("X-Timestamp"));
 
     // A `block`-only rule is enforced, not announced; the gateway does not send it, and a stray one is skipped.
-    const alerts = notifications.filter((notification) => notification.action !== "block").map((notification) => toUsageAlert(userId, notification, signedAtMs));
+    const alerts = notifications
+        .filter((notification) => notification.action !== "block")
+        .map((notification) => toUsageAlert(userId, notification, signedAtMs));
 
     try {
         if (alerts.length > 0) {

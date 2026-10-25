@@ -106,10 +106,9 @@ describe(gatewayNotificationsHttpAction, () => {
         const response = await gatewayNotificationsHttpAction(context(), await signedRequest(payload));
 
         expect(response.status).toBe(200);
-        expect(runMutation).toHaveBeenCalledExactlyOnceWith(
-            internal.notifications.functions.createNotifications,
-            { notifications: [expect.objectContaining({ type: "usage_alert", userId: "user-a" })] },
-        );
+        expect(runMutation).toHaveBeenCalledExactlyOnceWith(internal.notifications.functions.createNotifications, {
+            notifications: [expect.objectContaining({ type: "usage_alert", userId: "user-a" })],
+        });
 
         const { page } = await rows();
 
