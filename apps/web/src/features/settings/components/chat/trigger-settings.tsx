@@ -44,6 +44,8 @@ import { toast } from "sonner";
 import env from "@/lib/env";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
+import TriggerTypePicker from "./trigger-type-picker";
+
 /** The template variable a webhook trigger fills with the request body; code, not copy. */
 const PAYLOAD_TOKEN = "{{payload}}";
 
@@ -136,12 +138,6 @@ const CRON_PRESETS: { expression: string; label: MessageDescriptor }[] = [
     { expression: "0 0 * * 0", label: msg`Every Sunday at midnight` },
     { expression: "0 9 1 * *", label: msg`First of each month at 9 AM` },
 ];
-
-const TRIGGER_TYPE_LABELS: Record<TriggerType, MessageDescriptor> = {
-    event: msg`Event`,
-    schedule: msg`Schedule`,
-    webhook: msg`Webhook`,
-};
 
 const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
     completed: msg`Completed`,
@@ -267,25 +263,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 {/* Type */}
                 <div className="space-y-1.5">
                     <Label>{t`Trigger Type`}</Label>
-                    <div aria-label={t`Trigger type`} className="flex gap-2" role="group">
-                        {(["schedule", "webhook", "event"] as const).map((type) => (
-                            <button
-                                className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                                    formData.type === type
-                                        ? "border-primary bg-primary/5 text-primary"
-                                        : "border-border text-muted-foreground hover:border-primary/50"
-                                }`}
-                                key={type}
-                                onClick={() => onChange({ ...formData, type })}
-                                type="button"
-                            >
-                                {type === "schedule" && <Calendar aria-hidden="true" className="size-4" />}
-                                {type === "webhook" && <Globe aria-hidden="true" className="size-4" />}
-                                {type === "event" && <Zap aria-hidden="true" className="size-4" />}
-                                {i18n._(TRIGGER_TYPE_LABELS[type])}
-                            </button>
-                        ))}
-                    </div>
+                    <TriggerTypePicker onSelect={(type) => onChange({ ...formData, type })} value={formData.type} />
                 </div>
 
                 {/* Schedule config */}
@@ -353,11 +331,11 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                     </div>
                 )}
 
-                {/* Event info */}
+                {/* An existing event trigger: nothing dispatches it, so it cannot be saved. */}
                 {formData.type === "event" && (
-                    <div className="bg-muted rounded-lg p-3 text-sm">
+                    <div className="bg-muted rounded-lg p-3 text-sm" role="status">
                         <p className="text-muted-foreground">
-                            <Trans>Event triggers via MCP/Composio are coming in Phase 2. For now, use webhook triggers to connect external services.</Trans>
+                            <Trans>Event triggers are not supported and never run. Delete this trigger and create a schedule or webhook trigger instead.</Trans>
                         </p>
                     </div>
                 )}
@@ -392,7 +370,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                     <Button onClick={onCancel} variant="outline">
                         {t`Cancel`}
                     </Button>
-                    <Button disabled={isPending || !formData.name.trim()} onClick={onSubmit}>
+                    <Button disabled={isPending || !formData.name.trim() || formData.type === "event"} onClick={onSubmit}>
                         {isPending && <Loader2 aria-hidden="true" className="mr-1.5 size-4 animate-spin" />}
                         {title}
                     </Button>
@@ -670,7 +648,7 @@ const TriggerSettings: FC = () => {
             <div className="flex items-start justify-between">
                 <div>
                     <Heading className="text-2xl font-bold tracking-tight">{t`Triggers`}</Heading>
-                    <p className="text-muted-foreground">{t`Automate agent execution on schedules, webhooks, or events`}</p>
+                    <p className="text-muted-foreground">{t`Automate agent execution on schedules or webhooks`}</p>
                 </div>
                 <Button disabled={showCreateForm} onClick={() => setShowCreateForm(true)} size="sm">
                     <Plus aria-hidden="true" className="mr-1.5 size-4" />
@@ -940,7 +918,7 @@ const TriggerSettings: FC = () => {
                                 <Zap aria-hidden="true" className="text-muted-foreground mb-3 size-10 opacity-40" />
                                 <CardHeading className="text-lg font-medium">{t`No triggers yet`}</CardHeading>
                                 <p className="text-muted-foreground mt-1 max-w-sm text-sm">
-                                    {t`Create your first trigger to automate agent execution on a schedule, via webhooks, or from external events.`}
+                                    {t`Create your first trigger to automate agent execution on a schedule or via webhooks.`}
                                 </p>
                                 <Button className="mt-4" onClick={() => setShowCreateForm(true)} size="sm">
                                     <Plus aria-hidden="true" className="mr-1.5 size-4" />
@@ -972,15 +950,6 @@ const TriggerSettings: FC = () => {
                                 <Trans>
                                     <span className="text-foreground font-medium">Webhook</span> — Receive HTTP POST requests from external services (Stripe,
                                     GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected.
-                                </Trans>
-                            </div>
-                        </div>
-                        <div className="flex items-start gap-2">
-                            <Zap aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                            <div>
-                                <Trans>
-                                    <span className="text-foreground font-medium">Event</span> — React to external events via MCP or Composio (coming in Phase
-                                    2).
                                 </Trans>
                             </div>
                         </div>
