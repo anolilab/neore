@@ -227,6 +227,10 @@ modelProxyRouter.openapi(
 
             if (body.action === "generate") {
                 // ── Non-streaming: doGenerate() ──────────────────────────
+                // The pricing read overlaps the model call; its rejection surfaces at the await below.
+                const pricingRead = policy.pricing();
+
+                pricingRead.catch(() => undefined);
                 const result = await model.doGenerate(callOptions);
                 const latencyMs = Date.now() - startTime;
 
@@ -237,7 +241,7 @@ modelProxyRouter.openapi(
                 const cachedTokens = usage?.inputTokens?.cacheRead ?? 0;
                 const reasoningTokens = usage?.outputTokens?.reasoning ?? 0;
 
-                const pricing = await policy.pricing();
+                const pricing = await pricingRead;
                 const costMicrodollars = pricing ? calculateCost(pricing, { cachedTokens, completionTokens, promptTokens, reasoningTokens }) : 0;
 
                 // Non-blocking usage tracking
@@ -293,6 +297,10 @@ modelProxyRouter.openapi(
             }
 
             // ── Streaming: doStream() ────────────────────────────────
+            // The pricing read overlaps the stream; its rejection surfaces at the await after the last chunk.
+            const pricingRead = policy.pricing();
+
+            pricingRead.catch(() => undefined);
             const streamResult = await model.doStream(callOptions);
             let ttftMs: number | undefined;
             const execContext = c.executionCtx;
@@ -390,7 +398,7 @@ modelProxyRouter.openapi(
                                 ? estimateCancelledUsage({ emittedChars, promptChars: countPromptTextChars(callOptions.prompt), reasoningChars })
                                 : { cachedTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 });
 
-                        const pricing = await policy.pricing();
+                        const pricing = await pricingRead;
                         const costMicrodollars = pricing ? calculateCost(pricing, tokens) : 0;
 
                         // Send gateway metadata as final SSE event
