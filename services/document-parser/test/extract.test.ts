@@ -273,7 +273,10 @@ describe("document-parser Worker", () => {
 
             outcome = response.status;
         } catch (error) {
-            if (!isConnectionFailure(error)) {
+            // Only a failure after the client pushed past the cap can be the race:
+            // the Worker must have read that far to refuse. An earlier failure means
+            // the request never got through, which is a real failure.
+            if (!isConnectionFailure(error) || sent <= MAX_DOCUMENT_BYTES) {
                 throw error;
             }
 
