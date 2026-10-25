@@ -280,12 +280,10 @@ const flushQuietly = async (telemetry: RequestTelemetry | undefined): Promise<vo
     }
 };
 
-export const sendNotifications = async (env: AppEnv, userId: string, notifications: NotificationEvent[]): Promise<void> => {
-    const lunoraUrl = env.LUNORA_URL;
-    const secret = env.SIGNING_SECRET;
+/** The backend refuses a larger batch (`MAX_NOTIFICATIONS_PER_REQUEST`), so a user with many firing rules is sent in slices. */
+const NOTIFICATIONS_PER_REQUEST = 50;
 
-    if (!lunoraUrl || !secret) return;
-
+const postNotifications = async (lunoraUrl: string, secret: string, userId: string, notifications: NotificationEvent[]): Promise<void> => {
     const body = JSON.stringify({ notifications, userId });
     const timestamp = Date.now().toString();
     const bodyHash = await sha256Hex(new TextEncoder().encode(body));
@@ -299,13 +297,34 @@ export const sendNotifications = async (env: AppEnv, userId: string, notificatio
         signal: AbortSignal.timeout(10_000),
     });
 
-    // Nothing reads the reply; cancel it so the Worker releases the connection.
-    await response.body?.cancel();
-
-    // Best-effort, but never silent: a rejected alert (bad signature, backend down) is otherwise lost.
+    // Log before the body is released, so a cancel that throws cannot hide the status.
     // Status and rule actions only — the payload names a user and their spend.
     if (!response.ok) {
         console.error("[Notifications] Backend rejected usage notifications", { actions: notifications.map((n) => n.action), status: response.status });
+    }
+
+    // Nothing reads the reply; cancel it so the Worker releases the connection.
+    await response.body?.cancel();
+};
+
+export const sendNotifications = async (env: AppEnv, userId: string, notifications: NotificationEvent[]): Promise<void> => {
+    const lunoraUrl = env.LUNORA_URL;
+    const secret = env.SIGNING_SECRET;
+
+    if (!lunoraUrl || !secret) return;
+
+    for (let offset = 0; offset < notifications.length; offset += NOTIFICATIONS_PER_REQUEST) {
+        const slice = notifications.slice(offset, offset + NOTIFICATIONS_PER_REQUEST);
+
+        try {
+            await postNotifications(lunoraUrl, secret, userId, slice);
+        } catch (error) {
+            // Best-effort, but never silent: a timeout or a dropped connection is otherwise lost. No retry, no payload.
+            console.error("[Notifications] Failed to deliver usage notifications", {
+                actions: slice.map((n) => n.action),
+                error: error instanceof Error ? `${error.name}: ${error.message}` : "unknown error",
+            });
+        }
     }
 };
 

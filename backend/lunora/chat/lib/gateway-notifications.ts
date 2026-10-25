@@ -59,7 +59,7 @@ const describeMetric = (metric: string, value: number): string => {
 export const toUsageAlert = (userId: string, notification: GatewayNotification, signedAtMs: number): NotificationInput => {
     const reached = describeMetric(notification.metric, notification.currentValue);
     const limit = describeMetric(notification.metric, notification.threshold);
-    const blocked = notification.action === "notify_and_block" ? " Requests are blocked until the period resets." : "";
+    const blocked = notification.action === "notify_and_block" ? " Requests are blocked for now." : "";
 
     return {
         body: `Usage reached ${reached} (limit ${limit}).${blocked}`,

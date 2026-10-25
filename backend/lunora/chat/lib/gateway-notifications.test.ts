@@ -158,6 +158,6 @@ describe(toUsageAlert, () => {
     it("words the blocked variant and non-cost metrics", () => {
         const alert = toUsageAlert("u", { ...firing, action: "notify_and_block", currentValue: 120, metric: "request_count", threshold: 100 } as never, 0);
 
-        expect(alert.body).toBe("Usage reached 120 requests (limit 100 requests). Requests are blocked until the period resets.");
+        expect(alert.body).toBe("Usage reached 120 requests (limit 100 requests). Requests are blocked for now.");
     });
 });
