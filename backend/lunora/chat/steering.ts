@@ -160,7 +160,7 @@ export const deliverSteers = internalMutation
 
         // A chat locked after this run started has no proof behind the run any more: the
         // steer stays queued, for the client to withdraw with a proof.
-        const thread = await ctx.db.get(threadId);
+        const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
 
         if (!thread || lockedAfterCreation(thread, stream._creationTime)) {
             return null;
