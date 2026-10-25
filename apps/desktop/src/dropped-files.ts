@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 
 /** A file dropped on the dock icon is read whole into memory, so the shell caps it. The site applies its own limits. */
@@ -42,7 +42,8 @@ export const readDroppedFiles = async (paths: ReadonlyArray<string>, maxBytes = 
         }
 
         try {
-            const info = await stat(filePath);
+            // lstat, not stat: a symbolic link is refused rather than followed to whatever it points at.
+            const info = await lstat(filePath);
 
             return info.isFile() && info.size <= maxBytes ? { data: await readFile(filePath), name: path.basename(filePath) } : undefined;
         } catch {

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -38,6 +38,17 @@ describe("queueDroppedFiles", () => {
 });
 
 describe("readDroppedFiles", () => {
+    it("refuses a symbolic link, so a dropped link cannot attach the file it points at", async () => {
+        const folder = await mkdtemp(path.join(tmpdir(), "neore-drop-"));
+        const secret = path.join(folder, "secret.txt");
+        const link = path.join(folder, "link.txt");
+
+        await writeFile(secret, "private");
+        await symlink(secret, link);
+
+        expect(await readDroppedFiles([link])).toStrictEqual([]);
+    });
+
     it("reads regular files and skips directories, relative paths, missing files and oversize files", async () => {
         const folder = await mkdtemp(path.join(tmpdir(), "neore-drop-"));
         const small = path.join(folder, "note.txt");
