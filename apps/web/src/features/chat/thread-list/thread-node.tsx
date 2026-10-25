@@ -245,6 +245,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const isUnlocked = isLocked && unlockProof !== undefined;
     // A locked chat shows no title: the list never has one for it.
     const displayTitle = isLocked ? t`Locked chat` : node.title;
+    // The row actions repeat for every thread, so each name carries the thread it acts on.
+    const named = (action: string) => t`${action}: ${displayTitle}`;
     const setShowManageTagsDialog = useThreadListUIStore(selectSetShowManageTagsDialog);
     const isTransitioningRef = useRef(false);
 
@@ -468,7 +470,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             {hasChildren && (
                 <Button
                     aria-expanded={isExpanded}
-                    aria-label={isExpanded ? t`Collapse branches` : t`Expand branches`}
+                    aria-label={named(isExpanded ? t`Collapse branches` : t`Expand branches`)}
                     className="h-4 w-4 p-0"
                     onClick={(e) => {
                         e.stopPropagation();
@@ -510,7 +512,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <TooltipTrigger
                         render={
                             <Button
-                                aria-label={t`Stop generating`}
+                                aria-label={named(t`Stop generating`)}
                                 className="hover:text-primary h-6 w-6 shrink-0 p-0"
                                 disabled={isStopping}
                                 onClick={(e) => {
@@ -572,7 +574,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         <TooltipTrigger
                             render={
                                 <Button
-                                    aria-label={i18n._(getPinTooltip(isPinning, node.isPinned))}
+                                    aria-label={named(i18n._(getPinTooltip(isPinning, node.isPinned)))}
                                     className="hover:text-primary h-6 w-6 p-0"
                                     disabled={isPinning}
                                     onClick={(e) => {
@@ -607,7 +609,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <TooltipTrigger
                         render={
                             <Button
-                                aria-label={isBranching ? t`Creating branch...` : t`Create branch`}
+                                aria-label={named(isBranching ? t`Creating branch...` : t`Create branch`)}
                                 className="hover:text-primary h-6 w-6 p-0"
                                 disabled={isBranching}
                                 onClick={(e) => {
@@ -637,7 +639,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <TooltipTrigger
                         render={
                             <Button
-                                aria-label={t`Move to project`}
+                                aria-label={named(t`Move to project`)}
                                 className="hover:text-primary h-6 w-6 p-0"
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -661,7 +663,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             render={
                                 <Button
                                     aria-disabled="true"
-                                    aria-label={t`Tags unavailable for temporary chats`}
+                                    aria-label={named(t`Tags unavailable for temporary chats`)}
                                     className="h-6 w-6 cursor-not-allowed p-0 opacity-50"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -693,7 +695,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 <DropdownMenuTrigger
                                     render={
                                         <Button
-                                            aria-label={isLocked ? t`Chat lock: locked` : t`Chat lock`}
+                                            aria-label={named(isLocked ? t`Chat lock: locked` : t`Chat lock`)}
                                             className="hover:text-primary h-6 w-6 p-0"
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -741,7 +743,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 <DropdownMenuTrigger
                                     render={
                                         <Button
-                                            aria-label={isDownloading ? t`Downloading...` : t`Download thread`}
+                                            aria-label={named(isDownloading ? t`Downloading...` : t`Download thread`)}
                                             className="hover:text-primary h-6 w-6 p-0"
                                             disabled={isDownloading}
                                             onClick={(e) => {
@@ -777,7 +779,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <TooltipTrigger
                         render={
                             <Button
-                                aria-label={i18n._(getArchiveTooltip(isArchiving, node.status))}
+                                aria-label={named(i18n._(getArchiveTooltip(isArchiving, node.status)))}
                                 className="hover:text-primary h-6 w-6 p-0"
                                 disabled={isArchiving}
                                 onClick={(e) => {
@@ -814,7 +816,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         <TooltipTrigger
                             render={
                                 <Button
-                                    aria-label={isConverting ? t`Converting...` : t`Convert to permanent`}
+                                    aria-label={named(isConverting ? t`Converting...` : t`Convert to permanent`)}
                                     className="hover:text-primary h-6 w-6 p-0"
                                     disabled={isConverting}
                                     onClick={async (e) => {
@@ -853,7 +855,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <TooltipTrigger
                         render={
                             <Button
-                                aria-label={isDeleting ? t`Deleting...` : t`Delete thread`}
+                                aria-label={named(isDeleting ? t`Deleting...` : t`Delete thread`)}
                                 className="hover:text-destructive h-6 w-6 p-0"
                                 disabled={isDeleting}
                                 onClick={(e) => {

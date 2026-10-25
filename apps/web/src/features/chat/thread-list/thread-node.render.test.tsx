@@ -178,15 +178,15 @@ describe("ThreadNode", () => {
         "Archive thread",
         "Convert to permanent",
         "Delete thread",
-    ])("names the %s button", (name) => {
+    ])("names the %s button after its thread", (action) => {
         render(<ThreadNode {...baseProps} />);
 
-        expect(screen.getByRole("button", { name })).toBeTruthy();
+        expect(screen.getByRole("button", { name: `${action}: Quarterly plan` })).toBeTruthy();
     });
 
     it("flips the expand label and state when the branches are open", () => {
         render(<ThreadNode {...baseProps} expandedThreads={new Set(["t1"])} />);
 
-        expect(screen.getByRole("button", { expanded: true, name: "Collapse branches" })).toBeTruthy();
+        expect(screen.getByRole("button", { expanded: true, name: "Collapse branches: Quarterly plan" })).toBeTruthy();
     });
 });

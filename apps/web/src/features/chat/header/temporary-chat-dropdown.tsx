@@ -235,7 +235,18 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
     };
 
     // The countdown alone does not say what the button does, so name its purpose and add the status.
-    const getAriaLabel = () => (isTemporary ? t`Temporary chat settings, ${formatExpiresAt(temporaryStatus.expiresAt)}` : getTooltipText());
+    // A chat that has not started has no countdown; the button is orange when the next one is temporary, so say so.
+    const getAriaLabel = () => {
+        if (isTemporary) {
+            return t`Temporary chat settings, ${formatExpiresAt(temporaryStatus.expiresAt)}`;
+        }
+
+        if (nextChatTemporary) {
+            return t`Temporary chat mode, on for your next chat`;
+        }
+
+        return getTooltipText();
+    };
 
     const getDescriptionText = () => {
         if (isTemporary) {

@@ -19,6 +19,10 @@ const status = vi.hoisted(() => {
     return { current: undefined as undefined | { expiresAt: number; isTemporary: boolean; retentionHours: number } };
 });
 
+const settings = vi.hoisted(() => {
+    return { current: undefined as undefined | { newChatsTemporary: boolean } };
+});
+
 vi.mock("@tanstack/react-query", () => {
     return {
         skipToken: Symbol("skip"),
@@ -34,7 +38,7 @@ vi.mock("@tanstack/react-query", () => {
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUserSettings: () => {
-            return { data: undefined };
+            return { data: settings.current };
         },
     };
 });
@@ -69,6 +73,18 @@ describe("TemporaryChatDropdown", () => {
         render(<TemporaryChatDropdown />);
 
         expect(screen.getByRole("button", { name: "Temporary chat mode" })).toBeTruthy();
+    });
+
+    it("says so in the name when the next chat is temporary", () => {
+        settings.current = { newChatsTemporary: true };
+
+        try {
+            render(<TemporaryChatDropdown />);
+
+            expect(screen.getByRole("button", { name: "Temporary chat mode, on for your next chat" })).toBeTruthy();
+        } finally {
+            settings.current = undefined;
+        }
     });
 
     it("names the trigger for an existing thread", () => {
